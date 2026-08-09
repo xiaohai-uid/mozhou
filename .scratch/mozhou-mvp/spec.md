@@ -117,3 +117,21 @@
 - **书源合规**：内置源仅收录可公开访问站点；用户自加源自负责任；README/页面免责
 - 逆向数据复用清单：case `work/openxz-re/notes/prompts-expanded.txt`（方法论）、E-004~E-014（协议/交互参考）
 - 品牌与文案：墨舟全原创；不出现 OpenWrite 相关名称/文案
+
+## Prototype Verdict（2026-08-09，prototype/pipeline-engine 分支）
+
+**问题**：管线引擎「LLM 输出 → JSON 校验 → 自动修复重试 → Token 记账」状态模型是否成立？
+**原型**：`prototype/pipeline-engine.prototype.html`（单文件，双击即玩，5 场景向导 + 自由操作）——纯 reducer 模块可 lift 进生产代码。
+
+**验证结果（12/12 断言通过）**：
+1. ✅ 一次成功：记账 + 状态 ok
+2. ✅ 坏 JSON → 自动修复重试（引擎自行处理，无需人工）
+3. ✅ 3 次失败 → 停下等人工 → 人工重试清零
+4. ✅ Token 超预算 → 中止（防失控账单）
+5. ✅ 完成后非法操作被**完全忽略**（状态/账本/文案三不污染）
+
+**原型发现的两个 bug（已修，生产实现必须保留语义）**：
+- **账本污染**：组合 reducer（validateFail(meter(llmRaw()))）中，任务完成后 meter 仍会记账——修复：meter 仅在 running 态记账（`!isRunning → return state`）
+- **文案覆盖**：嵌套组合时后层 action 覆盖前层拒绝文案——修复：非 running 态校验/记账动作原样返回 state（完全忽略）
+
+**生产实现要求**：lift `PipelineEngine` 模块（Node/TS 化），保持纯函数语义；reducer 组合顺序固定为 `validate( meter( llmRaw(state) ) )`，每一层都检查 running 态。
