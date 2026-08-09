@@ -19,6 +19,27 @@ export function SkillsView() {
   const [showCreate, setShowCreate] = useState(false);
   const [skillName, setSkillName] = useState("");
   const [skillDesc, setSkillDesc] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [mySkills, setMySkills] = useState([
+    { name: "网文开篇", desc: "黄金三章结构，钩子前置", tag: "写作" },
+    { name: "伏笔管理", desc: "登记与回收纪律检查", tag: "一致性" },
+  ]);
+
+  async function saveSkill() {
+    const name = skillName.trim();
+    if (!name || saving) return;
+    setSaving(true);
+    // UI 先行：mock 保存延迟；后端 /api/v1/skills 实现后替换为真实 POST
+    await new Promise((r) => setTimeout(r, 800));
+    setMySkills((prev) => [
+      ...prev,
+      { name, desc: skillDesc.trim() || "自定义技能", tag: "自定义" },
+    ]);
+    setSkillName("");
+    setSkillDesc("");
+    setSaving(false);
+    setShowCreate(false);
+  }
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:px-8">
@@ -69,8 +90,12 @@ export function SkillsView() {
               className="mt-2 w-full resize-none rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
             />
           </label>
-          <button className="mt-4 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500">
-            保存技能
+          <button
+            onClick={() => void saveSkill()}
+            disabled={!skillName.trim() || saving}
+            className="mt-4 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+          >
+            {saving ? "保存中…" : "保存技能"}
           </button>
         </div>
       )}

@@ -11,6 +11,19 @@ const books = [
 
 export function ShelfView() {
   const [active, setActive] = useState<number | null>(null);
+  const [loading, setLoading] = useState<number | null>(null);
+
+  async function toggleBook(id: number) {
+    if (active === id) {
+      setActive(null);
+      return;
+    }
+    // UI 先行：mock 章节拉取延迟；后端 /api/v1/shelf/[id]/chapters 实现后替换为真实 fetch
+    setLoading(id);
+    await new Promise((r) => setTimeout(r, 600));
+    setLoading(null);
+    setActive(id);
+  }
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:px-8">
@@ -36,11 +49,12 @@ export function ShelfView() {
                 </div>
               </div>
               <button
-                onClick={() => setActive(active === b.id ? null : b.id)}
-                className="flex shrink-0 items-center gap-1 rounded-full border border-surface-2 px-3.5 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-600 hover:text-white"
+                onClick={() => void toggleBook(b.id)}
+                disabled={loading !== null}
+                className="flex shrink-0 items-center gap-1 rounded-full border border-surface-2 px-3.5 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
               >
                 <BookOpen size={13} aria-hidden />
-                {active === b.id ? "收起" : "阅读"}
+                {loading === b.id ? "加载中…" : active === b.id ? "收起" : "阅读"}
               </button>
             </div>
             <p className="mt-4 text-xs text-faint">更新于 {b.updated}</p>

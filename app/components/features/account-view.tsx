@@ -15,7 +15,17 @@ const features = [
 ];
 
 export function AccountView() {
-  const [isMember] = useState(false);
+  const [isMember, setIsMember] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+
+  async function upgrade() {
+    if (upgrading || isMember) return;
+    setUpgrading(true);
+    // UI 先行：mock 开通延迟；后端 /api/v1/account/upgrade 实现后替换为真实 POST
+    await new Promise((r) => setTimeout(r, 1200));
+    setUpgrading(false);
+    setIsMember(true);
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
@@ -85,8 +95,12 @@ export function AccountView() {
               </li>
             ))}
           </ul>
-          <button className="mt-6 w-full rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500">
-            升级为会员
+          <button
+            onClick={() => void upgrade()}
+            disabled={upgrading || isMember}
+            className="mt-6 w-full rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+          >
+            {upgrading ? "开通中…" : isMember ? "已是会员" : "升级为会员"}
           </button>
         </div>
       </div>
