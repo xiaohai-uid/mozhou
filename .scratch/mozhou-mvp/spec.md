@@ -1,0 +1,119 @@
+# 墨舟 (MoZhou) — AI 小说写作平台 MVP 规格
+
+> 状态: ready-for-agent | 来源: grill-with-docs（CONTEXT.md 23 项决策）| 日期: 2026-08-09
+
+## Problem Statement
+
+中文网文作者依赖的 AI 写作工具（如 OpenWrite 类产品）存在三个根本问题：①客户端无秘密但服务端锁定——功能固化、无法扩展、会员体系封闭；②数据（小说项目/风格/技能）被绑定在单一产品里，无法迁移；③免费模型与高级能力割裂，作者要为"额度"和"会员"重复付费。作者需要一款**功能对等甚至更强、数据自有、模型自由**的 AI 小说写作平台。
+
+## Solution
+
+**墨舟**——Web 版 AI 小说写作平台（自有品牌，全原创 UI/文案）：
+
+- **AI 写作对话**（流式输出，DeepSeek 为主 + Qwen 备用，one-api 网关自动 failover）
+- **小说项目管理**：人物库/世界观/章节摘要/章节文件，**pgvector RAG 注入**（写作时自动检索相关资料进上下文）——核心差异化
+- **风格蒸馏**：上传文本 → LLM 分析生成可复用风格指南
+- **小说拆解**：输入书名搜索/上传 TXT → 选择章节 → AI 生成章节大纲
+- **书源搜索**：Yuedu/legado 书源规则格式（内置 3-5 主流源，用户可加源）
+- **抽卡对比**：同提示词并发多模型输出对比（会员演示点）
+- **自研轻量 Agent 管线**：节点式（LLM 调用 + 工具 + JSON 校验重试 + Token 记账），理念借鉴 DeterminFlow，代码全原创（规避 AGPL）
+- **账号/会员**：邮箱+密码；免费基础 + 会员（蒸馏/拆解/抽卡/不限次）+ RAG 额度（one-api 记账）
+
+## User Stories
+
+1. 作为网文作者，我可以在浏览器打开墨舟并立即开始与 AI 对话写作，以便无需安装任何客户端
+2. 作为作者，我可以创建小说项目（书名/类型/简介），以便组织我的创作
+3. 作为作者，我可以在项目中维护人物库、世界观设定、章节摘要，以便 AI 写作时保持一致性
+4. 作为作者，写作时 AI 能自动检索人物库/世界观/章节摘要并注入上下文，以便不会写崩设定
+5. 作为作者，我可以续写章节、生成章节大纲、分析章节摘要，以便推进创作
+6. 作为作者，我可以上传文本让 AI 分析并生成可复用的"风格指南"，以便模仿特定文风（会员）
+7. 作为作者，我可以选择已保存的风格指南应用到写作对话，以便保持文风统一
+8. 作为作者，我可以输入书名搜索网络小说或上传 TXT，选择章节后 AI 拆解剧情生成大纲，以便研究爆款结构（会员）
+9. 作为作者，我可以搜索网络小说书源（Yuedu 规则），以便找到参考文本
+10. 作为作者，我可以添加自定义书源规则，以便覆盖更多站点
+11. 作为作者，我可以发起抽卡对比（同提示词多模型输出），以便选择最佳模型/文风（会员）
+12. 作为作者，我可以切换模型（免费/高级/BYOK），以便控制成本与质量
+13. 作为作者，我可以绑定自己的 API key（BYOK），以便使用自己账号的高级模型
+14. 作为作者，我可以注册邮箱账号并登录，以便跨设备保存数据
+15. 作为作者，我可以看到我的会员状态与额度用量，以便规划使用
+16. 作为作者，我可以升级会员（订阅）以解锁全部功能，以便完整使用平台
+17. 作为作者，超长对话时系统自动压缩上下文，以便不丢失前文且不超模型限制
+18. 作为作者，我可以从 OpenWrite 迁移小说项目（导入目录结构），以便数据自有（二期）
+19. 作为管理员，我可以管理模型供应商（one-api 渠道）与额度策略，以便控制成本
+20. 作为管理员，我可以查看 token 用量审计（按节点/任务/用户），以便成本核算
+
+## Implementation Decisions
+
+### 架构（Docker Compose 单机）
+```
+墨舟 Web (Next.js + TS + Tailwind + shadcn/ui)
+  ├── 业务 API（Next.js API Routes：auth/novels/chapters/distill/deconstruct/sources/usage）
+  ├── 管线引擎（自研轻量节点管线，见下）
+  ├── PostgreSQL + pgvector（Drizzle ORM）
+  └── one-api（独立容器：LLM 网关/额度/渠道/failover）
+```
+
+### 管线引擎（自研轻量，理念借鉴 DeterminFlow）
+- 节点类型：`llm`（一次模型调用 + 工具白名单）、`script`（确定性处理：文件读写/书源抓取）、`validation`（JSON 输出校验）
+- 核心循环：LLM 调用 → JSON 输出检测 → 校验失败自动修复重试（≤3 次）→ 节点结果入 Token 账本
+- 管线实例：`写作对话`（RAG 注入 → LLM → 流式）、`风格蒸馏`（分析 → 风格指南 JSON）、`小说拆解`（抓取/上传 → 选章 → 大纲 JSON）、`自审`（质量检查，不过触发返工——二期）
+- Token 记账：每次调用记 provider/model/prompt_tokens/completion_tokens → usage 表 → 额度扣减（与 one-api 对账）
+
+### 数据模型（核心表）
+- `users`（id/email/password_hash/membership_tier/created_at）
+- `novels`（id/user_id/title/genre/synopsis/cover/settings）
+- `chapters`（id/novel_id/order/title/content/status）
+- `worldview_entries` / `character_entries`（novel_id/type/content + **embedding 向量列**）
+- `styles`（id/user_id/name/guide_json/created_at）——风格蒸馏产物
+- `book_sources`（id/name/rule_yaml/status）——Yuedu 规则
+- `usages`（id/user_id/provider/model/prompt_tokens/completion_tokens/created_at）
+- `sessions`（对话：id/user_id/novel_id/context_compressed_at）
+
+### API 契约（REST，前缀 /api/v1）
+- `POST /auth/register|login|logout`
+- `GET|POST /novels`，`GET|PUT|DELETE /novels/{id}`
+- `POST /novels/{id}/chapters`（含 generate/续写/大纲 action）
+- `POST /distill`（multipart 文本 → 风格指南）
+- `POST /deconstruct`（book_url 或 file → 章节列表 → 大纲）
+- `GET /sources/search?q=&source=`（书源搜索）
+- `POST /chat`（SSE 流式；body 含 novel_id/model/风格引用）
+- `GET /usage/me`（额度）
+- 认证：JWT（httpOnly cookie）+ 中间件
+
+### 其他决策
+- RAG：pgvector HNSW 索引；检索 top-k（k=5~8）注入系统提示词"参考资料"节
+- 上下文压缩：按 token 阈值触发，压缩历史摘要后继续（借鉴 OpenWrite contextCompression 与 DeterminFlow 压缩理念）
+- 书源：Yuedu 规则格式（rule_yaml），解析器自研（规则引擎 ~300 行）
+- 会员划分对齐原版：免费=写作对话(限次)+项目+RAG 基础；会员=蒸馏/拆解/抽卡/不限次/RAG 扩容
+- 免费模型：DeepSeek-chat 为主 + Qwen 备用，one-api 渠道 failover；BYOK 用户走自有渠道
+- 品牌：墨舟；深色编辑器风；UI 全原创（不复制 OpenWrite 视觉/文案）
+- 提示词：参考逆向提取的方法论（system prompt 结构/工具定义模式）但**全部重新编写**
+
+## Testing Decisions
+
+- 测试哲学：只测外部行为（API 契约 + 管线输出），不测实现细节
+- **管线引擎**是最高 seam：`llm 调用 → 校验 → 重试` 循环用 mock provider 做单元测试；JSON 校验失败重试路径必测
+- **API 契约测试**：vitest + supertest 全端点（auth/novels/distill/deconstruct/sources/usage）
+- **书源解析器**：用 fixture 书源规则 + 本地 HTML fixture 测提取正确性
+- **RAG 检索**：embedding 用 fixture 向量测 top-k 排序与注入格式
+- LLM 相关：集成测试用真实 deepseek（低成本）+ 关键路径 fixture 化（避免不稳定）
+- 前例：无既有代码库（greenfield），从管线引擎 seam 开始
+
+## Out of Scope
+
+- 云同步（WebDAV/备份迁移）——二期
+- 技能广场（Skill 市场）——二期
+- 扫榜（网文榜单大数据）——二期
+- 从 OpenWrite 数据迁移工具——二期
+- 桌面壳（Tauri）——产品验证后
+- 支付集成（支付宝/微信/Stripe）——MVP 只做额度框架与会员状态，支付二期
+- 微信/第三方登录——二期
+- 开源发布——产品跑通后
+- 多章节批量管线（DeterminFlow 式复杂工作流）——二期评估
+
+## Further Notes
+
+- **AGPL 规避**：管线理念借鉴 DeterminFlow（AGPL-3.0），代码全原创，不引入其依赖——避免传染义务（墨舟 SaaS 需保持私有）
+- **书源合规**：内置源仅收录可公开访问站点；用户自加源自负责任；README/页面免责
+- 逆向数据复用清单：case `work/openxz-re/notes/prompts-expanded.txt`（方法论）、E-004~E-014（协议/交互参考）
+- 品牌与文案：墨舟全原创；不出现 OpenWrite 相关名称/文案
