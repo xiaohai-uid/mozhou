@@ -1,6 +1,7 @@
 "use client";
 
-// 抽卡模式：多模型并行真实调用（one-api 双渠道）。
+// 抽卡模式（UI 先行）：同指令多模型并行对比。
+// 当前为界面示意：本地 mock 并行输出；后端 /api/v1/draw 实现后替换为真实调用。
 import { useState } from "react";
 import { Cards, Play } from "@phosphor-icons/react/dist/ssr";
 
@@ -13,6 +14,14 @@ interface DrawOutput {
   model: string;
   text: string;
 }
+
+// mock 输出（演示用；真实结果来自各模型并行生成）
+const MOCK_OUTPUTS: Record<string, string> = {
+  "deepseek-v4-flash":
+    "雨夜，灰烬镇的巷口。阿雀裹着单衣站在门檐下，雨水顺着瓦片连成细线，她盯着巷尾——陆沉舟的身影迟迟没有出现。风把远处的灯芯草吹得沙沙响，像有人在低声数着什么。",
+  "glm-4.5-flash":
+    "夜雨敲瓦。阿雀立在门檐下，手里攥着一截没点完的灯芯。巷尾黑黢黢的，雨声里她听见脚步声由远及近——是陆沉舟，肩头披着湿透的旧袍，怀里护着什么东西，微微泛着暖光。",
+};
 
 export function DrawView() {
   const [selected, setSelected] = useState<string[]>(["deepseek-v4-flash"]);
@@ -33,19 +42,14 @@ export function DrawView() {
     setError(null);
     setOutputs([]);
     try {
-      // 并行调用所有选中模型
+      // UI 先行：mock 并行延迟 + 假数据；后端接入后替换为
+      // Promise.all(selected.map(id => fetch("/api/v1/draw", {...})))
       const results = await Promise.all(
-        selected.map(async (id) => {
-          const res = await fetch("/api/v1/draw", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model: id, instruction }),
-          });
-          const data = (await res.json()) as { text?: string; error?: string };
-          if (!res.ok) throw new Error(data.error ?? `模型 ${id} 失败`);
+        selected.map(async (id, i) => {
+          await new Promise((r) => setTimeout(r, 900 + i * 500));
           return {
             model: MODEL_OPTIONS.find((m) => m.id === id)?.label ?? id,
-            text: data.text ?? "",
+            text: MOCK_OUTPUTS[id] ?? "",
           };
         }),
       );
