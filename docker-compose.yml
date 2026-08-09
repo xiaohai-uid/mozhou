@@ -1,0 +1,58 @@
+# 墨舟 (MoZhou) — 开发环境编排
+# 用法:
+#   docker compose up -d                  # 基础设施（postgres + one-api）
+#   cd app && npm run dev                 # Web 开发模式（推荐，热重载）
+#   docker compose --profile prod up -d --build   # 全栈生产镜像（需 Docker 能访问镜像源）
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mozhou-postgres
+    environment:
+      POSTGRES_USER: mozhou
+      POSTGRES_PASSWORD: mozhou_dev
+      POSTGRES_DB: mozhou
+    ports:
+      - "5433:5432"   # 5432 被本机 WSL Postgres 占用，映射到 5433
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init:/docker-entrypoint-initdb.d:ro   # 首次初始化：启用 pgvector
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mozhou"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  one-api:
+    image: justsong/one-api:latest
+    container_name: mozhou-one-api
+    environment:
+      TZ: Asia/Shanghai
+      SQL_DSN: ""
+      SESSION_SECRET: mozhou-dev-secret-change-me
+    ports:
+      - "3001:3000"
+    volumes:
+      - oneapi-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    profiles: ["prod"]   # 默认不启动（构建需镜像源；开发用宿主 npm run dev）
+    container_name: mozhou-app
+    environment:
+      DATABASE_URL: postgres://mozhou:mozhou_dev@postgres:5432/mozhou
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  oneapi-data:
