@@ -13,7 +13,11 @@ export function LogoutButton() {
   }
 
   return (
-    <Button variant="outline" onClick={onLogout}>
+    <Button
+      variant="outline"
+      onClick={onLogout}
+      className="rounded-full border-surface-2 text-zinc-300 hover:border-zinc-600 hover:text-white"
+    >
       登出
     </Button>
   );

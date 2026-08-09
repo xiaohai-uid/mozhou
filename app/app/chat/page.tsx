@@ -1,5 +1,10 @@
+import { AppShell } from "@/components/app-shell";
 import { ChatView } from "./chat-view";
 
 export default function ChatPage() {
-  return <ChatView />;
+  return (
+    <AppShell>
+      <ChatView />
+    </AppShell>
+  );
 }

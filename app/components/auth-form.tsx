@@ -66,60 +66,69 @@ export function AuthForm({
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <Card className="w-full max-w-sm border-zinc-800 bg-zinc-900/60">
-        <CardHeader>
-          <CardTitle className="text-xl">{title}</CardTitle>
-          <CardDescription className="text-zinc-400">{description}</CardDescription>
-        </CardHeader>
-        <form onSubmit={onSubmit}>
-          <CardContent className="flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5 text-sm text-zinc-300">
-              邮箱
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm text-zinc-300">
-              密码
-              <input
-                name="password"
-                type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                required
-                minLength={8}
-                className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-              />
-              {passwordHint && (
-                <span className="text-xs text-zinc-500">{passwordHint}</span>
+      <div className="w-full max-w-sm">
+        {/* 品牌区：应用身份，非官网 */}
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-xl font-bold text-white shadow-[0_12px_40px_rgba(127,34,254,0.3)]">
+            墨
+          </span>
+          <span className="text-lg font-semibold tracking-wide">墨舟</span>
+        </div>
+        <Card className="w-full rounded-2xl border-surface-2 bg-surface/60 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <CardHeader>
+            <CardTitle className="text-xl">{title}</CardTitle>
+            <CardDescription className="text-muted">{description}</CardDescription>
+          </CardHeader>
+          <form onSubmit={onSubmit}>
+            <CardContent className="flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5 text-sm text-zinc-300">
+                邮箱
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-zinc-100 outline-none transition focus:border-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm text-zinc-300">
+                密码
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  required
+                  minLength={8}
+                  className="rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-zinc-100 outline-none transition focus:border-accent"
+                />
+                {passwordHint && (
+                  <span className="text-xs text-faint">{passwordHint}</span>
+                )}
+              </label>
+              {error && (
+                <p role="alert" className="text-sm text-red-400">
+                  {error}
+                </p>
               )}
-            </label>
-            {error && (
-              <p role="alert" className="text-sm text-red-400">
-                {error}
+            </CardContent>
+            <CardFooter className="flex-col gap-3">
+              <Button
+                type="submit"
+                disabled={pending}
+                className="w-full rounded-full bg-accent hover:bg-violet-500"
+              >
+                {pending ? submitPendingLabel : submitLabel}
+              </Button>
+              <p className="text-sm text-muted">
+                {footerText}{" "}
+                <Link href={footerLinkHref} className="text-accent hover:underline">
+                  {footerLinkLabel}
+                </Link>
               </p>
-            )}
-          </CardContent>
-          <CardFooter className="flex-col gap-3">
-            <Button
-              type="submit"
-              disabled={pending}
-              className="w-full bg-violet-600 hover:bg-violet-500"
-            >
-              {pending ? submitPendingLabel : submitLabel}
-            </Button>
-            <p className="text-sm text-zinc-400">
-              {footerText}{" "}
-              <Link href={footerLinkHref} className="text-violet-400 hover:underline">
-                {footerLinkLabel}
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
     </main>
   );
 }

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "墨舟 — AI 小说写作平台",
-  description: "人物、世界观、章节——AI 记得你笔下的世界。墨舟，为中文网文作者打造的 AI 写作平台。",
+  title: "墨舟 - AI 小说写作平台",
+  description: "人物、世界观、章节，AI 记得你笔下的世界。墨舟，为中文网文作者打造的 AI 写作平台。",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -3,6 +3,7 @@
 // 写作对话视图：消息列表 + SSE 流式 + 会话切换 + 模型选择（深色编辑器风）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ArrowUp, Plus } from "@phosphor-icons/react/dist/ssr";
 import { MODELS } from "@/lib/chat/models";
 
 interface Session {
@@ -137,49 +138,59 @@ export function ChatView() {
   }
 
   return (
-    <main className="flex flex-1 gap-4 px-6 py-6">
+    <main className="flex min-h-[100dvh] flex-1 gap-4 px-6 py-6">
       {/* 会话侧栏 */}
-      <aside className="flex w-56 flex-col gap-2">
+      <aside className="flex w-60 shrink-0 flex-col gap-3">
         <Button
           onClick={newSession}
           disabled={streaming}
-          className="w-full bg-violet-600 hover:bg-violet-500"
+          className="w-full rounded-full bg-accent hover:bg-violet-500"
         >
-          ＋ 新会话
+          <Plus size={16} weight="bold" className="mr-1" />
+          新会话
         </Button>
-        <div className="flex flex-col gap-1 overflow-y-auto">
+        <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
           {sessions.map((s) => (
             <button
               key={s.id}
               onClick={() => void loadSession(s.id)}
               disabled={streaming}
-              className={`truncate rounded-md px-3 py-2 text-left text-sm transition ${
+              className={`relative truncate rounded-xl px-3.5 py-2.5 text-left text-sm transition ${
                 s.id === sessionId
-                  ? "bg-violet-600/20 text-violet-300"
-                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                  ? "bg-accent/10 text-zinc-100"
+                  : "text-zinc-400 hover:bg-surface hover:text-zinc-200"
               }`}
               title={s.title}
             >
+              {s.id === sessionId && (
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
+                />
+              )}
               {s.title}
             </button>
           ))}
           {sessions.length === 0 && (
-            <p className="px-3 py-2 text-sm text-zinc-600">还没有会话</p>
+            <div className="px-3.5 py-8 text-center">
+              <p className="text-sm text-faint">还没有会话</p>
+              <p className="mt-1 text-xs text-zinc-600">新建一个，开始与 AI 共同创作</p>
+            </div>
           )}
         </div>
       </aside>
 
       {/* 对话区 */}
-      <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-zinc-800 bg-zinc-900/40">
-        <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+      <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-2 bg-surface/40">
+        <header className="flex items-center justify-between border-b border-surface-2 px-5 py-3.5">
           <h1 className="text-sm font-medium text-zinc-300">写作对话</h1>
-          <label className="flex items-center gap-2 text-sm text-zinc-400">
+          <label className="flex items-center gap-2 text-sm text-faint">
             模型
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
               disabled={streaming}
-              className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-zinc-200 outline-none focus:border-violet-500"
+              className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
             >
               {MODELS.map((id) => (
                 <option key={id} value={id}>
@@ -190,11 +201,12 @@ export function ChatView() {
           </label>
         </header>
 
-        <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {messages.length === 0 && !streaming && (
-            <p className="pt-16 text-center text-zinc-600">
-              与 AI 一起写作——发送第一句话开始
-            </p>
+            <div className="flex h-full flex-col items-center justify-center gap-2 pt-16">
+              <p className="text-sm text-faint">与 AI 一起写作</p>
+              <p className="text-xs text-zinc-600">发送第一句话开始</p>
+            </div>
           )}
           {messages.map((m, i) => (
             <div
@@ -202,33 +214,49 @@ export function ChatView() {
               className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[75%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-6 ${
+                className={`max-w-[75%] whitespace-pre-wrap px-4 py-2.5 text-sm leading-6 ${
                   m.role === "user"
-                    ? "bg-violet-600 text-white"
-                    : "border border-zinc-800 bg-zinc-950 text-zinc-200"
+                    ? "rounded-2xl rounded-br-sm bg-accent text-white"
+                    : "rounded-2xl rounded-bl-sm border border-surface-2 bg-zinc-950 text-zinc-200"
                 }`}
               >
-                {m.content || (streaming && i === messages.length - 1 ? "…" : "")}
+                {m.content}
+                {m.role === "assistant" && streaming && i === messages.length - 1 && (
+                  <span
+                    aria-label="正在生成"
+                    className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-accent"
+                  />
+                )}
               </div>
             </div>
           ))}
         </div>
 
-        <footer className="border-t border-zinc-800 p-3">
+        <footer className="border-t border-surface-2 p-4">
           {error && (
             <p role="alert" className="mb-2 text-sm text-red-400">
               {error}
             </p>
           )}
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            disabled={streaming}
-            rows={3}
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            className="w-full resize-none rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-          />
+          <div className="flex items-end gap-2 rounded-xl border border-surface-2 bg-zinc-950 p-2 transition focus-within:border-accent">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              disabled={streaming}
+              rows={3}
+              placeholder={streaming ? "正在生成…" : "输入消息，Enter 发送，Shift+Enter 换行"}
+              className="w-full resize-none bg-transparent px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-faint"
+            />
+            <button
+              onClick={() => void send()}
+              disabled={!input.trim() || streaming}
+              aria-label="发送"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"
+            >
+              <ArrowUp size={16} weight="bold" />
+            </button>
+          </div>
         </footer>
       </section>
     </main>
