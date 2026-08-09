@@ -1,14 +1,19 @@
 "use client";
 
-// 项目管理（UI 先行）：作品列表 + 人物库 / 世界观 / 章节 三栏。
+// 项目管理（UI 先行）：作品列表 + 人物库 / 世界观 / 章节 三栏 + RAG 注入 / 审查 / 导出。
 // 后端 RAG 注入待接；示例数据为真实《零界道种》（用户作品）。
 import { useState } from "react";
 import {
   BookOpenText,
+  CloudArrowUp,
+  FileArchive,
+  FileText,
   GitBranch,
   Globe,
   Plus,
+  ShieldCheck,
   UsersThree,
+  Waveform,
 } from "@phosphor-icons/react/dist/ssr";
 
 const demoChapters = [
@@ -135,6 +140,98 @@ export function ProjectsView() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            </div>
+
+            {/* RAG 注入配置（写作时自动检索资料进上下文） */}
+            <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                <Waveform size={16} weight="duotone" className="text-accent" aria-hidden />
+                RAG 注入配置
+              </div>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                写作对话时自动检索以下资料注入上下文，保持设定一致性
+              </p>
+              <ul className="mt-4 space-y-2">
+                {[
+                  { name: "人物库", desc: "陆沉舟 / 阿雀 等 12 条", on: true },
+                  { name: "世界观设定", desc: "零界 / 灰烬镇 等 8 条", on: true },
+                  { name: "章节摘要", desc: "001-004 章摘要", on: false },
+                ].map((c) => (
+                  <li key={c.name} className="flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+                    <div>
+                      <span className="text-sm font-medium text-zinc-100">{c.name}</span>
+                      <p className="mt-0.5 text-xs text-muted">{c.desc}</p>
+                    </div>
+                    <button
+                      aria-label={`${c.name}注入开关`}
+                      aria-pressed={c.on}
+                      className={`rounded-full px-3 py-1.5 text-xs transition ${
+                        c.on ? "bg-accent/15 text-accent" : "border border-surface-2 text-faint"
+                      }`}
+                    >
+                      {c.on ? "注入中" : "未注入"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 审查记录 */}
+            <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                <ShieldCheck size={16} weight="duotone" className="text-accent" aria-hidden />
+                审查记录
+              </div>
+              <ul className="mt-4 space-y-2">
+                {[
+                  { ch: "ch004", issue: "未覆盖必含词「守塔」", level: "medium", when: "刚刚" },
+                  { ch: "ch003", issue: "角色一致性：阿雀语气偏离", level: "low", when: "2 小时前" },
+                  { ch: "ch003", issue: "泄密扫描通过（S-001/003/005 未曝光）", level: "ok", when: "2 小时前" },
+                ].map((c) => (
+                  <li key={c.when + c.ch} className="flex items-center justify-between gap-3 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 font-mono text-xs text-faint">{c.ch}</span>
+                      <span className="truncate text-sm text-zinc-300">{c.issue}</span>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] ${
+                        c.level === "ok"
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : c.level === "low"
+                            ? "bg-yellow-500/10 text-yellow-400"
+                            : "bg-red-500/10 text-red-400"
+                      }`}
+                    >
+                      {c.level === "ok" ? "通过" : c.level === "low" ? "低" : "中"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[11px] text-faint">审查引擎接入中，当前为界面示意</p>
+            </div>
+
+            {/* 导出与备份 */}
+            <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                <CloudArrowUp size={16} weight="duotone" className="text-accent" aria-hidden />
+                导出与备份
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                {[
+                  { icon: FileText, name: "全书 TXT", desc: "纯文本导出，章节按序拼接" },
+                  { icon: FileArchive, name: "作品包 JSON", desc: "含设定/摘要/章节的完整包" },
+                  { icon: CloudArrowUp, name: "云同步备份", desc: "推送到已配置的 WebDAV" },
+                ].map((c) => (
+                  <button
+                    key={c.name}
+                    className="flex flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left transition hover:border-zinc-600"
+                  >
+                    <c.icon size={16} weight="duotone" className="text-zinc-400" aria-hidden />
+                    <span className="text-sm font-medium text-zinc-200">{c.name}</span>
+                    <span className="text-[11px] leading-4 text-faint">{c.desc}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
