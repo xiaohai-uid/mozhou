@@ -1,8 +1,8 @@
 "use client";
 
-// 项目管理（UI 先行）：作品列表 + 人物库 / 世界观 / 章节 三栏 + RAG 注入 / 审查 / 导出。
-// 后端 RAG 注入待接；示例数据为真实《零界道种》（用户作品）。
-import { useState } from "react";
+// 项目管理（05 工单已接入）：作品列表 + 人物库 / 世界观 / 章节 三栏 + RAG 注入 / 审查 / 导出。
+// 列表/创建/详情/新增/删除走真实 API（/api/v1/novels*）；RAG/审查/导出仍为界面示意（06/09 工单接入）。
+import { useCallback, useEffect, useState } from "react";
 import {
   BookOpenText,
   CloudArrowUp,
@@ -12,20 +12,152 @@ import {
   Globe,
   Plus,
   ShieldCheck,
+  Trash,
   UsersThree,
   Waveform,
 } from "@phosphor-icons/react/dist/ssr";
 
-const demoChapters = [
-  { ch: "001", title: "灰烬有籽", status: "定稿" },
-  { ch: "002", title: "灰里有苗", status: "定稿" },
-  { ch: "003", title: "灰里藏灯", status: "定稿" },
-  { ch: "004", title: "灰里开田", status: "定稿" },
-];
+interface NovelSummary {
+  id: number;
+  name: string;
+  meta: string;
+}
+
+interface Chapter {
+  id: number;
+  ch: string;
+  title: string;
+  status: "draft" | "final";
+}
+
+interface Entry {
+  id: number;
+  name: string;
+  note: string | null;
+}
+
+interface NovelDetail {
+  novel: NovelSummary;
+  chapters: Chapter[];
+  characters: Entry[];
+  worldviews: Entry[];
+}
 
 export function ProjectsView() {
+  const [novels, setNovels] = useState<NovelSummary[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<NovelDetail | null>(null);
   const [bookName, setBookName] = useState("");
-  const [hasBook, setHasBook] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshList = useCallback(async () => {
+    const res = await fetch("/api/v1/novels");
+    if (!res.ok) return;
+    const data = (await res.json()) as { novels: NovelSummary[] };
+    setNovels(data.novels);
+  }, []);
+
+  const loadDetail = useCallback(async (id: number) => {
+    const res = await fetch(`/api/v1/novels/${id}`);
+    if (!res.ok) return;
+    setDetail((await res.json()) as NovelDetail);
+  }, []);
+
+  useEffect(() => {
+    void refreshList();
+  }, [refreshList]);
+
+  async function createBook() {
+    const name = bookName.trim();
+    if (!name || creating) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/novels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = (await res.json()) as { novel?: NovelSummary; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "创建失败");
+      setBookName("");
+      await refreshList();
+      setActiveId(data.novel!.id);
+      await loadDetail(data.novel!.id);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function selectNovel(id: number) {
+    setActiveId(id);
+    await loadDetail(id);
+  }
+
+  async function addChapter() {
+    if (!activeId) return;
+    const title = window.prompt("章节标题");
+    if (!title?.trim()) return;
+    const res = await fetch(`/api/v1/novels/${activeId}/chapters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim() }),
+    });
+    if (!res.ok) return;
+    await loadDetail(activeId);
+  }
+
+  async function deleteChapter(chapterId: number) {
+    if (!activeId) return;
+    if (!window.confirm("删除该章节？")) return;
+    await fetch(`/api/v1/novels/${activeId}/chapters?chapterId=${chapterId}`, {
+      method: "DELETE",
+    });
+    await loadDetail(activeId);
+  }
+
+  async function addEntry(kind: "character" | "worldview") {
+    if (!activeId) return;
+    const name = window.prompt(kind === "character" ? "人物名称" : "设定名称");
+    if (!name?.trim()) return;
+    const note = window.prompt("备注（可留空）") ?? undefined;
+    const res = await fetch(
+      `/api/v1/novels/${activeId}/entries?kind=${kind}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), note }),
+      },
+    );
+    if (!res.ok) return;
+    await loadDetail(activeId);
+  }
+
+  async function deleteEntry(kind: "character" | "worldview", entryId: number) {
+    if (!activeId) return;
+    if (!window.confirm("删除该条目？")) return;
+    await fetch(
+      `/api/v1/novels/${activeId}/entries?kind=${kind}&entryId=${entryId}`,
+      { method: "DELETE" },
+    );
+    await loadDetail(activeId);
+  }
+
+  async function deleteNovel(id: number) {
+    if (!window.confirm(`删除《${novels.find((n) => n.id === id)?.name}》？章节与设定将一并删除`)) {
+      return;
+    }
+    const res = await fetch(`/api/v1/novels/${id}`, { method: "DELETE" });
+    if (!res.ok) return;
+    if (activeId === id) {
+      setActiveId(null);
+      setDetail(null);
+    }
+    await refreshList();
+  }
 
   return (
     <main className="flex flex-1 gap-6 px-6 py-8 lg:px-10">
@@ -33,13 +165,35 @@ export function ProjectsView() {
       <aside className="flex w-64 shrink-0 flex-col gap-3">
         <div className="flex items-center justify-between">
           <h1 className="text-sm font-semibold text-zinc-200">我的作品</h1>
+          <span className="text-xs text-faint">{novels.length}</span>
         </div>
-        {hasBook && (
-          <button className="rounded-xl border border-surface-2 bg-surface px-4 py-3 text-left transition hover:border-zinc-600">
-            <span className="block text-sm font-medium text-zinc-100">零界道种</span>
-            <span className="mt-0.5 block text-xs text-faint">卷一 · 连载中 · 4 章</span>
-          </button>
-        )}
+        <div className="flex flex-col gap-1">
+          {novels.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => void selectNovel(n.id)}
+              className={`group relative rounded-xl border px-4 py-3 text-left transition ${
+                activeId === n.id
+                  ? "border-accent/50 bg-accent/10"
+                  : "border-surface-2 bg-surface hover:border-zinc-600"
+              }`}
+            >
+              <span className="block text-sm font-medium text-zinc-100">{n.name}</span>
+              <span className="mt-0.5 block text-xs text-faint">{n.meta}</span>
+              <span
+                role="button"
+                aria-label={`删除 ${n.name}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void deleteNovel(n.id);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-faint opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+              >
+                <Trash size={15} aria-hidden />
+              </span>
+            </button>
+          ))}
+        </div>
         {/* 新建作品 */}
         <div className="mt-2 rounded-card border border-dashed border-surface-2 p-4">
           <p className="text-xs text-muted">创建新作品</p>
@@ -47,27 +201,33 @@ export function ProjectsView() {
             <input
               value={bookName}
               onChange={(e) => setBookName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void createBook();
+              }}
               placeholder="书名"
               aria-label="书名"
               className="w-full min-w-0 rounded-xl border border-surface-2 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
             />
             <button
-              onClick={() => {
-                if (bookName.trim()) setHasBook(true);
-              }}
-              disabled={!bookName.trim()}
+              onClick={() => void createBook()}
+              disabled={!bookName.trim() || creating}
               aria-label="创建"
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 disabled:opacity-40"
             >
               <Plus size={16} weight="bold" />
             </button>
           </div>
+          {error && (
+            <p role="alert" className="mt-2 text-xs text-red-400">
+              {error}
+            </p>
+          )}
         </div>
       </aside>
 
       {/* 详情区 */}
       <section className="min-w-0 flex-1">
-        {!hasBook ? (
+        {!detail ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 rounded-card border border-dashed border-surface-2 py-24 text-center">
             <BookOpenText size={30} weight="duotone" className="text-zinc-500" aria-hidden />
             <p className="text-sm text-muted">选择或创建一个作品，开始管理你笔下的世界</p>
@@ -75,88 +235,151 @@ export function ProjectsView() {
         ) : (
           <div className="flex h-full flex-col gap-6">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold text-zinc-100">零界道种</h2>
-              <span className="text-xs text-faint">卷一「灰烬有苗」 · 目标 100 万字</span>
+              <h2 className="text-xl font-semibold text-zinc-100">{detail.novel.name}</h2>
+              <span className="text-xs text-faint">{detail.novel.meta}</span>
             </div>
 
             <div className="grid flex-1 grid-cols-1 gap-5 lg:grid-cols-3">
               {/* 人物库 */}
               <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-                  <UsersThree size={16} weight="duotone" className="text-accent" aria-hidden />
-                  人物库
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                    <UsersThree size={16} weight="duotone" className="text-accent" aria-hidden />
+                    人物库
+                  </div>
+                  <button
+                    onClick={() => void addEntry("character")}
+                    aria-label="新增人物"
+                    className="flex size-7 items-center justify-center rounded-full border border-surface-2 text-faint transition hover:border-zinc-600 hover:text-zinc-200"
+                  >
+                    <Plus size={13} weight="bold" />
+                  </button>
                 </div>
                 <ul className="mt-4 space-y-2.5">
-                  {[
-                    { name: "陆沉舟", note: "阿雀的兄长，沉默寡言" },
-                    { name: "阿雀", note: "病弱，守着灰罐里的火苗" },
-                  ].map((c) => (
-                    <li key={c.name} className="rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+                  {detail.characters.map((c) => (
+                    <li key={c.id} className="group relative rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
                       <span className="text-sm font-medium text-zinc-100">{c.name}</span>
-                      <p className="mt-0.5 text-xs leading-5 text-muted">{c.note}</p>
+                      {c.note && (
+                        <p className="mt-0.5 text-xs leading-5 text-muted">{c.note}</p>
+                      )}
+                      <button
+                        onClick={() => void deleteEntry("character", c.id)}
+                        aria-label={`删除 ${c.name}`}
+                        className="absolute right-2.5 top-2.5 text-faint opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                      >
+                        <Trash size={14} aria-hidden />
+                      </button>
                     </li>
                   ))}
+                  {detail.characters.length === 0 && (
+                    <li className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-center text-xs text-faint">
+                      还没有人物，点击右上角添加
+                    </li>
+                  )}
                 </ul>
               </div>
 
               {/* 世界观 */}
               <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-                  <Globe size={16} weight="duotone" className="text-accent" aria-hidden />
-                  世界观设定
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                    <Globe size={16} weight="duotone" className="text-accent" aria-hidden />
+                    世界观设定
+                  </div>
+                  <button
+                    onClick={() => void addEntry("worldview")}
+                    aria-label="新增设定"
+                    className="flex size-7 items-center justify-center rounded-full border border-surface-2 text-faint transition hover:border-zinc-600 hover:text-zinc-200"
+                  >
+                    <Plus size={13} weight="bold" />
+                  </button>
                 </div>
                 <ul className="mt-4 space-y-2.5">
-                  {[
-                    { name: "零界", note: "火苗偏斜的方向，无人提及" },
-                    { name: "灰烬镇", note: "故事起点，灰罐与灯芯" },
-                  ].map((c) => (
-                    <li key={c.name} className="rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+                  {detail.worldviews.map((c) => (
+                    <li key={c.id} className="group relative rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
                       <span className="text-sm font-medium text-zinc-100">{c.name}</span>
-                      <p className="mt-0.5 text-xs leading-5 text-muted">{c.note}</p>
+                      {c.note && (
+                        <p className="mt-0.5 text-xs leading-5 text-muted">{c.note}</p>
+                      )}
+                      <button
+                        onClick={() => void deleteEntry("worldview", c.id)}
+                        aria-label={`删除 ${c.name}`}
+                        className="absolute right-2.5 top-2.5 text-faint opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                      >
+                        <Trash size={14} aria-hidden />
+                      </button>
                     </li>
                   ))}
+                  {detail.worldviews.length === 0 && (
+                    <li className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-center text-xs text-faint">
+                      还没有设定，点击右上角添加
+                    </li>
+                  )}
                 </ul>
               </div>
 
               {/* 章节 */}
               <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-                  <GitBranch size={16} weight="duotone" className="text-accent" aria-hidden />
-                  章节
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                    <GitBranch size={16} weight="duotone" className="text-accent" aria-hidden />
+                    章节
+                  </div>
+                  <button
+                    onClick={() => void addChapter()}
+                    aria-label="新建章节"
+                    className="flex size-7 items-center justify-center rounded-full border border-surface-2 text-faint transition hover:border-zinc-600 hover:text-zinc-200"
+                  >
+                    <Plus size={13} weight="bold" />
+                  </button>
                 </div>
                 <ul className="mt-4 space-y-2">
-                  {demoChapters.map((c) => (
+                  {detail.chapters.map((c) => (
                     <li
-                      key={c.ch}
-                      className="flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-2.5"
+                      key={c.id}
+                      className="group flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-2.5"
                     >
                       <span className="text-sm text-zinc-200">
                         <span className="mr-2 font-mono text-xs text-faint">{c.ch}</span>
                         {c.title}
                       </span>
-                      <span className="rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-faint">
-                        {c.status}
+                      <span className="flex items-center gap-2">
+                        <span className="rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-faint">
+                          {c.status === "final" ? "定稿" : "草稿"}
+                        </span>
+                        <button
+                          onClick={() => void deleteChapter(c.id)}
+                          aria-label={`删除 ${c.title}`}
+                          className="text-faint opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                        >
+                          <Trash size={14} aria-hidden />
+                        </button>
                       </span>
                     </li>
                   ))}
+                  {detail.chapters.length === 0 && (
+                    <li className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-center text-xs text-faint">
+                      还没有章节，点击右上角新建
+                    </li>
+                  )}
                 </ul>
               </div>
             </div>
 
-            {/* RAG 注入配置（写作时自动检索资料进上下文） */}
+            {/* RAG 注入配置（06 工单接入；当前界面示意） */}
             <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
                 <Waveform size={16} weight="duotone" className="text-accent" aria-hidden />
                 RAG 注入配置
               </div>
               <p className="mt-1 text-xs leading-5 text-muted">
-                写作对话时自动检索以下资料注入上下文，保持设定一致性
+                写作对话时自动检索以下资料注入上下文，保持设定一致性（06 工单接入）
               </p>
               <ul className="mt-4 space-y-2">
                 {[
-                  { name: "人物库", desc: "陆沉舟 / 阿雀 等 12 条", on: true },
-                  { name: "世界观设定", desc: "零界 / 灰烬镇 等 8 条", on: true },
-                  { name: "章节摘要", desc: "001-004 章摘要", on: false },
+                  { name: "人物库", desc: `${detail.characters.length} 条`, on: true },
+                  { name: "世界观设定", desc: `${detail.worldviews.length} 条`, on: true },
+                  { name: "章节摘要", desc: `${detail.chapters.length} 章`, on: false },
                 ].map((c) => (
                   <li key={c.name} className="flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
                     <div>
@@ -177,7 +400,7 @@ export function ProjectsView() {
               </ul>
             </div>
 
-            {/* 审查记录 */}
+            {/* 审查记录（09 工单接入；当前界面示意） */}
             <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
                 <ShieldCheck size={16} weight="duotone" className="text-accent" aria-hidden />
@@ -208,10 +431,10 @@ export function ProjectsView() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-[11px] text-faint">审查引擎接入中，当前为界面示意</p>
+              <p className="mt-3 text-[11px] text-faint">审查引擎接入中（09 工单），当前为界面示意</p>
             </div>
 
-            {/* 导出与备份 */}
+            {/* 导出与备份（08 工单接入；当前界面示意） */}
             <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
                 <CloudArrowUp size={16} weight="duotone" className="text-accent" aria-hidden />
