@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -25,12 +26,16 @@ export default function Home() {
         </div>
 
         <div className="flex gap-4">
-          <Button size="lg" className="bg-violet-600 hover:bg-violet-500">
-            开始写作
-          </Button>
-          <Button size="lg" variant="outline">
-            了解墨舟
-          </Button>
+          <Link href="/register">
+            <Button size="lg" className="bg-violet-600 hover:bg-violet-500">
+              开始写作
+            </Button>
+          </Link>
+          <Link href="/login">
+            <Button size="lg" variant="outline">
+              登录
+            </Button>
+          </Link>
         </div>
 
         <p className="text-sm text-zinc-600">
