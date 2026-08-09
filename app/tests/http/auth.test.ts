@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 
-// 与 tests/global-setup.ts 的 PORT（3100）保持一致；vitest.config.ts env 也注入同一值
+// 与 tests/http/global-setup.ts 的 PORT（3100）保持一致；vitest.config.ts env 也注入同一值
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 
 const RUN = Date.now().toString(36);

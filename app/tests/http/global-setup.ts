@@ -8,7 +8,7 @@ let child: ChildProcess | null = null;
 
 export default async function setup() {
   // 直接用 node 跑 next 的 bin（Windows 下 spawn .cmd 会 EINVAL，且避免 shell 层）
-  const log = createWriteStream("tests/.next-dev.log", { flags: "w" });
+  const log = createWriteStream("tests/http/.next-dev.log", { flags: "w" });
   child = spawn(
     process.execPath,
     ["node_modules/next/dist/bin/next", "dev", "-p", String(PORT), "-H", "127.0.0.1"],
@@ -25,7 +25,7 @@ export default async function setup() {
   let ready = false;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`next dev 提前退出（code ${child.exitCode}），见 tests/.next-dev.log`);
+      throw new Error(`next dev 提前退出（code ${child.exitCode}），见 tests/http/.next-dev.log`);
     }
     try {
       const res = await fetch(BASE);
@@ -39,7 +39,7 @@ export default async function setup() {
     await new Promise((r) => setTimeout(r, 500));
   }
   if (!ready) {
-    throw new Error(`next dev 未在 120s 内就绪，见 tests/.next-dev.log`);
+    throw new Error(`next dev 未在 120s 内就绪，见 tests/http/.next-dev.log`);
   }
 
   return async () => {
