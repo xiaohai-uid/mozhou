@@ -2,8 +2,17 @@
 import type { StreamProvider, StreamDelta } from "@/lib/pipeline/engine";
 
 export interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
+}
+
+/** 组装 system 消息：RAG 注入的"参考资料"节（06 工单） */
+export function buildSystemPrompt(injected: string[]): string {
+  if (injected.length === 0) return "";
+  return (
+    "以下是作者小说设定库中与当前写作相关的参考资料，写作时必须遵守，不得写崩设定：\n" +
+    injected.map((s) => `- ${s}`).join("\n")
+  );
 }
 
 /** one-api 网关（OpenAI 兼容 SSE 流） */
@@ -14,10 +23,15 @@ export class OneApiStreamProvider implements StreamProvider {
       token: string;
       model: string;
       messages: ChatMessage[];
+      systemPrompt?: string;
     },
   ) {}
 
   async *stream(): AsyncIterable<StreamDelta> {
+    const messages = [
+      ...(this.opts.systemPrompt ? [{ role: "system" as const, content: this.opts.systemPrompt }] : []),
+      ...this.opts.messages,
+    ];
     const res = await fetch(`${this.opts.baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -27,7 +41,7 @@ export class OneApiStreamProvider implements StreamProvider {
       body: JSON.stringify({
         model: this.opts.model,
         stream: true,
-        messages: this.opts.messages,
+        messages,
       }),
     });
     if (!res.ok || !res.body) {
@@ -86,6 +100,7 @@ export class MockChatProvider implements StreamProvider {
 export function makeChatProvider(
   model: string,
   messages: ChatMessage[],
+  systemPrompt?: string,
 ): StreamProvider {
   if (process.env.CHAT_PROVIDER === "mock") {
     return new MockChatProvider();
@@ -95,5 +110,6 @@ export function makeChatProvider(
     token: process.env.ONEAPI_TOKEN ?? "",
     model,
     messages,
+    systemPrompt,
   });
 }

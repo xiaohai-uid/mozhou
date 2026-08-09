@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { messages, sessions } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
-import { makeChatProvider, type ChatMessage } from "./stream-provider";
+import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
+import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
 import type { ChatModel } from "./models";
 
 export { DEFAULT_MODEL, MODELS, isChatModel } from "./models";
@@ -89,6 +90,8 @@ export interface RunChatResult {
   reply: string;
   /** 落库后的助手消息 id（ok 时） */
   messageId?: number;
+  /** RAG 注入的设定条目（06 工单；供界面展示作者可见） */
+  injected: RagEntry[];
 }
 
 /**
@@ -114,7 +117,15 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   }
 
   const history = await listMessages(input.sessionId, input.userId);
-  const provider = makeChatProvider(input.model, history ?? []);
+  // RAG 注入（06 工单）：按当前输入检索相关设定条目，注入 system 提示
+  const injected = await retrieveContext(input.userId, input.content);
+  const provider = makeChatProvider(
+    input.model,
+    history ?? [],
+    buildSystemPrompt(
+      injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
+    ),
+  );
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },
@@ -127,7 +138,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       .insert(messages)
       .values({ sessionId: input.sessionId, role: "assistant", content: reply })
       .returning({ id: messages.id });
-    return { state, reply, messageId: assistantMsg?.id };
+    return { state, reply, messageId: assistantMsg?.id, injected };
   }
-  return { state, reply };
+  return { state, reply, injected };
 }

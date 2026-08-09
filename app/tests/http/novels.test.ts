@@ -289,3 +289,67 @@ describe("人物/世界观条目 CRUD", () => {
     expect(after.status).toBe(404);
   });
 });
+
+describe("RAG 设定注入（06 工单，关键词检索）", () => {
+  let ragNovelId: number;
+
+  it("前置：创建作品 + 人物/世界观条目", async () => {
+    const novel = await fetch(`${BASE}/api/v1/novels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "RAG测试书" }),
+    });
+    expect(novel.status).toBe(201);
+    ragNovelId = ((await novel.json()) as { novel: { id: number } }).novel.id;
+
+    const c = await fetch(`${BASE}/api/v1/novels/${ragNovelId}/entries?kind=character`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "陆沉舟", note: "阿雀的兄长，沉默寡言" }),
+    });
+    expect(c.status).toBe(201);
+
+    const w = await fetch(`${BASE}/api/v1/novels/${ragNovelId}/entries?kind=worldview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "零界", note: "火苗偏斜的方向，无人提及" }),
+    });
+    expect(w.status).toBe(201);
+  });
+
+  it("相关话题：SSE done 事件携带注入条目", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "写一段陆沉舟走向零界的场景" }),
+    });
+    expect(res.status).toBe(200);
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: Array<{ kind: string; name: string }>;
+    };
+    expect(done?.injected).toBeDefined();
+    const names = done.injected!.map((i) => i.name);
+    expect(names).toContain("陆沉舟");
+    expect(names).toContain("零界");
+  });
+
+  it("不相关话题：注入为空", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "聊聊今天吃的苹果" }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: unknown[];
+    };
+    expect(done?.injected ?? []).toHaveLength(0);
+  });
+});

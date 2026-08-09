@@ -58,7 +58,7 @@ export async function POST(request: Request) {
           onDelta: (text) => send({ type: "delta", text }),
         });
         if (result.state.task?.status === "ok" && result.messageId) {
-          send({ type: "done", messageId: result.messageId });
+          send({ type: "done", messageId: result.messageId, injected: result.injected });
         } else if (result.state.task?.status === "ok") {
           send({ type: "error", message: "模型返回为空，请重试" });
         } else {
