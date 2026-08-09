@@ -91,6 +91,37 @@ export function AccountView() {
         </div>
       </div>
 
+
+      {/* 额度与用量 */}
+      <div className="mt-8 rounded-card border border-surface-2 bg-surface/50 p-6">
+        <h2 className="text-sm font-semibold text-zinc-200">额度与用量</h2>
+        <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-3">
+          {[
+            { label: "本月 Token", used: "186K", total: "500K", pct: 37 },
+            { label: "云同步容量", used: "120MB", total: "500MB", pct: 24 },
+            { label: "抽卡次数", used: "8", total: "20", pct: 40 },
+          ].map((q) => (
+            <div key={q.label}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-faint">{q.label}</span>
+                <span className="text-sm font-medium text-zinc-200">
+                  {q.used}<span className="text-xs text-faint"> / {q.total}</span>
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className="h-full rounded-full bg-accent"
+                  style={{ width: `${q.pct}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-[11px] text-faint">
+          用量统计接入中，当前为界面示意
+        </p>
+      </div>
+
       <p className="mt-6 text-center text-xs text-faint">
         会员开通与支付服务接入中，当前为界面示意
       </p>

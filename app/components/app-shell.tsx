@@ -4,6 +4,7 @@ import {
   BookOpenText,
   CloudArrowUp,
   Feather,
+  BookBookmark,
   GlobeSimple,
   House,
   MagnifyingGlass,
@@ -34,6 +35,7 @@ const groups = [
     label: "资源",
     items: [
       { href: "/search", label: "书源搜索", icon: MagnifyingGlass },
+      { href: "/shelf", label: "书源书架", icon: BookBookmark },
       { href: "/skills", label: "技能广场", icon: Sparkle },
       { href: "/rankings", label: "网文扫榜", icon: Trophy },
       { href: "/websearch", label: "联网搜索", icon: GlobeSimple },

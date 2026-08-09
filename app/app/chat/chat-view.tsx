@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUp, Plus } from "@phosphor-icons/react/dist/ssr";
+import { WritingToolsPanel } from "@/components/features/writing-tools-panel";
 import { MODELS } from "@/lib/chat/models";
 
 interface Session {
@@ -259,6 +260,9 @@ export function ChatView() {
           </div>
         </footer>
       </section>
+
+      {/* 写作工具面板（合同/任务书/机检/上下文） */}
+      <WritingToolsPanel />
     </main>
   );
 }
