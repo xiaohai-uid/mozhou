@@ -38,15 +38,18 @@ interface MessageListResponse { messages: ChatMessage[] }
 interface ChatMessage { role: "user" | "assistant"; content: string }
 
 // POST /api/v1/chat              → 流式续写（SSE，text/event-stream）
+// 注：已实现端点的协议以【后端发射端 + 契约测试断言】为准（2026-08-10 核对修正）；
+//     UI 消费是协议子集（前端静默忽略未知事件类型），不能作为事件全集来源。
 interface ChatRequest {
   sessionId: number | null; // null = 新会话（首个 delta 会带回 sessionId）
   model: "deepseek-v4-flash" | "glm-4.5-flash";
   content: string;          // 用户输入（Enter 发送；上限 4000 字）
 }
-// SSE 事件流（每行 data: {...}，\n\n 分隔）：
+// SSE 事件流（每行 data: {...}，\n\n 分隔；事件顺序：start → delta* → done，出错时 error 替代后续流）：
 interface ChatStreamEvent =
   | { type: "start";  sessionId: number }        // 会话已建立
   | { type: "delta";  text: string }             // 增量文本，前端累积渲染
+  | { type: "done" }                             // 流结束（前端静默跳过，无需渲染）
   | { type: "error";  message: string };         // 生成失败
 ```
 
