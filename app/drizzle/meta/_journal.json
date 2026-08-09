@@ -8,6 +8,20 @@
       "when": 1786258723789,
       "tag": "0000_tough_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786265076604,
+      "tag": "0001_warm_triton",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786266257690,
+      "tag": "0002_lying_alex_wilder",
+      "breakpoints": true
     }
   ]
 }

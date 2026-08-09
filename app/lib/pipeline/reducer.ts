@@ -32,8 +32,10 @@ export type PipelineAction =
   | { type: "start"; nodeType: string; maxRetries?: number; budget?: number }
   | { type: "llmRaw"; text: string }
   | { type: "llmResult"; text: string; usage: Usage; schema: OutputSchema }
+  | { type: "llmTextResult"; text: string; usage: Usage }
   | { type: "validateOk"; output: unknown }
   | { type: "validateFail"; reason: string }
+  | { type: "fail"; reason: string }
   | { type: "meter"; usage: Usage }
   | { type: "manualRetry" }
   | { type: "abort" }
@@ -136,6 +138,16 @@ function validateFail(state: PipelineState, reason: string): PipelineState {
   };
 }
 
+/** 流式调用失败直接置 failed（无校验修复重试语义，等人工重试） */
+function fail(state: PipelineState, reason: string): PipelineState {
+  if (!isRunning(state)) return state;
+  return {
+    ...state,
+    task: { ...state.task!, status: "failed", lastError: reason },
+    lastAction: `任务失败：${reason}`,
+  };
+}
+
 function manualRetry(state: PipelineState): PipelineState {
   if (state.task?.status !== "failed") {
     return { ...state, lastAction: "只有失败的任务可以人工重试" };
@@ -166,6 +178,15 @@ function llmResult(state: PipelineState, action: Extract<PipelineAction, { type:
   return verdict.ok ? validateOk(raw, verdict.json) : validateFail(raw, verdict.reason);
 }
 
+/** 自由文本节点（写作对话）：meter → llmRaw → 直接完成，不做 JSON 校验 */
+function llmTextResult(
+  state: PipelineState,
+  action: Extract<PipelineAction, { type: "llmTextResult" }>,
+): PipelineState {
+  const metered = meter(state, action.usage);
+  return validateOk(llmRaw(metered, action.text), action.text);
+}
+
 export function reducer(state: PipelineState, action: PipelineAction): PipelineState {
   switch (action.type) {
     case "start":
@@ -176,10 +197,14 @@ export function reducer(state: PipelineState, action: PipelineAction): PipelineS
       return llmRaw(state, action.text);
     case "llmResult":
       return llmResult(state, action);
+    case "llmTextResult":
+      return llmTextResult(state, action);
     case "validateOk":
       return validateOk(state, action.output);
     case "validateFail":
       return validateFail(state, action.reason);
+    case "fail":
+      return fail(state, action.reason);
     case "manualRetry":
       return manualRetry(state);
     case "abort":

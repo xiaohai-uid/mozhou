@@ -1,23 +1,12 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { db } from "@/lib/db";
-import { users } from "@/lib/schema";
-import { verifySession, SESSION_COOKIE } from "@/lib/auth/session";
+import { Button } from "@/components/ui/button";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { LogoutButton } from "./logout-button";
 
 export default async function WorkspacePage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const session = token ? await verifySession(token) : null;
-  if (!session) redirect("/login");
-
-  // proxy 只做乐观校验，这里以数据库为准（用户可能已被删除）
-  const [user] = await db
-    .select({ id: users.id, email: users.email, tier: users.tier })
-    .from(users)
-    .where(eq(users.id, Number(session.sub)));
+  const user = await getCurrentUser();
   if (!user) {
     // 先经 logout route handler 清 cookie 再回登录页；
     // 直接 redirect /login 会因 proxy 的「已登录访问 /login」再踢回，死循环
@@ -40,6 +29,12 @@ export default async function WorkspacePage() {
       <p className="text-zinc-400">
         写作工作台正在打磨中——小说项目、人物库与世界观即将上线。
       </p>
+      <Button
+        render={<Link href="/chat" />}
+        className="bg-violet-600 hover:bg-violet-500"
+      >
+        开始写作
+      </Button>
       <LogoutButton />
     </main>
   );

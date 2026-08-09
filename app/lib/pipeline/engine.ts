@@ -12,6 +12,16 @@ export interface LlmProvider {
   }): Promise<{ text: string; usage: Usage }>;
 }
 
+/** 流式 LLM 提供者（SSE 对话场景）：逐 delta 输出，流结束可带 usage */
+export interface StreamProvider {
+  stream(): AsyncIterable<StreamDelta>;
+}
+
+export interface StreamDelta {
+  text?: string;
+  usage?: Usage;
+}
+
 export interface NodeConfig {
   nodeType: string;
   schema: OutputSchema;
@@ -47,6 +57,48 @@ export async function runNode(
   }
 
   return state;
+}
+
+/**
+ * 流式节点（写作对话）：逐 delta 回调转发，流结束一次性记账完成。
+ * 自由文本不做 JSON 校验（对话语义）；provider 抛错 → failed（无修复重试语义）。
+ */
+export async function runNodeStream(
+  initial: PipelineState,
+  cfg: StreamNodeConfig,
+  onDelta: (text: string) => void,
+): Promise<PipelineState> {
+  const state = reducer(initial, {
+    type: "start",
+    nodeType: cfg.nodeType,
+    budget: cfg.budget,
+  });
+  if (state.task?.status !== "running") return state;
+
+  let text = "";
+  let usage: Usage = { prompt: 0, completion: 0 };
+  try {
+    for await (const delta of cfg.provider.stream()) {
+      if (delta.text) {
+        text += delta.text;
+        onDelta(delta.text);
+      }
+      if (delta.usage) usage = delta.usage;
+    }
+  } catch (err) {
+    return reducer(state, {
+      type: "fail",
+      reason: `调用失败：${(err as Error).message}`,
+    });
+  }
+
+  return reducer(state, { type: "llmTextResult", text, usage });
+}
+
+export interface StreamNodeConfig {
+  nodeType: string;
+  provider: StreamProvider;
+  budget?: number;
 }
 
 export { initialState };

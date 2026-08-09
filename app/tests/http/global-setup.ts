@@ -14,7 +14,11 @@ export default async function setup() {
     ["node_modules/next/dist/bin/next", "dev", "-p", String(PORT), "-H", "127.0.0.1"],
     {
       cwd: process.cwd(),
-      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+      env: {
+        ...process.env,
+        NEXT_TELEMETRY_DISABLED: "1",
+        CHAT_PROVIDER: "mock", // 契约测试注入 mock LLM（确定性，不依赖外网）
+      },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );

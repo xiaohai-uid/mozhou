@@ -1,0 +1,133 @@
+// 对话会话服务：会话 CRUD + runChat（管线流式 + 持久化）
+import { and, desc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { messages, sessions } from "@/lib/schema";
+import { initialState, runNodeStream } from "@/lib/pipeline/engine";
+import type { PipelineState } from "@/lib/pipeline/reducer";
+import { makeChatProvider, type ChatMessage } from "./stream-provider";
+import type { ChatModel } from "./models";
+
+export { DEFAULT_MODEL, MODELS, isChatModel } from "./models";
+export type { ChatModel } from "./models";
+
+export const DEFAULT_TITLE = "新会话";
+
+/** 会话不存在或不属于该用户 */
+export class SessionNotFoundError extends Error {
+  constructor() {
+    super("会话不存在");
+    this.name = "SessionNotFoundError";
+  }
+}
+
+export interface SessionRow {
+  id: number;
+  title: string;
+  createdAt: Date;
+}
+
+export async function createSession(
+  userId: number,
+  title: string = DEFAULT_TITLE,
+): Promise<SessionRow> {
+  const [row] = await db
+    .insert(sessions)
+    .values({ userId, title })
+    .returning({ id: sessions.id, title: sessions.title, createdAt: sessions.createdAt });
+  return row!;
+}
+
+export async function listSessions(userId: number): Promise<SessionRow[]> {
+  return db
+    .select({ id: sessions.id, title: sessions.title, createdAt: sessions.createdAt })
+    .from(sessions)
+    .where(eq(sessions.userId, userId))
+    .orderBy(desc(sessions.createdAt));
+}
+
+/** 校验会话归属；归属存在返回消息列表（可能为空），否则返回 null */
+export async function listMessages(
+  sessionId: number,
+  userId: number,
+): Promise<ChatMessage[] | null> {
+  const [owner] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
+  if (!owner) return null;
+  const rows = await db
+    .select({ role: messages.role, content: messages.content })
+    .from(messages)
+    .where(eq(messages.sessionId, sessionId))
+    .orderBy(messages.createdAt);
+  return rows.map((m) => ({
+    role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+    content: m.content,
+  }));
+}
+
+/** 归属校验（写路径防 IDOR）：会话不存在或不属于该用户时抛错 */
+async function assertOwned(sessionId: number, userId: number): Promise<void> {
+  const [owner] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
+  if (!owner) throw new SessionNotFoundError();
+}
+
+export interface RunChatInput {
+  userId: number;
+  sessionId: number;
+  model: ChatModel;
+  content: string;
+  onDelta: (text: string) => void;
+}
+
+export interface RunChatResult {
+  state: PipelineState;
+  /** 完整回复（终态 ok 时存在） */
+  reply: string;
+  /** 落库后的助手消息 id（ok 时） */
+  messageId?: number;
+}
+
+/**
+ * 执行一轮对话：校验归属 → 存用户消息 → 管线流式调用（记账）→ 成功后存助手消息。
+ * 会话标题取首条用户消息前 20 字。
+ */
+export async function runChat(input: RunChatInput): Promise<RunChatResult> {
+  await assertOwned(input.sessionId, input.userId); // 写路径防 IDOR
+
+  const [userMsg] = await db
+    .insert(messages)
+    .values({ sessionId: input.sessionId, role: "user", content: input.content })
+    .returning({ id: messages.id });
+  if (!userMsg) throw new Error("消息入库失败");
+
+  const [sessionRow] = await db
+    .select({ title: sessions.title })
+    .from(sessions)
+    .where(eq(sessions.id, input.sessionId));
+  if (sessionRow && sessionRow.title === DEFAULT_TITLE) {
+    const title = input.content.trim().slice(0, 20) || DEFAULT_TITLE;
+    await db.update(sessions).set({ title }).where(eq(sessions.id, input.sessionId));
+  }
+
+  const history = await listMessages(input.sessionId, input.userId);
+  const provider = makeChatProvider(input.model, history ?? []);
+  const state = await runNodeStream(
+    initialState(),
+    { nodeType: "写作对话", provider },
+    input.onDelta,
+  );
+
+  const reply = state.task?.outputs.at(-1) ?? "";
+  if (state.task?.status === "ok" && reply) {
+    const [assistantMsg] = await db
+      .insert(messages)
+      .values({ sessionId: input.sessionId, role: "assistant", content: reply })
+      .returning({ id: messages.id });
+    return { state, reply, messageId: assistantMsg?.id };
+  }
+  return { state, reply };
+}
