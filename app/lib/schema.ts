@@ -126,3 +126,17 @@ export const shelfBooks = pgTable("shelf_books", {
   status: text("status"),
   importedAt: timestamp("imported_at").notNull().defaultNow(),
 });
+
+/** 技能（任务二-A）：声明式技能 = 名称 + 说明 + 系统提示词，chat 可加载注入 */
+export const skills = pgTable("skills", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  systemPrompt: text("system_prompt").notNull(),
+  /** 广场来源：墨舟官方 / 社区 */
+  author: text("author").notNull().default("自定义"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

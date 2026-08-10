@@ -57,6 +57,13 @@
       "when": 1786360776616,
       "tag": "0007_ambitious_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786371022914,
+      "tag": "0008_thin_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

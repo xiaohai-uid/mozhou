@@ -1,7 +1,7 @@
 // 对话会话服务：会话 CRUD + runChat（管线流式 + 持久化）
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { messages, sessions } from "@/lib/schema";
+import { messages, sessions, skills as skillsTable } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
 import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
@@ -148,11 +148,24 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   const injected = await retrieveContext(input.userId, input.content, {
     novelId: input.novelId ?? null,
   });
-  // 风格/技能（R4 决策）：与 RAG 注入合并为 system 提示
+  // 风格/技能（R4 决策 + 任务二-A）：技能从 skills 表取真实 systemPrompt 注入
   const extra: string[] = [];
   if (summary) extra.push(summary);
   if (input.style) extra.push(`[风格] 全文遵循「${input.style}」文风写作`);
-  for (const sk of input.skills ?? []) extra.push(`[技能] 启用「${sk}」规则`);
+  if (input.skills && input.skills.length > 0) {
+    const skillRows = await db
+      .select({ name: skillsTable.name, systemPrompt: skillsTable.systemPrompt })
+      .from(skillsTable)
+      .where(
+        and(
+          eq(skillsTable.userId, input.userId),
+          inArray(skillsTable.name, input.skills),
+        ),
+      );
+    for (const row of skillRows) {
+      extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
+    }
+  }
   const provider = makeChatProvider(
     input.model,
     history ?? [],
