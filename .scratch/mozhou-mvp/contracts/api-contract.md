@@ -142,15 +142,20 @@ interface DeconstructResponse {
 }
 ```
 
-## 7. 抽卡模式 — 🧊 冷冻（前端并行调用）
+## 7. 抽卡模式 — 🧊 冷冻（已并入写作对话，2026-08-10 结构调整）
+
+> 独立 /draw 页面已删除（用户定案：抽卡是写作流程内联操作，避免复制粘贴）。
+> 现形态：写作对话输入区「抽卡」按钮 → 多模型并行生成候选（当前 mock）→ 点选插入对话流。
+> 真实双模型不落库抽卡（dryRun）归工单 10，届时契约如下：
 
 ```typescript
-// POST /draw（每个选中模型各发一次，Promise.all 并行）
+// POST /chat（dryRun=true，工单 10 实现）— 每个模型各发一次，Promise.all 并行
 interface DrawRequest {
   model: "deepseek-v4-flash" | "glm-4.5-flash";
-  instruction: string; // 写作指令 textarea
+  content: string; // 写作指令（输入区内容）
+  dryRun: true;    // 不落库：候选仅供选用
 }
-interface DrawResponse { text: string } // 该模型生成文字
+interface DrawResponse { text: string } // 该模型生成文字（不写入 messages 表）
 ```
 
 ## 8. 书源搜索 — 🧊 冷冻

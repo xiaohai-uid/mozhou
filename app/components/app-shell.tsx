@@ -10,7 +10,6 @@ import {
   MagnifyingGlass,
   PenNib,
   Scissors,
-  Shuffle,
   Sparkle,
   Trophy,
   UserCircle,
@@ -28,7 +27,6 @@ const groups = [
       { href: "/projects", label: "我的作品", icon: BookOpenText },
       { href: "/distill", label: "风格蒸馏", icon: Feather },
       { href: "/deconstruct", label: "小说拆解", icon: Scissors },
-      { href: "/draw", label: "抽卡模式", icon: Shuffle },
     ],
   },
   {

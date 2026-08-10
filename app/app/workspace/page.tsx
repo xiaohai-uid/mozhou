@@ -5,7 +5,6 @@ import {
   MagnifyingGlass,
   PenNib,
   Scissors,
-  Shuffle,
 } from "@phosphor-icons/react/dist/ssr";
 import { AppShell } from "@/components/app-shell";
 
@@ -14,7 +13,6 @@ const tools = [
   { href: "/distill", icon: Feather, name: "风格蒸馏", desc: "上传文本，生成可复用风格指南" },
   { href: "/deconstruct", icon: Scissors, name: "小说拆解", desc: "结构、剧情、节奏逐层拆开" },
   { href: "/search", icon: MagnifyingGlass, name: "书源搜索", desc: "主流书源，规则化检索" },
-  { href: "/draw", icon: Shuffle, name: "抽卡模式", desc: "多模型多风格对比输出" },
 ];
 
 export default async function WorkspacePage() {

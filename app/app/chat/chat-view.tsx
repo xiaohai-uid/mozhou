@@ -1,9 +1,9 @@
 "use client";
 
-// 写作对话视图：消息列表 + SSE 流式 + 会话切换 + 模型选择（深色编辑器风）
+// 写作对话视图：消息列表 + SSE 流式 + 会话切换 + 模型选择 + 内联抽卡（多模型候选选优）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Plus } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUp, Plus, Shuffle } from "@phosphor-icons/react/dist/ssr";
 import { WritingToolsPanel } from "@/components/features/writing-tools-panel";
 import { MODELS } from "@/lib/chat/models";
 
@@ -17,6 +17,12 @@ interface ChatMessage {
   content: string;
 }
 
+/** 抽卡候选（一次并行生成的多模型结果） */
+interface DrawCandidate {
+  model: string;
+  text: string;
+}
+
 export function ChatView() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -25,6 +31,9 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 内联抽卡状态：候选列表 + 抽卡中
+  const [drawing, setDrawing] = useState(false);
+  const [candidates, setCandidates] = useState<DrawCandidate[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
 
   const refreshSessions = useCallback(async () => {
@@ -131,6 +140,51 @@ export function ChatView() {
     }
   }
 
+  /** 内联抽卡：同一提示词并行生成候选，选中后才作为消息插入。
+   *  UI 先行：当前为 mock 并行延迟；真实双模型抽卡（不落库 dryRun）归工单 10。 */
+  async function drawCandidates() {
+    const content = input.trim();
+    if (!content || streaming || drawing) return;
+    setDrawing(true);
+    setError(null);
+    setCandidates([]);
+    try {
+      // mock 候选：两模型风格差异（DeepSeek 短句写实 / GLM 意象绵长）
+      const mockTexts: Record<string, string> = {
+        "deepseek-v4-flash":
+          `雨夜，灰烬镇的巷口。阿雀裹着单衣站在门檐下，雨水顺着瓦片连成细线，她盯着巷尾——陆沉舟的身影迟迟没有出现。风把远处的灯芯草吹得沙沙响，像有人在低声数着什么。\n\n——基于「${content.slice(0, 20)}」`,
+        "glm-4.5-flash":
+          `夜雨敲瓦。阿雀立在门檐下，手里攥着一截没点完的灯芯。巷尾黑黢黢的，雨声里她听见脚步声由远及近——是陆沉舟，肩头披着湿透的旧袍，怀里护着什么东西，微微泛着暖光。\n\n——基于「${content.slice(0, 20)}」`,
+      };
+      const results = await Promise.all(
+        MODELS.map(async (m, i) => {
+          await new Promise((r) => setTimeout(r, 700 + i * 400));
+          return { model: m, text: mockTexts[m] ?? "" };
+        }),
+      );
+      setCandidates(results);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDrawing(false);
+    }
+  }
+
+  /** 选用候选：作为助手消息插入对话流（占位替换，随下一条 send 落库） */
+  function adoptCandidate(candidate: DrawCandidate) {
+    setMessages((prev) => {
+      // 若末尾是抽卡占位（空 assistant），替换之；否则追加
+      const last = prev.at(-1);
+      if (last && last.role === "assistant" && last.content === "") {
+        const next = [...prev];
+        next[next.length - 1] = { role: "assistant", content: candidate.text };
+        return next;
+      }
+      return [...prev, { role: "assistant", content: candidate.text }];
+    });
+    setCandidates([]);
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -231,6 +285,42 @@ export function ChatView() {
               </div>
             </div>
           ))}
+
+          {/* 内联抽卡候选区 */}
+          {(drawing || candidates.length > 0) && (
+            <div className="space-y-2">
+              <p className="text-xs text-faint">
+                {drawing ? "抽卡中：多模型并行生成候选…" : "抽卡结果：点选一个作为回复"}
+              </p>
+              {drawing && (
+                <div className="flex items-center gap-3 rounded-2xl border border-surface-2 bg-zinc-950 px-4 py-3">
+                  <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+                  <span className="text-sm text-muted">模型并行生成中…</span>
+                </div>
+              )}
+              {candidates.map((c) => (
+                <div
+                  key={c.model}
+                  className="rounded-2xl border border-surface-2 bg-zinc-950 p-4 transition hover:border-accent/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs text-accent">
+                      {c.model === "deepseek-v4-flash" ? "DeepSeek" : "GLM"}
+                    </span>
+                    <button
+                      onClick={() => adoptCandidate(c)}
+                      className="rounded-full border border-surface-2 px-3 py-1 text-xs text-zinc-200 transition hover:border-accent hover:text-white"
+                    >
+                      选用
+                    </button>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-200">
+                    {c.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <footer className="border-t border-surface-2 p-4">
@@ -249,6 +339,15 @@ export function ChatView() {
               placeholder={streaming ? "正在生成…" : "输入消息，Enter 发送，Shift+Enter 换行"}
               className="w-full resize-none bg-transparent px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-faint"
             />
+            <button
+              onClick={() => void drawCandidates()}
+              disabled={!input.trim() || streaming || drawing}
+              aria-label="抽卡"
+              title="多模型并行生成候选，选优插入"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-surface-2 text-zinc-300 transition hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              <Shuffle size={16} weight="bold" />
+            </button>
             <button
               onClick={() => void send()}
               disabled={!input.trim() || streaming}
