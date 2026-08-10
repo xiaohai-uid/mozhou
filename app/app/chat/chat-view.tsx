@@ -37,6 +37,8 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 12 工单：历史被自动压缩的提示（done.compressed）
+  const [compressedNotice, setCompressedNotice] = useState(false);
   // 当前作品绑定（R3 决策）：顶部选择器，RAG 按作品过滤
   const [novels, setNovels] = useState<NovelSummary[]>([]);
   const [novelId, setNovelId] = useState<number | null>(null);
@@ -174,9 +176,12 @@ export function ChatView() {
             text?: string;
             sessionId?: number;
             message?: string;
+            compressed?: boolean;
           };
           if (data.type === "start" && data.sessionId && !sessionId) {
             setSessionId(data.sessionId);
+          } else if (data.type === "done" && data.compressed) {
+            setCompressedNotice(true); // 12 工单：历史被压缩，UI 可见
           } else if (data.type === "delta" && data.text) {
             current += data.text;
             body = current;
@@ -384,6 +389,12 @@ export function ChatView() {
         </header>
 
         <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {compressedNotice && (
+            <div className="flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5 text-xs text-accent">
+              <span className="inline-block size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+              历史对话已自动压缩（摘要保留设定与进展），可继续写作
+            </div>
+          )}
           {messages.length === 0 && !streaming && (
             <div className="flex h-full flex-col items-center justify-center gap-2 pt-16">
               <p className="text-sm text-faint">与 AI 一起写作</p>

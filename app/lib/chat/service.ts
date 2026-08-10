@@ -6,6 +6,7 @@ import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
 import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
+import { compressHistory, shouldCompress } from "./compress";
 import type { ChatModel } from "./models";
 
 export { DEFAULT_MODEL, MODELS, isChatModel } from "./models";
@@ -107,6 +108,8 @@ export interface RunChatResult {
   messageId?: number;
   /** RAG 注入的设定条目（06 工单；供界面展示作者可见） */
   injected: RagEntry[];
+  /** 本次是否触发上下文压缩（12 工单；UI 可见） */
+  compressed: boolean;
 }
 
 /**
@@ -132,12 +135,21 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   }
 
   const history = await listMessages(input.sessionId, input.userId);
+  // 上下文压缩（12 工单）：历史超阈值 → 早期消息摘要化，摘要注入 system
+  let compressed = false;
+  let summary = "";
+  if (history && shouldCompress(history)) {
+    const r = await compressHistory(history);
+    summary = r.summary;
+    compressed = summary.length > 0;
+  }
   // RAG 注入（06 工单）：按当前输入 + 绑定作品检索相关设定条目，注入 system 提示
   const injected = await retrieveContext(input.userId, input.content, {
     novelId: input.novelId ?? null,
   });
   // 风格/技能（R4 决策）：与 RAG 注入合并为 system 提示
   const extra: string[] = [];
+  if (summary) extra.push(summary);
   if (input.style) extra.push(`[风格] 全文遵循「${input.style}」文风写作`);
   for (const sk of input.skills ?? []) extra.push(`[技能] 启用「${sk}」规则`);
   const provider = makeChatProvider(
@@ -160,7 +172,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       .insert(messages)
       .values({ sessionId: input.sessionId, role: "assistant", content: reply })
       .returning({ id: messages.id });
-    return { state, reply, messageId: assistantMsg?.id, injected };
+    return { state, reply, messageId: assistantMsg?.id, injected, compressed };
   }
-  return { state, reply, injected };
+  return { state, reply, injected, compressed };
 }

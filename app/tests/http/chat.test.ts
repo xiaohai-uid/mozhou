@@ -244,3 +244,58 @@ describe("风格/技能注入（R4 决策）", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("上下文自动压缩（12 工单）", () => {
+  it("超阈值历史 → done 事件携带 compressed=true", async () => {
+    // 先建会话（4 轮共用，历史才能累积）
+    const created = await fetch(`${BASE}/api/v1/sessions`, {
+      method: "POST",
+      headers: { cookie: me.cookie },
+    });
+    const { session } = (await created.json()) as { session: { id: number } };
+    // 造超阈值历史：chat 单条上限 4000 字，分 4 次发 ~3000 字消息累计超 11200 字（5600 token）
+    for (let i = 0; i < 4; i++) {
+      const r = await fetch(`${BASE}/api/v1/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: me.cookie },
+        body: JSON.stringify({
+          sessionId: session.id,
+          content: `第${i}轮设定：`.padEnd(3000, "长"),
+        }),
+      });
+      expect(r.status).toBe(200);
+    }
+
+    // 再发一条正常消息：此时历史已超阈值，应触发压缩
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ sessionId: session.id, content: "继续写" }),
+    });
+    expect(res.status).toBe(200);
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      compressed?: boolean;
+    };
+    expect(done?.compressed).toBe(true);
+  });
+
+  it("短历史 → compressed=false 或缺失", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "短消息" }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      compressed?: boolean;
+    };
+    expect(done?.compressed ?? false).toBe(false);
+  });
+});
