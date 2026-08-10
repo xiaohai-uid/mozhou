@@ -2,7 +2,9 @@
 
 // 项目管理（05 工单已接入）：作品列表 + 人物库 / 世界观 / 章节 三栏 + RAG 注入 / 审查 / 导出。
 // 列表/创建/详情/新增/删除走真实 API（/api/v1/novels*）；RAG/审查/导出仍为界面示意（06/09 工单接入）。
+// V1.1 Journey ⑦：章节项可点开进入章节编辑器（当前为 Mock Preview 页）。
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   BookOpenText,
   CloudArrowUp,
@@ -363,11 +365,16 @@ export function ProjectsView() {
                       key={c.id}
                       className="group flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-2.5"
                     >
-                      <span className="text-sm text-zinc-200">
-                        <span className="mr-2 font-mono text-xs text-faint">{c.ch}</span>
-                        {c.title}
-                      </span>
-                      <span className="flex items-center gap-2">
+                      {/* V1.1 Journey ⑦：点章节名打开章节编辑器（Mock Preview） */}
+                      <Link
+                        href={`/chapter/${c.id}?novel=${encodeURIComponent(detail.novel.name)}&ch=${c.ch}&title=${encodeURIComponent(c.title)}`}
+                        title="打开章节"
+                        className="flex min-w-0 items-center gap-2 transition hover:text-accent"
+                      >
+                        <span className="font-mono text-xs text-faint">{c.ch}</span>
+                        <span className="truncate text-sm text-zinc-200">{c.title}</span>
+                      </Link>
+                      <span className="flex shrink-0 items-center gap-2">
                         <span className="rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-faint">
                           {c.status === "final" ? "定稿" : "草稿"}
                         </span>
