@@ -112,3 +112,17 @@ export const usageEvents = pgTable("usage_events", {
   completionTokens: integer("completion_tokens").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/** 书架（08 工单）：从书源导入的书，供阅读参考与拆解 */
+export const shelfBooks = pgTable("shelf_books", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  source: text("source").notNull(),
+  author: text("author"),
+  site: text("site"),
+  status: text("status"),
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+});
