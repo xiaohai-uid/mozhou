@@ -14,17 +14,43 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]["key"];
 
-const demoChecks = [
-  { name: "字数窗口", ok: true, detail: "2885 字（窗口 2400-3900）" },
-  { name: "占位符", ok: true, detail: "无占位符" },
-  { name: "泄密扫描", ok: true, detail: "未曝光 S-001/003/005" },
-  { name: "实体登记", ok: true, detail: "青水河,田师 已登记" },
-  { name: "复读检测", ok: false, detail: "相邻段落重复片段「\"田是它的」" },
-  { name: "合同断言", ok: false, detail: "未覆盖必含词 守塔" },
-];
+interface CheckResult {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
 
 export function WritingToolsPanel() {
   const [tab, setTab] = useState<TabKey>("contract");
+  // 机检（任务二-B）：输入正文 → 真实 6 项检查
+  const [checkText, setCheckText] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [checks, setChecks] = useState<CheckResult[] | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+
+  async function runChecks() {
+    const text = checkText.trim();
+    if (!text || checking) return;
+    setChecking(true);
+    setCheckError(null);
+    try {
+      const res = await fetch("/api/v1/tools/checks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, mustCover: ["开田", "守塔"] }),
+      });
+      const data = (await res.json()) as {
+        checks?: CheckResult[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "机检失败");
+      setChecks(data.checks ?? null);
+    } catch (err) {
+      setCheckError((err as Error).message);
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-l border-surface-2 bg-zinc-950/40">
@@ -99,29 +125,52 @@ export function WritingToolsPanel() {
         )}
 
         {tab === "checks" && (
-          <ul className="space-y-2">
-            {demoChecks.map((c) => (
-              <li
-                key={c.name}
-                className={`rounded-xl border px-3.5 py-2.5 ${
-                  c.ok
-                    ? "border-surface-2 bg-surface/40"
-                    : "border-red-500/30 bg-red-500/5"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className={`size-1.5 rounded-full ${
-                      c.ok ? "bg-emerald-400" : "bg-red-400"
+          <div className="space-y-3">
+            <textarea
+              value={checkText}
+              onChange={(e) => setCheckText(e.target.value)}
+              rows={6}
+              placeholder="粘贴本章正文，运行机器检查…"
+              className="w-full resize-none rounded-xl border border-surface-2 bg-zinc-950 px-3 py-2.5 text-xs leading-5 text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
+            />
+            <button
+              onClick={() => void runChecks()}
+              disabled={!checkText.trim() || checking}
+              className="w-full rounded-full bg-accent py-2 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+            >
+              {checking ? "检查中…" : "运行机检"}
+            </button>
+            {checkError && (
+              <p role="alert" className="text-xs text-red-400">
+                {checkError}
+              </p>
+            )}
+            {checks && (
+              <ul className="space-y-2">
+                {checks.map((c) => (
+                  <li
+                    key={c.name}
+                    className={`rounded-xl border px-3.5 py-2.5 ${
+                      c.ok
+                        ? "border-surface-2 bg-surface/40"
+                        : "border-red-500/30 bg-red-500/5"
                     }`}
-                  />
-                  <span className="text-xs font-medium text-zinc-200">{c.name}</span>
-                </div>
-                <p className="mt-1 pl-3.5 text-[11px] leading-4 text-muted">{c.detail}</p>
-              </li>
-            ))}
-          </ul>
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className={`size-1.5 rounded-full ${
+                          c.ok ? "bg-emerald-400" : "bg-red-400"
+                        }`}
+                      />
+                      <span className="text-xs font-medium text-zinc-200">{c.name}</span>
+                    </div>
+                    <p className="mt-1 pl-3.5 text-[11px] leading-4 text-muted">{c.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         {tab === "context" && (
