@@ -43,6 +43,13 @@
       "when": 1786354579186,
       "tag": "0005_ambiguous_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786358810580,
+      "tag": "0006_flimsy_veda",
+      "breakpoints": true
     }
   ]
 }

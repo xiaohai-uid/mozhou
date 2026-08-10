@@ -2,6 +2,7 @@
 // 免费模型走 one-api 网关；测试注入 DISTILL_PROVIDER=mock 返回固定指南（与 CHAT_PROVIDER 模式一致）
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { recordUsage } from "@/lib/account/service";
 
 export interface StyleGuide {
   narrative: string; // 叙事视角
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const raw = data.choices?.[0]?.message?.content ?? "";
     const guide = parseGuide(raw);
@@ -116,6 +118,8 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
+    // 用量记账（11 工单）
+    await recordUsage(user.id, "风格蒸馏", data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0).catch(() => {});
     return NextResponse.json({ guide });
   } catch (err) {
     return NextResponse.json(

@@ -2,6 +2,7 @@
 // 前端 Promise.all 并发调用本端点（每模型一次）；结果不落库，选中后作为对话消息插入
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { assertQuota, recordUsage } from "@/lib/account/service";
 
 export const DRAW_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
 export type DrawModel = (typeof DRAW_MODELS)[number];
@@ -41,8 +42,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // 测试模式：返回固定输出
+  // 额度 gating（11 工单）：free 用户抽卡超 20 次/月 → 402
+  const quotaBlock = await assertQuota(user.id, "draw");
+  if (quotaBlock) {
+    return NextResponse.json({ error: quotaBlock.error }, { status: quotaBlock.status });
+  }
+
+  // 测试模式：返回固定输出（同样记账，保证配额逻辑可测）
   if (process.env.DRAW_PROVIDER === "mock") {
+    await recordUsage(user.id, "抽卡模式", 10, 5).catch(() => {});
     return NextResponse.json({ text: MOCK_OUTPUTS[model] ?? "" });
   }
 
@@ -77,6 +85,7 @@ export async function POST(request: Request) {
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const text = data.choices?.[0]?.message?.content?.trim() ?? "";
     if (!text) {
@@ -85,6 +94,8 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
+    // 用量记账（11 工单）：抽卡节点 +1 次
+    await recordUsage(user.id, "抽卡模式", data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0).catch(() => {});
     return NextResponse.json({ text });
   } catch (err) {
     return NextResponse.json(

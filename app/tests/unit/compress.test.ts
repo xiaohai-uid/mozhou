@@ -45,6 +45,7 @@ describe("shouldCompress（70% 阈值）", () => {
 
 describe("compressHistory 保留近期（KEEP_RECENT）", () => {
   it("早期消息被摘出，保留最近 6 条原文", async () => {
+    process.env.CHAT_PROVIDER = "mock"; // unit 环境无 global-setup，显式注入 mock
     const { compressHistory } = await import("@/lib/chat/compress");
     const messages = Array.from({ length: 10 }, (_, i) => msg(`消息${i}`));
     const r = await compressHistory(messages);
@@ -57,6 +58,7 @@ describe("compressHistory 保留近期（KEEP_RECENT）", () => {
   });
 
   it("消息数 <= KEEP_RECENT → 不压缩", async () => {
+    process.env.CHAT_PROVIDER = "mock";
     const { compressHistory } = await import("@/lib/chat/compress");
     const messages = Array.from({ length: 4 }, (_, i) => msg(`消息${i}`));
     const r = await compressHistory(messages);

@@ -7,6 +7,7 @@ import type { PipelineState } from "@/lib/pipeline/reducer";
 import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
 import { compressHistory, shouldCompress } from "./compress";
+import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "./models";
 
 export { DEFAULT_MODEL, MODELS, isChatModel } from "./models";
@@ -167,6 +168,15 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   );
 
   const reply = state.task?.outputs.at(-1) ?? "";
+  // 用量记账（11 工单）：chat 每轮落 usage_events
+  await recordUsage(
+    input.userId,
+    "写作对话",
+    state.ledger.prompt,
+    state.ledger.completion,
+  ).catch(() => {
+    // 记账失败不阻断对话
+  });
   if (state.task?.status === "ok" && reply) {
     const [assistantMsg] = await db
       .insert(messages)

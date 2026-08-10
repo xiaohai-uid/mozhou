@@ -99,3 +99,16 @@ export const worldviewEntries = pgTable("worldview_entries", {
   note: text("note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/** 用量事件（11 工单）：每次 LLM 调用记账一行，/api/v1/account 聚合展示 */
+export const usageEvents = pgTable("usage_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** 功能节点：写作对话/风格蒸馏/小说拆解/抽卡模式 */
+  nodeType: text("node_type").notNull(),
+  promptTokens: integer("prompt_tokens").notNull().default(0),
+  completionTokens: integer("completion_tokens").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

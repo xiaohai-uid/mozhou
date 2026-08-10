@@ -1,7 +1,7 @@
 "use client";
 
-// 会员中心（UI）：当前状态 + 套餐对比 + 升级入口。
-import { useState } from "react";
+// 会员中心（11 工单已真实化）：当前状态 + 套餐对比 + 真实用量（/api/v1/account）。
+import { useEffect, useState } from "react";
 import { Check, Crown } from "@phosphor-icons/react/dist/ssr";
 
 const features = [
@@ -14,9 +14,35 @@ const features = [
   { name: "高级模型 BYOK", free: false, member: true },
 ];
 
+interface AccountOverview {
+  email: string;
+  plan: "free" | "member";
+  quota: {
+    token: { used: number; total: number; pct: number };
+    draw: { used: number; total: number; pct: number };
+  };
+}
+
+function fmt(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(n);
+}
+
 export function AccountView() {
   const [isMember, setIsMember] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const [overview, setOverview] = useState<AccountOverview | null>(null);
+
+  useEffect(() => {
+    // 11 工单：真实用量
+    fetch("/api/v1/account")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: AccountOverview | null) => {
+        if (data) {
+          setOverview(data);
+          setIsMember(data.plan === "member");
+        }
+      });
+  }, []);
 
   async function upgrade() {
     if (upgrading || isMember) return;
@@ -106,14 +132,23 @@ export function AccountView() {
       </div>
 
 
-      {/* 额度与用量 */}
+      {/* 额度与用量（11 工单：真实聚合） */}
       <div className="mt-8 rounded-card border border-surface-2 bg-surface/50 p-6">
         <h2 className="text-sm font-semibold text-zinc-200">额度与用量</h2>
-        <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2">
           {[
-            { label: "本月 Token", used: "186K", total: "500K", pct: 37 },
-            { label: "云同步容量", used: "120MB", total: "500MB", pct: 24 },
-            { label: "抽卡次数", used: "8", total: "20", pct: 40 },
+            {
+              label: "本月 Token",
+              used: fmt(overview?.quota.token.used ?? 0),
+              total: fmt(overview?.quota.token.total ?? 500000),
+              pct: overview?.quota.token.pct ?? 0,
+            },
+            {
+              label: "抽卡次数",
+              used: String(overview?.quota.draw.used ?? 0),
+              total: String(overview?.quota.draw.total ?? 20),
+              pct: overview?.quota.draw.pct ?? 0,
+            },
           ].map((q) => (
             <div key={q.label}>
               <div className="flex items-baseline justify-between">
@@ -132,7 +167,7 @@ export function AccountView() {
           ))}
         </div>
         <p className="mt-5 text-[11px] text-faint">
-          用量统计接入中，当前为界面示意
+          用量来自真实 Token 记账（写作对话/蒸馏/拆解/抽卡）
         </p>
       </div>
 

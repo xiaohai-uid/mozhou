@@ -2,6 +2,7 @@
 // 09 工单：复用 07 蒸馏模式（one-api 非流式 + JSON 容错解析 + mock 测试模式）
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { recordUsage } from "@/lib/account/service";
 
 export interface DeconstructResult {
   structure: string[]; // 结构（开场/中段/收束）
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const raw = data.choices?.[0]?.message?.content ?? "";
     const result = parseResult(raw);
@@ -113,6 +115,8 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
+    // 用量记账（11 工单）
+    await recordUsage(user.id, "小说拆解", data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0).catch(() => {});
     return NextResponse.json({ result, title });
   } catch (err) {
     return NextResponse.json(
