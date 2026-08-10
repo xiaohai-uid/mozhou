@@ -103,3 +103,47 @@ describe("书架导入与列表（08 工单）", () => {
     expect(anon.status).toBe(401);
   });
 });
+
+describe("书架前端数据链路（任务一：shelf-view 接真）", () => {
+  it("导入的书在列表中真实可见（search 导入 → shelf 读取）", async () => {
+    // 模拟 search 页导入动作（与 search-view importBook 相同的请求）
+    const post = await fetch(`${BASE}/api/v1/shelf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "灰烬有籽",
+        source: "书古阁",
+        author: "佚名",
+        site: "shukuge.com",
+        status: "已读 3 章",
+      }),
+    });
+    expect(post.status).toBe(201);
+
+    // shelf-view 的加载请求（GET 列表）
+    const list = await fetch(`${BASE}/api/v1/shelf`, { headers: { cookie } });
+    expect(list.status).toBe(200);
+    const { books } = (await list.json()) as {
+      books: Array<{ id: number; name: string; source: string; author: string; site: string; status: string }>;
+    };
+    const target = books.find((b) => b.name === "灰烬有籽" && b.source === "书古阁");
+    expect(target).toBeDefined();
+    expect(target?.author).toBe("佚名");
+    expect(target?.site).toBe("shukuge.com");
+    expect(target?.status).toBe("已读 3 章");
+  });
+
+  it("新用户书架为空（空态数据）", async () => {
+    // 新注册用户（无导入）→ GET 应返回空数组
+    const email = `mozhou-src-empty-${RUN}@example.com`;
+    const reg = await fetch(`${BASE}/api/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: PASSWORD }),
+    });
+    const emptyCookie = `mozhou_session=${reg.headers.get("set-cookie")!.match(/mozhou_session=([^;]+)/)![1]}`;
+    const list = await fetch(`${BASE}/api/v1/shelf`, { headers: { cookie: emptyCookie } });
+    const { books } = (await list.json()) as { books: unknown[] };
+    expect(books).toHaveLength(0);
+  });
+});
