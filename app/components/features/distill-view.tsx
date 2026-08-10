@@ -118,6 +118,25 @@ export function DistillView() {
                 {guide.rhythm}
               </li>
             </ul>
+            {/* R1/R2 回流：应用到写作对话（产物→上下文注入） */}
+            <button
+              onClick={() => {
+                // 暂存指南，chat 页读取后注入为风格提示（R4 风格胶囊联动）
+                sessionStorage.setItem(
+                  "mozhou_pending_style",
+                  JSON.stringify({
+                    name: "本次蒸馏风格",
+                    guide,
+                    at: Date.now(),
+                  }),
+                );
+                window.location.href = "/chat";
+              }}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+            >
+              <Sparkle size={15} weight="fill" aria-hidden />
+              应用到写作对话
+            </button>
           </div>
         </div>
       )}

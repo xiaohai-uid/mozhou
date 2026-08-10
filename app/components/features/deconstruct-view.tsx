@@ -167,6 +167,29 @@ export function DeconstructView() {
               </div>
             ))}
           </div>
+          {/* R1/R2 回流：发送到写作对话（拆解结果→消息插入类） */}
+          <button
+            onClick={() => {
+              const blocks = [
+                { name: "结构", lines: ["开场：灰罐火苗偏斜", "中段：阿雀醒来对话", "收束：铁灰飞鸟掠过"] },
+                { name: "剧情", lines: ["伏笔：火苗朝零界偏斜", "人物：陆沉舟夜间外出", "推进：灯芯与药引"] },
+                { name: "节奏", lines: ["短句密（对话段）", "缓（景物描写）", "悬（结尾鸟飞向零界）"] },
+              ];
+              sessionStorage.setItem(
+                "mozhou_pending_deconstruct",
+                JSON.stringify({
+                  chapter: selected,
+                  blocks,
+                  at: Date.now(),
+                }),
+              );
+              window.location.href = "/chat";
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-accent/50 py-2.5 text-sm font-medium text-accent transition hover:bg-accent/10"
+          >
+            <TreeStructure size={15} weight="duotone" aria-hidden />
+            发送到写作对话
+          </button>
           <p className="text-center text-xs text-faint">拆解引擎开发中，当前为界面示意</p>
         </div>
       )}

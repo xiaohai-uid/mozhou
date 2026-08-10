@@ -78,6 +78,42 @@ export function ChatView() {
       .then((data: { novels: NovelSummary[] } | null) => {
         if (data) setNovels(data.novels);
       });
+    // R1/R2 回流：读取蒸馏页暂存风格，自动选中
+    try {
+      const raw = sessionStorage.getItem("mozhou_pending_style");
+      if (raw) {
+        const pending = JSON.parse(raw) as { name?: string };
+        sessionStorage.removeItem("mozhou_pending_style");
+        if (pending?.name) {
+          setStyle(pending.name);
+          setError(null);
+        }
+      }
+    } catch {
+      // 暂存数据损坏则忽略
+    }
+    // R1/R2 回流：读取拆解页暂存结果，作为消息插入对话流
+    try {
+      const raw = sessionStorage.getItem("mozhou_pending_deconstruct");
+      if (raw) {
+        const pending = JSON.parse(raw) as {
+          chapter?: string | null;
+          blocks?: Array<{ name: string; lines: string[] }>;
+        };
+        sessionStorage.removeItem("mozhou_pending_deconstruct");
+        if (pending?.blocks) {
+          const text = [
+            `【第 ${pending.chapter ?? "?"} 章拆解结果】`,
+            ...pending.blocks.map(
+              (b) => `\n${b.name}：\n` + b.lines.map((l) => `  - ${l}`).join("\n"),
+            ),
+          ].join("");
+          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]);
+        }
+      }
+    } catch {
+      // 暂存数据损坏则忽略
+    }
   }, []);
 
   useEffect(() => {
@@ -303,6 +339,11 @@ export function ChatView() {
             {/* 风格胶囊（R4：单选，同时只生效一种文风） */}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-faint">风格</span>
+              {style && !["无", "灰烬写实", "意象绵长"].includes(style) && (
+                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs text-accent">
+                  {style}
+                </span>
+              )}
               {["无", "灰烬写实", "意象绵长"].map((s) => (
                 <button
                   key={s}
