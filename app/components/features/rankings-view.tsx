@@ -1,48 +1,68 @@
 "use client";
 
-// 网文扫榜（UI）：扫榜开关 + 多榜浏览（对齐 OpenWrite 逆向的 8 案例）。
+// 网文扫榜（任务二-C 已真实化）：榜单数据走 /api/v1/rankings（超时优雅降级）。
 import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trophy } from "@phosphor-icons/react/dist/ssr";
 
-const boards = [
-  { name: "畅销榜 Top10", site: "番茄小说" },
-  { name: "月票榜", site: "起点中文网" },
-  { name: "新书榜", site: "番茄小说" },
-  { name: "完结榜", site: "起点中文网" },
-];
+interface RankingBoard {
+  name: string;
+  site: string;
+}
 
-const demoRows = [
-  { rank: 1, name: "宿命之环", heat: "9.8 万人在读" },
-  { rank: 2, name: "道诡异仙", heat: "8.7 万人在读" },
-  { rank: 3, name: "深海余烬", heat: "7.9 万人在读" },
-  { rank: 4, name: "玄鉴仙族", heat: "6.4 万人在读" },
-  { rank: 5, name: "夜的命名术", heat: "5.8 万人在读" },
-];
+interface RankingRow {
+  rank: number;
+  name: string;
+  heat: string;
+}
 
 export function RankingsView() {
   const [enabled, setEnabled] = useState(false);
-  const [board, setBoard] = useState(boards[0].name);
+  const [boards, setBoards] = useState<RankingBoard[]>([]);
+  const [board, setBoard] = useState("");
+  const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [degraded, setDegraded] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function fetchRankings() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/v1/rankings");
+      if (!res.ok) throw new Error("榜单加载失败");
+      const data = (await res.json()) as {
+        boards?: RankingBoard[];
+        rows?: RankingRow[];
+        degraded?: boolean;
+        note?: string;
+      };
+      if (data.boards && data.boards.length > 0 && !board) {
+        setBoards(data.boards);
+        setBoard(data.boards[0].name);
+      }
+      setRows(data.rows ?? []);
+      setDegraded(data.degraded ?? false);
+      setNote(data.note ?? null);
+    } catch {
+      setDegraded(true);
+      setNote("榜单加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function toggleEnabled() {
     if (enabled) {
       setEnabled(false);
       return;
     }
-    // UI 先行：mock 扫榜启动延迟；后端 /api/v1/rankings 实现后替换为真实 fetch
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setLoading(false);
+    await fetchRankings();
     setEnabled(true);
   }
 
   async function switchBoard(name: string) {
     if (name === board || loading) return;
-    setLoading(true);
-    // UI 先行：mock 榜源切换延迟
-    await new Promise((r) => setTimeout(r, 600));
-    setLoading(false);
     setBoard(name);
+    await fetchRankings();
   }
 
   return (
@@ -107,26 +127,31 @@ export function RankingsView() {
                 <span className="text-sm text-muted">正在拉取榜单…</span>
               </div>
             ) : (
-            <ul className="divide-y divide-surface-2">
-              {demoRows.map((r) => (
-                <li key={r.rank} className="flex items-center gap-4 px-6 py-3.5">
-                  <span
-                    className={`w-6 text-center font-mono text-sm ${
-                      r.rank <= 3 ? "font-semibold text-accent" : "text-faint"
-                    }`}
-                  >
-                    {String(r.rank).padStart(2, "0")}
-                  </span>
-                  <span className="flex-1 text-sm text-zinc-200">{r.name}</span>
-                  <span className="text-xs text-faint">{r.heat}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {degraded && (
+                <div className="flex items-center gap-2 border-b border-surface-2 bg-yellow-500/5 px-6 py-2.5 text-xs text-yellow-400">
+                  <span className="inline-block size-1.5 shrink-0 rounded-full bg-yellow-400" aria-hidden />
+                  {note ?? "榜单源不可达，已降级为示例数据"}
+                </div>
+              )}
+              <ul className="divide-y divide-surface-2">
+                {rows.map((r) => (
+                  <li key={r.rank} className="flex items-center gap-4 px-6 py-3.5">
+                    <span
+                      className={`w-6 text-center font-mono text-sm ${
+                        r.rank <= 3 ? "font-semibold text-accent" : "text-faint"
+                      }`}
+                    >
+                      {String(r.rank).padStart(2, "0")}
+                    </span>
+                    <span className="flex-1 text-sm text-zinc-200">{r.name}</span>
+                    <span className="text-xs text-faint">{r.heat}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
             )}
           </div>
-          <p className="mt-4 text-center text-xs text-faint">
-            榜单数据源接入中，当前为界面示意
-          </p>
         </>
       )}
 

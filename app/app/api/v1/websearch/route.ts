@@ -1,0 +1,82 @@
+// POST /api/v1/websearch — 联网搜索（任务二-C）：真实检索 + 超时优雅降级（绝不抛异常）
+// 复用 source engine 容错模式：5s 超时，失败返回 degraded 标记 + 明确错误文案
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
+
+export interface WebResult {
+  title: string;
+  source: string;
+  snippet: string;
+  url: string;
+}
+
+const TIMEOUT_MS = 5000;
+const MAX_QUERY = 100;
+
+/** 测试模式：确定性降级数据 */
+const MOCK_RESULTS: WebResult[] = [
+  { title: "「灰烬」在丧葬民俗中的含义", source: "民俗百科", snippet: "骨灰罐中留存火种，象征家族延续，多出现在南方宗族葬俗记载中…", url: "https://example.com/folk/ash" },
+  { title: "灯芯草：生长环境与取火用途", source: "植物志", snippet: "灯芯草髓部可制灯芯，湿时柔韧，干后易燃，是旧时民间照明的主要材料…", url: "https://example.com/botany/rush" },
+];
+
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+
+  const body = (await request.json().catch(() => null)) as {
+    query?: unknown;
+  } | null;
+  const query = typeof body?.query === "string" ? body.query.trim() : "";
+  if (!query) {
+    return NextResponse.json({ error: "搜索关键词不能为空" }, { status: 400 });
+  }
+  if (query.length > MAX_QUERY) {
+    return NextResponse.json({ error: `搜索词过长（上限 ${MAX_QUERY} 字）` }, { status: 400 });
+  }
+
+  // 测试模式
+  if (process.env.WEBSEARCH_PROVIDER === "mock") {
+    return NextResponse.json({ results: MOCK_RESULTS, degraded: true, note: "联网检索服务降级（mock 数据）" });
+  }
+
+  try {
+    // 真实检索：走公开搜索端点（Bing 无 key 的 html 查询，超时受控）
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    const res = await fetch(
+      `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+      { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MoZhou/1.0" } },
+    );
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`上游 ${res.status}`);
+
+    // 简化解析：提取标题与摘要片段（真实解析器归后续切片）
+    const html = await res.text();
+    const titles = [...html.matchAll(/<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>([^<]{5,80})<\/a>/g)]
+      .slice(0, 6)
+      .map((m) => ({ url: m[1], title: m[2].replace(/<[^>]+>/g, "").trim() }));
+    if (titles.length === 0) {
+      return NextResponse.json({
+        results: MOCK_RESULTS,
+        degraded: true,
+        note: "检索结果解析失败，已降级为示例数据",
+      });
+    }
+    return NextResponse.json({
+      results: titles.map((t, i) => ({
+        title: t.title,
+        source: "联网检索",
+        snippet: `来自 ${t.url.split("/")[2] ?? "网络"} 的检索结果…`,
+        url: t.url,
+      })),
+      degraded: false,
+    });
+  } catch (err) {
+    // 超时/网络失败 → 优雅降级（绝不抛异常）
+    return NextResponse.json({
+      results: MOCK_RESULTS,
+      degraded: true,
+      note: `联网检索暂时不可用（${(err as Error).message}），已降级为示例数据`,
+    });
+  }
+}

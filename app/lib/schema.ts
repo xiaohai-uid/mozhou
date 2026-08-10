@@ -140,3 +140,17 @@ export const skills = pgTable("skills", {
   author: text("author").notNull().default("自定义"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/** WebDAV 同步配置（任务二-C）：每用户一条，保存后连接测试 */
+export const syncConfigs = pgTable("sync_configs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  username: text("username").notNull(),
+  /** 应用密码（存储为明文是权衡；生产应加密，见 AGENTS.md 基建备注） */
+  password: text("password").notNull(),
+  autoSync: boolean("auto_sync").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

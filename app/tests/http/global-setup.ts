@@ -22,6 +22,9 @@ export default async function setup() {
         DECONSTRUCT_PROVIDER: "mock", // 小说拆解同样 mock（09 工单）
         DRAW_PROVIDER: "mock", // 抽卡模式同样 mock（10 工单）
         SOURCE_PROVIDER: "mock", // 书源引擎同样 mock（08 工单，外部源不可达的确定性表现）
+        WEBSEARCH_PROVIDER: "mock", // 联网搜索 mock（任务二-C）
+        RANKINGS_PROVIDER: "mock", // 网文扫榜 mock（任务二-C）
+        SYNC_PROVIDER: "mock", // 云同步 mock（任务二-C）
       },
       stdio: ["ignore", "pipe", "pipe"],
     },

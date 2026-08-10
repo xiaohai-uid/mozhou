@@ -1,23 +1,53 @@
 "use client";
 
-// 联网搜索（UI）：写作时搜资料，结果列表 + 引用入文。
+// 联网搜索（任务二-C 已真实化）：真实检索（超时优雅降级）+ 结果列表 + 引用入文。
 import { useState } from "react";
 import { GlobeSimple, LinkSimple } from "@phosphor-icons/react/dist/ssr";
+
+interface WebResult {
+  title: string;
+  source: string;
+  snippet: string;
+  url: string;
+}
 
 export function WebSearchView() {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<WebResult[]>([]);
   const [searched, setSearched] = useState(false);
+  const [degraded, setDegraded] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function doSearch() {
     const q = query.trim();
     if (!q || searching) return;
     setSearching(true);
     setSearched(false);
-    // UI 先行：mock 检索延迟；后端 /api/v1/websearch 实现后替换为真实 fetch
-    await new Promise((r) => setTimeout(r, 900));
-    setSearching(false);
-    setSearched(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/websearch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = (await res.json()) as {
+        results?: WebResult[];
+        degraded?: boolean;
+        note?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "检索失败");
+      setResults(data.results ?? []);
+      setDegraded(data.degraded ?? false);
+      setNote(data.note ?? null);
+      setSearched(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
@@ -61,13 +91,21 @@ export function WebSearchView() {
         </div>
       )}
 
-      {searched && (
+      {error && (
+        <p role="alert" className="mt-6 text-sm text-red-400">
+          {error}
+        </p>
+      )}
+
+      {searched && !searching && (
         <div className="mt-8 space-y-3">
-          {[
-            { title: "「灰烬」在丧葬民俗中的含义", source: "民俗百科", snippet: "骨灰罐中留存火种，象征家族延续，多出现在南方宗族葬俗记载中…" },
-            { title: "灯芯草：生长环境与取火用途", source: "植物志", snippet: "灯芯草髓部可制灯芯，湿时柔韧，干后易燃，是旧时民间照明的主要材料…" },
-            { title: "零界：方言中「边界之外」的说法", source: "方言词典", snippet: "部分地区以「零界」指代村界之外、不可知的地带，常用于老人讲述的禁忌故事…" },
-          ].map((r) => (
+          {degraded && (
+            <div className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 text-xs text-yellow-400">
+              <span className="inline-block size-1.5 shrink-0 rounded-full bg-yellow-400" aria-hidden />
+              {note ?? "联网检索服务暂时不可用，已降级为示例数据"}
+            </div>
+          )}
+          {results.map((r) => (
             <div key={r.title} className="rounded-card border border-surface-2 bg-surface/50 px-6 py-4 transition hover:border-zinc-600">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -82,7 +120,6 @@ export function WebSearchView() {
               </div>
             </div>
           ))}
-          <p className="pt-2 text-center text-xs text-faint">检索服务接入中，当前为界面示意</p>
         </div>
       )}
     </main>

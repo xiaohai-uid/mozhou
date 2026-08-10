@@ -1,22 +1,56 @@
 "use client";
 
-// 云同步（UI）：WebDAV 配置（坚果云默认端点）+ 同步状态。
-import { useState } from "react";
+// 云同步（任务二-C 已真实化）：WebDAV 配置保存 + 真实连接测试（超时优雅错误）。
+import { useEffect, useState } from "react";
 import { CloudArrowUp, Eye, EyeSlash, ToggleLeft, ToggleRight } from "@phosphor-icons/react/dist/ssr";
 
 export function SyncView() {
+  const [url, setUrl] = useState("https://dav.jianguoyun.com/dav/");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    // 加载已有配置（密码不回传，仅回填 URL/账号）
+    fetch("/api/v1/sync/config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { configured?: boolean; url?: string; username?: string; autoSync?: boolean } | null) => {
+        if (data?.configured) {
+          setUrl(data.url ?? url);
+          setUsername(data.username ?? "");
+          setAutoSync(data.autoSync ?? true);
+          setConfigured(true);
+        }
+      });
+  }, []);
 
   async function saveAndTest() {
     if (testing) return;
     setTesting(true);
-    // UI 先行：mock 连接测试延迟；后端 /api/v1/sync/config 实现后替换为真实 POST
-    await new Promise((r) => setTimeout(r, 1200));
-    setTesting(false);
-    setConfigured(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/v1/sync/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, username, password, autoSync }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "保存失败");
+      setResult({ ok: data.ok ?? false, message: data.message ?? "已连接" });
+      if (data.ok) setConfigured(true);
+    } catch (err) {
+      setResult({ ok: false, message: (err as Error).message });
+    } finally {
+      setTesting(false);
+    }
   }
 
   return (
@@ -33,7 +67,8 @@ export function SyncView() {
           <label className="block">
             <span className="text-xs text-faint">服务器地址</span>
             <input
-              defaultValue="https://dav.jianguoyun.com/dav/"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
               placeholder="https://dav.jianguoyun.com/dav/"
               className="mt-2 w-full rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
             />
@@ -42,6 +77,8 @@ export function SyncView() {
             <label className="block">
               <span className="text-xs text-faint">账号</span>
               <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder="坚果云邮箱"
                 className="mt-2 w-full rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
               />
@@ -51,6 +88,8 @@ export function SyncView() {
               <div className="relative mt-2">
                 <input
                   type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="坚果云「应用密码」"
                   className="w-full rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 pr-10 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
                 />
@@ -67,11 +106,19 @@ export function SyncView() {
         </div>
         <button
           onClick={() => void saveAndTest()}
-          disabled={testing}
+          disabled={testing || !url || !username || !password}
           className="mt-5 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
         >
           {testing ? "测试连接中…" : "保存并测试连接"}
         </button>
+        {result && (
+          <p
+            role={result.ok ? "status" : "alert"}
+            className={`mt-3 text-xs ${result.ok ? "text-emerald-400" : "text-yellow-400"}`}
+          >
+            {result.message}
+          </p>
+        )}
       </div>
 
       {/* 测试中 */}
@@ -96,8 +143,8 @@ export function SyncView() {
           </div>
           <ul className="mt-4 space-y-2.5 text-sm">
             {[
-              { name: "作品与章节", status: "3 分钟前同步" },
-              { name: "会话记录", status: "3 分钟前同步" },
+              { name: "作品与章节", status: "待首次同步" },
+              { name: "会话记录", status: "待首次同步" },
               { name: "技能包", status: "未更改" },
             ].map((item) => (
               <li
