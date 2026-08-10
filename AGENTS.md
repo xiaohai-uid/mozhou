@@ -2,26 +2,53 @@
 
 Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS.md` (symlinked from `~/.zcode/AGENTS.md`) — this file only adds project-scoped conventions.
 
-## Agent skills
+## Engineering Rules - UVSD Protocol v2.2.1 Final
 
-### Issue tracker
+> 生效：2026-08-11（替换旧《全局开发规范 v1.0.0》禁锢规约；V1.0 已归档，12 接口全部真实化，范围锁死解除）。
+> 核心口诀：User Journey 决定范围，UI 固化交互，Contract 固化边界，Spike 验证技术风险，Walking Skeleton 贯穿血脉，Vertical Slice 持续交付，Automated Gates 防止 AI 越界。
 
-Issues and specs live as local markdown under `.scratch/<feature>/` (spec at `spec.md`, one file per ticket at `issues/NN-<slug>.md`). See `docs/agents/issue-tracker.md`.
+### 1. Scope & Capabilities
+1. User journeys define product scope. UI defines the interactive surface.
+2. Do not implement business capabilities that are not required by an approved user journey.
+3. Necessary security, persistence, reliability, observability, and runtime infrastructure are allowed only when required by an approved capability.
+4. Do not implement speculative V2/V3 abstractions or unrequested architectural layers.
 
-### Triage labels
+### 2. Ticket Boundary & Scope
+5. One ticket implements one observable behavior or capability.
+6. A ticket may change multiple related files across layers if required by that capability.
+7. Current-ticket local refactoring is allowed only when strictly necessary. Never perform architectural refactoring, cross-module refactoring, directory restructuring, or generic abstraction extraction.
+8. If a required fix crosses the ticket boundary, stop and report the dependency instead of expanding scope.
 
-Five canonical roles, label strings equal to their names: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+### 3. Contracts & BFF Layer
+9. UI consumes explicit typed contracts; UI data models must not directly dictate persistence domain models.
+10. Contracts are frozen by default.
+11. Contract changes require an explicit Contract Delta and synchronized updates to schema, mock, implementation, and tests.
+12. Never bypass a contract with `any`, untyped maps, generic metadata fields (`data?: any`), or undocumented response fields.
 
-### Domain docs
+### 4. Environment & Mocking Boundaries
+13. Mock data is allowed only in development, test, or explicitly marked demo environments.
+14. Production must never silently fall back to mock data.
+15. Production failures must surface as an explicit error, unavailable state, cached/stale state when valid, or controlled retry.
 
-Single-context — one `CONTEXT.md` at the repo root (grill-with-docs output, 23 decisions), ADRs at `docs/adr/` when they exist. See `docs/agents/domain.md`.
+### 5. Verification & Test Integrity
+16. Every change must include appropriate tests.
+17. Test failures may only be fixed inside the causal scope of the current ticket via evidence-based iterations. Stop if the same failure repeats twice or requires out-of-scope changes.
+18. Never change unrelated code merely to make tests pass.
+19. Do not claim completion until required verification checks (TypeCheck, Tests, Build) have actually passed.
+20. NEVER weaken, delete, skip, or rewrite a failing test merely to make verification pass. A test may change only when: a) the approved requirement/behavior changed, b) an approved Contract Delta changed the contract, or c) the test itself is demonstrated to be invalid, with the reason documented in the ticket.
+21. Existing passing tests are regression constraints and must not be modified or deleted merely to accommodate an implementation.
 
-## 开发禁锢规约（《全局开发规范 v1.0.0》第五节）
+### 6. Unattended / Night Mode Protocols
+22. Unattended Mode may start only from a clean committed baseline in a dedicated branch or isolated git worktree. If unrelated uncommitted developer changes exist, DO NOT start autonomous implementation; mark the run BLOCKED.
+23. NEVER perform destructive Git operations (`git reset --hard`, `git clean -fd`, `git checkout -- .`) on uncommitted developer work.
+24. NEVER execute production DB migrations, deploy code, publish packages, force-push branches, modify secrets, or trigger irreversible external side effects (payments, real emails).
+25. In Unattended Mode: If an architectural decision or ambiguous requirement is required, stop that ticket and mark it BLOCKED. Do not guess.
+26. Preserve failed work and diffs in an isolated branch/worktree for developer inspection rather than destructively cleaning it.
+27. Produce a structured Morning Report detailing commits, verification results, contract deltas, pending migrations, blocked tickets, external side effects, and retained diffs.
 
-> 生效：2026-08-09。核心哲学：UI 先行 (UI-First) · 契约驱动 (Contract-Driven) · 物理隔离 (Surgical Isolation) · 渐进演进 (Incremental MVP)。契约全集见 `.scratch/mozhou-mvp/contracts/api-contract.md`。
-
-1. **契约死规则**：未在当前 UI 界面展示的 API 接口与字段，严肃禁止在后端编写占位逻辑。
-2. **范围锁死**：现阶段只允许修改【写作对话】与【认证】相关代码，其余 11 个界面代码处于只读冷冻状态。
-3. **拒绝重构**：排错时仅修改报错对应的具体函数。严禁顺手优化未报错的 Rust Core / Go 架构。
-4. **工单限制**：每次回答仅允许执行 1 个工单，改动文件不得超过 3 个。单工单完成后触发审查并提交 Git。
-5. **拒绝谄媚**：严禁建议合并工单回顾。遇到不明确架构，触发 /grill-me 向人类发起追问。
+### 7. 项目基建（V1.0 已固化，勿删）
+- 契约全集：`.scratch/mozhou-mvp/contracts/api-contract.md`（已实现端点以后端发射端 + 契约测试为准，UI 消费是协议子集）
+- Ticket tracker：`.scratch/mozhou-mvp/issues/NN-<slug>.md`；spec 见 `.scratch/mozhou-mvp/spec.md`
+- 决策记录：OB `10_Projects/墨舟.md`；spike 结论：`docs/spikes/`（见 0.5 探针）
+- 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
+- 遗留切片（V1.1 候选）：书源 HTML 规则解析器、会员支付、蒸馏风格库持久化

@@ -37,6 +37,8 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Retrying 态（UVSD Stage 2）：失败后保留最后输入，可一键重试
+  const [lastSentContent, setLastSentContent] = useState<string | null>(null);
   // 12 工单：历史被自动压缩的提示（done.compressed）
   const [compressedNotice, setCompressedNotice] = useState(false);
   // 当前作品绑定（R3 决策）：顶部选择器，RAG 按作品过滤
@@ -142,6 +144,7 @@ export function ChatView() {
     if (!content || streaming) return;
     setInput("");
     setError(null);
+    setLastSentContent(content);
     setStreaming(true);
     setMessages((prev) => [...prev, { role: "user", content }]);
     // 流式期间先插入占位 assistant 消息
@@ -196,6 +199,7 @@ export function ChatView() {
         }
       }
       if (!body) throw new Error("没有收到回复");
+      setLastSentContent(null); // 成功即清空重试缓存
     } catch (err) {
       setError((err as Error).message);
       setMessages((prev) => prev.slice(0, -1)); // 移除占位消息
@@ -203,6 +207,13 @@ export function ChatView() {
       setStreaming(false);
       await refreshSessions();
     }
+  }
+
+  /** Retrying 态：重发上一次失败的内容 */
+  async function retryLast() {
+    if (!lastSentContent || streaming) return;
+    setInput(lastSentContent);
+    await send();
   }
 
   /** 内联抽卡（10 工单真实化）：同一指令多模型并行生成候选，选中后才作为消息插入（不落库） */
@@ -463,9 +474,33 @@ export function ChatView() {
 
         <footer className="border-t border-surface-2 p-4">
           {error && (
-            <p role="alert" className="mb-2 text-sm text-red-400">
-              {error}
-            </p>
+            <div
+              role="alert"
+              className={`mb-2 flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm ${
+                /额度|次数已用完|402|429/.test(error)
+                  ? "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
+                  : "border-red-500/30 bg-red-500/5 text-red-400"
+              }`}
+            >
+              <span>
+                {/额度|次数已用完|402|429/.test(error) && (
+                  <span className="mr-2 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px]">
+                    额度不足
+                  </span>
+                )}
+                {error}
+              </span>
+              {/* Retrying 态：失败后提供重试（重发最后一条输入） */}
+              {!streaming && lastSentContent && (
+                <button
+                  onClick={() => void retryLast()}
+                  disabled={streaming}
+                  className="shrink-0 rounded-full border border-current px-3 py-1 text-xs transition hover:bg-current/10 disabled:opacity-40"
+                >
+                  重试
+                </button>
+              )}
+            </div>
           )}
           <div className="flex items-end gap-2 rounded-xl border border-surface-2 bg-zinc-950 p-2 transition focus-within:border-accent">
             <textarea

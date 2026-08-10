@@ -135,6 +135,12 @@ export function AccountView() {
       {/* 额度与用量（11 工单：真实聚合） */}
       <div className="mt-8 rounded-card border border-surface-2 bg-surface/50 p-6">
         <h2 className="text-sm font-semibold text-zinc-200">额度与用量</h2>
+        {(overview?.quota.token.pct ?? 0) >= 100 && (
+          <p className="mt-2 flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 text-xs text-yellow-400">
+            <span className="inline-block size-1.5 shrink-0 rounded-full bg-yellow-400" aria-hidden />
+            Token 额度已用完（RateLimited）—— 升级会员解锁更多
+          </p>
+        )}
         <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2">
           {[
             {

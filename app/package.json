@@ -10,7 +10,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gate:ticket": "tsc --noEmit && vitest run --changed",
+    "gate:milestone": "tsc --noEmit && vitest run && next build"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
