@@ -44,6 +44,9 @@ interface ChatRequest {
   sessionId: number | null; // null = 新会话（首个 delta 会带回 sessionId）
   model: "deepseek-v4-flash" | "glm-4.5-flash";
   content: string;          // 用户输入（Enter 发送；上限 4000 字）
+  novelId?: number | null;  // 当前作品绑定（R3：RAG 只检索该作品设定）
+  styleId?: number | null;  // 风格引用（工单 15）：风格库 id，服务端查表注入完整四维指南；可空
+  skills?: string[];        // 技能名列表（任务二-A：按名查 skills 表注入 systemPrompt）
 }
 // SSE 事件流（每行 data: {...}，\n\n 分隔；事件顺序：start → delta* → done，出错时 error 替代后续流）：
 interface ChatStreamEvent =

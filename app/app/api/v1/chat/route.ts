@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     model?: unknown;
     content?: unknown;
     novelId?: unknown;
-    style?: unknown;
+    styleId?: unknown;
     skills?: unknown;
   };
   try {
@@ -46,8 +46,10 @@ export async function POST(request: Request) {
     typeof body.novelId === "number" && Number.isInteger(body.novelId)
       ? body.novelId
       : null;
-  const style =
-    typeof body.style === "string" && body.style.trim() ? body.style.trim() : null;
+  const styleId =
+    typeof body.styleId === "number" && Number.isInteger(body.styleId)
+      ? body.styleId
+      : null;
   const skills =
     Array.isArray(body.skills) &&
     body.skills.every((s) => typeof s === "string" && s.trim())
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
           model,
           content,
           novelId,
-          style,
+          styleId,
           skills,
           onDelta: (text) => send({ type: "delta", text }),
         });

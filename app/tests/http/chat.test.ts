@@ -299,3 +299,67 @@ describe("上下文自动压缩（12 工单）", () => {
     expect(done?.compressed ?? false).toBe(false);
   });
 });
+
+describe("chat styleId 注入（工单 15，mock 回显 system 提示）", () => {
+  it("携带 styleId → 四维指南按契约格式注入（叙事视角/句式节奏/意象偏好/情绪节奏）", async () => {
+    const save = await fetch(`${BASE}/api/v1/styles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({
+        name: "注入测试风格",
+        guide: { narrative: "N-视角", sentence: "S-句式", imagery: "I-意象", rhythm: "R-节奏" },
+      }),
+    });
+    expect(save.status).toBe(201);
+    const { style } = (await save.json()) as { style: { id: number } };
+
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "写一段", styleId: style.id }),
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("（已注入：");
+    expect(text).toContain(
+      "[风格] 注入测试风格：叙事视角——N-视角；句式节奏——S-句式；意象偏好——I-意象；情绪节奏——R-节奏",
+    );
+    expect(text).toContain('"type":"done"');
+  });
+
+  it("他人风格的 styleId → 归属校验不注入，不报错", async () => {
+    // other 保存一条风格
+    const save = await fetch(`${BASE}/api/v1/styles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: other.cookie },
+      body: JSON.stringify({
+        name: "他人风格",
+        guide: { narrative: "X", sentence: "X", imagery: "X", rhythm: "X" },
+      }),
+    });
+    expect(save.status).toBe(201);
+    const { style } = (await save.json()) as { style: { id: number } };
+
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "hi", styleId: style.id }),
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain("他人风格");
+    expect(text).toContain('"type":"done"');
+  });
+
+  it("不存在的 styleId → 静默忽略，正常完成", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "hi", styleId: 999999 }),
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain("[风格]");
+    expect(text).toContain('"type":"done"');
+  });
+});

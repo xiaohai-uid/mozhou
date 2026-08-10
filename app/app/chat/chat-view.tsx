@@ -18,6 +18,12 @@ interface NovelSummary {
   name: string;
 }
 
+/** 风格库引用（工单 15）：chat 只持 id+name，四维指南由服务端按 styleId 注入 */
+interface StyleRef {
+  id: number;
+  name: string;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -45,7 +51,9 @@ export function ChatView() {
   const [novels, setNovels] = useState<NovelSummary[]>([]);
   const [novelId, setNovelId] = useState<number | null>(null);
   // 风格/技能选择（R4 决策）：胶囊单选/多选，注入 system 提示
-  const [style, setStyle] = useState<string | null>(null);
+  // 工单 15：风格引用真实风格库（{id,name}），请求带 styleId；演示三件套已删除
+  const [style, setStyle] = useState<StyleRef | null>(null);
+  const [styleLibrary, setStyleLibrary] = useState<StyleRef[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   // 技能链路（真实化）：从 /api/v1/skills 加载我的技能名，胶囊可选中注入
   const [mySkillNames, setMySkillNames] = useState<string[]>([]);
@@ -90,21 +98,35 @@ export function ChatView() {
       .then((data: { skills: Array<{ name: string }> } | null) => {
         if (data) setMySkillNames(data.skills.map((s) => s.name));
       });
-    // R1/R2 回流：读取蒸馏页暂存风格，自动选中（一次性初始化，setState 豁免见下行）
-    try {
-      const raw = sessionStorage.getItem("mozhou_pending_style");
-      if (raw) {
-        const pending = JSON.parse(raw) as { name?: string };
-        sessionStorage.removeItem("mozhou_pending_style");
-        if (pending?.name) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setStyle(pending.name);
-          setError(null);
+    // 风格库（工单 15）：加载我的风格库 → 胶囊可选中；蒸馏页回流（{styleId,name}）校验后选中
+    fetch("/api/v1/styles")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { styles: StyleRef[] } | null) => {
+        const lib = data ? data.styles : [];
+        setStyleLibrary(lib);
+        // R1/R2 回流：蒸馏页保存后"应用到对话"（styleId 引用），校验存在于库中才选中
+        try {
+          const raw = sessionStorage.getItem("mozhou_pending_style");
+          if (raw) {
+            const pending = JSON.parse(raw) as { styleId?: number; name?: string };
+            sessionStorage.removeItem("mozhou_pending_style");
+            const match = lib.find((s) => s.id === pending.styleId);
+            if (match) {
+              setStyle({ id: match.id, name: match.name });
+              setError(null);
+            } else if (pending.name) {
+              // 旧格式/未知 id 兜底：按名匹配
+              const byName = lib.find((s) => s.name === pending.name);
+              if (byName) {
+                setStyle({ id: byName.id, name: byName.name });
+                setError(null);
+              }
+            }
+          }
+        } catch {
+          // 暂存数据损坏则忽略
         }
-      }
-    } catch {
-      // 暂存数据损坏则忽略
-    }
+      });
     // R1/R2 回流：读取拆解页暂存结果，作为消息插入对话流
     try {
       const raw = sessionStorage.getItem("mozhou_pending_deconstruct");
@@ -121,7 +143,7 @@ export function ChatView() {
               (b) => `\n${b.name}：\n` + b.lines.map((l) => `  - ${l}`).join("\n"),
             ),
           ].join("");
-          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]);
+          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]); // eslint-disable-line react-hooks/set-state-in-effect -- 一次性初始化回流，与 style 回流同类豁免
         }
       }
     } catch {
@@ -164,7 +186,7 @@ export function ChatView() {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model, content, novelId, style, skills }),
+        body: JSON.stringify({ sessionId, model, content, novelId, styleId: style?.id ?? null, skills }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
@@ -360,28 +382,37 @@ export function ChatView() {
             </label>
           </div>
           <div className="flex items-center gap-2">
-            {/* 风格胶囊（R4：单选，同时只生效一种文风） */}
+            {/* 风格胶囊（R4：单选，同时只生效一种文风；工单 15：数据源 = 我的风格库） */}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-faint">风格</span>
-              {style && !["无", "灰烬写实", "意象绵长"].includes(style) && (
-                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs text-accent">
-                  {style}
-                </span>
-              )}
-              {["无", "灰烬写实", "意象绵长"].map((s) => (
+              <button
+                onClick={() => setStyle(null)}
+                disabled={streaming}
+                className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                  style === null
+                    ? "bg-accent/15 text-accent"
+                    : "border border-surface-2 text-faint hover:text-zinc-300"
+                }`}
+              >
+                无
+              </button>
+              {styleLibrary.map((s) => (
                 <button
-                  key={s}
-                  onClick={() => setStyle(s === "无" ? null : s)}
+                  key={s.id}
+                  onClick={() => setStyle({ id: s.id, name: s.name })}
                   disabled={streaming}
                   className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
-                    style === s
+                    style?.id === s.id
                       ? "bg-accent/15 text-accent"
                       : "border border-surface-2 text-faint hover:text-zinc-300"
                   }`}
                 >
-                  {s}
+                  {s.name}
                 </button>
               ))}
+              {styleLibrary.length === 0 && (
+                <span className="text-xs text-zinc-600">（蒸馏页保存后出现）</span>
+              )}
             </div>
             {/* 技能胶囊（R4 多选 + 真实技能库） */}
             <div className="flex items-center gap-1.5">

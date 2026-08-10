@@ -1,7 +1,7 @@
 // 对话会话服务：会话 CRUD + runChat（管线流式 + 持久化）
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { messages, sessions, skills as skillsTable } from "@/lib/schema";
+import { messages, sessions, skills as skillsTable, styles as stylesTable } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
 import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
@@ -96,7 +96,8 @@ export interface RunChatInput {
   model: ChatModel;
   content: string;
   novelId?: number | null;
-  style?: string | null;
+  /** 风格引用（工单 15）：风格库 id，服务端查表注入完整四维指南 */
+  styleId?: number | null;
   skills?: string[];
   onDelta: (text: string) => void;
 }
@@ -148,10 +149,20 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   const injected = await retrieveContext(input.userId, input.content, {
     novelId: input.novelId ?? null,
   });
-  // 风格/技能（R4 决策 + 任务二-A）：技能从 skills 表取真实 systemPrompt 注入
+  // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验）
   const extra: string[] = [];
   if (summary) extra.push(summary);
-  if (input.style) extra.push(`[风格] 全文遵循「${input.style}」文风写作`);
+  if (input.styleId) {
+    const styleRows = await db
+      .select({ name: stylesTable.name, guide: stylesTable.guide })
+      .from(stylesTable)
+      .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
+    for (const row of styleRows) {
+      extra.push(
+        `[风格] ${row.name}：叙事视角——${row.guide.narrative}；句式节奏——${row.guide.sentence}；意象偏好——${row.guide.imagery}；情绪节奏——${row.guide.rhythm}`,
+      );
+    }
+  }
   if (input.skills && input.skills.length > 0) {
     const skillRows = await db
       .select({ name: skillsTable.name, systemPrompt: skillsTable.systemPrompt })

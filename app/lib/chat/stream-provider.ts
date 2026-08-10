@@ -88,7 +88,12 @@ export class OneApiStreamProvider implements StreamProvider {
 
 /** 固定流 mock（契约测试用，确定性输出） */
 export class MockChatProvider implements StreamProvider {
+  constructor(private systemPrompt?: string) {}
   async *stream(): AsyncIterable<StreamDelta> {
+    // 回显 system 提示（若有注入：RAG/风格/技能/压缩），让注入成为可断言的外部行为（工单 15）
+    if (this.systemPrompt) {
+      yield { text: `（已注入：${this.systemPrompt}）` };
+    }
     for (const piece of ["你好，我是墨舟。", "（模拟流式输出）"]) {
       yield { text: piece };
     }
@@ -103,7 +108,7 @@ export function makeChatProvider(
   systemPrompt?: string,
 ): StreamProvider {
   if (process.env.CHAT_PROVIDER === "mock") {
-    return new MockChatProvider();
+    return new MockChatProvider(systemPrompt);
   }
   return new OneApiStreamProvider({
     baseUrl: process.env.ONEAPI_BASE_URL ?? "http://localhost:3001",
