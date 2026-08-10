@@ -15,7 +15,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  let body: { sessionId?: unknown; model?: unknown; content?: unknown };
+  let body: {
+    sessionId?: unknown;
+    model?: unknown;
+    content?: unknown;
+    novelId?: unknown;
+    style?: unknown;
+    skills?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -35,6 +42,17 @@ export async function POST(request: Request) {
       : DEFAULT_MODEL;
   const sessionId =
     typeof body.sessionId === "number" ? body.sessionId : undefined;
+  const novelId =
+    typeof body.novelId === "number" && Number.isInteger(body.novelId)
+      ? body.novelId
+      : null;
+  const style =
+    typeof body.style === "string" && body.style.trim() ? body.style.trim() : null;
+  const skills =
+    Array.isArray(body.skills) &&
+    body.skills.every((s) => typeof s === "string" && s.trim())
+      ? (body.skills as string[]).map((s) => s.trim())
+      : [];
 
   // 归属校验在流外完成：他人会话 → 404（不进入 SSE）
   if (sessionId !== undefined && (await listMessages(sessionId, user.id)) === null) {
@@ -48,17 +66,26 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       try {
         const targetSession =
-          sessionId ?? (await createSession(user.id)).id;
+          sessionId ??
+          (await createSession(user.id, undefined, novelId)).id;
         send({ type: "start", sessionId: targetSession });
         const result = await runChat({
           userId: user.id,
           sessionId: targetSession,
           model,
           content,
+          novelId,
+          style,
+          skills,
           onDelta: (text) => send({ type: "delta", text }),
         });
         if (result.state.task?.status === "ok" && result.messageId) {
-          send({ type: "done", messageId: result.messageId });
+          send({
+            type: "done",
+            messageId: result.messageId,
+            injected: result.injected,
+            compressed: result.compressed,
+          });
         } else if (result.state.task?.status === "ok") {
           send({ type: "error", message: "模型返回为空，请重试" });
         } else {

@@ -22,6 +22,28 @@ const demoRows = [
 export function RankingsView() {
   const [enabled, setEnabled] = useState(false);
   const [board, setBoard] = useState(boards[0].name);
+  const [loading, setLoading] = useState(false);
+
+  async function toggleEnabled() {
+    if (enabled) {
+      setEnabled(false);
+      return;
+    }
+    // UI 先行：mock 扫榜启动延迟；后端 /api/v1/rankings 实现后替换为真实 fetch
+    setLoading(true);
+    await new Promise((r) => setTimeout(r, 900));
+    setLoading(false);
+    setEnabled(true);
+  }
+
+  async function switchBoard(name: string) {
+    if (name === board || loading) return;
+    setLoading(true);
+    // UI 先行：mock 榜源切换延迟
+    await new Promise((r) => setTimeout(r, 600));
+    setLoading(false);
+    setBoard(name);
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
@@ -34,11 +56,17 @@ export function RankingsView() {
           <p className="mt-2 text-sm text-muted">跟踪热门作品与市场风向，扫榜结果可写入参考库</p>
         </div>
         <button
-          onClick={() => setEnabled((v) => !v)}
+          onClick={() => void toggleEnabled()}
           aria-label={enabled ? "关闭扫榜" : "开启扫榜"}
           className={enabled ? "text-accent" : "text-faint"}
         >
-          {enabled ? <ToggleRight size={32} weight="fill" /> : <ToggleLeft size={32} weight="fill" />}
+          {loading ? (
+            <span className="inline-block size-4 animate-pulse rounded-full bg-accent" aria-hidden />
+          ) : enabled ? (
+            <ToggleRight size={32} weight="fill" />
+          ) : (
+            <ToggleLeft size={32} weight="fill" />
+          )}
         </button>
       </div>
 
@@ -49,8 +77,9 @@ export function RankingsView() {
             {boards.map((b) => (
               <button
                 key={b.name}
-                onClick={() => setBoard(b.name)}
-                className={`rounded-full px-4 py-2 text-sm transition ${
+                onClick={() => void switchBoard(b.name)}
+                disabled={loading}
+                className={`rounded-full px-4 py-2 text-sm transition disabled:opacity-50 ${
                   board === b.name
                     ? "bg-accent text-white"
                     : "border border-surface-2 text-zinc-400 hover:text-zinc-200"
@@ -67,8 +96,17 @@ export function RankingsView() {
           {/* 榜单 */}
           <div className="mt-6 rounded-card border border-surface-2 bg-surface/50">
             <div className="border-b border-surface-2 px-6 py-3.5">
-              <h2 className="text-sm font-semibold text-zinc-200">{board}</h2>
+              <h2 className="text-sm font-semibold text-zinc-200">
+                {board}
+                {loading && <span className="ml-2 text-xs font-normal text-faint">加载中…</span>}
+              </h2>
             </div>
+            {loading ? (
+              <div className="flex items-center justify-center gap-3 py-12">
+                <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+                <span className="text-sm text-muted">正在拉取榜单…</span>
+              </div>
+            ) : (
             <ul className="divide-y divide-surface-2">
               {demoRows.map((r) => (
                 <li key={r.rank} className="flex items-center gap-4 px-6 py-3.5">
@@ -84,6 +122,7 @@ export function RankingsView() {
                 </li>
               ))}
             </ul>
+            )}
           </div>
           <p className="mt-4 text-center text-xs text-faint">
             榜单数据源接入中，当前为界面示意

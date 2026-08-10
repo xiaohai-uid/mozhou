@@ -4,7 +4,10 @@ import { db } from "@/lib/db";
 import { messages, sessions } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
-import { makeChatProvider, type ChatMessage } from "./stream-provider";
+import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
+import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
+import { compressHistory, shouldCompress } from "./compress";
+import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "./models";
 
 export { DEFAULT_MODEL, MODELS, isChatModel } from "./models";
@@ -24,22 +27,34 @@ export interface SessionRow {
   id: number;
   title: string;
   createdAt: Date;
+  novelId: number | null;
 }
 
 export async function createSession(
   userId: number,
   title: string = DEFAULT_TITLE,
+  novelId?: number | null,
 ): Promise<SessionRow> {
   const [row] = await db
     .insert(sessions)
-    .values({ userId, title })
-    .returning({ id: sessions.id, title: sessions.title, createdAt: sessions.createdAt });
+    .values({ userId, title, novelId: novelId ?? null })
+    .returning({
+      id: sessions.id,
+      title: sessions.title,
+      createdAt: sessions.createdAt,
+      novelId: sessions.novelId,
+    });
   return row!;
 }
 
 export async function listSessions(userId: number): Promise<SessionRow[]> {
   return db
-    .select({ id: sessions.id, title: sessions.title, createdAt: sessions.createdAt })
+    .select({
+      id: sessions.id,
+      title: sessions.title,
+      createdAt: sessions.createdAt,
+      novelId: sessions.novelId,
+    })
     .from(sessions)
     .where(eq(sessions.userId, userId))
     .orderBy(desc(sessions.createdAt));
@@ -80,6 +95,9 @@ export interface RunChatInput {
   sessionId: number;
   model: ChatModel;
   content: string;
+  novelId?: number | null;
+  style?: string | null;
+  skills?: string[];
   onDelta: (text: string) => void;
 }
 
@@ -89,6 +107,10 @@ export interface RunChatResult {
   reply: string;
   /** 落库后的助手消息 id（ok 时） */
   messageId?: number;
+  /** RAG 注入的设定条目（06 工单；供界面展示作者可见） */
+  injected: RagEntry[];
+  /** 本次是否触发上下文压缩（12 工单；UI 可见） */
+  compressed: boolean;
 }
 
 /**
@@ -114,7 +136,31 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   }
 
   const history = await listMessages(input.sessionId, input.userId);
-  const provider = makeChatProvider(input.model, history ?? []);
+  // 上下文压缩（12 工单）：历史超阈值 → 早期消息摘要化，摘要注入 system
+  let compressed = false;
+  let summary = "";
+  if (history && shouldCompress(history)) {
+    const r = await compressHistory(history);
+    summary = r.summary;
+    compressed = summary.length > 0;
+  }
+  // RAG 注入（06 工单）：按当前输入 + 绑定作品检索相关设定条目，注入 system 提示
+  const injected = await retrieveContext(input.userId, input.content, {
+    novelId: input.novelId ?? null,
+  });
+  // 风格/技能（R4 决策）：与 RAG 注入合并为 system 提示
+  const extra: string[] = [];
+  if (summary) extra.push(summary);
+  if (input.style) extra.push(`[风格] 全文遵循「${input.style}」文风写作`);
+  for (const sk of input.skills ?? []) extra.push(`[技能] 启用「${sk}」规则`);
+  const provider = makeChatProvider(
+    input.model,
+    history ?? [],
+    buildSystemPrompt([
+      ...injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
+      ...extra,
+    ]),
+  );
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },
@@ -122,12 +168,21 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   );
 
   const reply = state.task?.outputs.at(-1) ?? "";
+  // 用量记账（11 工单）：chat 每轮落 usage_events
+  await recordUsage(
+    input.userId,
+    "写作对话",
+    state.ledger.prompt,
+    state.ledger.completion,
+  ).catch(() => {
+    // 记账失败不阻断对话
+  });
   if (state.task?.status === "ok" && reply) {
     const [assistantMsg] = await db
       .insert(messages)
       .values({ sessionId: input.sessionId, role: "assistant", content: reply })
       .returning({ id: messages.id });
-    return { state, reply, messageId: assistantMsg?.id };
+    return { state, reply, messageId: assistantMsg?.id, injected, compressed };
   }
-  return { state, reply };
+  return { state, reply, injected, compressed };
 }

@@ -1,7 +1,7 @@
 "use client";
 
-// 会员中心（UI）：当前状态 + 套餐对比 + 升级入口。
-import { useState } from "react";
+// 会员中心（11 工单已真实化）：当前状态 + 套餐对比 + 真实用量（/api/v1/account）。
+import { useEffect, useState } from "react";
 import { Check, Crown } from "@phosphor-icons/react/dist/ssr";
 
 const features = [
@@ -14,8 +14,44 @@ const features = [
   { name: "高级模型 BYOK", free: false, member: true },
 ];
 
+interface AccountOverview {
+  email: string;
+  plan: "free" | "member";
+  quota: {
+    token: { used: number; total: number; pct: number };
+    draw: { used: number; total: number; pct: number };
+  };
+}
+
+function fmt(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(n);
+}
+
 export function AccountView() {
-  const [isMember] = useState(false);
+  const [isMember, setIsMember] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [overview, setOverview] = useState<AccountOverview | null>(null);
+
+  useEffect(() => {
+    // 11 工单：真实用量
+    fetch("/api/v1/account")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: AccountOverview | null) => {
+        if (data) {
+          setOverview(data);
+          setIsMember(data.plan === "member");
+        }
+      });
+  }, []);
+
+  async function upgrade() {
+    if (upgrading || isMember) return;
+    setUpgrading(true);
+    // UI 先行：mock 开通延迟；后端 /api/v1/account/upgrade 实现后替换为真实 POST
+    await new Promise((r) => setTimeout(r, 1200));
+    setUpgrading(false);
+    setIsMember(true);
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
@@ -85,10 +121,54 @@ export function AccountView() {
               </li>
             ))}
           </ul>
-          <button className="mt-6 w-full rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500">
-            升级为会员
+          <button
+            onClick={() => void upgrade()}
+            disabled={upgrading || isMember}
+            className="mt-6 w-full rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+          >
+            {upgrading ? "开通中…" : isMember ? "已是会员" : "升级为会员"}
           </button>
         </div>
+      </div>
+
+
+      {/* 额度与用量（11 工单：真实聚合） */}
+      <div className="mt-8 rounded-card border border-surface-2 bg-surface/50 p-6">
+        <h2 className="text-sm font-semibold text-zinc-200">额度与用量</h2>
+        <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2">
+          {[
+            {
+              label: "本月 Token",
+              used: fmt(overview?.quota.token.used ?? 0),
+              total: fmt(overview?.quota.token.total ?? 500000),
+              pct: overview?.quota.token.pct ?? 0,
+            },
+            {
+              label: "抽卡次数",
+              used: String(overview?.quota.draw.used ?? 0),
+              total: String(overview?.quota.draw.total ?? 20),
+              pct: overview?.quota.draw.pct ?? 0,
+            },
+          ].map((q) => (
+            <div key={q.label}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-faint">{q.label}</span>
+                <span className="text-sm font-medium text-zinc-200">
+                  {q.used}<span className="text-xs text-faint"> / {q.total}</span>
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className="h-full rounded-full bg-accent"
+                  style={{ width: `${q.pct}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-[11px] text-faint">
+          用量来自真实 Token 记账（写作对话/蒸馏/拆解/抽卡）
+        </p>
       </div>
 
       <p className="mt-6 text-center text-xs text-faint">

@@ -8,6 +8,16 @@ export function SyncView() {
   const [showPassword, setShowPassword] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [configured, setConfigured] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  async function saveAndTest() {
+    if (testing) return;
+    setTesting(true);
+    // UI 先行：mock 连接测试延迟；后端 /api/v1/sync/config 实现后替换为真实 POST
+    await new Promise((r) => setTimeout(r, 1200));
+    setTesting(false);
+    setConfigured(true);
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
@@ -56,12 +66,21 @@ export function SyncView() {
           </div>
         </div>
         <button
-          onClick={() => setConfigured(true)}
-          className="mt-5 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+          onClick={() => void saveAndTest()}
+          disabled={testing}
+          className="mt-5 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
         >
-          保存并测试连接
+          {testing ? "测试连接中…" : "保存并测试连接"}
         </button>
       </div>
+
+      {/* 测试中 */}
+      {testing && (
+        <div className="mt-6 flex items-center justify-center gap-3 rounded-card border border-surface-2 bg-surface/50 py-8">
+          <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+          <span className="text-sm text-muted">正在连接 WebDAV 服务器…</span>
+        </div>
+      )}
 
       {/* 同步状态 */}
       {configured && (

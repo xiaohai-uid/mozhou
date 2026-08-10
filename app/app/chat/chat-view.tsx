@@ -1,19 +1,32 @@
 "use client";
 
-// 写作对话视图：消息列表 + SSE 流式 + 会话切换 + 模型选择（深色编辑器风）
+// 写作对话视图：消息列表 + SSE 流式 + 会话切换 + 模型选择 + 内联抽卡（多模型候选选优）
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Plus } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUp, Plus, Shuffle } from "@phosphor-icons/react/dist/ssr";
+import { WritingToolsPanel } from "@/components/features/writing-tools-panel";
 import { MODELS } from "@/lib/chat/models";
 
 interface Session {
   id: number;
   title: string;
+  novelId: number | null;
+}
+
+interface NovelSummary {
+  id: number;
+  name: string;
 }
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/** 抽卡候选（一次并行生成的多模型结果） */
+interface DrawCandidate {
+  model: string;
+  text: string;
 }
 
 export function ChatView() {
@@ -24,6 +37,17 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 12 工单：历史被自动压缩的提示（done.compressed）
+  const [compressedNotice, setCompressedNotice] = useState(false);
+  // 当前作品绑定（R3 决策）：顶部选择器，RAG 按作品过滤
+  const [novels, setNovels] = useState<NovelSummary[]>([]);
+  const [novelId, setNovelId] = useState<number | null>(null);
+  // 风格/技能选择（R4 决策）：胶囊单选/多选，注入 system 提示
+  const [style, setStyle] = useState<string | null>(null);
+  const [skills, setSkills] = useState<string[]>([]);
+  // 内联抽卡状态：候选列表 + 抽卡中
+  const [drawing, setDrawing] = useState(false);
+  const [candidates, setCandidates] = useState<DrawCandidate[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
 
   const refreshSessions = useCallback(async () => {
@@ -39,15 +63,59 @@ export function ChatView() {
     const data = (await res.json()) as { messages: ChatMessage[] };
     setMessages(data.messages);
     setSessionId(id);
-  }, []);
+    // 会话绑定的作品回填选择器
+    const s = sessions.find((x) => x.id === id);
+    if (s) setNovelId(s.novelId);
+  }, [sessions]);
 
   useEffect(() => {
-    // 初始加载会话列表（异步，避免 effect 内同步 setState）
+    // 初始加载会话列表 + 作品列表（异步，避免 effect 内同步 setState）
     fetch("/api/v1/sessions")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { sessions: Session[] } | null) => {
         if (data) setSessions(data.sessions);
       });
+    fetch("/api/v1/novels")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { novels: NovelSummary[] } | null) => {
+        if (data) setNovels(data.novels);
+      });
+    // R1/R2 回流：读取蒸馏页暂存风格，自动选中
+    try {
+      const raw = sessionStorage.getItem("mozhou_pending_style");
+      if (raw) {
+        const pending = JSON.parse(raw) as { name?: string };
+        sessionStorage.removeItem("mozhou_pending_style");
+        if (pending?.name) {
+          setStyle(pending.name);
+          setError(null);
+        }
+      }
+    } catch {
+      // 暂存数据损坏则忽略
+    }
+    // R1/R2 回流：读取拆解页暂存结果，作为消息插入对话流
+    try {
+      const raw = sessionStorage.getItem("mozhou_pending_deconstruct");
+      if (raw) {
+        const pending = JSON.parse(raw) as {
+          chapter?: string | null;
+          blocks?: Array<{ name: string; lines: string[] }>;
+        };
+        sessionStorage.removeItem("mozhou_pending_deconstruct");
+        if (pending?.blocks) {
+          const text = [
+            `【第 ${pending.chapter ?? "?"} 章拆解结果】`,
+            ...pending.blocks.map(
+              (b) => `\n${b.name}：\n` + b.lines.map((l) => `  - ${l}`).join("\n"),
+            ),
+          ].join("");
+          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]);
+        }
+      }
+    } catch {
+      // 暂存数据损坏则忽略
+    }
   }, []);
 
   useEffect(() => {
@@ -57,7 +125,11 @@ export function ChatView() {
   async function newSession() {
     setStreaming(false);
     setError(null);
-    const res = await fetch("/api/v1/sessions", { method: "POST" });
+    const res = await fetch("/api/v1/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ novelId }),
+    });
     if (!res.ok) return;
     const data = (await res.json()) as { session: Session };
     setMessages([]);
@@ -80,7 +152,7 @@ export function ChatView() {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model, content }),
+        body: JSON.stringify({ sessionId, model, content, novelId, style, skills }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
@@ -104,9 +176,12 @@ export function ChatView() {
             text?: string;
             sessionId?: number;
             message?: string;
+            compressed?: boolean;
           };
           if (data.type === "start" && data.sessionId && !sessionId) {
             setSessionId(data.sessionId);
+          } else if (data.type === "done" && data.compressed) {
+            setCompressedNotice(true); // 12 工单：历史被压缩，UI 可见
           } else if (data.type === "delta" && data.text) {
             current += data.text;
             body = current;
@@ -128,6 +203,50 @@ export function ChatView() {
       setStreaming(false);
       await refreshSessions();
     }
+  }
+
+  /** 内联抽卡（10 工单真实化）：同一指令多模型并行生成候选，选中后才作为消息插入（不落库） */
+  async function drawCandidates() {
+    const content = input.trim();
+    if (!content || streaming || drawing) return;
+    setDrawing(true);
+    setError(null);
+    setCandidates([]);
+    try {
+      // 真实抽卡：每个模型并发调 /api/v1/draw（不落库，仅生成候选）
+      const results = await Promise.all(
+        MODELS.map(async (m) => {
+          const res = await fetch("/api/v1/draw", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: m, instruction: content }),
+          });
+          const data = (await res.json()) as { text?: string; error?: string };
+          if (!res.ok) throw new Error(data.error ?? `模型 ${m} 失败`);
+          return { model: m, text: data.text ?? "" };
+        }),
+      );
+      setCandidates(results);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDrawing(false);
+    }
+  }
+
+  /** 选用候选：作为助手消息插入对话流（占位替换，随下一条 send 落库） */
+  function adoptCandidate(candidate: DrawCandidate) {
+    setMessages((prev) => {
+      // 若末尾是抽卡占位（空 assistant），替换之；否则追加
+      const last = prev.at(-1);
+      if (last && last.role === "assistant" && last.content === "") {
+        const next = [...prev];
+        next[next.length - 1] = { role: "assistant", content: candidate.text };
+        return next;
+      }
+      return [...prev, { role: "assistant", content: candidate.text }];
+    });
+    setCandidates([]);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -184,24 +303,98 @@ export function ChatView() {
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-2 bg-surface/40">
         <header className="flex items-center justify-between border-b border-surface-2 px-5 py-3.5">
           <h1 className="text-sm font-medium text-zinc-300">写作对话</h1>
-          <label className="flex items-center gap-2 text-sm text-faint">
-            模型
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              disabled={streaming}
-              className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
-            >
-              {MODELS.map((id) => (
-                <option key={id} value={id}>
-                  {id === "deepseek-v4-flash" ? "DeepSeek（免费）" : "GLM（免费）"}
-                </option>
-              ))}
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-faint">
+              作品
+              <select
+                value={novelId ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNovelId(v === "" ? null : Number(v));
+                }}
+                disabled={streaming}
+                className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
+              >
+                <option value="">未绑定</option>
+                {novels.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-faint">
+              模型
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                disabled={streaming}
+                className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
+              >
+                {MODELS.map((id) => (
+                  <option key={id} value={id}>
+                    {id === "deepseek-v4-flash" ? "DeepSeek（免费）" : "GLM（免费）"}
+                  </option>
+                ))}
             </select>
-          </label>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* 风格胶囊（R4：单选，同时只生效一种文风） */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-faint">风格</span>
+              {style && !["无", "灰烬写实", "意象绵长"].includes(style) && (
+                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs text-accent">
+                  {style}
+                </span>
+              )}
+              {["无", "灰烬写实", "意象绵长"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStyle(s === "无" ? null : s)}
+                  disabled={streaming}
+                  className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                    style === s
+                      ? "bg-accent/15 text-accent"
+                      : "border border-surface-2 text-faint hover:text-zinc-300"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            {/* 技能胶囊（R4：多选叠加） */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-faint">技能</span>
+              {["去AI味", "伏笔管理"].map((sk) => (
+                <button
+                  key={sk}
+                  onClick={() =>
+                    setSkills((prev) =>
+                      prev.includes(sk) ? prev.filter((x) => x !== sk) : [...prev, sk],
+                    )
+                  }
+                  disabled={streaming}
+                  className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                    skills.includes(sk)
+                      ? "bg-accent/15 text-accent"
+                      : "border border-surface-2 text-faint hover:text-zinc-300"
+                  }`}
+                >
+                  {sk}
+                </button>
+              ))}
+            </div>
+          </div>
         </header>
 
         <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {compressedNotice && (
+            <div className="flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5 text-xs text-accent">
+              <span className="inline-block size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+              历史对话已自动压缩（摘要保留设定与进展），可继续写作
+            </div>
+          )}
           {messages.length === 0 && !streaming && (
             <div className="flex h-full flex-col items-center justify-center gap-2 pt-16">
               <p className="text-sm text-faint">与 AI 一起写作</p>
@@ -230,6 +423,42 @@ export function ChatView() {
               </div>
             </div>
           ))}
+
+          {/* 内联抽卡候选区 */}
+          {(drawing || candidates.length > 0) && (
+            <div className="space-y-2">
+              <p className="text-xs text-faint">
+                {drawing ? "抽卡中：多模型并行生成候选…" : "抽卡结果：点选一个作为回复"}
+              </p>
+              {drawing && (
+                <div className="flex items-center gap-3 rounded-2xl border border-surface-2 bg-zinc-950 px-4 py-3">
+                  <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+                  <span className="text-sm text-muted">模型并行生成中…</span>
+                </div>
+              )}
+              {candidates.map((c) => (
+                <div
+                  key={c.model}
+                  className="rounded-2xl border border-surface-2 bg-zinc-950 p-4 transition hover:border-accent/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs text-accent">
+                      {c.model === "deepseek-v4-flash" ? "DeepSeek" : "GLM"}
+                    </span>
+                    <button
+                      onClick={() => adoptCandidate(c)}
+                      className="rounded-full border border-surface-2 px-3 py-1 text-xs text-zinc-200 transition hover:border-accent hover:text-white"
+                    >
+                      选用
+                    </button>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-200">
+                    {c.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <footer className="border-t border-surface-2 p-4">
@@ -249,6 +478,15 @@ export function ChatView() {
               className="w-full resize-none bg-transparent px-2 py-1 text-sm text-zinc-100 outline-none placeholder:text-faint"
             />
             <button
+              onClick={() => void drawCandidates()}
+              disabled={!input.trim() || streaming || drawing}
+              aria-label="抽卡"
+              title="多模型并行生成候选，选优插入"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-surface-2 text-zinc-300 transition hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              <Shuffle size={16} weight="bold" />
+            </button>
+            <button
               onClick={() => void send()}
               disabled={!input.trim() || streaming}
               aria-label="发送"
@@ -259,6 +497,9 @@ export function ChatView() {
           </div>
         </footer>
       </section>
+
+      {/* 写作工具面板（合同/任务书/机检/上下文） */}
+      <WritingToolsPanel />
     </main>
   );
 }

@@ -6,7 +6,19 @@ import { GlobeSimple, LinkSimple } from "@phosphor-icons/react/dist/ssr";
 
 export function WebSearchView() {
   const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  async function doSearch() {
+    const q = query.trim();
+    if (!q || searching) return;
+    setSearching(true);
+    setSearched(false);
+    // UI 先行：mock 检索延迟；后端 /api/v1/websearch 实现后替换为真实 fetch
+    await new Promise((r) => setTimeout(r, 900));
+    setSearching(false);
+    setSearched(true);
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
@@ -19,7 +31,7 @@ export function WebSearchView() {
         className="mt-8 flex gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          if (query.trim()) setSearched(true);
+          void doSearch();
         }}
       >
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-surface-2 bg-zinc-950 px-4 py-3 transition focus-within:border-accent">
@@ -34,12 +46,20 @@ export function WebSearchView() {
         </div>
         <button
           type="submit"
-          disabled={!query.trim()}
+          disabled={!query.trim() || searching}
           className="rounded-full bg-accent px-7 py-3 text-sm font-medium text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"
         >
-          搜索
+          {searching ? "搜索中…" : "搜索"}
         </button>
       </form>
+
+      {/* 搜索中 */}
+      {searching && (
+        <div className="mt-8 flex items-center justify-center gap-3 rounded-card border border-surface-2 bg-surface/50 py-12">
+          <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+          <span className="text-sm text-muted">正在检索资料…</span>
+        </div>
+      )}
 
       {searched && (
         <div className="mt-8 space-y-3">

@@ -18,6 +18,10 @@ export default async function setup() {
         ...process.env,
         NEXT_TELEMETRY_DISABLED: "1",
         CHAT_PROVIDER: "mock", // 契约测试注入 mock LLM（确定性，不依赖外网）
+        DISTILL_PROVIDER: "mock", // 风格蒸馏同样 mock（07 工单）
+        DECONSTRUCT_PROVIDER: "mock", // 小说拆解同样 mock（09 工单）
+        DRAW_PROVIDER: "mock", // 抽卡模式同样 mock（10 工单）
+        SOURCE_PROVIDER: "mock", // 书源引擎同样 mock（08 工单，外部源不可达的确定性表现）
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
