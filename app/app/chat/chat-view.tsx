@@ -73,7 +73,7 @@ export function ChatView() {
   }, [sessions]);
 
   useEffect(() => {
-    // 初始加载会话列表 + 作品列表（异步，避免 effect 内同步 setState）
+    // 初始加载会话列表 + 作品列表 + 技能（异步 fetch，setState 均在 promise 回调）
     fetch("/api/v1/sessions")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { sessions: Session[] } | null) => {
@@ -90,13 +90,14 @@ export function ChatView() {
       .then((data: { skills: Array<{ name: string }> } | null) => {
         if (data) setMySkillNames(data.skills.map((s) => s.name));
       });
-    // R1/R2 回流：读取蒸馏页暂存风格，自动选中
+    // R1/R2 回流：读取蒸馏页暂存风格，自动选中（一次性初始化，setState 豁免见下行）
     try {
       const raw = sessionStorage.getItem("mozhou_pending_style");
       if (raw) {
         const pending = JSON.parse(raw) as { name?: string };
         sessionStorage.removeItem("mozhou_pending_style");
         if (pending?.name) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setStyle(pending.name);
           setError(null);
         }

@@ -1,6 +1,6 @@
 // 写作机检契约测试（任务二-B）：6 项检查真实逻辑
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 

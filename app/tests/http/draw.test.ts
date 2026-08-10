@@ -1,6 +1,6 @@
 // 抽卡模式 API 契约测试（10 工单）：指令 + 模型 → 生成文本
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 

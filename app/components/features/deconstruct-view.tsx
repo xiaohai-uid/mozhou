@@ -2,6 +2,7 @@
 
 // 小说拆解（09 工单已真实化）：输入书名/上传 → 章节选择 → 真实 LLM 三段式拆解（结构/剧情/节奏）。
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileText, MagnifyingGlass, TreeStructure } from "@phosphor-icons/react/dist/ssr";
 
 interface DeconstructResult {
@@ -18,6 +19,7 @@ const demoChapters = [
 ];
 
 export function DeconstructView() {
+  const router = useRouter();
   const [tab, setTab] = useState<"search" | "upload">("search");
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState(false);
@@ -225,7 +227,7 @@ export function DeconstructView() {
                   at: Date.now(),
                 }),
               );
-              window.location.href = "/chat";
+              router.push("/chat");
             }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-accent/50 py-2.5 text-sm font-medium text-accent transition hover:bg-accent/10"
           >

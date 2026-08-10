@@ -1,6 +1,6 @@
 // 风格蒸馏 API 契约测试（07 工单）：文本 → 四维风格指南
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 

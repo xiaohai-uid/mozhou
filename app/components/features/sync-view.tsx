@@ -21,7 +21,7 @@ export function SyncView() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { configured?: boolean; url?: string; username?: string; autoSync?: boolean; updatedAt?: string } | null) => {
         if (data?.configured) {
-          setUrl(data.url ?? url);
+          setUrl((prev) => data.url ?? prev);
           setUsername(data.username ?? "");
           setAutoSync(data.autoSync ?? true);
           setUpdatedAt(data.updatedAt ?? null);

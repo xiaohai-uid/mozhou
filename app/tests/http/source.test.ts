@@ -1,6 +1,6 @@
 // 书源引擎契约测试（08 工单）：搜索（容错降级）+ 导入书架 + 书架列表
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 

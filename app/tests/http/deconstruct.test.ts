@@ -1,6 +1,6 @@
 // 小说拆解 API 契约测试（09 工单）：文本 → 三段式拆解结果
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 

@@ -2,6 +2,7 @@
 
 // 风格蒸馏（07 工单已真实化）：上传文本 → 真实 LLM 风格分析（one-api 网关）→ 四维指南。
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileText, Sparkle } from "@phosphor-icons/react/dist/ssr";
 
 interface Guide {
@@ -12,6 +13,7 @@ interface Guide {
 }
 
 export function DistillView() {
+  const router = useRouter();
   const [fileName, setFileName] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [guide, setGuide] = useState<Guide | null>(null);
@@ -125,7 +127,7 @@ export function DistillView() {
                     at: Date.now(),
                   }),
                 );
-                window.location.href = "/chat";
+                router.push("/chat");
               }}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
             >

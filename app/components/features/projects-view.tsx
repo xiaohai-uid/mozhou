@@ -87,6 +87,8 @@ export function ProjectsView() {
   }, []);
 
   useEffect(() => {
+    // 挂载时异步加载（fetch 后 setState）；豁免 react-hooks/set-state-in-effect 对数据获取的误报
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshList();
   }, [refreshList]);
 

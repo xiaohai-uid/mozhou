@@ -1,6 +1,6 @@
 // 技能广场契约测试（任务二-A）：技能 CRUD + 广场安装 + chat 真实 Prompt 注入
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 

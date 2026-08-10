@@ -1,5 +1,5 @@
 // 会员与用量服务（11 工单）：用量事件记账 + 聚合查询 + 会员功能 gating
-import { and, eq, gte, sql, sum } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { usageEvents, users } from "@/lib/schema";
 

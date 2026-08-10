@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       });
     }
     return NextResponse.json({
-      results: titles.map((t, i) => ({
+      results: titles.map((t) => ({
         title: t.title,
         source: "联网检索",
         snippet: `来自 ${t.url.split("/")[2] ?? "网络"} 的检索结果…`,

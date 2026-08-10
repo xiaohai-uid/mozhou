@@ -1,6 +1,6 @@
 // 任务二-C 契约测试：联网搜索 / 网文扫榜 / 云同步（mock provider → 确定性降级）
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
 
