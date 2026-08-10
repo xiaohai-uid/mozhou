@@ -200,8 +200,7 @@ export function ChatView() {
     }
   }
 
-  /** 内联抽卡：同一提示词并行生成候选，选中后才作为消息插入。
-   *  UI 先行：当前为 mock 并行延迟；真实双模型抽卡（不落库 dryRun）归工单 10。 */
+  /** 内联抽卡（10 工单真实化）：同一指令多模型并行生成候选，选中后才作为消息插入（不落库） */
   async function drawCandidates() {
     const content = input.trim();
     if (!content || streaming || drawing) return;
@@ -209,17 +208,17 @@ export function ChatView() {
     setError(null);
     setCandidates([]);
     try {
-      // mock 候选：两模型风格差异（DeepSeek 短句写实 / GLM 意象绵长）
-      const mockTexts: Record<string, string> = {
-        "deepseek-v4-flash":
-          `雨夜，灰烬镇的巷口。阿雀裹着单衣站在门檐下，雨水顺着瓦片连成细线，她盯着巷尾——陆沉舟的身影迟迟没有出现。风把远处的灯芯草吹得沙沙响，像有人在低声数着什么。\n\n——基于「${content.slice(0, 20)}」`,
-        "glm-4.5-flash":
-          `夜雨敲瓦。阿雀立在门檐下，手里攥着一截没点完的灯芯。巷尾黑黢黢的，雨声里她听见脚步声由远及近——是陆沉舟，肩头披着湿透的旧袍，怀里护着什么东西，微微泛着暖光。\n\n——基于「${content.slice(0, 20)}」`,
-      };
+      // 真实抽卡：每个模型并发调 /api/v1/draw（不落库，仅生成候选）
       const results = await Promise.all(
-        MODELS.map(async (m, i) => {
-          await new Promise((r) => setTimeout(r, 700 + i * 400));
-          return { model: m, text: mockTexts[m] ?? "" };
+        MODELS.map(async (m) => {
+          const res = await fetch("/api/v1/draw", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: m, instruction: content }),
+          });
+          const data = (await res.json()) as { text?: string; error?: string };
+          if (!res.ok) throw new Error(data.error ?? `模型 ${m} 失败`);
+          return { model: m, text: data.text ?? "" };
         }),
       );
       setCandidates(results);
