@@ -1,14 +1,20 @@
 "use client";
 
-// 小说拆解（UI 先行）：输入书名/上传 → 章节选择 → 拆解结果。
-// 交互对齐 OpenWrite 实测（弹窗式：搜索/上传 → 选章节 → AI 生成大纲）。
+// 小说拆解（09 工单已真实化）：输入书名/上传 → 章节选择 → 真实 LLM 三段式拆解（结构/剧情/节奏）。
 import { useState } from "react";
 import { FileText, MagnifyingGlass, TreeStructure } from "@phosphor-icons/react/dist/ssr";
 
+interface DeconstructResult {
+  structure: string[];
+  plot: string[];
+  rhythm: string[];
+}
+
+/** 各章节拆解用文本（demo；真实场景由书源/上传提供，08 工单接通） */
 const demoChapters = [
-  { ch: "001", title: "灰烬有籽", words: "3120 字" },
-  { ch: "002", title: "灰里有苗", words: "2980 字" },
-  { ch: "003", title: "灰里藏灯", words: "3050 字" },
+  { ch: "001", title: "灰烬有籽", words: "3120 字", text: "灰烬镇。灯童与陆沉舟立约：你守田，我守灯。灰里开田，第一铲下去，土是活的。阿雀守着灰罐里的火苗，火苗偏斜，指向零界。肃界卫盘查回程，守塔人未曾露面。田师说，田是它的。灰烬镇的人们在夜里听见铁灰飞鸟掠过，谁也没有抬头。" },
+  { ch: "002", title: "灰里有苗", words: "2980 字", text: "第二日，田里冒出青苗。陆沉舟蹲在田埂上，指腹摩过叶尖的灰。阿雀坐在门槛，火苗在她眼底跳。肃界卫清晨经过，问苗从何来。陆沉舟说，灰里生的。他们知道，灰烬镇不该有绿色。" },
+  { ch: "003", title: "灰里藏灯", words: "3050 字", text: "夜里，灯童听见罐中有声。火苗不再偏斜，直直指向天空。陆沉舟解开灯芯，里面卷着一枚铁片，刻着零界的字样。阿雀咳嗽着醒来，说梦见了海。灰烬镇没有海，但铁片上的字，像潮水。" },
 ];
 
 export function DeconstructView() {
@@ -17,15 +23,35 @@ export function DeconstructView() {
   const [picked, setPicked] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<DeconstructResult | null>(null);
+  const [resultTitle, setResultTitle] = useState<string | null>(null);
 
-  function analyze() {
+  async function analyze() {
+    const chapter = demoChapters.find((c) => c.ch === selected);
+    if (!chapter || analyzing) return;
     setAnalyzing(true);
-    setDone(false);
-    setTimeout(() => {
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/v1/deconstruct/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: chapter.text, title: chapter.title }),
+      });
+      const data = (await res.json()) as {
+        result?: DeconstructResult;
+        title?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "拆解失败");
+      setResult(data.result ?? null);
+      setResultTitle(data.title ?? chapter.title);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
       setAnalyzing(false);
-      setDone(true);
-    }, 1800);
+    }
   }
 
   return (
@@ -47,7 +73,8 @@ export function DeconstructView() {
               setTab(t.key);
               setPicked(false);
               setSelected(null);
-              setDone(false);
+              setResult(null);
+              setError(null);
             }}
             className={`rounded-full px-5 py-2 text-sm transition ${
               tab === t.key
@@ -105,7 +132,7 @@ export function DeconstructView() {
       )}
 
       {/* 章节选择 */}
-      {picked && !done && (
+      {picked && !result && !analyzing && (
         <div className="mt-6">
           <h2 className="text-sm font-semibold text-zinc-200">选择要拆解的章节</h2>
           <ul className="mt-4 space-y-2">
@@ -129,7 +156,7 @@ export function DeconstructView() {
             ))}
           </ul>
           <button
-            onClick={analyze}
+            onClick={() => void analyze()}
             disabled={!selected || analyzing}
             className="mt-6 w-full rounded-full bg-accent py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
           >
@@ -138,20 +165,35 @@ export function DeconstructView() {
         </div>
       )}
 
+      {/* 拆解中 */}
+      {analyzing && (
+        <div className="mt-6 flex items-center justify-center gap-3 rounded-card border border-surface-2 bg-surface/50 py-12">
+          <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
+          <span className="text-sm text-muted">AI 正在拆解章节…</span>
+        </div>
+      )}
+
+      {/* 错误 */}
+      {error && (
+        <p role="alert" className="mt-6 text-sm text-red-400">
+          {error}
+        </p>
+      )}
+
       {/* 结果 */}
-      {done && (
+      {result && (
         <div className="mt-8 space-y-4">
           <div className="flex items-center gap-2">
             <TreeStructure size={18} weight="duotone" className="text-accent" aria-hidden />
             <h2 className="text-sm font-semibold text-zinc-100">
-              第 {selected} 章拆解
+              第 {selected} 章拆解{resultTitle ? ` · ${resultTitle}` : ""}
             </h2>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {[
-              { name: "结构", lines: ["开场：灰罐火苗偏斜", "中段：阿雀醒来对话", "收束：铁灰飞鸟掠过"] },
-              { name: "剧情", lines: ["伏笔：火苗朝零界偏斜", "人物：陆沉舟夜间外出", "推进：灯芯与药引"] },
-              { name: "节奏", lines: ["短句密（对话段）", "缓（景物描写）", "悬（结尾鸟飞向零界）"] },
+              { name: "结构", lines: result.structure },
+              { name: "剧情", lines: result.plot },
+              { name: "节奏", lines: result.rhythm },
             ].map((b) => (
               <div key={b.name} className="rounded-card border border-surface-2 bg-surface/50 p-5">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-faint">
@@ -171,9 +213,9 @@ export function DeconstructView() {
           <button
             onClick={() => {
               const blocks = [
-                { name: "结构", lines: ["开场：灰罐火苗偏斜", "中段：阿雀醒来对话", "收束：铁灰飞鸟掠过"] },
-                { name: "剧情", lines: ["伏笔：火苗朝零界偏斜", "人物：陆沉舟夜间外出", "推进：灯芯与药引"] },
-                { name: "节奏", lines: ["短句密（对话段）", "缓（景物描写）", "悬（结尾鸟飞向零界）"] },
+                { name: "结构", lines: result.structure },
+                { name: "剧情", lines: result.plot },
+                { name: "节奏", lines: result.rhythm },
               ];
               sessionStorage.setItem(
                 "mozhou_pending_deconstruct",
@@ -190,7 +232,6 @@ export function DeconstructView() {
             <TreeStructure size={15} weight="duotone" aria-hidden />
             发送到写作对话
           </button>
-          <p className="text-center text-xs text-faint">拆解引擎开发中，当前为界面示意</p>
         </div>
       )}
     </main>
