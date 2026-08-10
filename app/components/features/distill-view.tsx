@@ -1,7 +1,6 @@
 "use client";
 
-// 风格蒸馏（UI 先行）：上传文本 → 分析中 → 风格指南四维。
-// 当前为界面示意：本地 mock 数据演示流程；后端 /api/v1/distill 实现后替换为真实调用。
+// 风格蒸馏（07 工单已真实化）：上传文本 → 真实 LLM 风格分析（one-api 网关）→ 四维指南。
 import { useState } from "react";
 import { FileText, Sparkle } from "@phosphor-icons/react/dist/ssr";
 
@@ -11,14 +10,6 @@ interface Guide {
   imagery: string;
   rhythm: string;
 }
-
-// mock 风格指南（演示用；真实结果来自 LLM 风格分析）
-const MOCK_GUIDE: Guide = {
-  narrative: "第三人称限知视角，紧贴主角感官，场景以触觉与气味开场",
-  sentence: "短句为主，动作前置，句中少用连接词，偶用顶针衔接",
-  imagery: "偏好农耕/土地/器物意象，拟人化土地，数字具象化",
-  rhythm: "段落短促如开垦节奏，冲突段落句长骤增，收束处留白",
-};
 
 export function DistillView() {
   const [fileName, setFileName] = useState<string | null>(null);
@@ -35,10 +26,14 @@ export function DistillView() {
       if (text.trim().length < 200) {
         throw new Error("文本太短，建议 1 万字以上效果更好（至少 200 字）");
       }
-      // UI 先行：mock 延迟 + 假数据；后端接入后替换为
-      // fetch("/api/v1/distill", { body: JSON.stringify({ text }) })
-      await new Promise((r) => setTimeout(r, 1600));
-      setGuide(MOCK_GUIDE);
+      const res = await fetch("/api/v1/distill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.slice(0, 20000) }),
+      });
+      const data = (await res.json()) as { guide?: Guide; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "分析失败");
+      setGuide(data.guide ?? null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
