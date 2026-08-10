@@ -32,6 +32,8 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   status: MessageStatus;
+  /** 本次回复生效的技能（发送时快照，UI 展示注入语义） */
+  skills: string[];
   /** 生成时的正文快照（冲突检测：插入时与当前正文比对） */
   snapshot: string;
   /** 已插入正文 */
@@ -52,6 +54,41 @@ const MOCK_STYLES = [
   { id: 1, name: "黄土纪年体" },
   { id: 2, name: "意象绵长" },
 ];
+
+/** Mock 技能库（v3：技能驱动对话；仅演示，UI Frozen 后换 /api/v1/skills 真实库，胶囊形态不变）。
+ * 去AI味/人物小传/信息差设计 = 墨舟技能广场真实技能；章节续写/章节起笔 = 场景技能（按章节状态切换）。 */
+const MOCK_SKILLS = [
+  {
+    name: "章节续写",
+    description: "接续前文，保持文风与人物一致",
+    systemPrompt:
+      "通读前文与作品设定；保持叙事视角与句式节奏；结尾留钩子。只输出正文。",
+  },
+  {
+    name: "章节起笔",
+    description: "空章节起笔，按作品文风开局",
+    systemPrompt:
+      "根据作品设定与风格指南起笔；建立场景与人物；结尾留钩子。只输出正文。",
+  },
+  {
+    name: "去 AI 味",
+    description: "反例库机检，清除 AI 腔套话",
+    systemPrompt:
+      "检查并清除文本中的 AI 腔：禁用'值得注意的是/总而言之/不仅…而且'等套话，句子要有信息增量。",
+  },
+  {
+    name: "人物小传",
+    description: "角色弧光与动机推导",
+    systemPrompt:
+      "为每个主要角色维护小传：外貌/动机/弧光/禁忌，写作时保持行为一致。",
+  },
+  {
+    name: "信息差设计",
+    description: "读者已知/角色已知对照",
+    systemPrompt:
+      "写作时维护信息差：读者已知、角色A已知、角色B已知三张表，用信息差制造悬念。",
+  },
+] as const;
 
 /** 示例正文（有正文示例；与产品文风一致） */
 const EXAMPLE_BODY = `黄土坡上，老周把锄头抡起来，一下，一下。土腥气顺着风钻进鼻子里，他嗅了嗅，又嗅了嗅。这地是沉的，锄刃磕下去，像是磕在铁上。
@@ -86,6 +123,8 @@ export function ChapterEditorView() {
   const [subphase, setSubphase] = useState<"preparing" | "streaming" | "cancelling">("preparing");
   const [model, setModel] = useState<string>(MOCK_MODELS[0]);
   const [styleId, setStyleId] = useState<number | null>(null);
+  // v3 技能驱动对话：可用技能按章节状态切换（空章节=起笔，非空=续写），默认选中场景技能
+  const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
   const [dirty, setDirty] = useState(false); // 未保存标记（本地态展示；真实保存接 Contract 后）
   const [demoMode, setDemoMode] = useState<DemoMode>("normal");
   const [demoOpen, setDemoOpen] = useState(false);
@@ -96,6 +135,17 @@ export function ChapterEditorView() {
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const emptyChapter = body.trim().length === 0;
+
+  /** 可用技能（空章节=起笔场景；非空=续写场景） */
+  const availableSkills = MOCK_SKILLS.filter((s) =>
+    emptyChapter ? s.name !== "章节续写" : s.name !== "章节起笔",
+  ).map((s) => s.name);
+
+  function toggleSkill(name: string) {
+    setActiveSkills((prev) =>
+      prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name],
+    );
+  }
 
   function clearTimer() {
     if (timerRef.current) {
@@ -112,8 +162,8 @@ export function ChapterEditorView() {
     dirtyTimerRef.current = setTimeout(() => setDirty(false), 2000);
   }
 
-  /** mockSendChat：发送一条用户消息 → AI 流式回复（纯本地定时器） */
-  function mockSendChat(text?: string) {
+  /** mockSendChat：发送一条用户消息 → AI 流式回复（纯本地定时器；技能驱动：回复携带生效技能） */
+  function mockSendChat(text?: string, skillsOverride?: string[]) {
     const content = (text ?? input).trim();
     if (!content || streaming || demoMode === "no-model") return;
     const gen = ++genIdRef.current;
@@ -122,10 +172,17 @@ export function ChapterEditorView() {
     setStreaming(true);
     const snapshot = body; // 生成时正文快照（冲突检测基准）
     const replyId = ++msgSeq;
+    // 生效技能：显式覆盖（起笔）> 当前选中 ∩ 可用；为空则自动补场景技能
+    const skills =
+      skillsOverride ??
+      (() => {
+        const kept = activeSkills.filter((s) => availableSkills.includes(s));
+        return kept.length > 0 ? kept : [emptyChapter ? "章节起笔" : "章节续写"];
+      })();
     setMessages((prev) => [
       ...prev,
-      { id: ++msgSeq, role: "user", content, status: "done", snapshot, inserted: false, confirmInsert: false },
-      { id: replyId, role: "assistant", content: "", status: "streaming", snapshot, inserted: false, confirmInsert: false },
+      { id: ++msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
+      { id: replyId, role: "assistant", content: "", status: "streaming", skills, snapshot, inserted: false, confirmInsert: false },
     ]);
 
     // 演示：生成失败 → 人性化错误面板
@@ -236,6 +293,8 @@ export function ChapterEditorView() {
     setInput("");
     setDirty(false);
     setBody(mode === "empty" ? "" : EXAMPLE_BODY);
+    // 场景技能随章节状态切换（空=起笔，非空=续写）
+    setActiveSkills(mode === "empty" ? ["章节起笔"] : ["章节续写"]);
   }
 
   /** 错误人性化（演示）：标题 + 怎么办 + 动作（灵笔 humanizeError 语义简化） */
@@ -386,24 +445,45 @@ export function ChapterEditorView() {
           />
           {emptyChapter && (
             <button
-              onClick={() => void mockSendChat("以黄土纪年的文风，为这一章写一个开头")}
+              onClick={() => void mockSendChat("以黄土纪年的文风，为这一章写一个开头", ["章节起笔"])}
               disabled={streaming || demoMode === "no-model"}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-accent/40 bg-accent/5 py-4 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-40"
             >
               <Sparkle size={16} weight="fill" aria-hidden />
-              让 AI 起笔这一章
+              让 AI 起笔这一章（技能：章节起笔）
             </button>
           )}
         </section>
 
         {/* 右侧 AI 对话面板（对话代理式：多轮对话 + 产出插入正文） */}
         <aside className="flex w-[360px] shrink-0 flex-col rounded-card border border-surface-2 bg-surface/60">
-          <div className="flex items-center justify-between border-b border-surface-2 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-              <Sparkle size={15} weight="duotone" className="text-accent" aria-hidden />
-              AI 对话
+          <div className="border-b border-surface-2 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                <Sparkle size={15} weight="duotone" className="text-accent" aria-hidden />
+                AI 对话
+              </div>
+              <span className="text-[10px] text-faint">参考：{ch} {title} 正文 {body.length} 字</span>
             </div>
-            <span className="text-[10px] text-faint">参考：{ch} {title} 正文 {body.length} 字</span>
+            {/* v3 技能驱动对话：技能胶囊行（多选；默认场景技能，随章节状态切换） */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-faint">技能</span>
+              {availableSkills.map((sk) => (
+                <button
+                  key={sk}
+                  onClick={() => toggleSkill(sk)}
+                  disabled={streaming}
+                  title={MOCK_SKILLS.find((s) => s.name === sk)?.description}
+                  className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                    activeSkills.includes(sk)
+                      ? "bg-accent/15 text-accent"
+                      : "border border-surface-2 text-faint hover:text-zinc-300"
+                  }`}
+                >
+                  {sk}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* 消息列表 */}
@@ -428,6 +508,12 @@ export function ChapterEditorView() {
                       : "rounded-bl-sm border border-surface-2 bg-zinc-950 text-zinc-200"
                   }`}
                 >
+                  {/* v3：AI 回复头部显示本次生效技能（模拟 system 注入的可见性） */}
+                  {m.role === "assistant" && m.skills.length > 0 && (
+                    <p className="mb-1.5 text-[10px] text-faint">
+                      [技能] {m.skills.join(" · ")}
+                    </p>
+                  )}
                   {m.content}
                   {m.role === "assistant" && m.status === "streaming" && (
                     <>
