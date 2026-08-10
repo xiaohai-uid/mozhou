@@ -254,3 +254,89 @@ interface UpgradeRequest { plan: "member" }
 ---
 
 **覆盖核对**：13 界面全部入契约（工作台为纯导航页，无数据交换）。✅ 已实现 3 组（认证/会话/对话）；🧊 冷冻 11 组，字段与界面元素一一对应，工单实现时对照本契约。
+
+## 15. 技能广场 — ✅ 已实现（任务二-A）
+
+```typescript
+// GET  /api/v1/skills?scope=mine|plaza → 我的技能 / 广场源
+interface SkillListResponse {
+  skills: { id?: number; name: string; description: string; systemPrompt: string; author: string }[];
+}
+// POST /api/v1/skills → 创建/安装技能
+interface CreateSkillRequest { name: string; description: string; systemPrompt: string; author?: string }
+// DELETE /api/v1/skills?id= → 删除
+// chat 技能注入：POST /api/v1/chat 请求带 skills: string[]，后端按名查库注入 systemPrompt
+```
+
+## 16. 写作机检 — ✅ 已实现（任务二-B）
+
+```typescript
+// POST /api/v1/tools/checks
+interface ChecksRequest {
+  text: string;                 // 正文（200-20000 字）
+  mustCover?: string[];         // 合同必含词
+  knownEntities?: string[];     // 绑定作品实体库（人物/世界观名）
+}
+interface ChecksResponse {
+  checks: {
+    name: "字数窗口" | "占位符" | "泄密扫描" | "实体登记" | "复读检测" | "合同断言";
+    ok: boolean;
+    detail: string;
+  }[];
+}
+```
+
+## 17. 网文扫榜 — ✅ 已实现（任务二-C，外部源超时降级）
+
+```typescript
+// GET /api/v1/rankings?board=畅销榜 Top10
+interface RankingsResponse {
+  boards: { name: string; site: string }[];
+  rows: { rank: number; name: string; heat: string }[];
+  board: string;
+  degraded: boolean;   // 外部榜源不可达 → 降级数据
+  note?: string;
+}
+```
+
+## 18. 联网搜索 — ✅ 已实现（任务二-C，5s 超时降级）
+
+```typescript
+// POST /api/v1/websearch
+interface WebSearchRequest { query: string }
+interface WebSearchResponse {
+  results: { title: string; source: string; snippet: string; url: string }[];
+  degraded: boolean;   // 检索不可用 → 降级数据
+  note?: string;
+}
+```
+
+## 19. 云同步 — ✅ 已实现（任务二-C，WebDAV 连接测试）
+
+```typescript
+// GET  /api/v1/sync/config → 已保存配置（密码永不回传）
+interface SyncConfigResponse {
+  configured: boolean;
+  url?: string;
+  username?: string;
+  autoSync?: boolean;
+  updatedAt?: string;
+}
+// POST /api/v1/sync/config → 保存 + 真实 WebDAV 连接测试（5s 超时）
+interface SyncSaveRequest { url: string; username: string; password: string; autoSync: boolean }
+// 200 { ok: boolean; message: string }（连接失败 ok=false 但 HTTP 200，前端可读错误）
+```
+
+---
+
+## Contract Delta 流程（UVSD 第 11 步）
+
+**规则**：契约默认冻结。真实实现发现契约不合理时，走显式 DELTA：
+
+1. 新建 `.scratch/mozhou-mvp/contracts/deltas/DELTA-<NNN>.md`：记录 变更原因 / 变更前后 Schema / 同步修改清单（Schema→Mock→UI→Backend→Tests）
+2. 同步更新本文件对应节 + 实现 + 测试
+3. 禁止 `data?: any` / 未文档化响应字段绕过契约
+
+**历史 DELTA**：无（V1.0 契约随实现即时补齐；抽卡并入对话为结构调整，已在本文件第 7 节记录）。
+
+**覆盖核对（2026-08-11 更新）**：全站 13 界面 + 认证 → **19 组端点全部入契约**；✅ 已实现 19 组；无冷冻组。
