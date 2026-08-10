@@ -65,7 +65,7 @@ export const novels = pgTable("novels", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-/** 章节（05 工单） */
+/** 章节（05 工单；content 正文列 16 工单 V1.1 Journey ⑦ 加入） */
 export const chapters = pgTable("chapters", {
   id: serial("id").primaryKey(),
   novelId: integer("novel_id")
@@ -73,6 +73,7 @@ export const chapters = pgTable("chapters", {
     .references(() => novels.id, { onDelete: "cascade" }),
   ch: text("ch").notNull(), // 章节号（"001"）
   title: text("title").notNull(),
+  content: text("content").notNull().default(""),
   status: chapterStatusEnum("status").notNull().default("draft"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),

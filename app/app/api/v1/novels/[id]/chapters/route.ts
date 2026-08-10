@@ -1,7 +1,30 @@
-// /api/v1/novels/[id]/chapters — 新建 / 编辑 / 删除章节（05 工单）
+// /api/v1/novels/[id]/chapters — 新建 / 读取 / 编辑 / 删除章节（05 工单；content 正文 16 工单）
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { createChapter, deleteChapter, updateChapter } from "@/lib/novels/service";
+import {
+  createChapter,
+  deleteChapter,
+  getChapter,
+  updateChapter,
+} from "@/lib/novels/service";
+
+/** GET /api/v1/novels/[id]/chapters?chapterId=X — 单章详情（含正文 content，16 工单） */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const { id } = await params;
+  const url = new URL(request.url);
+  const chapterId = Number(url.searchParams.get("chapterId"));
+  if (!chapterId) {
+    return NextResponse.json({ error: "缺少 chapterId" }, { status: 400 });
+  }
+  const chapter = await getChapter(user.id, Number(id), chapterId);
+  if (!chapter) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+  return NextResponse.json({ chapter });
+}
 
 export async function POST(
   request: Request,
@@ -33,10 +56,12 @@ export async function PATCH(
   const body = (await request.json().catch(() => null)) as {
     title?: string;
     status?: "draft" | "final";
+    content?: string;
   } | null;
-  const patch: { title?: string; status?: "draft" | "final" } = {};
+  const patch: { title?: string; status?: "draft" | "final"; content?: string } = {};
   if (body?.title !== undefined) patch.title = body.title.trim();
   if (body?.status !== undefined) patch.status = body.status;
+  if (body?.content !== undefined) patch.content = body.content;
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "无可更新字段" }, { status: 400 });
   }

@@ -12,9 +12,9 @@
 // 状态机（对话式）：ChatIdle → ChatStreaming(Preparing/Streaming/Cancelling) → MessageDone
 //   → InsertConfirm(正文已变) / Inserted / Cancelled / Error。Empty 变体：空章节空态"让 AI 起笔"。
 // UI Frozen 后 progressive swap：mock 函数族换真实契约，组件形态保持。
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUp,
@@ -113,10 +113,16 @@ let msgSeq = 0;
 
 export function ChapterEditorView() {
   const params = useSearchParams();
+  const { chapterId: pathChapterId } = useParams<{ chapterId: string }>();
+  const chapterId = Number(pathChapterId);
+  const novelId = Number(params.get("novelId") ?? 0);
   const ch = params.get("ch") ?? "001";
   const title = params.get("title") ?? "第一章";
 
-  const [body, setBody] = useState(EXAMPLE_BODY);
+  // 工单 16：正文从真实 API 加载（progressive swap 第一切片）；对话仍为 mock（工单 17 换）
+  const [body, setBody] = useState("");
+  const [bodyLoaded, setBodyLoaded] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "failed">("saved");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -125,7 +131,6 @@ export function ChapterEditorView() {
   const [styleId, setStyleId] = useState<number | null>(null);
   // v3 技能驱动对话：可用技能按章节状态切换（空章节=起笔，非空=续写），默认选中场景技能
   const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
-  const [dirty, setDirty] = useState(false); // 未保存标记（本地态展示；真实保存接 Contract 后）
   const [demoMode, setDemoMode] = useState<DemoMode>("normal");
   const [demoOpen, setDemoOpen] = useState(false);
 
@@ -134,10 +139,40 @@ export function ChapterEditorView() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** 工单 16：加载真实正文（GET 单章含 content） */
+  useEffect(() => {
+    if (!novelId || !chapterId) return;
+    fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { chapter?: { content?: string } } | null) => {
+        if (data?.chapter) {
+          setBody(data.chapter.content ?? "");
+          setBodyLoaded(true);
+        }
+      });
+  }, [novelId, chapterId]);
+
+  /** 工单 16：保存正文（PATCH content；自动保存与显式保存同端点；content 显式传参防闭包过期） */
+  async function saveBody(content: string) {
+    if (!novelId || !chapterId) return;
+    setSaveState("saving");
+    try {
+      const res = await fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("保存失败");
+      setSaveState("saved");
+    } catch {
+      setSaveState("failed");
+    }
+  }
+
   const emptyChapter = body.trim().length === 0;
 
   /** 可用技能（空章节=起笔场景；非空=续写场景） */
-  const availableSkills = MOCK_SKILLS.filter((s) =>
+  const availableSkills: string[] = MOCK_SKILLS.filter((s) =>
     emptyChapter ? s.name !== "章节续写" : s.name !== "章节起笔",
   ).map((s) => s.name);
 
@@ -154,12 +189,14 @@ export function ChapterEditorView() {
     }
   }
 
-  /** 正文编辑：对话期间正文永不锁定；编辑置未保存（2s 防抖回落"已保存"本地态） */
+  /** 正文编辑：对话期间正文永不锁定；编辑置未保存 + 2s 防抖自动保存（工单 16 真实落盘） */
   function onBodyChange(v: string) {
     setBody(v);
-    setDirty(true);
+    setSaveState("dirty");
     if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
-    dirtyTimerRef.current = setTimeout(() => setDirty(false), 2000);
+    dirtyTimerRef.current = setTimeout(() => {
+      void saveBody(v);
+    }, 2000);
   }
 
   /** mockSendChat：发送一条用户消息 → AI 流式回复（纯本地定时器；技能驱动：回复携带生效技能） */
@@ -264,9 +301,12 @@ export function ChapterEditorView() {
       return;
     }
     setBody(body.trim() ? body + "\n\n" + content : content);
-    setDirty(true);
+    // 插入后正文变化 → 未保存 + 防抖自动保存（工单 16 真实落盘）
+    setSaveState("dirty");
     if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
-    dirtyTimerRef.current = setTimeout(() => setDirty(false), 2000);
+    dirtyTimerRef.current = setTimeout(() => {
+      void saveBody(body.trim() ? body + "\n\n" + content : content);
+    }, 2000);
     setMessages((prev) =>
       prev.map((m) => (m.id === msgId ? { ...m, inserted: true, confirmInsert: false } : m)),
     );
@@ -282,7 +322,7 @@ export function ChapterEditorView() {
     mockInsertToChapter(msgId);
   }
 
-  /** 演示模式切换（仅 Mock）：重置全部本地态 */
+  /** 演示模式切换（仅 Mock）：重置全部本地态；normal 重新加载真实正文 */
   function switchDemoMode(mode: DemoMode) {
     genIdRef.current++;
     clearTimer();
@@ -291,8 +331,21 @@ export function ChapterEditorView() {
     setDemoOpen(false);
     setMessages([]);
     setInput("");
-    setDirty(false);
-    setBody(mode === "empty" ? "" : EXAMPLE_BODY);
+    setSaveState("saved");
+    if (mode === "empty") {
+      setBody("");
+    } else if (mode === "normal") {
+      setBody("");
+      if (novelId && chapterId) {
+        fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: { chapter?: { content?: string } } | null) => {
+            if (data?.chapter) setBody(data.chapter.content ?? "");
+          });
+      }
+    } else {
+      setBody(EXAMPLE_BODY);
+    }
     // 场景技能随章节状态切换（空=起笔，非空=续写）
     setActiveSkills(mode === "empty" ? ["章节起笔"] : ["章节续写"]);
   }
@@ -332,9 +385,32 @@ export function ChapterEditorView() {
           <span className="rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-faint">
             草稿
           </span>
-          <span className={`text-[10px] ${dirty ? "text-yellow-400" : "text-faint"}`}>
-            {dirty ? "未保存" : "已保存（本地）"}
+          <span
+            className={`text-[10px] ${
+              saveState === "dirty"
+                ? "text-yellow-400"
+                : saveState === "failed"
+                  ? "text-red-400"
+                  : saveState === "saving"
+                    ? "text-faint"
+                    : "text-faint"
+            }`}
+          >
+            {saveState === "dirty"
+              ? "未保存"
+              : saveState === "failed"
+                ? "保存失败"
+                : saveState === "saving"
+                  ? "保存中…"
+                  : "已保存"}
           </span>
+          <button
+            onClick={() => void saveBody(body)}
+            disabled={saveState === "saving"}
+            className="rounded-full border border-surface-2 px-2.5 py-0.5 text-[10px] text-faint transition hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40"
+          >
+            保存
+          </button>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-faint">
@@ -437,13 +513,15 @@ export function ChapterEditorView() {
             value={body}
             onChange={(e) => onBodyChange(e.target.value)}
             placeholder={
-              emptyChapter
-                ? "这一章还没有正文。在右侧和 AI 对话让它起笔，或直接开写。"
-                : "从这里继续写你的故事…"
+              !bodyLoaded
+                ? "加载中…"
+                : emptyChapter
+                  ? "这一章还没有正文。在右侧和 AI 对话让它起笔，或直接开写。"
+                  : "从这里继续写你的故事…"
             }
             className="mt-2 min-h-[62vh] w-full flex-1 resize-none rounded-card border border-surface-2 bg-surface/40 px-6 py-5 text-[15px] leading-8 text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
           />
-          {emptyChapter && (
+          {bodyLoaded && emptyChapter && (
             <button
               onClick={() => void mockSendChat("以黄土纪年的文风，为这一章写一个开头", ["章节起笔"])}
               disabled={streaming || demoMode === "no-model"}

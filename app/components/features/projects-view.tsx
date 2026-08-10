@@ -365,9 +365,9 @@ export function ProjectsView() {
                       key={c.id}
                       className="group flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-2.5"
                     >
-                      {/* V1.1 Journey ⑦：点章节名打开章节编辑器（Mock Preview） */}
+                      {/* V1.1 Journey ⑦：点章节名打开章节编辑器（工单 16 起接真实正文） */}
                       <Link
-                        href={`/chapter/${c.id}?novel=${encodeURIComponent(detail.novel.name)}&ch=${c.ch}&title=${encodeURIComponent(c.title)}`}
+                        href={`/chapter/${c.id}?novelId=${detail.novel.id}&novel=${encodeURIComponent(detail.novel.name)}&ch=${c.ch}&title=${encodeURIComponent(c.title)}`}
                         title="打开章节"
                         className="flex min-w-0 items-center gap-2 transition hover:text-accent"
                       >

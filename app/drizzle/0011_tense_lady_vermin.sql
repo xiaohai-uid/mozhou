@@ -1,0 +1,1 @@
+ALTER TABLE "chapters" ADD COLUMN "content" text DEFAULT '' NOT NULL;

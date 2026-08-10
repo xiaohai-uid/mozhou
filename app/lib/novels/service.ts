@@ -161,12 +161,12 @@ export async function createChapter(
   return row;
 }
 
-/** 编辑章节标题/状态，归属校验（经 novel 归属） */
+/** 编辑章节标题/状态/正文，归属校验（经 novel 归属） */
 export async function updateChapter(
   userId: number,
   novelId: number,
   chapterId: number,
-  patch: { title?: string; status?: "draft" | "final" },
+  patch: { title?: string; status?: "draft" | "final"; content?: string },
 ): Promise<Chapter | null> {
   const novel = await getNovel(userId, novelId);
   if (!novel) return null;
@@ -175,6 +175,21 @@ export async function updateChapter(
     .set({ ...patch, updatedAt: sql`now()` })
     .where(and(eq(chapters.id, chapterId), eq(chapters.novelId, novelId)))
     .returning();
+  return row ?? null;
+}
+
+/** 单章详情（含正文 content），归属校验（16 工单，章节编辑器加载） */
+export async function getChapter(
+  userId: number,
+  novelId: number,
+  chapterId: number,
+): Promise<Chapter | null> {
+  const novel = await getNovel(userId, novelId);
+  if (!novel) return null;
+  const [row] = await db
+    .select()
+    .from(chapters)
+    .where(and(eq(chapters.id, chapterId), eq(chapters.novelId, novelId)));
   return row ?? null;
 }
 
