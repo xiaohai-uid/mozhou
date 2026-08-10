@@ -1,88 +1,69 @@
-# UI Acceptance Report — 章节级续写 Mock Preview（V1.1 Journey ⑦）
+# UI Acceptance Report v2 — 章节级续写 Mock（对话代理式，V1.1 Journey ⑦）
 
-- **日期**: 2026-08-11
-- **模式**: UI-First（产品定义层）；工程执行层未启动（无 DB/API/Provider/Ticket）
-- **范围**: 章节编辑器 + 续写状态机（⑧ Cancelled 并入）全前端 Mock；入口 = 我的作品 → 章节
-- **结论**: **10/10 状态浏览器实测通过**（含 2 个修复迭代），Mock 可完整操作。等待 UI Frozen 批准。
+- **日期**: 2026-08-11（v1 验收后按用户反馈修订为 v2）
+- **模式**: UI-First；全前端 Mock（无 DB/API/Provider/Ticket）
+- **修订动因**: 用户反馈"工作方式有问题"→ 查 OB 与 lingbi-next 代码（C:\codex\lingbi-next）确认灵笔对话工作方式 → 用户定案 **B. 对话代理式（接 chat 工作方式）**
+- **结论**: **9/9 浏览器实测通过**（多轮对话/插入/冲突保护/停止/Error 人性化/NoModel/Empty 闭环），等待 UI Frozen 批准
 
-## A. Journey（最终用户路径）
+## A. 参考项目核验（灵笔 lingbi-next，代码证据）
 
-```
-我的作品 → 打开章节（章节项可点）→ 章节编辑器
-  → 查看/编辑正文（textarea，本地态）
-  → 底部"续写"（空章节时变"生成开头"）→ 配置面板（模型/风格/长度三档/要求，可跳过直接续写）
-  → 开始生成：Preparing（组织上下文）→ Streaming（候选预览逐字出现，正文锁定，随时可停止）
-  → CandidateReady：候选可删改（部分采纳）→ 采纳当前内容 / 重新生成（覆盖旧候选）/ 丢弃
-  → Accepted：正文追加 + 撤销条（撤销恢复采纳前快照；再编辑或再续写则撤销权消失）
-  → 回到可编辑态，继续写作
-```
+- 布局：三栏 = 章节列表 | CodeMirror 编辑器 | **右侧 AI 助手栏**（流式输出 + 候选确认在侧栏）
+- 底部单行指令输入 + 生成按钮；正文生成期间**不锁定**
+- 安全机制：`DocumentConflict`（"为了保护你的内容，LingBi 没有覆盖当前正文"）/ `CandidateStale`（候选基于旧正文）/ 2s 防抖自动保存 + hash 守卫 / 保存状态（未保存/保存中/已保存/保存失败）/ 异常关闭 RecoveryBanner / `humanizeError`（标题+怎么办+动作：retry/switch_model/keep_current/regenerate）
 
-## B. UI 状态（实际实现，10 态）
+## B. 对话代理式设计（v2，与 v1 的差异）
 
-| 状态 | 验证 | 说明 |
+| 维度 | v1（工具式） | v2（对话代理式） |
 |---|---|---|
-| Idle | ✅ | 正文可编辑，底部续写条 |
-| EmptyChapter | ✅ | 空正文：占位文案 + 主按钮变"生成开头"，全流程可走通（0→217 字） |
-| Configuring | ✅ | 模型 select + 风格胶囊（Mock 库）+ 长度短/中/长 + 要求输入 + 参考范围说明；可跳过（快捷续写） |
-| Generating（Preparing/Streaming） | ✅ | 正文/模型/风格锁定；流式预览 + 光标；"参考前文 N 字"标注；停止按钮 |
-| Cancelling（瞬态） | ✅ | 停止 →"正在停止…"250ms → Cancelled（并入 Cancelled 呈现） |
-| Cancelled | ✅ | "已停止生成，未写入正文"提示条；正文零变化；可立即重新续写 |
-| CandidateReady | ✅ | 候选可编辑预览 + 丢弃/重新生成/采纳当前内容；正文仍锁定 |
-| Accepted | ✅ | "已采纳 N 字，正文已更新"+ 撤销采纳按钮；撤销后正文恢复快照（201→275→201 实测） |
-| Partial Accepted | ✅ | 删改候选后采纳 = 只采纳保留部分（被删段落未入正文，DOM 断言） |
-| Error | ✅ | 红条（失败原因）+ 重试/丢弃；重试进入 Generating；正文零变化 |
-| NoModel（ProviderUnavailable） | ✅ | 黄条常显"模型不可用"+ 续写/开始生成禁用；配置可展开查看 |
+| 布局 | 底部悬浮条 + 配置面板 | **右侧 AI 对话面板**（消息气泡 + 输入框，接 chat 形态） |
+| 交互 | 单次生成 → 候选采纳 | **多轮对话**（可追问调整），回复完成可插入 |
+| 正文 | 生成/候选期间锁定 | **永不锁定**，随时编辑 |
+| 冲突 | 无 | 插入时快照比对 → "正文已变化"确认（不覆盖用户内容） |
+| 停止 | 整页 Cancelled 态 | 消息级"已停止 · 可插入已生成部分"（= 天然部分采纳） |
+| 保存 | 无 | 未保存/已保存（2s 防抖本地态） |
+| 错误 | 红条+重试/丢弃 | **人性化**：标题 + 怎么办 + 动作 |
+| 空章节 | 入口按钮变"生成开头" | 空态"让 AI 起笔这一章" → 自动发消息 → 回复插入 |
 
-## C. 关键交互决策（B 节决策落点）
+## C. Journey（v2 最终）
 
-1. **续写入口 = 编辑器底部悬浮条**（+ 章节工具栏同按钮）：正文末尾即续写起点，"顺流而下"；不用 Slash command（中文网文作者无此习惯）不用 Floating action（遮挡正文）。项目现状没有章节编辑器，本页补齐（mock）。
-2. **配置只 4 项**：模型 / 风格（单选胶囊，复用 chat 形态）/ 长度三档 / 自定义要求。上下文范围/RAG 跟随作品级开关（projects 页已有），不重复造面板。
-3. **AI 不直接改正文**：产出进候选预览区（流式期间正文锁定），Accept 才追加——沿用抽卡候选采纳心智 + 项目安全原则。
-4. **Partial Accept = 预览区可编辑 + "采纳当前内容"**：删改即部分采纳，比选区交互简单可靠。
-5. **Cancel = 零副作用**：停止 → Cancelled 提示，正文零变化；重新续写从正文末尾继续。
-6. **Error 恢复**：红条 + 重试（进入新 Generating，旧候选不残留）/ 丢弃（回 Idle）。
-7. **Retry 覆盖旧候选**：候选是"未落地建议"，无存档价值；文案明示"重新生成"。
-8. **Undo**：采纳后撤销条常驻，直到正文再编辑或再续写（撤销权转移语义）。
+```
+我的作品 → 打开章节 → 正文 + 右侧 AI 对话面板
+→ 对话（参考当前正文与作品设定）→ AI 流式回复（可停止，保留部分）
+→ 完成 → [插入正文] / [忽略] / 继续对话（多轮）
+→ 插入：正文追加 + "已插入 ✓"；正文已变 → 冲突确认（仍要插入/取消）
+→ 空章节：让 AI 起笔 → 对话 → 插入（0 → 正文）
+```
 
-## D. 浏览器验证（实际点击，非代码推断）
+## D. UI 状态（v2 实现，消息级 + 页面级）
 
-- 全流程：打开章节（projects 真实章节 Link）→ 配置展开 → 生成 → 流式 → 候选 → 采纳 → 撤销 → 再续写 → 停止（Cancelled）→ Error（演示）→ 重试 → NoModel（演示）→ Empty（演示）→ 生成开头全流程
-- 状态切换全部通过 DOM 断言（按钮 disabled 态、提示条文案、正文长度变化、撤销恢复）
+ChatIdle / ChatStreaming（Preparing"正在组织上下文…"→Streaming）/ MessageDone（插入/忽略）/ InsertConfirm（正文已变化）/ Inserted / Cancelled（消息级，部分可插）/ Error（人性化）/ NoModel（黄条禁用）/ Empty（起笔按钮）——正文**全程可编辑**。
 
-## E. 截图 / DOM 证据
+## E. 浏览器验证（实际点击 + DOM 断言）
 
-截图（用户 Temp 目录，6 张）：
-- `cont-01-configuring.png` — 配置面板（长度三档 + 要求输入）
-- `cont-02-candidate.png` — CandidateReady（候选预览 + 三按钮）
-- `cont-03-cancelled.png` — Cancelled 提示条
-- `cont-04-error.png` — Error 红条 + 重试/丢弃
-- `cont-05-nomodel.png` — NoModel 黄条 + 禁用态
-- `cont-06-empty-accepted.png` — 空章节生成开头 → 采纳后（0→217 字）
+| 场景 | 结果 |
+|---|---|
+| 第一轮对话：发送 → 流式 → 完成 + [插入正文] | ✅ userMsg/aiReply/insertBtn |
+| 插入正文：201 → 420 字 + "已插入正文" | ✅ bodyLen 420, hasTail |
+| 多轮对话：第二轮回复待插入，正文不变 | ✅ insertBtns=1, bodyLen 420 |
+| **冲突保护**：正文编辑后插入旧回复 → 黄条"正文已变化，这条回复基于旧正文"+ 仍要插入/取消，正文未被覆盖 | ✅ conflictBanner, bodyLen 432（含手动内容） |
+| 仍要插入：用户内容保留 + AI 追加（432 → 651） | ✅ userNoteKept |
+| 停止：流式中停止 → "已停止 · 可插入已生成部分"，部分保留 | ✅ stoppedNote/partialKept/insertBtn |
+| Error 人性化："AI 返回了无法理解的内容 · 请重试，或切换模型" | ✅ errorHumanized |
+| NoModel：黄条"对话已禁用"+ 输入/发送禁用 | ✅ noModelBanner/inputDisabled/sendDisabled |
+| Empty：空章节 + 起笔按钮 + 面板空态 → 起笔 → 回复 → 插入（0→217 字） | ✅ kickoffBtn/bodyLen 217 |
 
-关键 DOM 断言（evaluate_script 实测返回值）：
-- 部分采纳：`bodyLen 275 = 201+74，hasCutPart false`（被删段落未入正文）
-- 撤销：`bodyLen 201，hasContinuation false`（快照恢复）
-- 取消：`cancelledBanner true，bodyLen 201`（零副作用）
-- Error：`errorBanner true，hasRetry/hasDiscard true，bodyLen 201`
-- NoModel：`yellowBanner true，continueDisabled true，startDisabled true，configOpen true`
-- Empty：`emptyBody true，startLabel true` → 采纳后 `bodyLen 217，acceptedBanner true`
+截图（用户 Temp）：`cont-v2-01-dialog.png`（对话面板）/ `cont-v2-02-error.png`（Error 人性化）/ `cont-v2-03-conflict.png`（冲突确认黄条）+ v1 的 6 张。
 
 ## F. 尚未实现（明确标注）
 
-- 正文 content 持久化（chapters 表无 content 列；编辑器正文为本地 state）
-- 真实 API / Provider / Streaming（全部为本地定时器 + 假文字池；模型/风格为 Mock 列表）
-- 保存/自动保存、章节状态流转（草稿→定稿）
-- RAG 上下文真实注入（显示"参考前文 N 字"，未接检索）
-- 演示菜单（正常/模型不可用/生成失败/空章节）——仅 Mock 阶段验收用，UI Frozen 后删除
-- 正文编辑的撤销（仅采纳撤销；手动编辑无 undo 栈）
-- 已采纳字数按字符数计（文案"字"，真实实现可换 token/字符语义）
+- 正文持久化（chapters 无 content 列；正文/对话为本地 state）
+- 真实 API/Provider/Streaming（定时器 + 假文字池；模型/风格 Mock 列表）
+- 自动保存真实落盘（保存状态为本地展示，2s 防抖仅模拟）
+- 对话上下文真实组装（"参考正文 N 字"为展示，未接 RAG/消息历史）
+- 演示菜单（UI Frozen 后删除）
+- 异常关闭恢复（RecoveryBanner 语义留 Contract 后）
+- 错误体系仅覆盖演示路径（真实错误码映射留 Contract 后）
 
-## G. 实测修复记录（浏览器驱动发现）
+## G. 停止点
 
-1. setTimeout 闭包捕获旧 phase → 流式卡 Preparing（改 genId 代际校验）
-2. Accepted 态点续写被守卫拦截（放开 + 撤销权转移）
-3. NoModel 时配置面板打不开、看不到禁用原因（黄条移主条常显）
-
-## 停止点
-
-**UI Acceptance Gate 达成。** 未启动任何 API/DB/Provider/Ticket。等待人工批准「UI Frozen」后，按既定流程（grill-with-docs → to-spec → Interaction/Application Contract → Domain/Persistence Model → to-tickets → Walking Skeleton → Progressive Swap → Vertical Slice → TDD → review → E2E → Milestone Gate）继续。
+**UI Acceptance Gate（v2）达成。** 未启动任何 API/DB/Provider/Ticket。等待人工批准「UI Frozen」。
