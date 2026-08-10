@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   serial,
@@ -153,4 +154,23 @@ export const syncConfigs = pgTable("sync_configs", {
   password: text("password").notNull(),
   autoSync: boolean("auto_sync").notNull().default(true),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+/** 风格指南（蒸馏产物，四维）——POST /distill 返回、styles 表存储、chat 按 styleId 注入（工单 14/15） */
+export interface StyleGuide {
+  narrative: string; // 叙事视角
+  sentence: string; // 句式节奏
+  imagery: string; // 意象偏好
+  rhythm: string; // 情绪节奏
+}
+
+/** 风格库（工单 14）：用户保存的风格指南，命名/列表/删除；同名允许（与 skills 一致，无唯一约束） */
+export const styles = pgTable("styles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  guide: jsonb("guide_json").$type<StyleGuide>().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });

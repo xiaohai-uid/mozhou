@@ -3,13 +3,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { recordUsage } from "@/lib/account/service";
-
-export interface StyleGuide {
-  narrative: string; // 叙事视角
-  sentence: string; // 句式节奏
-  imagery: string; // 意象偏好
-  rhythm: string; // 情绪节奏
-}
+import type { StyleGuide } from "@/lib/schema";
 
 const MAX_TEXT = 20000;
 const MIN_TEXT = 200;

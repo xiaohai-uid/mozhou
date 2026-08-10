@@ -329,6 +329,32 @@ interface SyncSaveRequest { url: string; username: string; password: string; aut
 
 ---
 
+## 20. 风格库 — ✅ 已实现（工单 14，V1.1 Journey ⑥）
+
+```typescript
+// GET  /api/v1/styles → 我的风格库（新→旧，全量无分页）
+interface StyleRow { id: number; name: string; guide: StyleGuide; createdAt: string }
+interface StyleListResponse { styles: StyleRow[] }
+
+// POST /api/v1/styles → 保存（蒸馏产物持久化；同名允许）
+interface StyleSaveRequest { name: string; guide: StyleGuide }
+// 400 名称空 / 指南缺四维 → { error: string }
+// 201 { style: { id: number; name: string } }
+
+// DELETE /api/v1/styles?id= → 删除（写路径归属校验，他人风格 404）
+// 400 缺 id → { error: string }；404 → { error: string }；200 { ok: true }
+
+// StyleGuide（四维，与 POST /distill 返回同形，schema.ts 单一来源）
+interface StyleGuide {
+  narrative: string; // 叙事视角
+  sentence: string;  // 句式节奏
+  imagery: string;   // 意象偏好
+  rhythm: string;    // 情绪节奏
+}
+```
+
+---
+
 ## Contract Delta 流程（UVSD 第 11 步）
 
 **规则**：契约默认冻结。真实实现发现契约不合理时，走显式 DELTA：
@@ -339,4 +365,4 @@ interface SyncSaveRequest { url: string; username: string; password: string; aut
 
 **历史 DELTA**：无（V1.0 契约随实现即时补齐；抽卡并入对话为结构调整，已在本文件第 7 节记录）。
 
-**覆盖核对（2026-08-11 更新）**：全站 13 界面 + 认证 → **19 组端点全部入契约**；✅ 已实现 19 组；无冷冻组。
+**覆盖核对（2026-08-11 更新）**：全站 13 界面 + 认证 → **20 组端点全部入契约**；✅ 已实现 20 组；无冷冻组。

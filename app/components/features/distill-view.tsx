@@ -1,9 +1,10 @@
 "use client";
 
 // 风格蒸馏（07 工单已真实化）：上传文本 → 真实 LLM 风格分析（one-api 网关）→ 四维指南。
-import { useState } from "react";
+// 工单 14：命名保存到风格库 + 我的风格库列表/删除（同页闭环）+ 保存后"应用到对话"回流（真实库引用）
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { Check, FileText, Sparkle, Trash } from "@phosphor-icons/react/dist/ssr";
 
 interface Guide {
   narrative: string;
@@ -12,17 +13,52 @@ interface Guide {
   rhythm: string;
 }
 
+interface StyleRow {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+/** 默认风格名：风格_MMDD */
+function defaultStyleName(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `风格_${mm}-${dd}`;
+}
+
 export function DistillView() {
   const router = useRouter();
   const [fileName, setFileName] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [guide, setGuide] = useState<Guide | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 工单 14：命名保存 + 我的风格库
+  const [styleName, setStyleName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<StyleRow | null>(null);
+  const [library, setLibrary] = useState<StyleRow[]>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const refreshLibrary = useCallback(async () => {
+    const res = await fetch("/api/v1/styles");
+    if (!res.ok) return;
+    const data = (await res.json()) as { styles: StyleRow[] };
+    setLibrary(data.styles);
+  }, []);
+
+  useEffect(() => {
+    // 挂载时异步加载风格库（fetch 后 setState）；豁免规则误报
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshLibrary();
+  }, [refreshLibrary]);
 
   async function analyze(file: File) {
     setAnalyzing(true);
     setError(null);
     setGuide(null);
+    setSaved(null);
+    setStyleName("");
     try {
       const text = await file.text();
       if (text.trim().length < 200) {
@@ -36,10 +72,65 @@ export function DistillView() {
       const data = (await res.json()) as { guide?: Guide; error?: string };
       if (!res.ok) throw new Error(data.error ?? "分析失败");
       setGuide(data.guide ?? null);
+      setStyleName(defaultStyleName());
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function saveStyle() {
+    if (!guide || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/styles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: styleName.trim() || defaultStyleName(),
+          guide,
+        }),
+      });
+      const data = (await res.json()) as { style?: StyleRow; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "保存失败");
+      setSaved(data.style ?? null);
+      setStyleName("");
+      await refreshLibrary();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** R1/R2 回流：保存成功后一键进对话并自动选中该风格（真实库引用，工单 15 消费 styleId） */
+  function applyToChat() {
+    if (!saved) return;
+    sessionStorage.setItem(
+      "mozhou_pending_style",
+      JSON.stringify({ styleId: saved.id, name: saved.name, at: Date.now() }),
+    );
+    router.push("/chat");
+  }
+
+  async function removeStyle(id: number) {
+    if (deletingId) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/styles?id=${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "删除失败");
+      }
+      if (saved?.id === id) setSaved(null);
+      await refreshLibrary();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -115,28 +206,77 @@ export function DistillView() {
                 {guide.rhythm}
               </li>
             </ul>
-            {/* R1/R2 回流：应用到写作对话（产物→上下文注入） */}
-            <button
-              onClick={() => {
-                // 暂存指南，chat 页读取后注入为风格提示（R4 风格胶囊联动）
-                sessionStorage.setItem(
-                  "mozhou_pending_style",
-                  JSON.stringify({
-                    name: "本次蒸馏风格",
-                    guide,
-                    at: Date.now(),
-                  }),
-                );
-                router.push("/chat");
-              }}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
-            >
-              <Sparkle size={15} weight="fill" aria-hidden />
-              应用到写作对话
-            </button>
+            {/* 工单 14：命名保存到风格库；保存成功后提供"应用到对话"回流 */}
+            {!saved ? (
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  value={styleName}
+                  onChange={(e) => setStyleName(e.target.value)}
+                  placeholder={`默认：${defaultStyleName()}`}
+                  maxLength={30}
+                  className="w-full rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
+                />
+                <button
+                  onClick={() => void saveStyle()}
+                  disabled={saving}
+                  className="shrink-0 rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+                >
+                  {saving ? "保存中…" : "保存到风格库"}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-5 flex flex-col items-center justify-between gap-3 sm:flex-row">
+                <p className="flex items-center gap-2 text-sm text-emerald-400">
+                  <Check size={16} weight="bold" aria-hidden />
+                  已保存「{saved.name}」
+                </p>
+                <button
+                  onClick={applyToChat}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 sm:w-auto sm:px-6"
+                >
+                  <Sparkle size={15} weight="fill" aria-hidden />
+                  应用到写作对话
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* 我的风格库（工单 14：列表/删除） */}
+      <h2 className="mt-10 text-sm font-semibold text-zinc-200">我的风格库</h2>
+      <div className="mt-4 space-y-2">
+        {library.map((s) => (
+          <div
+            key={s.id}
+            className="group flex items-center justify-between rounded-card border border-surface-2 bg-surface/50 px-5 py-3.5"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-zinc-100">
+              <Sparkle size={16} weight="duotone" className="text-accent" aria-hidden />
+              {s.name}
+            </span>
+            <span className="flex items-center gap-3">
+              <span className="text-xs text-faint">
+                {new Date(s.createdAt).toLocaleDateString("zh-CN")}
+              </span>
+              <button
+                onClick={() => void removeStyle(s.id)}
+                disabled={deletingId === s.id}
+                aria-label={`删除 ${s.name}`}
+                className="text-faint opacity-0 transition group-hover:opacity-100 hover:text-red-400 disabled:opacity-40"
+              >
+                <Trash size={14} aria-hidden />
+              </button>
+            </span>
+          </div>
+        ))}
+        {library.length === 0 && (
+          <p className="rounded-card border border-dashed border-surface-2 px-5 py-8 text-center text-xs text-faint">
+            还没有保存的风格，分析文本后命名保存即可复用
+          </p>
+        )}
+      </div>
     </main>
   );
 }
