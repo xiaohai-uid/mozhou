@@ -13,7 +13,12 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
   const [row] = await db
-    .select({ url: syncConfigs.url, username: syncConfigs.username, autoSync: syncConfigs.autoSync })
+    .select({
+      url: syncConfigs.url,
+      username: syncConfigs.username,
+      autoSync: syncConfigs.autoSync,
+      updatedAt: syncConfigs.updatedAt,
+    })
     .from(syncConfigs)
     .where(eq(syncConfigs.userId, user.id));
   if (!row) return NextResponse.json({ configured: false });

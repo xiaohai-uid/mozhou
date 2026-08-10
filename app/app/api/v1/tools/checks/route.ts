@@ -37,6 +37,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
     text?: unknown;
     mustCover?: unknown; // 合同必含词（如 ["开田","守塔"]）
+    knownEntities?: unknown; // 绑定作品的实体库（人物/世界观条目名）
   } | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   if (!text) {
@@ -75,12 +76,31 @@ export async function POST(request: Request) {
     detail: leaked.length > 0 ? `正文出现禁区代号 ${[...new Set(leaked)].join("/")}` : "未曝光 S-001/003/005",
   });
 
-  // 4. 实体登记（人名/地名出现即视为已登记）
-  const entityMatch = text.match(/([\u4e00-\u9fa5]{2,4})(?:说|问|道|站在|走向|看见|回到)/);
+  // 4. 实体登记（真实化：对照绑定作品的人物/世界观条目库）
+  //    正文中出现库中已知实体 → 已登记；出现未在库中的疑似实体 → 提示登记
+  const knownEntities = Array.isArray(body?.knownEntities)
+    ? body.knownEntities.filter((e): e is string => typeof e === "string")
+    : [];
+  // 提取正文中疑似实体（"XX说/站在/走向/看见/回到" 前的 2-4 字名词）
+  const suspected = [
+    ...new Set(
+      [...text.matchAll(/([\u4e00-\u9fa5]{2,4})(?:说|问|道|站在|走向|看见|回到|望向|攥着)/g)].map(
+        (m) => m[1],
+      ),
+    ),
+  ];
+  const unregistered = suspected.filter((e) => !knownEntities.includes(e));
   checks.push({
     name: "实体登记",
-    ok: true,
-    detail: entityMatch ? `「${entityMatch[1]}」等实体已登记` : "无新实体",
+    ok: unregistered.length === 0,
+    detail:
+      unregistered.length > 0
+        ? `正文出现未登记实体：${unregistered.slice(0, 3).join(" / ")}`
+        : suspected.length > 0
+          ? `已登记实体 ${suspected.slice(0, 3).join(" / ")} 等`
+          : knownEntities.length > 0
+            ? "无新实体（库中 ${knownEntities.length} 条已知）"
+            : "未配置实体库（绑定作品后自动核对）",
   });
 
   // 5. 复读检测

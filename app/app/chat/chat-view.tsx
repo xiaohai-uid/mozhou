@@ -47,6 +47,8 @@ export function ChatView() {
   // 风格/技能选择（R4 决策）：胶囊单选/多选，注入 system 提示
   const [style, setStyle] = useState<string | null>(null);
   const [skills, setSkills] = useState<string[]>([]);
+  // 技能链路（真实化）：从 /api/v1/skills 加载我的技能名，胶囊可选中注入
+  const [mySkillNames, setMySkillNames] = useState<string[]>([]);
   // 内联抽卡状态：候选列表 + 抽卡中
   const [drawing, setDrawing] = useState(false);
   const [candidates, setCandidates] = useState<DrawCandidate[]>([]);
@@ -81,6 +83,12 @@ export function ChatView() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { novels: NovelSummary[] } | null) => {
         if (data) setNovels(data.novels);
+      });
+    // 技能链路（真实化）：加载我的技能名 → 胶囊可选中注入
+    fetch("/api/v1/skills?scope=mine")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { skills: Array<{ name: string }> } | null) => {
+        if (data) setMySkillNames(data.skills.map((s) => s.name));
       });
     // R1/R2 回流：读取蒸馏页暂存风格，自动选中
     try {
@@ -374,10 +382,13 @@ export function ChatView() {
                 </button>
               ))}
             </div>
-            {/* 技能胶囊（R4：多选叠加） */}
+            {/* 技能胶囊（R4 多选 + 真实技能库） */}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-faint">技能</span>
-              {["去AI味", "伏笔管理"].map((sk) => (
+              {mySkillNames.length === 0 && (
+                <span className="text-xs text-zinc-600">（技能广场创建后出现）</span>
+              )}
+              {mySkillNames.map((sk) => (
                 <button
                   key={sk}
                   onClick={() =>

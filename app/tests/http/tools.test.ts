@@ -89,3 +89,38 @@ describe("POST /api/v1/tools/checks", () => {
     expect(anon.status).toBe(401);
   });
 });
+
+describe("实体登记真实化（② 修复）", () => {
+  it("正文出现库外实体 → 登记失败并提示", async () => {
+    const res = await fetch(`${BASE}/api/v1/tools/checks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        text: "青水河站在岸边，望向远处的山。".repeat(50),
+        knownEntities: ["陆沉舟", "阿雀"],
+      }),
+    });
+    const { checks } = (await res.json()) as {
+      checks: Array<{ name: string; ok: boolean; detail: string }>;
+    };
+    const entity = checks.find((c) => c.name === "实体登记")!;
+    expect(entity.ok).toBe(false);
+    expect(entity.detail).toContain("青水河");
+  });
+
+  it("正文实体均在库中 → 登记通过", async () => {
+    const res = await fetch(`${BASE}/api/v1/tools/checks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        text: "陆沉舟站在岸边，阿雀望向远处的山。".repeat(50),
+        knownEntities: ["陆沉舟", "阿雀"],
+      }),
+    });
+    const { checks } = (await res.json()) as {
+      checks: Array<{ name: string; ok: boolean; detail: string }>;
+    };
+    const entity = checks.find((c) => c.name === "实体登记")!;
+    expect(entity.ok).toBe(true);
+  });
+});

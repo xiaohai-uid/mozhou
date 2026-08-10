@@ -24,10 +24,12 @@ export function RankingsView() {
   const [degraded, setDegraded] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  async function fetchRankings() {
+  async function fetchRankings(targetBoard?: string) {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/rankings");
+      const res = await fetch(
+        `/api/v1/rankings${targetBoard ? `?board=${encodeURIComponent(targetBoard)}` : ""}`,
+      );
       if (!res.ok) throw new Error("榜单加载失败");
       const data = (await res.json()) as {
         boards?: RankingBoard[];
@@ -62,7 +64,7 @@ export function RankingsView() {
   async function switchBoard(name: string) {
     if (name === board || loading) return;
     setBoard(name);
-    await fetchRankings();
+    await fetchRankings(name);
   }
 
   return (

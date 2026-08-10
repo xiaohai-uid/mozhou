@@ -46,6 +46,10 @@ services:
     container_name: mozhou-app
     environment:
       DATABASE_URL: postgres://mozhou:mozhou_dev@postgres:5432/mozhou
+      # 生产必需密钥（从宿主环境注入；部署前必须设置，见 docs/deployment.md）
+      AUTH_SECRET: ${AUTH_SECRET:?生产必须设置 AUTH_SECRET}
+      ONEAPI_BASE_URL: ${ONEAPI_BASE_URL:-http://one-api:3000}
+      ONEAPI_TOKEN: ${ONEAPI_TOKEN:?生产必须设置 ONEAPI_TOKEN}
     ports:
       - "3000:3000"
     depends_on:

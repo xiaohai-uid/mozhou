@@ -13,16 +13,18 @@ export function SyncView() {
   const [configured, setConfigured] = useState(false);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    // 加载已有配置（密码不回传，仅回填 URL/账号）
+    // 加载已有配置（密码不回传，仅回填 URL/账号；状态区显示真实配置时间）
     fetch("/api/v1/sync/config")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { configured?: boolean; url?: string; username?: string; autoSync?: boolean } | null) => {
+      .then((data: { configured?: boolean; url?: string; username?: string; autoSync?: boolean; updatedAt?: string } | null) => {
         if (data?.configured) {
           setUrl(data.url ?? url);
           setUsername(data.username ?? "");
           setAutoSync(data.autoSync ?? true);
+          setUpdatedAt(data.updatedAt ?? null);
           setConfigured(true);
         }
       });
@@ -45,7 +47,10 @@ export function SyncView() {
       };
       if (!res.ok) throw new Error(data.error ?? "保存失败");
       setResult({ ok: data.ok ?? false, message: data.message ?? "已连接" });
-      if (data.ok) setConfigured(true);
+      if (data.ok) {
+        setConfigured(true);
+        setUpdatedAt(new Date().toISOString());
+      }
     } catch (err) {
       setResult({ ok: false, message: (err as Error).message });
     } finally {
@@ -143,9 +148,9 @@ export function SyncView() {
           </div>
           <ul className="mt-4 space-y-2.5 text-sm">
             {[
-              { name: "作品与章节", status: "待首次同步" },
-              { name: "会话记录", status: "待首次同步" },
-              { name: "技能包", status: "未更改" },
+              { name: "作品与章节", status: updatedAt ? `配置于 ${new Date(updatedAt).toLocaleString()}` : "未同步" },
+              { name: "会话记录", status: updatedAt ? `配置于 ${new Date(updatedAt).toLocaleString()}` : "未同步" },
+              { name: "技能包", status: "配置已保存" },
             ].map((item) => (
               <li
                 key={item.name}
@@ -169,6 +174,9 @@ export function SyncView() {
               {autoSync ? <ToggleRight size={28} weight="fill" /> : <ToggleLeft size={28} weight="fill" />}
             </button>
           </div>
+          <p className="mt-4 text-[11px] text-faint">
+            配置已真实保存；文件级同步执行（WebDAV 上传/拉取）归 V1.1
+          </p>
         </div>
       )}
     </main>
