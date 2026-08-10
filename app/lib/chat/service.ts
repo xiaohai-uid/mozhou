@@ -94,6 +94,8 @@ export interface RunChatInput {
   model: ChatModel;
   content: string;
   novelId?: number | null;
+  style?: string | null;
+  skills?: string[];
   onDelta: (text: string) => void;
 }
 
@@ -134,12 +136,17 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   const injected = await retrieveContext(input.userId, input.content, {
     novelId: input.novelId ?? null,
   });
+  // 风格/技能（R4 决策）：与 RAG 注入合并为 system 提示
+  const extra: string[] = [];
+  if (input.style) extra.push(`[风格] 全文遵循「${input.style}」文风写作`);
+  for (const sk of input.skills ?? []) extra.push(`[技能] 启用「${sk}」规则`);
   const provider = makeChatProvider(
     input.model,
     history ?? [],
-    buildSystemPrompt(
-      injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
-    ),
+    buildSystemPrompt([
+      ...injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
+      ...extra,
+    ]),
   );
   const state = await runNodeStream(
     initialState(),

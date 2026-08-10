@@ -40,6 +40,9 @@ export function ChatView() {
   // 当前作品绑定（R3 决策）：顶部选择器，RAG 按作品过滤
   const [novels, setNovels] = useState<NovelSummary[]>([]);
   const [novelId, setNovelId] = useState<number | null>(null);
+  // 风格/技能选择（R4 决策）：胶囊单选/多选，注入 system 提示
+  const [style, setStyle] = useState<string | null>(null);
+  const [skills, setSkills] = useState<string[]>([]);
   // 内联抽卡状态：候选列表 + 抽卡中
   const [drawing, setDrawing] = useState(false);
   const [candidates, setCandidates] = useState<DrawCandidate[]>([]);
@@ -111,7 +114,7 @@ export function ChatView() {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model, content, novelId }),
+        body: JSON.stringify({ sessionId, model, content, novelId, style, skills }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
@@ -294,7 +297,49 @@ export function ChatView() {
                   </option>
                 ))}
             </select>
-          </label>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* 风格胶囊（R4：单选，同时只生效一种文风） */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-faint">风格</span>
+              {["无", "灰烬写实", "意象绵长"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStyle(s === "无" ? null : s)}
+                  disabled={streaming}
+                  className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                    style === s
+                      ? "bg-accent/15 text-accent"
+                      : "border border-surface-2 text-faint hover:text-zinc-300"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            {/* 技能胶囊（R4：多选叠加） */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-faint">技能</span>
+              {["去AI味", "伏笔管理"].map((sk) => (
+                <button
+                  key={sk}
+                  onClick={() =>
+                    setSkills((prev) =>
+                      prev.includes(sk) ? prev.filter((x) => x !== sk) : [...prev, sk],
+                    )
+                  }
+                  disabled={streaming}
+                  className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                    skills.includes(sk)
+                      ? "bg-accent/15 text-accent"
+                      : "border border-surface-2 text-faint hover:text-zinc-300"
+                  }`}
+                >
+                  {sk}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 

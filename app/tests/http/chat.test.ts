@@ -214,3 +214,33 @@ describe("POST /api/v1/chat（SSE 流式，mock provider）", () => {
     expect(messages).toHaveLength(0);
   });
 });
+
+describe("风格/技能注入（R4 决策）", () => {
+  it("携带 style + skills：SSE 正常完成", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({
+        content: "写一段雨夜",
+        style: "灰烬写实",
+        skills: ["去AI味", "伏笔管理"],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    expect(events[0].type).toBe("start");
+    expect(events.at(-1)?.type).toBe("done");
+  });
+
+  it("非法 skills（非字符串数组）→ 忽略不报错", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "hi", skills: [1, 2] as unknown as string[] }),
+    });
+    expect(res.status).toBe(200);
+  });
+});

@@ -20,6 +20,8 @@ export async function POST(request: Request) {
     model?: unknown;
     content?: unknown;
     novelId?: unknown;
+    style?: unknown;
+    skills?: unknown;
   };
   try {
     body = await request.json();
@@ -44,6 +46,13 @@ export async function POST(request: Request) {
     typeof body.novelId === "number" && Number.isInteger(body.novelId)
       ? body.novelId
       : null;
+  const style =
+    typeof body.style === "string" && body.style.trim() ? body.style.trim() : null;
+  const skills =
+    Array.isArray(body.skills) &&
+    body.skills.every((s) => typeof s === "string" && s.trim())
+      ? (body.skills as string[]).map((s) => s.trim())
+      : [];
 
   // 归属校验在流外完成：他人会话 → 404（不进入 SSE）
   if (sessionId !== undefined && (await listMessages(sessionId, user.id)) === null) {
@@ -66,6 +75,8 @@ export async function POST(request: Request) {
           model,
           content,
           novelId,
+          style,
+          skills,
           onDelta: (text) => send({ type: "delta", text }),
         });
         if (result.state.task?.status === "ok" && result.messageId) {
