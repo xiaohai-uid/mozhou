@@ -25,22 +25,34 @@ export interface SessionRow {
   id: number;
   title: string;
   createdAt: Date;
+  novelId: number | null;
 }
 
 export async function createSession(
   userId: number,
   title: string = DEFAULT_TITLE,
+  novelId?: number | null,
 ): Promise<SessionRow> {
   const [row] = await db
     .insert(sessions)
-    .values({ userId, title })
-    .returning({ id: sessions.id, title: sessions.title, createdAt: sessions.createdAt });
+    .values({ userId, title, novelId: novelId ?? null })
+    .returning({
+      id: sessions.id,
+      title: sessions.title,
+      createdAt: sessions.createdAt,
+      novelId: sessions.novelId,
+    });
   return row!;
 }
 
 export async function listSessions(userId: number): Promise<SessionRow[]> {
   return db
-    .select({ id: sessions.id, title: sessions.title, createdAt: sessions.createdAt })
+    .select({
+      id: sessions.id,
+      title: sessions.title,
+      createdAt: sessions.createdAt,
+      novelId: sessions.novelId,
+    })
     .from(sessions)
     .where(eq(sessions.userId, userId))
     .orderBy(desc(sessions.createdAt));
@@ -81,6 +93,7 @@ export interface RunChatInput {
   sessionId: number;
   model: ChatModel;
   content: string;
+  novelId?: number | null;
   onDelta: (text: string) => void;
 }
 
@@ -117,8 +130,10 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   }
 
   const history = await listMessages(input.sessionId, input.userId);
-  // RAG 注入（06 工单）：按当前输入检索相关设定条目，注入 system 提示
-  const injected = await retrieveContext(input.userId, input.content);
+  // RAG 注入（06 工单）：按当前输入 + 绑定作品检索相关设定条目，注入 system 提示
+  const injected = await retrieveContext(input.userId, input.content, {
+    novelId: input.novelId ?? null,
+  });
   const provider = makeChatProvider(
     input.model,
     history ?? [],

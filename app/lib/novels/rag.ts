@@ -2,7 +2,7 @@
 // 无 embedding 渠道（one-api 无 embedding 模型），降级为共现字符相关性检索：
 // 拉取用户全部人物库/世界观条目，按与 query 的共现字符数排序取 top-k。
 // 有 embedding 渠道后升级为 pgvector 语义检索（06b）。
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { characterEntries, novels, worldviewEntries } from "@/lib/schema";
 
@@ -33,23 +33,34 @@ export function rankEntries(entries: RagEntry[], query: string): RagEntry[] {
     .map((s) => s.e);
 }
 
-/** 检索当前用户全部设定条目（经 novels 归属），取 top-k（无共现则返回空） */
+/** 检索设定条目（可限定作品；novelId 为 null 时检索用户全部作品），取 top-k（无共现则返回空） */
 export async function retrieveContext(
   userId: number,
   query: string,
-  topK = 5,
+  opts: { topK?: number; novelId?: number | null } = {},
 ): Promise<RagEntry[]> {
+  const topK = opts.topK ?? 5;
+  let ownerCond = eq(novels.userId, userId);
+  if (opts.novelId != null) {
+    // 归属校验：novelId 必须属于该用户（防越权检索他人作品设定）
+    const [owned] = await db
+      .select({ id: novels.id })
+      .from(novels)
+      .where(and(eq(novels.id, opts.novelId), eq(novels.userId, userId)));
+    if (!owned) return [];
+    ownerCond = eq(novels.id, opts.novelId);
+  }
   const [chars, wvs] = await Promise.all([
     db
       .select({ name: characterEntries.name, note: characterEntries.note })
       .from(characterEntries)
       .innerJoin(novels, eq(characterEntries.novelId, novels.id))
-      .where(eq(novels.userId, userId)),
+      .where(ownerCond),
     db
       .select({ name: worldviewEntries.name, note: worldviewEntries.note })
       .from(worldviewEntries)
       .innerJoin(novels, eq(worldviewEntries.novelId, novels.id))
-      .where(eq(novels.userId, userId)),
+      .where(ownerCond),
   ]);
   const entries: RagEntry[] = [
     ...chars.map((r) => ({ kind: "character" as const, name: r.name, note: r.note })),

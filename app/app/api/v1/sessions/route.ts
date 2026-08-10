@@ -1,4 +1,4 @@
-// /api/v1/sessions — 会话列表 / 新建
+// /api/v1/sessions — 会话列表 / 新建（支持绑定当前作品 novelId）
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createSession, listSessions } from "@/lib/chat/service";
@@ -9,9 +9,16 @@ export async function GET() {
   return NextResponse.json({ sessions: await listSessions(user.id) });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  const session = await createSession(user.id);
+  const body = (await request.json().catch(() => null)) as {
+    novelId?: unknown;
+  } | null;
+  const novelId =
+    typeof body?.novelId === "number" && Number.isInteger(body.novelId)
+      ? body.novelId
+      : null;
+  const session = await createSession(user.id, undefined, novelId);
   return NextResponse.json({ session }, { status: 201 });
 }

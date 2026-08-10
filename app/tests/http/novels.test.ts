@@ -353,3 +353,79 @@ describe("RAG 设定注入（06 工单，关键词检索）", () => {
     expect(done?.injected ?? []).toHaveLength(0);
   });
 });
+
+describe("会话↔作品绑定（R3 决策）", () => {
+  let bindNovelId: number;
+
+  it("前置：创建绑定用作品 + 条目", async () => {
+    const novel = await fetch(`${BASE}/api/v1/novels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "绑定测试书" }),
+    });
+    bindNovelId = ((await novel.json()) as { novel: { id: number } }).novel.id;
+
+    await fetch(`${BASE}/api/v1/novels/${bindNovelId}/entries?kind=character`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "独有角色甲", note: "只属于绑定测试书" }),
+    });
+  });
+
+  it("新建会话带 novelId：返回并持久化", async () => {
+    const res = await fetch(`${BASE}/api/v1/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ novelId: bindNovelId }),
+    });
+    expect(res.status).toBe(201);
+    const { session } = (await res.json()) as {
+      session: { id: number; novelId: number | null };
+    };
+    expect(session.novelId).toBe(bindNovelId);
+
+    // 列表也带 novelId
+    const list = await fetch(`${BASE}/api/v1/sessions`, {
+      headers: { cookie: me.cookie },
+    });
+    const { sessions } = (await list.json()) as {
+      sessions: Array<{ novelId: number | null }>;
+    };
+    expect(sessions.some((s) => s.novelId === bindNovelId)).toBe(true);
+  });
+
+  it("绑定作品后 chat：RAG 只注入该作品设定", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "写独有角色甲的出场", novelId: bindNovelId }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: Array<{ name: string }>;
+    };
+    const names = (done?.injected ?? []).map((i) => i.name);
+    expect(names).toContain("独有角色甲");
+    // 不应混入其他书的设定（如 RAG 测试书的「陆沉舟」）
+    expect(names).not.toContain("陆沉舟");
+  });
+
+  it("越权：绑定他人作品 → 注入为空（不泄漏）", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: other.cookie },
+      body: JSON.stringify({ content: "写独有角色甲的出场", novelId: bindNovelId }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: unknown[];
+    };
+    expect(done?.injected ?? []).toHaveLength(0);
+  });
+});

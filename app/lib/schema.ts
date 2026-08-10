@@ -22,13 +22,16 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-/** 对话会话（04 工单；novel_id 留 05 小说项目绑定） */
+/** 对话会话（04 工单；novelId 绑定当前写作作品，06 工单 R3 决策落地） */
 export const sessions = pgTable("sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull().default("新会话"),
+  novelId: integer("novel_id").references(() => novels.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

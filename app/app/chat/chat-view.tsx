@@ -10,6 +10,12 @@ import { MODELS } from "@/lib/chat/models";
 interface Session {
   id: number;
   title: string;
+  novelId: number | null;
+}
+
+interface NovelSummary {
+  id: number;
+  name: string;
 }
 
 interface ChatMessage {
@@ -31,6 +37,9 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 当前作品绑定（R3 决策）：顶部选择器，RAG 按作品过滤
+  const [novels, setNovels] = useState<NovelSummary[]>([]);
+  const [novelId, setNovelId] = useState<number | null>(null);
   // 内联抽卡状态：候选列表 + 抽卡中
   const [drawing, setDrawing] = useState(false);
   const [candidates, setCandidates] = useState<DrawCandidate[]>([]);
@@ -49,14 +58,22 @@ export function ChatView() {
     const data = (await res.json()) as { messages: ChatMessage[] };
     setMessages(data.messages);
     setSessionId(id);
-  }, []);
+    // 会话绑定的作品回填选择器
+    const s = sessions.find((x) => x.id === id);
+    if (s) setNovelId(s.novelId);
+  }, [sessions]);
 
   useEffect(() => {
-    // 初始加载会话列表（异步，避免 effect 内同步 setState）
+    // 初始加载会话列表 + 作品列表（异步，避免 effect 内同步 setState）
     fetch("/api/v1/sessions")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { sessions: Session[] } | null) => {
         if (data) setSessions(data.sessions);
+      });
+    fetch("/api/v1/novels")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { novels: NovelSummary[] } | null) => {
+        if (data) setNovels(data.novels);
       });
   }, []);
 
@@ -67,7 +84,11 @@ export function ChatView() {
   async function newSession() {
     setStreaming(false);
     setError(null);
-    const res = await fetch("/api/v1/sessions", { method: "POST" });
+    const res = await fetch("/api/v1/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ novelId }),
+    });
     if (!res.ok) return;
     const data = (await res.json()) as { session: Session };
     setMessages([]);
@@ -90,7 +111,7 @@ export function ChatView() {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model, content }),
+        body: JSON.stringify({ sessionId, model, content, novelId }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
@@ -239,21 +260,42 @@ export function ChatView() {
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-2 bg-surface/40">
         <header className="flex items-center justify-between border-b border-surface-2 px-5 py-3.5">
           <h1 className="text-sm font-medium text-zinc-300">写作对话</h1>
-          <label className="flex items-center gap-2 text-sm text-faint">
-            模型
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              disabled={streaming}
-              className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
-            >
-              {MODELS.map((id) => (
-                <option key={id} value={id}>
-                  {id === "deepseek-v4-flash" ? "DeepSeek（免费）" : "GLM（免费）"}
-                </option>
-              ))}
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-faint">
+              作品
+              <select
+                value={novelId ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNovelId(v === "" ? null : Number(v));
+                }}
+                disabled={streaming}
+                className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
+              >
+                <option value="">未绑定</option>
+                {novels.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-faint">
+              模型
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                disabled={streaming}
+                className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
+              >
+                {MODELS.map((id) => (
+                  <option key={id} value={id}>
+                    {id === "deepseek-v4-flash" ? "DeepSeek（免费）" : "GLM（免费）"}
+                  </option>
+                ))}
             </select>
           </label>
+          </div>
         </header>
 
         <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
