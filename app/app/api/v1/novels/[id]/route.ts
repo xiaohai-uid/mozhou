@@ -25,6 +25,7 @@ export async function PATCH(
   const body = (await request.json().catch(() => null)) as {
     name?: string;
     description?: string;
+    ragEnabled?: boolean;
   } | null;
   const name = body?.name?.trim();
   if (name !== undefined && !name) {
@@ -36,6 +37,7 @@ export async function PATCH(
   const novel = await updateNovel(user.id, Number(id), {
     ...(name !== undefined ? { name } : {}),
     ...(body?.description !== undefined ? { description: body.description } : {}),
+    ...(body?.ragEnabled !== undefined ? { ragEnabled: body.ragEnabled } : {}),
   });
   if (!novel) return NextResponse.json({ error: "作品不存在" }, { status: 404 });
   return NextResponse.json({ novel });

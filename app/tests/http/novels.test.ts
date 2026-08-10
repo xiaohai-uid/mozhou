@@ -429,3 +429,95 @@ describe("会话↔作品绑定（R3 决策）", () => {
     expect(done?.injected ?? []).toHaveLength(0);
   });
 });
+
+describe("RAG 开关（06 收尾）", () => {
+  let switchNovelId: number;
+
+  it("前置：创建开关测试书 + 条目", async () => {
+    const novel = await fetch(`${BASE}/api/v1/novels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "开关测试书" }),
+    });
+    switchNovelId = ((await novel.json()) as { novel: { id: number } }).novel.id;
+    await fetch(`${BASE}/api/v1/novels/${switchNovelId}/entries?kind=character`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "开关人物", note: "开关测试用" }),
+    });
+  });
+
+  it("默认开启：详情 ragEnabled=true，chat 正常注入", async () => {
+    const detail = await fetch(`${BASE}/api/v1/novels/${switchNovelId}`, {
+      headers: { cookie: me.cookie },
+    });
+    const d = (await detail.json()) as { novel: { ragEnabled: boolean } };
+    expect(d.novel.ragEnabled).toBe(true);
+
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "写开关人物的出场", novelId: switchNovelId }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: Array<{ name: string }>;
+    };
+    expect((done?.injected ?? []).map((i) => i.name)).toContain("开关人物");
+  });
+
+  it("PATCH 关闭 ragEnabled=false：持久化 + chat 注入为空", async () => {
+    const patch = await fetch(`${BASE}/api/v1/novels/${switchNovelId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ ragEnabled: false }),
+    });
+    expect(patch.status).toBe(200);
+
+    // 刷新详情：状态保持
+    const detail = await fetch(`${BASE}/api/v1/novels/${switchNovelId}`, {
+      headers: { cookie: me.cookie },
+    });
+    const d = (await detail.json()) as { novel: { ragEnabled: boolean } };
+    expect(d.novel.ragEnabled).toBe(false);
+
+    // chat 读取开关：注入为空
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "写开关人物的出场", novelId: switchNovelId }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: unknown[];
+    };
+    expect(done?.injected ?? []).toHaveLength(0);
+  });
+
+  it("PATCH 重新开启：注入恢复", async () => {
+    await fetch(`${BASE}/api/v1/novels/${switchNovelId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ ragEnabled: true }),
+    });
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "写开关人物的出场", novelId: switchNovelId }),
+    });
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      injected?: Array<{ name: string }>;
+    };
+    expect((done?.injected ?? []).map((i) => i.name)).toContain("开关人物");
+  });
+});

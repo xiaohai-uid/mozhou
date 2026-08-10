@@ -21,6 +21,7 @@ interface NovelSummary {
   id: number;
   name: string;
   meta: string;
+  ragEnabled: boolean;
 }
 
 interface Chapter {
@@ -50,6 +51,27 @@ export function ProjectsView() {
   const [bookName, setBookName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ragSaving, setRagSaving] = useState(false);
+
+  /** RAG 总开关：PATCH 持久化后刷新详情（06 收尾） */
+  async function toggleRag() {
+    if (!activeId || !detail || ragSaving) return;
+    setRagSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/novels/${activeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ragEnabled: !detail.novel.ragEnabled }),
+      });
+      if (!res.ok) throw new Error("保存失败");
+      await loadDetail(activeId);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRagSaving(false);
+    }
+  }
 
   const refreshList = useCallback(async () => {
     const res = await fetch("/api/v1/novels");
@@ -366,35 +388,43 @@ export function ProjectsView() {
               </div>
             </div>
 
-            {/* RAG 注入配置（06 工单接入；当前界面示意） */}
+            {/* RAG 注入配置（06 收尾：主开关真实绑定 ragEnabled，PATCH 持久化） */}
             <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
-                <Waveform size={16} weight="duotone" className="text-accent" aria-hidden />
-                RAG 注入配置
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
+                  <Waveform size={16} weight="duotone" className="text-accent" aria-hidden />
+                  RAG 注入配置
+                </div>
+                <button
+                  onClick={() => void toggleRag()}
+                  disabled={ragSaving}
+                  aria-label="RAG 注入总开关"
+                  aria-pressed={detail.novel.ragEnabled}
+                  className={`rounded-full px-3 py-1.5 text-xs transition disabled:opacity-50 ${
+                    detail.novel.ragEnabled
+                      ? "bg-accent/15 text-accent"
+                      : "border border-surface-2 text-faint"
+                  }`}
+                >
+                  {ragSaving ? "保存中…" : detail.novel.ragEnabled ? "注入中" : "已关闭"}
+                </button>
               </div>
               <p className="mt-1 text-xs leading-5 text-muted">
-                写作对话时自动检索以下资料注入上下文，保持设定一致性（06 工单接入）
+                写作对话时自动检索以下资料注入上下文，保持设定一致性
+                {!detail.novel.ragEnabled && "（当前已关闭，对话不再注入本作品设定）"}
               </p>
               <ul className="mt-4 space-y-2">
                 {[
-                  { name: "人物库", desc: `${detail.characters.length} 条`, on: true },
-                  { name: "世界观设定", desc: `${detail.worldviews.length} 条`, on: true },
-                  { name: "章节摘要", desc: `${detail.chapters.length} 章`, on: false },
+                  { name: "人物库", desc: `${detail.characters.length} 条` },
+                  { name: "世界观设定", desc: `${detail.worldviews.length} 条` },
+                  { name: "章节摘要", desc: `${detail.chapters.length} 章` },
                 ].map((c) => (
                   <li key={c.name} className="flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
                     <div>
                       <span className="text-sm font-medium text-zinc-100">{c.name}</span>
                       <p className="mt-0.5 text-xs text-muted">{c.desc}</p>
                     </div>
-                    <button
-                      aria-label={`${c.name}注入开关`}
-                      aria-pressed={c.on}
-                      className={`rounded-full px-3 py-1.5 text-xs transition ${
-                        c.on ? "bg-accent/15 text-accent" : "border border-surface-2 text-faint"
-                      }`}
-                    >
-                      {c.on ? "注入中" : "未注入"}
-                    </button>
+                    <span className="text-xs text-faint">跟随总开关</span>
                   </li>
                 ))}
               </ul>

@@ -44,10 +44,12 @@ export async function retrieveContext(
   if (opts.novelId != null) {
     // 归属校验：novelId 必须属于该用户（防越权检索他人作品设定）
     const [owned] = await db
-      .select({ id: novels.id })
+      .select({ id: novels.id, ragEnabled: novels.ragEnabled })
       .from(novels)
       .where(and(eq(novels.id, opts.novelId), eq(novels.userId, userId)));
     if (!owned) return [];
+    // RAG 开关（06 收尾）：作品关闭注入时返回空
+    if (!owned.ragEnabled) return [];
     ownerCond = eq(novels.id, opts.novelId);
   }
   const [chars, wvs] = await Promise.all([

@@ -18,6 +18,7 @@ export interface NovelSummary {
   id: number;
   name: string;
   meta: string; // "连载中 · 4 章"
+  ragEnabled: boolean;
 }
 
 export interface NovelDetail {
@@ -27,13 +28,14 @@ export interface NovelDetail {
   worldviews: WorldviewEntry[];
 }
 
-/** 列表（meta = 章节数拼接） */
+/** 列表（meta = 章节数拼接；含 RAG 开关） */
 export async function listNovels(userId: number): Promise<NovelSummary[]> {
   const rows = await db
     .select({
       id: novels.id,
       name: novels.name,
       description: novels.description,
+      ragEnabled: novels.ragEnabled,
       chapterCount: count(chapters.id),
     })
     .from(novels)
@@ -45,6 +47,7 @@ export async function listNovels(userId: number): Promise<NovelSummary[]> {
     id: r.id,
     name: r.name,
     meta: `连载中 · ${r.chapterCount} 章`,
+    ragEnabled: r.ragEnabled,
   }));
 }
 
@@ -100,6 +103,7 @@ export async function getNovel(
       id: novel.id,
       name: novel.name,
       meta: `连载中 · ${chapterCount} 章`,
+      ragEnabled: novel.ragEnabled,
     },
     chapters: chapterRows,
     characters: characterRows,
@@ -107,11 +111,11 @@ export async function getNovel(
   };
 }
 
-/** 编辑项目（书名/简介），归属校验 */
+/** 编辑项目（书名/简介/RAG 开关），归属校验 */
 export async function updateNovel(
   userId: number,
   novelId: number,
-  patch: { name?: string; description?: string },
+  patch: { name?: string; description?: string; ragEnabled?: boolean },
 ): Promise<Novel | null> {
   const [row] = await db
     .update(novels)

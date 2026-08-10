@@ -36,6 +36,13 @@
       "when": 1786351925959,
       "tag": "0004_past_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786354579186,
+      "tag": "0005_ambiguous_starfox",
+      "breakpoints": true
     }
   ]
 }

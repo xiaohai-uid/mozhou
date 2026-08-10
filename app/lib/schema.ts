@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgEnum,
   pgTable,
@@ -57,6 +58,8 @@ export const novels = pgTable("novels", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
+  /** RAG 注入开关（06 收尾：projects 页开关绑定，false 时对话不检索该作品设定） */
+  ragEnabled: boolean("rag_enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
