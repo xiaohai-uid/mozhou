@@ -51,7 +51,7 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 - Ticket tracker：`.scratch/mozhou-mvp/issues/NN-<slug>.md`；spec 见 `.scratch/mozhou-mvp/spec.md`
 - 决策记录：OB `10_Projects/墨舟.md`；spike 结论：`docs/spikes/`（见 0.5 探针）
 - 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
-- 遗留切片（V1.1 候选）：书源 HTML 规则解析器、会员支付、蒸馏风格库持久化
+- 遗留切片（V1.1 未做项，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，工单 14/15）
 
 ## Agent skills
 
