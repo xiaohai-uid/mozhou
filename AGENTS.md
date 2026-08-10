@@ -52,3 +52,17 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 - 决策记录：OB `10_Projects/墨舟.md`；spike 结论：`docs/spikes/`（见 0.5 探针）
 - 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
 - 遗留切片（V1.1 候选）：书源 HTML 规则解析器、会员支付、蒸馏风格库持久化
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown — tickets live at `.scratch/<feature-slug>/issues/NN-<slug>.md` (e.g. `.scratch/mozhou-mvp/`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five canonical roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` at repo root; ADRs under `docs/adr/` (created lazily). See `docs/agents/domain.md`.
