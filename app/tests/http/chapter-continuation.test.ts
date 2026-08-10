@@ -51,8 +51,7 @@ afterAll(async () => {
   await db.delete(users).where(like(users.email, "mozhou-chcont-%"));
 });
 
-describe("章节正文读写（工单 16）", () => {
-  it("GET 单章：初始 content 为空串", async () => {
+describe("章节正文读写（工单 16）", () => {  it("GET 单章：初始 content 为空串", async () => {
     const res = await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
       headers: { cookie },
     });
@@ -142,6 +141,190 @@ describe("章节正文读写（工单 16）", () => {
     const anon = await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
       headers: {},
     });
+    expect(anon.status).toBe(401);
+  });
+});
+
+describe("章节对话引擎（工单 17）", () => {
+  /** SSE 文本 → 事件数组 */
+  function parseSse(text: string) {
+    return text
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+  }
+
+  it("POST chat：SSE start/delta/done + 消息落库（skills 快照 + snapshot）", async () => {
+    // 先给章节写一段正文（注入链正文参考）
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "黄土坡上，老周把锄头抡起来。" }),
+    });
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "继续写：夜里起风了", skills: ["章节续写", "去 AI 味"] }),
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const events = parseSse(await res.text());
+    expect(events[0].type).toBe("start");
+    expect(events.some((e) => e.type === "delta")).toBe(true);
+    const done = events.find((e) => e.type === "done") as { messageId?: number };
+    expect(done?.messageId).toBeTruthy();
+
+    // 落库断言：user + assistant（skills 快照 + snapshot=生成时正文）
+    const list = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
+      { headers: { cookie } },
+    );
+    const { messages } = (await list.json()) as {
+      messages: Array<{
+        role: string;
+        content: string;
+        skills: string[];
+        snapshot: string;
+        status: string;
+      }>;
+    };
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[1].role).toBe("user");
+    expect(messages[0].skills).toEqual(["章节续写", "去 AI 味"]);
+    expect(messages[0].snapshot).toBe("黄土坡上，老周把锄头抡起来。");
+    expect(messages[0].status).toBe("done");
+  });
+
+  it("注入链：mock 回显可见 [正文参考] 与 [技能] 与 [风格]", async () => {
+    // 保存一个风格（styleId 注入路径）
+    const style = await fetch(`${BASE}/api/v1/styles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "章节对话风格",
+        guide: { narrative: "N", sentence: "S", imagery: "I", rhythm: "R" },
+      }),
+    });
+    const { style: s } = (await style.json()) as { style: { id: number } };
+
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({
+          content: "写一段",
+          styleId: s.id,
+          skills: ["章节续写"],
+        }),
+      },
+    );
+    const text = await res.text();
+    expect(text).toContain("[正文参考] 当前章节前文");
+    expect(text).toContain("[技能] 章节续写：通读前文与作品设定");
+    expect(text).toContain("[风格] 章节对话风格：叙事视角——N");
+  });
+
+  it("未安装技能名 → 注入忽略不报错（场景技能外的名字查 skills 表）", async () => {
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "hi", skills: ["不存在的技能"] }),
+      },
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain("[技能] 不存在的技能");
+    expect(text).toContain('"type":"done"');
+  });
+
+  it("多轮对话：历史新→旧，第二轮后 4 条消息", async () => {
+    await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "第二轮", skills: ["章节续写"] }),
+      },
+    );
+    const list = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
+      { headers: { cookie } },
+    );
+    const { messages } = (await list.json()) as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    expect(messages.length).toBeGreaterThanOrEqual(4); // 前一轮 2 + 本轮 2
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[1].role).toBe("user");
+  });
+
+  it("断开请求（abort）→ 服务端不崩，消息落库状态为 done 或 stopped", async () => {
+    const controller = new AbortController();
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "会被中断的一条", skills: ["章节续写"] }),
+        signal: controller.signal,
+      },
+    );
+    controller.abort();
+    await res.body?.cancel().catch(() => {});
+    // 服务端仍健康
+    const after = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "中断后正常请求", skills: [] }),
+      },
+    );
+    expect(after.status).toBe(200);
+  });
+
+  it("越权/校验：他人章节 404 / 空消息 400 / 缺 chapterId 400 / 未登录 401", async () => {
+    const cross = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: otherCookie },
+        body: JSON.stringify({ content: "x" }),
+      },
+    );
+    expect(cross.status).toBe(404);
+
+    const empty = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "  " }),
+      },
+    );
+    expect(empty.status).toBe(400);
+
+    const noId = await fetch(`${BASE}/api/v1/novels/${novelId}/chapters/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "x" }),
+    });
+    expect(noId.status).toBe(400);
+
+    const anon = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "x" }),
+      },
+    );
     expect(anon.status).toBe(401);
   });
 });

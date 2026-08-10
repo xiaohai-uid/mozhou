@@ -49,47 +49,6 @@ type DemoMode = "normal" | "no-model" | "fail" | "empty";
 /** Mock 模型（仅演示；UI Frozen 后换真实模型契约） */
 const MOCK_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
 
-/** Mock 风格库（仅演示；UI Frozen 后换 /api/v1/styles 真实库，胶囊形态不变） */
-const MOCK_STYLES = [
-  { id: 1, name: "黄土纪年体" },
-  { id: 2, name: "意象绵长" },
-];
-
-/** Mock 技能库（v3：技能驱动对话；仅演示，UI Frozen 后换 /api/v1/skills 真实库，胶囊形态不变）。
- * 去AI味/人物小传/信息差设计 = 墨舟技能广场真实技能；章节续写/章节起笔 = 场景技能（按章节状态切换）。 */
-const MOCK_SKILLS = [
-  {
-    name: "章节续写",
-    description: "接续前文，保持文风与人物一致",
-    systemPrompt:
-      "通读前文与作品设定；保持叙事视角与句式节奏；结尾留钩子。只输出正文。",
-  },
-  {
-    name: "章节起笔",
-    description: "空章节起笔，按作品文风开局",
-    systemPrompt:
-      "根据作品设定与风格指南起笔；建立场景与人物；结尾留钩子。只输出正文。",
-  },
-  {
-    name: "去 AI 味",
-    description: "反例库机检，清除 AI 腔套话",
-    systemPrompt:
-      "检查并清除文本中的 AI 腔：禁用'值得注意的是/总而言之/不仅…而且'等套话，句子要有信息增量。",
-  },
-  {
-    name: "人物小传",
-    description: "角色弧光与动机推导",
-    systemPrompt:
-      "为每个主要角色维护小传：外貌/动机/弧光/禁忌，写作时保持行为一致。",
-  },
-  {
-    name: "信息差设计",
-    description: "读者已知/角色已知对照",
-    systemPrompt:
-      "写作时维护信息差：读者已知、角色A已知、角色B已知三张表，用信息差制造悬念。",
-  },
-] as const;
-
 /** 示例正文（有正文示例；与产品文风一致） */
 const EXAMPLE_BODY = `黄土坡上，老周把锄头抡起来，一下，一下。土腥气顺着风钻进鼻子里，他嗅了嗅，又嗅了嗅。这地是沉的，锄刃磕下去，像是磕在铁上。
 
@@ -97,17 +56,6 @@ const EXAMPLE_BODY = `黄土坡上，老周把锄头抡起来，一下，一下�
 
 天擦黑的时候，沟里的水声大起来。老周收了锄，沿着垄沟走回去。家里灶上煨着粥，他媳妇在门口纳鞋底，见他回来，也不说话，只把粥碗往前推了推。`;
 
-/** Mock 回复文字池（按 chunk 顺序流式追加；每轮对话从头取，长轮次自然截断） */
-const MOCK_CHUNKS = [
-  "后半夜起了风。\n",
-  "风是从东洼那边过来的，裹着土腥气和麦秆灰。老周翻了个身，炕席吱呀一声。\n",
-  "他想起白天翻的那片地。墒是够了，就是太板，犁铧下去像刮铁皮。后生们都说今年旱，他不信。\n",
-  "渠水声一夜没停。\n",
-  "天蒙蒙亮的时候，老周披衣下炕。媳妇在灶间烧火，见他起来，也不问，把一碗糊糊推过来。\n",
-  "他蹲在门槛上喝完，抹了把嘴：东洼那片，今儿再下一遍犁。\n",
-  "媳妇说，翻死了。\n",
-  "翻不死。老周把碗搁下，声音不大，却像犁铧磕在石头上。土地这东西，你哄它，它就哄你。\n",
-];
 
 let msgSeq = 0;
 
@@ -119,11 +67,13 @@ export function ChapterEditorView() {
   const ch = params.get("ch") ?? "001";
   const title = params.get("title") ?? "第一章";
 
-  // 工单 16：正文从真实 API 加载（progressive swap 第一切片）；对话仍为 mock（工单 17 换）
+  // 工单 16：正文从真实 API 加载；工单 17：对话消息真实持久化（留存 Q1）
   const [body, setBody] = useState("");
   const [bodyLoaded, setBodyLoaded] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "failed">("saved");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 工单 17：我的技能（真实 /api/v1/skills?scope=mine）+ 场景技能（内置）
+  const [mySkillNames, setMySkillNames] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [subphase, setSubphase] = useState<"preparing" | "streaming" | "cancelling">("preparing");
@@ -138,8 +88,11 @@ export function ChapterEditorView() {
   const genIdRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  // 工单 17：真实风格库（styleId 注入路径）
+  const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
 
-  /** 工单 16：加载真实正文（GET 单章含 content） */
+  /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
   useEffect(() => {
     if (!novelId || !chapterId) return;
     fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`)
@@ -149,6 +102,21 @@ export function ChapterEditorView() {
           setBody(data.chapter.content ?? "");
           setBodyLoaded(true);
         }
+      });
+    fetch(`/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { messages?: ChatMessage[] } | null) => {
+        if (data?.messages) setMessages(data.messages);
+      });
+    fetch("/api/v1/skills?scope=mine")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { skills?: Array<{ name: string }> } | null) => {
+        if (data?.skills) setMySkillNames(data.skills.map((s) => s.name));
+      });
+    fetch("/api/v1/styles")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { styles?: Array<{ id: number; name: string }> } | null) => {
+        if (data?.styles) setStyleLibrary(data.styles);
       });
   }, [novelId, chapterId]);
 
@@ -171,10 +139,11 @@ export function ChapterEditorView() {
 
   const emptyChapter = body.trim().length === 0;
 
-  /** 可用技能（空章节=起笔场景；非空=续写场景） */
-  const availableSkills: string[] = MOCK_SKILLS.filter((s) =>
-    emptyChapter ? s.name !== "章节续写" : s.name !== "章节起笔",
-  ).map((s) => s.name);
+  /** 可用技能（空章节=起笔场景；非空=续写场景；内置场景技能 + 我的技能） */
+  const availableSkills: string[] = [
+    ...(emptyChapter ? ["章节起笔"] : ["章节续写"]),
+    ...mySkillNames,
+  ].filter((n, i, arr) => arr.indexOf(n) === i); // 去重（我的技能里可能有同名）
 
   function toggleSkill(name: string) {
     setActiveSkills((prev) =>
@@ -199,92 +168,103 @@ export function ChapterEditorView() {
     }, 2000);
   }
 
-  /** mockSendChat：发送一条用户消息 → AI 流式回复（纯本地定时器；技能驱动：回复携带生效技能） */
-  function mockSendChat(text?: string, skillsOverride?: string[]) {
+  /** mockSendChat → sendChat（工单 17 真实化）：POST chat SSE 流式，技能驱动；停止=abort */
+  async function sendChat(text?: string, skillsOverride?: string[]) {
     const content = (text ?? input).trim();
     if (!content || streaming || demoMode === "no-model") return;
-    const gen = ++genIdRef.current;
-    setInput("");
-    setSubphase("preparing");
-    setStreaming(true);
-    const snapshot = body; // 生成时正文快照（冲突检测基准）
-    const replyId = ++msgSeq;
-    // 生效技能：显式覆盖（起笔）> 当前选中 ∩ 可用；为空则自动补场景技能
     const skills =
       skillsOverride ??
       (() => {
         const kept = activeSkills.filter((s) => availableSkills.includes(s));
         return kept.length > 0 ? kept : [emptyChapter ? "章节起笔" : "章节续写"];
       })();
+    setInput("");
+    setSubphase("preparing");
+    setStreaming(true);
+    const replyId = ++msgSeq;
+    const snapshot = body; // 本地快照（工单 18 换服务端快照比对）
     setMessages((prev) => [
       ...prev,
       { id: ++msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
       { id: replyId, role: "assistant", content: "", status: "streaming", skills, snapshot, inserted: false, confirmInsert: false },
     ]);
-
-    // 演示：生成失败 → 人性化错误面板
-    if (demoMode === "fail") {
-      setTimeout(() => {
-        if (genIdRef.current !== gen) return;
-        setStreaming(false);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === replyId
-              ? { ...m, status: "error", errorCode: "AiInvalidResponse" }
-              : m,
-          ),
-        );
-      }, 600);
-      return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const res = await fetch(
+        `/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, model, styleId, skills }),
+          signal: controller.signal,
+        },
+      );
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => null);
+        throw new Error((data as { error?: string } | null)?.error ?? `请求失败（${res.status}）`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let current = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const evt of events) {
+          const line = evt.trim();
+          if (!line.startsWith("data:")) continue;
+          const data = JSON.parse(line.slice(5).trim()) as {
+            type: string;
+            text?: string;
+            messageId?: number;
+            code?: string;
+            message?: string;
+          };
+          if (data.type === "delta" && data.text) {
+            current += data.text;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === replyId ? { ...m, content: current } : m)),
+            );
+          } else if (data.type === "done") {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === replyId ? { ...m, content: current, status: "done" } : m,
+              ),
+            );
+          } else if (data.type === "error") {
+            throw new Error(data.message ?? "生成失败");
+          }
+        }
+      }
+    } catch (err) {
+      // 停止（abort）→ 保留已生成部分，标记 stopped；其他 → error
+      const aborted = controller.signal.aborted;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === replyId
+            ? {
+                ...m,
+                content:
+                  m.content ||
+                  (aborted ? "" : (err as Error).message === "生成失败" ? "" : m.content),
+                status: aborted ? "stopped" : "error",
+              }
+            : m,
+        ),
+      );
+    } finally {
+      abortRef.current = null;
+      setStreaming(false);
     }
-
-    // Preparing（组织上下文）→ Streaming（逐 chunk 出字）
-    // ⚠️ 不检查 state（setTimeout 闭包捕获旧值）；只用 genId 代际校验防竞态
-    setTimeout(() => {
-      if (genIdRef.current !== gen) return;
-      setSubphase("streaming");
-      let idx = 0;
-      timerRef.current = setInterval(() => {
-        if (genIdRef.current !== gen) {
-          clearTimer();
-          return;
-        }
-        const chunk = MOCK_CHUNKS[idx];
-        idx += 1;
-        if (!chunk) {
-          clearTimer();
-          setStreaming(false);
-          setMessages((prev) =>
-            prev.map((m) => (m.id === replyId ? { ...m, status: "done" } : m)),
-          );
-          return;
-        }
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === replyId ? { ...m, content: m.content + chunk } : m,
-          ),
-        );
-      }, 110);
-    }, 700);
   }
 
-  /** mockStopReply：停止当前回复（保留已输出部分 = 天然部分插入通道） */
-  function mockStopReply() {
-    const gen = genIdRef.current;
-    genIdRef.current++;
-    clearTimer();
-    setSubphase("cancelling");
-    setTimeout(() => {
-      // 仅当期间无新动作时落"已停止"
-      if (genIdRef.current === gen + 1) {
-        setStreaming(false);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.status === "streaming" ? { ...m, status: "stopped" } : m,
-          ),
-        );
-      }
-    }, 250);
+  /** stopReply → stopReply（工单 17）：abort 当前 SSE */
+  function stopReply() {
+    abortRef.current?.abort();
   }
 
   /** mockInsertToChapter：AI 消息插入正文（正文已变 → 冲突确认，灵笔 DocumentConflict 语义） */
@@ -442,7 +422,7 @@ export function ChapterEditorView() {
             >
               无
             </button>
-            {MOCK_STYLES.map((s) => (
+            {styleLibrary.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setStyleId(s.id)}
@@ -456,6 +436,9 @@ export function ChapterEditorView() {
                 {s.name}
               </button>
             ))}
+            {styleLibrary.length === 0 && (
+              <span className="text-xs text-zinc-600">（蒸馏页保存后出现）</span>
+            )}
           </div>
           {/* 演示菜单（仅 Mock 阶段验收用，UI Frozen 后删除） */}
           <div className="relative">
@@ -523,7 +506,7 @@ export function ChapterEditorView() {
           />
           {bodyLoaded && emptyChapter && (
             <button
-              onClick={() => void mockSendChat("以黄土纪年的文风，为这一章写一个开头", ["章节起笔"])}
+              onClick={() => void sendChat("以黄土纪年的文风，为这一章写一个开头", ["章节起笔"])}
               disabled={streaming || demoMode === "no-model"}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-accent/40 bg-accent/5 py-4 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-40"
             >
@@ -551,7 +534,7 @@ export function ChapterEditorView() {
                   key={sk}
                   onClick={() => toggleSkill(sk)}
                   disabled={streaming}
-                  title={MOCK_SKILLS.find((s) => s.name === sk)?.description}
+                  title={sk === "章节续写" || sk === "章节起笔" ? "平台内置场景技能" : "我的技能"}
                   className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
                     activeSkills.includes(sk)
                       ? "bg-accent/15 text-accent"
@@ -694,7 +677,7 @@ export function ChapterEditorView() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    void mockSendChat();
+                    void sendChat();
                   }
                 }}
                 disabled={streaming || demoMode === "no-model"}
@@ -704,7 +687,7 @@ export function ChapterEditorView() {
               />
               {streaming ? (
                 <button
-                  onClick={mockStopReply}
+                  onClick={stopReply}
                   aria-label="停止"
                   title="停止生成"
                   className="flex size-9 shrink-0 items-center justify-center rounded-full border border-surface-2 text-zinc-300 transition hover:border-red-500/40 hover:text-red-400"
@@ -713,7 +696,7 @@ export function ChapterEditorView() {
                 </button>
               ) : (
                 <button
-                  onClick={() => void mockSendChat()}
+                  onClick={() => void sendChat()}
                   disabled={!input.trim() || streaming || demoMode === "no-model"}
                   aria-label="发送"
                   className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"

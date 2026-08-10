@@ -175,3 +175,24 @@ export const styles = pgTable("styles", {
   guide: jsonb("guide_json").$type<StyleGuide>().notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/** 章节对话消息（工单 17，V1.1 Journey ⑦）：章节 AI 对话留存（Q1），assistant 带技能/正文快照 */
+export const chapterMessages = pgTable("chapter_messages", {
+  id: serial("id").primaryKey(),
+  chapterId: integer("chapter_id")
+    .notNull()
+    .references(() => chapters.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // user | assistant
+  content: text("content").notNull(),
+  /** 生效技能快照（assistant） */
+  skills: jsonb("skills").$type<string[]>().notNull().default([]),
+  /** 生成时正文快照（插入冲突检测基准，assistant） */
+  snapshot: text("snapshot").notNull().default(""),
+  /** done | stopped | error */
+  status: text("status").notNull().default("done"),
+  inserted: boolean("inserted").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
