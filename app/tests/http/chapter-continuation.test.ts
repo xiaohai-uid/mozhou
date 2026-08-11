@@ -243,6 +243,52 @@ describe("章节对话引擎（工单 17）", () => {
     expect(text).toContain('"type":"done"');
   });
 
+  it("J9 selection 注入：发送时带选区 → mock 回显 [所选片段]；越界/与正文不符 → 400", async () => {
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "老周蹲下来。他抬头看天。" }),
+    });
+    const ok = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({
+          content: "改写这段",
+          skills: ["章节续写"],
+          selection: { start: 0, end: 2, text: "老周" },
+        }),
+      },
+    );
+    expect(ok.status).toBe(200);
+    const text = await ok.text();
+    expect(text).toContain("[所选片段]");
+    expect(text).toContain("老周");
+    expect(text).toContain('"type":"done"');
+
+    // 越界
+    const bad1 = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "x", selection: { start: 0, end: 999, text: "x" } }),
+      },
+    );
+    expect(bad1.status).toBe(400);
+    // 与正文区间不符（防伪造注入）
+    const bad2 = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "x", selection: { start: 0, end: 2, text: "不是老周" } }),
+      },
+    );
+    expect(bad2.status).toBe(400);
+  });
+
   it("多轮对话：历史新→旧，第二轮后 4 条消息", async () => {
     // 等待 SSE done（done 在 AI 消息落库后发出）再断言，避免与落库赛跑（A3 确定性修复）
     const res = await fetch(
@@ -352,13 +398,18 @@ describe("插入与冲突保护（工单 18）", () => {
     return done.messageId!;
   }
 
-  async function insert(messageId: number, content: string, force = false) {
+  async function insert(
+    messageId: number,
+    content: string,
+    force = false,
+    extra: Record<string, unknown> = {},
+  ) {
     return fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/messages/${messageId}/insert?chapterId=${chapterId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", cookie },
-        body: JSON.stringify({ content, force }),
+        body: JSON.stringify({ content, force, ...extra }),
       },
     );
   }
@@ -403,9 +454,9 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(error).toContain("已插入");
   });
 
-  it("正文在生成后变化 → 插入 409 ContentChanged；force 重发成功", async () => {
-    const messageId = await chatAndGetReplyId("冲突测试一轮");
-    // 生成后修改正文（模拟用户编辑）
+  it("J9 收紧：生成期间整章变化不再必然 409（点击时正文已保存则照常插入）", async () => {
+    const messageId = await chatAndGetReplyId("J9 收紧测试");
+    // 生成后修改正文（J7 旧语义：快照不一致 → 409；J9 新语义：插入以点击时已保存正文为准，expectedContent 比对）
     const patched = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`,
       {
@@ -415,18 +466,112 @@ describe("插入与冲突保护（工单 18）", () => {
       },
     );
     expect(patched.status).toBe(200);
+    // 客户端已把修改落盘 → expectedContent 与当前一致 → 插入成功，用户内容不丢
+    const res = await insert(messageId, "这条基于点击时的正文", false, {
+      expectedContent: "（用户在生成后手动修改的正文）",
+    });
+    expect(res.status).toBe(200);
+    const content = await currentContent();
+    expect(content).toContain("（用户在生成后手动修改的正文）");
+    expect(content).toContain("这条基于点击时的正文");
+  });
 
-    const res = await insert(messageId, "这条基于旧正文");
+  it("J9 第一层冲突：expectedContent 与当前正文不一致 → 409 ContentChanged；force 跳过", async () => {
+    // 构造竞态：客户端点击时正文为 V1，服务端已被另一请求改为 V2
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "V2-服务端已被其他请求修改" }),
+    });
+    const messageId = await chatAndGetReplyId("第一层冲突测试");
+    const res = await insert(messageId, "客户端旧版插入", false, {
+      expectedContent: "V1-客户端点击时看到的正文",
+    });
     expect(res.status).toBe(409);
     const data = (await res.json()) as { code?: string };
     expect(data.code).toBe("ContentChanged");
 
-    // 用户确认 → force 重发 → 成功且不丢用户内容
-    const forced = await insert(messageId, "这条基于旧正文", true);
+    // 用户确认 → force → 跳过内容冲突，但校验不绕过
+    const forced = await insert(messageId, "客户端旧版插入", true, {
+      expectedContent: "V1-客户端点击时看到的正文",
+    });
     expect(forced.status).toBe(200);
     const content = await currentContent();
-    expect(content).toContain("（用户在生成后手动修改的正文）");
-    expect(content).toContain("这条基于旧正文");
+    expect(content).toContain("V2-服务端已被其他请求修改");
+    expect(content).toContain("客户端旧版插入");
+  });
+
+  it("J9 精确插入：position 中间/开头/末尾 splice（无自动分隔符）", async () => {
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "ABCDEF" }),
+    });
+    const mid = await chatAndGetReplyId("中间插入");
+    const midRes = await insert(mid, "XY", false, { position: 3 });
+    expect(midRes.status).toBe(200);
+    expect(((await midRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ABCXYDEF");
+
+    const start = await chatAndGetReplyId("开头插入");
+    const startRes = await insert(start, "Z", false, { position: 0 });
+    expect(startRes.status).toBe(200);
+    expect(((await startRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ZABCXYDEF");
+
+    const end = await chatAndGetReplyId("末尾插入");
+    const endRes = await insert(end, "W", false, { position: 9 });
+    expect(endRes.status).toBe(200);
+    expect(((await endRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ZABCXYDEFW");
+  });
+
+  it("J9 精确替换：mode=replace 只替换目标区间，前后文不变", async () => {
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "ABCDEF" }),
+    });
+    const messageId = await chatAndGetReplyId("替换测试");
+    const res = await insert(messageId, "XY", false, { mode: "replace", range: { start: 1, end: 3 } });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe("AXYDEF");
+  });
+
+  it("J9 非法 target：负数/越界/NaN/字符串/非整数 position 与 range → 400 且正文不变", async () => {
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "ABCDEF" }),
+    });
+    const messageId = await chatAndGetReplyId("非法 target 测试");
+    const bad: Array<Record<string, unknown>> = [
+      { position: -1 },
+      { position: 7 }, // 越界
+      { position: "3" }, // 字符串偷渡
+      { position: 1.5 }, // 非整数
+      { mode: "replace", range: { start: 3, end: 1 } }, // start > end
+      { mode: "replace", range: { start: -1, end: 2 } }, // 负数
+      { mode: "replace", range: { start: 0, end: 99 } }, // 越界
+      { mode: "replace", range: { start: 0, end: 2.5 } }, // 非整数
+      { mode: "weird" }, // 非法 mode
+    ];
+    for (const extra of bad) {
+      const res = await insert(messageId, "X", false, extra);
+      expect(res.status).toBe(400);
+    }
+    expect(await currentContent()).toBe("ABCDEF");
+  });
+
+  it("J9 中文/emoji 混排：position 按 UTF-16 code unit 精确插入不错位", async () => {
+    // "中文😀ABC" = 中(1)文(1)😀(2 代理对)…：length=7
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "中文😀ABC" }),
+    });
+    const messageId = await chatAndGetReplyId("emoji 测试");
+    // position=2（"中文"后、emoji 代理对前）→ "中文" + "X" + "😀ABC"
+    const res = await insert(messageId, "X", false, { position: 2 });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe("中文X😀ABC");
   });
 
   it("非法入参：空 content 400 / 非 assistant 消息 400 / 消息不存在 400", async () => {

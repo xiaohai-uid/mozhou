@@ -1,11 +1,13 @@
-// POST /api/v1/novels/[id]/chapters/messages/[messageId]/insert — 插入 AI 回复到正文（工单 18）
-// 冲突保护：生成快照 ≠ 当前正文 且非 force → 409 ContentChanged（客户端确认后 force 重发）。
+// POST /api/v1/novels/[id]/chapters/messages/[messageId]/insert — 插入 AI 回复到正文（工单 18 + J9 精确插入）
+// J9 冲突：第一层 expectedContent 与当前正文不一致且非 force → 409 ContentChanged（客户端确认后 force 重发）；
+// position/range 校验失败一律 400（不 silent clamp，force 同样校验）。
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   ChapterNotFoundError,
   ContentChangedError,
   insertChapterMessage,
+  type InsertTarget,
 } from "@/lib/novels/chapter-chat";
 
 export async function POST(
@@ -24,9 +26,41 @@ export async function POST(
   const body = (await request.json().catch(() => null)) as {
     content?: unknown;
     force?: unknown;
+    mode?: unknown;
+    position?: unknown;
+    range?: unknown;
+    expectedContent?: unknown;
   } | null;
   const content = typeof body?.content === "string" ? body.content : "";
   const force = body?.force === true;
+  // 类型门禁：显式传入但类型错误（string/NaN 偷渡）→ NaN 交给 service isInt 拒绝（400），不静默忽略
+  const rawPos = body?.position;
+  const position = rawPos === undefined ? undefined : typeof rawPos === "number" ? rawPos : NaN;
+  const rawRange = body?.range;
+  const range =
+    typeof rawRange === "object" && rawRange !== null
+      ? {
+          start:
+            typeof (rawRange as { start?: unknown }).start === "number"
+              ? ((rawRange as { start?: unknown }).start as number)
+              : NaN,
+          end:
+            typeof (rawRange as { end?: unknown }).end === "number"
+              ? ((rawRange as { end?: unknown }).end as number)
+              : NaN,
+        }
+      : undefined;
+  const target: InsertTarget = {
+    mode:
+      body?.mode === undefined
+        ? "insert"
+        : body?.mode === "replace"
+          ? "replace"
+          : ("INVALID" as InsertTarget["mode"]), // 显式非法 mode → service 拒绝（400）
+    ...(position !== undefined ? { position } : {}),
+    ...(range !== undefined ? { range } : {}),
+    ...(typeof body?.expectedContent === "string" ? { expectedContent: body.expectedContent } : {}),
+  };
 
   try {
     const result = await insertChapterMessage(
@@ -36,6 +70,7 @@ export async function POST(
       messageId,
       content,
       force,
+      target,
     );
     return NextResponse.json({ ...result, message: { inserted: true } });
   } catch (err) {

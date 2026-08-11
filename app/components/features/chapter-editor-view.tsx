@@ -12,7 +12,7 @@
 // 状态机（对话式）：ChatIdle → ChatStreaming(Preparing/Streaming/Cancelling) → MessageDone
 //   → InsertConfirm(正文已变) / Inserted / Cancelled / Error。Empty 变体：空章节空态"让 AI 起笔"。
 // UI Frozen 后 progressive swap：mock 函数族换真实契约，组件形态保持。
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useReducer, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import {
@@ -25,7 +25,7 @@ import {
   Sparkle,
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
-import { useBodyHistory } from "./undo-history";
+import { useBodyHistory, type SelectionState } from "./undo-history";
 
 type MessageStatus = "streaming" | "done" | "stopped" | "error";
 
@@ -40,8 +40,10 @@ interface ChatMessage {
   snapshot: string;
   /** 已插入正文 */
   inserted: boolean;
-  /** 冲突确认中 */
+  /** 冲突确认中（第一层：正文已变化） */
   confirmInsert: boolean;
+  /** 选区冲突确认中（J9 第二层：bound 选区内容已变化） */
+  confirmSelection?: boolean;
   /** 演示用错误码 */
   errorCode?: string;
 }
@@ -79,6 +81,13 @@ export function ChapterEditorView() {
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 最后保存/服务端确认的正文（撤销/重做后的保存状态比较基准，Journey ⑧） */
   const lastSavedRef = useRef("");
+  /** J9：正文 textarea 引用（插入后 caret/focus 恢复） */
+  const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  /** J9：editor insertion target（DOM focus ≠ target：blur 不重置；用户重新点击正文才更新） */
+  const targetRef = useRef<SelectionState>({ start: 0, end: 0 });
+  const [, bumpTarget] = useReducer((n: number) => n + 1, 0);
+  /** J9：generation-bound selection snapshot（仅选区作为 AI 输入时建立；会话级，不写 DB） */
+  const boundRef = useRef<Map<number, { start: number; end: number; text: string }>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   // 工单 17：真实风格库（styleId 注入路径）
   const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
@@ -161,20 +170,55 @@ export function ChapterEditorView() {
     }
   }
 
+  /** J9：跟踪 textarea 最后有效 caret/selection（DOM focus ≠ editor target；blur 不重置） */
+  function onEditorSelect() {
+    const ta = bodyTextareaRef.current;
+    if (!ta) return;
+    const sel = { start: ta.selectionStart, end: ta.selectionEnd };
+    targetRef.current = sel;
+    bodyHist.setSelection(sel); // 纯 caret 移动不入 history
+    bumpTarget(); // 按钮文案（插入正文/替换选中内容）随 target 变化重渲
+  }
+
   /** 正文编辑：对话期间正文永不锁定；输入走 history（2s 窗口内连续输入合并为一层 undo） */
   function onBodyChange(v: string) {
-    bodyHist.type(v);
+    const ta = bodyTextareaRef.current;
+    const sel: SelectionState = ta
+      ? { start: ta.selectionStart, end: ta.selectionEnd }
+      : { start: v.length, end: v.length };
+    bodyHist.type(v, sel);
+    targetRef.current = sel;
     markChanged(v);
   }
 
-  /** Journey ⑧：撤销/重做（栈空时返回 null，不触发保存调度） */
+  /** Journey ⑧+⑨：撤销/重做（栈空时返回 null）；恢复正文同时恢复该层的光标/选区并聚焦 */
   function doUndo() {
-    const v = bodyHist.undo();
-    if (v !== null) markChanged(v);
+    const r = bodyHist.undo();
+    if (r !== null) {
+      markChanged(r.content);
+      restoreSelection(r.selection);
+    }
   }
   function doRedo() {
-    const v = bodyHist.redo();
-    if (v !== null) markChanged(v);
+    const r = bodyHist.redo();
+    if (r !== null) {
+      markChanged(r.content);
+      restoreSelection(r.selection);
+    }
+  }
+  /** 恢复 caret/选区（focus 回正文，用户可立即继续） */
+  function restoreSelection(sel: SelectionState) {
+    targetRef.current = { ...sel };
+    requestAnimationFrame(() => {
+      const ta = bodyTextareaRef.current;
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(
+          Math.min(sel.start, ta.value.length),
+          Math.min(sel.end, ta.value.length),
+        );
+      }
+    });
   }
 
   /** textarea 快捷键：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（阻止默认，避免与浏览器原生双重撤销） */
@@ -207,6 +251,17 @@ export function ChapterEditorView() {
     setStreaming(true);
     const replyId = ++msgSeq;
     const snapshot = body; // 本地快照（工单 18 换服务端快照比对）
+    // J9：选区作为 AI 输入（改写/润色等）→ 绑定 generation-bound selection snapshot（会话级）
+    const ta = bodyTextareaRef.current;
+    const hasSelection = ta !== null && ta.selectionStart !== ta.selectionEnd;
+    const selection = hasSelection && ta
+      ? {
+          start: ta.selectionStart,
+          end: ta.selectionEnd,
+          text: body.slice(ta.selectionStart, ta.selectionEnd),
+        }
+      : undefined;
+    if (selection) boundRef.current.set(replyId, selection);
     setMessages((prev) => [
       ...prev,
       { id: ++msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
@@ -220,7 +275,13 @@ export function ChapterEditorView() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, model, styleId, skills }),
+          body: JSON.stringify({
+            content,
+            model,
+            styleId,
+            skills,
+            ...(selection ? { selection } : {}),
+          }),
           signal: controller.signal,
         },
       );
@@ -254,7 +315,12 @@ export function ChapterEditorView() {
               prev.map((m) => (m.id === replyId ? { ...m, content: current } : m)),
             );
           } else if (data.type === "done") {
-            // 用服务端 messageId 替换本地临时 id（插入/后续操作必须用真实 id）
+            // 用服务端 messageId 替换本地临时 id（插入/后续操作必须用真实 id）；bound snapshot 同步迁移
+            const bound = boundRef.current.get(replyId);
+            if (bound && data.messageId) {
+              boundRef.current.delete(replyId);
+              boundRef.current.set(data.messageId, bound);
+            }
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === replyId
@@ -302,7 +368,7 @@ export function ChapterEditorView() {
     abortRef.current?.abort();
   }
 
-  /** insertToChapter（工单 18 真实化）：POST insert，快照冲突 → 409 → 本地确认态；force 重发 */
+  /** insertToChapter（工单 18 + J9 精确插入）：点击插入 → 两层冲突 → 服务端 splice → caret 恢复 */
   async function insertToChapter(msgId: number) {
     const msg = messages.find((m) => m.id === msgId);
     if (!msg || msg.status === "streaming" || msg.inserted) return;
@@ -311,7 +377,24 @@ export function ChapterEditorView() {
     setInsertingId(msgId);
     setErrorMsg(null);
     try {
-      // 插入前先落盘本地编辑（防抖可能未触发）：确保服务端 content 为最新，快照比对才有意义
+      // J9：位置 = 点击插入这一刻的 editor target（blur 不丢；用户移动 caret/选区才更新）
+      const target = { ...targetRef.current };
+      const mode: "insert" | "replace" = target.start !== target.end ? "replace" : "insert";
+
+      // J9 第二层：bound selection source conflict（仅选区作为 AI 输入的候选）
+      const bound = boundRef.current.get(msgId);
+      if (mode === "replace" && bound && !msg.confirmSelection) {
+        const currentText = body.slice(target.start, target.end);
+        if (currentText !== bound.text) {
+          // 目标文字与 AI 当初处理的不同 → 轻量冲突（不静默覆盖；复用 ContentChanged 视觉）
+          setMessages((prev) =>
+            prev.map((m) => (m.id === msgId ? { ...m, confirmSelection: true } : m)),
+          );
+          return;
+        }
+      }
+
+      // J9 第一层：先可靠落盘本地正文（防抖可能未触发）→ expectedContent = 点击插入时正文
       const saved = await saveBody(body);
       if (!saved) throw new Error("正文保存失败，请重试");
       const res = await fetch(
@@ -319,11 +402,19 @@ export function ChapterEditorView() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, force: msg.confirmInsert }),
+          body: JSON.stringify({
+            content,
+            force: msg.confirmInsert || msg.confirmSelection,
+            mode,
+            ...(mode === "insert"
+              ? { position: target.start }
+              : { range: { start: target.start, end: target.end } }),
+            expectedContent: body,
+          }),
         },
       );
       if (res.status === 409) {
-        // 正文已变化：先确认，不覆盖（灵笔 DocumentConflict 语义）
+        // 第一层冲突：点击插入后到服务端执行之间正文被改 → 确认，不覆盖（灵笔 DocumentConflict 语义）
         setMessages((prev) =>
           prev.map((m) => (m.id === msgId ? { ...m, confirmInsert: true } : m)),
         );
@@ -335,12 +426,21 @@ export function ChapterEditorView() {
       } | null;
       if (!res.ok) throw new Error(data?.error ?? "插入失败");
       if (data?.chapter?.content !== undefined) {
-        bodyHist.apply(data.chapter.content); // 服务端正文为准（原子一层，一次撤销整体回退）
-        lastSavedRef.current = data.chapter.content;
+        const after = data.chapter.content;
+        // caret：插入/替换结果末尾（J9 冻结：ABCXYZ|DEF / ABCnew text|DEF）
+        const caret = Math.min(target.start + content.length, after.length);
+        bodyHist.apply(after, { start: caret, end: caret }); // 服务端正文为准（原子一层，一次撤销整体回退）
+        targetRef.current = { start: caret, end: caret };
+        lastSavedRef.current = after;
         setSaveState("saved");
+        restoreSelection({ start: caret, end: caret });
       }
       setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, inserted: true, confirmInsert: false } : m)),
+        prev.map((m) =>
+          m.id === msgId
+            ? { ...m, inserted: true, confirmInsert: false, confirmSelection: false }
+            : m,
+        ),
       );
     } catch (err) {
       setErrorMsg((err as Error).message);
@@ -349,7 +449,7 @@ export function ChapterEditorView() {
     }
   }
 
-  /** 冲突确认：仍要插入（confirmInsert 已 true → force 重发） */
+  /** 冲突确认：仍要插入/替换（force 重发；force 只跳过用户已确认的内容冲突，校验不绕过） */
   function forceInsert(msgId: number) {
     void insertToChapter(msgId);
   }
@@ -519,8 +619,10 @@ export function ChapterEditorView() {
             </p>
           )}
           <textarea
+            ref={bodyTextareaRef}
             value={body}
             onChange={(e) => onBodyChange(e.target.value)}
+            onSelect={onEditorSelect}
             onKeyDown={onBodyKeyDown}
             placeholder={
               !bodyLoaded
@@ -653,6 +755,30 @@ export function ChapterEditorView() {
                                 取消
                               </button>
                             </span>
+                          ) : m.confirmSelection ? (
+                            // J9 第二层：bound 选区内容已变化（不静默覆盖）
+                            <span className="flex flex-wrap items-center gap-2 text-xs text-yellow-400">
+                              <Warning size={13} aria-hidden />
+                              选中内容已发生变化——AI 是根据之前的选中文字生成的
+                              <button
+                                onClick={() => forceInsert(m.id)}
+                                className="rounded-full border border-current px-2.5 py-0.5 transition hover:bg-current/10"
+                              >
+                                仍要替换
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setMessages((prev) =>
+                                    prev.map((x) =>
+                                      x.id === m.id ? { ...x, confirmSelection: false } : x,
+                                    ),
+                                  )
+                                }
+                                className="rounded-full border border-surface-2 px-2.5 py-0.5 text-zinc-400 transition hover:text-zinc-200"
+                              >
+                                取消
+                              </button>
+                            </span>
                           ) : (
                             <>
                               <button
@@ -660,7 +786,12 @@ export function ChapterEditorView() {
                                 disabled={!m.content.trim() || insertingId === m.id}
                                 className="flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
                               >
-                                {insertingId === m.id ? "插入中…" : "插入正文"}
+                                {/* J9：有效非空 selection target（blur 不丢）→ 替换选中内容；否则插入正文 */}
+                                {insertingId === m.id
+                                  ? "插入中…"
+                                  : targetRef.current.start !== targetRef.current.end
+                                    ? "替换选中内容"
+                                    : "插入正文"}
                               </button>
                               {m.status === "stopped" && (
                                 <span className="text-[10px] text-faint">

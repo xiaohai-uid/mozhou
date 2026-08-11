@@ -89,6 +89,8 @@ export interface ChapterChatInput {
   model: ChatModel;
   styleId?: number | null;
   skills?: string[];
+  /** J9：AI 请求以选区为输入的绑定快照（改写/润色等；注入 [所选片段]，不持久化） */
+  selection?: { start: number; end: number; text: string };
   onDelta: (text: string) => void;
   /** 客户端断开（停止语义）：流中 abort → 消息标记 stopped */
   signal?: AbortSignal;
@@ -121,11 +123,16 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     .returning({ id: chapterMessages.id });
   if (!userMsg) throw new Error("消息入库失败");
 
-  // 注入链组装（按序）：正文参考 → RAG → 风格 → 技能
+  // 注入链组装（按序）：正文参考 → 所选片段(J9) → RAG → 风格 → 技能
   const extra: string[] = [];
   const bodyRef = chapter.content.slice(-BODY_REF_LIMIT);
   if (bodyRef.trim()) {
     extra.push(`[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`);
+  }
+  if (input.selection) {
+    extra.push(
+      `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`,
+    );
   }
   const injectedRag = await retrieveContext(input.userId, input.content, {
     novelId: input.novelId,
@@ -225,11 +232,26 @@ export interface InsertResult {
   messageId: number;
 }
 
+/** J9 插入目标（契约：position/range 均为 UTF-16 code unit，与 textarea selectionStart/End 一致） */
+export interface InsertTarget {
+  mode: "insert" | "replace";
+  position?: number;
+  range?: { start: number; end: number };
+  /** 点击插入时客户端已落盘的正文（第一层乐观并发：与当前正文不一致 → 409） */
+  expectedContent?: string;
+}
+
+function isInt(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v);
+}
+
 /**
- * 插入 AI 消息到正文（工单 18）：快照比对冲突保护（DocumentConflict/CandidateStale 语义）。
- * - 消息必须为 assistant、未插入、内容非空（400）
- * - 生成快照 ≠ 当前正文 且非 force → ContentChangedError（409）
- * - 正文末尾追加 + 消息标记 inserted（服务端持久化，刷新仍在）
+ * 插入 AI 消息到正文（工单 18 + J9 精确插入）。
+ * 冲突语义（J9 收紧，替代"生成时整章快照变化=必然冲突"）：
+ * - 第一层：expectedContent !== 当前正文 且非 force → ContentChangedError（409）——保护点击插入后的真实竞争；
+ * - 第二层（selection source conflict）由客户端本地判定（bound 场景），服务端不重复；
+ * - force 只跳过用户已确认的内容冲突，**不绕过** range/position/归属校验（越界一律 400，不 silent clamp）。
+ * 插入语义：position 提供 → 纯 splice（无自动分隔符）；省略 → 旧版末尾追加（+\n\n，向后兼容）。
  */
 export async function insertChapterMessage(
   userId: number,
@@ -238,6 +260,7 @@ export async function insertChapterMessage(
   messageId: number,
   content: string,
   force: boolean,
+  target?: InsertTarget,
 ): Promise<InsertResult> {
   const chapter = await getChapter(userId, novelId, chapterId);
   if (!chapter) throw new ChapterNotFoundError();
@@ -252,11 +275,31 @@ export async function insertChapterMessage(
   const insertText = content.trim();
   if (!insertText) throw new Error("插入内容不能为空");
 
-  if (msg.snapshot !== chapter.content && !force) {
+  // J9 target 校验（先于内容冲突；force 同样执行，不允许 silent clamp）
+  const mode = target?.mode ?? "insert";
+  if (mode !== "insert" && mode !== "replace") throw new Error("无效的插入模式");
+  const len = chapter.content.length;
+  let next: string;
+  if (mode === "replace") {
+    const r = target?.range;
+    if (!r || !isInt(r.start) || !isInt(r.end) || r.start < 0 || r.end < r.start || r.end > len) {
+      throw new Error("替换区间无效");
+    }
+    next = chapter.content.slice(0, r.start) + insertText + chapter.content.slice(r.end);
+  } else if (target?.position !== undefined) {
+    const p = target.position;
+    if (!isInt(p) || p < 0 || p > len) throw new Error("插入位置无效");
+    next = chapter.content.slice(0, p) + insertText + chapter.content.slice(p);
+  } else {
+    // 旧版路径：正文末尾追加（+\n\n 段落分隔）
+    next = chapter.content.trim() ? chapter.content + "\n\n" + insertText : insertText;
+  }
+
+  // J9 第一层：点击插入时客户端正文 vs 服务端当前正文（force 跳过 = 用户已确认）
+  if (!force && target?.expectedContent !== undefined && target.expectedContent !== chapter.content) {
     throw new ContentChangedError();
   }
 
-  const next = chapter.content.trim() ? chapter.content + "\n\n" + insertText : insertText;
   await db
     .update(chapters)
     .set({ content: next, updatedAt: sql`now()` })

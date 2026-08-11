@@ -31,6 +31,7 @@ export async function POST(
     model?: unknown;
     styleId?: unknown;
     skills?: unknown;
+    selection?: unknown;
   };
   try {
     body = await request.json();
@@ -58,6 +59,34 @@ export async function POST(
       ? (body.skills as string[]).map((s) => s.trim())
       : [];
 
+  // J9：选区绑定（改写/润色等）。校验：整数、0<=start<=end、text 与正文区间一致（防伪造注入）
+  const sel = body.selection as
+    | { start?: unknown; end?: unknown; text?: unknown }
+    | undefined;
+  let selection: { start: number; end: number; text: string } | undefined;
+  if (sel !== undefined) {
+    const chapter = await getChapter(user.id, Number(id), chapterId);
+    if (!chapter) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+    const s = sel.start;
+    const e = sel.end;
+    const t = sel.text;
+    if (
+      typeof s !== "number" ||
+      !Number.isInteger(s) ||
+      typeof e !== "number" ||
+      !Number.isInteger(e) ||
+      s < 0 ||
+      e < s ||
+      e > chapter.content.length ||
+      typeof t !== "string" ||
+      !t.trim() ||
+      chapter.content.slice(s, e) !== t
+    ) {
+      return NextResponse.json({ error: "选区无效" }, { status: 400 });
+    }
+    selection = { start: s, end: e, text: t };
+  }
+
   // 归属预校验（不进 SSE）：章节不存在/他人章节 → 404
   const novelId = Number(id);
   if (!(await getChapter(user.id, novelId, chapterId))) {
@@ -79,6 +108,7 @@ export async function POST(
           model,
           styleId,
           skills,
+          selection,
           signal: request.signal,
           onDelta: (text) => send({ type: "delta", text }),
         });
