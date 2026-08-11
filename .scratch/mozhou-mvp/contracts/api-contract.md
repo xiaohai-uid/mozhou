@@ -368,7 +368,29 @@ interface StyleGuide {
 
 **历史 DELTA**：无（V1.0 契约随实现即时补齐；抽卡并入对话为结构调整，已在本文件第 7 节记录）。
 
-**覆盖核对（2026-08-11 更新）**：全站 13 界面 + 认证 → **21 组端点全部入契约**；✅ 已实现 21 组；无冷冻组。
+**覆盖核对（2026-08-11 更新）**：全站 13 界面 + 认证 → **23 组端点全部入契约**；✅ 已实现 23 组；无冷冻组。
+
+## 22. 云同步推送（V1.1 Journey ④，Contract Frozen 2026-08-11）
+
+```typescript
+// POST /api/v1/sync/push → 文件级推送（备份语义，单向）
+// 目录结构：mozhou/<作品名>/<章节号>-<标题>.md（正文）
+// 200 { pushed: number; at: string }（推送章节数 + 时间）
+// 失败 → 502 { error: string }（WebDAV 不可达/凭据错误，可读文案）
+// autoSync 语义：正文保存（PATCH content）后若配置 autoSync=true → 触发推送（异步，不阻塞保存）
+```
+
+## 23. 搜索引用入文（V1.1 Journey ⑤，Contract Frozen 2026-08-11）
+
+```typescript
+// 交互契约（无新端点）：websearch 结果多选 → 引用入文 → sessionStorage 回流通道
+// mozhou_pending_websearch = { items: [{ title, source, snippet, url }], at }
+// chat 页读取 → 插入消息（对齐 mozhou_pending_deconstruct 回流模式）
+// 消息格式：
+// 【引用资料】标题（来源）：摘要…
+// 来源：URL
+// （多条合并一次插入）
+```
 
 ## 21. 章节级续写（V1.1 Journey ⑦，Contract Frozen 2026-08-11）
 

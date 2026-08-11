@@ -218,3 +218,33 @@
 - 工作方式参考：灵笔 lingbi-next（DocumentConflict/CandidateStale/humanizeError/autosave，代码在 C:\codex\lingbi-next）、笔枢写作（技能化流程，bishu-novel 33 Agent-Prompt 组合）
 - Mock 组件 `chapter-editor-view.tsx` 为 progressive swap 基座（mock 函数族 → 真实契约逐票替换）
 - 章节对话留存（Q1）意味着对话消息需随章节持久化——具体表结构 Contract Frozen 后定
+
+### Journey ④ sync 文件级同步（已冻结 2026-08-11）
+
+> 补全型：UI 已存在（sync-view：配置保存 + WebDAV 连接测试真实），补真实文件级推送。
+
+**Problem**：作者数据（正文）绑在墨舟单一产品里，无法迁移/备份（Q17 数据自有决策）。当前 sync 只有配置与连接测试，"同步状态"是占位。
+
+**Solution（用户视角）**：配置 WebDAV（坚果云等）→ 手动"立即同步"或 autoSync 自动 → 作品章节以文件级推送到远端 `mozhou/<作品名>/<章节号>-<标题>.md`（正文 md 人可读可迁移）→ 同步状态显示"上次推送时间 · N 章"。
+
+**决策（2026-08-11 grilling S1-S4 按推荐）**：
+1. 同步范围：**作品与章节正文**（每章一个 .md 文件）；风格/技能/会话不纳入（先不扩散格式）
+2. 方向：**单向推送（备份语义）**，本地→远端按 mtime 覆盖；不做双向/拉取（冲突处理复杂，坚果云自带历史版本）
+3. 触发：手动"立即同步"按钮 + **autoSync 开关（配置已有）**——正文保存（PATCH content）后触发防抖推送
+4. 格式：`mozhou/<作品名>/<章节号>-<标题>.md`（文件级、人可读、可迁移）
+
+**Domain/Persistence**：无新表（复用 syncConfigs + chapters.content）；推送为无状态操作。
+
+### Journey ⑤ websearch 引用入文（已冻结 2026-08-11）
+
+> 补全型：UI 已存在（websearch-view：真实搜索 + 降级），"引用入文"按钮无动作。
+
+**Problem**：搜索结果是"看了就关"——无法把资料带进写作流程，检索与写作割裂（R1 决策：工具产出应回流写作主流程）。
+
+**Solution（用户视角）**：搜索 → 勾选多条结果 → 点"引用入文"→ 资料以消息插入写作对话（`【引用资料】标题（来源）：摘要…\n来源：URL`）→ AI 后续回复可参考。
+
+**决策（2026-08-11 grilling W1-W2 按推荐）**：
+1. 引用去向：**写入写作对话**（chat 消息插入，R2"消息插入"语义；对齐拆解结果回流先例）
+2. 引用形式：**多选合并一次插入**，格式 `【引用资料】标题（来源）：摘要…[链接]`；回流通道复用 sessionStorage `mozhou_pending_*` 模式
+
+**Domain/Persistence**：无新表（搜索结果不持久化，回流即消息插入）。
