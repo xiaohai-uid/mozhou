@@ -52,11 +52,13 @@ export async function POST(
       : undefined;
   const target: InsertTarget = {
     mode:
-      body?.mode === undefined
+      body?.mode === "insert"
         ? "insert"
         : body?.mode === "replace"
           ? "replace"
-          : ("INVALID" as InsertTarget["mode"]), // 显式非法 mode → service 拒绝（400）
+          : body?.mode === undefined
+            ? "insert"
+            : ("INVALID" as InsertTarget["mode"]), // 显式非法 mode → service 拒绝（400）
     ...(position !== undefined ? { position } : {}),
     ...(range !== undefined ? { range } : {}),
     ...(typeof body?.expectedContent === "string" ? { expectedContent: body.expectedContent } : {}),

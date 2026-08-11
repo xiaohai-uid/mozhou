@@ -508,7 +508,7 @@ describe("插入与冲突保护（工单 18）", () => {
       body: JSON.stringify({ content: "ABCDEF" }),
     });
     const mid = await chatAndGetReplyId("中间插入");
-    const midRes = await insert(mid, "XY", false, { position: 3 });
+    const midRes = await insert(mid, "XY", false, { mode: "insert", position: 3 }); // 显式 mode:"insert" 必须被接受
     expect(midRes.status).toBe(200);
     expect(((await midRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ABCXYDEF");
 
