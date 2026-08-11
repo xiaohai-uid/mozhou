@@ -90,3 +90,16 @@
 ## 13. 结论
 
 **Journey ⑨：ACCEPTED 就绪。V1.2：RELEASE READY**（typecheck/lint/157 测试/build/gate×4/浏览器 A–T/回归 smoke/真实 LLM smoke/hygiene/安全审查全部通过）。
+
+## 14. Production Deployment Gate（2026-08-11 追加）
+
+| 阶段 | 结果 | 证据 |
+|------|------|------|
+| PG1 Production Readiness Audit | **PASS（无发布阻断项）** | cookie HttpOnly/SameSite=Lax/secure(prod)；CSRF 由 SameSite+JSON-only 覆盖；LLM 滥用由登录门槛+配额 429 兜底（无 IP 限流=记录，不阻断）；同源部署无 CORS 需求；错误响应不泄 stack（`{"error":"未登录"}`）；生产代码无 console 日志；待部署者项=HTTPS+密钥（部署指南列明） |
+| PG2 测试稳定性 | **PASS（三个根因已修复）** | ① Turbopack 并发首次请求编译竞态（dev-only：请求 404/500[EPERM manifest]）→ global-setup 预热全部 API 路由（重试至非 404）；② 端口文件时序竞态（预热长 await 致 worker 读到残留端口）→ 写端口提前到 ready 后；③ chat 压缩测试未消费 SSE body（中间态历史）→ 测试 await r.text() 同步。修复后全量 http **20 轮 0 失败**（此前 ~50%）+ gate:milestone ×3 PASS。commit 03fe791 |
+| PG3 真实生产构建 | **PASS** | clean build（Compiled 3.2s + 37/37 static）→ `next start`（production）→ 首页/login 200、API 未登录 401（JSON 无泄漏）；无 MOCK 自动启用；无 dev-only 假设 |
+| PG4 真实数据库 | **PASS** | **Fresh install**：空库按序应用 13 个迁移 SQL（0000-0012，drizzle-kit CLI 在 Windows spinner 挂起→手动 SQL 为官方替代路径）→ production 起服→注册 201/登录 200/建作品/章节/保存 200/读取 MATCH；**Existing data**：既有账号登录+作品/章节/消息读取正常（V1.1→V1.2 无 schema 变化，无无关 migration） |
+| PG5-7 部署 | **BLOCKED（缺外部 target/凭据）** | 仓库无既有公网部署目标（部署指南=Docker compose/Vercel 流程，密钥需部署者设置；不自己注册服务）。本地 production 实例（next start + dev 库）执行替代 smoke：**浏览器全链路 PASS**——注册/登录/建项目/章节/编辑/保存/刷新持久化；真实 LLM→caret=3 精确插入→Undo（caret 恢复）→Redo；style 创建/选择；auth isolation（登出 401→重登恢复）；production logs 无 secret |
+| PG8 WebDAV | **Sync not production-verified** | 无真实凭据；未配置时 push 返回真实错误「尚未配置同步」，UI 保持未配置状态，绝不伪装成功 |
+| PG9 公网 Abuse | **PASS（本地生产实例）** | 未登录受保护资源 401；IDOR 匿名 401；malformed JSON 400；错误响应无 stack/secret；**oversized 记录**：2MB 正文保存成功（Next 16 route handler 默认限制之上）——低危（登录+配额约束、注入链 BODY_REF_LIMIT 截断），不阻断，建议后续加显式正文大小上限 |
+| PG10 Release Decision | **CODE RELEASE READY / DEPLOYMENT BLOCKED ONLY BY EXTERNAL TARGET OR CREDENTIAL** | 非 GO（公网部署未执行）、非 NO-GO（无产品 blocker）。最小外部动作：① 公网服务器或 Vercel 项目 + 域名（HTTPS）② 生产 DATABASE_URL/AUTH_SECRET/ONEAPI_TOKEN（公网 one-api 或同机容器）③ 可选：真实 WebDAV 凭据（Sync 生产验证） |
