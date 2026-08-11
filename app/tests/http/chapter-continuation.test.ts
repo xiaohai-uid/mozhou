@@ -557,6 +557,9 @@ describe("插入与冲突保护（工单 18）", () => {
       const res = await insert(messageId, "X", false, extra);
       expect(res.status).toBe(400);
     }
+    // force 不绕过 target 校验（用户确认的只是内容冲突，不是非法位置）
+    const forcedBad = await insert(messageId, "X", true, { position: -5 });
+    expect(forcedBad.status).toBe(400);
     expect(await currentContent()).toBe("ABCDEF");
   });
 
