@@ -1,8 +1,9 @@
 "use client";
 
-// 联网搜索（任务二-C 已真实化）：真实检索（超时优雅降级）+ 结果列表 + 引用入文。
+// 联网搜索（任务二-C 真实化 + 工单 21）：真实检索（超时优雅降级）+ 多选引用入文（回流写作对话）。
 import { useState } from "react";
-import { GlobeSimple, LinkSimple } from "@phosphor-icons/react/dist/ssr";
+import { useRouter } from "next/navigation";
+import { Check, GlobeSimple } from "@phosphor-icons/react/dist/ssr";
 
 interface WebResult {
   title: string;
@@ -12,6 +13,7 @@ interface WebResult {
 }
 
 export function WebSearchView() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<WebResult[]>([]);
@@ -19,6 +21,8 @@ export function WebSearchView() {
   const [degraded, setDegraded] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 工单 21：多选结果（按 title 去重）
+  const [selected, setSelected] = useState<string[]>([]);
 
   async function doSearch() {
     const q = query.trim();
@@ -26,6 +30,7 @@ export function WebSearchView() {
     setSearching(true);
     setSearched(false);
     setError(null);
+    setSelected([]);
     try {
       const res = await fetch("/api/v1/websearch", {
         method: "POST",
@@ -48,6 +53,23 @@ export function WebSearchView() {
     } finally {
       setSearching(false);
     }
+  }
+
+  function toggleSelect(title: string) {
+    setSelected((prev) =>
+      prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title],
+    );
+  }
+
+  /** 工单 21：引用入文——多选结果存回流通道 → 写作对话（R2 消息插入语义，契约 23） */
+  function citeSelected() {
+    const items = results.filter((r) => selected.includes(r.title));
+    if (items.length === 0) return;
+    sessionStorage.setItem(
+      "mozhou_pending_websearch",
+      JSON.stringify({ items, at: Date.now() }),
+    );
+    router.push("/chat");
   }
 
   return (
@@ -105,18 +127,56 @@ export function WebSearchView() {
               {note ?? "联网检索服务暂时不可用，已降级为示例数据"}
             </div>
           )}
+          {/* 工单 21：多选 → 引用入文（回流写作对话） */}
+          {results.length > 0 && (
+            <div className="flex items-center justify-between rounded-card border border-surface-2 bg-surface/50 px-5 py-3">
+              <span className="text-xs text-faint">
+                {selected.length > 0 ? `已选 ${selected.length} 条` : "勾选结果后引用到写作对话"}
+              </span>
+              <button
+                onClick={citeSelected}
+                disabled={selected.length === 0}
+                className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+              >
+                <Check size={13} weight="bold" aria-hidden />
+                引用入文（{selected.length}）
+              </button>
+            </div>
+          )}
           {results.map((r) => (
-            <div key={r.title} className="rounded-card border border-surface-2 bg-surface/50 px-6 py-4 transition hover:border-zinc-600">
+            <div
+              key={r.title}
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleSelect(r.title)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleSelect(r.title);
+                }
+              }}
+              className={`cursor-pointer rounded-card border px-6 py-4 transition ${
+                selected.includes(r.title)
+                  ? "border-accent/50 bg-accent/5"
+                  : "border-surface-2 bg-surface/50 hover:border-zinc-600"
+              }`}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <h2 className="text-sm font-medium text-zinc-100">{r.title}</h2>
                   <p className="mt-1 text-xs text-faint">{r.source}</p>
                   <p className="mt-2 text-sm leading-6 text-zinc-400">{r.snippet}</p>
                 </div>
-                <button className="flex shrink-0 items-center gap-1.5 rounded-full border border-surface-2 px-3.5 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-600 hover:text-white">
-                  <LinkSimple size={13} aria-hidden />
-                  引用入文
-                </button>
+                <span
+                  aria-hidden
+                  className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border transition ${
+                    selected.includes(r.title)
+                      ? "border-accent bg-accent text-white"
+                      : "border-surface-2 text-transparent"
+                  }`}
+                >
+                  <Check size={12} weight="bold" />
+                </span>
               </div>
             </div>
           ))}

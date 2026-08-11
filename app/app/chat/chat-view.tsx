@@ -143,7 +143,27 @@ export function ChatView() {
               (b) => `\n${b.name}：\n` + b.lines.map((l) => `  - ${l}`).join("\n"),
             ),
           ].join("");
-          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]); // eslint-disable-line react-hooks/set-state-in-effect -- 一次性初始化回流，与 style 回流同类豁免
+          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]); // eslint-disable-line react-hooks/set-state-in-effect -- 一次性初始化回流，同类豁免
+        }
+      }
+    } catch {
+      // 暂存数据损坏则忽略
+    }
+    // R1/R2 回流：读取搜索页暂存引用，作为消息插入对话流（工单 21，契约 23）
+    try {
+      const raw = sessionStorage.getItem("mozhou_pending_websearch");
+      if (raw) {
+        const pending = JSON.parse(raw) as {
+          items?: Array<{ title: string; source: string; snippet: string; url: string }>;
+        };
+        sessionStorage.removeItem("mozhou_pending_websearch");
+        if (pending?.items && pending.items.length > 0) {
+          const text = pending.items
+            .map(
+              (i) => `【引用资料】${i.title}（${i.source}）：${i.snippet}\n来源：${i.url}`,
+            )
+            .join("\n\n");
+          setMessages([{ role: "user", content: "（导入搜索引用）" }, { role: "assistant", content: text }]);
         }
       }
     } catch {
