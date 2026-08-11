@@ -94,3 +94,79 @@
 - 服务端：`insertChapterMessage` 增加 `position?`/`replaceLength?`（默认=末尾追加，向后兼容契约测试）；消息表增加 selection 快照列（迁移 0013）。
 - 前端：`undo-history.ts` 每层加 selection；editor 插入流程传 position；插入后设置光标。
 - 契约测试：插入位置/替换/force clamp/409 不变式；单测：selection 快照语义。
+
+## 7. 用户批准补充规则（2026-08-11 指令，正式并入冻结）
+
+- **位置 = 点击「插入正文/替换选中内容」时刻的编辑器最新 target**；普通续写绝不绑定生成开始时的旧坐标。
+- **generation-bound selection snapshot** 仅当 AI 请求明确以选区为输入（改写/润色/扩写/缩写——即发送消息时正文存在非空选区）时建立：记录 `{start, end, text}`，属于当前候选/会话，**不写 DB、不做持久化版本**。
+- **两层冲突保护**（替代"生成时整章快照变化=必然冲突"）：
+  - 第一层（click-time optimistic concurrency）：客户端先可靠落盘本地正文，insert 请求携带 `expectedContent`；服务端 `expectedContent !== 当前正文 → 409 ContentChanged`。保护"点击插入后到服务端执行之间的真实竞争"。
+  - 第二层（selection source conflict，仅 bound 场景）：目标文字与生成时快照不同 → 本地轻量冲突「选中内容已发生变化」（取消/仍要替换），复用 ContentChanged 视觉，不发明第二套系统。
+- **不再**：因"生成期间整章有任何字变化"而强制 409（J7 快照语义最小精化）。
+- **force 不 silent clamp**：target stale 时优先 409；force 仅跳过用户已确认的内容冲突，**永不绕过** auth/ownership/range 校验/基础验证。
+- **DOM focus ≠ editor insertion target**：textarea 最后有效 caret/selection 由编辑器保存；仅因点击 AI 面板/按钮 blur 不得重置 target；用户重新点击正文改变 selection 才更新；选区折叠为 caret 才视为"不再替换"。
+- **caret 规则**：insert → `ABCXYZ|DEF`（内容末尾，重新 focus）；replace → `ABCnew text|DEF`（替换结果末尾，默认不保持整段选中）。
+- **Undo/Redo 升级为正文+selection**：每个 history operation 记 before/after content+selection；Undo insert 恢复原 caret/选区；Undo replace 恢复原选中文本**且恢复选区（仍选中）**；Redo 光标在结果末尾。纯 caret 移动不创建 undo entry。
+- **保存**：不清 undo 栈、不改 selection（J8 保持）。
+- **按钮文案**：无有效非空 selection target →「插入正文」；有（含 blur 后逻辑 target）→「替换选中内容」。
+- **不新增位置指示 UI**（不加字符下标/anchor 显示；仅在实际测试证明混淆时才考虑极轻量提示）。
+- **No new DB（默认）**：selection 快照存前端会话级（刷新后降级为普通插入，不误伤）；仅当事实证明必须才加 migration。
+
+## 8. Behavior Spec（Frozen，Given/When/Then）
+
+1. **caret 中间插入**：Given 正文 `ABC|DEF`（caret 在 C、D 间）When 点击「插入正文」→ Then 正文 `ABCXYZ|DEF`（XYZ=AI 候选），caret 在 XYZ 后，textarea 聚焦
+2. **caret 开头插入**：Given caret=0 When 插入 → Then 候选出现在文章开头，caret 在候选末尾
+3. **caret 末尾插入**：Given caret=content.length When 插入 → Then 候选在末尾追加，caret 在末尾（与旧版一致）
+4. **selection replace**：Given 选中 `ABC[old]DEF` When 点击「替换选中内容」→ Then 仅替换为 `ABCnew|DEF`，前后文不变，caret 在替换结果末尾
+5. **AI 面板 blur 不丢 target**：Given 选中一段后点击 AI 面板（textarea blur）When 查看插入按钮 → Then 按钮仍为「替换选中内容」，插入仍替换该选区
+6. **生成期间移动 caret**：Given 第 5 段发起续写，生成期间 caret 移到第 8 段 When 点击插入 → Then 插入第 8 段当前 caret（不用生成开始位置）
+7. **生成期间改变 selection**：Given 生成期间用户选择/取消选择另一段 When 点击插入 → Then 以点击时的最新 selection 为 target
+8. **bound selection 内容变化**：Given 改写选中文字，生成期间该目标文字被改 When 点击替换 → Then 出现「选中内容已发生变化」确认（不得静默覆盖）
+9. **server content race**：Given 客户端落盘后、insert 执行前服务端正文被另一请求改变 When insert → Then 409 ContentChanged（不得插错位置）
+10. **force insert**：Given 409 已显示并确认 When force 重发 → Then 以用户确认时的有效 target 插入；range 校验仍执行（越界 400 不 clamp）
+11. **force replace**：Given selection 冲突已确认 When 「仍要替换」→ Then 替换当前目标区间，其它正文保留
+12. **Undo insert**：Given 插入完成 When 一次 Ctrl+Z → Then 整段 AI 内容消失，caret 恢复插入前位置，focus 回正文
+13. **Redo insert**：Given 已 Undo When 一次 Redo → Then AI 内容恢复，caret 在 AI 内容末尾
+14. **Undo replace**：Given 替换完成 When Ctrl+Z → Then 原选中文本完整恢复，且恢复为仍选中状态
+15. **Redo replace**：Given 已 Undo replace When Redo → Then 替换结果恢复，caret 在替换结果末尾
+16. **auto save**：Given 输入中触发自动保存 When 保存完成 → Then caret/target 不异常移动；Undo 栈不清空；Undo 后正文+selection 正确恢复，dirty/saved 正确
+17. **explicit save**：Given 点击保存 When 完成 → Then caret/target 不变；保存后 Undo/Redo 正常
+18. **chapter switch**：Given 章节 A 有 history/target When 切到章节 B → Then B 的 history/target 为空（会话级，不继承）
+19. **page refresh**：Given 刷新 When 重新加载 → Then 不要求恢复 Undo 栈/旧 selection；正文 = 最后真实保存内容；bound snapshot 不恢复（消息降级为普通插入）
+20. **malformed position/range**：Given position 负数/越界/NaN/字符串，range start>end/越界/非整数 When insert → Then 400 项目标准错误，正文不变
+21. **authorization/ownership 不回退**：Given 他人章节/他人消息/未登录 When insert(replace) → Then 404/401（与 J7 一致）
+
+## 9. Contract（Frozen）
+
+### chat（选区绑定注入，J9 扩展）
+
+```
+POST /api/v1/novels/{novelId}/chapters/chat?chapterId={chapterId}
+body: { content, model?, styleId?, skills?, selection?: { start, end, text } }
+selection 校验：整数、0 <= start <= end、text 非空且 === 服务端当前正文 slice(start,end)（防伪造）
+注入链：正文参考之后追加 [所选片段]（用户选中的 N 字）
+错误：400 非法 JSON/空消息/selection 越界或不符
+No new DB：selection 不持久化，仅注入
+```
+
+### insert（J9 升级，同一 endpoint）
+
+```
+POST /api/v1/novels/{novelId}/chapters/messages/{messageId}/insert?chapterId={chapterId}
+interface InsertRequest {
+  content: string;             // AI 候选（可删改，不变）
+  force?: boolean;             // 用户已确认冲突（不变）
+  mode?: "insert" | "replace"; // 默认 "insert"
+  position?: number;           // insert：偏移（UTF-16 code unit，与 textarea selectionStart 一致）；省略=旧版末尾追加（+\n\n）
+  range?: { start: number; end: number };  // replace：替换区间
+  expectedContent?: string;    // 点击插入时客户端已落盘的正文（第一层乐观并发）
+}
+200 { chapter: { content, updatedAt }, message: { inserted: true } }
+409 { error: 正文已变化… }  expectedContent !== 当前正文（第一层；force 跳过）
+400：消息不存在/非 assistant/已插入/content 空/mode 非法/position 非整数或越界/range 非法/NaN|string 偷渡
+404：章节不存在（归属）
+校验语义：position/range 均不允许 silent clamp；force 同样校验（越界 400），force 只跳过用户已确认的内容冲突
+No new DB / No new API / No new dependency
+```
+
+索引语义：`position/range` 使用 UTF-16 code unit（与 `textarea.selectionStart/End` 及 JS string 一致）——中文/emoji 混排不错位（契约级保证，必测）。
