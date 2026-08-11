@@ -98,3 +98,22 @@ async function saveConfig(
     await db.insert(syncConfigs).values({ userId, url, username, password, autoSync });
   }
 }
+
+/** PATCH /api/v1/sync/config — 更新 autoSync 开关（工单 20；不改 URL/凭据，不重测连接） */
+export async function PATCH(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const body = (await request.json().catch(() => null)) as { autoSync?: unknown } | null;
+  if (typeof body?.autoSync !== "boolean") {
+    return NextResponse.json({ error: "缺少 autoSync 布尔值" }, { status: 400 });
+  }
+  const rows = await db
+    .update(syncConfigs)
+    .set({ autoSync: body.autoSync, updatedAt: sql`now()` })
+    .where(eq(syncConfigs.userId, user.id))
+    .returning({ id: syncConfigs.id });
+  if (rows.length === 0) {
+    return NextResponse.json({ error: "尚未配置同步" }, { status: 400 });
+  }
+  return NextResponse.json({ ok: true, autoSync: body.autoSync });
+}

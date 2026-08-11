@@ -1,6 +1,7 @@
 "use client";
 
-// 云同步（任务二-C 已真实化）：WebDAV 配置保存 + 真实连接测试（超时优雅错误）。
+// 云同步（任务二-C 真实化 + 工单 20）：WebDAV 配置保存/连接测试 + 文件级单向推送（备份语义）。
+// 范围决策（spec Journey ④ S1）：作品与章节正文（mozhou/<作品名>/<章节号>-<标题>.md）；会话/技能不纳入。
 import { useEffect, useState } from "react";
 import { CloudArrowUp, Eye, EyeSlash, ToggleLeft, ToggleRight } from "@phosphor-icons/react/dist/ssr";
 
@@ -12,8 +13,10 @@ export function SyncView() {
   const [autoSync, setAutoSync] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [lastPush, setLastPush] = useState<{ at: string; pushed: number } | null>(null);
 
   useEffect(() => {
     // 加载已有配置（密码不回传，仅回填 URL/账号；状态区显示真实配置时间）
@@ -55,6 +58,45 @@ export function SyncView() {
       setResult({ ok: false, message: (err as Error).message });
     } finally {
       setTesting(false);
+    }
+  }
+
+  /** 工单 20：立即同步（文件级单向推送） */
+  async function pushNow() {
+    if (pushing) return;
+    setPushing(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/v1/sync/push", { method: "POST" });
+      const data = (await res.json()) as {
+        pushed?: number;
+        at?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "同步失败");
+      if (data.pushed !== undefined && data.at) {
+        setLastPush({ at: data.at, pushed: data.pushed });
+        setResult({ ok: true, message: `已推送 ${data.pushed} 章` });
+      }
+    } catch (err) {
+      setResult({ ok: false, message: (err as Error).message });
+    } finally {
+      setPushing(false);
+    }
+  }
+
+  /** 工单 20：autoSync 开关真实落库（PATCH 不重测连接） */
+  async function toggleAutoSync() {
+    const next = !autoSync;
+    setAutoSync(next);
+    try {
+      await fetch("/api/v1/sync/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoSync: next }),
+      });
+    } catch {
+      setAutoSync(!next); // 失败回滚
     }
   }
 
@@ -148,9 +190,16 @@ export function SyncView() {
           </div>
           <ul className="mt-4 space-y-2.5 text-sm">
             {[
-              { name: "作品与章节", status: updatedAt ? `配置于 ${new Date(updatedAt).toLocaleString()}` : "未同步" },
-              { name: "会话记录", status: updatedAt ? `配置于 ${new Date(updatedAt).toLocaleString()}` : "未同步" },
-              { name: "技能包", status: "配置已保存" },
+              {
+                name: "作品与章节",
+                status: lastPush
+                  ? `上次推送 ${new Date(lastPush.at).toLocaleString()} · ${lastPush.pushed} 章`
+                  : updatedAt
+                    ? "配置已保存，尚未推送"
+                    : "未同步",
+              },
+              { name: "会话记录", status: "暂不纳入（范围决策）" },
+              { name: "技能包", status: "暂不纳入（范围决策）" },
             ].map((item) => (
               <li
                 key={item.name}
@@ -161,22 +210,31 @@ export function SyncView() {
               </li>
             ))}
           </ul>
+          {/* 工单 20：立即同步（文件级单向推送，mozhou/<作品名>/<章节号>-<标题>.md） */}
+          <button
+            onClick={() => void pushNow()}
+            disabled={pushing}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+          >
+            <CloudArrowUp size={15} weight="bold" aria-hidden />
+            {pushing ? "同步中…" : "立即同步"}
+          </button>
+          <p className="mt-2 text-[11px] text-faint">
+            作品章节以正文推送为 mozhou/&lt;作品名&gt;/&lt;章节号&gt;-&lt;标题&gt;.md（人可读、可迁移）
+          </p>
           <div className="mt-5 flex items-center justify-between border-t border-surface-2 pt-4">
             <div>
               <p className="text-sm text-zinc-300">自动同步</p>
               <p className="mt-0.5 text-xs text-faint">保存后自动上传变更</p>
             </div>
             <button
-              onClick={() => setAutoSync((v) => !v)}
+              onClick={() => void toggleAutoSync()}
               aria-label={autoSync ? "关闭自动同步" : "开启自动同步"}
               className={autoSync ? "text-accent" : "text-faint"}
             >
               {autoSync ? <ToggleRight size={28} weight="fill" /> : <ToggleLeft size={28} weight="fill" />}
             </button>
           </div>
-          <p className="mt-4 text-[11px] text-faint">
-            配置已真实保存；文件级同步执行（WebDAV 上传/拉取）归 V1.1
-          </p>
         </div>
       )}
     </main>

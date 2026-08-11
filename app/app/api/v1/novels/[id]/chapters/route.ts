@@ -7,6 +7,7 @@ import {
   getChapter,
   updateChapter,
 } from "@/lib/novels/service";
+import { maybeAutoSync } from "@/lib/sync/service";
 
 /** GET /api/v1/novels/[id]/chapters?chapterId=X — 单章详情（含正文 content，16 工单） */
 export async function GET(
@@ -67,6 +68,10 @@ export async function PATCH(
   }
   const chapter = await updateChapter(user.id, Number(id), chapterId, patch);
   if (!chapter) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+  // 工单 20：autoSync 开启时正文保存后后台推送（fire-and-forget，失败静默）
+  if (patch.content !== undefined) {
+    void maybeAutoSync(user.id);
+  }
   return NextResponse.json({ chapter });
 }
 
