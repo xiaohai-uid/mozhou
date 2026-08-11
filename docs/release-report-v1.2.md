@@ -103,3 +103,26 @@
 | PG8 WebDAV | **Sync not production-verified** | 无真实凭据；未配置时 push 返回真实错误「尚未配置同步」，UI 保持未配置状态，绝不伪装成功 |
 | PG9 公网 Abuse | **PASS（本地生产实例）** | 未登录受保护资源 401；IDOR 匿名 401；malformed JSON 400；错误响应无 stack/secret；**oversized 记录**：2MB 正文保存成功（Next 16 route handler 默认限制之上）——低危（登录+配额约束、注入链 BODY_REF_LIMIT 截断），不阻断，建议后续加显式正文大小上限 |
 | PG10 Release Decision | **CODE RELEASE READY / DEPLOYMENT BLOCKED ONLY BY EXTERNAL TARGET OR CREDENTIAL** | 非 GO（公网部署未执行）、非 NO-GO（无产品 blocker）。最小外部动作：① 公网服务器或 Vercel 项目 + 域名（HTTPS）② 生产 DATABASE_URL/AUTH_SECRET/ONEAPI_TOKEN（公网 one-api 或同机容器）③ 可选：真实 WebDAV 凭据（Sync 生产验证） |
+
+## 15. Production Deployment（2026-08-11 实盘上线）
+
+**结论：V1.2 PRODUCTION LIVE** — 公网 HTTPS 可访问，全链路真实 Smoke PASS。
+
+| 项 | 值 |
+|---|---|
+| 日期 | 2026-08-11 |
+| GCP project | `mozhou-prod`（PN 663535144874；计费账号 0113D3-65F91E-579DA6，预算 $10/月 @ 50/90/100%） |
+| Cloud Run service | `mozhou-web`（revision `mozhou-web-00005-mnd`，100% traffic）+ `mozhou-one-api`（revision `mozhou-one-api-00002-97w`） |
+| Region | asia-northeast1（Tokyo） |
+| 配置 | CPU 1 / 1GiB / min 0 / max 2 / timeout 300s / allow-unauthenticated（Web App 公网） |
+| 镜像 | `asia-northeast1-docker.pkg.dev/mozhou-prod/mozhou/mozhou-web`，tag `9b9138c…`（commit SHA）+ `v1.2.0`，digest `840a9577…`（修复版）/ `bb9494f…`（首发版） |
+| Public URL | https://mozhou-web-7ecwvlclyq-an.a.run.app（旧格式 https://mozhou-web-663535144874.asia-northeast1.run.app 亦可达） |
+| 生产 DB | Neon PostgreSQL（us-east-2 免费计划；区域非 Tokyo，延迟可接受）— 空库迁移 13/13 PASS，tracking=13（LF-sha256 与 dev 库逐条一致） |
+| Secrets | DATABASE_URL / AUTH_SECRET / ONEAPI_TOKEN / ONEAPI_DB_URL / ONEAPI_SESSION_SECRET 全部存 Google Secret Manager（Secret Accessor IAM 已授） |
+| ONE-API | 云端部署（Cloud Run + Neon `oneapi` 独立库）；管理密码已改强随机；渠道 deepseek-sensenova-free（type=1）+ glm-free（type=50）真实调用 PASS；ModelRatio 已迁移（321 模型）；应用令牌 mozhou-app 入 Secret Manager |
+| 生产 Smoke | API 13 项 PASS（注册/登录/登出 401/重登/作品/章节/保存/刷新持久化/Unicode/malformed 400/IDOR 404/越界 400/错误无 stack）；浏览器：SSE 多 delta（10 个增长步）、caret 精确插入、Undo/Redo、选区替换、selection conflict（横幅→取消→force）、Style 创建/选择/聊天、Skill 注入、Websearch 真实 Bing 回流【引用资料】、Sync 未配置态（按钮 disabled 无伪成功）、20k 字章节（打开 306ms/中部插入 1ms/Undo 正常） |
+| 上线前修复 | **P0：本地消息 id 与生产空库服务端 id 撞车**（dev 库 id 偏移掩盖；生产空库 messageId 从 1 起 → `find()` 取到 user 消息 → 插入内容错误）。修复=本地临时 id 改负命名空间（commit `9b9138c`），157/157 测试 + build PASS，重部署后精确插入复验 PASS |
+| 已知偶发 | sensenova free provider 2 次流尾失败（`state.task.status != ok` → 路由 error 事件 → 客户端「操作没有成功·请稍后重试」人性化降级；消息已完整落库不丢；重试成功）——记录为 provider 偶发，优雅降级，非 P0 |
+| 安全 | Cloud Run logs / HTML / 错误响应 secret 泄漏扫描 0 命中；3 小时 0 个 HTTP 500；revision 全健康无重启循环 |
+| Rollback | 上稳定 revision `mozhou-web-00004-wnl`；一条命令 `gcloud run services update-traffic mozhou-web --region=asia-northeast1 --to-revisions=mozhou-web-00004-wnl=100` |
+| Known Constraints | ① WebDAV 生产 smoke 待真实凭据（未配置态验证 PASS）② 章节正文无显式大小上限（登录+配额约束，低危）③ undo/selection/风格选中为会话级 ④ websearch 结果相关性受简化解析限制（V1.1 既有）⑤ 生产 smoke 数据保留为「Production smoke tenant」（ui.smoke.20260811@mozhou.prod 等） |
