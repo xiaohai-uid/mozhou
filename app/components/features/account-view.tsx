@@ -29,7 +29,6 @@ function fmt(n: number): string {
 
 export function AccountView() {
   const [isMember, setIsMember] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
   const [overview, setOverview] = useState<AccountOverview | null>(null);
 
   useEffect(() => {
@@ -44,14 +43,8 @@ export function AccountView() {
       });
   }, []);
 
-  async function upgrade() {
-    if (upgrading || isMember) return;
-    setUpgrading(true);
-    // UI 先行：mock 开通延迟；后端 /api/v1/account/upgrade 实现后替换为真实 POST
-    await new Promise((r) => setTimeout(r, 1200));
-    setUpgrading(false);
-    setIsMember(true);
-  }
+  // 会员支付不在当前范围（用户排除）：按钮 disabled + 暂未开放，绝不伪造开通成功
+  // 移除原 mock 开通（setTimeout + setIsMember(true)）——正式产品不得把假数据冒充真实功能
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
@@ -122,11 +115,11 @@ export function AccountView() {
             ))}
           </ul>
           <button
-            onClick={() => void upgrade()}
-            disabled={upgrading || isMember}
-            className="mt-6 w-full rounded-full bg-accent py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
+            disabled
+            title="会员支付暂未开放"
+            className="mt-6 w-full cursor-not-allowed rounded-full bg-accent/40 py-2.5 text-sm font-medium text-white opacity-60"
           >
-            {upgrading ? "开通中…" : isMember ? "已是会员" : "升级为会员"}
+            暂未开放
           </button>
         </div>
       </div>

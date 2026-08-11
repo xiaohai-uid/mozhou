@@ -487,11 +487,16 @@ export function ProjectsView() {
                 ].map((c) => (
                   <button
                     key={c.name}
-                    className="flex flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left transition hover:border-zinc-600"
+                    disabled
+                    title="暂未开放"
+                    className="flex cursor-not-allowed flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left opacity-60"
                   >
                     <c.icon size={16} weight="duotone" className="text-zinc-400" aria-hidden />
                     <span className="text-sm font-medium text-zinc-200">{c.name}</span>
                     <span className="text-[11px] leading-4 text-faint">{c.desc}</span>
+                    <span className="mt-1 rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-zinc-500">
+                      暂未开放
+                    </span>
                   </button>
                 ))}
               </div>
