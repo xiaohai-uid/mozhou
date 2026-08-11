@@ -328,3 +328,143 @@ describe("章节对话引擎（工单 17）", () => {
     expect(anon.status).toBe(401);
   });
 });
+
+describe("插入与冲突保护（工单 18）", () => {
+  /** 走一轮对话拿到 assistant messageId */
+  async function chatAndGetReplyId(content: string, skills: string[] = ["章节续写"]): Promise<number> {
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content, skills }),
+      },
+    );
+    const text = await res.text();
+    const done = text
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()))
+      .find((e) => e.type === "done") as { messageId?: number };
+    return done.messageId!;
+  }
+
+  async function insert(messageId: number, content: string, force = false) {
+    return fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages/${messageId}/insert?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content, force }),
+      },
+    );
+  }
+
+  async function currentContent(): Promise<string> {
+    const res = await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      headers: { cookie },
+    });
+    const { chapter } = (await res.json()) as { chapter: { content: string } };
+    return chapter.content;
+  }
+
+  it("插入成功：正文末尾追加 + 消息 inserted（刷新后仍在）", async () => {
+    const before = await currentContent();
+    const messageId = await chatAndGetReplyId("插入测试一轮");
+    const insertedText = "（插入测试：翻不死。老周把碗搁下。）";
+    const res = await insert(messageId, insertedText);
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as {
+      chapter: { content: string };
+      message: { inserted: boolean };
+    };
+    expect(data.chapter.content).toBe(before + "\n\n" + insertedText);
+    expect(data.message.inserted).toBe(true);
+
+    // 刷新（重新 GET 消息）→ inserted 持久
+    const list = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
+      { headers: { cookie } },
+    );
+    const { messages } = (await list.json()) as { messages: Array<{ id: number; inserted: boolean }> };
+    const target = messages.find((m) => m.id === messageId);
+    expect(target?.inserted).toBe(true);
+  });
+
+  it("重复插入同一条 → 400", async () => {
+    const messageId = await chatAndGetReplyId("重复插入测试");
+    await insert(messageId, "第一次插入");
+    const again = await insert(messageId, "第二次插入");
+    expect(again.status).toBe(400);
+    const { error } = (await again.json()) as { error: string };
+    expect(error).toContain("已插入");
+  });
+
+  it("正文在生成后变化 → 插入 409 ContentChanged；force 重发成功", async () => {
+    const messageId = await chatAndGetReplyId("冲突测试一轮");
+    // 生成后修改正文（模拟用户编辑）
+    const patched = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "（用户在生成后手动修改的正文）" }),
+      },
+    );
+    expect(patched.status).toBe(200);
+
+    const res = await insert(messageId, "这条基于旧正文");
+    expect(res.status).toBe(409);
+    const data = (await res.json()) as { code?: string };
+    expect(data.code).toBe("ContentChanged");
+
+    // 用户确认 → force 重发 → 成功且不丢用户内容
+    const forced = await insert(messageId, "这条基于旧正文", true);
+    expect(forced.status).toBe(200);
+    const content = await currentContent();
+    expect(content).toContain("（用户在生成后手动修改的正文）");
+    expect(content).toContain("这条基于旧正文");
+  });
+
+  it("非法入参：空 content 400 / 非 assistant 消息 400 / 消息不存在 400", async () => {
+    const messageId = await chatAndGetReplyId("空内容测试");
+    const empty = await insert(messageId, "  ");
+    expect(empty.status).toBe(400);
+
+    // user 消息 id 不可插入
+    const list = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
+      { headers: { cookie } },
+    );
+    const { messages } = (await list.json()) as { messages: Array<{ id: number; role: string }> };
+    const userMsg = messages.find((m) => m.role === "user");
+    const userInsert = await insert(userMsg!.id, "x");
+    expect(userInsert.status).toBe(400);
+
+    const missing = await insert(999999, "x");
+    expect(missing.status).toBe(400);
+  });
+
+  it("越权/未登录：他人章节插入 404 / 匿名 401", async () => {
+    const messageId = await chatAndGetReplyId("越权测试");
+    const cross = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages/${messageId}/insert?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: otherCookie },
+        body: JSON.stringify({ content: "x" }),
+      },
+    );
+    expect(cross.status).toBe(404);
+
+    const anon = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages/${messageId}/insert?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "x" }),
+      },
+    );
+    expect(anon.status).toBe(401);
+  });
+});

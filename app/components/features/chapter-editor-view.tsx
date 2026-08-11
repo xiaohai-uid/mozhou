@@ -91,6 +91,9 @@ export function ChapterEditorView() {
   const abortRef = useRef<AbortController | null>(null);
   // 工单 17：真实风格库（styleId 注入路径）
   const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
+  // 工单 18：插入中 + 插入错误提示
+  const [insertingId, setInsertingId] = useState<number | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
   useEffect(() => {
@@ -121,8 +124,8 @@ export function ChapterEditorView() {
   }, [novelId, chapterId]);
 
   /** 工单 16：保存正文（PATCH content；自动保存与显式保存同端点；content 显式传参防闭包过期） */
-  async function saveBody(content: string) {
-    if (!novelId || !chapterId) return;
+  async function saveBody(content: string): Promise<boolean> {
+    if (!novelId || !chapterId) return false;
     setSaveState("saving");
     try {
       const res = await fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
@@ -132,8 +135,10 @@ export function ChapterEditorView() {
       });
       if (!res.ok) throw new Error("保存失败");
       setSaveState("saved");
+      return true;
     } catch {
       setSaveState("failed");
+      return false;
     }
   }
 
@@ -230,9 +235,12 @@ export function ChapterEditorView() {
               prev.map((m) => (m.id === replyId ? { ...m, content: current } : m)),
             );
           } else if (data.type === "done") {
+            // 用服务端 messageId 替换本地临时 id（插入/后续操作必须用真实 id）
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === replyId ? { ...m, content: current, status: "done" } : m,
+                m.id === replyId
+                  ? { ...m, id: data.messageId ?? m.id, content: current, status: "done" }
+                  : m,
               ),
             );
           } else if (data.type === "error") {
@@ -267,39 +275,55 @@ export function ChapterEditorView() {
     abortRef.current?.abort();
   }
 
-  /** mockInsertToChapter：AI 消息插入正文（正文已变 → 冲突确认，灵笔 DocumentConflict 语义） */
-  function mockInsertToChapter(msgId: number) {
+  /** insertToChapter（工单 18 真实化）：POST insert，快照冲突 → 409 → 本地确认态；force 重发 */
+  async function insertToChapter(msgId: number) {
     const msg = messages.find((m) => m.id === msgId);
     if (!msg || msg.status === "streaming" || msg.inserted) return;
     const content = msg.content.trim();
     if (!content) return;
-    if (msg.snapshot !== body && !msg.confirmInsert) {
-      // 正文在生成期间被修改：先确认，不覆盖（灵笔 DocumentConflict / CandidateStale 语义）
-      setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, confirmInsert: true } : m)),
+    setInsertingId(msgId);
+    setErrorMsg(null);
+    try {
+      // 插入前先落盘本地编辑（防抖可能未触发）：确保服务端 content 为最新，快照比对才有意义
+      const saved = await saveBody(body);
+      if (!saved) throw new Error("正文保存失败，请重试");
+      const res = await fetch(
+        `/api/v1/novels/${novelId}/chapters/messages/${msgId}/insert?chapterId=${chapterId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, force: msg.confirmInsert }),
+        },
       );
-      return;
+      if (res.status === 409) {
+        // 正文已变化：先确认，不覆盖（灵笔 DocumentConflict 语义）
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, confirmInsert: true } : m)),
+        );
+        return;
+      }
+      const data = (await res.json().catch(() => null)) as {
+        chapter?: { content?: string };
+        error?: string;
+      } | null;
+      if (!res.ok) throw new Error(data?.error ?? "插入失败");
+      if (data?.chapter?.content !== undefined) {
+        setBody(data.chapter.content); // 服务端正文为准（本地不再拼接）
+        setSaveState("saved");
+      }
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, inserted: true, confirmInsert: false } : m)),
+      );
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+    } finally {
+      setInsertingId(null);
     }
-    setBody(body.trim() ? body + "\n\n" + content : content);
-    // 插入后正文变化 → 未保存 + 防抖自动保存（工单 16 真实落盘）
-    setSaveState("dirty");
-    if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
-    dirtyTimerRef.current = setTimeout(() => {
-      void saveBody(body.trim() ? body + "\n\n" + content : content);
-    }, 2000);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, inserted: true, confirmInsert: false } : m)),
-    );
   }
 
-  /** 冲突确认：仍要插入 */
+  /** 冲突确认：仍要插入（confirmInsert 已 true → force 重发） */
   function forceInsert(msgId: number) {
-    const msg = messages.find((m) => m.id === msgId);
-    if (!msg) return;
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, confirmInsert: false } : m)),
-    );
-    mockInsertToChapter(msgId);
+    void insertToChapter(msgId);
   }
 
   /** 演示模式切换（仅 Mock）：重置全部本地态；normal 重新加载真实正文 */
@@ -312,6 +336,7 @@ export function ChapterEditorView() {
     setMessages([]);
     setInput("");
     setSaveState("saved");
+    setErrorMsg(null);
     if (mode === "empty") {
       setBody("");
     } else if (mode === "normal") {
@@ -492,6 +517,11 @@ export function ChapterEditorView() {
               </span>
             )}
           </div>
+          {errorMsg && (
+            <p role="alert" className="mt-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2 text-xs text-red-400">
+              {errorMsg}
+            </p>
+          )}
           <textarea
             value={body}
             onChange={(e) => onBodyChange(e.target.value)}
@@ -629,11 +659,11 @@ export function ChapterEditorView() {
                           ) : (
                             <>
                               <button
-                                onClick={() => mockInsertToChapter(m.id)}
-                                disabled={!m.content.trim()}
+                                onClick={() => void insertToChapter(m.id)}
+                                disabled={!m.content.trim() || insertingId === m.id}
                                 className="flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
                               >
-                                插入正文
+                                {insertingId === m.id ? "插入中…" : "插入正文"}
                               </button>
                               {m.status === "stopped" && (
                                 <span className="text-[10px] text-faint">

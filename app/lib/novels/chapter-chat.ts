@@ -1,7 +1,7 @@
 // 章节对话引擎（工单 17，V1.1 Journey ⑦）：章节 AI 对话——消息持久化 + 技能驱动生成。
 // 注入链（system，按序）：正文参考（末尾 3000 字）→ RAG 设定（novelId，复用 06 工单）→ 风格（styleId，复用 15）→ 技能（内置场景技能 + 我的技能）。
 // 生成内核复用 runNodeStream（管线 seam 不新增）；mock provider 回显 system 使注入可断言。
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   chapterMessages,
@@ -209,5 +209,65 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     reply,
     stopped,
     injected: [...ragLines, ...extra],
+  };
+}
+
+/** 插入冲突（正文已变化，快照比对失败且非 force）：路由层转 409 */
+export class ContentChangedError extends Error {
+  constructor() {
+    super("正文已变化，这条回复基于旧正文");
+    this.name = "ContentChangedError";
+  }
+}
+
+export interface InsertResult {
+  chapter: { content: string; updatedAt: string };
+  messageId: number;
+}
+
+/**
+ * 插入 AI 消息到正文（工单 18）：快照比对冲突保护（DocumentConflict/CandidateStale 语义）。
+ * - 消息必须为 assistant、未插入、内容非空（400）
+ * - 生成快照 ≠ 当前正文 且非 force → ContentChangedError（409）
+ * - 正文末尾追加 + 消息标记 inserted（服务端持久化，刷新仍在）
+ */
+export async function insertChapterMessage(
+  userId: number,
+  novelId: number,
+  chapterId: number,
+  messageId: number,
+  content: string,
+  force: boolean,
+): Promise<InsertResult> {
+  const chapter = await getChapter(userId, novelId, chapterId);
+  if (!chapter) throw new ChapterNotFoundError();
+
+  const [msg] = await db
+    .select()
+    .from(chapterMessages)
+    .where(and(eq(chapterMessages.id, messageId), eq(chapterMessages.chapterId, chapterId)));
+  if (!msg) throw new Error("消息不存在");
+  if (msg.role !== "assistant") throw new Error("只能插入 AI 回复");
+  if (msg.inserted) throw new Error("该回复已插入过正文");
+  const insertText = content.trim();
+  if (!insertText) throw new Error("插入内容不能为空");
+
+  if (msg.snapshot !== chapter.content && !force) {
+    throw new ContentChangedError();
+  }
+
+  const next = chapter.content.trim() ? chapter.content + "\n\n" + insertText : insertText;
+  await db
+    .update(chapters)
+    .set({ content: next, updatedAt: sql`now()` })
+    .where(eq(chapters.id, chapterId));
+  await db
+    .update(chapterMessages)
+    .set({ inserted: true })
+    .where(eq(chapterMessages.id, messageId));
+
+  return {
+    chapter: { content: next, updatedAt: new Date().toISOString() },
+    messageId,
   };
 }
