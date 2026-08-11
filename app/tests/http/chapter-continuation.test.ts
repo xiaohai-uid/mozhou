@@ -244,7 +244,8 @@ describe("章节对话引擎（工单 17）", () => {
   });
 
   it("多轮对话：历史新→旧，第二轮后 4 条消息", async () => {
-    await fetch(
+    // 等待 SSE done（done 在 AI 消息落库后发出）再断言，避免与落库赛跑（A3 确定性修复）
+    const res = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
       {
         method: "POST",
@@ -252,6 +253,8 @@ describe("章节对话引擎（工单 17）", () => {
         body: JSON.stringify({ content: "第二轮", skills: ["章节续写"] }),
       },
     );
+    const done = parseSse(await res.text()).find((e) => e.type === "done");
+    expect(done?.messageId).toBeGreaterThan(0);
     const list = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
       { headers: { cookie } },

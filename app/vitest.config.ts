@@ -24,7 +24,7 @@ export default defineConfig({
           environment: "node",
           include: ["tests/http/**/*.test.ts"],
           globalSetup: ["tests/http/global-setup.ts"],
-          env: { TEST_BASE_URL: "http://127.0.0.1:3100" }, // 与 global-setup.ts 的 PORT 一致
+          setupFiles: ["tests/http/setup-env.ts"], // A3：从 .test-port 握手注入 TEST_BASE_URL（动态端口）
           testTimeout: 30000,
           hookTimeout: 30000,
         },
