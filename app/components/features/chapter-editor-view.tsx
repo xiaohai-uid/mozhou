@@ -12,10 +12,12 @@
 // 状态机（对话式）：ChatIdle → ChatStreaming(Preparing/Streaming/Cancelling) → MessageDone
 //   → InsertConfirm(正文已变) / Inserted / Cancelled / Error。Empty 变体：空章节空态"让 AI 起笔"。
 // UI Frozen 后 progressive swap：mock 函数族换真实契约，组件形态保持。
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import {
+  ArrowClockwise,
+  ArrowCounterClockwise,
   ArrowLeft,
   ArrowUp,
   Check,
@@ -23,6 +25,7 @@ import {
   Sparkle,
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
+import { useBodyHistory } from "./undo-history";
 
 type MessageStatus = "streaming" | "done" | "stopped" | "error";
 
@@ -57,7 +60,9 @@ export function ChapterEditorView() {
   const title = params.get("title") ?? "第一章";
 
   // 工单 16：正文从真实 API 加载；工单 17：对话消息真实持久化（留存 Q1）
-  const [body, setBody] = useState("");
+  // Journey ⑧：正文经 useBodyHistory 统一变更（会话级 undo/redo history，方案 A 冻结）
+  const bodyHist = useBodyHistory("");
+  const body = bodyHist.body;
   const [bodyLoaded, setBodyLoaded] = useState(false);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "failed">("saved");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -72,6 +77,8 @@ export function ChapterEditorView() {
   const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
 
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 最后保存/服务端确认的正文（撤销/重做后的保存状态比较基准，Journey ⑧） */
+  const lastSavedRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
   // 工单 17：真实风格库（styleId 注入路径）
   const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
@@ -86,7 +93,8 @@ export function ChapterEditorView() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { chapter?: { content?: string } } | null) => {
         if (data?.chapter) {
-          setBody(data.chapter.content ?? "");
+          bodyHist.reset(data.chapter.content ?? "");
+          lastSavedRef.current = data.chapter.content ?? "";
           setBodyLoaded(true);
         }
       });
@@ -105,7 +113,7 @@ export function ChapterEditorView() {
       .then((data: { styles?: Array<{ id: number; name: string }> } | null) => {
         if (data?.styles) setStyleLibrary(data.styles);
       });
-  }, [novelId, chapterId]);
+  }, [novelId, chapterId, bodyHist]); // bodyHist 实例稳定（useState 惰性初始化），仅随章节变化重载
 
   /** 工单 16：保存正文（PATCH content；自动保存与显式保存同端点；content 显式传参防闭包过期） */
   async function saveBody(content: string): Promise<boolean> {
@@ -118,6 +126,7 @@ export function ChapterEditorView() {
         body: JSON.stringify({ content }),
       });
       if (!res.ok) throw new Error("保存失败");
+      lastSavedRef.current = content;
       setSaveState("saved");
       return true;
     } catch {
@@ -140,14 +149,47 @@ export function ChapterEditorView() {
     );
   }
 
-  /** 正文编辑：对话期间正文永不锁定；编辑置未保存 + 2s 防抖自动保存（工单 16 真实落盘） */
+  /** 正文变更统一入口（Journey ⑧）：保存状态 = 与最后保存内容比较；不同则进 2s 防抖自动保存（保存不清 undo 栈） */
+  function markChanged(next: string) {
+    const sameAsSaved = next === lastSavedRef.current;
+    setSaveState(sameAsSaved ? "saved" : "dirty");
+    if (!sameAsSaved) {
+      if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
+      dirtyTimerRef.current = setTimeout(() => {
+        void saveBody(next);
+      }, 2000);
+    }
+  }
+
+  /** 正文编辑：对话期间正文永不锁定；输入走 history（2s 窗口内连续输入合并为一层 undo） */
   function onBodyChange(v: string) {
-    setBody(v);
-    setSaveState("dirty");
-    if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
-    dirtyTimerRef.current = setTimeout(() => {
-      void saveBody(v);
-    }, 2000);
+    bodyHist.type(v);
+    markChanged(v);
+  }
+
+  /** Journey ⑧：撤销/重做（栈空时返回 null，不触发保存调度） */
+  function doUndo() {
+    const v = bodyHist.undo();
+    if (v !== null) markChanged(v);
+  }
+  function doRedo() {
+    const v = bodyHist.redo();
+    if (v !== null) markChanged(v);
+  }
+
+  /** textarea 快捷键：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（阻止默认，避免与浏览器原生双重撤销） */
+  function onBodyKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+    const k = e.key.toLowerCase();
+    if (k === "z") {
+      e.preventDefault();
+      if (e.shiftKey) doRedo();
+      else doUndo();
+    } else if (k === "y") {
+      e.preventDefault();
+      doRedo();
+    }
   }
 
   /** mockSendChat → sendChat（工单 17 真实化）：POST chat SSE 流式，技能驱动；停止=abort */
@@ -293,7 +335,8 @@ export function ChapterEditorView() {
       } | null;
       if (!res.ok) throw new Error(data?.error ?? "插入失败");
       if (data?.chapter?.content !== undefined) {
-        setBody(data.chapter.content); // 服务端正文为准（本地不再拼接）
+        bodyHist.apply(data.chapter.content); // 服务端正文为准（原子一层，一次撤销整体回退）
+        lastSavedRef.current = data.chapter.content;
         setSaveState("saved");
       }
       setMessages((prev) =>
@@ -441,11 +484,34 @@ export function ChapterEditorView() {
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center justify-between">
             <span className="text-xs text-faint">正文</span>
-            {!emptyChapter && (
-              <span className="text-[11px] text-faint">
-                {body.length} 字 · 对话中的 AI 会参考正文，编辑后以最新为准
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {!emptyChapter && (
+                <span className="text-[11px] text-faint">
+                  {body.length} 字 · 对话中的 AI 会参考正文，编辑后以最新为准
+                </span>
+              )}
+              {/* Journey ⑧：撤销/重做（会话级 history；栈空 disabled） */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={doUndo}
+                  disabled={!bodyHist.canUndo}
+                  title="撤销 (Ctrl+Z)"
+                  aria-label="撤销"
+                  className="rounded-lg border border-surface-2 p-1 text-faint transition hover:text-zinc-200 disabled:opacity-30"
+                >
+                  <ArrowCounterClockwise size={14} aria-hidden />
+                </button>
+                <button
+                  onClick={doRedo}
+                  disabled={!bodyHist.canRedo}
+                  title="重做 (Ctrl+Shift+Z)"
+                  aria-label="重做"
+                  className="rounded-lg border border-surface-2 p-1 text-faint transition hover:text-zinc-200 disabled:opacity-30"
+                >
+                  <ArrowClockwise size={14} aria-hidden />
+                </button>
+              </div>
+            </div>
           </div>
           {errorMsg && (
             <p role="alert" className="mt-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2 text-xs text-red-400">
@@ -455,6 +521,7 @@ export function ChapterEditorView() {
           <textarea
             value={body}
             onChange={(e) => onBodyChange(e.target.value)}
+            onKeyDown={onBodyKeyDown}
             placeholder={
               !bodyLoaded
                 ? "加载中…"
