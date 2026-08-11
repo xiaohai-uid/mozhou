@@ -94,8 +94,54 @@ export default async function setup() {
       throw new Error(`next dev 未在 120s 内就绪（port ${port}），见 tests/http/.next-dev.log`);
     }
 
-    // 端口握手：worker 进程读不到本进程的 env，写文件由 setup-env.ts 注入 TEST_BASE_URL
+    // 端口握手先行：预热可能耗时数十秒，若预热后才写端口文件，
+    // setup-env（worker 侧）可能读到上一轮残留端口（生产 gate 排查发现的竞态）。
     writeFileSync(portFile, String(port), "utf8");
+
+    // 路由预热：Turbopack 首次请求触发编译，编译完成前请求可能 404（并发测试首次请求风暴竞态）。
+    // 就绪后逐个触发核心 API 路由编译（未登录 401 即视为已注册），避免测试期间偶发 404。
+    const warmRoutes = [
+      "/api/v1/auth/register",
+      "/api/v1/auth/login",
+      "/api/v1/auth/logout",
+      "/api/v1/account",
+      "/api/v1/novels",
+      "/api/v1/novels/0",
+      "/api/v1/novels/0/chapters",
+      "/api/v1/novels/0/chapters/chat",
+      "/api/v1/novels/0/chapters/messages",
+      "/api/v1/novels/0/chapters/messages/0/insert",
+      "/api/v1/novels/0/entries",
+      "/api/v1/styles",
+      "/api/v1/skills",
+      "/api/v1/distill",
+      "/api/v1/deconstruct/analyze",
+      "/api/v1/draw",
+      "/api/v1/search",
+      "/api/v1/shelf",
+      "/api/v1/sessions",
+      "/api/v1/sessions/0/messages",
+      "/api/v1/websearch",
+      "/api/v1/rankings",
+      "/api/v1/sync/config",
+      "/api/v1/sync/push",
+      "/api/v1/tools/checks",
+      "/api/v1/chat",
+    ];
+    // 每个 route 重试直到非 404（Turbopack 编译队列忙时首次请求可能 404 且不触发编译，
+    // 重试可让编译队列空闲后的请求正常触发编译注册）
+    for (const r of warmRoutes) {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          const res = await fetch(`${base}${r}`, { method: "POST", body: "{}" });
+          if (res.status !== 404) break; // 401/400/405 均视为 route 已注册
+        } catch {
+          // 网络错误重试
+        }
+        await new Promise((res) => setTimeout(res, 400));
+      }
+      await new Promise((res) => setTimeout(res, 100));
+    }
   } catch (err) {
     killTree(); // 启动失败也必须清掉自己拉起的进程
     log.end();

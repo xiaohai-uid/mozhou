@@ -264,6 +264,9 @@ describe("上下文自动压缩（12 工单）", () => {
         }),
       });
       expect(r.status).toBe(200);
+      // 必须读完 SSE body：服务端在流式完成 + assistant 落库后才发 done，
+      // 不消费 body 就发下一轮会读到中间态历史（压缩判定偶发失败，生产 gate 确定性修复）
+      await r.text();
     }
 
     // 再发一条正常消息：此时历史已超阈值，应触发压缩
