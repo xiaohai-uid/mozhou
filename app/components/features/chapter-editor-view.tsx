@@ -249,7 +249,9 @@ export function ChapterEditorView() {
     setInput("");
     setSubphase("preparing");
     setStreaming(true);
-    const replyId = ++msgSeq;
+    // 本地临时 id 用负命名空间（服务端 id 为正整数、全局序列——空库时从 1 起，正 id 会在 done
+    // 替换后与 user 本地 id 撞车，find() 取错消息插入错误内容；生产 smoke 复现后修复）
+    const replyId = --msgSeq;
     const snapshot = body; // 本地快照（工单 18 换服务端快照比对）
     // J9：选区作为 AI 输入（改写/润色等）→ 绑定 generation-bound selection snapshot（会话级）
     const ta = bodyTextareaRef.current;
@@ -264,7 +266,7 @@ export function ChapterEditorView() {
     if (selection) boundRef.current.set(replyId, selection);
     setMessages((prev) => [
       ...prev,
-      { id: ++msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
+      { id: --msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
       { id: replyId, role: "assistant", content: "", status: "streaming", skills, snapshot, inserted: false, confirmInsert: false },
     ]);
     const controller = new AbortController();
