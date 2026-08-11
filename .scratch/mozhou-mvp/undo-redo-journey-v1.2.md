@@ -113,3 +113,37 @@ redo()  { if (!future.length) return; past.push(current); setBody(future.pop());
 - **纯前端**：`components/features/undo-history.ts`（hook）+ chapter-editor-view 集成。
 - **No new API / No new DB / No new dependency**（与 V1.1 最小化原则一致）。
 - 单元测试：hook 的栈语义（合并/原子/undo/redo/save 关系）；契约测试：零改动（无服务端变化）。
+
+## 8. 实现记录（UI Freeze 后最小真实化）
+
+- **seam**：`components/features/undo-history.ts` — `createBodyHistory`（纯逻辑，可单测）+ `useBodyHistory`（useState 惰性实例 + useReducer bump + useMemo 稳定返回对象，getter 惰性读 current/canUndo/canRedo）。
+  > 实测发现：返回对象不稳定会导致编辑器加载 effect 每次渲染重跑（请求风暴）——useMemo 稳定化是必要修复。
+- **No new API / No new DB / No new dependency**。
+- **atomic operation**：`apply()`（AI 插入 / force 插入 / 起笔 / 清空）始终 push 当前值 + 原子更新 = 一层 undo；`type()` 在 2s 窗口内合并连续输入（与自动保存同窗口）。
+- **auto-save 共存**：保存（自动/显式）只更新 `lastSavedRef`，不动 past/future 栈；undo/redo 后经统一 `markChanged`：正文 == lastSaved → "已保存"，否则 "未保存" → 2s 防抖自动保存（撤销结果最终落盘）。
+- **AI insert / force insert 入栈**：插入成功路径 `apply(服务端 content)`（单原子一层，一次撤销整体回退），不依赖浏览器原生 undo 栈（程序性赋值不进原生栈）。
+- **快捷键**：textarea onKeyDown 拦截 Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（preventDefault 防浏览器双重撤销）；正文区 header Undo/Redo 图标按钮（栈空 disabled）。
+
+## 9. 人工验收结果（浏览器真实交互，15/15 PASS）
+
+| # | 案例 | 结果 | 实测证据 |
+|---|------|------|----------|
+| 1 | 普通输入 → Undo | PASS | 输入"他抬起头。"(629) → Ctrl+Z → 624 |
+| 2 | Undo → Redo | PASS | Ctrl+Shift+Z → 629 |
+| 3 | 多段连续输入 | PASS | 同一 2s 窗口输入合并一层（一次撤销整段）；窗口外分层（实测间隔 >2s 时一次只撤销一段，符合冻结语义）；合并窗口精确行为由单测 fake timers 覆盖 |
+| 4 | AI 插入大段 → 一次 Undo | PASS | mock 插入 767 字(1396) → 一次 Ctrl+Z → 629 |
+| 5 | Undo 插入 → Redo 恢复 | PASS | Ctrl+Shift+Z → 1396 完整恢复 |
+| 6 | 自动保存后 Undo | PASS | 输入"他蹲下去。"自动保存(1401) → Ctrl+Z → 1396 |
+| 7 | Undo 后保存状态 | PASS | 撤销回保存点="已保存"；撤销到非保存点="未保存"→2s 自动保存（PATCH 序列取证：1401→1396→1402→1396） |
+| 8 | 显式保存后 Undo | PASS | 输入→点保存(1405/"已保存")→Ctrl+Z→1400="已保存" |
+| 9 | force insert 后整体 Undo | PASS | 409 冲突确认→"仍要插入"→2946→一次 Ctrl+Z→1407 |
+| 10 | Undo 不覆盖生成期间新增 | PASS | 生成期间输入"生成期间新增。"(1407)→force 插入→undo→1407 内容完整保留 |
+| 11 | Undo 不破坏章节对话 | PASS | 对话面板 8 个消息气泡完整（冲突消息/已插入标记均在） |
+| 12 | 栈空时按钮 disabled | PASS | 初始/刷新后/撤销到顶均 disabled；输入后启用 |
+| 13 | 键盘快捷键 | PASS | Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y 正常 |
+| 14 | 鼠标操作 | PASS | 点击重做/撤销按钮正常 |
+| 15 | 切换章节 | PASS | 第二章打开后 undo/redo 均 disabled（会话级，不保留） |
+
+自动化：`gate:milestone` PASS（tsc + 149/149 [139 契约 + 10 undo-history 单测] + build 37/37）。
+测试操作备注：React 受控组件下 JS setter 不触发 onChange（用 CDP 真实输入）；textarea 失焦时 Ctrl+Z 走浏览器原生栈（所有编辑器同此行为，非产品缺陷）。
+已记录的产品边界：undo 撤销 AI 插入后，消息"已插入正文"标记不追踪正文回退（冻结规范 §5 未要求，保持简单）。
