@@ -4,7 +4,7 @@
 
 **Blocked by:** —（契约 22 已 Frozen；syncConfigs + chapters.content 已就绪）
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-11）
 
 **决策（spec.md Journey ④）：** 范围=作品章节正文；方向=单向推送（mtime 覆盖远端）；触发=手动 + autoSync（PATCH content 后防抖）；格式=`mozhou/<作品名>/<章节号>-<标题>.md`
 

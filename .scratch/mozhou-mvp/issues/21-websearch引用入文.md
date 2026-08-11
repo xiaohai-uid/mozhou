@@ -4,7 +4,7 @@
 
 **Blocked by:** —（契约 23 已 Frozen；websearch 搜索真实已就绪；deconstruct 回流通道为先例）
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-11）
 
 **决策（spec.md Journey ⑤）：** 去向=写作对话消息插入（R2 消息插入语义）；形式=多选合并一次插入；通道=sessionStorage `mozhou_pending_websearch`（对齐 deconstruct 回流）
 
