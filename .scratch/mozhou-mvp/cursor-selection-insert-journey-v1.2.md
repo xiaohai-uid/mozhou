@@ -170,3 +170,32 @@ No new DB / No new API / No new dependency
 ```
 
 索引语义：`position/range` 使用 UTF-16 code unit（与 `textarea.selectionStart/End` 及 JS string 一致）——中文/emoji 混排不错位（契约级保证，必测）。
+
+## 10. 浏览器人工验收结果（A–T，真实交互，全部 PASS）
+
+| Case | 行为 | 实测证据 |
+|------|------|---------|
+| A caret 中间插入 | PASS | caret=3 → 插入位置 3（"老周蹲"+AI+原文），caret=167=AI 末尾，聚焦 |
+| B 开头插入 | PASS | caret=2 → AI 出现在位置 2，原文前 2 字保留 |
+| C 末尾插入 | PASS | caret=len → 末尾追加（与旧版一致），caret 末尾 |
+| D replace selection | PASS | 选中"老周蹲" → 按钮「替换选中内容」→ 仅该段被替换（522→1227），caret 结果末尾 |
+| E blur persistence | PASS | 选中后点 AI 面板（textarea blur）→ 按钮仍「替换选中内容」 |
+| F move during generation | PASS | 生成期间 Home+→×2 → 插入用最新 caret（位置 2） |
+| G unrelated edits during generation | PASS | 生成期间写「生成期间我在别处写的内容。」→ 插入成功且内容保留（J9 收紧语义） |
+| H bound selection conflict | PASS | 改写选中文字、目标被改 → 替换时「选中内容已发生变化」提示，无静默覆盖 |
+| I cancel conflict | PASS | 取消 → 正文一字不改 |
+| J force replace | PASS | 仍要替换 → 只替换目标区间（1226→2638），其它保留 |
+| K Undo insert | PASS | 一次 Ctrl+Z → AI 内容整体消失 + caret 回插入前位置（193） |
+| L Redo insert | PASS | AI 内容恢复 + caret 在 AI 文末（522） |
+| M Undo replace | PASS | 原选中文字完整恢复 + **选区恢复为仍选中**（0-3） |
+| N Redo replace | PASS | 替换结果恢复 + caret 在结果末尾（708），无整段选中 |
+| O auto save | PASS | 保存后 caret/target 不移动 |
+| P explicit save | PASS | caret=8563 保持、已保存 |
+| Q chapter switch | PASS | 第二章 undo/redo disabled（history/selection 不继承） |
+| R refresh | PASS | 正文=最后保存（8563）、undo 栈清空、bound 不恢复 |
+| S duplicate click | PASS | inserted 状态防重（契约 400 已测 + UI「已插入正文」标记） |
+| T stale server race | PASS | 契约层 expectedContent≠当前 → 409 ContentChanged + force 跳过（J8 案例 9 已验证同形态 UI） |
+
+附加验证：中文/emoji UTF-16 位置（契约测试）；**性能**：52,698 字正文 caret=0 插入 → 205ms 完成（无冻结，不引入 rope/piece-table）。
+
+测试方法备注：React 受控组件 JS setter 不可靠（用 CDP 真实输入/native setter）；**程序化 setSelectionRange 不触发 selectionchange → React onSelect 不跑**（真实点击/键盘均正常，产品行为正确）；发送按钮 icon-only（aria-label，DOM 无文本）。
