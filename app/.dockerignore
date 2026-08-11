@@ -1,0 +1,24 @@
+# 墨舟生产镜像构建上下文排除（不得带入 .env / .git / 设计期产物）
+# VCS
+.git
+.gitignore
+
+# secrets — 任何 .env* 一律不进镜像
+.env
+.env.*
+*.pem
+
+# deps / build artifacts
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# tests / scratch / design assets
+tests
+.scratch
+figma-upload
+*.log
+.test-port
