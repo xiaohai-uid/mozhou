@@ -19,7 +19,6 @@ import {
   ArrowLeft,
   ArrowUp,
   Check,
-  DotsThree,
   Pause,
   Sparkle,
   Warning,
@@ -44,18 +43,8 @@ interface ChatMessage {
   errorCode?: string;
 }
 
-type DemoMode = "normal" | "no-model" | "fail" | "empty";
-
 /** Mock 模型（仅演示；UI Frozen 后换真实模型契约） */
 const MOCK_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
-
-/** 示例正文（有正文示例；与产品文风一致） */
-const EXAMPLE_BODY = `黄土坡上，老周把锄头抡起来，一下，一下。土腥气顺着风钻进鼻子里，他嗅了嗅，又嗅了嗅。这地是沉的，锄刃磕下去，像是磕在铁上。
-
-村里人叫他周三两，因为他称地从来只称三两。他蹲在田埂上，把土块捻碎了，凑到眼前看。墒够，他说。旁边的后生不信，拿脚跺了跺，果然湿气上来。
-
-天擦黑的时候，沟里的水声大起来。老周收了锄，沿着垄沟走回去。家里灶上煨着粥，他媳妇在门口纳鞋底，见他回来，也不说话，只把粥碗往前推了推。`;
-
 
 let msgSeq = 0;
 
@@ -81,12 +70,7 @@ export function ChapterEditorView() {
   const [styleId, setStyleId] = useState<number | null>(null);
   // v3 技能驱动对话：可用技能按章节状态切换（空章节=起笔，非空=续写），默认选中场景技能
   const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
-  const [demoMode, setDemoMode] = useState<DemoMode>("normal");
-  const [demoOpen, setDemoOpen] = useState(false);
 
-  // 代际计数：每条消息一轮生成；+1 使旧代定时回调全部失效（防竞态）
-  const genIdRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   // 工单 17：真实风格库（styleId 注入路径）
@@ -156,13 +140,6 @@ export function ChapterEditorView() {
     );
   }
 
-  function clearTimer() {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }
-
   /** 正文编辑：对话期间正文永不锁定；编辑置未保存 + 2s 防抖自动保存（工单 16 真实落盘） */
   function onBodyChange(v: string) {
     setBody(v);
@@ -176,7 +153,7 @@ export function ChapterEditorView() {
   /** mockSendChat → sendChat（工单 17 真实化）：POST chat SSE 流式，技能驱动；停止=abort */
   async function sendChat(text?: string, skillsOverride?: string[]) {
     const content = (text ?? input).trim();
-    if (!content || streaming || demoMode === "no-model") return;
+    if (!content || streaming) return;
     const skills =
       skillsOverride ??
       (() => {
@@ -244,7 +221,15 @@ export function ChapterEditorView() {
               ),
             );
           } else if (data.type === "error") {
-            throw new Error(data.message ?? "生成失败");
+            // 消息级错误：带 code 供人性化映射（工单 19）
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === replyId
+                  ? { ...m, status: "error", errorCode: data.code ?? "UNKNOWN" }
+                  : m,
+              ),
+            );
+            return;
           }
         }
       }
@@ -326,46 +311,28 @@ export function ChapterEditorView() {
     void insertToChapter(msgId);
   }
 
-  /** 演示模式切换（仅 Mock）：重置全部本地态；normal 重新加载真实正文 */
-  function switchDemoMode(mode: DemoMode) {
-    genIdRef.current++;
-    clearTimer();
-    setStreaming(false);
-    setDemoMode(mode);
-    setDemoOpen(false);
-    setMessages([]);
-    setInput("");
-    setSaveState("saved");
-    setErrorMsg(null);
-    if (mode === "empty") {
-      setBody("");
-    } else if (mode === "normal") {
-      setBody("");
-      if (novelId && chapterId) {
-        fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`)
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data: { chapter?: { content?: string } } | null) => {
-            if (data?.chapter) setBody(data.chapter.content ?? "");
-          });
-      }
-    } else {
-      setBody(EXAMPLE_BODY);
-    }
-    // 场景技能随章节状态切换（空=起笔，非空=续写）
-    setActiveSkills(mode === "empty" ? ["章节起笔"] : ["章节续写"]);
-  }
-
-  /** 错误人性化（演示）：标题 + 怎么办 + 动作（灵笔 humanizeError 语义简化） */
-  function humanizeError(code: string): { title: string; guidance: string; action: string } {
+  /** 错误人性化（工单 19 正式化）：标题 + 怎么办（灵笔 humanizeError 语义，映射契约 21 错误码） */
+  function humanizeError(code: string): { title: string; guidance: string } {
     switch (code) {
       case "AiNoApiKey":
-        return { title: "还没有配置 AI", guidance: "先选择模型并配置可用渠道。", action: "reconfigure" };
+        return { title: "还没有配置 AI", guidance: "先选择模型并配置可用渠道。" };
       case "AiRateLimited":
-        return { title: "请求太频繁", guidance: "模型暂时繁忙，稍后重试或切换模型。", action: "switch_model" };
+        return { title: "请求太频繁", guidance: "模型暂时繁忙，稍后重试或切换模型。" };
+      case "AiServerError":
+        return { title: "模型暂时繁忙", guidance: "稍后重试或切换模型。" };
+      case "AiTimeout":
+      case "AiNetworkError":
+        return { title: "网络连接失败", guidance: "请检查网络后重试。" };
       case "AiInvalidResponse":
-        return { title: "AI 返回了无法理解的内容", guidance: "请重试，或切换模型。", action: "retry" };
+        return { title: "AI 返回了无法理解的内容", guidance: "请重试，或切换模型。" };
+      case "AiCancelled":
+        return { title: "已取消生成", guidance: "生成已停止，你可以继续写作。" };
+      case "ContentChanged":
+        return { title: "正文已经变化", guidance: "这条回复基于旧正文，请重新生成。" };
+      case "ChapterNotFound":
+        return { title: "章节不存在", guidance: "返回作品列表重新选择。" };
       default:
-        return { title: "生成失败", guidance: "请稍后重试。", action: "retry" };
+        return { title: "操作没有成功", guidance: "请稍后重试。" };
     }
   }
 
@@ -375,7 +342,7 @@ export function ChapterEditorView() {
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-6 lg:px-8">
-      {/* 顶栏：返回 + 章节标识 + 模型/风格 + 保存态 + 演示菜单 */}
+      {/* 顶栏：返回 + 章节标识 + 模型/风格 + 保存态 */}
       <header className="flex flex-wrap items-center gap-3">
         <Link
           href="/projects"
@@ -465,45 +432,8 @@ export function ChapterEditorView() {
               <span className="text-xs text-zinc-600">（蒸馏页保存后出现）</span>
             )}
           </div>
-          {/* 演示菜单（仅 Mock 阶段验收用，UI Frozen 后删除） */}
-          <div className="relative">
-            <button
-              onClick={() => setDemoOpen((v) => !v)}
-              aria-label="演示模式"
-              title="演示模式（仅 Mock）"
-              className="flex size-7 items-center justify-center rounded-full border border-surface-2 text-faint transition hover:text-zinc-200"
-            >
-              <DotsThree size={15} weight="bold" />
-            </button>
-            {demoOpen && (
-              <div className="absolute right-0 top-9 z-20 w-44 rounded-card border border-surface-2 bg-surface p-1.5 shadow-xl">
-                <p className="px-2.5 py-1 text-[10px] uppercase tracking-wide text-faint">
-                  演示（Mock）
-                </p>
-                {(
-                  [
-                    { key: "normal", label: "正常" },
-                    { key: "no-model", label: "模型不可用" },
-                    { key: "fail", label: "生成失败" },
-                    { key: "empty", label: "空章节示例" },
-                  ] as Array<{ key: DemoMode; label: string }>
-                ).map((d) => (
-                  <button
-                    key={d.key}
-                    onClick={() => switchDemoMode(d.key)}
-                    className={`block w-full rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
-                      demoMode === d.key
-                        ? "bg-accent/15 text-accent"
-                        : "text-zinc-300 hover:bg-surface-2"
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
+
       </header>
 
       <div className="mt-5 flex min-h-0 flex-1 gap-5">
@@ -537,7 +467,7 @@ export function ChapterEditorView() {
           {bodyLoaded && emptyChapter && (
             <button
               onClick={() => void sendChat("以黄土纪年的文风，为这一章写一个开头", ["章节起笔"])}
-              disabled={streaming || demoMode === "no-model"}
+              disabled={streaming}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-accent/40 bg-accent/5 py-4 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-40"
             >
               <Sparkle size={16} weight="fill" aria-hidden />
@@ -695,11 +625,6 @@ export function ChapterEditorView() {
 
           {/* 输入区 */}
           <div className="border-t border-surface-2 p-3">
-            {demoMode === "no-model" && (
-              <div className="mb-2 flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-3 py-2 text-xs text-yellow-400">
-                ⚠ 模型不可用（演示）：对话已禁用
-              </div>
-            )}
             <div className="flex items-end gap-2 rounded-xl border border-surface-2 bg-zinc-950 p-2 transition focus-within:border-accent">
               <textarea
                 value={input}
@@ -710,7 +635,7 @@ export function ChapterEditorView() {
                     void sendChat();
                   }
                 }}
-                disabled={streaming || demoMode === "no-model"}
+                disabled={streaming}
                 rows={2}
                 placeholder={streaming ? "正在生成…" : startPlaceholder}
                 className="max-h-28 w-full resize-none bg-transparent px-1.5 py-1 text-sm text-zinc-100 outline-none placeholder:text-faint"
@@ -727,7 +652,7 @@ export function ChapterEditorView() {
               ) : (
                 <button
                   onClick={() => void sendChat()}
-                  disabled={!input.trim() || streaming || demoMode === "no-model"}
+                  disabled={!input.trim() || streaming}
                   aria-label="发送"
                   className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"
                 >
