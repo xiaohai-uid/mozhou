@@ -1,5 +1,6 @@
 // 章节级续写契约测试（V1.1 Journey ⑦，工单 16）：章节正文读写（content 落库 + 归属校验）
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
 import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
@@ -9,6 +10,26 @@ const RUN = Date.now().toString(36);
 const EMAIL = `mozhou-chcont-${RUN}@example.com`;
 const OTHER_EMAIL = `mozhou-chcont-o-${RUN}@example.com`;
 const PASSWORD = "s3cret-测试密码";
+const OBSERVER_FILE = "tests/http/.payload-observer.jsonl";
+
+function readPayloadObservations(): Array<{
+  route: string;
+  message_count: number;
+  message_roles: string[];
+  current_user_present: boolean;
+  chapter_scope_present: boolean;
+  skill_count: number;
+  system_sections: string[];
+}> {
+  try {
+    return readFileSync(OBSERVER_FILE, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
+}
 
 let cookie = "";
 let otherCookie = "";
@@ -177,6 +198,15 @@ describe("章节对话引擎（工单 17）", () => {
     const done = events.find((e) => e.type === "done") as { messageId?: number };
     expect(done?.messageId).toBeTruthy();
 
+    const chapterObservation = readPayloadObservations().find((entry) => entry.route === "chapter-chat");
+    expect(chapterObservation).toMatchObject({
+      route: "chapter-chat",
+      message_count: 0,
+      message_roles: [],
+      current_user_present: false,
+      chapter_scope_present: true,
+    });
+
     // 落库断言：user + assistant（skills 快照 + snapshot=生成时正文）
     const list = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
@@ -241,6 +271,11 @@ describe("章节对话引擎（工单 17）", () => {
     const text = await res.text();
     expect(text).not.toContain("[技能] 不存在的技能");
     expect(text).toContain('"type":"done"');
+    const latest = readPayloadObservations()
+      .filter((entry) => entry.route === "chapter-chat")
+      .at(-1);
+    expect(latest?.skill_count).toBe(0);
+    expect(latest?.system_sections).not.toContain("skill");
   });
 
   it("J9 selection 注入：发送时带选区 → mock 回显 [所选片段]；越界/与正文不符 → 400", async () => {

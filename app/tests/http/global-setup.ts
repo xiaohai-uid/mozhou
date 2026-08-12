@@ -24,6 +24,12 @@ export default async function setup() {
   const port = Number(process.env.TEST_PORT ?? 0) || (await pickFreePort());
   const base = `http://127.0.0.1:${port}`;
   const portFile = join(process.cwd(), "tests/http/.test-port");
+  const observerFile = join(process.cwd(), "tests/http/.payload-observer.jsonl");
+  try {
+    unlinkSync(observerFile);
+  } catch {
+    // Previous interrupted runs may not have left a capture file.
+  }
 
   // 直接用 node 跑 next 的 bin（Windows 下 spawn .cmd 会 EINVAL，且避免 shell 层）
   const log = createWriteStream("tests/http/.next-dev.log", { flags: "w" });
@@ -47,8 +53,10 @@ export default async function setup() {
         cwd: process.cwd(),
         env: {
           ...process.env,
+          NODE_ENV: "test", // 让 Capturing Provider 满足唯一的测试环境门
           NEXT_TELEMETRY_DISABLED: "1",
           CHAT_PROVIDER: "mock", // 契约测试注入 mock LLM（确定性，不依赖外网）
+          CHAT_OBSERVER_FILE: observerFile, // 测试 worker 读取的脱敏 observer 证据桥
           DISTILL_PROVIDER: "mock", // 风格蒸馏同样 mock（07 工单）
           DECONSTRUCT_PROVIDER: "mock", // 小说拆解同样 mock（09 工单）
           DRAW_PROVIDER: "mock", // 抽卡模式同样 mock（10 工单）
@@ -155,6 +163,11 @@ export default async function setup() {
       unlinkSync(portFile);
     } catch {
       // 文件不存在则忽略
+    }
+    try {
+      unlinkSync(observerFile);
+    } catch {
+      // 捕获文件不存在则忽略
     }
   };
 }

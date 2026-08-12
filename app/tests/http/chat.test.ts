@@ -1,5 +1,6 @@
 // 对话 API 契约测试：会话 CRUD + SSE 流式 chat（mock provider）+ 归属校验
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
@@ -9,6 +10,28 @@ const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);
 const EMAIL = `mozhou-chat-${RUN}@example.com`;
 const PASSWORD = "s3cret-测试密码";
+const OBSERVER_FILE = "tests/http/.payload-observer.jsonl";
+
+function readPayloadObservations(): Array<{
+  route: string;
+  system_present: boolean;
+  message_count: number;
+  message_roles: string[];
+  current_user_present: boolean;
+  current_user_occurrences: number;
+  compression_applied: boolean;
+  history_count_before: number;
+  history_count_after: number;
+}> {
+  try {
+    return readFileSync(OBSERVER_FILE, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
+}
 
 interface TestUser {
   cookie: string;
@@ -121,6 +144,28 @@ describe("POST /api/v1/chat（SSE 流式，mock provider）", () => {
     };
     const s = list.find((x) => x.id === sessionId);
     expect(s?.title).toBe("帮我写个开篇");
+  });
+
+  it("真实 HTTP consumer 能观察脱敏 payload 结构，而不是只观察 mock 输出", async () => {
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: `payload-observer-${RUN}` }),
+    });
+    expect(res.status).toBe(200);
+    await res.text();
+
+    const observation = readPayloadObservations().find(
+      (entry) => entry.route === "chat" && entry.current_user_present && entry.message_count === 1,
+    );
+    expect(observation).toMatchObject({
+      route: "chat",
+      message_count: 1,
+      message_roles: ["user"],
+      current_user_present: true,
+      current_user_occurrences: 1,
+    });
+    expect(JSON.stringify(readPayloadObservations())).not.toContain(`payload-observer-${RUN}`);
   });
 
   it("新会话复用：不带 sessionId 自动建会话，二次调用续在同一会话", async () => {
@@ -284,6 +329,14 @@ describe("上下文自动压缩（12 工单）", () => {
       compressed?: boolean;
     };
     expect(done?.compressed).toBe(true);
+
+    const compressedObservation = readPayloadObservations().find(
+      (entry) => entry.route === "chat" && entry.compression_applied,
+    );
+    expect(compressedObservation).toMatchObject({
+      compression_applied: true,
+      history_count_after: compressedObservation?.history_count_before,
+    });
   });
 
   it("短历史 → compressed=false 或缺失", async () => {

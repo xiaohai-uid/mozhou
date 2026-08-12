@@ -1,10 +1,11 @@
 // 对话 LLM 提供者：one-api 网关 SSE 流（真实现）+ mock（测试用，env CHAT_PROVIDER=mock 切换）
 import type { StreamProvider, StreamDelta } from "@/lib/pipeline/engine";
-
-export interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
+import {
+  capturePreparedChatRequest,
+  isPayloadCaptureEnabled,
+  observePreparedChatRequest,
+  type PreparedChatRequest,
+} from "./payload";
 
 /** 组装 system 消息：RAG 注入的"参考资料"节（06 工单） */
 export function buildSystemPrompt(injected: string[]): string {
@@ -18,18 +19,15 @@ export function buildSystemPrompt(injected: string[]): string {
 /** one-api 网关（OpenAI 兼容 SSE 流） */
 export class OneApiStreamProvider implements StreamProvider {
   constructor(
-    private opts: {
+    private opts: PreparedChatRequest & {
       baseUrl: string;
       token: string;
-      model: string;
-      messages: ChatMessage[];
-      systemPrompt?: string;
     },
   ) {}
 
   async *stream(): AsyncIterable<StreamDelta> {
     const messages = [
-      ...(this.opts.systemPrompt ? [{ role: "system" as const, content: this.opts.systemPrompt }] : []),
+      ...(this.opts.system ? [{ role: "system" as const, content: this.opts.system }] : []),
       ...this.opts.messages,
     ];
     const res = await fetch(`${this.opts.baseUrl}/v1/chat/completions`, {
@@ -88,11 +86,11 @@ export class OneApiStreamProvider implements StreamProvider {
 
 /** 固定流 mock（契约测试用，确定性输出） */
 export class MockChatProvider implements StreamProvider {
-  constructor(private systemPrompt?: string) {}
+  constructor(private request: PreparedChatRequest) {}
   async *stream(): AsyncIterable<StreamDelta> {
     // 回显 system 提示（若有注入：RAG/风格/技能/压缩），让注入成为可断言的外部行为（工单 15）
-    if (this.systemPrompt) {
-      yield { text: `（已注入：${this.systemPrompt}）` };
+    if (this.request.system) {
+      yield { text: `（已注入：${this.request.system}）` };
     }
     for (const piece of ["你好，我是墨舟。", "（模拟流式输出）"]) {
       yield { text: piece };
@@ -103,18 +101,34 @@ export class MockChatProvider implements StreamProvider {
 
 /** 按环境选择 provider：测试注入 CHAT_PROVIDER=mock，生产默认 one-api 网关 */
 export function makeChatProvider(
-  model: string,
-  messages: ChatMessage[],
-  systemPrompt?: string,
+  request: PreparedChatRequest,
 ): StreamProvider {
-  if (process.env.CHAT_PROVIDER === "mock") {
-    return new MockChatProvider(systemPrompt);
+  observePreparedChatRequest(request);
+
+  const provider =
+    process.env.CHAT_PROVIDER === "mock"
+      ? new MockChatProvider(request)
+      : new OneApiStreamProvider({
+          ...request,
+          baseUrl: process.env.ONEAPI_BASE_URL ?? "http://localhost:3001",
+          token: process.env.ONEAPI_TOKEN ?? "",
+        });
+
+  if (isPayloadCaptureEnabled()) {
+    return new CapturingChatProvider(request, provider);
   }
-  return new OneApiStreamProvider({
-    baseUrl: process.env.ONEAPI_BASE_URL ?? "http://localhost:3001",
-    token: process.env.ONEAPI_TOKEN ?? "",
-    model,
-    messages,
-    systemPrompt,
-  });
+  return provider;
+}
+
+/** 测试专用 provider wrapper：捕获 provider 消费前的完整最终请求。 */
+export class CapturingChatProvider implements StreamProvider {
+  constructor(
+    private request: PreparedChatRequest,
+    private delegate: StreamProvider,
+  ) {}
+
+  async *stream(): AsyncIterable<StreamDelta> {
+    capturePreparedChatRequest(this.request);
+    yield* this.delegate.stream();
+  }
 }

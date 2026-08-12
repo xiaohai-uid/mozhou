@@ -1,6 +1,6 @@
 // 上下文自动压缩（12 工单）：会话历史超阈值 → 早期消息摘要化，保留近期原文。
 // 摘要经 one-api 非流式生成；测试模式（CHAT_PROVIDER=mock）返回固定摘要。
-import type { ChatMessage } from "./stream-provider";
+import type { ChatMessage } from "./payload";
 
 /** 上下文窗口（对齐 UI 上下文面板 8K） */
 export const CONTEXT_MAX_TOKENS = 8000;

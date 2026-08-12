@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { messages, sessions, skills as skillsTable, styles as stylesTable } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
-import { makeChatProvider, buildSystemPrompt, type ChatMessage } from "./stream-provider";
+import { makeChatProvider, buildSystemPrompt } from "./stream-provider";
+import type { ChatMessage } from "./payload";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
 import { compressHistory, shouldCompress } from "./compress";
 import { recordUsage } from "@/lib/account/service";
@@ -151,13 +152,22 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   });
   // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验）
   const extra: string[] = [];
-  if (summary) extra.push(summary);
+  const systemSections: string[] = [];
+  let stylePresent = false;
+  let skillCount = 0;
+  if (injected.length > 0) systemSections.push("rag");
+  if (summary) {
+    extra.push(summary);
+    systemSections.push("compression_summary");
+  }
   if (input.styleId) {
     const styleRows = await db
       .select({ name: stylesTable.name, guide: stylesTable.guide })
       .from(stylesTable)
       .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
     for (const row of styleRows) {
+      stylePresent = true;
+      systemSections.push("style");
       extra.push(
         `[风格] ${row.name}：叙事视角——${row.guide.narrative}；句式节奏——${row.guide.sentence}；意象偏好——${row.guide.imagery}；情绪节奏——${row.guide.rhythm}`,
       );
@@ -172,19 +182,39 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
           eq(skillsTable.userId, input.userId),
           inArray(skillsTable.name, input.skills),
         ),
-      );
+    );
     for (const row of skillRows) {
+      skillCount += 1;
+      systemSections.push("skill");
       extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
     }
   }
-  const provider = makeChatProvider(
-    input.model,
-    history ?? [],
-    buildSystemPrompt([
-      ...injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
-      ...extra,
-    ]),
-  );
+  const providerMessages = history ?? [];
+  const system = buildSystemPrompt([
+    ...injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
+    ...extra,
+  ]);
+  const provider = makeChatProvider({
+    model: input.model,
+    messages: providerMessages,
+    system,
+    observation: {
+      route: "chat",
+      mode: "independent",
+      // 01 只观察现有实现：压缩后仍将原 history 传给 provider。
+      historyCountBefore: providerMessages.length,
+      historyCountAfter: providerMessages.length,
+      compressionApplied: compressed,
+      ragEntryCount: injected.length,
+      stylePresent,
+      skillCount,
+      novelScopePresent: input.novelId != null,
+      chapterScopePresent: false,
+      ownerScopeResolved: true,
+      currentUserIndices: providerMessages.length > 0 ? [providerMessages.length - 1] : [],
+      systemSections: system ? systemSections : [],
+    },
+  });
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },

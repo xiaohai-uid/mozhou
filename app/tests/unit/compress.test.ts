@@ -6,7 +6,7 @@ import {
   shouldCompress,
   KEEP_RECENT,
 } from "@/lib/chat/compress";
-import type { ChatMessage } from "@/lib/chat/stream-provider";
+import type { ChatMessage } from "@/lib/chat/payload";
 
 function msg(content: string): ChatMessage {
   return { role: "user", content };

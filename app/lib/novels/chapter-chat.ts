@@ -125,11 +125,17 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
 
   // 注入链组装（按序）：正文参考 → 所选片段(J9) → RAG → 风格 → 技能
   const extra: string[] = [];
+  let stylePresent = false;
+  let skillCount = 0;
+  let hasBodyReference = false;
+  let hasValidatedSelection = false;
   const bodyRef = chapter.content.slice(-BODY_REF_LIMIT);
   if (bodyRef.trim()) {
+    hasBodyReference = true;
     extra.push(`[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`);
   }
   if (input.selection) {
+    hasValidatedSelection = true;
     extra.push(
       `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`,
     );
@@ -146,6 +152,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       .from(stylesTable)
       .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
     if (styleRow) {
+      stylePresent = true;
       extra.push(
         `[风格] ${styleRow.name}：叙事视角——${styleRow.guide.narrative}；句式节奏——${styleRow.guide.sentence}；意象偏好——${styleRow.guide.imagery}；情绪节奏——${styleRow.guide.rhythm}`,
       );
@@ -162,15 +169,49 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
           eq(skillsTable.userId, input.userId),
           inArray(skillsTable.name, userSkillNames),
         ),
-      );
-    for (const row of skillRows) extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
+    );
+    for (const row of skillRows) {
+      skillCount += 1;
+      extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
+    }
   }
   for (const name of skills) {
-    if (SCENE_SKILLS[name]) extra.push(`[技能] ${name}：${SCENE_SKILLS[name]}`);
+    if (SCENE_SKILLS[name]) {
+      skillCount += 1;
+      extra.push(`[技能] ${name}：${SCENE_SKILLS[name]}`);
+    }
   }
 
   const snapshot = chapter.content; // 生成时正文快照（插入冲突检测基准，工单 18 消费）
-  const provider = makeChatProvider(input.model, [], buildSystemPrompt([...ragLines, ...extra]));
+  const system = buildSystemPrompt([...ragLines, ...extra]);
+  const systemSections = [
+    ...(ragLines.length > 0 ? ["rag"] : []),
+    ...(hasBodyReference ? ["chapter_reference"] : []),
+    ...(hasValidatedSelection ? ["validated_selection"] : []),
+    ...(stylePresent ? ["style"] : []),
+    ...(skillCount > 0 ? ["skill"] : []),
+  ];
+  const provider = makeChatProvider({
+    model: input.model,
+    messages: [],
+    system,
+    observation: {
+      route: "chapter-chat",
+      mode: "chapter",
+      // 保留当前章节对话的既有行为：它目前不把持久化 chapter messages 送入 provider。
+      historyCountBefore: 0,
+      historyCountAfter: 0,
+      compressionApplied: false,
+      ragEntryCount: injectedRag.length,
+      stylePresent,
+      skillCount,
+      novelScopePresent: true,
+      chapterScopePresent: true,
+      ownerScopeResolved: true,
+      currentUserIndices: [],
+      systemSections: system ? systemSections : [],
+    },
+  });
   let reply = "";
   let stopped = false;
 
