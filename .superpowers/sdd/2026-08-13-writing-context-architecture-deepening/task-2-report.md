@@ -138,3 +138,37 @@ Result: all exit 0; Next.js 16.3.0 production build completed and generated 42 s
 
 - Vitest retains existing Vite configuration deprecation warnings; no test infrastructure was changed.
 - The worktree still contains unrelated dirty Slice 3/candidate-lifecycle and product work. The follow-up commit stages only this selected-model fix, its regression tests, and this report addendum.
+
+## Re-review whitespace fix
+
+Date: 2026-08-13
+
+The re-review correctly found that the selected-model fix commit (`ec1669d`) introduced a CR character before the newline on:
+
+```ts
+const result = await compressHistory(history, transport, input.model);
+```
+
+The prior addendum incorrectly recorded a generic `git diff --check` pass. That command did not validate the requested `6dd2e0e..ec1669d` commit range; the actual scoped command produced:
+
+```text
+app/lib/novels/chapter-chat.ts:154: trailing whitespace.
++      const result = await compressHistory(history, transport, input.model);
+```
+
+This follow-up removes only that trailing CR from the Slice 2 line. The final staged range was verified with:
+
+```powershell
+git diff --cached --check 6dd2e0e
+```
+
+Result: exit 0, no whitespace errors.
+
+Relevant verification was re-run:
+
+```powershell
+npm test -- tests/unit/compress-adapter.test.ts tests/unit/compress.test.ts tests/unit/payload-consumer.test.ts --maxWorkers=1 --fileParallelism=false
+npx tsc --noEmit
+```
+
+Result: 3 files, 22 tests passed; TypeScript check exit 0.
