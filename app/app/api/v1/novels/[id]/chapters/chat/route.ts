@@ -4,9 +4,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/chat/models";
-import { getChapter } from "@/lib/novels/service";
+import { resolveOwnedChapter } from "@/lib/novels/ownership";
 import {
   ChapterChatError,
+  GenerationKeyConflictError,
   ChapterNotFoundError,
   runChapterChat,
 } from "@/lib/novels/chapter-chat";
@@ -31,6 +32,7 @@ export async function POST(
     model?: unknown;
     styleId?: unknown;
     skills?: unknown;
+    generationKey?: unknown;
     selection?: unknown;
   };
   try {
@@ -58,6 +60,15 @@ export async function POST(
     body.skills.every((s) => typeof s === "string" && s.trim())
       ? (body.skills as string[]).map((s) => s.trim())
       : [];
+  const generationKey =
+    body.generationKey === undefined
+      ? undefined
+      : typeof body.generationKey === "string" && body.generationKey.trim().length <= 120
+        ? body.generationKey.trim()
+        : null;
+  if (generationKey === null) {
+    return NextResponse.json({ error: "生成请求键无效" }, { status: 400 });
+  }
 
   // J9：选区绑定（改写/润色等）。校验：整数、0<=start<=end、text 与正文区间一致（防伪造注入）
   const sel = body.selection as
@@ -65,7 +76,7 @@ export async function POST(
     | undefined;
   let selection: { start: number; end: number; text: string } | undefined;
   if (sel !== undefined) {
-    const chapter = await getChapter(user.id, Number(id), chapterId);
+    const chapter = await resolveOwnedChapter({ userId: user.id, novelId: Number(id), chapterId });
     if (!chapter) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
     const s = sel.start;
     const e = sel.end;
@@ -89,7 +100,7 @@ export async function POST(
 
   // 归属预校验（不进 SSE）：章节不存在/他人章节 → 404
   const novelId = Number(id);
-  if (!(await getChapter(user.id, novelId, chapterId))) {
+  if (!(await resolveOwnedChapter({ userId: user.id, novelId, chapterId }))) {
     return NextResponse.json({ error: "章节不存在" }, { status: 404 });
   }
 
@@ -108,14 +119,19 @@ export async function POST(
           model,
           styleId,
           skills,
+          generationKey,
           selection,
           signal: request.signal,
           onDelta: (text) => send({ type: "delta", text }),
         });
-        if (result.stopped) {
+        if (result.status === "generating") {
+          send({ type: "error", code: "GenerationInProgress", message: "这条生成仍在进行，请稍后刷新" });
+        } else if (result.stopped) {
           send({ type: "error", code: "AiCancelled", message: "已停止生成" });
-        } else if (result.reply) {
-          send({ type: "done", messageId: result.messageId });
+        } else if (result.reply && ["completed_candidate", "applied"].includes(result.status)) {
+          send({ type: "done", messageId: result.messageId, status: result.status });
+        } else if (result.status === "error") {
+          send({ type: "error", code: "AiGenerationFailed", message: "生成失败，请重试" });
         } else {
           send({ type: "error", code: "AiInvalidResponse", message: "模型返回为空，请重试" });
         }
@@ -125,8 +141,10 @@ export async function POST(
           code:
             err instanceof ChapterNotFoundError
               ? "ChapterNotFound"
-              : err instanceof ChapterChatError
-                ? "AiGenerationFailed"
+              : err instanceof GenerationKeyConflictError
+                ? "GenerationKeyConflict"
+                : err instanceof ChapterChatError
+                  ? "AiGenerationFailed"
                 : "AiGenerationFailed",
           message: (err as Error).message ?? "生成失败",
         });

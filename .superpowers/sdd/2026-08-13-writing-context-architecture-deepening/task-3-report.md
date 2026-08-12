@@ -1,0 +1,72 @@
+# Task 3 Report — Slice 3: chapter replay policy, candidate lifecycle, ownership
+
+Date: 2026-08-13
+
+## Scope delivered
+
+- Added `app/lib/novels/chapter-replay.ts`: replayable persistence rows are converted to provider history only when they are `user/done`, `assistant/completed_candidate`, or `assistant/applied`. The current user and active candidate are excluded; `writing-context` remains responsible for appending the final current user message.
+- Added `app/lib/novels/chapter-candidate.ts`: candidate preparation/reuse, stale `generating` recovery, provider settlement, owner/status/revision/content application guards, race-safe idempotent apply, and discard transitions are centralized here.
+- Added `app/lib/novels/ownership.ts`: a single owner resolver is used for route precheck and the domain transaction. The route retains synchronous HTTP 404 before it creates the SSE stream/provider; the transaction is authoritative.
+- Refactored `app/lib/novels/chapter-chat.ts` to orchestrate context, transport, and events while delegating replay/candidate mutation decisions to the focused modules.
+- Updated the chapter chat route to use the ownership resolver; added focused replay/lifecycle tests and strengthened the HTTP test to prove a non-owner request produces no provider observation.
+
+No schema, transport, compression, SSE framing, or public event contract was intentionally changed by this slice. Existing `generationKey`, `requestHash`, `baseRevision`, status, and revision facts remain the persistence source of truth.
+
+## State matrix
+
+| Persisted row | Replayed to provider | Candidate application |
+| --- | --- | --- |
+| `user + done` | yes | n/a |
+| `assistant + completed_candidate` | yes | allowed only for owner, non-empty content, matching revision/content guard |
+| `assistant + applied` | yes | idempotent; no duplicate body mutation |
+| `assistant + generating` | no | rejected |
+| `assistant + stopped` | no | allowed only with owner and matching revision/content guard |
+| `assistant + error` | no | rejected |
+| `assistant + discarded` | no | rejected |
+| current user / current assistant candidate | no | n/a |
+
+## Test-first evidence
+
+The new unit test files were created before the modules existed. The first run failed as expected with module-resolution errors for `@/lib/novels/chapter-replay` and `@/lib/novels/chapter-candidate`; that established the red state. After implementation, the focused tests passed.
+
+## Verification evidence
+
+Executed from `C:\zcode\novel-ai\app`:
+
+```text
+npx vitest run tests/unit/chapter-replay.test.ts tests/unit/chapter-candidate-lifecycle.test.ts
+RED: failed as expected before implementation: both required modules were absent.
+
+npx vitest run tests/unit/chapter-replay.test.ts tests/unit/chapter-candidate-lifecycle.test.ts tests/http/chapter-continuation.test.ts
+PASS: 3 test files, 45 tests.
+
+npx tsc --noEmit
+PASS: exit 0.
+
+npm run build
+PASS: Next.js 16.3.0 production build; compiled, TypeScript, and 42 static pages completed.
+
+npx drizzle-kit check
+PASS: Everything's fine.
+
+node scripts/smoke-real-llm.mjs
+PASS: real one-api chapter generation, SSE 52 deltas/done, assistant persistence and refresh, then apply and chapter-body verification. Candidate messageId=10050; reply=340 chars; resulting body=370 chars.
+```
+
+The focused HTTP suite covers idempotent generation-key reuse, exactly-once candidate persistence, complete/stopped/error state handling, owner/status/revision/expected-content guards, duplicate application, concurrent application, and the non-owner `provider_call_count=0` equivalent (no new provider observation).
+
+## DB evidence
+
+- `drizzle-kit check` confirmed the available database/migration configuration.
+- The real smoke persisted the generated assistant candidate, re-read it through the chapter message API, applied it, and re-read the chapter with the generated text at its tail.
+- The real smoke did not alter schema.
+
+## Real smoke coverage and limits
+
+- Passed: real generation, streaming completion, candidate persistence/refresh, and application/body verification.
+- Not available as a dedicated real smoke scenario: stop, same-key retry, duplicate application, and revision conflict. `scripts/smoke-real-llm.mjs` only exercises the golden generation/apply path; the local HTTP suite covers those scenarios against the deterministic provider. No claim is made that those four variants were exercised against a real provider in this slice.
+
+## Concerns
+
+- The checkout began dirty with pre-existing candidate-lifecycle/schema/migration work in the same files. This slice preserves it; its commit stages only the focused module/extraction/test/report work and does not include unrelated existing changes.
+- Vitest reports existing Vite configuration deprecation warnings (`configLoader: native` and `vite-tsconfig-paths`); they do not fail the required checks.

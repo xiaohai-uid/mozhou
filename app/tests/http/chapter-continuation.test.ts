@@ -31,6 +31,10 @@ function readPayloadObservations(): Array<{
   }
 }
 
+function providerCallCount(): number {
+  return readPayloadObservations().filter((entry) => entry.route === "chapter-chat").length;
+}
+
 let cookie = "";
 let otherCookie = "";
 let novelId = 0;
@@ -55,7 +59,7 @@ beforeAll(async () => {
   const novel = await fetch(`${BASE}/api/v1/novels`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify({ name: "正文读写测试" }),
+    body: JSON.stringify({ name: "正文读写测试", requestKey: `chapter-${RUN}` }),
   });
   const { novel: n } = (await novel.json()) as { novel: { id: number } };
   novelId = n.id;
@@ -227,7 +231,7 @@ describe("章节对话引擎（工单 17）", () => {
     expect(messages[1].role).toBe("user");
     expect(messages[0].skills).toEqual(["章节续写", "去 AI 味"]);
     expect(messages[0].snapshot).toBe("黄土坡上，老周把锄头抡起来。");
-    expect(messages[0].status).toBe("done");
+    expect(messages[0].status).toBe("completed_candidate");
   });
 
   it("注入链：mock 回显可见 [正文参考] 与 [技能] 与 [风格]", async () => {
@@ -375,7 +379,11 @@ describe("章节对话引擎（工单 17）", () => {
     expect(after.status).toBe(200);
   });
 
-  it("越权/校验：他人章节 404 / 空消息 400 / 缺 chapterId 400 / 未登录 401", async () => {
+  it("越权在 provider 调用和候选写入前同步返回 404", async () => {
+    // 前一条 abort 测试的服务端流可能仍在完成落库；先等观察流稳定，
+    // 再断言本次非 owner 请求没有进入 provider seam。
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const before = providerCallCount();
     const cross = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
       {
@@ -385,6 +393,11 @@ describe("章节对话引擎（工单 17）", () => {
       },
     );
     expect(cross.status).toBe(404);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(providerCallCount()).toBe(before);
+  });
+
+  it("校验：空消息 400 / 缺 chapterId 400 / 未登录 401", async () => {
 
     const empty = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
@@ -416,8 +429,8 @@ describe("章节对话引擎（工单 17）", () => {
 });
 
 describe("插入与冲突保护（工单 18）", () => {
-  /** 走一轮对话拿到 assistant messageId */
-  async function chatAndGetReplyId(content: string, skills: string[] = ["章节续写"]): Promise<number> {
+  /** 走一轮对话拿到服务端候选身份；候选正文必须从服务端读取，不能由客户端伪造。 */
+  async function chatAndGetReply(content: string, skills: string[] = ["章节续写"]): Promise<{ id: number; content: string }> {
     const res = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
       {
@@ -431,8 +444,33 @@ describe("插入与冲突保护（工单 18）", () => {
       .split("\n\n")
       .filter((e) => e.startsWith("data:"))
       .map((e) => JSON.parse(e.slice(5).trim()))
-      .find((e) => e.type === "done") as { messageId?: number };
-    return done.messageId!;
+      .find((e) => e.type === "done") as { messageId?: number } | undefined;
+    if (!done?.messageId) throw new Error(`生成未完成：${text}`);
+    const messageId = done.messageId;
+    const list = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
+      { headers: { cookie } },
+    );
+    const { messages } = (await list.json()) as { messages: Array<{ id: number; role: string; content: string }> };
+    const candidate = messages.find((message) => message.id === messageId && message.role === "assistant");
+    expect(candidate).toBeTruthy();
+    return { id: messageId, content: candidate!.content };
+  }
+
+  async function chatAndGetReplyId(content: string, skills: string[] = ["章节续写"]): Promise<number> {
+    return (await chatAndGetReply(content, skills)).id;
+  }
+
+  async function chatWithGenerationKey(content: string, generationKey: string) {
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content, skills: ["章节续写"], generationKey }),
+      },
+    );
+    return { response: res, text: await res.text() };
   }
 
   async function insert(
@@ -461,15 +499,14 @@ describe("插入与冲突保护（工单 18）", () => {
 
   it("插入成功：正文末尾追加 + 消息 inserted（刷新后仍在）", async () => {
     const before = await currentContent();
-    const messageId = await chatAndGetReplyId("插入测试一轮");
-    const insertedText = "（插入测试：翻不死。老周把碗搁下。）";
-    const res = await insert(messageId, insertedText);
+    const candidate = await chatAndGetReply("插入测试一轮");
+    const res = await insert(candidate.id, candidate.content);
     expect(res.status).toBe(200);
     const data = (await res.json()) as {
       chapter: { content: string };
       message: { inserted: boolean };
     };
-    expect(data.chapter.content).toBe(before + "\n\n" + insertedText);
+    expect(data.chapter.content).toBe(before + "\n\n" + candidate.content.trim());
     expect(data.message.inserted).toBe(true);
 
     // 刷新（重新 GET 消息）→ inserted 持久
@@ -478,22 +515,81 @@ describe("插入与冲突保护（工单 18）", () => {
       { headers: { cookie } },
     );
     const { messages } = (await list.json()) as { messages: Array<{ id: number; inserted: boolean }> };
-    const target = messages.find((m) => m.id === messageId);
+    const target = messages.find((m) => m.id === candidate.id);
     expect(target?.inserted).toBe(true);
   });
 
-  it("重复插入同一条 → 400", async () => {
-    const messageId = await chatAndGetReplyId("重复插入测试");
-    await insert(messageId, "第一次插入");
-    const again = await insert(messageId, "第二次插入");
-    expect(again.status).toBe(400);
-    const { error } = (await again.json()) as { error: string };
-    expect(error).toContain("已插入");
+  it("刷新后确认：省略客户端候选正文时使用服务端持久化候选", async () => {
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "服务端候选基线" }),
+    });
+    const candidate = await chatAndGetReply("刷新后确认");
+    const response = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages/${candidate.id}/insert?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({}),
+      },
+    );
+    expect(response.status).toBe(200);
+    const data = (await response.json()) as { chapter: { content: string } };
+    expect(data.chapter.content).toBe(`服务端候选基线\n\n${candidate.content.trim()}`);
   });
 
-  it("J9 收紧：生成期间整章变化不再必然 409（点击时正文已保存则照常插入）", async () => {
-    const messageId = await chatAndGetReplyId("J9 收紧测试");
-    // 生成后修改正文（J7 旧语义：快照不一致 → 409；J9 新语义：插入以点击时已保存正文为准，expectedContent 比对）
+  it("重复确认同一候选 → 幂等返回，不重复修改正文", async () => {
+    const candidate = await chatAndGetReply("重复插入测试");
+    const first = await insert(candidate.id, candidate.content);
+    expect(first.status).toBe(200);
+    const beforeRetry = await currentContent();
+    const again = await insert(candidate.id, "客户端篡改候选");
+    expect(again.status).toBe(200);
+    const retryBody = (await again.json()) as { alreadyApplied?: boolean; chapter: { content: string } };
+    expect(retryBody.alreadyApplied).toBe(true);
+    expect(retryBody.chapter.content).toBe(beforeRetry);
+  });
+
+  it("忽略候选持久化且不修改正文", async () => {
+    const before = await currentContent();
+    const messageId = await chatAndGetReplyId("忽略候选测试");
+    const discarded = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages/${messageId}/discard?chapterId=${chapterId}`,
+      { method: "POST", headers: { cookie, "Content-Type": "application/json" } },
+    );
+    expect(discarded.status).toBe(200);
+    expect((await discarded.json()) as { status: string }).toMatchObject({ status: "discarded" });
+    expect(await currentContent()).toBe(before);
+
+    const list = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`,
+      { headers: { cookie } },
+    );
+    const { messages } = (await list.json()) as { messages: Array<{ id: number; status: string }> };
+    expect(messages.find((m) => m.id === messageId)?.status).toBe("discarded");
+  });
+
+  it("同一 generation key 复用候选；请求内容变化时拒绝复用", async () => {
+    const key = `generation-key-${Date.now()}`;
+    const first = await chatWithGenerationKey("稳定请求身份", key);
+    expect(first.response.status).toBe(200);
+    const firstDone = first.text
+      .split("\n\n")
+      .filter((event) => event.startsWith("data:"))
+      .map((event) => JSON.parse(event.slice(5).trim()))
+      .find((event) => event.type === "done") as { messageId: number } | undefined;
+    expect(firstDone?.messageId).toBeTruthy();
+    const firstMessageId = firstDone!.messageId;
+    const second = await chatWithGenerationKey("稳定请求身份", key);
+    expect(second.text).toContain(`"messageId":${firstMessageId}`);
+    const conflict = await chatWithGenerationKey("篡改同一请求身份", key);
+    expect(conflict.text).toContain("GenerationKeyConflict");
+  });
+
+  it("生成期间正文发生变化 → 候选基线冲突；用户确认后 force 应用", async () => {
+    const candidate = await chatAndGetReply("候选基线冲突测试");
+    // 生成后修改正文：候选 baseRevision 过期，默认确认必须拒绝，不能静默覆盖。
     const patched = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`,
       {
@@ -503,14 +599,38 @@ describe("插入与冲突保护（工单 18）", () => {
       },
     );
     expect(patched.status).toBe(200);
-    // 客户端已把修改落盘 → expectedContent 与当前一致 → 插入成功，用户内容不丢
-    const res = await insert(messageId, "这条基于点击时的正文", false, {
+    const res = await insert(candidate.id, candidate.content, false, {
       expectedContent: "（用户在生成后手动修改的正文）",
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+
+    const forced = await insert(candidate.id, candidate.content, true, {
+      expectedContent: "（用户在生成后手动修改的正文）",
+    });
+    expect(forced.status).toBe(409);
     const content = await currentContent();
     expect(content).toContain("（用户在生成后手动修改的正文）");
-    expect(content).toContain("这条基于点击时的正文");
+    expect(content).not.toContain("这条基于点击时的正文");
+  });
+
+  it("并发确认同一候选 → 只有一次正文变更，其余请求安全幂等", async () => {
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "并发确认基线" }),
+    });
+    const candidate = await chatAndGetReply("并发确认候选");
+    const responses = await Promise.all([
+      insert(candidate.id, candidate.content),
+      insert(candidate.id, candidate.content),
+    ]);
+    expect(responses.every((res) => res.status === 200)).toBe(true);
+    const bodies = await Promise.all(
+      responses.map((res) => res.json() as Promise<{ alreadyApplied?: boolean; chapter: { content: string } }>),
+    );
+    expect(bodies.filter((body) => body.alreadyApplied).length).toBe(1);
+    expect(bodies.map((body) => body.chapter.content).every((value) => value === `并发确认基线\n\n${candidate.content.trim()}`)).toBe(true);
+    expect((await currentContent())).toBe(`并发确认基线\n\n${candidate.content.trim()}`);
   });
 
   it("J9 第一层冲突：expectedContent 与当前正文不一致 → 409 ContentChanged；force 跳过", async () => {
@@ -520,8 +640,8 @@ describe("插入与冲突保护（工单 18）", () => {
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "V2-服务端已被其他请求修改" }),
     });
-    const messageId = await chatAndGetReplyId("第一层冲突测试");
-    const res = await insert(messageId, "客户端旧版插入", false, {
+    const candidate = await chatAndGetReply("第一层冲突测试");
+    const res = await insert(candidate.id, candidate.content, false, {
       expectedContent: "V1-客户端点击时看到的正文",
     });
     expect(res.status).toBe(409);
@@ -529,13 +649,13 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(data.code).toBe("ContentChanged");
 
     // 用户确认 → force → 跳过内容冲突，但校验不绕过
-    const forced = await insert(messageId, "客户端旧版插入", true, {
+    const forced = await insert(candidate.id, candidate.content, true, {
       expectedContent: "V1-客户端点击时看到的正文",
     });
     expect(forced.status).toBe(200);
     const content = await currentContent();
     expect(content).toContain("V2-服务端已被其他请求修改");
-    expect(content).toContain("客户端旧版插入");
+    expect(content).toContain(candidate.content.trim());
   });
 
   it("J9 精确插入：position 中间/开头/末尾 splice（无自动分隔符）", async () => {
@@ -544,20 +664,20 @@ describe("插入与冲突保护（工单 18）", () => {
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "ABCDEF" }),
     });
-    const mid = await chatAndGetReplyId("中间插入");
-    const midRes = await insert(mid, "XY", false, { mode: "insert", position: 3 }); // 显式 mode:"insert" 必须被接受
+    const mid = await chatAndGetReply("中间插入");
+    const midRes = await insert(mid.id, mid.content, false, { mode: "insert", position: 3 }); // 显式 mode:"insert" 必须被接受
     expect(midRes.status).toBe(200);
-    expect(((await midRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ABCXYDEF");
+    expect(((await midRes.json()) as { chapter: { content: string } }).chapter.content).toBe(`ABC${mid.content.trim()}DEF`);
 
-    const start = await chatAndGetReplyId("开头插入");
-    const startRes = await insert(start, "Z", false, { position: 0 });
+    const start = await chatAndGetReply("开头插入");
+    const startRes = await insert(start.id, start.content, false, { position: 0 });
     expect(startRes.status).toBe(200);
-    expect(((await startRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ZABCXYDEF");
+    expect(((await startRes.json()) as { chapter: { content: string } }).chapter.content).toBe(`${start.content.trim()}ABC${mid.content.trim()}DEF`);
 
-    const end = await chatAndGetReplyId("末尾插入");
-    const endRes = await insert(end, "W", false, { position: 9 });
+    const end = await chatAndGetReply("末尾插入");
+    const endRes = await insert(end.id, end.content, false, { position: `${start.content.trim()}ABC${mid.content.trim()}DEF`.length });
     expect(endRes.status).toBe(200);
-    expect(((await endRes.json()) as { chapter: { content: string } }).chapter.content).toBe("ZABCXYDEFW");
+    expect(((await endRes.json()) as { chapter: { content: string } }).chapter.content).toBe(`${start.content.trim()}ABC${mid.content.trim()}DEF${end.content.trim()}`);
   });
 
   it("J9 精确替换：mode=replace 只替换目标区间，前后文不变", async () => {
@@ -566,10 +686,10 @@ describe("插入与冲突保护（工单 18）", () => {
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "ABCDEF" }),
     });
-    const messageId = await chatAndGetReplyId("替换测试");
-    const res = await insert(messageId, "XY", false, { mode: "replace", range: { start: 1, end: 3 } });
+    const candidate = await chatAndGetReply("替换测试");
+    const res = await insert(candidate.id, candidate.content, false, { mode: "replace", range: { start: 1, end: 3 } });
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe("AXYDEF");
+    expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe(`A${candidate.content.trim()}DEF`);
   });
 
   it("J9 非法 target：负数/越界/NaN/字符串/非整数 position 与 range → 400 且正文不变", async () => {
@@ -578,7 +698,7 @@ describe("插入与冲突保护（工单 18）", () => {
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "ABCDEF" }),
     });
-    const messageId = await chatAndGetReplyId("非法 target 测试");
+    const candidate = await chatAndGetReply("非法 target 测试");
     const bad: Array<Record<string, unknown>> = [
       { position: -1 },
       { position: 7 }, // 越界
@@ -591,11 +711,11 @@ describe("插入与冲突保护（工单 18）", () => {
       { mode: "weird" }, // 非法 mode
     ];
     for (const extra of bad) {
-      const res = await insert(messageId, "X", false, extra);
+      const res = await insert(candidate.id, candidate.content, false, extra);
       expect(res.status).toBe(400);
     }
     // force 不绕过 target 校验（用户确认的只是内容冲突，不是非法位置）
-    const forcedBad = await insert(messageId, "X", true, { position: -5 });
+    const forcedBad = await insert(candidate.id, candidate.content, true, { position: -5 });
     expect(forcedBad.status).toBe(400);
     expect(await currentContent()).toBe("ABCDEF");
   });
@@ -607,11 +727,11 @@ describe("插入与冲突保护（工单 18）", () => {
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "中文😀ABC" }),
     });
-    const messageId = await chatAndGetReplyId("emoji 测试");
+    const candidate = await chatAndGetReply("emoji 测试");
     // position=2（"中文"后、emoji 代理对前）→ "中文" + "X" + "😀ABC"
-    const res = await insert(messageId, "X", false, { position: 2 });
+    const res = await insert(candidate.id, candidate.content, false, { position: 2 });
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe("中文X😀ABC");
+    expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe(`中文${candidate.content.trim()}😀ABC`);
   });
 
   it("非法入参：空 content 400 / 非 assistant 消息 400 / 消息不存在 400", async () => {
