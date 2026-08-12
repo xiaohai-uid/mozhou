@@ -148,6 +148,7 @@ describe("POST /api/v1/chat（SSE 流式，mock provider）", () => {
   });
 
   it("真实 HTTP consumer 能观察脱敏 payload 结构，而不是只观察 mock 输出", async () => {
+    const observationsBefore = readPayloadObservations().length;
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
@@ -156,7 +157,7 @@ describe("POST /api/v1/chat（SSE 流式，mock provider）", () => {
     expect(res.status).toBe(200);
     await res.text();
 
-    const observation = readPayloadObservations().find(
+    const observation = readPayloadObservations().slice(observationsBefore).find(
       (entry) => entry.route === "chat" && entry.current_user_present && entry.message_count === 1,
     );
     expect(observation).toMatchObject({

@@ -23,6 +23,10 @@ export default defineConfig({
           name: "http",
           environment: "node",
           include: ["tests/http/**/*.test.ts"],
+          // HTTP tests share one real Next server and its observer sink;
+          // serialize files so observations cannot cross test boundaries.
+          fileParallelism: false,
+          maxWorkers: 1,
           globalSetup: ["tests/http/global-setup.ts"],
           setupFiles: ["tests/http/setup-env.ts"], // A3：从 .test-port 握手注入 TEST_BASE_URL（动态端口）
           testTimeout: 30000,
@@ -32,4 +36,3 @@ export default defineConfig({
     ],
   },
 });
-
