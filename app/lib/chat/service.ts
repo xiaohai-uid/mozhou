@@ -4,7 +4,10 @@ import { db } from "@/lib/db";
 import { messages, sessions, skills as skillsTable, styles as stylesTable } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
-import { makeChatProvider, buildSystemPrompt } from "./stream-provider";
+import {
+  buildIndependentSystemPrompt,
+  makeChatProvider,
+} from "./stream-provider";
 import type { ChatMessage } from "./payload";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
 import { compressHistory, shouldCompress } from "./compress";
@@ -82,6 +85,30 @@ export async function listMessages(
   }));
 }
 
+type StoredChatMessage = ChatMessage & { id: number };
+
+/** 独立对话内部使用带 identity 的消息列表，把本轮消息与历史分开。 */
+async function listMessagesWithIds(
+  sessionId: number,
+  userId: number,
+): Promise<StoredChatMessage[] | null> {
+  const [owner] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
+  if (!owner) return null;
+  const rows = await db
+    .select({ id: messages.id, role: messages.role, content: messages.content })
+    .from(messages)
+    .where(eq(messages.sessionId, sessionId))
+    .orderBy(messages.createdAt);
+  return rows.map((m) => ({
+    id: m.id,
+    role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+    content: m.content,
+  }));
+}
+
 /** 归属校验（写路径防 IDOR）：会话不存在或不属于该用户时抛错 */
 async function assertOwned(sessionId: number, userId: number): Promise<void> {
   const [owner] = await db
@@ -137,14 +164,30 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     await db.update(sessions).set({ title }).where(eq(sessions.id, input.sessionId));
   }
 
-  const history = await listMessages(input.sessionId, input.userId);
-  // 上下文压缩（12 工单）：历史超阈值 → 早期消息摘要化，摘要注入 system
+  const storedMessages = await listMessagesWithIds(input.sessionId, input.userId);
+  if (!storedMessages) throw new SessionNotFoundError();
+  const currentMessage = storedMessages.find((message) => message.id === userMsg.id);
+  if (!currentMessage) throw new Error("当前消息读取失败");
+  const history = storedMessages
+    .filter((message) => message.id !== currentMessage.id)
+    .map(({ role, content }) => ({ role, content }));
+
+  // 上下文压缩（12 工单）：只压缩历史，本轮 user 永远独立追加到末尾。
   let compressed = false;
   let summary = "";
-  if (history && shouldCompress(history)) {
-    const r = await compressHistory(history);
-    summary = r.summary;
-    compressed = summary.length > 0;
+  let providerHistory = history;
+  if (shouldCompress(history)) {
+    try {
+      const r = await compressHistory(history);
+      const candidateSummary = typeof r.summary === "string" ? r.summary.trim() : "";
+      if (candidateSummary && Array.isArray(r.kept)) {
+        summary = candidateSummary;
+        providerHistory = r.kept;
+        compressed = true;
+      }
+    } catch {
+      // 摘要器异常时 fail-open：不发送摘要，保留完整历史继续请求。
+    }
   }
   // RAG 注入（06 工单）：按当前输入 + 绑定作品检索相关设定条目，注入 system 提示
   const injected = await retrieveContext(input.userId, input.content, {
@@ -152,14 +195,10 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   });
   // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验）
   const extra: string[] = [];
-  const systemSections: string[] = [];
+  const systemSections: string[] = ["base_identity", "mode_contract"];
   let stylePresent = false;
   let skillCount = 0;
-  if (injected.length > 0) systemSections.push("rag");
-  if (summary) {
-    extra.push(summary);
-    systemSections.push("compression_summary");
-  }
+  if (injected.length > 0) systemSections.push("novel_context");
   if (input.styleId) {
     const styleRows = await db
       .select({ name: stylesTable.name, guide: stylesTable.guide })
@@ -189,8 +228,15 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
     }
   }
-  const providerMessages = history ?? [];
-  const system = buildSystemPrompt([
+  if (summary) {
+    extra.push(summary);
+    systemSections.push("compression_summary");
+  }
+  const providerMessages: ChatMessage[] = [
+    ...providerHistory,
+    { role: "user", content: currentMessage.content },
+  ];
+  const system = buildIndependentSystemPrompt([
     ...injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
     ...extra,
   ]);
@@ -201,8 +247,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     observation: {
       route: "chat",
       mode: "independent",
-      // 01 只观察现有实现：压缩后仍将原 history 传给 provider。
-      historyCountBefore: providerMessages.length,
+      historyCountBefore: history.length,
       historyCountAfter: providerMessages.length,
       compressionApplied: compressed,
       ragEntryCount: injected.length,
@@ -212,7 +257,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       chapterScopePresent: false,
       ownerScopeResolved: true,
       currentUserIndices: providerMessages.length > 0 ? [providerMessages.length - 1] : [],
-      systemSections: system ? systemSections : [],
+      systemSections,
     },
   });
   const state = await runNodeStream(

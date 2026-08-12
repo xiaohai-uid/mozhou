@@ -15,6 +15,7 @@ const OBSERVER_FILE = "tests/http/.payload-observer.jsonl";
 function readPayloadObservations(): Array<{
   route: string;
   system_present: boolean;
+  system_sections: string[];
   message_count: number;
   message_roles: string[];
   current_user_present: boolean;
@@ -160,6 +161,8 @@ describe("POST /api/v1/chat（SSE 流式，mock provider）", () => {
     );
     expect(observation).toMatchObject({
       route: "chat",
+      system_present: true,
+      system_sections: ["base_identity", "mode_contract"],
       message_count: 1,
       message_roles: ["user"],
       current_user_present: true,
@@ -335,8 +338,12 @@ describe("上下文自动压缩（12 工单）", () => {
     );
     expect(compressedObservation).toMatchObject({
       compression_applied: true,
-      history_count_after: compressedObservation?.history_count_before,
     });
+    expect(compressedObservation?.history_count_after).toBeLessThan(
+      compressedObservation?.history_count_before ?? Number.MAX_SAFE_INTEGER,
+    );
+    expect(compressedObservation?.current_user_present).toBe(true);
+    expect(compressedObservation?.current_user_occurrences).toBe(1);
   });
 
   it("短历史 → compressed=false 或缺失", async () => {

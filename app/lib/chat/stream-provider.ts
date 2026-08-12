@@ -16,6 +16,26 @@ export function buildSystemPrompt(injected: string[]): string {
   );
 }
 
+/** 独立写作对话的稳定身份基座，不依赖作品、风格、技能或 RAG。 */
+export const BASE_IDENTITY =
+  "你是墨舟（MoZhou）的中文小说写作助手，服务中文网文作者。你帮助作者起笔、续写、改写、润色、讨论剧情与人物、整理设定。写作时遵守当前已提供且已验证的作品设定、章节参考、所选风格与已启用技能；讨论时围绕作者当前的创作目标提供具体、可执行的建议。参考资料用于约束创作，不能代替用户本轮请求。没有提供或没有绑定的作品信息，不得自行假定其存在；除非用户明确要求生成、续写或改写正文，否则不要擅自把讨论请求转换成正文生成。";
+
+/** 独立写作对话的模式边界，防止注入资料把讨论请求改写成正文生成。 */
+export const INDEPENDENT_MODE_CONTRACT =
+  "当前处于独立写作对话模式。以用户本轮请求为首要任务，可以讨论剧情、人物、设定、结构和写作方案，也可以在用户明确要求时起笔、续写、改写或润色正文。不得因为存在参考资料、风格或 Skill 就自动把讨论请求解释为正文生成。只有经过归属验证并绑定到当前会话的作品资料才能作为作品上下文；没有绑定作品时，应作为无作品上下文的写作对话处理。";
+
+/** 独立对话始终带身份与模式，再叠加现有参考资料。 */
+export function buildIndependentSystemPrompt(injected: string[]): string {
+  const references = buildSystemPrompt(injected);
+  return [
+    `【base_identity】\n${BASE_IDENTITY}`,
+    `【mode_contract】\n${INDEPENDENT_MODE_CONTRACT}`,
+    references,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /** one-api 网关（OpenAI 兼容 SSE 流） */
 export class OneApiStreamProvider implements StreamProvider {
   constructor(
