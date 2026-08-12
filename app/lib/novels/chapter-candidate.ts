@@ -222,7 +222,6 @@ export interface InsertTarget {
 export interface InsertResult {
   chapter: { content: string; updatedAt: string };
   messageId: number;
-  alreadyApplied?: boolean;
 }
 
 function isInt(value: unknown): value is number {
@@ -249,17 +248,15 @@ export async function applyChapterCandidate(input: {
     if (!candidate) throw new Error("消息不存在");
     if (candidate.userId !== input.userId) throw new ChapterNotFoundError();
     if (candidate.role !== "assistant") throw new Error("只能插入 AI 回复");
+    const insertText = input.suppliedContent.trim();
+    if (!insertText) throw new Error("插入内容不能为空");
     if (
       normalizeCandidateStatus({
         inserted: candidate.inserted,
         status: candidate.status as CandidateStatus,
       }) === "applied"
     ) {
-      return {
-        chapter: { content: chapter.content, updatedAt: chapter.updatedAt.toISOString() },
-        messageId: input.messageId,
-        alreadyApplied: true,
-      };
+      throw new CandidateAlreadyAppliedError();
     }
 
     const applicability = canApplyChapterCandidate({
@@ -275,11 +272,6 @@ export async function applyChapterCandidate(input: {
       if (applicability.reason === "revision") throw new ContentChangedError();
       if (applicability.reason === "content") throw new Error("候选内容为空，不能插入");
       throw new Error("该回复尚未成为可确认候选");
-    }
-
-    const insertText = candidate.content.trim();
-    if (input.suppliedContent.trim() && input.suppliedContent.trim() !== insertText) {
-      throw new Error("候选内容已变化，请刷新后重试");
     }
 
     const mode = input.target?.mode ?? "insert";
@@ -308,26 +300,7 @@ export async function applyChapterCandidate(input: {
       .set({ content: next, revision: sql`${chapters.revision} + 1`, updatedAt: sql`now()` })
       .where(and(eq(chapters.id, input.chapterId), eq(chapters.revision, chapter.revision)))
       .returning({ content: chapters.content, updatedAt: chapters.updatedAt });
-    if (!updatedChapter) {
-      const [appliedByOtherRequest] = await tx
-        .select({ status: chapterMessages.status })
-        .from(chapterMessages)
-        .where(eq(chapterMessages.id, input.messageId));
-      if (appliedByOtherRequest?.status === "applied") {
-        const [latestChapter] = await tx
-          .select({ content: chapters.content, updatedAt: chapters.updatedAt })
-          .from(chapters)
-          .where(eq(chapters.id, input.chapterId));
-        if (latestChapter) {
-          return {
-            chapter: { content: latestChapter.content, updatedAt: latestChapter.updatedAt.toISOString() },
-            messageId: input.messageId,
-            alreadyApplied: true,
-          };
-        }
-      }
-      throw new ContentChangedError();
-    }
+    if (!updatedChapter) throw new ContentChangedError();
 
     const [updatedCandidate] = await tx
       .update(chapterMessages)

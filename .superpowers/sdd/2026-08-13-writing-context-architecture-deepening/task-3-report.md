@@ -70,3 +70,47 @@ The focused HTTP suite covers idempotent generation-key reuse, exactly-once cand
 
 - The checkout began dirty with pre-existing candidate-lifecycle/schema/migration work in the same files. This slice preserves it; its commit stages only the focused module/extraction/test/report work and does not include unrelated existing changes.
 - Vitest reports existing Vite configuration deprecation warnings (`configLoader: native` and `vite-tsconfig-paths`); they do not fail the required checks.
+
+---
+
+## Fix round 1 — review corrections (2026-08-13)
+
+### Corrected contracts
+
+- Restored the frozen V1.2 insertion contract from `docs/release-report-v1.2.md`: insertion uses non-empty client-supplied text, including partial author edits. It no longer substitutes persisted candidate content when the client omits text.
+- Restored duplicate insertion to `400` through `CandidateAlreadyAppliedError`; an applied candidate no longer returns a successful `alreadyApplied` response and client-text validation is performed before that duplicate status is checked.
+- Preserved target/range/expectedContent/force validation and candidate owner/status/base-revision/race guards. Concurrent applies now have one successful mutation and one `400` or `409`, without a second body write.
+- Removed the unapproved `status` field from chapter `done` SSE events. The event is again `{ type: "done", messageId }`.
+- Added DB-backed chapter HTTP coverage for exact stopped persistence, same-key reuse row counts, concurrent same-key row counts, and stale-generation recovery. The stale test marks an existing candidate old, verifies same-key retry reports terminal failure after recovery, and verifies a new key creates exactly one fresh user/candidate pair.
+
+### Schema baseline clarification
+
+This slice does **not** add schema or migrations. `revision`, `generationKey`, `baseRevision`, `requestHash`, and `updatedAt` are pre-existing dirty working-tree baseline prerequisites supplied by earlier user changes. Slice 3 consumes those fields; it is not self-contained from a clean pre-baseline commit, and no schema/migration path is staged by either Slice 3 commit.
+
+### Fix-round verification
+
+Executed from `C:\zcode\novel-ai\app`:
+
+```text
+npx vitest run tests/http/chapter-continuation.test.ts
+PASS: 1 file, 30 tests.
+
+npx vitest run tests/unit/chapter-replay.test.ts tests/unit/chapter-candidate-lifecycle.test.ts tests/http/chapter-continuation.test.ts
+PASS: 3 files, 47 tests.
+
+npx tsc --noEmit
+PASS: exit 0.
+
+npm run build
+PASS: Next.js production build; compiled, TypeScript, and 42 static pages completed.
+
+npx drizzle-kit check
+PASS: Everything's fine.
+
+node scripts/smoke-real-llm.mjs
+PASS: real one-api generation, SSE 31 deltas/done, persistence/refresh, and client-text apply/body verification. Candidate messageId=10312; reply=195 chars; resulting body=225 chars.
+```
+
+### Real-smoke limitation
+
+`smoke-real-llm.mjs` covers only the real-provider happy path (generate, persist, refresh, apply). It does not deterministically drive stop, same-key retry, duplicate apply, stale recovery, concurrent generation, or revision conflict. Those behaviors are verified against the real local test database through the HTTP harness; they are not claimed as real-provider smoke coverage.

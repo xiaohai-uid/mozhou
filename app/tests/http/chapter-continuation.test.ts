@@ -1,9 +1,9 @@
 // 章节级续写契约测试（V1.1 Journey ⑦，工单 16）：章节正文读写（content 落库 + 归属校验）
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
-import { like } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/schema";
+import { chapterMessages, users } from "@/lib/schema";
 
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);
@@ -39,6 +39,7 @@ let cookie = "";
 let otherCookie = "";
 let novelId = 0;
 let chapterId = 0;
+let userId = 0;
 
 async function register(email: string): Promise<string> {
   const res = await fetch(`${BASE}/api/v1/auth/register`, {
@@ -55,6 +56,8 @@ beforeAll(async () => {
   await db.delete(users).where(like(users.email, "mozhou-chcont-%"));
   cookie = await register(EMAIL);
   otherCookie = await register(OTHER_EMAIL);
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, EMAIL));
+  userId = user!.id;
   // 准备作品 + 章节
   const novel = await fetch(`${BASE}/api/v1/novels`, {
     method: "POST",
@@ -201,6 +204,7 @@ describe("章节对话引擎（工单 17）", () => {
     expect(events.some((e) => e.type === "delta")).toBe(true);
     const done = events.find((e) => e.type === "done") as { messageId?: number };
     expect(done?.messageId).toBeTruthy();
+    expect(done).toEqual({ type: "done", messageId: done!.messageId });
 
     const chapterObservation = readPayloadObservations().find((entry) => entry.route === "chapter-chat");
     expect(chapterObservation).toMatchObject({
@@ -354,19 +358,36 @@ describe("章节对话引擎（工单 17）", () => {
     expect(messages[1].role).toBe("user");
   });
 
-  it("断开请求（abort）→ 服务端不崩，消息落库状态为 done 或 stopped", async () => {
+  it("断开请求（abort）→ assistant 候选精确持久化为 stopped", async () => {
+    const content = `abort-${RUN}`;
     const controller = new AbortController();
     const res = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", cookie },
-        body: JSON.stringify({ content: "会被中断的一条", skills: ["章节续写"] }),
+        body: JSON.stringify({ content, skills: ["章节续写"] }),
         signal: controller.signal,
       },
     );
     controller.abort();
     await res.body?.cancel().catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const [stopped] = await db
+      .select({ status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(
+        and(
+          eq(chapterMessages.chapterId, chapterId),
+          eq(chapterMessages.userId, userId),
+          eq(chapterMessages.role, "assistant"),
+          sql`${chapterMessages.id} = (
+            select max(id) from chapter_messages
+            where chapter_id = ${chapterId} and user_id = ${userId}
+          )`,
+        ),
+      );
+    expect(stopped?.status).toBe("stopped");
     // 服务端仍健康
     const after = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
@@ -519,36 +540,32 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(target?.inserted).toBe(true);
   });
 
-  it("刷新后确认：省略客户端候选正文时使用服务端持久化候选", async () => {
+  it("插入使用客户端提供的部分编辑，空正文保持 400", async () => {
     await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "服务端候选基线" }),
     });
     const candidate = await chatAndGetReply("刷新后确认");
-    const response = await fetch(
-      `${BASE}/api/v1/novels/${novelId}/chapters/messages/${candidate.id}/insert?chapterId=${chapterId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", cookie },
-        body: JSON.stringify({}),
-      },
-    );
+    const partial = candidate.content.trim().slice(0, 12);
+    const response = await insert(candidate.id, partial);
     expect(response.status).toBe(200);
     const data = (await response.json()) as { chapter: { content: string } };
-    expect(data.chapter.content).toBe(`服务端候选基线\n\n${candidate.content.trim()}`);
+    expect(data.chapter.content).toBe(`服务端候选基线\n\n${partial}`);
+
+    const emptyCandidate = await chatAndGetReply("空客户端正文");
+    const empty = await insert(emptyCandidate.id, "  ");
+    expect(empty.status).toBe(400);
   });
 
-  it("重复确认同一候选 → 幂等返回，不重复修改正文", async () => {
+  it("重复确认同一候选 → 400，且不会绕过客户端正文验证", async () => {
     const candidate = await chatAndGetReply("重复插入测试");
     const first = await insert(candidate.id, candidate.content);
     expect(first.status).toBe(200);
     const beforeRetry = await currentContent();
     const again = await insert(candidate.id, "客户端篡改候选");
-    expect(again.status).toBe(200);
-    const retryBody = (await again.json()) as { alreadyApplied?: boolean; chapter: { content: string } };
-    expect(retryBody.alreadyApplied).toBe(true);
-    expect(retryBody.chapter.content).toBe(beforeRetry);
+    expect(again.status).toBe(400);
+    expect(await currentContent()).toBe(beforeRetry);
   });
 
   it("忽略候选持久化且不修改正文", async () => {
@@ -570,7 +587,7 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(messages.find((m) => m.id === messageId)?.status).toBe("discarded");
   });
 
-  it("同一 generation key 复用候选；请求内容变化时拒绝复用", async () => {
+  it("generation key 重试复用同一 DB user/candidate 对；内容变化时拒绝复用", async () => {
     const key = `generation-key-${Date.now()}`;
     const first = await chatWithGenerationKey("稳定请求身份", key);
     expect(first.response.status).toBe(200);
@@ -583,8 +600,64 @@ describe("插入与冲突保护（工单 18）", () => {
     const firstMessageId = firstDone!.messageId;
     const second = await chatWithGenerationKey("稳定请求身份", key);
     expect(second.text).toContain(`"messageId":${firstMessageId}`);
+    const persisted = await db
+      .select({ role: chapterMessages.role, generationKey: chapterMessages.generationKey, content: chapterMessages.content })
+      .from(chapterMessages)
+      .where(and(eq(chapterMessages.chapterId, chapterId), eq(chapterMessages.userId, userId)));
+    expect(persisted.filter((row) => row.generationKey === key && row.role === "assistant")).toHaveLength(1);
+    expect(persisted.filter((row) => row.role === "user" && row.content === "稳定请求身份")).toHaveLength(1);
     const conflict = await chatWithGenerationKey("篡改同一请求身份", key);
     expect(conflict.text).toContain("GenerationKeyConflict");
+  });
+
+  it("并发同 generation key 只持久化一个 DB user/candidate 对", async () => {
+    const key = `concurrent-generation-${RUN}`;
+    const content = `concurrent generation ${RUN}`;
+    const [left, right] = await Promise.all([
+      chatWithGenerationKey(content, key),
+      chatWithGenerationKey(content, key),
+    ]);
+    expect([left.text, right.text].filter((text) => text.includes('"type":"done"'))).toHaveLength(1);
+    expect([left.text, right.text].filter((text) => text.includes("GenerationInProgress"))).toHaveLength(1);
+    const persisted = await db
+      .select({ role: chapterMessages.role, generationKey: chapterMessages.generationKey, content: chapterMessages.content })
+      .from(chapterMessages)
+      .where(and(eq(chapterMessages.chapterId, chapterId), eq(chapterMessages.userId, userId)));
+    expect(persisted.filter((row) => row.role === "assistant" && row.generationKey === key)).toHaveLength(1);
+    expect(persisted.filter((row) => row.role === "user" && row.content === content)).toHaveLength(1);
+  });
+
+  it("stale generating becomes error; only a new key creates the next DB user/candidate pair", async () => {
+    const staleKey = `stale-${RUN}`;
+    const freshKey = `fresh-${RUN}`;
+    const staleContent = `stale request ${RUN}`;
+    const freshContent = `fresh request ${RUN}`;
+    const first = await chatWithGenerationKey(staleContent, staleKey);
+    expect(first.response.status).toBe(200);
+    const [stale] = await db
+      .select({ id: chapterMessages.id })
+      .from(chapterMessages)
+      .where(and(eq(chapterMessages.chapterId, chapterId), eq(chapterMessages.generationKey, staleKey)));
+    await db
+      .update(chapterMessages)
+      .set({ status: "generating", updatedAt: new Date(Date.now() - 11 * 60 * 1000) })
+      .where(eq(chapterMessages.id, stale!.id));
+
+    const sameKey = await chatWithGenerationKey(staleContent, staleKey);
+    expect(sameKey.text).toContain("AiGenerationFailed");
+    const fresh = await chatWithGenerationKey(freshContent, freshKey);
+    expect(fresh.text).toContain('"type":"done"');
+
+    const persisted = await db
+      .select({ role: chapterMessages.role, generationKey: chapterMessages.generationKey, content: chapterMessages.content, status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(and(eq(chapterMessages.chapterId, chapterId), eq(chapterMessages.userId, userId)));
+    expect(persisted.filter((row) => row.role === "assistant" && row.generationKey === staleKey)).toEqual([
+      expect.objectContaining({ status: "error" }),
+    ]);
+    expect(persisted.filter((row) => row.role === "assistant" && row.generationKey === freshKey)).toHaveLength(1);
+    expect(persisted.filter((row) => row.role === "user" && row.content === staleContent)).toHaveLength(1);
+    expect(persisted.filter((row) => row.role === "user" && row.content === freshContent)).toHaveLength(1);
   });
 
   it("生成期间正文发生变化 → 候选基线冲突；用户确认后 force 应用", async () => {
@@ -613,7 +686,7 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(content).not.toContain("这条基于点击时的正文");
   });
 
-  it("并发确认同一候选 → 只有一次正文变更，其余请求安全幂等", async () => {
+  it("并发确认同一候选 → 只有一次正文变更，失败方不覆盖正文", async () => {
     await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", cookie },
@@ -624,12 +697,8 @@ describe("插入与冲突保护（工单 18）", () => {
       insert(candidate.id, candidate.content),
       insert(candidate.id, candidate.content),
     ]);
-    expect(responses.every((res) => res.status === 200)).toBe(true);
-    const bodies = await Promise.all(
-      responses.map((res) => res.json() as Promise<{ alreadyApplied?: boolean; chapter: { content: string } }>),
-    );
-    expect(bodies.filter((body) => body.alreadyApplied).length).toBe(1);
-    expect(bodies.map((body) => body.chapter.content).every((value) => value === `并发确认基线\n\n${candidate.content.trim()}`)).toBe(true);
+    expect(responses.filter((res) => res.status === 200)).toHaveLength(1);
+    expect(responses.filter((res) => res.status !== 200).every((res) => [400, 409].includes(res.status))).toBe(true);
     expect((await currentContent())).toBe(`并发确认基线\n\n${candidate.content.trim()}`);
   });
 

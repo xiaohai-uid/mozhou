@@ -32,6 +32,9 @@ export async function POST(
     expectedContent?: unknown;
   } | null;
   const content = typeof body?.content === "string" ? body.content : "";
+  if (!content.trim()) {
+    return NextResponse.json({ error: "插入内容不能为空" }, { status: 400 });
+  }
   const force = body?.force === true;
   // 类型门禁：显式传入但类型错误（string/NaN 偷渡）→ NaN 交给 service isInt 拒绝（400），不静默忽略
   const rawPos = body?.position;

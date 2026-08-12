@@ -129,7 +129,7 @@ export async function POST(
         } else if (result.stopped) {
           send({ type: "error", code: "AiCancelled", message: "已停止生成" });
         } else if (result.reply && ["completed_candidate", "applied"].includes(result.status)) {
-          send({ type: "done", messageId: result.messageId, status: result.status });
+          send({ type: "done", messageId: result.messageId });
         } else if (result.status === "error") {
           send({ type: "error", code: "AiGenerationFailed", message: "生成失败，请重试" });
         } else {
