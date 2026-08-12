@@ -47,7 +47,6 @@ export interface PayloadObservation {
   model: string;
   system_present: boolean;
   system_sections: string[];
-  system_char_count: number;
   message_count: number;
   message_roles: ChatMessage["role"][];
   history_count_before: number;
@@ -72,6 +71,16 @@ export interface CapturedChatRequest {
 
 const capturedRequests: CapturedChatRequest[] = [];
 let lastObservation: PayloadObservation | undefined;
+const OBSERVABLE_SYSTEM_SECTIONS = new Set([
+  "base_identity",
+  "mode_contract",
+  "owner_context",
+  "chapter_reference",
+  "selection",
+  "style",
+  "skill",
+  "compression_summary",
+]);
 
 /**
  * Capturing 只允许 NODE_ENV=test 且由测试显式打开。
@@ -86,10 +95,13 @@ export function isPayloadCaptureEnabled(): boolean {
 /** 将最终请求转换成生产可记录的白名单结构，绝不包含正文或 prompt。 */
 export function buildPayloadObservation(request: PreparedChatRequest): PayloadObservation {
   const messages = request.messages;
-  const currentUserOccurrences = request.observation.currentUserIndices.filter(
-    (index) => messages[index]?.role === "user",
-  ).length;
+  const currentUserOccurrences = messages.at(-1)?.role === "user" ? 1 : 0;
   const systemPresent = Boolean(request.system);
+  const systemSections = systemPresent
+    ? [...request.system!.matchAll(/^【([^】\r\n]+)】$/gm)]
+      .map((match) => match[1]!)
+      .filter((section) => OBSERVABLE_SYSTEM_SECTIONS.has(section))
+    : [];
 
   return {
     payload_schema_version: "v1",
@@ -98,13 +110,11 @@ export function buildPayloadObservation(request: PreparedChatRequest): PayloadOb
     mode: request.observation.mode,
     model: request.model,
     system_present: systemPresent,
-    // 当前实现把所有注入合成一个 system 字符串；后续上下文契约可在此处细分。
-    system_sections: systemPresent ? request.observation.systemSections : [],
-    system_char_count: request.system?.length ?? 0,
+    system_sections: systemSections,
     message_count: messages.length,
     message_roles: messages.map((message) => message.role),
     history_count_before: request.observation.historyCountBefore,
-    history_count_after: request.observation.historyCountAfter,
+    history_count_after: messages.length,
     current_user_present: currentUserOccurrences > 0,
     current_user_occurrences: currentUserOccurrences,
     compression_applied: request.observation.compressionApplied,

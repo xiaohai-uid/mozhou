@@ -9,6 +9,7 @@ import {
   SessionNotFoundError,
 } from "@/lib/chat/service";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/chat/models";
+import { createSseResponse, safeSseErrorMessage } from "@/lib/http/sse";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -65,16 +66,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "作品不存在" }, { status: 404 });
   }
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (obj: unknown) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+  return createSseResponse(async (writer) => {
       try {
         const targetSession =
           sessionId ??
           (await createSession(user.id, undefined, novelId)).id;
-        send({ type: "start", sessionId: targetSession });
+        writer.start({ type: "start", sessionId: targetSession });
         const result = await runChat({
           userId: user.id,
           sessionId: targetSession,
@@ -83,42 +80,31 @@ export async function POST(request: Request) {
           novelId,
           styleId,
           skills,
-          onDelta: (text) => send({ type: "delta", text }),
+          onDelta: (text) => writer.delta({ type: "delta", text }),
         });
         if (result.state.task?.status === "ok" && result.messageId) {
-          send({
+          writer.done({
             type: "done",
             messageId: result.messageId,
             injected: result.injected,
             compressed: result.compressed,
           });
         } else if (result.state.task?.status === "ok") {
-          send({ type: "error", message: "模型返回为空，请重试" });
+          writer.error({ type: "error", message: "模型返回为空，请重试" });
         } else {
-          send({
+          writer.error({
             type: "error",
-            message: result.state.task?.lastError ?? "生成失败",
+            message: safeSseErrorMessage(result.state.task?.lastError),
           });
         }
       } catch (err) {
-        send({
+        writer.error({
           type: "error",
           message:
             err instanceof SessionNotFoundError
               ? "会话不存在"
-              : ((err as Error).message ?? "生成失败"),
+              : safeSseErrorMessage(err),
         });
-      } finally {
-        controller.close();
       }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  }, request.signal);
 }

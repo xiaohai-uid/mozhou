@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import {
+  buildPayloadObservation,
   getCapturedChatRequests,
   getLastPayloadObservation,
   resetPayloadObservations,
@@ -23,6 +24,41 @@ describe("final chat payload observability", () => {
     else process.env.CHAT_CAPTURE = originalCapture;
     if (originalProvider === undefined) delete process.env.CHAT_PROVIDER;
     else process.env.CHAT_PROVIDER = originalProvider;
+  });
+
+  it("derives sections, current user, and final history count from the final request", () => {
+    const observation = buildPayloadObservation({
+      model: "test-model",
+      system: "【base_identity】\nidentity\n\n【not_a_section_secret】\ncontext body\n\n【skill】\nskill body",
+      messages: [
+        { role: "assistant", content: "history" },
+        { role: "user", content: "current user" },
+      ],
+      observation: {
+        route: "chat",
+        mode: "independent",
+        historyCountBefore: 99,
+        historyCountAfter: 0,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        currentUserIndices: [],
+        systemSections: ["caller_supplied_section"],
+      },
+    });
+
+    expect(observation).toMatchObject({
+      system_sections: ["base_identity", "skill"],
+      message_roles: ["assistant", "user"],
+      history_count_after: 2,
+      current_user_present: true,
+      current_user_occurrences: 1,
+    });
+    expect(JSON.stringify(observation)).not.toContain("not_a_section_secret");
   });
 
   it("captures the exact final system and messages before provider consumption", async () => {

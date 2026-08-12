@@ -11,6 +11,7 @@ import {
   ChapterNotFoundError,
   runChapterChat,
 } from "@/lib/novels/chapter-chat";
+import { createSseResponse, safeSseErrorMessage } from "@/lib/http/sse";
 
 export async function POST(
   request: Request,
@@ -104,13 +105,9 @@ export async function POST(
     return NextResponse.json({ error: "章节不存在" }, { status: 404 });
   }
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (obj: unknown) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+  return createSseResponse(async (writer, signal) => {
       try {
-        send({ type: "start" });
+        writer.start({ type: "start" });
         const result = await runChapterChat({
           userId: user.id,
           novelId,
@@ -121,22 +118,22 @@ export async function POST(
           skills,
           generationKey,
           selection,
-          signal: request.signal,
-          onDelta: (text) => send({ type: "delta", text }),
+          signal,
+          onDelta: (text) => writer.delta({ type: "delta", text }),
         });
         if (result.status === "generating") {
-          send({ type: "error", code: "GenerationInProgress", message: "这条生成仍在进行，请稍后刷新" });
+          writer.error({ type: "error", code: "GenerationInProgress", message: "这条生成仍在进行，请稍后刷新" });
         } else if (result.stopped) {
-          send({ type: "error", code: "AiCancelled", message: "已停止生成" });
+          writer.error({ type: "error", code: "AiCancelled", message: "已停止生成" });
         } else if (result.reply && ["completed_candidate", "applied"].includes(result.status)) {
-          send({ type: "done", messageId: result.messageId });
+          writer.done({ type: "done", messageId: result.messageId });
         } else if (result.status === "error") {
-          send({ type: "error", code: "AiGenerationFailed", message: "生成失败，请重试" });
+          writer.error({ type: "error", code: "AiGenerationFailed", message: "生成失败，请重试" });
         } else {
-          send({ type: "error", code: "AiInvalidResponse", message: "模型返回为空，请重试" });
+          writer.error({ type: "error", code: "AiInvalidResponse", message: "模型返回为空，请重试" });
         }
       } catch (err) {
-        send({
+        writer.error({
           type: "error",
           code:
             err instanceof ChapterNotFoundError
@@ -146,19 +143,13 @@ export async function POST(
                 : err instanceof ChapterChatError
                   ? "AiGenerationFailed"
                 : "AiGenerationFailed",
-          message: (err as Error).message ?? "生成失败",
+          message:
+            err instanceof ChapterNotFoundError
+              ? "章节不存在"
+              : err instanceof GenerationKeyConflictError
+                ? "生成请求键与原请求不一致"
+                : safeSseErrorMessage(err),
         });
-      } finally {
-        controller.close();
       }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+  }, request.signal);
 }
