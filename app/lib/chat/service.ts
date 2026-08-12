@@ -1,7 +1,13 @@
 // 对话会话服务：会话 CRUD + runChat（管线流式 + 持久化）
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { messages, sessions, skills as skillsTable, styles as stylesTable } from "@/lib/schema";
+import {
+  messages,
+  novels,
+  sessions,
+  skills as skillsTable,
+  styles as stylesTable,
+} from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
 import {
@@ -39,6 +45,9 @@ export async function createSession(
   title: string = DEFAULT_TITLE,
   novelId?: number | null,
 ): Promise<SessionRow> {
+  if (novelId != null && !(await isNovelOwned(userId, novelId))) {
+    throw new SessionNotFoundError();
+  }
   const [row] = await db
     .insert(sessions)
     .values({ userId, title, novelId: novelId ?? null })
@@ -64,16 +73,33 @@ export async function listSessions(userId: number): Promise<SessionRow[]> {
     .orderBy(desc(sessions.createdAt));
 }
 
+/** 服务端确认的会话上下文；客户端每轮 novelId 不参与裁决。 */
+export async function getOwnedSessionContext(
+  sessionId: number,
+  userId: number,
+): Promise<{ id: number; novelId: number | null } | null> {
+  const [session] = await db
+    .select({ id: sessions.id, novelId: sessions.novelId })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
+  return session ?? null;
+}
+
+/** 作品绑定只接受当前用户拥有的作品。 */
+export async function isNovelOwned(userId: number, novelId: number): Promise<boolean> {
+  const [novel] = await db
+    .select({ id: novels.id })
+    .from(novels)
+    .where(and(eq(novels.id, novelId), eq(novels.userId, userId)));
+  return Boolean(novel);
+}
+
 /** 校验会话归属；归属存在返回消息列表（可能为空），否则返回 null */
 export async function listMessages(
   sessionId: number,
   userId: number,
 ): Promise<ChatMessage[] | null> {
-  const [owner] = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
-  if (!owner) return null;
+  if (!(await getOwnedSessionContext(sessionId, userId))) return null;
   const rows = await db
     .select({ role: messages.role, content: messages.content })
     .from(messages)
@@ -92,11 +118,7 @@ async function listMessagesWithIds(
   sessionId: number,
   userId: number,
 ): Promise<StoredChatMessage[] | null> {
-  const [owner] = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
-  if (!owner) return null;
+  if (!(await getOwnedSessionContext(sessionId, userId))) return null;
   const rows = await db
     .select({ id: messages.id, role: messages.role, content: messages.content })
     .from(messages)
@@ -107,15 +129,6 @@ async function listMessagesWithIds(
     role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
     content: m.content,
   }));
-}
-
-/** 归属校验（写路径防 IDOR）：会话不存在或不属于该用户时抛错 */
-async function assertOwned(sessionId: number, userId: number): Promise<void> {
-  const [owner] = await db
-    .select({ id: sessions.id })
-    .from(sessions)
-    .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)));
-  if (!owner) throw new SessionNotFoundError();
 }
 
 export interface RunChatInput {
@@ -147,7 +160,8 @@ export interface RunChatResult {
  * 会话标题取首条用户消息前 20 字。
  */
 export async function runChat(input: RunChatInput): Promise<RunChatResult> {
-  await assertOwned(input.sessionId, input.userId); // 写路径防 IDOR
+  const ownedSession = await getOwnedSessionContext(input.sessionId, input.userId);
+  if (!ownedSession) throw new SessionNotFoundError();
 
   const [userMsg] = await db
     .insert(messages)
@@ -191,7 +205,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   }
   // RAG 注入（06 工单）：按当前输入 + 绑定作品检索相关设定条目，注入 system 提示
   const injected = await retrieveContext(input.userId, input.content, {
-    novelId: input.novelId ?? null,
+    novelId: ownedSession.novelId,
   });
   // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验）
   const extra: string[] = [];
@@ -253,7 +267,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       ragEntryCount: injected.length,
       stylePresent,
       skillCount,
-      novelScopePresent: input.novelId != null,
+      novelScopePresent: ownedSession.novelId != null,
       chapterScopePresent: false,
       ownerScopeResolved: true,
       currentUserIndices: providerMessages.length > 0 ? [providerMessages.length - 1] : [],

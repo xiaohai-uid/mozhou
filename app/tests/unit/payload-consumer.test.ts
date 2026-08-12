@@ -1,8 +1,16 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chapterMessages, chapters, messages, novels, sessions, users } from "@/lib/schema";
-import { runChat } from "@/lib/chat/service";
+import {
+  characterEntries,
+  chapterMessages,
+  chapters,
+  messages,
+  novels,
+  sessions,
+  users,
+} from "@/lib/schema";
+import { runChat, SessionNotFoundError } from "@/lib/chat/service";
 import { runChapterChat } from "@/lib/novels/chapter-chat";
 import {
   getCapturedChatRequests,
@@ -14,13 +22,14 @@ const EMAIL = `mozhou-payload-consumer-${RUN}@example.com`;
 const PASSWORD_HASH = "test-only";
 
 let userId = 0;
+let otherUserId = 0;
 let novelId = 0;
 let chapterId = 0;
 
-async function createSession(): Promise<number> {
+async function createSession(novelId?: number | null): Promise<number> {
   const [row] = await db
     .insert(sessions)
-    .values({ userId: userId, title: "payload consumer test" })
+    .values({ userId: userId, title: "payload consumer test", novelId: novelId ?? null })
     .returning({ id: sessions.id });
   return row!.id;
 }
@@ -31,6 +40,12 @@ beforeAll(async () => {
     .values({ email: EMAIL, passwordHash: PASSWORD_HASH })
     .returning({ id: users.id });
   userId = user!.id;
+
+  const [otherUser] = await db
+    .insert(users)
+    .values({ email: `mozhou-payload-consumer-other-${RUN}@example.com`, passwordHash: PASSWORD_HASH })
+    .returning({ id: users.id });
+  otherUserId = otherUser!.id;
 
   const [novel] = await db
     .insert(novels)
@@ -46,7 +61,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(users).where(eq(users.id, userId));
+  await db.delete(users).where(inArray(users.id, [userId, otherUserId]));
 });
 
 beforeEach(async () => {
@@ -54,6 +69,8 @@ beforeEach(async () => {
   process.env.CHAT_PROVIDER = "mock";
   process.env.CHAT_CAPTURE = "1";
   await db.delete(chapterMessages).where(eq(chapterMessages.chapterId, chapterId));
+  await db.delete(characterEntries).where(eq(characterEntries.novelId, novelId));
+  await db.delete(novels).where(and(eq(novels.userId, userId), ne(novels.id, novelId)));
   resetPayloadObservations();
 });
 
@@ -82,6 +99,75 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
     });
     expect(capture?.system).toContain("墨舟");
     expect(capture?.system).toContain("独立写作对话模式");
+  });
+
+  it("closes RAG for an unbound session even when the client supplies a novelId", async () => {
+    await db.insert(characterEntries).values({
+      novelId,
+      name: "未绑定作品人物",
+      note: "不应进入独立会话",
+    });
+    const sessionId = await createSession();
+
+    const result = await runChat({
+      userId,
+      sessionId,
+      model: "deepseek-v4-flash",
+      content: "请讨论未绑定作品人物",
+      novelId,
+      onDelta: () => {},
+    });
+
+    expect(result.injected).toEqual([]);
+    const capture = getCapturedChatRequests()[0];
+    expect(capture?.observation).toMatchObject({
+      novel_scope_present: false,
+      rag_entry_count: 0,
+      owner_scope_resolved: true,
+    });
+  });
+
+  it("uses the session-bound novel scope instead of a client override", async () => {
+    const [otherNovel] = await db
+      .insert(novels)
+      .values({ userId, name: "bound override novel" })
+      .returning({ id: novels.id });
+    await db.insert(characterEntries).values([
+      { novelId, name: "绑定作品人物", note: "服务端绑定作品" },
+      { novelId: otherNovel!.id, name: "覆盖作品人物", note: "客户端不应切换到这里" },
+    ]);
+    const sessionId = await createSession(novelId);
+
+    const result = await runChat({
+      userId,
+      sessionId,
+      model: "deepseek-v4-flash",
+      content: "请讨论绑定作品人物",
+      novelId: otherNovel!.id,
+      onDelta: () => {},
+    });
+
+    expect(result.injected.map((entry) => entry.name)).toContain("绑定作品人物");
+    expect(result.injected.map((entry) => entry.name)).not.toContain("覆盖作品人物");
+    expect(getCapturedChatRequests()[0]?.observation).toMatchObject({
+      novel_scope_present: true,
+    });
+    expect(getCapturedChatRequests()[0]?.observation.rag_entry_count).toBeGreaterThanOrEqual(1);
+  });
+
+  it("rejects a non-owner session before provider consumption", async () => {
+    const sessionId = await createSession();
+
+    await expect(
+      runChat({
+        userId: otherUserId,
+        sessionId,
+        model: "deepseek-v4-flash",
+        content: "越权请求",
+        onDelta: () => {},
+      }),
+    ).rejects.toBeInstanceOf(SessionNotFoundError);
+    expect(getCapturedChatRequests()).toHaveLength(0);
   });
 
   it("separates the current user from independent history before compression", async () => {

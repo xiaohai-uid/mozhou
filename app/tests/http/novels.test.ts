@@ -1,5 +1,6 @@
 // 小说项目管理 API 契约测试（05 工单）：作品 CRUD + 章节 + 人物/世界观条目 + 归属校验
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
@@ -9,6 +10,15 @@ const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);
 const EMAIL = `mozhou-novel-${RUN}@example.com`;
 const PASSWORD = "s3cret-测试密码";
+const OBSERVER_FILE = "tests/http/.payload-observer.jsonl";
+
+function observerCount(): number {
+  try {
+    return readFileSync(OBSERVER_FILE, "utf8").split("\n").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
 
 interface TestUser {
   cookie: string;
@@ -321,7 +331,7 @@ describe("RAG 设定注入（06 工单，关键词检索）", () => {
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ content: "写一段陆沉舟走向零界的场景" }),
+      body: JSON.stringify({ content: "写一段陆沉舟走向零界的场景", novelId: ragNovelId }),
     });
     expect(res.status).toBe(200);
     const events = (await res.text())
@@ -341,7 +351,7 @@ describe("RAG 设定注入（06 工单，关键词检索）", () => {
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ content: "聊聊今天吃的苹果" }),
+      body: JSON.stringify({ content: "聊聊今天吃的苹果", novelId: ragNovelId }),
     });
     const events = (await res.text())
       .split("\n\n")
@@ -356,6 +366,7 @@ describe("RAG 设定注入（06 工单，关键词检索）", () => {
 
 describe("会话↔作品绑定（R3 决策）", () => {
   let bindNovelId: number;
+  let boundSessionId: number;
 
   it("前置：创建绑定用作品 + 条目", async () => {
     const novel = await fetch(`${BASE}/api/v1/novels`, {
@@ -382,6 +393,7 @@ describe("会话↔作品绑定（R3 决策）", () => {
     const { session } = (await res.json()) as {
       session: { id: number; novelId: number | null };
     };
+    boundSessionId = session.id;
     expect(session.novelId).toBe(bindNovelId);
 
     // 列表也带 novelId
@@ -395,10 +407,15 @@ describe("会话↔作品绑定（R3 决策）", () => {
   });
 
   it("绑定作品后 chat：RAG 只注入该作品设定", async () => {
+    const before = observerCount();
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ content: "写独有角色甲的出场", novelId: bindNovelId }),
+      body: JSON.stringify({
+        sessionId: boundSessionId,
+        content: "写独有角色甲的出场",
+        novelId,
+      }),
     });
     const events = (await res.text())
       .split("\n\n")
@@ -409,24 +426,19 @@ describe("会话↔作品绑定（R3 决策）", () => {
     };
     const names = (done?.injected ?? []).map((i) => i.name);
     expect(names).toContain("独有角色甲");
-    // 不应混入其他书的设定（如 RAG 测试书的「陆沉舟」）
     expect(names).not.toContain("陆沉舟");
+    expect(observerCount()).toBeGreaterThan(before);
   });
 
-  it("越权：绑定他人作品 → 注入为空（不泄漏）", async () => {
+  it("越权：绑定他人作品 → 404 且不进入 provider", async () => {
+    const before = observerCount();
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: other.cookie },
       body: JSON.stringify({ content: "写独有角色甲的出场", novelId: bindNovelId }),
     });
-    const events = (await res.text())
-      .split("\n\n")
-      .filter((e) => e.startsWith("data:"))
-      .map((e) => JSON.parse(e.slice(5).trim()));
-    const done = events.find((e) => e.type === "done") as {
-      injected?: unknown[];
-    };
-    expect(done?.injected ?? []).toHaveLength(0);
+    expect(res.status).toBe(404);
+    expect(observerCount()).toBe(before);
   });
 });
 

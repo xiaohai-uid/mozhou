@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   createSession,
+  isNovelOwned,
   listMessages,
   runChat,
   SessionNotFoundError,
@@ -59,6 +60,9 @@ export async function POST(request: Request) {
   // 归属校验在流外完成：他人会话 → 404（不进入 SSE）
   if (sessionId !== undefined && (await listMessages(sessionId, user.id)) === null) {
     return NextResponse.json({ error: "会话不存在" }, { status: 404 });
+  }
+  if (sessionId === undefined && novelId !== null && !(await isNovelOwned(user.id, novelId))) {
+    return NextResponse.json({ error: "作品不存在" }, { status: 404 });
   }
 
   const encoder = new TextEncoder();

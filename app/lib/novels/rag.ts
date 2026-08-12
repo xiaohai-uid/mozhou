@@ -33,25 +33,21 @@ export function rankEntries(entries: RagEntry[], query: string): RagEntry[] {
     .map((s) => s.e);
 }
 
-/** 检索设定条目（可限定作品；novelId 为 null 时检索用户全部作品），取 top-k（无共现则返回空） */
+/** 检索已确认作品范围的设定条目；未提供作品范围时关闭 RAG。 */
 export async function retrieveContext(
   userId: number,
   query: string,
   opts: { topK?: number; novelId?: number | null } = {},
 ): Promise<RagEntry[]> {
   const topK = opts.topK ?? 5;
-  let ownerCond = eq(novels.userId, userId);
-  if (opts.novelId != null) {
-    // 归属校验：novelId 必须属于该用户（防越权检索他人作品设定）
-    const [owned] = await db
-      .select({ id: novels.id, ragEnabled: novels.ragEnabled })
-      .from(novels)
-      .where(and(eq(novels.id, opts.novelId), eq(novels.userId, userId)));
-    if (!owned) return [];
-    // RAG 开关（06 收尾）：作品关闭注入时返回空
-    if (!owned.ragEnabled) return [];
-    ownerCond = eq(novels.id, opts.novelId);
-  }
+  if (opts.novelId == null) return [];
+  // 归属校验：novelId 必须属于该用户（防越权检索他人作品设定）
+  const [owned] = await db
+    .select({ id: novels.id, ragEnabled: novels.ragEnabled })
+    .from(novels)
+    .where(and(eq(novels.id, opts.novelId), eq(novels.userId, userId)));
+  if (!owned || !owned.ragEnabled) return [];
+  const ownerCond = eq(novels.id, opts.novelId);
   const [chars, wvs] = await Promise.all([
     db
       .select({ name: characterEntries.name, note: characterEntries.note })
