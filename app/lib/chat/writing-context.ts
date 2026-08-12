@@ -25,6 +25,8 @@ export type WritingContextInput = {
   sections: WritingContextSection[];
   history: ChatMessage[];
   currentUser: ChatMessage;
+  /** Optional source index when history also contains a distinct current-user copy. */
+  currentUserHistoryIndex?: number;
   observation: Omit<ChatObservationScope, "systemSections" | "currentUserIndices" | "historyCountAfter">;
 };
 
@@ -90,7 +92,10 @@ export function buildWritingContext(input: WritingContextInput): PreparedChatReq
     ...input.sections,
   ]);
   const messages = [
-    ...input.history.filter((message) => message !== input.currentUser),
+    ...input.history.filter(
+      (message, index) =>
+        message !== input.currentUser && index !== input.currentUserHistoryIndex,
+    ),
     { role: "user" as const, content: input.currentUser.content },
   ];
 

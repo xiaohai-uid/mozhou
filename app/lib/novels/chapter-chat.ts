@@ -163,18 +163,15 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
 
   // 注入链组装（按序）：正文参考 → 所选片段(J9) → RAG → 风格 → 技能
   const contextSections: WritingContextSection[] = [];
-  const extra: string[] = [];
   let stylePresent = false;
   let skillCount = 0;
   const bodyRef = chapter.content.slice(-BODY_REF_LIMIT);
   if (bodyRef.trim()) {
     const content = `[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`;
-    extra.push(content);
     contextSections.push({ kind: "chapter_reference", content });
   }
   if (input.selection) {
     const content = `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`;
-    extra.push(content);
     contextSections.push({ kind: "selection", content });
   }
   const injectedRag = await retrieveContext(input.userId, input.content, {
@@ -192,8 +189,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     if (styleRow) {
       stylePresent = true;
       const content = `[风格] ${styleRow.name}：叙事视角——${styleRow.guide.narrative}；句式节奏——${styleRow.guide.sentence}；意象偏好——${styleRow.guide.imagery}；情绪节奏——${styleRow.guide.rhythm}`;
-      extra.push(content);
-      contextSections.push({ kind: "style", content });
+        contextSections.push({ kind: "style", content });
     }
   }
   const skills = input.skills ?? [];
@@ -211,21 +207,18 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     for (const row of skillRows) {
       skillCount += 1;
       const content = `[技能] ${row.name}：${row.systemPrompt}`;
-      extra.push(content);
-      contextSections.push({ kind: "skill", content });
+        contextSections.push({ kind: "skill", content });
     }
   }
   for (const name of skills) {
     if (SCENE_SKILLS[name]) {
       skillCount += 1;
       const content = `[技能] ${name}：${SCENE_SKILLS[name]}`;
-      extra.push(content);
-      contextSections.push({ kind: "skill", content });
+        contextSections.push({ kind: "skill", content });
     }
   }
 
   if (summary) {
-    extra.push(summary);
     contextSections.push({ kind: "compression_summary", content: summary });
   }
 
@@ -293,7 +286,12 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     messageId: aiMsg?.id ?? 0,
     reply,
     stopped,
-    injected: [...ragLines, ...extra],
+    injected: [
+      ...ragLines,
+      ...contextSections
+        .filter((section) => section.kind !== "owner_context")
+        .map((section) => section.content),
+    ],
   };
 }
 

@@ -137,6 +137,27 @@ describe("buildWritingContext", () => {
     expect(request.observation.currentUserIndices).toEqual([2]);
   });
 
+  it("removes a structurally equal current user copy while preserving different replayable history", () => {
+    const currentUser: ChatMessage = { role: "user", content: "本轮请求" };
+    const request = buildWritingContext(input({
+      history: [
+        { role: "user", content: "较早且不同的请求" },
+        { role: "user", content: "本轮请求" },
+        { role: "assistant", content: "历史回答" },
+      ],
+      currentUser,
+      currentUserHistoryIndex: 1,
+    }));
+
+    expect(request.messages).toEqual([
+      { role: "user", content: "较早且不同的请求" },
+      { role: "assistant", content: "历史回答" },
+      { role: "user", content: "本轮请求" },
+    ]);
+    expect(request.messages.filter((message) => message.role === "user" && message.content === "本轮请求"))
+      .toHaveLength(1);
+  });
+
   it("keeps owner facts explicit and does not invent unowned novel context", () => {
     const owned = buildWritingContext(input({
       sections: [{ kind: "owner_context", content: "[设定] 当前作品的角色" }],
