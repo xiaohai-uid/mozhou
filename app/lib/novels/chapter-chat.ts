@@ -12,10 +12,8 @@ import {
 import { getChapter } from "./service";
 import { retrieveContext } from "./rag";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
-import {
-  buildChapterSystemPrompt,
-  makeChatProvider,
-} from "@/lib/chat/stream-provider";
+import { makeChatProvider } from "@/lib/chat/stream-provider";
+import { buildWritingContext, type WritingContextSection } from "@/lib/chat/writing-context";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "@/lib/chat/models";
 import type { ChatMessage } from "@/lib/chat/payload";
@@ -164,28 +162,28 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   }
 
   // 注入链组装（按序）：正文参考 → 所选片段(J9) → RAG → 风格 → 技能
+  const contextSections: WritingContextSection[] = [];
   const extra: string[] = [];
   let stylePresent = false;
   let skillCount = 0;
-  let hasBodyReference = false;
-  let hasValidatedSelection = false;
   const bodyRef = chapter.content.slice(-BODY_REF_LIMIT);
   if (bodyRef.trim()) {
-    hasBodyReference = true;
-    extra.push(`[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`);
+    const content = `[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`;
+    extra.push(content);
+    contextSections.push({ kind: "chapter_reference", content });
   }
   if (input.selection) {
-    hasValidatedSelection = true;
-    extra.push(
-      `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`,
-    );
+    const content = `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`;
+    extra.push(content);
+    contextSections.push({ kind: "selection", content });
   }
   const injectedRag = await retrieveContext(input.userId, input.content, {
     novelId: input.novelId,
   });
   const ragLines = injectedRag.map(
-    (e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`,
+    (entry) => `[${entry.kind === "character" ? "人物" : "设定"}] ${entry.name}${entry.note ? `：${entry.note}` : ""}`,
   );
+  contextSections.push(...ragLines.map((content) => ({ kind: "owner_context" as const, content })));
   if (input.styleId) {
     const [styleRow] = await db
       .select({ name: stylesTable.name, guide: stylesTable.guide })
@@ -193,9 +191,9 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
     if (styleRow) {
       stylePresent = true;
-      extra.push(
-        `[风格] ${styleRow.name}：叙事视角——${styleRow.guide.narrative}；句式节奏——${styleRow.guide.sentence}；意象偏好——${styleRow.guide.imagery}；情绪节奏——${styleRow.guide.rhythm}`,
-      );
+      const content = `[风格] ${styleRow.name}：叙事视角——${styleRow.guide.narrative}；句式节奏——${styleRow.guide.sentence}；意象偏好——${styleRow.guide.imagery}；情绪节奏——${styleRow.guide.rhythm}`;
+      extra.push(content);
+      contextSections.push({ kind: "style", content });
     }
   }
   const skills = input.skills ?? [];
@@ -212,43 +210,36 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     );
     for (const row of skillRows) {
       skillCount += 1;
-      extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
+      const content = `[技能] ${row.name}：${row.systemPrompt}`;
+      extra.push(content);
+      contextSections.push({ kind: "skill", content });
     }
   }
   for (const name of skills) {
     if (SCENE_SKILLS[name]) {
       skillCount += 1;
-      extra.push(`[技能] ${name}：${SCENE_SKILLS[name]}`);
+      const content = `[技能] ${name}：${SCENE_SKILLS[name]}`;
+      extra.push(content);
+      contextSections.push({ kind: "skill", content });
     }
   }
 
-  if (summary) extra.push(summary);
+  if (summary) {
+    extra.push(summary);
+    contextSections.push({ kind: "compression_summary", content: summary });
+  }
 
   const snapshot = chapter.content; // 生成时正文快照（插入冲突检测基准，工单 18 消费）
-  const providerMessages: ChatMessage[] = [
-    ...providerHistory,
-    { role: "user", content: currentMessage.content },
-  ];
-  const system = buildChapterSystemPrompt([...ragLines, ...extra]);
-  const systemSections = [
-    "base_identity",
-    "mode_contract",
-    ...(ragLines.length > 0 ? ["novel_context"] : []),
-    ...(hasBodyReference ? ["chapter_reference"] : []),
-    ...(hasValidatedSelection ? ["validated_selection"] : []),
-    ...(stylePresent ? ["style"] : []),
-    ...(skillCount > 0 ? ["skill"] : []),
-    ...(summary ? ["compression_summary"] : []),
-  ];
-  const provider = makeChatProvider({
+  const provider = makeChatProvider(buildWritingContext({
     model: input.model,
-    messages: providerMessages,
-    system,
+    mode: "chapter",
+    sections: contextSections,
+    history: providerHistory,
+    currentUser: { role: "user", content: currentMessage.content },
     observation: {
       route: "chapter-chat",
       mode: "chapter",
       historyCountBefore: history.length,
-      historyCountAfter: providerMessages.length,
       compressionApplied: compressed,
       ragEntryCount: injectedRag.length,
       stylePresent,
@@ -256,10 +247,8 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       novelScopePresent: true,
       chapterScopePresent: true,
       ownerScopeResolved: true,
-      currentUserIndices: [providerMessages.length - 1],
-      systemSections,
     },
-  });
+  }));
   let reply = "";
   let stopped = false;
 

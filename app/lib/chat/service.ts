@@ -10,10 +10,8 @@ import {
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
-import {
-  buildIndependentSystemPrompt,
-  makeChatProvider,
-} from "./stream-provider";
+import { makeChatProvider } from "./stream-provider";
+import { buildWritingContext, type WritingContextSection } from "./writing-context";
 import type { ChatMessage } from "./payload";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
 import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
@@ -208,11 +206,12 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     novelId: ownedSession.novelId,
   });
   // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验）
-  const extra: string[] = [];
-  const systemSections: string[] = ["base_identity", "mode_contract"];
+  const contextSections: WritingContextSection[] = injected.map((entry) => ({
+    kind: "owner_context",
+    content: `[${entry.kind === "character" ? "人物" : "设定"}] ${entry.name}${entry.note ? `：${entry.note}` : ""}`,
+  }));
   let stylePresent = false;
   let skillCount = 0;
-  if (injected.length > 0) systemSections.push("novel_context");
   if (input.styleId) {
     const styleRows = await db
       .select({ name: stylesTable.name, guide: stylesTable.guide })
@@ -220,10 +219,10 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
     for (const row of styleRows) {
       stylePresent = true;
-      systemSections.push("style");
-      extra.push(
-        `[风格] ${row.name}：叙事视角——${row.guide.narrative}；句式节奏——${row.guide.sentence}；意象偏好——${row.guide.imagery}；情绪节奏——${row.guide.rhythm}`,
-      );
+      contextSections.push({
+        kind: "style",
+        content: `[风格] ${row.name}：叙事视角——${row.guide.narrative}；句式节奏——${row.guide.sentence}；意象偏好——${row.guide.imagery}；情绪节奏——${row.guide.rhythm}`,
+      });
     }
   }
   if (input.skills && input.skills.length > 0) {
@@ -238,31 +237,22 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     );
     for (const row of skillRows) {
       skillCount += 1;
-      systemSections.push("skill");
-      extra.push(`[技能] ${row.name}：${row.systemPrompt}`);
+      contextSections.push({ kind: "skill", content: `[技能] ${row.name}：${row.systemPrompt}` });
     }
   }
   if (summary) {
-    extra.push(summary);
-    systemSections.push("compression_summary");
+    contextSections.push({ kind: "compression_summary", content: summary });
   }
-  const providerMessages: ChatMessage[] = [
-    ...providerHistory,
-    { role: "user", content: currentMessage.content },
-  ];
-  const system = buildIndependentSystemPrompt([
-    ...injected.map((e) => `[${e.kind === "character" ? "人物" : "设定"}] ${e.name}${e.note ? `：${e.note}` : ""}`),
-    ...extra,
-  ]);
-  const provider = makeChatProvider({
+  const provider = makeChatProvider(buildWritingContext({
     model: input.model,
-    messages: providerMessages,
-    system,
+    mode: "independent",
+    sections: contextSections,
+    history: providerHistory,
+    currentUser: currentMessage,
     observation: {
       route: "chat",
       mode: "independent",
       historyCountBefore: history.length,
-      historyCountAfter: providerMessages.length,
       compressionApplied: compressed,
       ragEntryCount: injected.length,
       stylePresent,
@@ -270,10 +260,8 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       novelScopePresent: ownedSession.novelId != null,
       chapterScopePresent: false,
       ownerScopeResolved: true,
-      currentUserIndices: providerMessages.length > 0 ? [providerMessages.length - 1] : [],
-      systemSections,
     },
-  });
+  }));
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },
