@@ -1,6 +1,6 @@
 // /api/v1/skills — 技能：我的技能 CRUD + 广场源（任务二-A）
 // 技能 = 声明式（名称/说明/系统提示词），chat 可加载注入 system 提示
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
@@ -89,7 +89,7 @@ export async function DELETE(request: Request) {
   if (!id) return NextResponse.json({ error: "缺少技能 id" }, { status: 400 });
   const rows = await db
     .delete(skills)
-    .where(eq(skills.id, id))
+    .where(and(eq(skills.id, id), eq(skills.userId, user.id)))
     .returning({ id: skills.id });
   if (rows.length === 0) {
     return NextResponse.json({ error: "技能不存在" }, { status: 404 });

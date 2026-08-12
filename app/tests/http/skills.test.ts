@@ -7,20 +7,27 @@ import { users } from "@/lib/schema";
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);
 const EMAIL = `mozhou-skill-${RUN}@example.com`;
+const OTHER_EMAIL = `mozhou-skill-other-${RUN}@example.com`;
 const PASSWORD = "s3cret-测试密码";
 
 let cookie = "";
+let otherCookie = "";
 
-beforeAll(async () => {
-  await db.delete(users).where(like(users.email, "mozhou-skill-%"));
+async function register(email: string): Promise<string> {
   const res = await fetch(`${BASE}/api/v1/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+    body: JSON.stringify({ email, password: PASSWORD }),
   });
   expect(res.status).toBe(201);
   const token = res.headers.get("set-cookie")!.match(/mozhou_session=([^;]+)/)![1];
-  cookie = `mozhou_session=${token}`;
+  return `mozhou_session=${token}`;
+}
+
+beforeAll(async () => {
+  await db.delete(users).where(like(users.email, "mozhou-skill-%"));
+  cookie = await register(EMAIL);
+  otherCookie = await register(OTHER_EMAIL);
 });
 
 afterAll(async () => {
@@ -94,6 +101,44 @@ describe("技能 CRUD（任务二-A）", () => {
       headers: { cookie },
     });
     expect(del.status).toBe(200);
+  });
+
+  it("删除归属校验：本人可删；他人和不存在目标均 404 且他人技能仍保留", async () => {
+    const created = await fetch(`${BASE}/api/v1/skills`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: otherCookie },
+      body: JSON.stringify({
+        name: "他人私有技能",
+        description: "仅用于归属边界测试",
+        systemPrompt: "保持归属边界。",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const { skill } = (await created.json()) as { skill: { id: number } };
+
+    const crossDel = await fetch(`${BASE}/api/v1/skills?id=${skill.id}`, {
+      method: "DELETE",
+      headers: { cookie },
+    });
+    expect(crossDel.status).toBe(404);
+
+    const otherList = await fetch(`${BASE}/api/v1/skills?scope=mine`, {
+      headers: { cookie: otherCookie },
+    });
+    const { skills: otherSkills } = (await otherList.json()) as { skills: Array<{ id: number }> };
+    expect(otherSkills.some((row) => row.id === skill.id)).toBe(true);
+
+    const ownDel = await fetch(`${BASE}/api/v1/skills?id=${skill.id}`, {
+      method: "DELETE",
+      headers: { cookie: otherCookie },
+    });
+    expect(ownDel.status).toBe(200);
+
+    const missingDel = await fetch(`${BASE}/api/v1/skills?id=${skill.id}`, {
+      method: "DELETE",
+      headers: { cookie: otherCookie },
+    });
+    expect(missingDel.status).toBe(404);
   });
 
   it("非法入参：空字段 400 / 未登录 401", async () => {
