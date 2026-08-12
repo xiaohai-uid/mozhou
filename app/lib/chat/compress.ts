@@ -11,6 +11,33 @@ export const KEEP_RECENT = 6;
 /** 摘要目标长度 */
 export const SUMMARY_MAX_CHARS = 200;
 
+/** 只接受原历史的近期后缀，压缩器返回异常结构时由 consumer fail-open。 */
+export function isUsableKeptHistory(
+  source: ChatMessage[],
+  candidate: unknown,
+): candidate is ChatMessage[] {
+  if (
+    !Array.isArray(candidate) ||
+    candidate.length === 0 ||
+    candidate.length > KEEP_RECENT ||
+    candidate.length > source.length
+  ) {
+    return false;
+  }
+  const offset = source.length - candidate.length;
+  return candidate.every((message, index) => {
+    if (!message || typeof message !== "object") return false;
+    const item = message as Partial<ChatMessage>;
+    const expected = source[offset + index];
+    return (
+      (item.role === "user" || item.role === "assistant") &&
+      typeof item.content === "string" &&
+      item.role === expected?.role &&
+      item.content === expected?.content
+    );
+  });
+}
+
 /** 粗略 token 估算：中文约 2 字/token */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 2);

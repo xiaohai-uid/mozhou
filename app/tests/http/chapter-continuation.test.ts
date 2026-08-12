@@ -201,10 +201,12 @@ describe("章节对话引擎（工单 17）", () => {
     const chapterObservation = readPayloadObservations().find((entry) => entry.route === "chapter-chat");
     expect(chapterObservation).toMatchObject({
       route: "chapter-chat",
-      message_count: 0,
-      message_roles: [],
-      current_user_present: false,
+      message_count: 1,
+      message_roles: ["user"],
+      current_user_present: true,
+      current_user_occurrences: 1,
       chapter_scope_present: true,
+      system_sections: ["base_identity", "mode_contract", "chapter_reference", "skill"],
     });
 
     // 落库断言：user + assistant（skills 快照 + snapshot=生成时正文）

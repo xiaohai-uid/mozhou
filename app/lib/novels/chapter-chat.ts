@@ -12,9 +12,18 @@ import {
 import { getChapter } from "./service";
 import { retrieveContext } from "./rag";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
-import { buildSystemPrompt, makeChatProvider } from "@/lib/chat/stream-provider";
+import {
+  buildChapterSystemPrompt,
+  makeChatProvider,
+} from "@/lib/chat/stream-provider";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "@/lib/chat/models";
+import type { ChatMessage } from "@/lib/chat/payload";
+import {
+  compressHistory,
+  isUsableKeptHistory,
+  shouldCompress,
+} from "@/lib/chat/compress";
 
 /** 内置场景技能（工单 19 正式化；此处为注入链基础）：名称 → systemPrompt */
 export const SCENE_SKILLS: Record<string, string> = {
@@ -123,6 +132,37 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     .returning({ id: chapterMessages.id });
   if (!userMsg) throw new Error("消息入库失败");
 
+  const storedMessages = await db
+    .select({ id: chapterMessages.id, role: chapterMessages.role, content: chapterMessages.content })
+    .from(chapterMessages)
+    .where(eq(chapterMessages.chapterId, input.chapterId))
+    .orderBy(chapterMessages.createdAt, chapterMessages.id);
+  const currentMessage = storedMessages.find((message) => message.id === userMsg.id);
+  if (!currentMessage) throw new Error("当前消息读取失败");
+  const history: ChatMessage[] = storedMessages
+    .filter((message) => message.id !== currentMessage.id)
+    .map((message) => ({
+      role: message.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: message.content,
+    }));
+
+  let compressed = false;
+  let summary = "";
+  let providerHistory = history;
+  if (shouldCompress(history)) {
+    try {
+      const result = await compressHistory(history);
+      const candidateSummary = typeof result.summary === "string" ? result.summary.trim() : "";
+      if (candidateSummary && isUsableKeptHistory(history, result.kept)) {
+        summary = candidateSummary;
+        providerHistory = result.kept;
+        compressed = true;
+      }
+    } catch {
+      // 摘要器异常时 fail-open：保留完整章节历史继续请求。
+    }
+  }
+
   // 注入链组装（按序）：正文参考 → 所选片段(J9) → RAG → 风格 → 技能
   const extra: string[] = [];
   let stylePresent = false;
@@ -182,34 +222,42 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     }
   }
 
+  if (summary) extra.push(summary);
+
   const snapshot = chapter.content; // 生成时正文快照（插入冲突检测基准，工单 18 消费）
-  const system = buildSystemPrompt([...ragLines, ...extra]);
+  const providerMessages: ChatMessage[] = [
+    ...providerHistory,
+    { role: "user", content: currentMessage.content },
+  ];
+  const system = buildChapterSystemPrompt([...ragLines, ...extra]);
   const systemSections = [
-    ...(ragLines.length > 0 ? ["rag"] : []),
+    "base_identity",
+    "mode_contract",
+    ...(ragLines.length > 0 ? ["novel_context"] : []),
     ...(hasBodyReference ? ["chapter_reference"] : []),
     ...(hasValidatedSelection ? ["validated_selection"] : []),
     ...(stylePresent ? ["style"] : []),
     ...(skillCount > 0 ? ["skill"] : []),
+    ...(summary ? ["compression_summary"] : []),
   ];
   const provider = makeChatProvider({
     model: input.model,
-    messages: [],
+    messages: providerMessages,
     system,
     observation: {
       route: "chapter-chat",
       mode: "chapter",
-      // 保留当前章节对话的既有行为：它目前不把持久化 chapter messages 送入 provider。
-      historyCountBefore: 0,
-      historyCountAfter: 0,
-      compressionApplied: false,
+      historyCountBefore: history.length,
+      historyCountAfter: providerMessages.length,
+      compressionApplied: compressed,
       ragEntryCount: injectedRag.length,
       stylePresent,
       skillCount,
       novelScopePresent: true,
       chapterScopePresent: true,
       ownerScopeResolved: true,
-      currentUserIndices: [],
-      systemSections: system ? systemSections : [],
+      currentUserIndices: [providerMessages.length - 1],
+      systemSections,
     },
   });
   let reply = "";

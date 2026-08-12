@@ -49,10 +49,11 @@ afterAll(async () => {
   await db.delete(users).where(eq(users.id, userId));
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   (process.env as Record<string, string | undefined>).NODE_ENV = "test";
   process.env.CHAT_PROVIDER = "mock";
   process.env.CHAT_CAPTURE = "1";
+  await db.delete(chapterMessages).where(eq(chapterMessages.chapterId, chapterId));
   resetPayloadObservations();
 });
 
@@ -214,13 +215,164 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
 
     const capture = getCapturedChatRequests()[0];
     expect(capture).toMatchObject({
-      messages: [],
+      messages: [{ role: "user", content: "章节 consumer 当前请求" }],
       observation: {
         route: "chapter-chat",
-        message_count: 0,
-        current_user_present: false,
+        message_count: 1,
+        current_user_present: true,
+        current_user_occurrences: 1,
         chapter_scope_present: true,
+        system_sections: ["base_identity", "mode_contract", "chapter_reference", "skill"],
       },
     });
+    expect(capture?.system).toContain("章节写作对话模式");
+    expect(capture?.system).toContain("前文");
   });
+
+  it("restores chapter history in order and appends the current user once", async () => {
+    const seeded = await db.insert(chapterMessages).values([
+      {
+        chapterId,
+        userId,
+        role: "user",
+        content: "章节历史问题",
+      },
+      {
+        chapterId,
+        userId,
+        role: "assistant",
+        content: "章节历史分析",
+        status: "stopped",
+      },
+    ]).returning({ id: chapterMessages.id });
+    expect(seeded).toHaveLength(2);
+
+    await runChapterChat({
+      userId,
+      novelId,
+      chapterId,
+      model: "deepseek-v4-flash",
+      content: "章节当前问题",
+      onDelta: () => {},
+    });
+
+    const capture = getCapturedChatRequests()[0];
+    expect(capture?.messages).toEqual([
+      { role: "user", content: "章节历史问题" },
+      { role: "assistant", content: "章节历史分析" },
+      { role: "user", content: "章节当前问题" },
+    ]);
+    expect(capture?.observation).toMatchObject({
+      history_count_before: 2,
+      history_count_after: 3,
+      current_user_present: true,
+      current_user_occurrences: 1,
+    });
+  });
+
+  it("compresses only old chapter history and keeps the current request last", async () => {
+    const seeded = await db.insert(chapterMessages).values(
+      Array.from({ length: 8 }, (_, index) => ({
+        chapterId,
+        userId,
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `${index}-章节长历史`.repeat(2000),
+      })),
+    ).returning({ id: chapterMessages.id });
+    expect(seeded).toHaveLength(8);
+
+    await runChapterChat({
+      userId,
+      novelId,
+      chapterId,
+      model: "deepseek-v4-flash",
+      content: "章节压缩当前请求",
+      onDelta: () => {},
+    });
+
+    const capture = getCapturedChatRequests()[0];
+    expect(capture?.observation).toMatchObject({
+      compression_applied: true,
+      history_count_before: 8,
+      history_count_after: 7,
+      current_user_present: true,
+      current_user_occurrences: 1,
+    });
+    expect(capture?.system).toContain("历史摘要");
+    expect(capture?.system).toContain("章节写作对话模式");
+    expect(capture?.messages).toHaveLength(7);
+    expect(capture?.messages.slice(0, -1)).toEqual(
+      Array.from({ length: 6 }, (_, index) => ({
+        role: (index + 2) % 2 === 0 ? "user" : "assistant",
+        content: `${index + 2}-章节长历史`.repeat(2000),
+      })),
+    );
+    expect(capture?.messages.at(-1)).toMatchObject({
+      role: "user",
+      content: "章节压缩当前请求",
+    });
+  });
+
+  it("fails open with complete chapter history when compression is unavailable", async () => {
+    const seeded = await db.insert(chapterMessages).values(
+      Array.from({ length: 8 }, (_, index) => ({
+        chapterId,
+        userId,
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `${index}-章节不可压缩历史`.repeat(2000),
+      })),
+    ).returning({ id: chapterMessages.id });
+    expect(seeded).toHaveLength(8);
+
+    const originalProvider = process.env.CHAT_PROVIDER;
+    const originalFetch = globalThis.fetch;
+    process.env.CHAT_PROVIDER = "one-api";
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      if (fetchCount === 1) return new Response(null, { status: 503 });
+      return new Response(
+        'data: {"choices":[{"delta":{"content":"chapter fail-open reply"}}]}\n\ndata: [DONE]\n\n',
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      );
+    };
+
+    try {
+      await runChapterChat({
+        userId,
+        novelId,
+        chapterId,
+        model: "deepseek-v4-flash",
+        content: "章节压缩失败当前请求",
+        onDelta: () => {},
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalProvider === undefined) delete process.env.CHAT_PROVIDER;
+      else process.env.CHAT_PROVIDER = originalProvider;
+    }
+
+    const capture = getCapturedChatRequests()[0];
+    expect(fetchCount).toBe(2);
+    expect(capture?.observation).toMatchObject({
+      compression_applied: false,
+      history_count_before: 8,
+      history_count_after: 9,
+      current_user_present: true,
+      current_user_occurrences: 1,
+    });
+    expect(capture?.system).not.toContain("历史摘要");
+    expect(capture?.messages).toEqual([
+      ...Array.from({ length: 8 }, (_, index) => ({
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `${index}-章节不可压缩历史`.repeat(2000),
+      })),
+      { role: "user", content: "章节压缩失败当前请求" },
+    ]);
+    expect(capture?.messages.at(-1)).toMatchObject({
+      role: "user",
+      content: "章节压缩失败当前请求",
+    });
+  });
+
 });

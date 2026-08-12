@@ -10,7 +10,7 @@ import {
 } from "./stream-provider";
 import type { ChatMessage } from "./payload";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
-import { compressHistory, shouldCompress } from "./compress";
+import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "./models";
 
@@ -78,7 +78,7 @@ export async function listMessages(
     .select({ role: messages.role, content: messages.content })
     .from(messages)
     .where(eq(messages.sessionId, sessionId))
-    .orderBy(messages.createdAt);
+    .orderBy(messages.createdAt, messages.id);
   return rows.map((m) => ({
     role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
     content: m.content,
@@ -101,7 +101,7 @@ async function listMessagesWithIds(
     .select({ id: messages.id, role: messages.role, content: messages.content })
     .from(messages)
     .where(eq(messages.sessionId, sessionId))
-    .orderBy(messages.createdAt);
+    .orderBy(messages.createdAt, messages.id);
   return rows.map((m) => ({
     id: m.id,
     role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
@@ -180,7 +180,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     try {
       const r = await compressHistory(history);
       const candidateSummary = typeof r.summary === "string" ? r.summary.trim() : "";
-      if (candidateSummary && Array.isArray(r.kept)) {
+      if (candidateSummary && isUsableKeptHistory(history, r.kept)) {
         summary = candidateSummary;
         providerHistory = r.kept;
         compressed = true;

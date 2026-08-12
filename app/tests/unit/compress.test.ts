@@ -5,6 +5,7 @@ import {
   historyTokens,
   shouldCompress,
   KEEP_RECENT,
+  isUsableKeptHistory,
 } from "@/lib/chat/compress";
 import type { ChatMessage } from "@/lib/chat/payload";
 
@@ -44,6 +45,15 @@ describe("shouldCompress（70% 阈值）", () => {
 });
 
 describe("compressHistory 保留近期（KEEP_RECENT）", () => {
+  it("只接受原历史的近期后缀作为 kept", () => {
+    const source = Array.from({ length: 8 }, (_, i) => msg(`消息${i}`));
+    expect(isUsableKeptHistory(source, source.slice(-KEEP_RECENT))).toBe(true);
+    expect(isUsableKeptHistory(source, [])).toBe(false);
+    expect(isUsableKeptHistory(source, source.slice(0, KEEP_RECENT))).toBe(false);
+    expect(isUsableKeptHistory(source, [{ role: "user", content: "伪造历史" }])).toBe(false);
+    expect(isUsableKeptHistory(source, [{ role: "system", content: "不是对话历史" }])).toBe(false);
+  });
+
   it("早期消息被摘出，保留最近 6 条原文", async () => {
     process.env.CHAT_PROVIDER = "mock"; // unit 环境无 global-setup，显式注入 mock
     const { compressHistory } = await import("@/lib/chat/compress");

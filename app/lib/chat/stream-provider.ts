@@ -10,10 +10,22 @@ import {
 /** 组装 system 消息：RAG 注入的"参考资料"节（06 工单） */
 export function buildSystemPrompt(injected: string[]): string {
   if (injected.length === 0) return "";
-  return (
-    "以下是作者小说设定库中与当前写作相关的参考资料，写作时必须遵守，不得写崩设定：\n" +
-    injected.map((s) => `- ${s}`).join("\n")
-  );
+  return injected
+    .map((value) => {
+      const section = value.startsWith("[正文参考]")
+        ? "chapter_reference"
+        : value.startsWith("[所选片段]")
+          ? "validated_selection"
+          : value.startsWith("[风格]")
+            ? "style"
+            : value.startsWith("[技能]")
+              ? "skill"
+              : value.startsWith("（历史摘要）")
+                ? "compression_summary"
+                : "novel_context";
+      return `【${section}】\n${value}`;
+    })
+    .join("\n\n");
 }
 
 /** 独立写作对话的稳定身份基座，不依赖作品、风格、技能或 RAG。 */
@@ -24,12 +36,28 @@ export const BASE_IDENTITY =
 export const INDEPENDENT_MODE_CONTRACT =
   "当前处于独立写作对话模式。以用户本轮请求为首要任务，可以讨论剧情、人物、设定、结构和写作方案，也可以在用户明确要求时起笔、续写、改写或润色正文。不得因为存在参考资料、风格或 Skill 就自动把讨论请求解释为正文生成。只有经过归属验证并绑定到当前会话的作品资料才能作为作品上下文；没有绑定作品时，应作为无作品上下文的写作对话处理。";
 
+/** 章节写作对话的模式边界，保留本轮明确意图优先级。 */
+export const CHAPTER_MODE_CONTRACT =
+  "当前处于章节写作对话模式。当前章节正文、合法选区、作品设定、风格和启用的 Skill 都是本轮创作参考与约束；它们不能代替用户本轮请求。必须首先理解并执行用户当前明确意图。用户要求续写、起笔、改写或润色时，按照对应 Skill 和章节上下文生成正文；用户要求讨论、解释、分析或提出方案时，应进行讨论或分析，不得仅因存在章节正文或续写 Skill 就自动续写正文。任何选区只有通过既有合法性校验后才能进入模型上下文。";
+
 /** 独立对话始终带身份与模式，再叠加现有参考资料。 */
 export function buildIndependentSystemPrompt(injected: string[]): string {
   const references = buildSystemPrompt(injected);
   return [
     `【base_identity】\n${BASE_IDENTITY}`,
     `【mode_contract】\n${INDEPENDENT_MODE_CONTRACT}`,
+    references,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** 章节对话始终带身份与章节模式，再叠加已校验的参考资料。 */
+export function buildChapterSystemPrompt(injected: string[]): string {
+  const references = buildSystemPrompt(injected);
+  return [
+    `【base_identity】\n${BASE_IDENTITY}`,
+    `【mode_contract】\n${CHAPTER_MODE_CONTRACT}`,
     references,
   ]
     .filter(Boolean)
