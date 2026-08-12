@@ -1,6 +1,5 @@
 // 上下文自动压缩（12 工单）：会话历史超阈值 → 早期消息摘要化，保留近期原文。
 import type { ChatMessage } from "./payload";
-import { DEFAULT_MODEL } from "./models";
 import type { CompletionAdapter } from "./llm-transport";
 
 /** 上下文窗口（对齐 UI 上下文面板 8K） */
@@ -68,6 +67,7 @@ const SUMMARY_PROMPT = `你是对话摘要器。将以下小说写作对话的�
 export async function compressHistory(
   messages: ChatMessage[],
   completionAdapter: CompletionAdapter,
+  model: string,
 ): Promise<{ summary: string; kept: ChatMessage[] }> {
   const kept = messages.slice(-KEEP_RECENT);
   const early = messages.slice(0, Math.max(0, messages.length - KEEP_RECENT));
@@ -75,7 +75,7 @@ export async function compressHistory(
 
   try {
     const result = await completionAdapter.complete({
-      model: DEFAULT_MODEL,
+      model,
       system: SUMMARY_PROMPT,
       messages: [{ role: "user", content: early.map((m) => `${m.role}: ${m.content}`).join("\n\n") }],
     });

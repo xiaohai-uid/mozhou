@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { compressHistory, KEEP_RECENT } from "@/lib/chat/compress";
-import type { CompletionAdapter } from "@/lib/chat/llm-transport";
+import { createOneApiLlmTransport, type CompletionAdapter } from "@/lib/chat/llm-transport";
 import type { ChatMessage } from "@/lib/chat/payload";
 
 const messages: ChatMessage[] = Array.from({ length: 8 }, (_, index) => ({
@@ -9,6 +9,50 @@ const messages: ChatMessage[] = Array.from({ length: 8 }, (_, index) => ({
 }));
 
 describe("compression completion adapter", () => {
+  it("uses the selected non-default model for completion and streaming", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "摘要" } }],
+    }), { status: 200 }));
+    const transport = createOneApiLlmTransport({
+      baseUrl: "https://one-api.example",
+      token: "test-token",
+      fetch: fetcher,
+    });
+
+    await compressHistory(messages, transport, "glm-4.5-flash");
+    const stream = transport.stream({
+      model: "glm-4.5-flash",
+      system: "same request semantics",
+      messages: [{ role: "user", content: "current user" }],
+      observation: {
+        route: "chat",
+        mode: "independent",
+        historyCountBefore: 0,
+        historyCountAfter: 1,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        currentUserIndices: [0],
+        systemSections: ["base_identity"],
+      },
+    });
+    for await (const _ of stream.stream()) {
+      // Consume the provider seam; the fake completion body has no stream deltas.
+    }
+
+    const bodies = (fetcher.mock.calls as unknown as Array<[string, RequestInit]>).map(([, init]) =>
+      JSON.parse(String(init.body)),
+    );
+    expect(bodies).toEqual([
+      expect.objectContaining({ model: "glm-4.5-flash", stream: false }),
+      expect.objectContaining({ model: "glm-4.5-flash", stream: true }),
+    ]);
+  });
+
   it("uses the injected completion adapter without making a network request", async () => {
     const complete = vi.fn(async () => ({ text: "已确认世界观与偏好" }));
     const adapter: CompletionAdapter = { complete };
@@ -18,7 +62,7 @@ describe("compression completion adapter", () => {
     }) as typeof fetch;
 
     try {
-      await expect(compressHistory(messages, adapter)).resolves.toEqual({
+      await expect(compressHistory(messages, adapter, "deepseek-v4-flash")).resolves.toEqual({
         summary: "（历史摘要）已确认世界观与偏好",
         kept: messages.slice(-KEEP_RECENT),
       });
@@ -38,7 +82,7 @@ describe("compression completion adapter", () => {
       complete: async () => { throw new Error("upstream unavailable"); },
     };
 
-    await expect(compressHistory(messages, adapter)).resolves.toEqual({
+    await expect(compressHistory(messages, adapter, "deepseek-v4-flash")).resolves.toEqual({
       summary: "",
       kept: messages.slice(-KEEP_RECENT),
     });

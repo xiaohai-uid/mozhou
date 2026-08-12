@@ -151,7 +151,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   let providerHistory = history;
   if (shouldCompress(history)) {
     try {
-      const result = await compressHistory(history, transport);
+      const result = await compressHistory(history, transport, input.model);
       const candidateSummary = typeof result.summary === "string" ? result.summary.trim() : "";
       if (candidateSummary && isUsableKeptHistory(history, result.kept)) {
         summary = candidateSummary;

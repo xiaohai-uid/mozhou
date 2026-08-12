@@ -61,7 +61,7 @@ describe("compressHistory 保留近期（KEEP_RECENT）", () => {
 
   it("早期消息被摘出，保留最近 6 条原文", async () => {
     const messages = Array.from({ length: 10 }, (_, i) => msg(`消息${i}`));
-    const r = await compressHistory(messages, fakeCompletion);
+    const r = await compressHistory(messages, fakeCompletion, "deepseek-v4-flash");
     expect(r.summary).toContain("历史摘要");
     expect(r.kept).toHaveLength(KEEP_RECENT);
     expect(r.kept.at(-1)?.content).toBe("消息9");
@@ -71,7 +71,7 @@ describe("compressHistory 保留近期（KEEP_RECENT）", () => {
 
   it("消息数 <= KEEP_RECENT → 不压缩", async () => {
     const messages = Array.from({ length: 4 }, (_, i) => msg(`消息${i}`));
-    const r = await compressHistory(messages, fakeCompletion);
+    const r = await compressHistory(messages, fakeCompletion, "deepseek-v4-flash");
     expect(r.summary).toBe("");
     expect(r.kept).toHaveLength(4);
   });

@@ -192,7 +192,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   let providerHistory = history;
   if (shouldCompress(history)) {
     try {
-      const r = await compressHistory(history, transport);
+      const r = await compressHistory(history, transport, input.model);
       const candidateSummary = typeof r.summary === "string" ? r.summary.trim() : "";
       if (candidateSummary && isUsableKeptHistory(history, r.kept)) {
         summary = candidateSummary;
