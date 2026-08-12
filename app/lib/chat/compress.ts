@@ -1,6 +1,7 @@
 // 上下文自动压缩（12 工单）：会话历史超阈值 → 早期消息摘要化，保留近期原文。
-// 摘要经 one-api 非流式生成；测试模式（CHAT_PROVIDER=mock）返回固定摘要。
 import type { ChatMessage } from "./payload";
+import { DEFAULT_MODEL } from "./models";
+import type { CompletionAdapter } from "./llm-transport";
 
 /** 上下文窗口（对齐 UI 上下文面板 8K） */
 export const CONTEXT_MAX_TOKENS = 8000;
@@ -66,46 +67,19 @@ const SUMMARY_PROMPT = `你是对话摘要器。将以下小说写作对话的�
  */
 export async function compressHistory(
   messages: ChatMessage[],
+  completionAdapter: CompletionAdapter,
 ): Promise<{ summary: string; kept: ChatMessage[] }> {
   const kept = messages.slice(-KEEP_RECENT);
   const early = messages.slice(0, Math.max(0, messages.length - KEEP_RECENT));
   if (early.length === 0) return { summary: "", kept };
 
-  // 测试模式：固定摘要（不依赖外网）
-  if (process.env.CHAT_PROVIDER === "mock") {
-    return {
-      summary: `（历史摘要）前 ${early.length} 条消息已压缩：对话围绕小说写作展开，确立了世界观设定与写作偏好。`,
-      kept,
-    };
-  }
-
   try {
-    const res = await fetch(
-      `${process.env.ONEAPI_BASE_URL ?? "http://localhost:3001"}/v1/chat/completions`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.ONEAPI_TOKEN ?? ""}`,
-        },
-        body: JSON.stringify({
-          model: process.env.DEFAULT_MODEL ?? "deepseek-v4-flash",
-          stream: false,
-          messages: [
-            { role: "system", content: SUMMARY_PROMPT },
-            {
-              role: "user",
-              content: early.map((m) => `${m.role}: ${m.content}`).join("\n\n"),
-            },
-          ],
-        }),
-      },
-    );
-    if (!res.ok) return { summary: "", kept };
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const summary = data.choices?.[0]?.message?.content?.trim() ?? "";
+    const result = await completionAdapter.complete({
+      model: DEFAULT_MODEL,
+      system: SUMMARY_PROMPT,
+      messages: [{ role: "user", content: early.map((m) => `${m.role}: ${m.content}`).join("\n\n") }],
+    });
+    const summary = result.text.trim();
     return {
       summary: summary ? `（历史摘要）${summary}` : "",
       kept,

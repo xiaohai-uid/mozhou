@@ -5,6 +5,7 @@ import {
   resetPayloadObservations,
 } from "@/lib/chat/payload";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
+import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
 
 describe("final chat payload observability", () => {
   const originalCapture = process.env.CHAT_CAPTURE;
@@ -47,7 +48,7 @@ describe("final chat payload observability", () => {
         currentUserIndices: [1],
         systemSections: ["injected_context"],
       },
-    });
+    }, createLlmTransportFromEnv());
 
     for await (const _delta of provider.stream()) {
       // 消费整个流，确保捕获发生在真实 provider 调用路径中。
@@ -85,7 +86,7 @@ describe("final chat payload observability", () => {
         currentUserIndices: [],
         systemSections: [],
       },
-    });
+    }, createLlmTransportFromEnv());
 
     for await (const _delta of provider.stream()) {
       // Keep the test at the provider seam rather than asserting mock text.
@@ -123,7 +124,7 @@ describe("final chat payload observability", () => {
         currentUserIndices: [0],
         systemSections: ["injected_context"],
       },
-    });
+    }, createLlmTransportFromEnv());
     for await (const _delta of provider.stream()) {
       // no-op
     }
@@ -169,7 +170,7 @@ describe("final chat payload observability", () => {
           currentUserIndices: [0],
           systemSections: ["injected_context"],
         },
-      });
+      }, createLlmTransportFromEnv());
       const deltas = [];
       for await (const delta of provider.stream()) deltas.push(delta);
       expect(deltas.some((delta) => "text" in delta)).toBe(true);

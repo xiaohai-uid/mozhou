@@ -1,12 +1,14 @@
 // 上下文压缩单元测试（12 工单）：token 估算 / 阈值检测 / 压缩保留近期
 import { describe, it, expect } from "vitest";
 import {
+  compressHistory,
   estimateTokens,
   historyTokens,
   shouldCompress,
   KEEP_RECENT,
   isUsableKeptHistory,
 } from "@/lib/chat/compress";
+import type { CompletionAdapter } from "@/lib/chat/llm-transport";
 import type { ChatMessage } from "@/lib/chat/payload";
 
 function msg(content: string): ChatMessage {
@@ -45,6 +47,9 @@ describe("shouldCompress（70% 阈值）", () => {
 });
 
 describe("compressHistory 保留近期（KEEP_RECENT）", () => {
+  const fakeCompletion: CompletionAdapter = {
+    complete: async () => ({ text: "对话围绕小说写作展开，确立了世界观设定与写作偏好。" }),
+  };
   it("只接受原历史的近期后缀作为 kept", () => {
     const source = Array.from({ length: 8 }, (_, i) => msg(`消息${i}`));
     expect(isUsableKeptHistory(source, source.slice(-KEEP_RECENT))).toBe(true);
@@ -55,11 +60,8 @@ describe("compressHistory 保留近期（KEEP_RECENT）", () => {
   });
 
   it("早期消息被摘出，保留最近 6 条原文", async () => {
-    process.env.CHAT_PROVIDER = "mock"; // unit 环境无 global-setup，显式注入 mock
-    const { compressHistory } = await import("@/lib/chat/compress");
     const messages = Array.from({ length: 10 }, (_, i) => msg(`消息${i}`));
-    const r = await compressHistory(messages);
-    // mock provider 下返回固定摘要
+    const r = await compressHistory(messages, fakeCompletion);
     expect(r.summary).toContain("历史摘要");
     expect(r.kept).toHaveLength(KEEP_RECENT);
     expect(r.kept.at(-1)?.content).toBe("消息9");
@@ -68,10 +70,8 @@ describe("compressHistory 保留近期（KEEP_RECENT）", () => {
   });
 
   it("消息数 <= KEEP_RECENT → 不压缩", async () => {
-    process.env.CHAT_PROVIDER = "mock";
-    const { compressHistory } = await import("@/lib/chat/compress");
     const messages = Array.from({ length: 4 }, (_, i) => msg(`消息${i}`));
-    const r = await compressHistory(messages);
+    const r = await compressHistory(messages, fakeCompletion);
     expect(r.summary).toBe("");
     expect(r.kept).toHaveLength(4);
   });

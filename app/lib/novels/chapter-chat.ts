@@ -14,6 +14,7 @@ import { retrieveContext } from "./rag";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
 import { buildWritingContext, type WritingContextSection } from "@/lib/chat/writing-context";
+import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "@/lib/chat/models";
 import type { ChatMessage } from "@/lib/chat/payload";
@@ -143,13 +144,14 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       role: message.role === "assistant" ? ("assistant" as const) : ("user" as const),
       content: message.content,
     }));
+  const transport = createLlmTransportFromEnv();
 
   let compressed = false;
   let summary = "";
   let providerHistory = history;
   if (shouldCompress(history)) {
     try {
-      const result = await compressHistory(history);
+      const result = await compressHistory(history, transport);
       const candidateSummary = typeof result.summary === "string" ? result.summary.trim() : "";
       if (candidateSummary && isUsableKeptHistory(history, result.kept)) {
         summary = candidateSummary;
@@ -241,7 +243,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       chapterScopePresent: true,
       ownerScopeResolved: true,
     },
-  }));
+  }), transport);
   let reply = "";
   let stopped = false;
 

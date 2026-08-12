@@ -11,6 +11,7 @@ import {
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
 import { makeChatProvider } from "./stream-provider";
+import { createLlmTransportFromEnv } from "./llm-transport";
 import { buildWritingContext, type WritingContextSection } from "./writing-context";
 import type { ChatMessage } from "./payload";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
@@ -183,6 +184,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   const history = storedMessages
     .filter((message) => message.id !== currentMessage.id)
     .map(({ role, content }) => ({ role, content }));
+  const transport = createLlmTransportFromEnv();
 
   // 上下文压缩（12 工单）：只压缩历史，本轮 user 永远独立追加到末尾。
   let compressed = false;
@@ -190,7 +192,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   let providerHistory = history;
   if (shouldCompress(history)) {
     try {
-      const r = await compressHistory(history);
+      const r = await compressHistory(history, transport);
       const candidateSummary = typeof r.summary === "string" ? r.summary.trim() : "";
       if (candidateSummary && isUsableKeptHistory(history, r.kept)) {
         summary = candidateSummary;
@@ -261,7 +263,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       chapterScopePresent: false,
       ownerScopeResolved: true,
     },
-  }));
+  }), transport);
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },
