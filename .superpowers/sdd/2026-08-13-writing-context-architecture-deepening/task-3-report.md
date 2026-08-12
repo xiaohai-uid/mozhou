@@ -5,7 +5,7 @@ Date: 2026-08-13
 ## Scope delivered
 
 - Added `app/lib/novels/chapter-replay.ts`: replayable persistence rows are converted to provider history only when they are `user/done`, `assistant/completed_candidate`, or `assistant/applied`. The current user and active candidate are excluded; `writing-context` remains responsible for appending the final current user message.
-- Added `app/lib/novels/chapter-candidate.ts`: candidate preparation/reuse, stale `generating` recovery, provider settlement, owner/status/revision/content application guards, race-safe idempotent apply, and discard transitions are centralized here.
+- Added `app/lib/novels/chapter-candidate.ts`: candidate preparation/reuse, stale `generating` recovery, provider settlement, owner/status/revision/content application guards, race-safe single-writer apply / duplicate returns 400, and discard transitions are centralized here.
 - Added `app/lib/novels/ownership.ts`: a single owner resolver is used for route precheck and the domain transaction. The route retains synchronous HTTP 404 before it creates the SSE stream/provider; the transaction is authoritative.
 - Refactored `app/lib/novels/chapter-chat.ts` to orchestrate context, transport, and events while delegating replay/candidate mutation decisions to the focused modules.
 - Updated the chapter chat route to use the ownership resolver; added focused replay/lifecycle tests and strengthened the HTTP test to prove a non-owner request produces no provider observation.
@@ -18,7 +18,7 @@ No schema, transport, compression, SSE framing, or public event contract was int
 | --- | --- | --- |
 | `user + done` | yes | n/a |
 | `assistant + completed_candidate` | yes | allowed only for owner, non-empty content, matching revision/content guard |
-| `assistant + applied` | yes | idempotent; no duplicate body mutation |
+| `assistant + applied` | yes | 历史上已应用；再次 apply 必须 400，且不重复修改正文 |
 | `assistant + generating` | no | rejected |
 | `assistant + stopped` | no | allowed only with owner and matching revision/content guard |
 | `assistant + error` | no | rejected |
@@ -53,7 +53,7 @@ node scripts/smoke-real-llm.mjs
 PASS: real one-api chapter generation, SSE 52 deltas/done, assistant persistence and refresh, then apply and chapter-body verification. Candidate messageId=10050; reply=340 chars; resulting body=370 chars.
 ```
 
-The focused HTTP suite covers idempotent generation-key reuse, exactly-once candidate persistence, complete/stopped/error state handling, owner/status/revision/expected-content guards, duplicate application, concurrent application, and the non-owner `provider_call_count=0` equivalent (no new provider observation).
+The focused HTTP suite covers same-generation-key reuse, exactly-once candidate persistence, complete/stopped/error state handling, owner/status/revision/expected-content guards, duplicate application returning 400, concurrent application, and the non-owner `provider_call_count=0` equivalent (no new provider observation).
 
 ## DB evidence
 
