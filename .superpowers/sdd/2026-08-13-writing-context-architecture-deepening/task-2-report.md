@@ -172,3 +172,17 @@ npx tsc --noEmit
 ```
 
 Result: 3 files, 22 tests passed; TypeScript check exit 0.
+
+### Post-commit command-context correction
+
+Immediately after commit `0536fa9`, the combined verification command was accidentally started from `C:\zcode\novel-ai` rather than `C:\zcode\novel-ai\app`. The scoped whitespace check ran successfully, but the subsequent commands did not run: `npm` reported that `C:\zcode\novel-ai\package.json` was missing and `npx tsc` printed its missing-compiler message. That failed root-directory invocation is not treated as a passing verification.
+
+The same checks were then re-run from `C:\zcode\novel-ai\app`:
+
+```powershell
+git diff --check 6dd2e0e..HEAD
+npm test -- tests/unit/compress-adapter.test.ts tests/unit/compress.test.ts tests/unit/payload-consumer.test.ts --maxWorkers=1 --fileParallelism=false
+npx tsc --noEmit
+```
+
+Result: all exit 0; the scoped diff check produced no output, and 3 files / 22 tests passed.
