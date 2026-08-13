@@ -1,27 +1,15 @@
 // GET /api/v1/rankings — 网文扫榜：真实榜源不可用时返回空榜并标记 degraded。
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import {
+  RANKING_BOARDS,
+  findRankingBoard,
+  resolveFanqieRankingRows,
+  type RankingBoard,
+  type RankingRow,
+} from "@/lib/story/rankings";
 
-export interface RankingBoard {
-  name: string;
-  site: string;
-  url: string;
-  mode: "long" | "short";
-}
-
-export interface RankingRow {
-  rank: number;
-  name: string;
-  heat: string;
-  source: string;
-  capturedAt: string;
-  url: string;
-}
-
-const BOARDS: RankingBoard[] = [
-  { name: "长篇热门榜", site: "番茄小说", url: "https://fanqienovel.com/rank/0_2_1139", mode: "long" },
-  { name: "短篇热门榜", site: "番茄小说", url: "https://fanqienovel.com/rank/0_1_1139", mode: "short" },
-];
+export type { RankingBoard, RankingRow } from "@/lib/story/rankings";
 
 /** 按榜数据（mock：各榜不同，验证按榜查询链路） */
 const BOARD_ROWS: Record<string, RankingRow[]> = {
@@ -82,48 +70,71 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const url = new URL(request.url);
-  const board = url.searchParams.get("board") ?? "畅销榜 Top10";
-  const selectedBoard = BOARDS.find((item) => item.name === board) ?? BOARDS[0];
+  const board = url.searchParams.get("board");
+  const categoryId = url.searchParams.get("category");
+  const selectedBoard = findRankingBoard(board);
+  const selectedCategory = selectedBoard.categories.find((category) => category.id === categoryId)
+    ?? selectedBoard.categories[0];
+  const selectedUrl = selectedCategory?.url ?? selectedBoard.url;
 
   // 测试模式：按榜返回不同数据（验证按榜查询）
   if (process.env.RANKINGS_PROVIDER === "mock") {
+    const mockBoard = board ?? "畅销榜 Top10";
     return NextResponse.json({
-      boards: BOARDS,
-      rows: (BOARD_ROWS[board] ?? FALLBACK_ROWS).map((row) => ({ ...row, source: "mock", url: selectedBoard.url })),
+      boards: RANKING_BOARDS,
+      rows: (BOARD_ROWS[mockBoard] ?? FALLBACK_ROWS).map((row) => ({ ...row, source: "mock", url: selectedBoard.url })),
       board: selectedBoard.name,
       degraded: true,
+      degradationReason: "mock_provider",
       note: "榜单数据源降级（mock 数据）",
+    });
+  }
+
+  if (selectedBoard.adapter !== "fanqie") {
+    return NextResponse.json({
+      boards: RANKING_BOARDS,
+      rows: [],
+      board: selectedBoard.name,
+      degraded: true,
+      degradationReason: "external_source_adapter_required",
+      note: `${selectedBoard.site}榜单适配器尚未配置，未返回虚构榜单`,
     });
   }
 
   // 真实榜源请求（带榜参数，超时受控）；失败降级
   try {
-    const res = await fetchRankingSource(selectedBoard.url);
+    const res = await fetchRankingSource(selectedUrl);
     if (!res.ok) throw new Error(`上游 ${res.status}`);
-    const html = await res.text();
     const capturedAt = new Date().toISOString();
-    const names = [...html.matchAll(/"bookName":"([^"\\]+)"/g)]
-      .map((m) => m[1])
-      .filter((n, i, all) => all.indexOf(n) === i)
-      .slice(0, 10);
-    if (names.length === 0) {
-      return NextResponse.json({ boards: BOARDS, rows: [], board: selectedBoard.name, degraded: true, note: "榜单解析失败，未返回虚构榜单" });
-    }
+    const html = await res.text();
+    const result = await resolveFanqieRankingRows({
+      boardUrl: selectedUrl,
+      capturedAt,
+      listHtml: html,
+      fetchDetail: async (bookId) => {
+        const detail = await fetchRankingSource(`https://fanqienovel.com/page/${bookId}`);
+        if (!detail.ok) throw new Error(`详情页上游 ${detail.status}`);
+        return detail.text();
+      },
+    });
     return NextResponse.json({
-      boards: BOARDS,
-      rows: names.slice(0, 5).map((n, i) => ({ rank: i + 1, name: n, heat: "—", source: "fanqienovel.com", capturedAt, url: selectedBoard.url })),
+      boards: RANKING_BOARDS,
+      rows: result.rows,
       board: selectedBoard.name,
-      degraded: false,
+      category: selectedCategory?.id,
+      degraded: result.degraded,
+      ...(result.degradationReason ? { degradationReason: result.degradationReason, note: result.degradationReason } : {}),
     });
   } catch (err) {
     const message = err instanceof Error && err.name === "AbortError"
       ? "榜单源请求超时"
       : "榜单源暂时不可达";
     return NextResponse.json({
-      boards: BOARDS,
+      boards: RANKING_BOARDS,
       rows: [],
       board: selectedBoard.name,
       degraded: true,
+      degradationReason: message,
       note: `${message}，未返回虚构榜单`,
     });
   }

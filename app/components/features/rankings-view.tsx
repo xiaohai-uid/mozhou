@@ -5,9 +5,13 @@ import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trophy } from "@phosphor-icons/react/dist/ssr";
 
 interface RankingBoard {
+  id?: string;
   name: string;
   site: string;
   url?: string;
+  mode?: "long" | "short";
+  availability?: string;
+  categories?: Array<{ id: string; name: string; url: string }>;
 }
 
 interface RankingRow {
@@ -23,6 +27,7 @@ export function RankingsView() {
   const [enabled, setEnabled] = useState(false);
   const [boards, setBoards] = useState<RankingBoard[]>([]);
   const [board, setBoard] = useState("");
+  const [category, setCategory] = useState("");
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [degraded, setDegraded] = useState(false);
@@ -44,6 +49,8 @@ export function RankingsView() {
       if (data.boards && data.boards.length > 0 && !board) {
         setBoards(data.boards);
         setBoard(data.boards[0].name);
+        const firstCategory = data.boards[0].categories?.[0];
+        if (firstCategory) setCategory(firstCategory.id);
       }
       setRows(data.rows ?? []);
       setDegraded(data.degraded ?? false);
@@ -68,7 +75,35 @@ export function RankingsView() {
   async function switchBoard(name: string) {
     if (name === board || loading) return;
     setBoard(name);
+    const next = boards.find((item) => item.name === name);
+    const nextCategory = next?.categories?.[0]?.id ?? "";
+    setCategory(nextCategory);
     await fetchRankings(name);
+  }
+
+  async function switchCategory(id: string) {
+    if (id === category || loading) return;
+    setCategory(id);
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/rankings?board=${encodeURIComponent(board)}&category=${encodeURIComponent(id)}`,
+      );
+      if (!res.ok) throw new Error("榜单加载失败");
+      const data = (await res.json()) as {
+        rows?: RankingRow[];
+        degraded?: boolean;
+        note?: string;
+      };
+      setRows(data.rows ?? []);
+      setDegraded(data.degraded ?? false);
+      setNote(data.note ?? null);
+    } catch {
+      setDegraded(true);
+      setNote("榜单加载失败");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -118,6 +153,25 @@ export function RankingsView() {
               </button>
             ))}
           </div>
+
+          {boards.find((item) => item.name === board)?.categories?.length ? (
+            <div className="mt-4 flex flex-wrap gap-2 border-l-2 border-accent/40 pl-4">
+              {boards.find((item) => item.name === board)?.categories?.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => void switchCategory(item.id)}
+                  disabled={loading}
+                  className={`rounded-full px-3 py-1.5 text-xs transition disabled:opacity-50 ${
+                    category === item.id
+                      ? "bg-accent/20 text-accent"
+                      : "border border-surface-2 text-faint hover:text-zinc-200"
+                  }`}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {/* 榜单 */}
           <div className="mt-6 rounded-card border border-surface-2 bg-surface/50">
