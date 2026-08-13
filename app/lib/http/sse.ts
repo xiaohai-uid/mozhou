@@ -22,6 +22,7 @@ export function safeSseErrorMessage(_error: unknown, fallback = "生成失败，
 export function createSseStream(run: SseRun, requestSignal?: AbortSignal): ReadableStream<Uint8Array> {
   const abortController = new AbortController();
   requestSignal?.addEventListener("abort", () => abortController.abort(), { once: true });
+  if (requestSignal?.aborted) abortController.abort();
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -46,6 +47,7 @@ export function createSseStream(run: SseRun, requestSignal?: AbortSignal): Reada
       };
 
       try {
+        if (abortController.signal.aborted) return;
         await run(writer, abortController.signal);
       } catch (error) {
         writer.error({ type: "error", message: safeSseErrorMessage(error) });

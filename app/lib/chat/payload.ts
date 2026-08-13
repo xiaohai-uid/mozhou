@@ -95,7 +95,11 @@ export function isPayloadCaptureEnabled(): boolean {
 /** 将最终请求转换成生产可记录的白名单结构，绝不包含正文或 prompt。 */
 export function buildPayloadObservation(request: PreparedChatRequest): PayloadObservation {
   const messages = request.messages;
-  const currentUserOccurrences = messages.at(-1)?.role === "user" ? 1 : 0;
+  const currentUserOccurrences = new Set(request.observation.currentUserIndices).size
+    ? [...new Set(request.observation.currentUserIndices)].filter(
+        (index) => Number.isInteger(index) && index >= 0 && index < messages.length && messages[index]?.role === "user",
+      ).length
+    : 0;
   const systemPresent = Boolean(request.system);
   const systemSections = systemPresent
     ? [...request.system!.matchAll(/^【([^】\r\n]+)】$/gm)]

@@ -62,6 +62,21 @@ describe("shared SSE framing", () => {
     expect(aborted).toBe(true);
   });
 
+  it("does not start the route callback when the request is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let started = false;
+
+    const stream = createSseStream(async (_writer, signal) => {
+      started = true;
+      expect(signal.aborted).toBe(true);
+    }, controller.signal);
+
+    const reader = stream.getReader();
+    await reader.cancel();
+    expect(started).toBe(false);
+  });
+
   it("uses a generic error message without provider details or secrets", () => {
     expect(safeSseErrorMessage(
       new Error("gateway Bearer very-secret-token failed\n at internal.ts:7"),

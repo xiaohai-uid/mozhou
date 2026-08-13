@@ -46,7 +46,7 @@ describe("final chat payload observability", () => {
         novelScopePresent: false,
         chapterScopePresent: false,
         ownerScopeResolved: true,
-        currentUserIndices: [],
+        currentUserIndices: [1],
         systemSections: ["caller_supplied_section"],
       },
     });
@@ -59,6 +59,35 @@ describe("final chat payload observability", () => {
       current_user_occurrences: 1,
     });
     expect(JSON.stringify(observation)).not.toContain("not_a_section_secret");
+  });
+
+  it("counts only valid current-user markers from the final request", () => {
+    const observation = buildPayloadObservation({
+      model: "test-model",
+      messages: [
+        { role: "user", content: "history user" },
+        { role: "assistant", content: "history assistant" },
+        { role: "user", content: "current user" },
+      ],
+      observation: {
+        route: "chat",
+        mode: "independent",
+        historyCountBefore: 2,
+        historyCountAfter: 3,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        currentUserIndices: [2, 2, 99],
+        systemSections: [],
+      },
+    });
+
+    expect(observation.current_user_occurrences).toBe(1);
+    expect(observation.current_user_present).toBe(true);
   });
 
   it("captures the exact final system and messages before provider consumption", async () => {
