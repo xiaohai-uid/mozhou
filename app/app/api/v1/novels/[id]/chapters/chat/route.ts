@@ -107,7 +107,11 @@ export async function POST(
           skills,
           selection,
           signal: request.signal,
-          onDelta: (text) => send({ type: "delta", text }),
+          onDelta: (text) => {
+            if (!send({ type: "delta", text })) {
+              throw new Error("SSE client disconnected");
+            }
+          },
         });
         if (result.stopped) {
           send({ type: "error", code: "AiCancelled", message: "已停止生成" });

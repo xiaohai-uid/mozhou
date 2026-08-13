@@ -81,7 +81,11 @@ export async function POST(request: Request) {
           novelId,
           styleId,
           skills,
-          onDelta: (text) => send({ type: "delta", text }),
+          onDelta: (text) => {
+            if (!send({ type: "delta", text })) {
+              throw new Error("SSE client disconnected");
+            }
+          },
         });
         if (result.state.task?.status === "ok" && result.messageId) {
           send({
