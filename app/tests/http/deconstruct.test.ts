@@ -65,6 +65,13 @@ describe("POST /api/v1/deconstruct/analyze（mock provider）", () => {
     expect(retryBody.runId).toBe(runId);
     expect(retryBody.title).toBe("灰烬有籽");
 
+    const changedInput = await fetch(`${BASE}/api/v1/deconstruct/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ text: `${text}正文已变更。`, title: "灰烬有籽", requestKey, mode: "short" }),
+    });
+    expect(changedInput.status).toBe(409);
+
     const runs = await fetch(`${BASE}/api/v1/deconstruct/runs`, { headers: { cookie } });
     expect(runs.status).toBe(200);
     const runsBody = (await runs.json()) as { runs: Array<{ id: number; result?: unknown }> };

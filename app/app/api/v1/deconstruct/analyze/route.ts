@@ -248,9 +248,9 @@ export async function POST(request: Request) {
   }
   if (requestKey) {
     const [existing] = await db.select().from(deconstructionRuns).where(and(eq(deconstructionRuns.userId, user.id), eq(deconstructionRuns.requestKey, requestKey)));
+    if (existing && existing.sourceHash !== sourceHash) return NextResponse.json({ error: "拆解请求键已用于另一份正文" }, { status: 409 });
     if (existing?.status === "completed" && existing.result) return NextResponse.json({ runId: existing.id, result: existing.result, title: existing.title, status: existing.status, resumed: true });
     if (existing?.status === "failed") return NextResponse.json({ runId: existing.id, status: "failed", error: existing.errorMessage ?? "该运行已失败，请使用新的请求键重新执行", errorClass: existing.lastErrorClass }, { status: 409 });
-    if (existing && existing.sourceHash !== sourceHash) return NextResponse.json({ error: "拆解请求键已用于另一份正文" }, { status: 409 });
     if (existing?.status === "running") {
       const staleAfterMs = 15 * 60 * 1000;
       const isStale = Date.now() - existing.updatedAt.getTime() > staleAfterMs;
@@ -270,7 +270,8 @@ export async function POST(request: Request) {
     const [run] = await db.insert(deconstructionRuns).values({ userId: user.id, novelId, title, sourceHash, sourceLength: text.length, requestKey, status: "running" }).onConflictDoNothing({ target: [deconstructionRuns.userId, deconstructionRuns.requestKey] }).returning({ id: deconstructionRuns.id });
     runId = run?.id;
     if (!runId) {
-      const [existing] = await db.select({ id: deconstructionRuns.id, status: deconstructionRuns.status, result: deconstructionRuns.result, errorMessage: deconstructionRuns.errorMessage, lastErrorClass: deconstructionRuns.lastErrorClass }).from(deconstructionRuns).where(and(eq(deconstructionRuns.userId, user.id), eq(deconstructionRuns.requestKey, requestKey)));
+      const [existing] = await db.select({ id: deconstructionRuns.id, sourceHash: deconstructionRuns.sourceHash, status: deconstructionRuns.status, result: deconstructionRuns.result, errorMessage: deconstructionRuns.errorMessage, lastErrorClass: deconstructionRuns.lastErrorClass }).from(deconstructionRuns).where(and(eq(deconstructionRuns.userId, user.id), eq(deconstructionRuns.requestKey, requestKey)));
+      if (existing?.sourceHash && existing.sourceHash !== sourceHash) return NextResponse.json({ error: "拆解请求键已用于另一份正文" }, { status: 409 });
       if (existing?.status === "completed" && existing.result) return NextResponse.json({ runId: existing.id, result: existing.result, title, status: existing.status, resumed: true });
       if (existing?.status === "failed") return NextResponse.json({ runId: existing.id, status: "failed", error: existing.errorMessage ?? "该运行已失败，请使用新的请求键重新执行", errorClass: existing.lastErrorClass }, { status: 409 });
       runId = existing?.id;
