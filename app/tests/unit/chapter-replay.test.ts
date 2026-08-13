@@ -4,6 +4,7 @@ import {
   isReplayableChapterMessage,
   type ReplayableChapterMessage,
 } from "@/lib/novels/chapter-replay";
+import { normalizePersistedChapterMessageStatus } from "@/lib/novels/chapter-candidate";
 
 function row(overrides: Partial<ReplayableChapterMessage>): ReplayableChapterMessage {
   return {
@@ -16,6 +17,31 @@ function row(overrides: Partial<ReplayableChapterMessage>): ReplayableChapterMes
 }
 
 describe("chapter replay policy", () => {
+  it("replays a legacy completed assistant only after candidate normalization", () => {
+    const status = normalizePersistedChapterMessageStatus({
+      role: "assistant",
+      status: "done",
+      inserted: false,
+    });
+
+    expect(
+      buildChapterReplayHistory(
+        [row({ role: "assistant", content: "legacy response", status })],
+        99,
+      ),
+    ).toEqual([{ role: "assistant", content: "legacy response" }]);
+  });
+
+  it("does not normalize a user history row into an assistant candidate", () => {
+    expect(
+      normalizePersistedChapterMessageStatus({
+        role: "user",
+        status: "done",
+        inserted: false,
+      }),
+    ).toBe("done");
+  });
+
   it.each([
     [row({ role: "user", status: "done" }), true],
     [row({ role: "assistant", status: "completed_candidate" }), true],

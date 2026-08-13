@@ -17,9 +17,24 @@ export interface CandidateRecord {
   inserted: boolean;
 }
 
+export interface PersistedChapterMessageStatus {
+  role: "user" | "assistant";
+  status: CandidateStatus;
+  inserted: boolean;
+}
+
 export function normalizeCandidateStatus(candidate: CandidateRecord): CandidateStatus {
   if (candidate.inserted || candidate.status === "applied") return "applied";
   return candidate.status === "done" ? "completed_candidate" : candidate.status;
+}
+
+/** Keeps user history values intact while normalizing assistant candidate persistence. */
+export function normalizePersistedChapterMessageStatus(
+  message: PersistedChapterMessageStatus,
+): CandidateStatus {
+  return message.role === "assistant"
+    ? normalizeCandidateStatus(message)
+    : message.status;
 }
 
 export function settleChapterCandidate(input: {

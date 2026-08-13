@@ -315,7 +315,7 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
     expect(capture?.system).toContain("前文");
   });
 
-  it("restores chapter history in order and appends the current user once", async () => {
+  it("normalizes legacy completed chapter history and appends the current user once", async () => {
     const seeded = await db.insert(chapterMessages).values([
       {
         chapterId,
@@ -328,7 +328,8 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
         userId,
         role: "assistant",
         content: "章节历史分析",
-        status: "stopped",
+        // Legacy persisted success value; chapter-chat must normalize it before replay.
+        status: "done",
       },
     ]).returning({ id: chapterMessages.id });
     expect(seeded).toHaveLength(2);

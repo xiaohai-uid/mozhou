@@ -30,6 +30,7 @@ import {
   discardChapterCandidate,
   GenerationKeyConflictError,
   normalizeCandidateStatus,
+  normalizePersistedChapterMessageStatus,
   persistChapterCandidateSettlement,
   prepareChapterCandidate,
   type CandidateStatus,
@@ -78,14 +79,11 @@ export interface ChapterMessageRow {
 }
 
 function toRow(m: typeof chapterMessages.$inferSelect): ChapterMessageRow {
-  const status =
-    m.role === "assistant"
-      ? m.inserted || m.status === "applied"
-        ? "applied"
-        : m.status === "done"
-          ? "completed_candidate"
-          : (m.status as ChapterMessageStatus)
-      : (m.status as ChapterMessageStatus);
+  const status = normalizePersistedChapterMessageStatus({
+    role: m.role as "user" | "assistant",
+    status: m.status as ChapterMessageStatus,
+    inserted: m.inserted,
+  });
   return {
     id: m.id,
     role: m.role as "user" | "assistant",
@@ -188,7 +186,11 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       id: message.id,
       role: message.role as "user" | "assistant",
       content: message.content,
-      status: message.status as ChapterMessageStatus,
+      status: normalizePersistedChapterMessageStatus({
+        role: message.role as "user" | "assistant",
+        status: message.status as ChapterMessageStatus,
+        inserted: message.inserted,
+      }),
     })),
     currentMessage.id,
     candidate.id,
