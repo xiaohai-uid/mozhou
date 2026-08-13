@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { skills } from "@/lib/schema";
+import { STORY_CAPABILITIES } from "@/lib/story/capabilities";
 
 export interface SkillRow {
   id: number;
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const scope = url.searchParams.get("scope") ?? "mine";
   if (scope === "plaza") {
-    return NextResponse.json({ skills: PLAZA_SKILLS });
+    return NextResponse.json({ skills: PLAZA_SKILLS, ohStorySkills: STORY_CAPABILITIES });
   }
   const rows = await db
     .select()

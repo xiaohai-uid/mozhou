@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /** 会员等级（11 工单消费） */
@@ -61,9 +62,16 @@ export const novels = pgTable("novels", {
   description: text("description"),
   /** RAG 注入开关（06 收尾：projects 页开关绑定，false 时对话不检索该作品设定） */
   ragEnabled: boolean("rag_enabled").notNull().default(true),
+  /** 快速开始请求键：同一用户重试首写创建时返回原有作品，避免重复作品。 */
+  bootstrapRequestKey: text("bootstrap_request_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  bootstrapRequestKeyIdx: uniqueIndex("novels_user_bootstrap_request_key_idx").on(
+    table.userId,
+    table.bootstrapRequestKey,
+  ),
+}));
 
 /** 章节（05 工单；content 正文列 16 工单 V1.1 Journey ⑦ 加入） */
 export const chapters = pgTable("chapters", {
@@ -76,9 +84,187 @@ export const chapters = pgTable("chapters", {
   content: text("content").notNull().default(""),
   status: chapterStatusEnum("status").notNull().default("draft"),
   sortOrder: integer("sort_order").notNull().default(0),
+  /** 正文乐观并发版本；每次正文实际变化递增。 */
+  revision: integer("revision").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  novelChapterKey: uniqueIndex("chapters_novel_id_ch_idx").on(table.novelId, table.ch),
+}));
+
+/** 首写工作流状态：作品创建与第一章创建的正式状态真源。 */
+export const novelWorkflows = pgTable("novel_workflows", {
+  id: serial("id").primaryKey(),
+  novelId: integer("novel_id")
+    .notNull()
+    .unique()
+    .references(() => novels.id, { onDelete: "cascade" }),
+  firstChapterId: integer("first_chapter_id")
+    .notNull()
+    .references(() => chapters.id, { onDelete: "restrict" }),
+  state: text("state").notNull().default("ready"), // ready | writing | active
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export type DeconstructionMode = "long" | "short";
+
+export interface DeconstructionStage {
+  stage: number;
+  name: string;
+  status: "completed";
+  artifact: DeconstructionArtifact;
+}
+
+export interface DeconstructionArtifact {
+  id: string;
+  kind: string;
+  schemaVersion: number;
+  [key: string]: unknown;
+}
+
+export interface DeconstructionResult {
+  /** Legacy summary projection retained for existing consumers. */
+  structure: string[];
+  plot: string[];
+  rhythm: string[];
+  /** The selected oh-story-compatible analysis route. */
+  mode: DeconstructionMode;
+  /** Structured stage artifacts. The UI and downstream writing flows consume these. */
+  stages: DeconstructionStage[];
+  quality: {
+    sourceLength: number;
+    chapterCount: number;
+    completedStages: number[];
+    warnings: string[];
+  };
+}
+
+/** 用户自有正文的拆解运行记录；结果可恢复，源文只存摘要哈希与长度，不重复保存正文。 */
+export const deconstructionRuns = pgTable("deconstruction_runs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  novelId: integer("novel_id").references(() => novels.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  sourceLength: integer("source_length").notNull(),
+  requestKey: text("request_key").notNull(),
+  status: text("status").notNull().default("pending"),
+  result: jsonb("result_json").$type<DeconstructionResult>(),
+  errorMessage: text("error_message"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastErrorClass: text("last_error_class"),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  requestIdx: uniqueIndex("deconstruction_runs_user_request_idx").on(table.userId, table.requestKey),
+}));
+
+/**
+ * 作品级长篇追踪真源（storyrepo adapter）。派生状态卡/伏笔/时间线都从这里重建，
+ * 不把页面缓存或模型输出当作长期事实。
+ */
+export interface StoryTrackingState {
+  statusCard: {
+    currentChapterId: number | null;
+    currentChapter: string | null;
+    settledChapters: number;
+    lastSettledAt: string | null;
+  };
+  characterStates: Array<{ name: string; state: string; chapterId: number }>;
+  promises: Array<{ id?: string; text: string; status: "open" | "resolved"; chapterId: number }>;
+  timeline: Array<{ text: string; chapterId: number; chapter: string; kind?: "fact" | "reveal" | "private" }>;
+  readerKnowledge: Array<{ text: string; chapterId: number }>;
+  chapterRecords: Array<{
+    chapterId: number;
+    chapter: string;
+    title: string;
+    revision: number;
+    wordCount: number;
+    checksPassed: number;
+    checksTotal: number;
+    settledAt: string;
+  }>;
+}
+
+/** storyrepo 作品级单一权威状态。 */
+export const novelTrackings = pgTable("novel_trackings", {
+  id: serial("id").primaryKey(),
+  novelId: integer("novel_id")
+    .notNull()
+    .unique()
+    .references(() => novels.id, { onDelete: "cascade" }),
+  stateRevision: integer("state_revision").notNull().default(0),
+  state: jsonb("state_json").$type<StoryTrackingState>().notNull(),
+  currentChapterId: integer("current_chapter_id").references(() => chapters.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+/** 每章一次结算后的可审计记录；正文仍以 chapters 为唯一正文真源。 */
+export const storyTrackingRecords = pgTable("story_tracking_records", {
+  id: serial("id").primaryKey(),
+  novelId: integer("novel_id")
+    .notNull()
+    .references(() => novels.id, { onDelete: "cascade" }),
+  chapterId: integer("chapter_id")
+    .notNull()
+    .references(() => chapters.id, { onDelete: "cascade" }),
+  chapterRevision: integer("chapter_revision").notNull(),
+  status: text("status").notNull().default("settled"),
+  wordCount: integer("word_count").notNull().default(0),
+  checks: jsonb("checks_json").$type<Array<{ name: string; ok: boolean; detail: string }>>().notNull(),
+  facts: jsonb("facts_json").$type<Record<string, unknown>>().notNull(),
+  settledAt: timestamp("settled_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  novelChapterIdx: uniqueIndex("story_tracking_records_novel_chapter_idx").on(
+    table.novelId,
+    table.chapterId,
+  ),
+}));
+
+/** 章节审查历史；每次结算保留结果，不用“当前页面状态”冒充历史。 */
+export const storyReviews = pgTable("story_reviews", {
+  id: serial("id").primaryKey(),
+  novelId: integer("novel_id")
+    .notNull()
+    .references(() => novels.id, { onDelete: "cascade" }),
+  chapterId: integer("chapter_id")
+    .notNull()
+    .references(() => chapters.id, { onDelete: "cascade" }),
+  chapterRevision: integer("chapter_revision").notNull(),
+  checks: jsonb("checks_json").$type<Array<{ name: string; ok: boolean; detail: string }>>().notNull(),
+  source: text("source").notNull().default("storyrepo"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/** 章节工作流运行记录：幂等键、阶段、终态和可恢复输出。 */
+export const storyWorkflowRuns = pgTable("story_workflow_runs", {
+  id: serial("id").primaryKey(),
+  novelId: integer("novel_id")
+    .notNull()
+    .references(() => novels.id, { onDelete: "cascade" }),
+  chapterId: integer("chapter_id").references(() => chapters.id, { onDelete: "set null" }),
+  operation: text("operation").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  inputHash: text("input_hash").notNull(),
+  status: text("status").notNull().default("running"),
+  output: jsonb("output_json").$type<Record<string, unknown>>(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  idempotencyIdx: uniqueIndex("story_workflow_runs_novel_idempotency_idx").on(
+    table.novelId,
+    table.idempotencyKey,
+  ),
+}));
 
 /** 人物库条目（05 工单） */
 export const characterEntries = pgTable("character_entries", {
@@ -151,7 +337,7 @@ export const syncConfigs = pgTable("sync_configs", {
     .references(() => users.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
   username: text("username").notNull(),
-  /** 应用密码（存储为明文是权衡；生产应加密，见 AGENTS.md 基建备注） */
+  /** 应用密码密文（AES-256-GCM；密钥来自 AUTH_SECRET，不回传客户端） */
   password: text("password").notNull(),
   autoSync: boolean("auto_sync").notNull().default(true),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -191,8 +377,24 @@ export const chapterMessages = pgTable("chapter_messages", {
   skills: jsonb("skills").$type<string[]>().notNull().default([]),
   /** 生成时正文快照（插入冲突检测基准，assistant） */
   snapshot: text("snapshot").notNull().default(""),
-  /** done | stopped | error */
+  /**
+   * user 消息历史沿用 done；assistant 候选状态：
+   * generating | completed_candidate | stopped | error | applied | discarded。
+   */
   status: text("status").notNull().default("done"),
   inserted: boolean("inserted").notNull().default(false),
+  /** 客户端生成请求身份；同一章节重复提交同一键只复用同一候选。 */
+  generationKey: text("generation_key"),
+  /** 生成请求内容的不可逆指纹，用于防止同一 key 被复用到另一条请求。 */
+  requestHash: text("request_hash"),
+  /** 候选生成时章节的 revision；确认时必须仍匹配。 */
+  baseRevision: integer("base_revision"),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  generationKeyIdx: uniqueIndex("chapter_messages_chapter_generation_key_idx").on(
+    table.chapterId,
+    table.generationKey,
+  ),
+}));

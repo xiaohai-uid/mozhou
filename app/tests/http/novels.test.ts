@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/schema";
+import { novels, users } from "@/lib/schema";
 
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 
@@ -60,7 +60,7 @@ describe("POST/GET /api/v1/novels", () => {
     const res = await fetch(`${BASE}/api/v1/novels`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ name: "零界道种" }),
+      body: JSON.stringify({ name: "零界道种", requestKey: `legacy-route-${RUN}` }),
     });
     expect(res.status).toBe(201);
     const { novel } = (await res.json()) as { novel: { id: number; name: string } };
@@ -108,6 +108,172 @@ describe("POST/GET /api/v1/novels", () => {
   });
 });
 
+describe("POST /api/v1/novels/bootstrap", () => {
+  it("原子准备首写：作品、第一章和工作流一次完成；重试幂等", async () => {
+    const requestKey = `bootstrap-${RUN}`;
+    const first = await fetch(`${BASE}/api/v1/novels/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "首写黄金路径", requestKey }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as {
+      created: boolean;
+      novel: { id: number };
+      chapter: { id: number; ch: string; title: string };
+      workflow: { novelId: number; firstChapterId: number; state: string };
+    };
+    expect(firstBody.created).toBe(true);
+    expect(firstBody.chapter.ch).toBe("001");
+    expect(firstBody.chapter.title).toBe("第一章");
+    expect(firstBody.workflow.novelId).toBe(firstBody.novel.id);
+    expect(firstBody.workflow.firstChapterId).toBe(firstBody.chapter.id);
+    expect(firstBody.workflow.state).toBe("ready");
+
+    const retry = await fetch(`${BASE}/api/v1/novels/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "不同书名不应覆盖", requestKey }),
+    });
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as {
+      created: boolean;
+      novel: { id: number; name: string };
+      chapter: { id: number };
+    };
+    expect(retryBody.created).toBe(false);
+    expect(retryBody.novel.id).toBe(firstBody.novel.id);
+    expect(retryBody.novel.name).toBe("首写黄金路径");
+    expect(retryBody.chapter.id).toBe(firstBody.chapter.id);
+
+    const detail = await fetch(`${BASE}/api/v1/novels/${firstBody.novel.id}`, {
+      headers: { cookie: me.cookie },
+    });
+    const detailBody = (await detail.json()) as { chapters: Array<{ ch: string }> };
+    expect(detailBody.chapters).toHaveLength(1);
+    expect(detailBody.chapters[0].ch).toBe("001");
+  });
+
+  it("缺少请求键时拒绝，避免无法幂等的首写创建", async () => {
+    const res = await fetch(`${BASE}/api/v1/novels/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "没有请求键" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("历史 0 章节作品可恢复首写，重复恢复不重复创建首章", async () => {
+    const [legacyNovel] = await db
+      .insert(novels)
+      .values({ userId: me.id, name: "历史空作品" })
+      .returning({ id: novels.id });
+    const legacyBody = { novel: { id: legacyNovel.id } };
+
+    const first = await fetch(`${BASE}/api/v1/novels/${legacyBody.novel.id}/start-writing`, {
+      method: "POST",
+      headers: { cookie: me.cookie },
+    });
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as {
+      chapter: { id: number; ch: string };
+      workflow: { firstChapterId: number };
+    };
+    expect(firstBody.chapter.ch).toBe("001");
+    expect(firstBody.workflow.firstChapterId).toBe(firstBody.chapter.id);
+
+    const retry = await fetch(`${BASE}/api/v1/novels/${legacyBody.novel.id}/start-writing`, {
+      method: "POST",
+      headers: { cookie: me.cookie },
+    });
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as { chapter: { id: number } };
+    expect(retryBody.chapter.id).toBe(firstBody.chapter.id);
+
+    const detail = await fetch(`${BASE}/api/v1/novels/${legacyBody.novel.id}`, {
+      headers: { cookie: me.cookie },
+    });
+    const detailBody = (await detail.json()) as { chapters: unknown[] };
+    expect(detailBody.chapters).toHaveLength(1);
+  });
+
+  it("首写工作流保护第一章不被删除", async () => {
+    const created = await fetch(`${BASE}/api/v1/novels/bootstrap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "首章保护测试", requestKey: `protect-${RUN}` }),
+    });
+    expect(created.status).toBe(201);
+    const body = (await created.json()) as {
+      novel: { id: number };
+      chapter: { id: number };
+    };
+
+    const response = await fetch(
+      `${BASE}/api/v1/novels/${body.novel.id}/chapters?chapterId=${body.chapter.id}`,
+      { method: "DELETE", headers: { cookie: me.cookie } },
+    );
+    expect(response.status).toBe(409);
+    expect((await response.json()) as { error: string }).toMatchObject({
+      error: "第一章是首写入口，不能删除",
+    });
+  });
+});
+
+describe("POST /api/v1/novels/import", () => {
+  it("导入自有正文：作品、首章和工作流原子创建；重试保留正文且幂等", async () => {
+    const requestKey = `import-${RUN}`;
+    const content = "这是用户拥有使用权的导入正文。".repeat(80);
+    const first = await fetch(`${BASE}/api/v1/novels/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "导入作品", content, requestKey }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as {
+      created: boolean;
+      novel: { id: number };
+      chapter: { id: number; content: string; revision: number };
+      workflow: { state: string };
+    };
+    expect(firstBody.created).toBe(true);
+    expect(firstBody.chapter.content).toBe(content);
+    expect(firstBody.chapter.revision).toBe(1);
+    expect(firstBody.workflow.state).toBe("active");
+
+    const retry = await fetch(`${BASE}/api/v1/novels/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "不应覆盖", content: `${content} changed`, requestKey }),
+    });
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as {
+      created: boolean;
+      novel: { id: number };
+      chapter: { id: number; content: string };
+    };
+    expect(retryBody.created).toBe(false);
+    expect(retryBody.novel.id).toBe(firstBody.novel.id);
+    expect(retryBody.chapter.id).toBe(firstBody.chapter.id);
+    expect(retryBody.chapter.content).toBe(content);
+  });
+
+  it("缺少请求键或正文过短时拒绝", async () => {
+    const missingKey = await fetch(`${BASE}/api/v1/novels/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "无幂等键", content: "x".repeat(300) }),
+    });
+    expect(missingKey.status).toBe(400);
+    const short = await fetch(`${BASE}/api/v1/novels/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "短正文", content: "太短", requestKey: `short-import-${RUN}` }),
+    });
+    expect(short.status).toBe(400);
+  });
+});
+
 describe("GET/PATCH/DELETE /api/v1/novels/[id]", () => {
   it("详情：三栏结构（章节/人物/世界观）+ meta", async () => {
     const res = await fetch(`${BASE}/api/v1/novels/${novelId}`, {
@@ -121,7 +287,7 @@ describe("GET/PATCH/DELETE /api/v1/novels/[id]", () => {
       worldviews: unknown[];
     };
     expect(detail.novel.name).toBe("零界道种");
-    expect(detail.chapters).toEqual([]);
+    expect(detail.chapters).toHaveLength(1);
     expect(detail.characters).toEqual([]);
     expect(detail.worldviews).toEqual([]);
   });
@@ -176,7 +342,7 @@ describe("章节 CRUD", () => {
     const { chapter } = (await res.json()) as {
       chapter: { id: number; ch: string; title: string; status: string };
     };
-    expect(chapter.ch).toBe("001");
+    expect(chapter.ch).toBe("002");
     expect(chapter.status).toBe("draft");
 
     const detail = await fetch(`${BASE}/api/v1/novels/${novelId}`, {
@@ -185,8 +351,8 @@ describe("章节 CRUD", () => {
     const { chapters } = (await detail.json()) as {
       chapters: Array<{ ch: string; title: string }>;
     };
-    expect(chapters).toHaveLength(1);
-    expect(chapters[0].title).toBe("灰烬有籽");
+    expect(chapters).toHaveLength(2);
+    expect(chapters[1].title).toBe("灰烬有籽");
   });
 
   it("编辑章节状态：final；删除章节", async () => {
@@ -196,7 +362,7 @@ describe("章节 CRUD", () => {
     const { chapters } = (await detail.json()) as {
       chapters: Array<{ id: number }>;
     };
-    const cid = chapters[0].id;
+    const cid = chapters[1].id;
 
     const patch = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${cid}`,
@@ -222,7 +388,8 @@ describe("章节 CRUD", () => {
     const { chapters: afterChapters } = (await after.json()) as {
       chapters: unknown[];
     };
-    expect(afterChapters).toHaveLength(0);
+    expect(afterChapters).toHaveLength(1);
+    expect((afterChapters[0] as { title: string }).title).toBe("第一章");
   });
 
   it("越权：他人对章节操作 → 404", async () => {
@@ -307,7 +474,7 @@ describe("RAG 设定注入（06 工单，关键词检索）", () => {
     const novel = await fetch(`${BASE}/api/v1/novels`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ name: "RAG测试书" }),
+      body: JSON.stringify({ name: "RAG测试书", requestKey: `rag-${RUN}` }),
     });
     expect(novel.status).toBe(201);
     ragNovelId = ((await novel.json()) as { novel: { id: number } }).novel.id;
@@ -364,6 +531,89 @@ describe("RAG 设定注入（06 工单，关键词检索）", () => {
   });
 });
 
+describe("storyrepo 作品级追踪适配器", () => {
+  let trackingNovelId = 0;
+  let trackingChapterId = 0;
+
+  it("结算章节：持久化追踪、检查历史和幂等 workflow run", async () => {
+    const created = await fetch(`${BASE}/api/v1/novels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ name: "追踪测试书", requestKey: `tracking-${RUN}` }),
+    });
+    const body = (await created.json()) as { novel: { id: number }; chapter: { id: number } };
+    trackingNovelId = body.novel.id;
+    trackingChapterId = body.chapter.id;
+    const saved = await fetch(`${BASE}/api/v1/novels/${trackingNovelId}/chapters?chapterId=${trackingChapterId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({ content: "第一章追踪正文".repeat(500) }),
+    });
+    expect(saved.status).toBe(200);
+
+    const settle = () => fetch(`${BASE}/api/v1/novels/${trackingNovelId}/tracking`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: me.cookie },
+      body: JSON.stringify({
+        chapterId: trackingChapterId,
+        idempotencyKey: `settle-${RUN}`,
+        facts: {
+          result: "主角在雨夜找到旧钥匙",
+          characterStates: [{ name: "主角", state: "持有旧钥匙" }],
+          promises: [{ id: "P-001", text: "查明钥匙来历", status: "open" }],
+          timeline: [{ text: "雨夜发现旧钥匙", kind: "fact" }],
+          readerKnowledge: [{ text: "读者知道钥匙与旧屋有关" }],
+        },
+      }),
+    });
+    const first = await settle();
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as {
+      tracking: {
+        stateRevision: number;
+        state: {
+          statusCard: { settledChapters: number };
+          characterStates: Array<{ name: string; state: string }>;
+          promises: Array<{ id?: string; status: string }>;
+          timeline: Array<{ text: string; chapter: string }>;
+          readerKnowledge: Array<{ text: string }>;
+        };
+      };
+      records: Array<{ chapterId: number }>;
+      reviews: Array<{ chapterId: number }>;
+      runs: Array<{ idempotencyKey: string; status: string }>;
+      workflow: { status: string };
+    };
+    expect(firstBody.workflow.status).toBe("completed");
+    expect(firstBody.tracking.state.statusCard.settledChapters).toBe(1);
+    expect(firstBody.records.some((record) => record.chapterId === trackingChapterId)).toBe(true);
+    expect(firstBody.reviews.some((review) => review.chapterId === trackingChapterId)).toBe(true);
+    expect(firstBody.runs.some((run) => run.idempotencyKey === `settle-${RUN}` && run.status === "completed")).toBe(true);
+    expect(firstBody.tracking.state.characterStates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "主角", state: "持有旧钥匙" })]),
+    );
+    expect(firstBody.tracking.state.promises).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "P-001", status: "open" })]),
+    );
+    expect(firstBody.tracking.state.timeline).toEqual(
+      expect.arrayContaining([expect.objectContaining({ text: "雨夜发现旧钥匙", chapter: "001" })]),
+    );
+    expect(firstBody.tracking.state.readerKnowledge).toEqual(
+      expect.arrayContaining([expect.objectContaining({ text: "读者知道钥匙与旧屋有关" })]),
+    );
+
+    const retry = await settle();
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as typeof firstBody;
+    expect(retryBody.records.filter((record) => record.chapterId === trackingChapterId)).toHaveLength(1);
+  });
+
+  it("追踪接口隔离作品归属", async () => {
+    const response = await fetch(`${BASE}/api/v1/novels/${trackingNovelId}/tracking`, { headers: { cookie: other.cookie } });
+    expect(response.status).toBe(404);
+  });
+});
+
 describe("会话↔作品绑定（R3 决策）", () => {
   let bindNovelId: number;
   let boundSessionId: number;
@@ -372,7 +622,7 @@ describe("会话↔作品绑定（R3 决策）", () => {
     const novel = await fetch(`${BASE}/api/v1/novels`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ name: "绑定测试书" }),
+      body: JSON.stringify({ name: "绑定测试书", requestKey: `bind-${RUN}` }),
     });
     bindNovelId = ((await novel.json()) as { novel: { id: number } }).novel.id;
 
@@ -449,7 +699,7 @@ describe("RAG 开关（06 收尾）", () => {
     const novel = await fetch(`${BASE}/api/v1/novels`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ name: "开关测试书" }),
+      body: JSON.stringify({ name: "开关测试书", requestKey: `switch-${RUN}` }),
     });
     switchNovelId = ((await novel.json()) as { novel: { id: number } }).novel.id;
     await fetch(`${BASE}/api/v1/novels/${switchNovelId}/entries?kind=character`, {

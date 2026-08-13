@@ -1,34 +1,10 @@
-// POST /api/v1/tools/checks — 写作机检（任务二-B）：对正文执行 6 项真实检查
-// 字数窗口 / 占位符 / 泄密扫描 / 实体登记 / 复读检测 / 合同断言（必含词）
+// POST /api/v1/tools/checks — 写作机检（storyrepo 与普通写作工具共用）。
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { runWritingChecks } from "@/lib/story/checks";
+import type { WritingCheckResult } from "@/lib/story/checks";
 
-export interface CheckResult {
-  name: string;
-  ok: boolean;
-  detail: string;
-}
-
-const MAX_TEXT = 20000;
-
-/** 字数窗口（对照 storyrepo 语义：2400-3900） */
-function wordCount(text: string): number {
-  return text.replace(/\s/g, "").length;
-}
-
-/** 复读检测：相邻段落重复 8+ 字的片段 */
-function findRepetition(text: string): string | null {
-  const paras = text.split(/\n+/).filter((p) => p.trim().length > 0);
-  for (let i = 1; i < paras.length; i++) {
-    const prev = paras[i - 1].trim();
-    const cur = paras[i].trim();
-    // 最长公共前缀 >= 8 视为复读
-    let j = 0;
-    while (j < prev.length && j < cur.length && prev[j] === cur[j]) j++;
-    if (j >= 8) return `「${cur.slice(0, j + 2)}…」`;
-  }
-  return null;
-}
+export type CheckResult = WritingCheckResult;
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -36,93 +12,21 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as {
     text?: unknown;
-    mustCover?: unknown; // 合同必含词（如 ["开田","守塔"]）
-    knownEntities?: unknown; // 绑定作品的实体库（人物/世界观条目名）
+    mustCover?: unknown;
+    knownEntities?: unknown;
   } | null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
-  if (!text) {
-    return NextResponse.json({ error: "正文不能为空" }, { status: 400 });
-  }
-  if (text.length > MAX_TEXT) {
-    return NextResponse.json({ error: "正文过长（上限 20000 字）" }, { status: 413 });
-  }
+  if (!text) return NextResponse.json({ error: "正文不能为空" }, { status: 400 });
   const mustCover = Array.isArray(body?.mustCover)
-    ? body.mustCover.filter((w): w is string => typeof w === "string")
+    ? body.mustCover.filter((word): word is string => typeof word === "string")
     : [];
-
-  const checks: CheckResult[] = [];
-
-  // 1. 字数窗口
-  const count = wordCount(text);
-  checks.push({
-    name: "字数窗口",
-    ok: count >= 2400 && count <= 3900,
-    detail: `${count} 字（窗口 2400-3900）`,
-  });
-
-  // 2. 占位符
-  const placeholder = /(TODO|占位|待补充|XXX|\.\.\.)/.exec(text);
-  checks.push({
-    name: "占位符",
-    ok: !placeholder,
-    detail: placeholder ? `发现占位符「${placeholder[1]}」` : "无占位符",
-  });
-
-  // 3. 泄密扫描（S- 信息差代号：正文不应提前曝光）
-  const leaked = [...text.matchAll(/S-(\d{3})/g)].map((m) => m[0]);
-  checks.push({
-    name: "泄密扫描",
-    ok: leaked.length === 0,
-    detail: leaked.length > 0 ? `正文出现禁区代号 ${[...new Set(leaked)].join("/")}` : "未曝光 S-001/003/005",
-  });
-
-  // 4. 实体登记（真实化：对照绑定作品的人物/世界观条目库）
-  //    正文中出现库中已知实体 → 已登记；出现未在库中的疑似实体 → 提示登记
   const knownEntities = Array.isArray(body?.knownEntities)
-    ? body.knownEntities.filter((e): e is string => typeof e === "string")
+    ? body.knownEntities.filter((entity): entity is string => typeof entity === "string")
     : [];
-  // 提取正文中疑似实体（"XX说/站在/走向/看见/回到" 前的 2-4 字名词）
-  const suspected = [
-    ...new Set(
-      [...text.matchAll(/([\u4e00-\u9fa5]{2,4})(?:说|问|道|站在|走向|看见|回到|望向|攥着)/g)].map(
-        (m) => m[1],
-      ),
-    ),
-  ];
-  const unregistered = suspected.filter((e) => !knownEntities.includes(e));
-  checks.push({
-    name: "实体登记",
-    ok: unregistered.length === 0,
-    detail:
-      unregistered.length > 0
-        ? `正文出现未登记实体：${unregistered.slice(0, 3).join(" / ")}`
-        : suspected.length > 0
-          ? `已登记实体 ${suspected.slice(0, 3).join(" / ")} 等`
-          : knownEntities.length > 0
-            ? "无新实体（库中 ${knownEntities.length} 条已知）"
-            : "未配置实体库（绑定作品后自动核对）",
-  });
-
-  // 5. 复读检测
-  const rep = findRepetition(text);
-  checks.push({
-    name: "复读检测",
-    ok: rep === null,
-    detail: rep ? `相邻段落重复片段${rep}` : "无复读",
-  });
-
-  // 6. 合同断言（必含词覆盖）
-  const missing = mustCover.filter((w) => !text.includes(w));
-  checks.push({
-    name: "合同断言",
-    ok: missing.length === 0,
-    detail:
-      missing.length > 0
-        ? `未覆盖必含词 ${missing.join(" / ")}`
-        : mustCover.length > 0
-          ? `必含词全覆盖（${mustCover.join(" / ")}）`
-          : "未设置必含词",
-  });
-
-  return NextResponse.json({ checks });
+  try {
+    return NextResponse.json({ checks: runWritingChecks(text, { mustCover, knownEntities }) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "机检失败";
+    return NextResponse.json({ error: message }, { status: message.startsWith("正文过长") ? 413 : 400 });
+  }
 }

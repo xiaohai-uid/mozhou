@@ -115,8 +115,9 @@ describe("final chat payload observability", () => {
       },
     }, createLlmTransportFromEnv());
 
-    for await (const _delta of provider.stream()) {
+    for await (const delta of provider.stream()) {
       // 消费整个流，确保捕获发生在真实 provider 调用路径中。
+      void delta;
     }
 
     expect(getCapturedChatRequests()).toMatchObject([
@@ -153,8 +154,9 @@ describe("final chat payload observability", () => {
       },
     }, createLlmTransportFromEnv());
 
-    for await (const _delta of provider.stream()) {
+    for await (const delta of provider.stream()) {
       // Keep the test at the provider seam rather than asserting mock text.
+      void delta;
     }
 
     expect(getLastPayloadObservation()).toMatchObject({
@@ -190,8 +192,9 @@ describe("final chat payload observability", () => {
         systemSections: ["injected_context"],
       },
     }, createLlmTransportFromEnv());
-    for await (const _delta of provider.stream()) {
+    for await (const delta of provider.stream()) {
       // no-op
+      void delta;
     }
 
     const observation = JSON.stringify(getLastPayloadObservation());

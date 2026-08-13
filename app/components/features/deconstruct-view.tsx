@@ -1,7 +1,8 @@
 "use client";
 
-// 小说拆解（09 工单已真实化）：输入书名/上传 → 章节选择 → 真实 LLM 三段式拆解（结构/剧情/节奏）。
-import { useState } from "react";
+// 小说拆解：书名搜索只提供书目元数据；真正拆解必须使用用户上传/拥有的正文。
+// 上传正文后进入真实 LLM 三段式拆解（结构/剧情/节奏），不使用固定演示章节。
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, MagnifyingGlass, TreeStructure } from "@phosphor-icons/react/dist/ssr";
 
@@ -9,50 +10,174 @@ interface DeconstructResult {
   structure: string[];
   plot: string[];
   rhythm: string[];
+  mode: "long" | "short";
+  stages: Array<{ stage: number; name: string; status: string; artifact: Record<string, unknown> }>;
+  quality: { sourceLength: number; chapterCount: number; completedStages: number[]; warnings: string[] };
 }
 
-/** 各章节拆解用文本（demo；真实场景由书源/上传提供，08 工单接通） */
-const demoChapters = [
-  { ch: "001", title: "灰烬有籽", words: "3120 字", text: "灰烬镇。灯童与陆沉舟立约：你守田，我守灯。灰里开田，第一铲下去，土是活的。阿雀守着灰罐里的火苗，火苗偏斜，指向零界。肃界卫盘查回程，守塔人未曾露面。田师说，田是它的。灰烬镇的人们在夜里听见铁灰飞鸟掠过，谁也没有抬头。" },
-  { ch: "002", title: "灰里有苗", words: "2980 字", text: "第二日，田里冒出青苗。陆沉舟蹲在田埂上，指腹摩过叶尖的灰。阿雀坐在门槛，火苗在她眼底跳。肃界卫清晨经过，问苗从何来。陆沉舟说，灰里生的。他们知道，灰烬镇不该有绿色。" },
-  { ch: "003", title: "灰里藏灯", words: "3050 字", text: "夜里，灯童听见罐中有声。火苗不再偏斜，直直指向天空。陆沉舟解开灯芯，里面卷着一枚铁片，刻着零界的字样。阿雀咳嗽着醒来，说梦见了海。灰烬镇没有海，但铁片上的字，像潮水。" },
-];
+interface LocalChapter {
+  ch: string;
+  title: string;
+  words: string;
+  text: string;
+}
+
+interface SourceResult {
+  source: string;
+  sourceLabel: string;
+  name: string;
+  author: string;
+  site: string;
+  status: string;
+  capturedAt?: string;
+  url?: string;
+}
+
+interface SavedRun {
+  id: number;
+  title: string;
+  sourceLength: number;
+  status: string;
+  result?: DeconstructResult | null;
+  errorMessage?: string | null;
+}
 
 export function DeconstructView() {
   const router = useRouter();
   const [tab, setTab] = useState<"search" | "upload">("search");
+  const [mode, setMode] = useState<"long" | "short">("short");
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<LocalChapter[]>([]);
+  const [sourceResults, setSourceResults] = useState<SourceResult[]>([]);
+  const [sourceSearching, setSourceSearching] = useState(false);
+  const [sourceDegraded, setSourceDegraded] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DeconstructResult | null>(null);
   const [resultTitle, setResultTitle] = useState<string | null>(null);
+  const [runId, setRunId] = useState<number | null>(null);
+  const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
+  const analysisRequestKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/v1/deconstruct/runs")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { runs?: SavedRun[] } | null) => {
+        if (data?.runs) setSavedRuns(data.runs);
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function analyze() {
-    const chapter = demoChapters.find((c) => c.ch === selected);
+    const chapter = chapters.find((c) => c.ch === selected);
     if (!chapter || analyzing) return;
     setAnalyzing(true);
     setError(null);
     setResult(null);
+    const requestKey = analysisRequestKeyRef.current ?? (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    analysisRequestKeyRef.current = requestKey;
     try {
       const res = await fetch("/api/v1/deconstruct/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: chapter.text, title: chapter.title }),
+        body: JSON.stringify({ text: chapter.text, title: chapter.title, requestKey, mode }),
       });
       const data = (await res.json()) as {
         result?: DeconstructResult;
+        runId?: number;
         title?: string;
         error?: string;
       };
       if (!res.ok) throw new Error(data.error ?? "拆解失败");
       setResult(data.result ?? null);
       setResultTitle(data.title ?? chapter.title);
+      setRunId(data.runId ?? null);
+      if (data.runId) {
+        setSavedRuns((previous) => [
+          { id: data.runId!, title: data.title ?? chapter.title, sourceLength: chapter.text.length, status: "completed", result: data.result },
+          ...previous.filter((run) => run.id !== data.runId),
+        ]);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function searchSources() {
+    const value = query.trim();
+    if (!value || sourceSearching) return;
+    setSourceSearching(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: value }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        results?: SourceResult[];
+        degraded?: boolean;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "搜索失败");
+      setSourceResults(data.results ?? []);
+      setSourceDegraded(data.degraded ?? false);
+      setPicked(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSourceSearching(false);
+    }
+  }
+
+  function loadTextFile(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    void file.text().then((text) => {
+      const value = text.trim();
+      if (value.length < 200) {
+        throw new Error("文本太短，至少需要 200 个字符才能拆解");
+      }
+      const title = file.name.replace(/\.txt$/i, "") || "上传章节";
+      setChapters([{ ch: "001", title, words: `${value.length} 字`, text: value }]);
+      analysisRequestKeyRef.current = null;
+      setSelected("001");
+      setPicked(true);
+    }).catch((err: unknown) => setError((err as Error).message));
+  }
+
+  async function importAsNovel() {
+    const chapter = chapters.find((c) => c.ch === selected);
+    if (!chapter || importing) return;
+    setImporting(true);
+    setError(null);
+    const requestKey = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try {
+      const res = await fetch("/api/v1/novels/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: resultTitle ?? chapter.title, content: chapter.text, requestKey }),
+      });
+      const data = (await res.json()) as {
+        novel?: { id: number; name: string };
+        chapter?: { id: number; ch: string; title: string };
+        error?: string;
+      };
+      if (!res.ok || !data.novel || !data.chapter) throw new Error(data.error ?? "导入作品失败");
+      router.push(
+        `/chapter/${data.chapter.id}?novelId=${data.novel.id}&novel=${encodeURIComponent(data.novel.name)}&ch=${data.chapter.ch}&title=${encodeURIComponent(data.chapter.title)}`,
+      );
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -75,7 +200,12 @@ export function DeconstructView() {
               setTab(t.key);
               setPicked(false);
               setSelected(null);
+              setChapters([]);
+              setSourceResults([]);
+              setSourceDegraded(false);
               setResult(null);
+              setRunId(null);
+              analysisRequestKeyRef.current = null;
               setError(null);
             }}
             className={`rounded-full px-5 py-2 text-sm transition ${
@@ -97,7 +227,7 @@ export function DeconstructView() {
               className="flex gap-3"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (query.trim()) setPicked(true);
+                void searchSources();
               }}
             >
               <div className="flex flex-1 items-center gap-2 rounded-xl border border-surface-2 bg-zinc-950 px-4 py-3 transition focus-within:border-accent">
@@ -115,7 +245,7 @@ export function DeconstructView() {
                 disabled={!query.trim()}
                 className="rounded-full bg-accent px-6 py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
               >
-                下一步
+                {sourceSearching ? "搜索中…" : "搜索书目"}
               </button>
             </form>
           ) : (
@@ -126,19 +256,62 @@ export function DeconstructView() {
                 type="file"
                 accept=".txt"
                 className="hidden"
-                onChange={() => setPicked(true)}
+                onChange={(e) => loadTextFile(e.target.files?.[0])}
               />
             </label>
           )}
         </div>
       )}
 
+      {picked && tab === "search" && (
+        <div className="mt-6 space-y-3">
+          {sourceDegraded && (
+            <p className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 text-xs text-yellow-400">
+              书源不可达，下面的书目仅为降级提示，不能直接作为拆解正文。
+            </p>
+          )}
+          <div className="rounded-card border border-surface-2 bg-surface/50 px-5 py-4">
+            <p className="text-sm text-zinc-200">已找到 {sourceResults.length} 条书目元数据</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              书目搜索不会自动抓取或复制正文。请上传你拥有使用权的 .txt 正文，再开始拆解。
+            </p>
+            <label className="mt-3 inline-flex cursor-pointer rounded-full border border-accent/50 px-4 py-2 text-xs text-accent transition hover:bg-accent/10">
+              上传可拆解正文
+              <input
+                type="file"
+                accept=".txt"
+                className="hidden"
+                onChange={(e) => loadTextFile(e.target.files?.[0])}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* 章节选择 */}
       {picked && !result && !analyzing && (
         <div className="mt-6">
+          <div className="mb-4 rounded-xl border border-surface-2 bg-surface/50 p-4">
+            <p className="text-xs font-medium text-zinc-200">拆解管道</p>
+            <div className="mt-3 flex gap-2">
+              {(["short", "long"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMode(value)}
+                  className={`rounded-full px-3 py-1.5 text-xs transition ${mode === value ? "bg-accent text-white" : "border border-surface-2 text-muted hover:text-zinc-200"}`}
+                >
+                  {value === "short" ? "短篇 Stage 0/2–6" : "长篇 Stage 0–6"}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-faint">
+              长篇包含黄金三章；短篇走独立的短篇结构、情绪与反转管道。结果会保存为可恢复的阶段产物。
+            </p>
+          </div>
           <h2 className="text-sm font-semibold text-zinc-200">选择要拆解的章节</h2>
           <ul className="mt-4 space-y-2">
-            {demoChapters.map((c) => (
+            {chapters.map((c) => (
               <li key={c.ch}>
                 <button
                   onClick={() => setSelected(c.ch)}
@@ -157,12 +330,24 @@ export function DeconstructView() {
               </li>
             ))}
           </ul>
+          {chapters.length === 0 && (
+            <p className="rounded-xl border border-dashed border-surface-2 px-4 py-4 text-center text-xs text-faint">
+              还没有可拆解的正文，请先上传 .txt 文件。
+            </p>
+          )}
           <button
             onClick={() => void analyze()}
             disabled={!selected || analyzing}
             className="mt-6 w-full rounded-full bg-accent py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
           >
             {analyzing ? "拆解中…" : "开始拆解"}
+          </button>
+          <button
+            onClick={() => void importAsNovel()}
+            disabled={!selected || importing || analyzing}
+            className="mt-2 w-full rounded-full border border-accent/50 py-3 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-40"
+          >
+            {importing ? "导入中…" : "直接导入为新作品并开始写作"}
           </button>
         </div>
       )}
@@ -182,14 +367,44 @@ export function DeconstructView() {
         </p>
       )}
 
+      {savedRuns.length > 0 && !result && (
+        <div className="mt-6 rounded-card border border-surface-2 bg-surface/50 p-5">
+          <h2 className="text-sm font-semibold text-zinc-200">可恢复的拆解结果</h2>
+          <ul className="mt-3 space-y-2">
+            {savedRuns.slice(0, 8).map((run) => (
+              <li key={run.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-zinc-200">{run.title}</p>
+                  <p className="mt-1 text-[10px] text-faint">#{run.id} · {run.sourceLength} 字 · {run.status === "completed" ? "已完成" : run.status}</p>
+                </div>
+                {run.status === "completed" && run.result && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResult(run.result ?? null);
+                      setResultTitle(run.title);
+                      setRunId(run.id);
+                    }}
+                    className="shrink-0 rounded-full border border-accent/50 px-3 py-1 text-[11px] text-accent hover:bg-accent/10"
+                  >
+                    查看结果
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* 结果 */}
       {result && (
         <div className="mt-8 space-y-4">
           <div className="flex items-center gap-2">
             <TreeStructure size={18} weight="duotone" className="text-accent" aria-hidden />
-            <h2 className="text-sm font-semibold text-zinc-100">
-              第 {selected} 章拆解{resultTitle ? ` · ${resultTitle}` : ""}
-            </h2>
+              <h2 className="text-sm font-semibold text-zinc-100">
+                第 {selected} 章拆解{resultTitle ? ` · ${resultTitle}` : ""}
+              </h2>
+              {runId && <span className="text-[10px] text-faint">已保存运行 #{runId}</span>}
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {[
@@ -210,6 +425,27 @@ export function DeconstructView() {
                 </ul>
               </div>
             ))}
+          </div>
+          <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-faint">阶段化产物</h3>
+              <span className="text-[10px] text-faint">
+                {result.mode === "long" ? "长篇 Stage 0–6" : "短篇 Stage 0/2–6"} · {result.quality.chapterCount || "—"} 章
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              {result.stages.map((stage) => (
+                <div key={stage.stage} className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+                  <p className="text-[10px] text-emerald-300">Stage {stage.stage} · 已完成</p>
+                  <p className="mt-1 text-xs text-zinc-300">{stage.name}</p>
+                </div>
+              ))}
+            </div>
+            {result.quality.warnings.length > 0 && (
+              <ul className="mt-3 space-y-1 text-[11px] text-yellow-400">
+                {result.quality.warnings.map((warning) => <li key={warning}>⚠ {warning}</li>)}
+              </ul>
+            )}
           </div>
           {/* R1/R2 回流：发送到写作对话（拆解结果→消息插入类） */}
           <button

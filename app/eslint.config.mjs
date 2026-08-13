@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party oh-story source snapshot; lint native adapters, not vendor code.
+    "lib/story/vendor/oh-story/**",
   ]),
 ]);
 

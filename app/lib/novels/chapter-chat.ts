@@ -6,7 +6,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import {
   chapterMessages,
-  chapters,
   skills as skillsTable,
   styles as stylesTable,
 } from "@/lib/schema";
@@ -17,7 +16,6 @@ import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
 import { buildWritingContext, type WritingContextSection } from "@/lib/chat/writing-context";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "@/lib/chat/models";
-import type { ChatMessage } from "@/lib/chat/payload";
 import {
   compressHistory,
   isUsableKeptHistory,
@@ -25,10 +23,7 @@ import {
 } from "@/lib/chat/compress";
 import {
   applyChapterCandidate,
-  ChapterNotFoundError,
-  ContentChangedError,
   discardChapterCandidate,
-  GenerationKeyConflictError,
   normalizeCandidateStatus,
   normalizePersistedChapterMessageStatus,
   persistChapterCandidateSettlement,
@@ -218,16 +213,12 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   const contextSections: WritingContextSection[] = [];
   let stylePresent = false;
   let skillCount = 0;
-  let hasBodyReference = false;
-  let hasValidatedSelection = false;
   const bodyRef = prepared.currentChapter.content.slice(-BODY_REF_LIMIT);
   if (bodyRef.trim()) {
-    hasBodyReference = true;
     const content = `[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`;
     contextSections.push({ kind: "chapter_reference", content });
   }
   if (input.selection) {
-    hasValidatedSelection = true;
     const content = `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`;
     contextSections.push({ kind: "selection", content });
   }
@@ -279,7 +270,6 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     contextSections.push({ kind: "compression_summary", content: summary });
   }
 
-  const snapshot = prepared.currentChapter.content; // 生成时正文快照（插入冲突检测基准）
   const provider = makeChatProvider(buildWritingContext({
     model: input.model,
     mode: "chapter",

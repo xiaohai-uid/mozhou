@@ -1,7 +1,7 @@
 "use client";
 
-// 云同步（任务二-C 真实化 + 工单 20）：WebDAV 配置保存/连接测试 + 文件级单向推送（备份语义）。
-// 范围决策（spec Journey ④ S1）：作品与章节正文（mozhou/<作品名>/<章节号>-<标题>.md）；会话/技能不纳入。
+// 云备份：WebDAV 配置、连接测试和作品章节文件级单向推送。
+// 当前范围只包含作品与章节正文；会话和技能不会被声称已经同步。
 import { useEffect, useState } from "react";
 import { CloudArrowUp, Eye, EyeSlash, ToggleLeft, ToggleRight } from "@phosphor-icons/react/dist/ssr";
 
@@ -104,7 +104,7 @@ export function SyncView() {
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
       <h1 className="text-xl font-semibold tracking-tight">云同步</h1>
       <p className="mt-2 text-sm text-muted">
-        通过 WebDAV 同步你的作品、会话与技能（支持坚果云等）
+        通过 WebDAV 备份你的作品章节（支持坚果云等）
       </p>
 
       {/* 配置 */}

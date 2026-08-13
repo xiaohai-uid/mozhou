@@ -7,12 +7,16 @@ import { ToggleLeft, ToggleRight, Trophy } from "@phosphor-icons/react/dist/ssr"
 interface RankingBoard {
   name: string;
   site: string;
+  url?: string;
 }
 
 interface RankingRow {
   rank: number;
   name: string;
   heat: string;
+  source: string;
+  capturedAt: string;
+  url: string;
 }
 
 export function RankingsView() {
@@ -133,7 +137,7 @@ export function RankingsView() {
               {degraded && (
                 <div className="flex items-center gap-2 border-b border-surface-2 bg-yellow-500/5 px-6 py-2.5 text-xs text-yellow-400">
                   <span className="inline-block size-1.5 shrink-0 rounded-full bg-yellow-400" aria-hidden />
-                  {note ?? "榜单源不可达，已降级为示例数据"}
+                  {note ?? "榜单源不可达，未返回虚构榜单"}
                 </div>
               )}
               <ul className="divide-y divide-surface-2">
@@ -151,6 +155,16 @@ export function RankingsView() {
                   </li>
                 ))}
               </ul>
+              {rows.length === 0 && (
+                <div className="px-6 py-10 text-center text-xs text-faint">
+                  没有可验证的榜单数据；服务降级时不会展示虚构榜单。
+                </div>
+              )}
+              {rows.length > 0 && (
+                <div className="border-t border-surface-2 px-6 py-2 text-[11px] text-faint">
+                  来源：{rows[0].source} · 抓取：{new Date(rows[0].capturedAt).toLocaleString("zh-CN")}
+                </div>
+              )}
             </>
             )}
           </div>

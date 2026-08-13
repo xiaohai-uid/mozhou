@@ -5,8 +5,15 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { syncConfigs } from "@/lib/schema";
+import { encryptSyncPassword } from "@/lib/sync/credentials";
 
 const TIMEOUT_MS = 5000;
+const MAX_ATTEMPTS = 3;
+
+function safeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "未知网络错误";
+  return message.replace(/https?:\/\/\S+/gi, "远端地址").replace(/authorization|basic\s+\S+/gi, "认证信息").slice(0, 160);
+}
 
 /** GET：读取已保存配置（不回传密码原文） */
 export async function GET() {
@@ -55,24 +62,29 @@ export async function POST(request: Request) {
 
   // 真实 WebDAV 连接测试（OPTIONS 探测，超时受控）
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     const auth = Buffer.from(`${username}:${password}`).toString("base64");
-    const res = await fetch(url, {
-      method: "OPTIONS",
-      signal: ctrl.signal,
-      headers: { Authorization: `Basic ${auth}` },
-    });
-    clearTimeout(timer);
-    if (res.status >= 500 || res.status === 0) {
-      throw new Error(`服务器响应 ${res.status}`);
+    let res: Response | undefined;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+      try {
+        res = await fetch(url, { method: "OPTIONS", signal: ctrl.signal, headers: { Authorization: `Basic ${auth}` } });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (res.ok || ![408, 425, 429, 500, 502, 503, 504].includes(res.status) || attempt === MAX_ATTEMPTS - 1) break;
+      const retryAfter = Number(res.headers.get("retry-after"));
+      await new Promise((resolve) => setTimeout(resolve, Number.isFinite(retryAfter) ? Math.min(5000, retryAfter * 1000) : 300 * 2 ** attempt));
+    }
+    if (!res || res.status >= 500 || res.status === 0) {
+      throw new Error(`服务器响应 ${res?.status ?? "无响应"}`);
     }
     await saveConfig(user.id, url, username, password, autoSync);
     return NextResponse.json({ ok: true, message: "已连接" });
   } catch (err) {
     // 连接失败：不保存？—— 保存但标记测试失败（用户可重试），返回可读错误
     return NextResponse.json(
-      { ok: false, message: `连接测试失败：${(err as Error).message}` },
+      { ok: false, message: `连接测试失败：${safeError(err)}` },
       { status: 200 },
     );
   }
@@ -85,6 +97,7 @@ async function saveConfig(
   password: string,
   autoSync: boolean,
 ) {
+  const encryptedPassword = encryptSyncPassword(password);
   const [existing] = await db
     .select({ id: syncConfigs.id })
     .from(syncConfigs)
@@ -92,10 +105,10 @@ async function saveConfig(
   if (existing) {
     await db
       .update(syncConfigs)
-      .set({ url, username, password, autoSync, updatedAt: sql`now()` })
+      .set({ url, username, password: encryptedPassword, autoSync, updatedAt: sql`now()` })
       .where(eq(syncConfigs.id, existing.id));
   } else {
-    await db.insert(syncConfigs).values({ userId, url, username, password, autoSync });
+    await db.insert(syncConfigs).values({ userId, url, username, password: encryptedPassword, autoSync });
   }
 }
 

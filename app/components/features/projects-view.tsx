@@ -1,10 +1,10 @@
 "use client";
 
-// 项目管理（05 工单已接入）：作品列表 + 人物库 / 世界观 / 章节 三栏 + RAG 注入 / 审查 / 导出。
-// 列表/创建/详情/新增/删除走真实 API（/api/v1/novels*）；RAG/审查/导出仍为界面示意（06/09 工单接入）。
-// V1.1 Journey ⑦：章节项可点开进入章节编辑器（当前为 Mock Preview 页）。
-import { useCallback, useEffect, useState } from "react";
+// 项目管理：作品、设定、章节、RAG 开关、机检、导出与同步入口。
+// 作品和章节数据来自真实 API；所有写入动作都展示失败原因，不用示例数据冒充生产结果。
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BookOpenText,
   CloudArrowUp,
@@ -30,7 +30,9 @@ interface Chapter {
   id: number;
   ch: string;
   title: string;
+  revision: number;
   status: "draft" | "final";
+  content?: string;
 }
 
 interface Entry {
@@ -46,7 +48,36 @@ interface NovelDetail {
   worldviews: Entry[];
 }
 
+interface CheckResult {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+interface TrackingSnapshot {
+  tracking: {
+    stateRevision: number;
+    state: {
+      statusCard: { settledChapters: number; currentChapter: string | null };
+      characterStates: Array<{ name: string; state: string }>;
+      promises: Array<{ id?: string; text: string; status: "open" | "resolved" }>;
+      timeline: Array<{ text: string; chapter: string }>;
+      readerKnowledge: Array<{ text: string }>;
+    };
+  };
+  records: Array<{ chapterId: number; chapterRevision: number; wordCount: number; checks: CheckResult[] }>;
+  reviews: Array<{ chapterId: number; chapterRevision: number; checks: CheckResult[]; createdAt: string }>;
+}
+
+interface TrackingDraft {
+  result: string;
+  characters: string;
+  promises: string;
+  readerKnowledge: string;
+}
+
 export function ProjectsView() {
+  const router = useRouter();
   const [novels, setNovels] = useState<NovelSummary[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [detail, setDetail] = useState<NovelDetail | null>(null);
@@ -54,6 +85,12 @@ export function ProjectsView() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ragSaving, setRagSaving] = useState(false);
+  const [reviewingChapterId, setReviewingChapterId] = useState<number | null>(null);
+  const [reviewResults, setReviewResults] = useState<Record<number, CheckResult[]>>({});
+  const [tracking, setTracking] = useState<TrackingSnapshot | null>(null);
+  const [trackingDrafts, setTrackingDrafts] = useState<Record<number, TrackingDraft>>({});
+  const [editingTrackingId, setEditingTrackingId] = useState<number | null>(null);
+  const bootstrapRequestKeyRef = useRef<string | null>(null);
 
   /** RAG 总开关：PATCH 持久化后刷新详情（06 收尾） */
   async function toggleRag() {
@@ -99,18 +136,29 @@ export function ProjectsView() {
     if (!name || creating) return;
     setCreating(true);
     setError(null);
+    const requestKey =
+      bootstrapRequestKeyRef.current ??
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    bootstrapRequestKeyRef.current = requestKey;
     try {
       const res = await fetch("/api/v1/novels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, requestKey }),
       });
-      const data = (await res.json()) as { novel?: NovelSummary; error?: string };
+      const data = (await res.json()) as {
+        novel?: { id: number; name: string };
+        chapter?: { id: number; ch: string; title: string };
+        error?: string;
+      };
       if (!res.ok) throw new Error(data.error ?? "创建失败");
       setBookName("");
-      await refreshList();
-      setActiveId(data.novel!.id);
-      await loadDetail(data.novel!.id);
+      bootstrapRequestKeyRef.current = null;
+      router.push(
+        `/chapter/${data.chapter!.id}?novelId=${data.novel!.id}&novel=${encodeURIComponent(data.novel!.name)}&ch=${data.chapter!.ch}&title=${encodeURIComponent(data.chapter!.title)}`,
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -121,6 +169,8 @@ export function ProjectsView() {
   async function selectNovel(id: number) {
     setActiveId(id);
     await loadDetail(id);
+    const trackingResponse = await fetch(`/api/v1/novels/${id}/tracking`);
+    if (trackingResponse.ok) setTracking((await trackingResponse.json()) as TrackingSnapshot);
   }
 
   async function addChapter() {
@@ -136,13 +186,130 @@ export function ProjectsView() {
     await loadDetail(activeId);
   }
 
+  async function startExistingWriting() {
+    if (!activeId) return;
+    setError(null);
+    const res = await fetch(`/api/v1/novels/${activeId}/start-writing`, { method: "POST" });
+    const data = (await res.json()) as {
+      novel?: { id: number; name: string };
+      chapter?: { id: number; ch: string; title: string };
+      error?: string;
+    };
+    if (!res.ok || !data.chapter || !data.novel) {
+      setError(data.error ?? "无法进入写作");
+      return;
+    }
+    router.push(
+      `/chapter/${data.chapter.id}?novelId=${data.novel.id}&novel=${encodeURIComponent(data.novel.name)}&ch=${data.chapter.ch}&title=${encodeURIComponent(data.chapter.title)}`,
+    );
+  }
+
   async function deleteChapter(chapterId: number) {
     if (!activeId) return;
     if (!window.confirm("删除该章节？")) return;
-    await fetch(`/api/v1/novels/${activeId}/chapters?chapterId=${chapterId}`, {
+    const res = await fetch(`/api/v1/novels/${activeId}/chapters?chapterId=${chapterId}`, {
       method: "DELETE",
     });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(data.error ?? "删除章节失败");
+      return;
+    }
     await loadDetail(activeId);
+  }
+
+  async function runChapterReview(chapter: Chapter) {
+    if (!activeId || reviewingChapterId !== null) return;
+    setReviewingChapterId(chapter.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/tools/checks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: chapter.content ?? "",
+          mustCover: [],
+          knownEntities: [
+            ...detail!.characters.map((entry) => entry.name),
+            ...detail!.worldviews.map((entry) => entry.name),
+          ],
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        checks?: CheckResult[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "审查失败");
+      setReviewResults((previous) => ({
+        ...previous,
+        [chapter.id]: data.checks ?? [],
+      }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setReviewingChapterId(null);
+    }
+  }
+
+  async function settleChapter(chapter: Chapter) {
+    if (!activeId || !chapter.content?.trim()) return;
+    setError(null);
+    const draft = trackingDrafts[chapter.id] ?? { result: "", characters: "", promises: "", readerKnowledge: "" };
+    const characterStates = draft.characters.split("\n").map((line) => line.trim()).filter(Boolean).flatMap((line) => {
+      const [name, ...state] = line.split("=");
+      return name?.trim() && state.join("=").trim() ? [{ name: name.trim(), state: state.join("=").trim() }] : [];
+    });
+    const promises = draft.promises.split("\n").map((line) => line.trim()).filter(Boolean).flatMap((line) => {
+      const [id, status, ...text] = line.split("|");
+      return id?.trim() && (status === "open" || status === "resolved") && text.join("|").trim()
+        ? [{ id: id.trim(), status, text: text.join("|").trim() }]
+        : [];
+    });
+    const readerKnowledge = draft.readerKnowledge.split("\n").map((line) => line.trim()).filter(Boolean).map((text) => ({ text }));
+    const response = await fetch(`/api/v1/novels/${activeId}/tracking`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chapterId: chapter.id,
+        idempotencyKey: `settle-${chapter.id}-r${chapter.revision}`,
+        expectedStateRevision: tracking?.tracking.stateRevision,
+        facts: { result: draft.result.trim() || undefined, characterStates, promises, readerKnowledge },
+      }),
+    });
+    const data = (await response.json().catch(() => ({}))) as TrackingSnapshot & { error?: string };
+    if (!response.ok) {
+      setError(data.error ?? "章节结算失败");
+      return;
+    }
+    setTracking(data);
+    setEditingTrackingId(null);
+    setReviewResults((previous) => ({ ...previous, [chapter.id]: data.records.find((record) => record.chapterId === chapter.id)?.checks ?? [] }));
+  }
+
+  function downloadNovel(format: "txt" | "json") {
+    if (!detail) return;
+    const filenameBase = detail.novel.name.replace(/[\\/:*?"<>|]/g, "_").trim() || "作品";
+    let body: string;
+    let type: string;
+    let extension: string;
+    if (format === "txt") {
+      body = detail.chapters
+        .map((chapter) => `第${chapter.ch}章 ${chapter.title}\n\n${chapter.content ?? ""}`)
+        .join("\n\n");
+      type = "text/plain;charset=utf-8";
+      extension = "txt";
+    } else {
+      body = JSON.stringify(detail, null, 2);
+      type = "application/json;charset=utf-8";
+      extension = "json";
+    }
+    const blob = new Blob([body], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${filenameBase}.${extension}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   async function addEntry(kind: "character" | "worldview") {
@@ -256,7 +423,7 @@ export function ProjectsView() {
         {!detail ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 rounded-card border border-dashed border-surface-2 py-24 text-center">
             <BookOpenText size={30} weight="duotone" className="text-zinc-500" aria-hidden />
-            <p className="text-sm text-muted">选择或创建一个作品，开始管理你笔下的世界</p>
+            <p className="text-sm text-muted">选择或创建一个作品，开始写作</p>
           </div>
         ) : (
           <div className="flex h-full flex-col gap-6">
@@ -389,8 +556,14 @@ export function ProjectsView() {
                     </li>
                   ))}
                   {detail.chapters.length === 0 && (
-                    <li className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-center text-xs text-faint">
-                      还没有章节，点击右上角新建
+                    <li className="rounded-xl border border-dashed border-accent/30 bg-accent/5 px-4 py-3 text-center text-xs text-faint">
+                      <p>还没有章节，先开始写作</p>
+                      <button
+                        onClick={() => void startExistingWriting()}
+                        className="mt-2 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-violet-500"
+                      >
+                        开始写作
+                      </button>
                     </li>
                   )}
                 </ul>
@@ -426,7 +599,7 @@ export function ProjectsView() {
                 {[
                   { name: "人物库", desc: `${detail.characters.length} 条` },
                   { name: "世界观设定", desc: `${detail.worldviews.length} 条` },
-                  { name: "章节摘要", desc: `${detail.chapters.length} 章` },
+                  { name: "当前章节正文参考", desc: "对话时读取当前章节末尾" },
                 ].map((c) => (
                   <li key={c.name} className="flex items-center justify-between rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
                     <div>
@@ -439,66 +612,149 @@ export function ProjectsView() {
               </ul>
             </div>
 
-            {/* 审查记录（09 工单接入；当前界面示意） */}
+            {/* 章节机检：结果只来自当前作品章节和真实 checks API */}
             <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
                 <ShieldCheck size={16} weight="duotone" className="text-accent" aria-hidden />
-                审查记录
+                章节审查
               </div>
               <ul className="mt-4 space-y-2">
-                {[
-                  { ch: "ch004", issue: "未覆盖必含词「守塔」", level: "medium", when: "刚刚" },
-                  { ch: "ch003", issue: "角色一致性：阿雀语气偏离", level: "low", when: "2 小时前" },
-                  { ch: "ch003", issue: "泄密扫描通过（S-001/003/005 未曝光）", level: "ok", when: "2 小时前" },
-                ].map((c) => (
-                  <li key={c.when + c.ch} className="flex items-center justify-between gap-3 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="shrink-0 font-mono text-xs text-faint">{c.ch}</span>
-                      <span className="truncate text-sm text-zinc-300">{c.issue}</span>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] ${
-                        c.level === "ok"
-                          ? "bg-emerald-500/10 text-emerald-400"
-                          : c.level === "low"
-                            ? "bg-yellow-500/10 text-yellow-400"
-                            : "bg-red-500/10 text-red-400"
-                      }`}
-                    >
-                      {c.level === "ok" ? "通过" : c.level === "low" ? "低" : "中"}
-                    </span>
+                {detail.chapters.map((chapter) => {
+                  const checks = reviewResults[chapter.id];
+                  return (
+                    <li key={chapter.id} className="rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-sm text-zinc-200">
+                          <span className="mr-2 font-mono text-xs text-faint">{chapter.ch}</span>
+                          {chapter.title}
+                        </span>
+                        <button
+                          onClick={() => void runChapterReview(chapter)}
+                          disabled={reviewingChapterId !== null}
+                          className="shrink-0 rounded-full border border-accent/50 px-3 py-1 text-[11px] text-accent transition hover:bg-accent/10 disabled:opacity-50"
+                        >
+                          {reviewingChapterId === chapter.id ? "审查中…" : "运行审查"}
+                        </button>
+                        <button
+                          onClick={() => void settleChapter(chapter)}
+                          disabled={!chapter.content?.trim()}
+                          className="shrink-0 rounded-full border border-emerald-500/40 px-3 py-1 text-[11px] text-emerald-400 transition hover:bg-emerald-500/10 disabled:opacity-40"
+                        >
+                          结算追踪
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTrackingId((current) => current === chapter.id ? null : chapter.id)}
+                        className="mt-2 text-[11px] text-faint underline decoration-dotted underline-offset-4 hover:text-zinc-300"
+                      >
+                        {editingTrackingId === chapter.id ? "收起追踪事实" : "补充追踪事实（可选）"}
+                      </button>
+                      {editingTrackingId === chapter.id && (
+                        <div className="mt-3 grid gap-2 border-t border-surface-2 pt-3 md:grid-cols-2">
+                          <label className="text-[11px] text-faint md:col-span-2">
+                            本章结果
+                            <input
+                              value={trackingDrafts[chapter.id]?.result ?? ""}
+                              onChange={(event) => setTrackingDrafts((previous) => ({ ...previous, [chapter.id]: { ...(previous[chapter.id] ?? { result: "", characters: "", promises: "", readerKnowledge: "" }), result: event.target.value } }))}
+                              placeholder="只写本章已经确认发生的结果"
+                              className="mt-1 w-full rounded-lg border border-surface-2 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 outline-none focus:border-accent"
+                            />
+                          </label>
+                          <label className="text-[11px] text-faint">
+                            人物状态（每行：角色=状态）
+                            <textarea
+                              value={trackingDrafts[chapter.id]?.characters ?? ""}
+                              onChange={(event) => setTrackingDrafts((previous) => ({ ...previous, [chapter.id]: { ...(previous[chapter.id] ?? { result: "", characters: "", promises: "", readerKnowledge: "" }), characters: event.target.value } }))}
+                              rows={3}
+                              className="mt-1 w-full resize-none rounded-lg border border-surface-2 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 outline-none focus:border-accent"
+                            />
+                          </label>
+                          <label className="text-[11px] text-faint">
+                            承诺（每行：ID|open/resolved|内容）
+                            <textarea
+                              value={trackingDrafts[chapter.id]?.promises ?? ""}
+                              onChange={(event) => setTrackingDrafts((previous) => ({ ...previous, [chapter.id]: { ...(previous[chapter.id] ?? { result: "", characters: "", promises: "", readerKnowledge: "" }), promises: event.target.value } }))}
+                              rows={3}
+                              className="mt-1 w-full resize-none rounded-lg border border-surface-2 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 outline-none focus:border-accent"
+                            />
+                          </label>
+                          <label className="text-[11px] text-faint md:col-span-2">
+                            读者已知（每行一条）
+                            <textarea
+                              value={trackingDrafts[chapter.id]?.readerKnowledge ?? ""}
+                              onChange={(event) => setTrackingDrafts((previous) => ({ ...previous, [chapter.id]: { ...(previous[chapter.id] ?? { result: "", characters: "", promises: "", readerKnowledge: "" }), readerKnowledge: event.target.value } }))}
+                              rows={2}
+                              className="mt-1 w-full resize-none rounded-lg border border-surface-2 bg-zinc-950 px-3 py-2 text-xs text-zinc-200 outline-none focus:border-accent"
+                            />
+                          </label>
+                          <p className="text-[10px] leading-4 text-faint md:col-span-2">
+                            这些内容只会作为可审计追踪事实写入，不会自动把正文当作事实，也不会替你猜测剧情。
+                          </p>
+                        </div>
+                      )}
+                      {checks && (
+                        <ul className="mt-3 space-y-1.5 border-t border-surface-2 pt-2.5">
+                          {checks.map((check) => (
+                            <li key={check.name} className="flex items-start gap-2 text-[11px]">
+                              <span className={`mt-1 size-1.5 shrink-0 rounded-full ${check.ok ? "bg-emerald-400" : "bg-red-400"}`} />
+                              <span className="text-zinc-300">{check.name}：{check.detail}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+                {detail.chapters.length === 0 && (
+                  <li className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-center text-xs text-faint">
+                    创建章节并保存正文后才能运行审查
                   </li>
-                ))}
+                )}
               </ul>
-              <p className="mt-3 text-[11px] text-faint">审查引擎接入中（09 工单），当前为界面示意</p>
+              <p className="mt-3 text-[11px] text-faint">审查结果为本次运行结果；当前不伪造历史审查记录。</p>
+              {tracking && (
+                <p className="mt-1 text-[11px] text-faint">
+                  作品追踪：已结算 {tracking.tracking.state.statusCard.settledChapters} 章
+                  {tracking.tracking.state.statusCard.currentChapter ? ` · 当前 ${tracking.tracking.state.statusCard.currentChapter}` : ""}
+                </p>
+              )}
             </div>
 
-            {/* 导出与备份（08 工单接入；当前界面示意） */}
+            {/* 导出与备份：浏览器下载 + 真实 WebDAV 配置入口 */}
             <div className="rounded-card border border-surface-2 bg-surface/50 p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
                 <CloudArrowUp size={16} weight="duotone" className="text-accent" aria-hidden />
                 导出与备份
               </div>
               <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                {[
-                  { icon: FileText, name: "全书 TXT", desc: "纯文本导出，章节按序拼接" },
-                  { icon: FileArchive, name: "作品包 JSON", desc: "含设定/摘要/章节的完整包" },
-                  { icon: CloudArrowUp, name: "云同步备份", desc: "推送到已配置的 WebDAV" },
-                ].map((c) => (
-                  <button
-                    key={c.name}
-                    disabled
-                    title="暂未开放"
-                    className="flex cursor-not-allowed flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left opacity-60"
-                  >
-                    <c.icon size={16} weight="duotone" className="text-zinc-400" aria-hidden />
-                    <span className="text-sm font-medium text-zinc-200">{c.name}</span>
-                    <span className="text-[11px] leading-4 text-faint">{c.desc}</span>
-                    <span className="mt-1 rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-zinc-500">
-                      暂未开放
-                    </span>
-                  </button>
-                ))}
+                <button
+                  onClick={() => downloadNovel("txt")}
+                  className="flex flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left transition hover:border-zinc-600"
+                >
+                  <FileText size={16} weight="duotone" className="text-zinc-400" aria-hidden />
+                  <span className="text-sm font-medium text-zinc-200">全书 TXT</span>
+                  <span className="text-[11px] leading-4 text-faint">纯文本导出，章节按序拼接</span>
+                  <span className="mt-1 rounded-full border border-emerald-500/30 px-2 py-0.5 text-[10px] text-emerald-400">可下载</span>
+                </button>
+                <button
+                  onClick={() => downloadNovel("json")}
+                  className="flex flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left transition hover:border-zinc-600"
+                >
+                  <FileArchive size={16} weight="duotone" className="text-zinc-400" aria-hidden />
+                  <span className="text-sm font-medium text-zinc-200">作品包 JSON</span>
+                  <span className="text-[11px] leading-4 text-faint">含设定、章节和正文的完整包</span>
+                  <span className="mt-1 rounded-full border border-emerald-500/30 px-2 py-0.5 text-[10px] text-emerald-400">可下载</span>
+                </button>
+                <Link
+                  href="/sync"
+                  className="flex flex-col items-start gap-1 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3.5 text-left transition hover:border-zinc-600"
+                >
+                  <CloudArrowUp size={16} weight="duotone" className="text-zinc-400" aria-hidden />
+                  <span className="text-sm font-medium text-zinc-200">云同步备份</span>
+                  <span className="text-[11px] leading-4 text-faint">配置并推送到 WebDAV</span>
+                  <span className="mt-1 rounded-full border border-accent/30 px-2 py-0.5 text-[10px] text-accent">打开配置</span>
+                </Link>
               </div>
             </div>
           </div>

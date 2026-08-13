@@ -124,7 +124,7 @@ export function WebSearchView() {
           {degraded && (
             <div className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 text-xs text-yellow-400">
               <span className="inline-block size-1.5 shrink-0 rounded-full bg-yellow-400" aria-hidden />
-              {note ?? "联网检索服务暂时不可用，已降级为示例数据"}
+              {note ?? "联网检索服务暂时不可用，未返回虚构结果"}
             </div>
           )}
           {/* 工单 21：多选 → 引用入文（回流写作对话） */}
@@ -180,6 +180,12 @@ export function WebSearchView() {
               </div>
             </div>
           ))}
+          {results.length === 0 && (
+            <div className="rounded-card border border-dashed border-surface-2 px-6 py-10 text-center">
+              <p className="text-sm text-muted">没有可验证的联网结果</p>
+              <p className="mt-2 text-xs leading-5 text-faint">服务降级时不会展示虚构资料，请稍后重试或使用可核验来源。</p>
+            </div>
+          )}
         </div>
       )}
     </main>

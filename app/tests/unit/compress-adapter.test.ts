@@ -40,8 +40,9 @@ describe("compression completion adapter", () => {
         systemSections: ["base_identity"],
       },
     });
-    for await (const _ of stream.stream()) {
+    for await (const delta of stream.stream()) {
       // Consume the provider seam; the fake completion body has no stream deltas.
+      void delta;
     }
 
     const bodies = (fetcher.mock.calls as unknown as Array<[string, RequestInit]>).map(([, init]) =>
