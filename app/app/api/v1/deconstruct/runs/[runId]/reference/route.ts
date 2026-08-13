@@ -16,10 +16,26 @@ export async function GET(
   const runId = Number(rawRunId);
   if (!Number.isInteger(runId) || runId <= 0) return NextResponse.json({ error: "运行记录无效" }, { status: 400 });
   const [run] = await db
-    .select({ result: deconstructionRuns.result, status: deconstructionRuns.status })
+    .select({
+      result: deconstructionRuns.result,
+      status: deconstructionRuns.status,
+      errorMessage: deconstructionRuns.errorMessage,
+      lastErrorClass: deconstructionRuns.lastErrorClass,
+      attemptCount: deconstructionRuns.attemptCount,
+      lastAttemptAt: deconstructionRuns.lastAttemptAt,
+    })
     .from(deconstructionRuns)
     .where(and(eq(deconstructionRuns.id, runId), eq(deconstructionRuns.userId, user.id)));
   if (!run) return NextResponse.json({ error: "运行记录不存在" }, { status: 404 });
-  if (run.status !== "completed" || !run.result) return NextResponse.json({ error: "拆解尚未完成" }, { status: 409 });
+  if (run.status !== "completed" || !run.result) {
+    return NextResponse.json({
+      error: run.errorMessage ?? "拆解尚未完成",
+      errorClass: run.lastErrorClass,
+      failureCode: run.lastErrorClass,
+      workflow: run.status === "failed" ? "failed_recoverable" : "running",
+      attemptCount: run.attemptCount,
+      lastAttemptAt: run.lastAttemptAt,
+    }, { status: run.status === "failed" ? 422 : 409 });
+  }
   return NextResponse.json({ runId, reference: buildWritingReference(run.result) });
 }

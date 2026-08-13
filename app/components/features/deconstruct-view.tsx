@@ -40,6 +40,9 @@ interface SavedRun {
   status: string;
   result?: DeconstructResult | null;
   errorMessage?: string | null;
+  lastErrorClass?: string | null;
+  attemptCount?: number;
+  lastAttemptAt?: string | null;
 }
 
 export function DeconstructView() {
@@ -90,8 +93,26 @@ export function DeconstructView() {
         runId?: number;
         title?: string;
         error?: string;
+        errorClass?: string;
+        workflow?: string;
       };
-      if (!res.ok) throw new Error(data.error ?? "拆解失败");
+      if (!res.ok) {
+        if (data.runId) {
+          setRunId(data.runId);
+          setSavedRuns((previous) => [
+            {
+              id: data.runId!,
+              title: data.title ?? chapter.title,
+              sourceLength: chapter.text.length,
+              status: "failed",
+              errorMessage: data.error ?? "拆解失败",
+              lastErrorClass: data.errorClass,
+            },
+            ...previous.filter((run) => run.id !== data.runId),
+          ]);
+        }
+        throw new Error(`${data.error ?? "拆解失败"}${data.errorClass ? `（${data.errorClass}）` : ""}`);
+      }
       setResult(data.result ?? null);
       setResultTitle(data.title ?? chapter.title);
       setRunId(data.runId ?? null);
@@ -371,12 +392,13 @@ export function DeconstructView() {
         <div className="mt-6 rounded-card border border-surface-2 bg-surface/50 p-5">
           <h2 className="text-sm font-semibold text-zinc-200">可恢复的拆解结果</h2>
           <ul className="mt-3 space-y-2">
-            {savedRuns.slice(0, 8).map((run) => (
-              <li key={run.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-zinc-200">{run.title}</p>
-                  <p className="mt-1 text-[10px] text-faint">#{run.id} · {run.sourceLength} 字 · {run.status === "completed" ? "已完成" : run.status}</p>
-                </div>
+          {savedRuns.slice(0, 8).map((run) => (
+            <li key={run.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-2 bg-zinc-950/60 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-xs text-zinc-200">{run.title}</p>
+                <p className="mt-1 text-[10px] text-faint">#{run.id} · {run.sourceLength} 字 · {run.status === "completed" ? "已完成" : run.status === "failed" ? `失败${run.lastErrorClass ? ` · ${run.lastErrorClass}` : ""}` : run.status}</p>
+                {run.status === "failed" && run.errorMessage && <p className="mt-1 text-[10px] text-red-300">{run.errorMessage}</p>}
+              </div>
                 {run.status === "completed" && run.result && (
                   <button
                     type="button"
@@ -388,6 +410,23 @@ export function DeconstructView() {
                     className="shrink-0 rounded-full border border-accent/50 px-3 py-1 text-[11px] text-accent hover:bg-accent/10"
                   >
                     查看结果
+                  </button>
+                )}
+                {run.status === "failed" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError("失败运行已保留；为保护正文隐私，请重新上传同一正文后再执行。");
+                      setResult(null);
+                      analysisRequestKeyRef.current = null;
+                      setTab("upload");
+                      setPicked(false);
+                      setSelected(null);
+                      setChapters([]);
+                    }}
+                    className="shrink-0 rounded-full border border-yellow-500/50 px-3 py-1 text-[11px] text-yellow-300 hover:bg-yellow-500/10"
+                  >
+                    重新执行
                   </button>
                 )}
               </li>

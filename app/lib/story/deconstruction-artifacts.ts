@@ -22,6 +22,7 @@ export function validateDeconstructionArtifacts(
   if (result.mode !== expectedMode) errors.push(`mode 必须为 ${expectedMode}`);
   const stages = Array.isArray(result.stages) ? result.stages : [];
   const ids = stages.map((stage) => stage?.stage);
+  if (stages.length > 7) errors.push("quality.stage 数量超出上限");
   if (new Set(ids).size !== ids.length) errors.push("stage id 不能重复");
   for (const stageId of requiredStages(expectedMode)) {
     const stage = stages.find((candidate) => candidate?.stage === stageId);
@@ -29,6 +30,8 @@ export function validateDeconstructionArtifacts(
       errors.push(`缺少 Stage ${stageId}`);
       continue;
     }
+    if (typeof stage.name !== "string" || stage.name.trim().length === 0) errors.push(`Stage ${stageId} name 必须为非空字符串`);
+    if (stage.status !== "completed") errors.push(`Stage ${stageId} status 必须为 completed`);
     const artifact = stage.artifact as Partial<DeconstructionArtifact> | undefined;
     if (!artifact || typeof artifact !== "object") {
       errors.push(`Stage ${stageId} artifact 无效`);
@@ -65,6 +68,7 @@ export function validateDeconstructionArtifacts(
                 : ["techniques"];
     for (const field of arrayFields) {
       if (!Array.isArray(artifact[field])) errors.push(`Stage ${stageId} ${field} 必须为数组`);
+      else if ((artifact[field] as unknown[]).length > 2000) errors.push(`quality.Stage ${stageId} ${field} 超出长度上限`);
     }
     if (stageId === 0 && typeof artifact.chapterCount !== "number") {
       errors.push("Stage 0 chapterCount 必须为数字");
@@ -88,8 +92,10 @@ export function validateDeconstructionArtifacts(
   if (!result.quality || typeof result.quality !== "object") {
     errors.push("quality 必须为对象");
   } else {
-    if (typeof result.quality.chapterCount !== "number") errors.push("quality.chapterCount 必须为数字");
+    if (typeof result.quality.sourceLength !== "number" || result.quality.sourceLength <= 0) errors.push("quality.sourceLength 必须为正数");
+    if (typeof result.quality.chapterCount !== "number" || !Number.isFinite(result.quality.chapterCount) || result.quality.chapterCount < 1) errors.push("quality.chapterCount 必须为正数");
     if (!Array.isArray(result.quality.completedStages)) errors.push("quality.completedStages 必须为数组");
+    else if (result.quality.completedStages.join(",") !== requiredStages(expectedMode).join(",")) errors.push("quality.completedStages 必须与 mode 阶段一致");
     if (!Array.isArray(result.quality.warnings) || !result.quality.warnings.every((item) => typeof item === "string")) {
       errors.push("quality.warnings 必须为字符串数组");
     }

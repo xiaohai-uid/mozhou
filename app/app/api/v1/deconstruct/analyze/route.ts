@@ -10,17 +10,45 @@ import {
   deconstructionRuns,
   novels,
   type DeconstructionMode,
-  type DeconstructionArtifact,
   type DeconstructionResult,
 } from "@/lib/schema";
-import { validateDeconstructionArtifacts } from "@/lib/story/deconstruction-artifacts";
+import {
+  classifyProviderResponse,
+  runStructuredDeconstruction,
+  attemptsOf,
+  type ProviderCallResult,
+} from "@/lib/story/deconstruction-pipeline";
 
 export type DeconstructResult = DeconstructionResult;
 
 const MAX_TEXT = 30000;
 const MIN_TEXT = 200;
-const PROVIDER_TIMEOUT_MS = 90_000;
-const PROVIDER_ATTEMPTS = 3;
+// Evidence-based hard bounds: the approved provider probes complete a valid
+// short artifact in under 100s, so the old 90s primary budget was too tight.
+// These remain finite and are still capped by the run deadline.
+const PROVIDER_TIMEOUT_MS = 125_000;
+const REPAIR_TIMEOUT_MS = 110_000;
+const PRIMARY_ATTEMPTS = 3;
+const REPAIR_ATTEMPTS = 2;
+
+function publicFailureCode(errorClass: string): string {
+  const codes: Record<string, string> = {
+    provider_timeout: "PROVIDER_TIMEOUT",
+    provider_rate_limit: "PROVIDER_RATE_LIMIT",
+    provider_client_error: "PROVIDER_CLIENT_ERROR",
+    provider_unavailable: "PROVIDER_UNAVAILABLE",
+    provider_network: "PROVIDER_NETWORK_ERROR",
+    provider_protocol: "PROVIDER_PROTOCOL_ERROR",
+    invalid_json: "INVALID_JSON",
+    artifact_schema_invalid: "ARTIFACT_SCHEMA_INVALID",
+    artifact_quality_failed: "ARTIFACT_QUALITY_INVALID",
+    repair_failed: "STRUCTURE_REPAIR_FAILED",
+    stale_running: "RUN_TIMEOUT",
+    configuration_error: "INTERNAL_ERROR",
+    internal: "INTERNAL_ERROR",
+  };
+  return codes[errorClass] ?? "INTERNAL_ERROR";
+}
 
 /** 测试用固定结果（DECONSTRUCT_PROVIDER=mock） */
 const MOCK_RESULT: DeconstructResult = {
@@ -63,16 +91,6 @@ function buildMockResult(mode: DeconstructionMode, sourceLength: number): Decons
   };
 }
 
-const STAGE_NAMES: Record<number, string> = {
-  0: "概要与章节边界",
-  1: "黄金三章",
-  2: "逐章摘要",
-  3: "剧情聚合",
-  4: "设定与关系",
-  5: "汇总报告",
-  6: "文风",
-};
-
 const MODE_STAGES: Record<DeconstructionMode, number[]> = {
   long: [0, 1, 2, 3, 4, 5, 6],
   short: [0, 2, 3, 4, 5, 6],
@@ -91,20 +109,23 @@ async function requestDeconstructionModel(input: {
   title: string;
   text: string;
   runId?: number;
+  baseAttemptCount?: number;
   repairOutput?: string;
-}) {
+  deadline: number;
+}): Promise<ProviderCallResult> {
   let lastResponse: Response | null = null;
-  let lastError: unknown = null;
-  const attempts = input.repairOutput ? 2 : PROVIDER_ATTEMPTS;
+  const attempts = input.repairOutput ? REPAIR_ATTEMPTS : PRIMARY_ATTEMPTS;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const remaining = input.deadline - Date.now();
+    if (remaining <= 0) return { kind: "timeout", attempts: attempt };
     if (input.runId) {
       await db.update(deconstructionRuns).set({
-        attemptCount: attempt + 1,
+        attemptCount: (input.baseAttemptCount ?? 0) + attempt + 1,
         lastAttemptAt: new Date(),
       }).where(eq(deconstructionRuns.id, input.runId));
     }
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), PROVIDER_TIMEOUT_MS);
+    const timer = setTimeout(() => ctrl.abort(), Math.min(input.repairOutput ? REPAIR_TIMEOUT_MS : PROVIDER_TIMEOUT_MS, remaining));
     try {
       const response = await fetch(
         `${process.env.ONEAPI_BASE_URL ?? "http://localhost:3001"}/v1/chat/completions`,
@@ -119,6 +140,9 @@ async function requestDeconstructionModel(input: {
             model: process.env.DECONSTRUCT_MODEL ?? "deepseek-v4-flash",
             stream: false,
             response_format: { type: "json_object" },
+            max_tokens: 6000,
+            temperature: 0.1,
+            thinking: { type: "disabled" },
             messages: [
               { role: "system", content: `${PROMPT}\n本次请求 mode：${input.mode}\n本次请求必须完成阶段：${MODE_STAGES[input.mode].join(", ")}${input.repairOutput ? `\n这是一次结构修复请求。上一次输出未通过契约校验。请只输出修复后的完整 JSON，不要解释，不要删减任何必填字段。上一次输出如下：\n${input.repairOutput.slice(0, 50000)}` : ""}` },
               { role: "user", content: input.repairOutput ? `请根据原始作品《${input.title}》的分析结果完成结构修复。` : `作品/章节《${input.title}》\n\n${input.text.slice(0, MAX_TEXT)}` },
@@ -127,20 +151,30 @@ async function requestDeconstructionModel(input: {
         },
       );
       lastResponse = response;
-      if (response.ok) return response;
-      if (![408, 409, 429, 500, 502, 503, 504].includes(response.status) || attempt === attempts - 1) return response;
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs(response, attempt)));
+      if (response.ok) {
+        const data = await response.json().catch(() => null) as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } } | null;
+        return {
+          kind: "success",
+          raw: data?.choices?.[0]?.message?.content ?? "",
+          usage: data?.usage,
+          attempts: attempt + 1,
+        };
+      }
+      const transport = classifyProviderResponse(response);
+      if (!["timeout", "rate_limit", "provider_5xx"].includes(transport) || attempt === attempts - 1) {
+        return { kind: transport === "success" ? "protocol_error" : transport, status: response.status, attempts: attempt + 1 };
+      }
+      await new Promise((resolve) => setTimeout(resolve, Math.min(retryDelayMs(response, attempt), Math.max(0, input.deadline - Date.now()))));
     } catch (error) {
-      lastError = error;
-      if (attempt === attempts - 1) throw error;
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs(null, attempt)));
+      const aborted = error instanceof Error && (error.name === "AbortError" || error.message.toLowerCase().includes("aborted"));
+      if (attempt === attempts - 1) return { kind: aborted ? "timeout" : "network", attempts: attempt + 1 };
+      await new Promise((resolve) => setTimeout(resolve, Math.min(retryDelayMs(null, attempt), Math.max(0, input.deadline - Date.now()))));
     } finally {
       clearTimeout(timer);
     }
   }
-  if (lastError) throw lastError;
-  if (lastResponse) return lastResponse;
-  throw new Error("拆解服务没有返回响应");
+  const transport = lastResponse ? classifyProviderResponse(lastResponse) : "network";
+  return { kind: transport === "success" ? "protocol_error" : transport, attempts };
 }
 
 const PROMPT = `你是资深网络小说编辑。你要执行 oh-story 的结构化拆文管道。
@@ -170,83 +204,11 @@ const PROMPT = `你是资深网络小说编辑。你要执行 oh-story 的结构
 6. Stage 4 artifact 必须含 characters/worldview/factions/relationships；硬事实没有证据时写“原文未明确”。
 7. Stage 5 artifact 必须含 readerNeeds/emotionEngine/writingTechniques/replicableModules/risks。
 8. Stage 6 artifact 必须含 sentence/rhythm/dialogue/emotion/techniques；不要输出超过 6 段原文摘录。
-9. chapters、chapterIndex、goldenChapters、subplots、units、foreshadowing、characters、factions、relationships、readerNeeds、writingTechniques、replicableModules、risks、techniques 必须是 JSON 数组；mainline、emotionCurve、coverage、worldview、emotionEngine 可按内容使用字符串、数字、数组或对象。摘要要具体、可被下游写作/审查消费；不要返回空的占位对象。
-10. 每个 artifact 必须保留稳定的字符串 id、字符串 kind 和数字 schemaVersion=1；不要把 stage 或 artifact.id 写成数字。
-11. 返回前逐项检查所有必填字段与字段类型；宁可按原文证据写空数组，也不要省略字段或输出 null。
+9. chapters、chapterIndex、goldenChapters、subplots、units、foreshadowing、characters、factions、relationships、readerNeeds、writingTechniques、replicableModules、risks、techniques、emotionCurve、worldview 必须是 JSON 数组（worldview 也可为 JSON 对象）；mainline 必须是字符串或数组，coverage 必须是数字、字符串或数组，emotionEngine 必须是字符串或数组。摘要要具体、可被下游写作/审查消费；不要返回空的占位对象。
+10. 每个 stage 对象必须同时保留数字整数 stage 字段（short 只能是 0、2、3、4、5、6；long 只能是 0、1、2、3、4、5、6）、字符串 name、status="completed" 和 artifact；不要省略 stage 字段，也不要把 stage 写成字符串。
+11. 每个 artifact 必须保留稳定的字符串 id、字符串 kind 和数字 schemaVersion=1；不要把 artifact.id 写成数字。
+12. 返回前逐项检查所有必填字段与字段类型；宁可按原文证据写空数组，也不要省略字段或输出 null。
 `;
-
-/** 容错解析：剥离 ```json 围栏与前后杂音，校验三数组 */
-function parseResult(raw: string, mode: DeconstructionMode, sourceLength: number): DeconstructResult | null {
-  let cleaned = raw.trim();
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  try {
-    const obj = JSON.parse(cleaned.slice(start, end + 1)) as Partial<DeconstructResult>;
-    const arr = (v: unknown): v is string[] =>
-      Array.isArray(v) && v.every((x) => typeof x === "string");
-    const stages = (Array.isArray(obj.stages) ? obj.stages : [])
-      .map((stage) => {
-        const candidate = stage as unknown as { stage?: unknown; name?: unknown; artifact?: unknown };
-        return {
-          stage: typeof candidate.stage === "number" && Number.isInteger(candidate.stage) ? candidate.stage : -1,
-          name: typeof candidate.name === "string" ? candidate.name : "",
-          artifact: candidate.artifact && typeof candidate.artifact === "object"
-            ? candidate.artifact as Record<string, unknown>
-            : {},
-        };
-      })
-      .filter((stage) => stage.stage >= 0)
-      .map((stage) => ({
-        stage: stage.stage,
-        name: stage.name || STAGE_NAMES[stage.stage] || `Stage ${stage.stage}`,
-        status: "completed" as const,
-        artifact: stage.artifact as DeconstructionArtifact,
-      }));
-    const actualStageIds = new Set(stages.map((stage) => stage.stage));
-    const quality = obj.quality && typeof obj.quality === "object" ? obj.quality : null;
-    const expectedStages = MODE_STAGES[mode];
-    const schemaErrors = validateDeconstructionArtifacts({
-      ...obj,
-      mode,
-      stages,
-      quality: quality ? {
-        sourceLength,
-        chapterCount: typeof quality.chapterCount === "number" ? quality.chapterCount : NaN,
-        completedStages: Array.isArray(quality.completedStages) ? quality.completedStages : expectedStages,
-        warnings: Array.isArray(quality.warnings) ? quality.warnings.filter((warning): warning is string => typeof warning === "string") : [],
-      } : undefined,
-    }, mode);
-    if (
-      arr(obj.structure) &&
-      arr(obj.plot) &&
-      arr(obj.rhythm) &&
-      expectedStages.every((stage) => actualStageIds.has(stage)) &&
-      stages.every((stage) => Object.keys(stage.artifact).length > 0) &&
-      schemaErrors.length === 0
-    ) {
-      return {
-        structure: obj.structure,
-        plot: obj.plot,
-        rhythm: obj.rhythm,
-        mode,
-        stages: stages.sort((a, b) => a.stage - b.stage),
-        quality: {
-          sourceLength,
-          chapterCount: typeof obj.quality?.chapterCount === "number" ? obj.quality.chapterCount : 0,
-          completedStages: expectedStages,
-          warnings: Array.isArray(obj.quality?.warnings)
-            ? obj.quality.warnings.filter((warning): warning is string => typeof warning === "string").slice(0, 20)
-            : [],
-        },
-      };
-    }
-  } catch {
-    // fallthrough
-  }
-  return null;
-}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -287,12 +249,19 @@ export async function POST(request: Request) {
   if (requestKey) {
     const [existing] = await db.select().from(deconstructionRuns).where(and(eq(deconstructionRuns.userId, user.id), eq(deconstructionRuns.requestKey, requestKey)));
     if (existing?.status === "completed" && existing.result) return NextResponse.json({ runId: existing.id, result: existing.result, title: existing.title, status: existing.status, resumed: true });
+    if (existing?.status === "failed") return NextResponse.json({ runId: existing.id, status: "failed", error: existing.errorMessage ?? "该运行已失败，请使用新的请求键重新执行", errorClass: existing.lastErrorClass }, { status: 409 });
     if (existing && existing.sourceHash !== sourceHash) return NextResponse.json({ error: "拆解请求键已用于另一份正文" }, { status: 409 });
     if (existing?.status === "running") {
       const staleAfterMs = 15 * 60 * 1000;
       const isStale = Date.now() - existing.updatedAt.getTime() > staleAfterMs;
       if (!isStale) return NextResponse.json({ error: "该拆解仍在运行，请稍后刷新结果列表", runId: existing.id, status: existing.status }, { status: 409 });
-      await db.update(deconstructionRuns).set({ status: "failed", errorMessage: "上一次拆解超过 15 分钟未完成，可安全重试", updatedAt: new Date() }).where(eq(deconstructionRuns.id, existing.id));
+      await db.update(deconstructionRuns).set({
+        status: "failed",
+        errorMessage: "上一次拆解超过 15 分钟未完成，可安全重试",
+        lastErrorClass: "RUN_TIMEOUT",
+        updatedAt: new Date(),
+      }).where(eq(deconstructionRuns.id, existing.id));
+      return NextResponse.json({ runId: existing.id, status: "failed", error: "上一次拆解已超时，请使用新的请求键重新执行", errorClass: "RUN_TIMEOUT" }, { status: 409 });
     }
   }
 
@@ -301,60 +270,126 @@ export async function POST(request: Request) {
     const [run] = await db.insert(deconstructionRuns).values({ userId: user.id, novelId, title, sourceHash, sourceLength: text.length, requestKey, status: "running" }).onConflictDoNothing({ target: [deconstructionRuns.userId, deconstructionRuns.requestKey] }).returning({ id: deconstructionRuns.id });
     runId = run?.id;
     if (!runId) {
-      const [existing] = await db.select({ id: deconstructionRuns.id, status: deconstructionRuns.status, result: deconstructionRuns.result }).from(deconstructionRuns).where(and(eq(deconstructionRuns.userId, user.id), eq(deconstructionRuns.requestKey, requestKey)));
+      const [existing] = await db.select({ id: deconstructionRuns.id, status: deconstructionRuns.status, result: deconstructionRuns.result, errorMessage: deconstructionRuns.errorMessage, lastErrorClass: deconstructionRuns.lastErrorClass }).from(deconstructionRuns).where(and(eq(deconstructionRuns.userId, user.id), eq(deconstructionRuns.requestKey, requestKey)));
       if (existing?.status === "completed" && existing.result) return NextResponse.json({ runId: existing.id, result: existing.result, title, status: existing.status, resumed: true });
+      if (existing?.status === "failed") return NextResponse.json({ runId: existing.id, status: "failed", error: existing.errorMessage ?? "该运行已失败，请使用新的请求键重新执行", errorClass: existing.lastErrorClass }, { status: 409 });
       runId = existing?.id;
     }
   }
 
-  const fail = async (message: string, httpStatus: number) => {
-    if (runId) await db.update(deconstructionRuns).set({ status: "failed", errorMessage: message, lastErrorClass: message.includes("429") ? "rate_limited" : "provider_or_schema", updatedAt: new Date() }).where(eq(deconstructionRuns.id, runId));
-    return NextResponse.json({ error: message, runId, status: "failed" }, { status: httpStatus });
+  if (runId) {
+    await db.update(deconstructionRuns).set({
+      status: "running",
+      errorMessage: null,
+      updatedAt: new Date(),
+    }).where(eq(deconstructionRuns.id, runId));
+  }
+
+  const fail = async (input: {
+    message: string;
+    httpStatus: number;
+    errorClass: string;
+    workflow?: "failed_recoverable" | "failed_terminal";
+    structured?: string | null;
+    transport?: string;
+    providerAttempts?: number;
+    repairAttempts?: number;
+    validationErrors?: string[];
+  }) => {
+    if (runId) await db.update(deconstructionRuns).set({
+      status: "failed",
+      errorMessage: input.message,
+      lastErrorClass: publicFailureCode(input.errorClass),
+      updatedAt: new Date(),
+    }).where(eq(deconstructionRuns.id, runId));
+    return NextResponse.json({
+      error: input.message,
+      errorClass: publicFailureCode(input.errorClass),
+      workflow: input.workflow ?? "failed_recoverable",
+      structured: input.structured,
+      transport: input.transport,
+      providerAttempts: input.providerAttempts,
+      repairAttempts: input.repairAttempts,
+      validationErrors: input.validationErrors,
+      runId,
+      status: "failed",
+    }, { status: input.httpStatus });
   };
 
   // 测试模式：返回固定结果
   if (process.env.DECONSTRUCT_PROVIDER === "mock") {
+    if (process.env.NODE_ENV === "production") {
+      return fail({ message: "拆解服务配置无效", httpStatus: 500, errorClass: "configuration_error", workflow: "failed_terminal" });
+    }
     const mockResult = buildMockResult(mode, text.length);
     if (runId) await db.update(deconstructionRuns).set({ status: "completed", result: mockResult, errorMessage: null, updatedAt: new Date() }).where(eq(deconstructionRuns.id, runId));
     return NextResponse.json({ runId, result: mockResult, title, mode, status: "completed" });
   }
 
   try {
-    const res = await requestDeconstructionModel({ mode, title, text, runId });
-    if (!res.ok) {
-      return fail(`拆解服务暂不可用（${res.status}）`, 502);
-    }
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
-    const raw = data.choices?.[0]?.message?.content ?? "";
-    let result = parseResult(raw, mode, text.length);
-    let repairUsage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
-    if (!result) {
-      const repairResponse = await requestDeconstructionModel({ mode, title, text, runId, repairOutput: raw });
-      if (repairResponse.ok) {
-        const repairData = (await repairResponse.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        };
-        repairUsage = repairData.usage;
-        result = parseResult(repairData.choices?.[0]?.message?.content ?? "", mode, text.length);
-      }
-    }
-    if (!result) {
-      return fail("拆解结果结构不符合当前阶段契约，请重试", 502);
+      const deadline = Date.now() + (mode === "long" ? 420_000 : 300_000);
+    let initialRaw = "";
+    let attemptOffset = 0;
+    const [runMetadata] = runId
+      ? await db.select({ attemptCount: deconstructionRuns.attemptCount }).from(deconstructionRuns).where(eq(deconstructionRuns.id, runId))
+      : [];
+    const pipeline = await runStructuredDeconstruction({
+      mode,
+      sourceLength: text.length,
+      request: async ({ repair }) => {
+        const response = await requestDeconstructionModel({
+          mode,
+          title,
+          text,
+          runId,
+          baseAttemptCount: runMetadata?.attemptCount ?? 0,
+          repairOutput: repair ? initialRaw : undefined,
+          deadline,
+        });
+        attemptOffset += attemptsOf(response);
+        if (runId) {
+          await db.update(deconstructionRuns).set({
+            attemptCount: (runMetadata?.attemptCount ?? 0) + attemptOffset,
+            lastAttemptAt: new Date(),
+          }).where(eq(deconstructionRuns.id, runId));
+        }
+        if (!repair && response.kind === "success") initialRaw = response.raw;
+        return response;
+      },
+    });
+    if (pipeline.workflow !== "completed" || !pipeline.result) {
+      const httpStatus = pipeline.errorClass === "provider_timeout" ? 504 : pipeline.errorClass === "provider_rate_limit" ? 429 : 502;
+      const message = pipeline.errorClass === "provider_timeout"
+        ? "拆解服务超时，可重新执行"
+        : pipeline.errorClass === "provider_rate_limit"
+          ? "拆解服务限流，请稍后重新执行"
+          : pipeline.errorClass === "artifact_quality_failed"
+            ? "拆解结果未通过质量检查，可重新执行"
+            : pipeline.structured === "repair_failed"
+              ? "拆解结果修复失败，可重新执行"
+              : "拆解服务未返回可用结果，可重新执行";
+      return fail({
+        message,
+        httpStatus,
+        errorClass: pipeline.errorClass ?? "provider_protocol",
+        workflow: pipeline.workflow === "completed" ? "failed_recoverable" : pipeline.workflow,
+        structured: pipeline.structured,
+        transport: pipeline.transport,
+        providerAttempts: pipeline.providerAttempts,
+        repairAttempts: pipeline.repairAttempts,
+        validationErrors: pipeline.validationErrors,
+      });
     }
     // 用量记账（11 工单）
     await recordUsage(
       user.id,
       "小说拆解",
-      (data.usage?.prompt_tokens ?? 0) + (repairUsage?.prompt_tokens ?? 0),
-      (data.usage?.completion_tokens ?? 0) + (repairUsage?.completion_tokens ?? 0),
+      pipeline.usage.prompt_tokens,
+      pipeline.usage.completion_tokens,
     ).catch(() => {});
-    if (runId) await db.update(deconstructionRuns).set({ status: "completed", result, errorMessage: null, updatedAt: new Date() }).where(eq(deconstructionRuns.id, runId));
-    return NextResponse.json({ runId, result, title, mode, status: "completed" });
-  } catch (err) {
-    return fail(`拆解失败：${(err as Error).message}`, 502);
+    if (runId) await db.update(deconstructionRuns).set({ status: "completed", result: pipeline.result, errorMessage: null, lastErrorClass: null, updatedAt: new Date() }).where(eq(deconstructionRuns.id, runId));
+    return NextResponse.json({ runId, result: pipeline.result, title, mode, status: "completed", workflow: pipeline.workflow, structured: pipeline.structured, transport: pipeline.transport, providerAttempts: pipeline.providerAttempts, repairAttempts: pipeline.repairAttempts });
+  } catch {
+    return fail({ message: "拆解服务内部失败，可重新执行", httpStatus: 502, errorClass: "internal" });
   }
 }

@@ -20,6 +20,7 @@ export async function GET() {
       errorMessage: deconstructionRuns.errorMessage,
       attemptCount: deconstructionRuns.attemptCount,
       lastErrorClass: deconstructionRuns.lastErrorClass,
+      failureCode: deconstructionRuns.lastErrorClass,
       lastAttemptAt: deconstructionRuns.lastAttemptAt,
       createdAt: deconstructionRuns.createdAt,
       updatedAt: deconstructionRuns.updatedAt,
