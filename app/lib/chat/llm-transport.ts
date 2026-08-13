@@ -1,11 +1,17 @@
 import type { StreamDelta, StreamProvider } from "@/lib/pipeline/engine";
-import type { ChatMessage, PreparedChatRequest, ProviderWirePayload } from "./payload";
+import type { ChatMessage, ProviderWirePayload } from "./payload";
 
 export type CompletionRequest = {
   model: string;
   system?: string;
   messages: ChatMessage[];
   temperature?: number;
+};
+
+export type SemanticProviderRequest = {
+  model: string;
+  system?: string;
+  messages: ChatMessage[];
 };
 
 export type CompletionResult = {
@@ -18,7 +24,12 @@ export interface CompletionAdapter {
 }
 
 export interface LlmTransport extends CompletionAdapter {
-  stream(request: PreparedChatRequest, wirePayload: ProviderWirePayload): StreamProvider;
+  prepare(
+    request: SemanticProviderRequest,
+    stream: boolean,
+    temperature?: number,
+  ): ProviderWirePayload;
+  stream(wirePayload: ProviderWirePayload): StreamProvider;
 }
 
 export type OneApiTransportConfig = {
@@ -34,8 +45,8 @@ export class LlmTransportError extends Error {
   }
 }
 
-export function buildProviderWirePayload(
-  request: { model: string; system?: string; messages: ChatMessage[] },
+function buildProviderWirePayload(
+  request: SemanticProviderRequest,
   stream: boolean,
   temperature?: number,
 ): ProviderWirePayload {
@@ -95,8 +106,16 @@ class OneApiLlmTransport implements LlmTransport {
     this.fetcher = config.fetch;
   }
 
+  prepare(
+    request: SemanticProviderRequest,
+    stream: boolean,
+    temperature?: number,
+  ): ProviderWirePayload {
+    return buildProviderWirePayload(request, stream, temperature);
+  }
+
   async complete(request: CompletionRequest): Promise<CompletionResult> {
-    const wirePayload = buildProviderWirePayload(request, false, request.temperature);
+    const wirePayload = this.prepare(request, false, request.temperature);
     let response: Response;
     try {
       response = await this.fetcher(this.endpoint, {
@@ -135,16 +154,13 @@ class OneApiLlmTransport implements LlmTransport {
     };
   }
 
-  stream(request: PreparedChatRequest, wirePayload: ProviderWirePayload): StreamProvider {
+  stream(wirePayload: ProviderWirePayload): StreamProvider {
     return {
-      stream: () => this.streamRequest(request, wirePayload),
+      stream: () => this.streamRequest(wirePayload),
     };
   }
 
-  private async *streamRequest(
-    request: PreparedChatRequest,
-    preparedWirePayload: ProviderWirePayload,
-  ): AsyncIterable<StreamDelta> {
+  private async *streamRequest(preparedWirePayload: ProviderWirePayload): AsyncIterable<StreamDelta> {
     let response: Response;
     try {
       response = await this.fetcher(this.endpoint, {
@@ -198,14 +214,23 @@ class OneApiLlmTransport implements LlmTransport {
 }
 
 class MockLlmTransport implements LlmTransport {
+  prepare(
+    request: SemanticProviderRequest,
+    stream: boolean,
+    temperature?: number,
+  ): ProviderWirePayload {
+    return buildProviderWirePayload(request, stream, temperature);
+  }
+
   async complete(): Promise<CompletionResult> {
     return { text: "对话围绕小说写作展开，确立了世界观设定与写作偏好。" };
   }
 
-  stream(request: PreparedChatRequest, _wirePayload: ProviderWirePayload): StreamProvider {
+  stream(wirePayload: ProviderWirePayload): StreamProvider {
     return {
       async *stream(): AsyncIterable<StreamDelta> {
-        if (request.system) yield { text: `（已注入：${request.system}）` };
+        const system = wirePayload.messages.find((message) => message.role === "system")?.content;
+        if (system) yield { text: `（已注入：${system}）` };
         yield { text: "你好，我是墨舟。" };
         yield { text: "（模拟流式输出）" };
         yield { usage: { prompt: 42, completion: 17 } };

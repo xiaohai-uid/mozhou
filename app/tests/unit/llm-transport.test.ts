@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   LlmConfigurationError,
   LlmTransportError,
-  buildProviderWirePayload,
   createLlmTransportFromEnv,
   createOneApiLlmTransport,
 } from "@/lib/chat/llm-transport";
@@ -17,7 +16,8 @@ function request() {
 
 describe("one-api LLM transport", () => {
   it("uses one shared conversion for semantic and provider wire payloads", () => {
-    expect(buildProviderWirePayload(request(), false, 0.2)).toEqual({
+    const transport = createOneApiLlmTransport({ baseUrl: "https://one-api.example", token: "test-token" });
+    expect(transport.prepare(request(), false, 0.2)).toEqual({
       model: "test-model",
       stream: false,
       temperature: 0.2,
@@ -26,7 +26,7 @@ describe("one-api LLM transport", () => {
         { role: "user", content: "current request" },
       ],
     });
-    expect(buildProviderWirePayload(request(), true)).toEqual({
+    expect(transport.prepare(request(), true)).toEqual({
       model: "test-model",
       stream: true,
       messages: [
@@ -99,7 +99,7 @@ describe("one-api LLM transport", () => {
     });
 
     const deltas = [];
-    for await (const delta of transport.stream({
+    const semanticRequest = {
       ...request(),
       observation: {
         route: "chat",
@@ -115,7 +115,8 @@ describe("one-api LLM transport", () => {
         ownerScopeResolved: true,
         systemSections: ["base_identity"],
       },
-    }, buildProviderWirePayload(request(), true)).stream()) deltas.push(delta);
+    };
+    for await (const delta of transport.stream(transport.prepare(semanticRequest, true)).stream()) deltas.push(delta);
 
     expect(deltas).toEqual([
       { text: "first" },
@@ -128,6 +129,32 @@ describe("one-api LLM transport", () => {
       model: "test-model",
     });
     expect(streamInit?.headers).toMatchObject({ Authorization: "Bearer shared-token" });
+  });
+
+  it("makes the Mock transport consume the same wire payload as the provider seam", async () => {
+    const env = process.env as Record<string, string | undefined>;
+    const originalNodeEnv = env.NODE_ENV;
+    const originalProvider = env.CHAT_PROVIDER;
+    env.NODE_ENV = "test";
+    env.CHAT_PROVIDER = "mock";
+    try {
+      const transport = createLlmTransportFromEnv();
+      const wirePayload = transport.prepare({
+        model: "test-model",
+        system: "wire system sentinel",
+        messages: [{ role: "user", content: "wire user" }],
+      }, true);
+      const chunks = [];
+      for await (const delta of transport.stream(wirePayload).stream()) {
+        if ("text" in delta) chunks.push(delta.text);
+      }
+      expect(chunks.join(" ")).toContain("wire system sentinel");
+    } finally {
+      if (originalNodeEnv === undefined) delete env.NODE_ENV;
+      else env.NODE_ENV = originalNodeEnv;
+      if (originalProvider === undefined) delete env.CHAT_PROVIDER;
+      else env.CHAT_PROVIDER = originalProvider;
+    }
   });
 
   it("rejects an empty completion response with a normalized error", async () => {

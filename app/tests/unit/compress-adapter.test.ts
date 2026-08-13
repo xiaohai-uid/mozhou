@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { compressHistory, KEEP_RECENT } from "@/lib/chat/compress";
-import { buildProviderWirePayload, createOneApiLlmTransport, type CompletionAdapter } from "@/lib/chat/llm-transport";
+import { createOneApiLlmTransport, type CompletionAdapter } from "@/lib/chat/llm-transport";
 import type { ChatMessage, PreparedChatRequest } from "@/lib/chat/payload";
 
 const messages: ChatMessage[] = Array.from({ length: 8 }, (_, index) => ({
@@ -39,7 +39,7 @@ describe("compression completion adapter", () => {
         systemSections: ["base_identity"],
       },
     };
-    const stream = transport.stream(streamRequest, buildProviderWirePayload(streamRequest, true));
+    const stream = transport.stream(transport.prepare(streamRequest, true));
     for await (const _ of stream.stream()) {
       // Consume the provider seam; the fake completion body has no stream deltas.
     }

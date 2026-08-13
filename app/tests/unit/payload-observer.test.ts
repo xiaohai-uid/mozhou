@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import {
+  buildPayloadObservation,
   getCapturedChatRequests,
   getLastPayloadObservation,
   resetPayloadObservations,
@@ -180,6 +181,118 @@ describe("final chat payload observability", () => {
       message_count: 3,
       message_roles: ["user", "assistant", "user"],
     });
+  });
+
+  it("rejects a semantic request whose final message is not the current user", () => {
+    const request = {
+      model: "test-model",
+      system: "safe system",
+      messages: [{ role: "assistant" as const, content: "history answer" }],
+      observation: {
+        route: "chat" as const,
+        mode: "independent" as const,
+        historyCountBefore: 1,
+        historyCountAfter: 1,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        systemSections: ["base_identity"],
+      },
+    };
+
+    const observation = buildPayloadObservation(request, {
+      model: "test-model",
+      stream: true,
+      messages: [
+        { role: "system", content: "safe system" },
+        { role: "assistant", content: "history answer" },
+      ],
+    });
+
+    expect(observation).toMatchObject({
+      current_user_present: false,
+      current_user_occurrences: 0,
+    });
+  });
+
+  it("rejects a wire payload whose final message is not the semantic current user", () => {
+    const request = {
+      model: "test-model",
+      system: "safe system",
+      messages: [{ role: "user" as const, content: "current request" }],
+      observation: {
+        route: "chat" as const,
+        mode: "independent" as const,
+        historyCountBefore: 0,
+        historyCountAfter: 1,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        systemSections: ["base_identity"],
+      },
+    };
+
+    const observation = buildPayloadObservation(request, {
+      model: "test-model",
+      stream: true,
+      messages: [
+        { role: "system", content: "safe system" },
+        { role: "user", content: "current request" },
+        { role: "assistant", content: "unexpected tail" },
+      ],
+    });
+
+    expect(observation).toMatchObject({
+      current_user_present: false,
+      current_user_occurrences: 0,
+    });
+  });
+
+  it("does not infer duplicate current-user identity from repeated text", () => {
+    const request = {
+      model: "test-model",
+      system: "safe system",
+      messages: [
+        { role: "user" as const, content: "重复请求" },
+        { role: "user" as const, content: "重复请求" },
+      ],
+      observation: {
+        route: "chat" as const,
+        mode: "independent" as const,
+        historyCountBefore: 1,
+        historyCountAfter: 2,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        systemSections: ["base_identity"],
+      },
+    };
+
+    const observation = buildPayloadObservation(request, {
+      model: "test-model",
+      stream: true,
+      messages: [
+        { role: "system", content: "safe system" },
+        { role: "user", content: "重复请求" },
+        { role: "user", content: "重复请求" },
+      ],
+    });
+
+    expect(observation.current_user_present).toBe(true);
+    expect(observation.current_user_occurrences).toBe(1);
+    expect(observation.message_roles).toEqual(["user", "user"]);
   });
 
   it("does not let a failing observer interrupt provider streaming", async () => {

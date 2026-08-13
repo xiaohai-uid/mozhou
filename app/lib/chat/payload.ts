@@ -100,9 +100,24 @@ export function buildPayloadObservation(
   const systemPresent = wireMessages[0]?.role === "system";
   const wireEnvelopeLength = systemPresent ? 1 : 0;
   const wireMessagesWithoutSystem = wireMessages.slice(wireEnvelopeLength);
+  const systemEnvelopeMatchesSemanticRequest = systemPresent === Boolean(request.system);
+  const wireMatchesSemanticMessages =
+    wireMessagesWithoutSystem.length === semanticMessages.length &&
+    wireMessagesWithoutSystem.every((message, index) => {
+      const semanticMessage = semanticMessages[index];
+      return (
+        semanticMessage !== undefined &&
+        message.role === semanticMessage.role &&
+        message.content === semanticMessage.content
+      );
+    });
   const semanticCurrentUserPresent = semanticMessages.at(-1)?.role === "user";
   const wireCurrentUserPresent = wireMessagesWithoutSystem.at(-1)?.role === "user";
-  const currentUserPresent = semanticCurrentUserPresent && wireCurrentUserPresent;
+  const currentUserPresent =
+    systemEnvelopeMatchesSemanticRequest &&
+    wireMatchesSemanticMessages &&
+    semanticCurrentUserPresent &&
+    wireCurrentUserPresent;
   const currentUserOccurrences = currentUserPresent ? 1 : 0;
 
   return {

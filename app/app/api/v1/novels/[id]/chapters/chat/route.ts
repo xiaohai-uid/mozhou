@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/chat/models";
 import { getChapter } from "@/lib/novels/service";
 import { LlmConfigurationError } from "@/lib/chat/llm-transport";
+import { createSseStream } from "@/lib/http/sse";
 import {
   ChapterNotFoundError,
   runChapterChat,
@@ -93,12 +94,8 @@ export async function POST(
     return NextResponse.json({ error: "章节不存在" }, { status: 404 });
   }
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (obj: unknown) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
-      try {
+  const stream = createSseStream(request, async ({ send }) => {
+    try {
         send({ type: "start" });
         const result = await runChapterChat({
           userId: user.id,
@@ -130,10 +127,7 @@ export async function POST(
             ? "生成服务暂不可用，请稍后重试"
             : (err as Error).message ?? "生成失败",
         });
-      } finally {
-        controller.close();
-      }
-    },
+    }
   });
 
   return new Response(stream, {
