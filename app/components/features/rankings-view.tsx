@@ -5,29 +5,31 @@ import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trophy } from "@phosphor-icons/react/dist/ssr";
 
 interface RankingBoard {
-  id?: string;
-  name: string;
-  site: string;
-  url?: string;
-  mode?: "long" | "short";
-  availability?: string;
-  categories?: Array<{ id: string; name: string; url: string }>;
+  id: string;
+  displayName: string;
+  source: string;
+  sourceKind: string;
+  workLength: "long" | "short";
+  rankingKind: string;
+  listUrl: string;
+  enabled: boolean;
 }
 
 interface RankingRow {
+  bookId: string;
   rank: number;
   name: string;
-  heat: string;
   source: string;
-  capturedAt: string;
-  url: string;
+  sourceUrl: string;
+  detailUrl: string;
+  titleResolution: "detail-html" | "detail-ssr";
+  capturedAt?: string;
 }
 
 export function RankingsView() {
   const [enabled, setEnabled] = useState(false);
   const [boards, setBoards] = useState<RankingBoard[]>([]);
   const [board, setBoard] = useState("");
-  const [category, setCategory] = useState("");
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [degraded, setDegraded] = useState(false);
@@ -48,9 +50,7 @@ export function RankingsView() {
       };
       if (data.boards && data.boards.length > 0 && !board) {
         setBoards(data.boards);
-        setBoard(data.boards[0].name);
-        const firstCategory = data.boards[0].categories?.[0];
-        if (firstCategory) setCategory(firstCategory.id);
+        setBoard(data.boards[0].id);
       }
       setRows(data.rows ?? []);
       setDegraded(data.degraded ?? false);
@@ -72,38 +72,10 @@ export function RankingsView() {
     setEnabled(true);
   }
 
-  async function switchBoard(name: string) {
-    if (name === board || loading) return;
-    setBoard(name);
-    const next = boards.find((item) => item.name === name);
-    const nextCategory = next?.categories?.[0]?.id ?? "";
-    setCategory(nextCategory);
-    await fetchRankings(name);
-  }
-
-  async function switchCategory(id: string) {
-    if (id === category || loading) return;
-    setCategory(id);
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/v1/rankings?board=${encodeURIComponent(board)}&category=${encodeURIComponent(id)}`,
-      );
-      if (!res.ok) throw new Error("榜单加载失败");
-      const data = (await res.json()) as {
-        rows?: RankingRow[];
-        degraded?: boolean;
-        note?: string;
-      };
-      setRows(data.rows ?? []);
-      setDegraded(data.degraded ?? false);
-      setNote(data.note ?? null);
-    } catch {
-      setDegraded(true);
-      setNote("榜单加载失败");
-    } finally {
-      setLoading(false);
-    }
+  async function switchBoard(id: string) {
+    if (id === board || loading) return;
+    setBoard(id);
+    await fetchRankings(id);
   }
 
   return (
@@ -137,47 +109,25 @@ export function RankingsView() {
           <div className="mt-8 flex flex-wrap gap-2">
             {boards.map((b) => (
               <button
-                key={b.name}
-                onClick={() => void switchBoard(b.name)}
+                key={b.id}
+                onClick={() => void switchBoard(b.id)}
                 disabled={loading}
                 className={`rounded-full px-4 py-2 text-sm transition disabled:opacity-50 ${
-                  board === b.name
+                  board === b.id
                     ? "bg-accent text-white"
                     : "border border-surface-2 text-zinc-400 hover:text-zinc-200"
                 }`}
               >
-                {b.name}
-                <span className={`ml-1.5 text-[10px] ${board === b.name ? "text-white/70" : "text-faint"}`}>
-                  {b.site}
-                </span>
+                {b.displayName}
               </button>
             ))}
           </div>
-
-          {boards.find((item) => item.name === board)?.categories?.length ? (
-            <div className="mt-4 flex flex-wrap gap-2 border-l-2 border-accent/40 pl-4">
-              {boards.find((item) => item.name === board)?.categories?.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => void switchCategory(item.id)}
-                  disabled={loading}
-                  className={`rounded-full px-3 py-1.5 text-xs transition disabled:opacity-50 ${
-                    category === item.id
-                      ? "bg-accent/20 text-accent"
-                      : "border border-surface-2 text-faint hover:text-zinc-200"
-                  }`}
-                >
-                  {item.name}
-                </button>
-              ))}
-            </div>
-          ) : null}
 
           {/* 榜单 */}
           <div className="mt-6 rounded-card border border-surface-2 bg-surface/50">
             <div className="border-b border-surface-2 px-6 py-3.5">
               <h2 className="text-sm font-semibold text-zinc-200">
-                {board}
+                {boards.find((item) => item.id === board)?.displayName ?? board}
                 {loading && <span className="ml-2 text-xs font-normal text-faint">加载中…</span>}
               </h2>
             </div>
@@ -196,7 +146,7 @@ export function RankingsView() {
               )}
               <ul className="divide-y divide-surface-2">
                 {rows.map((r) => (
-                  <li key={r.rank} className="flex items-center gap-4 px-6 py-3.5">
+                  <li key={r.bookId} className="flex items-center gap-4 px-6 py-3.5">
                     <span
                       className={`w-6 text-center font-mono text-sm ${
                         r.rank <= 3 ? "font-semibold text-accent" : "text-faint"
@@ -205,7 +155,6 @@ export function RankingsView() {
                       {String(r.rank).padStart(2, "0")}
                     </span>
                     <span className="flex-1 text-sm text-zinc-200">{r.name}</span>
-                    <span className="text-xs text-faint">{r.heat}</span>
                   </li>
                 ))}
               </ul>
@@ -216,7 +165,7 @@ export function RankingsView() {
               )}
               {rows.length > 0 && (
                 <div className="border-t border-surface-2 px-6 py-2 text-[11px] text-faint">
-                  来源：{rows[0].source} · 抓取：{new Date(rows[0].capturedAt).toLocaleString("zh-CN")}
+                  来源：{rows[0].source} · 抓取：{rows[0].capturedAt ? new Date(rows[0].capturedAt).toLocaleString("zh-CN") : "—"}
                 </div>
               )}
             </>

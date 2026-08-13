@@ -1,68 +1,63 @@
-// GET /api/v1/rankings — 网文扫榜：真实榜源不可用时返回空榜并标记 degraded。
+// GET /api/v1/rankings — only verified Fanqie official boards are product-enabled.
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   RANKING_BOARDS,
+  fetchRankingWithRetry,
   findRankingBoard,
   resolveFanqieRankingRows,
   type RankingBoard,
+  type RankingDegradation,
   type RankingRow,
 } from "@/lib/story/rankings";
 
-export type { RankingBoard, RankingRow } from "@/lib/story/rankings";
+export type { RankingBoard, RankingDegradation, RankingRow } from "@/lib/story/rankings";
 
-/** 按榜数据（mock：各榜不同，验证按榜查询链路） */
-const BOARD_ROWS: Record<string, RankingRow[]> = {
-  "畅销榜 Top10": [
-    { rank: 1, name: "宿命之环", heat: "9.8 万人在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 2, name: "道诡异仙", heat: "8.7 万人在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 3, name: "深海余烬", heat: "7.9 万人在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 4, name: "玄鉴仙族", heat: "6.4 万人在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 5, name: "夜的命名术", heat: "5.8 万人在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-  ],
-  "月票榜": [
-    { rank: 1, name: "大奉打更人", heat: "12.3 万月票", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 2, name: "诡秘之主2", heat: "11.1 万月票", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 3, name: "凡人修仙传", heat: "9.7 万月票", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-  ],
-  "新书榜": [
-    { rank: 1, name: "重生之我在大学当卷王", heat: "3.2 万在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 2, name: "我在修仙界开网吧", heat: "2.8 万在读", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-  ],
-  "完结榜": [
-    { rank: 1, name: "剑来", heat: "已完结", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 2, name: "雪中悍刀行", heat: "已完结", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-    { rank: 3, name: "诡秘之主", heat: "已完结", source: "mock", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://example.invalid/mock" },
-  ],
-};
+const MOCK_ROWS: RankingRow[] = [
+  "惹金枝", "笨蛋美人替嫁后被疯批王爷宠上天", "掌上娇娇", "攀高枝", "何不同舟渡",
+].map((name, index) => ({
+  bookId: `mock-${index + 1}`,
+  rank: index + 1,
+  name,
+  source: "mock",
+  sourceUrl: RANKING_BOARDS[0].listUrl,
+  detailUrl: `https://example.invalid/mock/${index + 1}`,
+  titleResolution: "detail-ssr",
+  capturedAt: "1970-01-01T00:00:00.000Z",
+  heat: "test-provider",
+}));
 
-const FALLBACK_ROWS = BOARD_ROWS["畅销榜 Top10"];
+interface RankingResponse {
+  boards: RankingBoard[];
+  board: Pick<RankingBoard, "id" | "displayName">;
+  source: "fanqienovel.com" | "mock";
+  capturedAt: string;
+  rows: RankingRow[];
+  degraded: boolean;
+  degradation?: RankingDegradation;
+  note?: string;
+}
 
-const RETRYABLE_SOURCE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+function responseBody(input: Omit<RankingResponse, "boards">): RankingResponse {
+  return { boards: RANKING_BOARDS, ...input };
+}
 
 async function fetchRankingSource(url: string): Promise<Response> {
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 5000);
-    try {
-      const res = await fetch(url, {
-        signal: ctrl.signal,
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MoZhou/1.0" },
-      });
-      if (res.ok || !RETRYABLE_SOURCE_STATUS.has(res.status) || attempt === 2) return res;
-      const retryAfter = Number(res.headers.get("retry-after"));
-      const delay = Number.isFinite(retryAfter) ? Math.min(5000, retryAfter * 1000) : 300 * 2 ** attempt;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    } catch (error) {
-      lastError = error;
-      if (attempt === 2) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 300 * 2 ** attempt));
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error("榜单源请求失败");
+  return fetchRankingWithRetry({
+    url,
+    request: async (requestUrl) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      try {
+        return await fetch(requestUrl, {
+          signal: ctrl.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MoZhou/1.0" },
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  });
 }
 
 export async function GET(request: Request) {
@@ -70,72 +65,76 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const url = new URL(request.url);
-  const board = url.searchParams.get("board");
-  const categoryId = url.searchParams.get("category");
-  const selectedBoard = findRankingBoard(board);
-  const selectedCategory = selectedBoard.categories.find((category) => category.id === categoryId)
-    ?? selectedBoard.categories[0];
-  const selectedUrl = selectedCategory?.url ?? selectedBoard.url;
+  const requestedBoard = url.searchParams.get("board") ?? "long-hot";
+  const selectedBoard = findRankingBoard(requestedBoard);
+  if (!selectedBoard) {
+    return NextResponse.json({
+      error: "未知榜单",
+      code: "UNKNOWN_BOARD",
+      boards: RANKING_BOARDS,
+    }, { status: 400 });
+  }
 
-  // 测试模式：按榜返回不同数据（验证按榜查询）
+  const capturedAt = new Date().toISOString();
+  const board = { id: selectedBoard.id, displayName: selectedBoard.displayName };
+
+  // Mock is test-only and explicitly degraded; it is never a production fallback.
   if (process.env.RANKINGS_PROVIDER === "mock") {
-    const mockBoard = board ?? "畅销榜 Top10";
-    return NextResponse.json({
-      boards: RANKING_BOARDS,
-      rows: (BOARD_ROWS[mockBoard] ?? FALLBACK_ROWS).map((row) => ({ ...row, source: "mock", url: selectedBoard.url })),
-      board: selectedBoard.name,
-      degraded: true,
-      degradationReason: "mock_provider",
-      note: "榜单数据源降级（mock 数据）",
-    });
-  }
-
-  if (selectedBoard.adapter !== "fanqie") {
-    return NextResponse.json({
-      boards: RANKING_BOARDS,
-      rows: [],
-      board: selectedBoard.name,
-      degraded: true,
-      degradationReason: "external_source_adapter_required",
-      note: `${selectedBoard.site}榜单适配器尚未配置，未返回虚构榜单`,
-    });
-  }
-
-  // 真实榜源请求（带榜参数，超时受控）；失败降级
-  try {
-    const res = await fetchRankingSource(selectedUrl);
-    if (!res.ok) throw new Error(`上游 ${res.status}`);
-    const capturedAt = new Date().toISOString();
-    const html = await res.text();
-    const result = await resolveFanqieRankingRows({
-      boardUrl: selectedUrl,
+    return NextResponse.json(responseBody({
+      board,
+      source: "mock",
       capturedAt,
-      listHtml: html,
+      rows: MOCK_ROWS.map((row) => ({ ...row, sourceUrl: selectedBoard.listUrl })),
+      degraded: true,
+      degradation: {
+        code: "SOURCE_FETCH_FAILED",
+        attempted: 5,
+        accepted: 5,
+        rejected: 0,
+      },
+      note: "测试榜源，不代表生产数据",
+    } satisfies Omit<RankingResponse, "boards">));
+  }
+
+  try {
+    const listResponse = await fetchRankingSource(selectedBoard.listUrl);
+    if (!listResponse.ok) {
+      return NextResponse.json(responseBody({
+        board,
+        source: "fanqienovel.com",
+        capturedAt,
+        rows: [],
+        degraded: true,
+        degradation: { code: "SOURCE_FETCH_FAILED", attempted: 0, accepted: 0, rejected: 0 },
+      } satisfies Omit<RankingResponse, "boards">));
+    }
+
+    const result = await resolveFanqieRankingRows({
+      boardUrl: selectedBoard.listUrl,
+      capturedAt,
+      listHtml: await listResponse.text(),
       fetchDetail: async (bookId) => {
         const detail = await fetchRankingSource(`https://fanqienovel.com/page/${bookId}`);
-        if (!detail.ok) throw new Error(`详情页上游 ${detail.status}`);
+        if (!detail.ok) throw new Error("detail source unavailable");
         return detail.text();
       },
     });
-    return NextResponse.json({
-      boards: RANKING_BOARDS,
+    return NextResponse.json(responseBody({
+      board,
+      source: "fanqienovel.com",
+      capturedAt,
       rows: result.rows,
-      board: selectedBoard.name,
-      category: selectedCategory?.id,
       degraded: result.degraded,
-      ...(result.degradationReason ? { degradationReason: result.degradationReason, note: result.degradationReason } : {}),
-    });
-  } catch (err) {
-    const message = err instanceof Error && err.name === "AbortError"
-      ? "榜单源请求超时"
-      : "榜单源暂时不可达";
-    return NextResponse.json({
-      boards: RANKING_BOARDS,
+      ...(result.degradation ? { degradation: result.degradation } : {}),
+    } satisfies Omit<RankingResponse, "boards">));
+  } catch {
+    return NextResponse.json(responseBody({
+      board,
+      source: "fanqienovel.com",
+      capturedAt,
       rows: [],
-      board: selectedBoard.name,
       degraded: true,
-      degradationReason: message,
-      note: `${message}，未返回虚构榜单`,
-    });
+      degradation: { code: "SOURCE_FETCH_FAILED", attempted: 0, accepted: 0, rejected: 0 },
+    } satisfies Omit<RankingResponse, "boards">));
   }
 }
