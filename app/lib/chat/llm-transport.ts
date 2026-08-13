@@ -1,5 +1,5 @@
 import type { StreamDelta, StreamProvider } from "@/lib/pipeline/engine";
-import type { ChatMessage, PreparedChatRequest } from "./payload";
+import type { ChatMessage, PreparedChatRequest, ProviderWirePayload } from "./payload";
 
 export type CompletionRequest = {
   model: string;
@@ -18,7 +18,7 @@ export interface CompletionAdapter {
 }
 
 export interface LlmTransport extends CompletionAdapter {
-  stream(request: PreparedChatRequest): StreamProvider;
+  stream(request: PreparedChatRequest, wirePayload: ProviderWirePayload): StreamProvider;
 }
 
 export type OneApiTransportConfig = {
@@ -34,11 +34,27 @@ export class LlmTransportError extends Error {
   }
 }
 
-function requestMessages(system: string | undefined, messages: ChatMessage[]) {
-  return [
-    ...(system ? [{ role: "system" as const, content: system }] : []),
-    ...messages,
-  ];
+export function buildProviderWirePayload(
+  request: { model: string; system?: string; messages: ChatMessage[] },
+  stream: boolean,
+  temperature?: number,
+): ProviderWirePayload {
+  return {
+    model: request.model,
+    stream,
+    ...(temperature === undefined ? {} : { temperature }),
+    messages: [
+      ...(request.system ? [{ role: "system" as const, content: request.system }] : []),
+      ...request.messages.map((message) => ({ ...message })),
+    ],
+  };
+}
+
+export class LlmConfigurationError extends LlmTransportError {
+  constructor(message = "LLM provider configuration is invalid") {
+    super(message);
+    this.name = "LlmConfigurationError";
+  }
 }
 
 function normalizedBaseUrl(baseUrl: string): string {
@@ -80,6 +96,7 @@ class OneApiLlmTransport implements LlmTransport {
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResult> {
+    const wirePayload = buildProviderWirePayload(request, false, request.temperature);
     let response: Response;
     try {
       response = await this.fetcher(this.endpoint, {
@@ -88,12 +105,7 @@ class OneApiLlmTransport implements LlmTransport {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.token}`,
         },
-        body: JSON.stringify({
-          model: request.model,
-          stream: false,
-          ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
-          messages: requestMessages(request.system, request.messages),
-        }),
+        body: JSON.stringify(wirePayload),
       });
     } catch (error) {
       throw fetchError(error, this.config.token);
@@ -123,13 +135,16 @@ class OneApiLlmTransport implements LlmTransport {
     };
   }
 
-  stream(request: PreparedChatRequest): StreamProvider {
+  stream(request: PreparedChatRequest, wirePayload: ProviderWirePayload): StreamProvider {
     return {
-      stream: () => this.streamRequest(request),
+      stream: () => this.streamRequest(request, wirePayload),
     };
   }
 
-  private async *streamRequest(request: PreparedChatRequest): AsyncIterable<StreamDelta> {
+  private async *streamRequest(
+    request: PreparedChatRequest,
+    preparedWirePayload: ProviderWirePayload,
+  ): AsyncIterable<StreamDelta> {
     let response: Response;
     try {
       response = await this.fetcher(this.endpoint, {
@@ -138,11 +153,7 @@ class OneApiLlmTransport implements LlmTransport {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.token}`,
         },
-        body: JSON.stringify({
-          model: request.model,
-          stream: true,
-          messages: requestMessages(request.system, request.messages),
-        }),
+        body: JSON.stringify(preparedWirePayload),
       });
     } catch (error) {
       throw fetchError(error, this.config.token);
@@ -191,7 +202,7 @@ class MockLlmTransport implements LlmTransport {
     return { text: "对话围绕小说写作展开，确立了世界观设定与写作偏好。" };
   }
 
-  stream(request: PreparedChatRequest): StreamProvider {
+  stream(request: PreparedChatRequest, _wirePayload: ProviderWirePayload): StreamProvider {
     return {
       async *stream(): AsyncIterable<StreamDelta> {
         if (request.system) yield { text: `（已注入：${request.system}）` };
@@ -212,6 +223,9 @@ export function createOneApiLlmTransport(config: OneApiTransportConfig): LlmTran
 
 /** Composition root factory: exactly one configuration path for completion and stream adapters. */
 export function createLlmTransportFromEnv(): LlmTransport {
+  if (process.env.NODE_ENV === "production" && process.env.CHAT_PROVIDER === "mock") {
+    throw new LlmConfigurationError();
+  }
   if (process.env.CHAT_PROVIDER === "mock") return new MockLlmTransport();
   return createOneApiLlmTransport({
     baseUrl: process.env.ONEAPI_BASE_URL ?? "http://localhost:3001",

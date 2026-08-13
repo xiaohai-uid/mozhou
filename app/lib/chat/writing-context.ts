@@ -27,7 +27,7 @@ export type WritingContextInput = {
   currentUser: ChatMessage;
   /** Optional source index when history also contains a distinct current-user copy. */
   currentUserHistoryIndex?: number;
-  observation: Omit<ChatObservationScope, "systemSections" | "currentUserIndices" | "historyCountAfter">;
+  observation: Omit<ChatObservationScope, "systemSections" | "historyCountAfter">;
 };
 
 /** 所有写作请求共享的稳定身份基座。 */
@@ -106,7 +106,6 @@ export function buildWritingContext(input: WritingContextInput): PreparedChatReq
     observation: {
       ...input.observation,
       systemSections: kinds,
-      currentUserIndices: [messages.length - 1],
       historyCountAfter: messages.length,
     },
   };

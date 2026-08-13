@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { compressHistory, KEEP_RECENT } from "@/lib/chat/compress";
-import { createOneApiLlmTransport, type CompletionAdapter } from "@/lib/chat/llm-transport";
-import type { ChatMessage } from "@/lib/chat/payload";
+import { buildProviderWirePayload, createOneApiLlmTransport, type CompletionAdapter } from "@/lib/chat/llm-transport";
+import type { ChatMessage, PreparedChatRequest } from "@/lib/chat/payload";
 
 const messages: ChatMessage[] = Array.from({ length: 8 }, (_, index) => ({
   role: index % 2 === 0 ? "user" : "assistant",
@@ -20,7 +20,7 @@ describe("compression completion adapter", () => {
     });
 
     await compressHistory(messages, transport, "glm-4.5-flash");
-    const stream = transport.stream({
+    const streamRequest: PreparedChatRequest = {
       model: "glm-4.5-flash",
       system: "same request semantics",
       messages: [{ role: "user", content: "current user" }],
@@ -36,10 +36,10 @@ describe("compression completion adapter", () => {
         novelScopePresent: false,
         chapterScopePresent: false,
         ownerScopeResolved: true,
-        currentUserIndices: [0],
         systemSections: ["base_identity"],
       },
-    });
+    };
+    const stream = transport.stream(streamRequest, buildProviderWirePayload(streamRequest, true));
     for await (const _ of stream.stream()) {
       // Consume the provider seam; the fake completion body has no stream deltas.
     }

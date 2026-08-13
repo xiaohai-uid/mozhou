@@ -3,19 +3,21 @@ import type { LlmTransport } from "./llm-transport";
 import {
   capturePreparedChatRequest,
   isPayloadCaptureEnabled,
-  observePreparedChatRequest,
+  observePreparedChatRequestWithWire,
   type PreparedChatRequest,
 } from "./payload";
+import { buildProviderWirePayload } from "./llm-transport";
 
 /** Adapts the shared transport to the existing pipeline StreamProvider boundary. */
 export function makeChatProvider(
   request: PreparedChatRequest,
   transport: LlmTransport,
 ): StreamProvider {
-  observePreparedChatRequest(request);
-  const provider = transport.stream(request);
+  const wirePayload = buildProviderWirePayload(request, true);
+  observePreparedChatRequestWithWire(request, wirePayload);
+  const provider = transport.stream(request, wirePayload);
   return isPayloadCaptureEnabled()
-    ? new CapturingChatProvider(request, provider)
+    ? new CapturingChatProvider(request, wirePayload, provider)
     : provider;
 }
 
@@ -23,11 +25,12 @@ export function makeChatProvider(
 export class CapturingChatProvider implements StreamProvider {
   constructor(
     private request: PreparedChatRequest,
+    private wirePayload: ReturnType<typeof buildProviderWirePayload>,
     private delegate: StreamProvider,
   ) {}
 
   async *stream(): AsyncIterable<StreamDelta> {
-    capturePreparedChatRequest(this.request);
+    capturePreparedChatRequest(this.request, this.wirePayload);
     yield* this.delegate.stream();
   }
 }

@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/chat/models";
 import { getChapter } from "@/lib/novels/service";
+import { LlmConfigurationError } from "@/lib/chat/llm-transport";
 import {
-  ChapterChatError,
   ChapterNotFoundError,
   runChapterChat,
 } from "@/lib/novels/chapter-chat";
@@ -125,10 +125,10 @@ export async function POST(
           code:
             err instanceof ChapterNotFoundError
               ? "ChapterNotFound"
-              : err instanceof ChapterChatError
-                ? "AiGenerationFailed"
-                : "AiGenerationFailed",
-          message: (err as Error).message ?? "生成失败",
+              : "AiGenerationFailed",
+          message: err instanceof LlmConfigurationError
+            ? "生成服务暂不可用，请稍后重试"
+            : (err as Error).message ?? "生成失败",
         });
       } finally {
         controller.close();

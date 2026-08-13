@@ -5,7 +5,7 @@ import {
   resetPayloadObservations,
 } from "@/lib/chat/payload";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
-import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
+import { createLlmTransportFromEnv, createOneApiLlmTransport } from "@/lib/chat/llm-transport";
 
 describe("final chat payload observability", () => {
   const originalCapture = process.env.CHAT_CAPTURE;
@@ -45,7 +45,6 @@ describe("final chat payload observability", () => {
         novelScopePresent: false,
         chapterScopePresent: false,
         ownerScopeResolved: true,
-        currentUserIndices: [1],
         systemSections: ["injected_context"],
       },
     }, createLlmTransportFromEnv());
@@ -62,6 +61,15 @@ describe("final chat payload observability", () => {
           { role: "assistant", content: "history" },
           { role: "user", content: "current user" },
         ],
+        wirePayload: {
+          model: "test-model",
+          stream: true,
+          messages: [
+            { role: "system", content: "system sentinel" },
+            { role: "assistant", content: "history" },
+            { role: "user", content: "current user" },
+          ],
+        },
       },
     ]);
   });
@@ -83,7 +91,6 @@ describe("final chat payload observability", () => {
         novelScopePresent: true,
         chapterScopePresent: true,
         ownerScopeResolved: true,
-        currentUserIndices: [],
         systemSections: [],
       },
     }, createLlmTransportFromEnv());
@@ -121,7 +128,6 @@ describe("final chat payload observability", () => {
         novelScopePresent: true,
         chapterScopePresent: false,
         ownerScopeResolved: true,
-        currentUserIndices: [0],
         systemSections: ["injected_context"],
       },
     }, createLlmTransportFromEnv());
@@ -139,6 +145,43 @@ describe("final chat payload observability", () => {
     });
   });
 
+  it("derives current-user facts from final semantic and wire structure, not caller indices", async () => {
+    const provider = makeChatProvider({
+      model: "test-model",
+      system: "safe system",
+      messages: [
+        { role: "user", content: "history user" },
+        { role: "assistant", content: "history answer" },
+        { role: "user", content: "current user" },
+      ],
+      observation: {
+        route: "chat",
+        mode: "independent",
+        historyCountBefore: 2,
+        historyCountAfter: 3,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: false,
+        chapterScopePresent: false,
+        ownerScopeResolved: true,
+        systemSections: ["base_identity"],
+      },
+    }, createLlmTransportFromEnv());
+
+    for await (const _delta of provider.stream()) {
+      // consume the real provider seam
+    }
+
+    expect(getLastPayloadObservation()).toMatchObject({
+      current_user_present: true,
+      current_user_occurrences: 1,
+      message_count: 3,
+      message_roles: ["user", "assistant", "user"],
+    });
+  });
+
   it("does not let a failing observer interrupt provider streaming", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalLog = process.env.CHAT_OBSERVER_LOG;
@@ -151,6 +194,14 @@ describe("final chat payload observability", () => {
     };
 
     try {
+      const transport = createOneApiLlmTransport({
+        baseUrl: "https://one-api.example",
+        token: "test-token",
+        fetch: async () => new Response(
+          'data: {"choices":[{"delta":{"content":"safe reply"}}]}\n\ndata: [DONE]\n\n',
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+      });
       const provider = makeChatProvider({
         model: "test-model",
         system: "safe system",
@@ -167,10 +218,9 @@ describe("final chat payload observability", () => {
           novelScopePresent: false,
           chapterScopePresent: false,
           ownerScopeResolved: true,
-          currentUserIndices: [0],
           systemSections: ["injected_context"],
         },
-      }, createLlmTransportFromEnv());
+      }, transport);
       const deltas = [];
       for await (const delta of provider.stream()) deltas.push(delta);
       expect(deltas.some((delta) => "text" in delta)).toBe(true);

@@ -9,6 +9,14 @@ export type ChatMessage = {
 export type ChatRoute = "chat" | "chapter-chat";
 export type ChatMode = "independent" | "chapter";
 
+/** Provider 实际消费的 HTTP payload；与语义层 PreparedChatRequest 分离。 */
+export interface ProviderWirePayload {
+  model: string;
+  stream: boolean;
+  messages: ChatMessage[];
+  temperature?: number;
+}
+
 /**
  * 进入 provider 前的结构化请求。它描述最终要发送的 payload，
  * 但不会改变现有 prompt 或 message 的组装语义。
@@ -33,8 +41,6 @@ export interface ChatObservationScope {
   novelScopePresent: boolean;
   chapterScopePresent: boolean;
   ownerScopeResolved: boolean;
-  /** provider messages 中属于当前这轮请求的索引；不包含正文内容。 */
-  currentUserIndices: number[];
   /** 当前 system 是聚合字符串，因此目前只能观察到一个注入区段。 */
   systemSections: string[];
 }
@@ -67,6 +73,7 @@ export interface CapturedChatRequest {
   model: string;
   system?: string;
   messages: ChatMessage[];
+  wirePayload: ProviderWirePayload;
   observation: PayloadObservation;
 };
 
@@ -84,28 +91,34 @@ export function isPayloadCaptureEnabled(): boolean {
 }
 
 /** 将最终请求转换成生产可记录的白名单结构，绝不包含正文或 prompt。 */
-export function buildPayloadObservation(request: PreparedChatRequest): PayloadObservation {
-  const messages = request.messages;
-  const currentUserOccurrences = request.observation.currentUserIndices.filter(
-    (index) => messages[index]?.role === "user",
-  ).length;
-  const systemPresent = Boolean(request.system);
+export function buildPayloadObservation(
+  request: PreparedChatRequest,
+  wirePayload: ProviderWirePayload,
+): PayloadObservation {
+  const semanticMessages = request.messages;
+  const wireMessages = wirePayload.messages;
+  const systemPresent = wireMessages[0]?.role === "system";
+  const wireEnvelopeLength = systemPresent ? 1 : 0;
+  const wireMessagesWithoutSystem = wireMessages.slice(wireEnvelopeLength);
+  const semanticCurrentUserPresent = semanticMessages.at(-1)?.role === "user";
+  const wireCurrentUserPresent = wireMessagesWithoutSystem.at(-1)?.role === "user";
+  const currentUserPresent = semanticCurrentUserPresent && wireCurrentUserPresent;
+  const currentUserOccurrences = currentUserPresent ? 1 : 0;
 
   return {
     payload_schema_version: "v1",
     request_id: randomUUID(),
     route: request.observation.route,
     mode: request.observation.mode,
-    model: request.model,
+    model: wirePayload.model,
     system_present: systemPresent,
-    // 当前实现把所有注入合成一个 system 字符串；后续上下文契约可在此处细分。
     system_sections: systemPresent ? request.observation.systemSections : [],
     system_char_count: request.system?.length ?? 0,
-    message_count: messages.length,
-    message_roles: messages.map((message) => message.role),
+    message_count: wireMessagesWithoutSystem.length,
+    message_roles: wireMessagesWithoutSystem.map((message) => message.role),
     history_count_before: request.observation.historyCountBefore,
     history_count_after: request.observation.historyCountAfter,
-    current_user_present: currentUserOccurrences > 0,
+    current_user_present: currentUserPresent,
     current_user_occurrences: currentUserOccurrences,
     compression_applied: request.observation.compressionApplied,
     rag_entry_count: request.observation.ragEntryCount,
@@ -117,12 +130,13 @@ export function buildPayloadObservation(request: PreparedChatRequest): PayloadOb
   };
 }
 
-/**
- * 记录脱敏结构。任何观测异常都必须被吞掉，不能改变 SSE 或 provider 语义。
- */
-export function observePreparedChatRequest(request: PreparedChatRequest): void {
+/** 在 provider wire payload 已生成后记录最终结构。 */
+export function observePreparedChatRequestWithWire(
+  request: PreparedChatRequest,
+  wirePayload: ProviderWirePayload,
+): void {
   try {
-    const observation = buildPayloadObservation(request);
+    const observation = buildPayloadObservation(request, wirePayload);
     if (isPayloadCaptureEnabled()) lastObservation = observation;
 
     const observerFile = process.env.CHAT_OBSERVER_FILE;
@@ -141,14 +155,21 @@ export function observePreparedChatRequest(request: PreparedChatRequest): void {
 }
 
 /** Capturing Provider 使用：保存测试环境中的最终 system/messages。 */
-export function capturePreparedChatRequest(request: PreparedChatRequest): void {
+export function capturePreparedChatRequest(
+  request: PreparedChatRequest,
+  wirePayload: ProviderWirePayload,
+): void {
   if (!isPayloadCaptureEnabled()) return;
   try {
     const captured: CapturedChatRequest = {
       model: request.model,
       system: request.system,
       messages: request.messages.map((message) => ({ ...message })),
-      observation: buildPayloadObservation(request),
+      wirePayload: {
+        ...wirePayload,
+        messages: wirePayload.messages.map((message) => ({ ...message })),
+      },
+      observation: buildPayloadObservation(request, wirePayload),
     };
     capturedRequests.push(captured);
 
@@ -161,6 +182,7 @@ export function getCapturedChatRequests(): CapturedChatRequest[] {
   return capturedRequests.map((request) => ({
     ...request,
     messages: request.messages.map((message) => ({ ...message })),
+    wirePayload: { ...request.wirePayload, messages: request.wirePayload.messages.map((message) => ({ ...message })) },
     observation: { ...request.observation, message_roles: [...request.observation.message_roles] },
   }));
 }

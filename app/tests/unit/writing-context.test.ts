@@ -99,7 +99,6 @@ describe("buildWritingContext", () => {
     ]);
     expect(request.observation).toMatchObject({
       systemSections: ["base_identity", "mode_contract", "owner_context"],
-      currentUserIndices: [2],
       historyCountAfter: 3,
     });
   });
@@ -134,7 +133,6 @@ describe("buildWritingContext", () => {
       { role: "assistant", content: "历史答复" },
       { role: "user", content: "" },
     ]);
-    expect(request.observation.currentUserIndices).toEqual([2]);
   });
 
   it("removes a structurally equal current user copy while preserving different replayable history", () => {

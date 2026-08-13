@@ -88,6 +88,14 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
     const capture = getCapturedChatRequests()[0];
     expect(capture).toMatchObject({
       messages: [{ role: "user", content: "独立 consumer 当前请求" }],
+      wirePayload: {
+        model: "deepseek-v4-flash",
+        stream: true,
+        messages: [
+          { role: "system", content: expect.stringContaining("墨舟") },
+          { role: "user", content: "独立 consumer 当前请求" },
+        ],
+      },
       observation: {
         route: "chat",
         system_present: true,
@@ -302,6 +310,14 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
     const capture = getCapturedChatRequests()[0];
     expect(capture).toMatchObject({
       messages: [{ role: "user", content: "章节 consumer 当前请求" }],
+      wirePayload: {
+        model: "deepseek-v4-flash",
+        stream: true,
+        messages: [
+          { role: "system", content: expect.stringContaining("章节写作对话模式") },
+          { role: "user", content: "章节 consumer 当前请求" },
+        ],
+      },
       observation: {
         route: "chapter-chat",
         message_count: 1,

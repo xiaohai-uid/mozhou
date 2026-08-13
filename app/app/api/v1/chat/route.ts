@@ -9,6 +9,7 @@ import {
   SessionNotFoundError,
 } from "@/lib/chat/service";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/chat/models";
+import { LlmConfigurationError } from "@/lib/chat/llm-transport";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -106,6 +107,8 @@ export async function POST(request: Request) {
           message:
             err instanceof SessionNotFoundError
               ? "会话不存在"
+              : err instanceof LlmConfigurationError
+                ? "生成服务暂不可用，请稍后重试"
               : ((err as Error).message ?? "生成失败"),
         });
       } finally {

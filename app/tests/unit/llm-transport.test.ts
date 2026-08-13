@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  LlmConfigurationError,
   LlmTransportError,
+  buildProviderWirePayload,
+  createLlmTransportFromEnv,
   createOneApiLlmTransport,
 } from "@/lib/chat/llm-transport";
 
@@ -13,6 +16,42 @@ function request() {
 }
 
 describe("one-api LLM transport", () => {
+  it("uses one shared conversion for semantic and provider wire payloads", () => {
+    expect(buildProviderWirePayload(request(), false, 0.2)).toEqual({
+      model: "test-model",
+      stream: false,
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: "system contract" },
+        { role: "user", content: "current request" },
+      ],
+    });
+    expect(buildProviderWirePayload(request(), true)).toEqual({
+      model: "test-model",
+      stream: true,
+      messages: [
+        { role: "system", content: "system contract" },
+        { role: "user", content: "current request" },
+      ],
+    });
+  });
+
+  it("fails closed when production is configured to use mock", () => {
+    const env = process.env as Record<string, string | undefined>;
+    const originalNodeEnv = env.NODE_ENV;
+    const originalProvider = env.CHAT_PROVIDER;
+    env.NODE_ENV = "production";
+    env.CHAT_PROVIDER = "mock";
+    try {
+      expect(() => createLlmTransportFromEnv()).toThrow(LlmConfigurationError);
+    } finally {
+      if (originalNodeEnv === undefined) delete env.NODE_ENV;
+      else env.NODE_ENV = originalNodeEnv;
+      if (originalProvider === undefined) delete env.CHAT_PROVIDER;
+      else env.CHAT_PROVIDER = originalProvider;
+    }
+  });
+
   it("uses the shared config for a non-stream completion request", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({
       choices: [{ message: { content: "compressed summary" } }],
@@ -74,10 +113,9 @@ describe("one-api LLM transport", () => {
         novelScopePresent: false,
         chapterScopePresent: false,
         ownerScopeResolved: true,
-        currentUserIndices: [0],
         systemSections: ["base_identity"],
       },
-    }).stream()) deltas.push(delta);
+    }, buildProviderWirePayload(request(), true)).stream()) deltas.push(delta);
 
     expect(deltas).toEqual([
       { text: "first" },
