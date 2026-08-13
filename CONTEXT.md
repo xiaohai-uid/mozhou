@@ -49,6 +49,13 @@
 
 - ~~Q23 Agent 层最终决策~~ → **已定 A：自研轻量管线**（节点管线 + JSON 校验重试 + Token 记账，理念借鉴 DeterminFlow，代码全原创，无 AGPL 包袱；二期再评估复杂工作流需求）
 
+## 2026-08-13 Hardening 边界
+
+- 本轮只处理写作上下文、最终 provider payload、脱敏 observer 和生产 Mock 配置安全；候选生命周期另立 effort。
+- 语义 payload 与 provider wire payload 是两个必须同时验证的边界；`PreparedChatRequest` 不等同于 HTTP body。
+- 生产环境选择 Mock 是请求级配置错误，必须 fail closed；不得静默使用模拟模型或切换 provider。
+- 共享 SSE framing 只处理编码、取消、关闭和安全错误，不拥有章节候选或领域事件语义。
+
 ## V1.1 术语表（2026-08-11 定案，工单 14/15）
 
 | 术语 | 定义 |
