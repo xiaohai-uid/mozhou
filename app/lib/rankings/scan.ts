@@ -83,6 +83,20 @@ const defaultPersist: ScanPersistFn = async (rows) => {
 };
 
 /** 从 SSR HTML 提取带引号的字符串字段（处理转义）；找不到返回 null。 */
+
+/** categoryV2 在详情页中是 JSON 字符串（含 Name 字段），取 Name；解析失败回退原文。 */
+function extractCategoryName(html: string): string | null {
+  const raw = extractJsonString(html, "categoryV2");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { Name?: string; name?: string };
+    const name = parsed.Name ?? parsed.name;
+    return name && name.trim() ? name : null;
+  } catch {
+    return raw.length > 50 ? null : raw;
+  }
+}
+
 function extractJsonString(html: string, key: string): string | null {
   const re = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`);
   const match = html.match(re);
@@ -116,7 +130,7 @@ async function scanBoard(
           bookId: card.bookId,
           name,
           author: extractJsonString(detailHtml, "author"),
-          category: extractJsonString(detailHtml, "categoryV2"),
+          category: extractCategoryName(detailHtml),
           rank: card.rank,
           capturedAt,
         } satisfies ScanInsertRow;

@@ -274,7 +274,7 @@ export async function resolveFanqieRankingRows(input: {
   const attempted = cards.length;
   const accepted = rows.length;
   const rejected = attempted - accepted;
-  if (accepted === attempted && accepted === 20) {
+  if (accepted === attempted && accepted > 0) {
     return { rows, degraded: false, attempted, accepted, rejected };
   }
 
