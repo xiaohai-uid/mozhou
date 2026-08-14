@@ -70,7 +70,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const url = new URL(request.url);
-  const requestedBoard = url.searchParams.get("board") ?? "long-hot";
+  const requestedBoard = url.searchParams.get("board") ?? RANKING_BOARDS[0].id;
   const selectedBoard = findRankingBoard(requestedBoard);
   if (!selectedBoard) {
     return NextResponse.json({
