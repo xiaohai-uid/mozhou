@@ -5,12 +5,14 @@ import { db } from "@/lib/db";
 import {
   chapters,
   characterEntries,
+  novelWorkflows,
   novels,
   worldviewEntries,
 } from "@/lib/schema";
 
 export type Novel = typeof novels.$inferSelect;
 export type Chapter = typeof chapters.$inferSelect;
+export type NovelWorkflow = typeof novelWorkflows.$inferSelect;
 export type CharacterEntry = typeof characterEntries.$inferSelect;
 export type WorldviewEntry = typeof worldviewEntries.$inferSelect;
 
@@ -26,6 +28,175 @@ export interface NovelDetail {
   chapters: Chapter[];
   characters: CharacterEntry[];
   worldviews: WorldviewEntry[];
+}
+
+export interface QuickStartResult {
+  novel: Novel;
+  chapter: Chapter;
+  workflow: NovelWorkflow;
+  created: boolean;
+}
+
+async function loadFirstWriteResult(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  novel: Novel,
+  created: boolean,
+): Promise<QuickStartResult> {
+  const [workflow] = await tx
+    .select()
+    .from(novelWorkflows)
+    .where(eq(novelWorkflows.novelId, novel.id));
+  if (!workflow) throw new Error("首写工作流记录缺失");
+  const [chapter] = await tx
+    .select()
+    .from(chapters)
+    .where(and(eq(chapters.id, workflow.firstChapterId), eq(chapters.novelId, novel.id)));
+  if (!chapter) throw new Error("首写章节记录缺失");
+  return { novel, chapter, workflow, created };
+}
+
+/**
+ * 快速开始的原子首写入口：作品、第一章、首写工作流必须一起存在。
+ * requestKey 由客户端在一次用户意图开始时生成，重试时复用；归属范围由 userId 决定。
+ */
+export async function quickStartNovel(
+  userId: number,
+  name: string,
+  requestKey: string,
+  description?: string,
+): Promise<QuickStartResult> {
+  return db.transaction(async (tx) => {
+    const insertedNovels = await tx
+      .insert(novels)
+      .values({
+        userId,
+        name,
+        description: description ?? null,
+        bootstrapRequestKey: requestKey,
+      })
+      .onConflictDoNothing({ target: [novels.userId, novels.bootstrapRequestKey] })
+      .returning();
+    if (insertedNovels.length === 0) {
+      const [existing] = await tx
+        .select()
+        .from(novels)
+        .where(and(eq(novels.userId, userId), eq(novels.bootstrapRequestKey, requestKey)));
+      if (!existing) throw new Error("幂等作品读取失败");
+      return loadFirstWriteResult(tx, existing, false);
+    }
+    const novel = insertedNovels[0];
+
+    const [chapter] = await tx
+      .insert(chapters)
+      .values({
+        novelId: novel.id,
+        ch: "001",
+        title: "第一章",
+        sortOrder: 1,
+      })
+      .returning();
+    if (!chapter) throw new Error("首写章节创建失败");
+
+    const [workflow] = await tx
+      .insert(novelWorkflows)
+      .values({ novelId: novel.id, firstChapterId: chapter.id, state: "ready" })
+      .returning();
+    if (!workflow) throw new Error("首写工作流创建失败");
+
+    return { novel, chapter, workflow, created: true };
+  });
+}
+
+/** 导入用户自有正文：作品、首章、首写工作流与正文同一事务创建。 */
+export async function importNovelWithFirstChapter(
+  userId: number,
+  name: string,
+  content: string,
+  requestKey: string,
+): Promise<QuickStartResult> {
+  return db.transaction(async (tx) => {
+    const insertedNovels = await tx
+      .insert(novels)
+      .values({ userId, name, bootstrapRequestKey: requestKey })
+      .onConflictDoNothing({ target: [novels.userId, novels.bootstrapRequestKey] })
+      .returning();
+    if (insertedNovels.length === 0) {
+      const [existing] = await tx
+        .select()
+        .from(novels)
+        .where(and(eq(novels.userId, userId), eq(novels.bootstrapRequestKey, requestKey)));
+      if (!existing) throw new Error("幂等导入作品读取失败");
+      return loadFirstWriteResult(tx, existing, false);
+    }
+    const novel = insertedNovels[0];
+    if (!novel) throw new Error("导入作品创建失败");
+    const [chapter] = await tx
+      .insert(chapters)
+      .values({ novelId: novel.id, ch: "001", title: "第一章", content, sortOrder: 1, revision: 1 })
+      .returning();
+    if (!chapter) throw new Error("导入首章创建失败");
+    const [workflow] = await tx
+      .insert(novelWorkflows)
+      .values({ novelId: novel.id, firstChapterId: chapter.id, state: "active" })
+      .returning();
+    if (!workflow) throw new Error("导入工作流创建失败");
+    return { novel, chapter, workflow, created: true };
+  });
+}
+
+/** 为历史上已创建但没有章节的作品补齐首写入口；同一作品重复调用只返回同一首章。 */
+export async function startWriting(
+  userId: number,
+  novelId: number,
+): Promise<QuickStartResult | null> {
+  return db.transaction(async (tx) => {
+    const [novel] = await tx
+      .select()
+      .from(novels)
+      .where(and(eq(novels.id, novelId), eq(novels.userId, userId)));
+    if (!novel) return null;
+
+    const [existingWorkflow] = await tx
+      .select()
+      .from(novelWorkflows)
+      .where(eq(novelWorkflows.novelId, novelId));
+    if (existingWorkflow) return loadFirstWriteResult(tx, novel, false);
+
+    const [existingChapter] = await tx
+      .select()
+      .from(chapters)
+      .where(eq(chapters.novelId, novelId))
+      .orderBy(chapters.sortOrder)
+      .limit(1);
+    if (existingChapter) {
+      const insertedWorkflows = await tx
+        .insert(novelWorkflows)
+        .values({ novelId, firstChapterId: existingChapter.id, state: "active" })
+        .onConflictDoNothing({ target: [novelWorkflows.novelId] })
+        .returning();
+      if (insertedWorkflows.length > 0) {
+        return loadFirstWriteResult(tx, novel, false);
+      }
+      return loadFirstWriteResult(tx, novel, false);
+    }
+
+    const insertedChapters = await tx
+      .insert(chapters)
+      .values({ novelId, ch: "001", title: "第一章", sortOrder: 1 })
+      .onConflictDoNothing({ target: [chapters.novelId, chapters.ch] })
+      .returning();
+    const chapter = insertedChapters[0] ?? (await tx
+      .select()
+      .from(chapters)
+      .where(and(eq(chapters.novelId, novelId), eq(chapters.ch, "001"))))[0];
+    if (!chapter) throw new Error("首写章节创建失败");
+
+    await tx
+      .insert(novelWorkflows)
+      .values({ novelId, firstChapterId: chapter.id, state: "ready" })
+      .onConflictDoNothing({ target: [novelWorkflows.novelId] });
+    return loadFirstWriteResult(tx, novel, false);
+  });
 }
 
 /** 列表（meta = 章节数拼接；含 RAG 开关） */
@@ -49,19 +220,6 @@ export async function listNovels(userId: number): Promise<NovelSummary[]> {
     meta: `连载中 · ${r.chapterCount} 章`,
     ragEnabled: r.ragEnabled,
   }));
-}
-
-/** 创建项目 */
-export async function createNovel(
-  userId: number,
-  name: string,
-  description?: string,
-): Promise<Novel> {
-  const [row] = await db
-    .insert(novels)
-    .values({ userId, name, description: description ?? null })
-    .returning();
-  return row;
 }
 
 /** 详情（含三栏），归属校验 */
@@ -172,7 +330,15 @@ export async function updateChapter(
   if (!novel) return null;
   const [row] = await db
     .update(chapters)
-    .set({ ...patch, updatedAt: sql`now()` })
+    .set({
+      ...patch,
+      ...(patch.content !== undefined
+        ? {
+            revision: sql`${chapters.revision} + CASE WHEN ${chapters.content} IS DISTINCT FROM ${patch.content} THEN 1 ELSE 0 END`,
+          }
+        : {}),
+      updatedAt: sql`now()`,
+    })
     .where(and(eq(chapters.id, chapterId), eq(chapters.novelId, novelId)))
     .returning();
   return row ?? null;
@@ -193,19 +359,37 @@ export async function getChapter(
   return row ?? null;
 }
 
-/** 删除章节，归属校验 */
+export type DeleteChapterResult = "deleted" | "not_found" | "protected";
+
+/**
+ * 删除章节，归属校验。
+ * 首写工作流持有第一章的正式引用；该章节不能被删除，否则已创建作品
+ * 一定可进入写作这一不变量会被 UI 或旧客户端破坏。
+ */
 export async function deleteChapter(
   userId: number,
   novelId: number,
   chapterId: number,
-): Promise<boolean> {
-  const novel = await getNovel(userId, novelId);
-  if (!novel) return false;
-  const rows = await db
-    .delete(chapters)
-    .where(and(eq(chapters.id, chapterId), eq(chapters.novelId, novelId)))
-    .returning({ id: chapters.id });
-  return rows.length > 0;
+): Promise<DeleteChapterResult> {
+  return db.transaction(async (tx) => {
+    const [novel] = await tx
+      .select({ id: novels.id })
+      .from(novels)
+      .where(and(eq(novels.id, novelId), eq(novels.userId, userId)));
+    if (!novel) return "not_found";
+
+    const [workflow] = await tx
+      .select({ firstChapterId: novelWorkflows.firstChapterId })
+      .from(novelWorkflows)
+      .where(eq(novelWorkflows.novelId, novelId));
+    if (workflow?.firstChapterId === chapterId) return "protected";
+
+    const rows = await tx
+      .delete(chapters)
+      .where(and(eq(chapters.id, chapterId), eq(chapters.novelId, novelId)))
+      .returning({ id: chapters.id });
+    return rows.length > 0 ? "deleted" : "not_found";
+  });
 }
 
 // ---- 人物库 / 世界观条目 ----

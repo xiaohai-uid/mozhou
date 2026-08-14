@@ -1,6 +1,7 @@
 // POST /api/v1/websearch — 联网搜索（任务二-C）：真实检索 + 超时优雅降级（绝不抛异常）
-// 复用 source engine 容错模式：5s 超时，失败返回 degraded 标记 + 明确错误文案
+// 5s 超时；失败返回 degraded 标记和空结果，不把固定样例冒充为联网检索结果。
 import { NextResponse } from "next/server";
+import { isBatchRelevant } from "@/lib/websearch/quality";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
 export interface WebResult {
@@ -57,9 +58,17 @@ export async function POST(request: Request) {
       .map((m) => ({ url: m[1], title: m[2].replace(/<[^>]+>/g, "").trim() }));
     if (titles.length === 0) {
       return NextResponse.json({
-        results: MOCK_RESULTS,
+        results: [],
         degraded: true,
-        note: "检索结果解析失败，已降级为示例数据",
+        note: "检索结果解析失败，未返回虚构结果，请稍后重试",
+      });
+    }
+    // 结果质量门：反爬/无关页（非 CJK、与 query 零重叠）视为上游异常 → 降级，不返回无关内容
+    if (!isBatchRelevant(titles.map((t) => ({ title: t.title, snippet: "" })), query)) {
+      return NextResponse.json({
+        results: [],
+        degraded: true,
+        note: "检索结果质量异常（疑似反爬页），未返回无关内容，请稍后重试",
       });
     }
     return NextResponse.json({
@@ -72,11 +81,11 @@ export async function POST(request: Request) {
       degraded: false,
     });
   } catch (err) {
-    // 超时/网络失败 → 优雅降级（绝不抛异常）
+    // 超时/网络失败 → 优雅降级（绝不抛异常，不返回虚构结果）
     return NextResponse.json({
-      results: MOCK_RESULTS,
+      results: [],
       degraded: true,
-      note: `联网检索暂时不可用（${(err as Error).message}），已降级为示例数据`,
+      note: `联网检索暂时不可用（${(err as Error).message}），未返回虚构结果`,
     });
   }
 }

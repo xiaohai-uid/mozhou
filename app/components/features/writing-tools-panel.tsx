@@ -1,7 +1,7 @@
 "use client";
 
-// 写作工具面板（UI）：合同 / 任务书 / 机检 / 上下文 四 tab。
-// 形态参考 lingbi-next 写作工具面板（只读展示面），语义对齐 storyrepo。
+// 写作工具面板：合同 / 任务书 / 机检 / 上下文四 tab。
+// 独立对话没有绑定作品时，只显示真实边界，不用某个示例作品冒充当前上下文。
 import { useState } from "react";
 import { ClipboardText, FileText, ShieldCheck, Stack } from "@phosphor-icons/react/dist/ssr";
 
@@ -37,7 +37,7 @@ export function WritingToolsPanel() {
       const res = await fetch("/api/v1/tools/checks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, mustCover: ["开田", "守塔"] }),
+        body: JSON.stringify({ text, mustCover: [] }),
       });
       const data = (await res.json()) as {
         checks?: CheckResult[];
@@ -79,48 +79,33 @@ export function WritingToolsPanel() {
         {tab === "contract" && (
           <div className="space-y-4">
             <p className="text-xs leading-5 text-muted">
-              本章写作合同：正文须覆盖必含词，不得触碰禁区词（S- 信息差）。
+              当前是独立写作对话，尚未绑定作品或章节合同。进入具体章节后，合同应由章节上下文提供。
             </p>
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
-                必含词
+                当前状态
               </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {["开田", "肃界卫", "守塔"].map((w) => (
-                  <span key={w} className="rounded-full border border-surface-2 px-2.5 py-1 text-xs text-zinc-300">
-                    {w}
-                  </span>
-                ))}
-              </div>
+              <span className="mt-2 inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/5 px-2.5 py-1 text-xs text-yellow-400">
+                未绑定章节合同
+              </span>
             </div>
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
-                禁区词
+                机检说明
               </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {["S-001", "S-003", "S-005", "S-006"].map((w) => (
-                  <span key={w} className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs text-red-400">
-                    {w}
-                  </span>
-                ))}
-              </div>
+              <p className="mt-1 text-xs leading-5 text-muted">下方机检只执行通用规则；作品专属禁区必须由真实合同传入。</p>
             </div>
           </div>
         )}
 
         {tab === "brief" && (
           <div className="space-y-4">
-            {[
-              { title: "背景", body: "灰烬镇，灯童与陆沉舟立约：你守田，我守灯。" },
-              { title: "本章目标", body: "完成第一次开田种苗，回程遇肃界卫盘查。" },
-              { title: "必须推进", body: "P-005 背书、P-006 推进；S-006 加深。" },
-              { title: "红线", body: "不炸穿 S-001/003/005；章末禁总结体。" },
-            ].map((s) => (
-              <div key={s.title}>
-                <p className="text-xs font-semibold text-zinc-200">{s.title}</p>
-                <p className="mt-1 text-xs leading-5 text-muted">{s.body}</p>
-              </div>
-            ))}
+            <p className="text-xs leading-5 text-muted">
+              当前对话没有可验证的章节任务书。任务书需要绑定作品和章节后，从真实大纲、设定和前文生成；这里不会显示虚构背景或目标。
+            </p>
+            <span className="inline-flex rounded-full border border-yellow-500/30 bg-yellow-500/5 px-2.5 py-1 text-xs text-yellow-400">
+              未生成任务书
+            </span>
           </div>
         )}
 
@@ -179,12 +164,10 @@ export function WritingToolsPanel() {
             <div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-300">上下文使用量</span>
-                <span className="text-faint">4.2K / 8K</span>
+                <span className="text-faint">未绑定会话</span>
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full w-[52%] rounded-full bg-accent" />
-              </div>
-              <p className="mt-1.5 text-[11px] text-faint">超出 70% 将自动压缩</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2" />
+              <p className="mt-1.5 text-[11px] text-faint">发送消息后按真实 payload 计算；此面板不估算上下文。</p>
             </div>
 
             {/* 压缩开关 */}
@@ -206,24 +189,9 @@ export function WritingToolsPanel() {
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
                 记忆注入
               </p>
-              <ul className="mt-2 space-y-1.5">
-                {[
-                  { name: "人物库 · 陆沉舟 / 阿雀", on: true },
-                  { name: "世界观 · 零界 / 灰烬镇", on: true },
-                  { name: "章摘要 · 001-004", on: false },
-                ].map((m) => (
-                  <li key={m.name} className="flex items-center justify-between rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5">
-                    <span className="text-xs text-zinc-300">{m.name}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] ${
-                        m.on ? "bg-accent/15 text-accent" : "bg-surface-2 text-faint"
-                      }`}
-                    >
-                      {m.on ? "注入中" : "未注入"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <p className="mt-2 rounded-xl border border-dashed border-surface-2 px-3.5 py-2.5 text-xs leading-5 text-faint">
+                当前未绑定作品，人物库、世界观和章节摘要不会注入。绑定作品后以服务端 payload 为准。
+              </p>
             </div>
           </div>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
-// 章节编辑器 Mock Preview v2（V1.1 Journey ⑦ 章节级续写，UI-First 阶段）
-// ⚠️ 全前端 Mock：无 DB / 无 API / 无 Provider——纯本地假数据 + 定时器模拟流式。
+// 章节编辑器：真实正文读写、章节对话、候选确认/丢弃与撤销恢复。
+// 章节正文、对话和候选消息均通过真实 API 与模型 provider 交互。
 //
 // 工作方式（用户定案 B：对话代理式，接写作对话的形态）：
 //   正文编辑器 + 右侧 AI 对话面板。用户在章节上下文里与 AI 多轮对话，
@@ -11,7 +11,7 @@
 //
 // 状态机（对话式）：ChatIdle → ChatStreaming(Preparing/Streaming/Cancelling) → MessageDone
 //   → InsertConfirm(正文已变) / Inserted / Cancelled / Error。Empty 变体：空章节空态"让 AI 起笔"。
-// UI Frozen 后 progressive swap：mock 函数族换真实契约，组件形态保持。
+// UI Frozen 后保留交互形态，数据与生成均走真实章节契约。
 import { useEffect, useReducer, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -27,7 +27,15 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { useBodyHistory, type SelectionState } from "./undo-history";
 
-type MessageStatus = "streaming" | "done" | "stopped" | "error";
+type MessageStatus =
+  | "streaming"
+  | "done"
+  | "generating"
+  | "completed_candidate"
+  | "stopped"
+  | "error"
+  | "applied"
+  | "discarded";
 
 interface ChatMessage {
   id: number;
@@ -40,16 +48,19 @@ interface ChatMessage {
   snapshot: string;
   /** 已插入正文 */
   inserted: boolean;
+  generationKey?: string | null;
+  baseRevision?: number | null;
+  errorMessage?: string | null;
   /** 冲突确认中（第一层：正文已变化） */
   confirmInsert: boolean;
   /** 选区冲突确认中（J9 第二层：bound 选区内容已变化） */
   confirmSelection?: boolean;
-  /** 演示用错误码 */
+  /** 服务端错误码 */
   errorCode?: string;
 }
 
-/** Mock 模型（仅演示；UI Frozen 后换真实模型契约） */
-const MOCK_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
+/** one-api 中配置的可用模型 */
+const CHAT_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
 
 let msgSeq = 0;
 
@@ -73,7 +84,7 @@ export function ChapterEditorView() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [subphase, setSubphase] = useState<"preparing" | "streaming" | "cancelling">("preparing");
-  const [model, setModel] = useState<string>(MOCK_MODELS[0]);
+  const [model, setModel] = useState<string>(CHAT_MODELS[0]);
   const [styleId, setStyleId] = useState<number | null>(null);
   // v3 技能驱动对话：可用技能按章节状态切换（空章节=起笔，非空=续写），默认选中场景技能
   const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
@@ -89,6 +100,7 @@ export function ChapterEditorView() {
   /** J9：generation-bound selection snapshot（仅选区作为 AI 输入时建立；会话级，不写 DB） */
   const boundRef = useRef<Map<number, { start: number; end: number; text: string }>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
+  const generationKeyRef = useRef<string | null>(null);
   // 工单 17：真实风格库（styleId 注入路径）
   const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
   // 工单 18：插入中 + 插入错误提示
@@ -236,7 +248,7 @@ export function ChapterEditorView() {
     }
   }
 
-  /** mockSendChat → sendChat（工单 17 真实化）：POST chat SSE 流式，技能驱动；停止=abort */
+  /** 章节对话：POST 真实 chat SSE 流式，技能驱动；停止=abort */
   async function sendChat(text?: string, skillsOverride?: string[]) {
     const content = (text ?? input).trim();
     if (!content || streaming) return;
@@ -247,6 +259,8 @@ export function ChapterEditorView() {
         return kept.length > 0 ? kept : [emptyChapter ? "章节起笔" : "章节续写"];
       })();
     setInput("");
+    const generationKey = crypto.randomUUID();
+    generationKeyRef.current = generationKey;
     setSubphase("preparing");
     setStreaming(true);
     // 本地临时 id 用负命名空间（服务端 id 为正整数、全局序列——空库时从 1 起，正 id 会在 done
@@ -283,6 +297,7 @@ export function ChapterEditorView() {
             styleId,
             skills,
             ...(selection ? { selection } : {}),
+            generationKey,
           }),
           signal: controller.signal,
         },
@@ -304,11 +319,12 @@ export function ChapterEditorView() {
         for (const evt of events) {
           const line = evt.trim();
           if (!line.startsWith("data:")) continue;
-          const data = JSON.parse(line.slice(5).trim()) as {
-            type: string;
-            text?: string;
-            messageId?: number;
-            code?: string;
+            const data = JSON.parse(line.slice(5).trim()) as {
+              type: string;
+              text?: string;
+              messageId?: number;
+              status?: MessageStatus;
+              code?: string;
             message?: string;
           };
           if (data.type === "delta" && data.text) {
@@ -326,7 +342,12 @@ export function ChapterEditorView() {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === replyId
-                  ? { ...m, id: data.messageId ?? m.id, content: current, status: "done" }
+                  ? {
+                      ...m,
+                      id: data.messageId ?? m.id,
+                      content: current,
+                      status: (data.status as MessageStatus | undefined) ?? "completed_candidate",
+                    }
                   : m,
               ),
             );
@@ -456,6 +477,21 @@ export function ChapterEditorView() {
     void insertToChapter(msgId);
   }
 
+  async function discardMessage(msgId: number) {
+    try {
+      const res = await fetch(
+        `/api/v1/novels/${novelId}/chapters/messages/${msgId}/discard?chapterId=${chapterId}`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error("忽略失败，请刷新后重试");
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, status: "discarded", confirmInsert: false, confirmSelection: false } : m)),
+      );
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+    }
+  }
+
   /** 错误人性化（工单 19 正式化）：标题 + 怎么办（灵笔 humanizeError 语义，映射契约 21 错误码） */
   function humanizeError(code: string): { title: string; guidance: string } {
     switch (code) {
@@ -538,14 +574,14 @@ export function ChapterEditorView() {
               disabled={streaming}
               className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent disabled:opacity-50"
             >
-              {MOCK_MODELS.map((m) => (
+              {CHAT_MODELS.map((m) => (
                 <option key={m} value={m}>
                   {m === "deepseek-v4-flash" ? "DeepSeek（免费）" : "GLM（免费）"}
                 </option>
               ))}
             </select>
           </label>
-          {/* 风格胶囊（Mock 库；形态复用 chat 胶囊） */}
+          {/* 风格胶囊（当前作品已绑定的风格；形态复用 chat 胶囊） */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-faint">风格</span>
             <button
@@ -636,14 +672,23 @@ export function ChapterEditorView() {
             className="mt-2 min-h-[62vh] w-full flex-1 resize-none rounded-card border border-surface-2 bg-surface/40 px-6 py-5 text-[15px] leading-8 text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
           />
           {bodyLoaded && emptyChapter && (
-            <button
-              onClick={() => void sendChat("以黄土纪年的文风，为这一章写一个开头", ["章节起笔"])}
-              disabled={streaming}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-accent/40 bg-accent/5 py-4 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-40"
-            >
-              <Sparkle size={16} weight="fill" aria-hidden />
-              让 AI 起笔这一章（技能：章节起笔）
-            </button>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                onClick={() => bodyTextareaRef.current?.focus()}
+                disabled={streaming}
+                className="flex w-full items-center justify-center gap-2 rounded-card border border-surface-2 bg-surface/60 py-4 text-sm font-medium text-zinc-200 transition hover:border-accent/40 hover:text-accent disabled:opacity-40"
+              >
+                我自己先写
+              </button>
+              <button
+                onClick={() => void sendChat("根据当前作品设定，为这一章写一个开头", ["章节起笔"])}
+                disabled={streaming}
+                className="flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-accent/40 bg-accent/5 py-4 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:opacity-40"
+              >
+                <Sparkle size={16} weight="fill" aria-hidden />
+                让 AI 起笔
+              </button>
+            </div>
           )}
         </section>
 
@@ -719,9 +764,11 @@ export function ChapterEditorView() {
                     </>
                   )}
                   {/* AI 消息操作区 */}
-                  {m.role === "assistant" && m.status !== "streaming" && (
+                  {m.role === "assistant" && m.status !== "streaming" && m.status !== "generating" && (
                     <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-surface-2 pt-2">
-                      {m.status === "error" ? (
+                      {m.status === "discarded" ? (
+                        <span className="text-xs text-faint">已忽略候选</span>
+                      ) : m.status === "error" ? (
                         <span className="flex items-center gap-1 text-xs text-red-400">
                           <Warning size={13} aria-hidden />
                           {humanizeError(m.errorCode ?? "UNKNOWN").title} ·{" "}
@@ -801,13 +848,7 @@ export function ChapterEditorView() {
                                 </span>
                               )}
                               <button
-                                onClick={() =>
-                                  setMessages((prev) =>
-                                    prev.map((x) =>
-                                      x.id === m.id ? { ...x, confirmInsert: false } : x,
-                                    ),
-                                  )
-                                }
+                                onClick={() => void discardMessage(m.id)}
                                 className="rounded-full border border-surface-2 px-2.5 py-1 text-xs text-faint transition hover:text-zinc-300"
                               >
                                 忽略

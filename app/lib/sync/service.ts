@@ -4,8 +4,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapters, novels, syncConfigs } from "@/lib/schema";
+import { decryptSyncPassword } from "@/lib/sync/credentials";
 
 const TIMEOUT_MS = 10000;
+const MAX_ATTEMPTS = 3;
 
 export interface SyncPushResult {
   pushed: number;
@@ -20,6 +22,32 @@ function sanitize(name: string): string {
 interface PushItem {
   path: string;
   content: string;
+}
+
+function safeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "未知网络错误";
+  return message.replace(/https?:\/\/\S+/gi, "远端地址").replace(/authorization|basic\s+\S+/gi, "认证信息").slice(0, 160);
+}
+
+async function requestWithRetry(input: RequestInfo | URL, init: RequestInit, ok: (status: number) => boolean): Promise<Response> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(input, { ...init, signal: ctrl.signal });
+      if (ok(res.status) || ![408, 425, 429, 500, 502, 503, 504].includes(res.status) || attempt === MAX_ATTEMPTS - 1) return res;
+      const retryAfter = Number(res.headers.get("retry-after"));
+      await new Promise((resolve) => setTimeout(resolve, Number.isFinite(retryAfter) ? Math.min(5000, retryAfter * 1000) : 300 * 2 ** attempt));
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_ATTEMPTS - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 300 * 2 ** attempt));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("WebDAV 请求失败");
 }
 
 /** 收集用户全部章节正文（空正文跳过） */
@@ -47,19 +75,16 @@ async function collectChapters(userId: number): Promise<PushItem[]> {
 
 /** MKCOL 建目录（已存在 405/301 视为成功） */
 async function mkcol(url: string, auth: string): Promise<void> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    const res = await requestWithRetry(url, {
       method: "MKCOL",
-      signal: ctrl.signal,
       headers: { Authorization: `Basic ${auth}` },
-    });
+    }, (status) => status === 200 || status === 201 || status === 204 || status === 405 || status === 301 || status === 302);
     if (!res.ok && res.status !== 405 && res.status !== 301 && res.status !== 302) {
       throw new Error(`建目录失败（${res.status}）`);
     }
-  } finally {
-    clearTimeout(timer);
+  } catch (error) {
+    throw new Error(`建目录失败：${safeError(error)}`);
   }
 }
 
@@ -82,35 +107,34 @@ export async function pushToWebDAV(userId: number): Promise<SyncPushResult | { e
     return { pushed: items.length, at: new Date().toISOString() };
   }
 
-  const auth = Buffer.from(`${config.username}:${config.password}`).toString("base64");
+  let password: string;
+  try {
+    password = decryptSyncPassword(config.password);
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+  const auth = Buffer.from(`${config.username}:${password}`).toString("base64");
   const base = config.url.replace(/\/+$/, "");
   try {
     await mkcol(`${base}/mozhou`, auth);
     const dirs = new Set(items.map((i) => i.path.split("/").slice(0, -1).join("/")));
     for (const dir of dirs) await mkcol(`${base}/${dir}`, auth);
     for (const item of items) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-      try {
-        const res = await fetch(`${base}/${item.path}`, {
-          method: "PUT",
-          signal: ctrl.signal,
-          headers: {
-            Authorization: `Basic ${auth}`,
-            "Content-Type": "text/markdown; charset=utf-8",
-          },
-          body: item.content,
-        });
-        if (!res.ok && res.status !== 201 && res.status !== 204) {
-          throw new Error(`推送 ${item.path} 失败（${res.status}）`);
-        }
-      } finally {
-        clearTimeout(timer);
+      const res = await requestWithRetry(`${base}/${item.path}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "text/markdown; charset=utf-8",
+        },
+        body: item.content,
+      }, (status) => status === 200 || status === 201 || status === 204);
+      if (!res.ok && res.status !== 201 && res.status !== 204) {
+        throw new Error(`推送 ${item.path} 失败（${res.status}）`);
       }
     }
     return { pushed: items.length, at: new Date().toISOString() };
   } catch (err) {
-    return { error: `同步失败：${(err as Error).message}` };
+    return { error: `同步失败：${safeError(err)}` };
   }
 }
 

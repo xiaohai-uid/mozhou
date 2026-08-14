@@ -59,7 +59,7 @@ export function AccountView() {
               <h1 className="text-base font-semibold text-zinc-100">
                 {isMember ? "会员" : "免费版"}
               </h1>
-              <p className="mt-0.5 text-xs text-faint">figma-test@mozhou.local</p>
+              <p className="mt-0.5 text-xs text-faint">{overview?.email ?? ""}</p>
             </div>
           </div>
           {!isMember && (

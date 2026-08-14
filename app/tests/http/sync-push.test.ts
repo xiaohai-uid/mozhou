@@ -27,7 +27,7 @@ beforeAll(async () => {
   const novel = await fetch(`${BASE}/api/v1/novels`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify({ name: "同步测试书" }),
+    body: JSON.stringify({ name: "同步测试书", requestKey: `sync-${RUN}` }),
   });
   const { novel: n } = (await novel.json()) as { novel: { id: number } };
   novelId = n.id;

@@ -13,6 +13,22 @@ interface Skill {
   author: string;
 }
 
+interface OhStorySkill {
+  name: string;
+  description: string;
+  adapter: string;
+  status: "native" | "configuration_required" | "provider_required" | "external_source_required" | "workflow_required";
+  evidence: string;
+}
+
+const statusLabels: Record<OhStorySkill["status"], string> = {
+  native: "原生可用",
+  configuration_required: "需要配置",
+  provider_required: "需模型服务",
+  external_source_required: "需外部数据源",
+  workflow_required: "需作品工作流",
+};
+
 export function SkillsView() {
   const [showCreate, setShowCreate] = useState(false);
   const [skillName, setSkillName] = useState("");
@@ -22,6 +38,7 @@ export function SkillsView() {
   const [installing, setInstalling] = useState<string | null>(null);
   const [mySkills, setMySkills] = useState<Skill[]>([]);
   const [plazaSkills, setPlazaSkills] = useState<Skill[]>([]);
+  const [ohStorySkills, setOhStorySkills] = useState<OhStorySkill[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -30,7 +47,10 @@ export function SkillsView() {
       fetch("/api/v1/skills?scope=plaza").then((r) => (r.ok ? r.json() : null)),
     ]);
     if (mine) setMySkills(mine.skills);
-    if (plaza) setPlazaSkills(plaza.skills);
+    if (plaza) {
+      setPlazaSkills(plaza.skills);
+      setOhStorySkills(plaza.ohStorySkills ?? []);
+    }
   }, []);
 
   useEffect(() => {
@@ -218,6 +238,27 @@ export function SkillsView() {
                 {installing === s.name ? "安装中…" : "安装"}
               </button>
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* oh-story 能力索引：只展示已注册的能力边界，不伪装成可一键安装的提示词。 */}
+      <h2 className="mt-10 text-sm font-semibold text-zinc-200">oh-story 能力索引</h2>
+      <p className="mt-2 text-xs leading-5 text-muted">
+        13 项能力已接入能力面；状态按真实适配器、模型和外部数据依赖展示。
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {ohStorySkills.map((skill) => (
+          <div key={skill.name} className="rounded-xl border border-surface-2 bg-surface/50 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xs text-accent">{skill.name}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] ${skill.status === "native" ? "border-emerald-500/30 text-emerald-400" : "border-yellow-500/30 text-yellow-400"}`}>
+                {statusLabels[skill.status]}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-muted">{skill.description}</p>
+            <p className="mt-1 text-[10px] leading-4 text-faint">适配器：{skill.adapter}</p>
+            <p className="mt-1 text-[10px] leading-4 text-faint">证据：{skill.evidence}</p>
           </div>
         ))}
       </div>

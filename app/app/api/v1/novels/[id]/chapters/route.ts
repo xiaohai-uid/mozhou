@@ -87,7 +87,12 @@ export async function DELETE(
   if (!chapterId) {
     return NextResponse.json({ error: "缺少 chapterId" }, { status: 400 });
   }
-  const ok = await deleteChapter(user.id, Number(id), chapterId);
-  if (!ok) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+  const result = await deleteChapter(user.id, Number(id), chapterId);
+  if (result === "not_found") {
+    return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+  }
+  if (result === "protected") {
+    return NextResponse.json({ error: "第一章是首写入口，不能删除" }, { status: 409 });
+  }
   return NextResponse.json({ ok: true });
 }

@@ -90,14 +90,10 @@ async function main() {
 
     const novel = await fetch(`${base}/api/v1/novels`, {
       method: "POST", headers: { "Content-Type": "application/json", cookie },
-      body: JSON.stringify({ name: "真实链路冒烟书" }),
+      body: JSON.stringify({ name: "真实链路冒烟书", requestKey: `smoke-${run}` }),
     });
-    const { novel: n } = await novel.json();
-    const ch = await fetch(`${base}/api/v1/novels/${n.id}/chapters`, {
-      method: "POST", headers: { "Content-Type": "application/json", cookie },
-      body: JSON.stringify({ title: "第一章 冒烟" }),
-    });
-    const { chapter } = await ch.json();
+    if (novel.status !== 201) throw new Error(`作品创建失败 HTTP ${novel.status}: ${(await novel.text()).slice(0, 200)}`);
+    const { novel: n, chapter } = await novel.json();
     const body = "黄土坡上，老周把锄头抡起来。\n\n土腥气顺着风钻进鼻子里。";
     const saved = await fetch(`${base}/api/v1/novels/${n.id}/chapters?chapterId=${chapter.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json", cookie },
