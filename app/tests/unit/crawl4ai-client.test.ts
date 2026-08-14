@@ -22,7 +22,7 @@ describe("T7 crawl4ai 客户端", () => {
   });
 
   it("wait_for 传入结构正确", async () => {
-    const fn = vi.fn(async () => ({ ok: true, json: async () => ({ success: true, results: [] }) }));
+    const fn = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({ ok: true, json: async () => ({ success: true, results: [] }) }));
     vi.stubGlobal("fetch", fn);
     await crawlUrl("https://x", { type: "js", query: "return 1" });
     const [, init] = fn.mock.calls[0];

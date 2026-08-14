@@ -10,6 +10,11 @@ import {
   type RankingDegradation,
   type RankingRow,
 } from "@/lib/story/rankings";
+import {
+  latestScanCapturedAt,
+  scanAll,
+  scanWithinCooldown,
+} from "@/lib/rankings/scan";
 
 export type { RankingBoard, RankingDegradation, RankingRow } from "@/lib/story/rankings";
 
@@ -137,4 +142,22 @@ export async function GET(request: Request) {
       degradation: { code: "SOURCE_FETCH_FAILED", attempted: 0, accepted: 0, rejected: 0 },
     } satisfies Omit<RankingResponse, "boards">));
   }
+}
+
+export async function POST() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+
+  // 冷却：最近一次成功扫榜距今 < 60s 则拒绝，防止频繁触发。
+  const lastCapturedAt = await latestScanCapturedAt();
+  if (scanWithinCooldown(lastCapturedAt)) {
+    return NextResponse.json({
+      error: "扫榜过于频繁，请稍后再试",
+      retryAfter: 60,
+      lastCapturedAt,
+    }, { status: 429 });
+  }
+
+  const result = await scanAll();
+  return NextResponse.json(result);
 }

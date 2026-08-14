@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -396,5 +397,31 @@ export const chapterMessages = pgTable("chapter_messages", {
   generationKeyIdx: uniqueIndex("chapter_messages_chapter_generation_key_idx").on(
     table.chapterId,
     table.generationKey,
+  ),
+}));
+
+
+/** 榜单历史快照（T2/T3 趋势）：每轮扫榜把各 enabled 榜前 20 名落库。 */
+export const rankingSnapshots = pgTable("ranking_snapshots", {
+  id: serial("id").primaryKey(),
+  boardId: text("board_id").notNull(),
+  bookId: text("book_id").notNull(),
+  name: text("name").notNull(),
+  author: text("author"),
+  /** 题材（详情页 categoryV2；无则 NULL） */
+  category: text("category"),
+  rank: integer("rank").notNull(),
+  /** 扫榜时间戳；同一轮所有行同值，幂等键之一 */
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  boardBookCaptureIdx: uniqueIndex("ranking_snapshots_board_book_captured_idx").on(
+    table.boardId,
+    table.bookId,
+    table.capturedAt,
+  ),
+  boardCaptureIdx: index("ranking_snapshots_board_captured_idx").on(
+    table.boardId,
+    table.capturedAt,
   ),
 }));

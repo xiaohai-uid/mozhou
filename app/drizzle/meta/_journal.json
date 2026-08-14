@@ -148,6 +148,13 @@
       "when": 1786546943556,
       "tag": "0020_shiny_maggott",
       "breakpoints": true
-    }
-  ]
+    },
+{
+  "idx": 21,
+  "version": "7",
+  "when": 1786712635348,
+  "tag": "0021_bright_panda",
+  "breakpoints": true
+}
+]
 }
