@@ -138,3 +138,39 @@
 10. 模型输入同时有语义 payload 与 wire payload 两个层次：前者保留 `PreparedChatRequest` 的 system/messages 分离，后者由 transport 唯一生成 provider 实际消费的 system + messages 数组；两层都必须测试。
 11. 共享 SSE framing 只负责编码、取消、关闭和安全错误，不拥有章节候选、消息状态或领域事件语义。
 12. 候选生命周期独立规格的最低范围包括 schema/migration、generationKey 幂等与冲突、完整候选状态机、章节 replay policy、正文 revision/expectedContent 冲突保护、stop/retry/duplicate apply/并发 apply，以及既有章节 SSE 事件契约。
+
+
+## 2026-08-14 扫榜/趋势/搜索 grilling 决策（Q1-Q8 全部按推荐/用户确认）
+
+### 决策表
+
+| # | 决策 | 结论 |
+|---|---|---|
+| Q1 | 榜单复刻范围 | 核心榜型全量：热门/新书/阅读/完结 × 女频/男频 × 短篇/长篇（实测 URL 后配置约 8-16 个榜）；题材榜（科幻末世等 18 个×4 组合）二期按需 |
+| Q2 | 每榜条数 | 前 20（与番茄页面同量级） |
+| Q3 | 扫榜频率与存储 | 每日自动 1 次（对齐番茄日更「每天下午3点前更新截止到上一日」）+ 手动刷新按钮；新建 ranking_snapshots 表（board_id + book_id + rank + captured_at） |
+| Q4 | 趋势指标与展示 | 首版：榜单行内涨跌标签（较上次快照）+ 新进榜/跌出榜标记 + 「上升最快 TOP5」「新进榜 TOP5」横区；单书趋势曲线页二期 |
+| Q5 | 趋势数据保留 | 90 天，超出自动清理 |
+| Q6 | 搜索定位 | 本地书目检索：搜索框在「已扫榜入库书目」内做书名/作者模糊检索，页面标注数据来源；不联网伪造 |
+| Q7 | 生产爬取通道 | 部署 crawl4ai（Cloud Run）作兜底抓取通道；榜单主链路保持轻量 fetch + detail-ssr（已验证无签名需求） |
+| Q8 | 搜索 API 路径 | a_bogus 签名移植为主：番茄 Web 搜索端点 GET /api/author/search/search_book/v1（参数 filter/page_count/page_index/query_type/query_word）需要 msToken + a_bogus（字节 Web 通用签名）；移植开源算法（mafqla/douyin-api 或 ylcangel/douyin_sign），内联 Next.js API，直接 fetch；crawl4ai 兜底 |
+
+### 事实依据（2026-08-14 调研）
+
+- 番茄 rank 页共 74 个榜单 URL，语义 /rank/{女0/男1}_{短1/长2}_{榜型或题材ID}；已确认 1139=热门（女频）、1017=新书（女频）、8=科幻末世等题材
+- 榜单页/搜索页书名均为字体反爬 PUA（U+E000-U+F8FF），detail-ssr（bookId→详情页明文）已线上验证可用
+- 搜索页 URL query 参数不触发真实搜索（默认返回「相关」推荐，query_word=0）；真实搜索由页面内输入触发
+- 无签名调用 search_book/v1 返回 200 空 body；真实浏览器可出结果；crawl4ai 无头环境被风控拦截
+- a_bogus 为字节 Web 通用签名，社区有活跃 Python/JS 实现
+
+### 术语表（2026-08-14）
+
+| 术语 | 定义 |
+|---|---|
+| 扫榜（ranking scan） | 按配置的榜单列表抓取番茄榜单并落库的过程；每次扫榜 = 每个榜 1 次列表页 + 每本书 1 次详情页（detail-ssr 解书名） |
+| 榜单快照（ranking snapshot） | 一次扫榜产生的 (board_id, book_id, rank, captured_at) 集合，ranking_snapshots 表的一批行 |
+| 趋势指标（trend delta） | 较最近一次早于本次的快照计算的名次变化：上升/下降/持平/新进榜/跌出榜 |
+| 上升最快榜 | 名次上升幅度最大的书集合（横区展示 TOP5） |
+| 新进榜 | 本次快照出现、上次快照不存在（或跌出后回归）的书 |
+| 书目库（book index） | 由扫榜积累的去重书目集合（book_id + 明文书名 + 作者），本地检索的数据源 |
+| 本地书目检索 | 在书目库内按书名/作者模糊匹配的搜索，标注「数据来自扫榜库」，不返回库外内容 |
