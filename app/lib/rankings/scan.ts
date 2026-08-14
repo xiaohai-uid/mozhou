@@ -89,9 +89,14 @@ function extractCategoryName(html: string): string | null {
   const raw = extractJsonString(html, "categoryV2");
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as { Name?: string; name?: string };
-    const name = parsed.Name ?? parsed.name;
-    return name && name.trim() ? name : null;
+    const parsed = JSON.parse(raw) as unknown;
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    for (const item of items) {
+      const obj = item as { Name?: string; name?: string } | null;
+      const name = obj?.Name ?? obj?.name;
+      if (name && name.trim()) return name.trim();
+    }
+    return null;
   } catch {
     return raw.length > 50 ? null : raw;
   }

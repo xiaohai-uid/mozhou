@@ -44,7 +44,9 @@ export function buildMarketSummary(
 ): MarketSummary {
   const unique = dedupeRows(rows);
   const days = new Set(unique.map((r) => r.capturedAt.slice(0, 10)));
-  const todayRows = unique.filter((r) => r.capturedAt.slice(0, 10) === today.slice(0, 10));
+  // 只聚合最新一轮扫榜（最新 capturedAt），避免同日多轮混合
+  const latestCaptured = unique.reduce((max, r) => (r.capturedAt > max ? r.capturedAt : max), "");
+  const todayRows = unique.filter((r) => r.capturedAt === latestCaptured);
   const byCategory = new Map<string, { appearances: number; books: Array<{ name: string; rank: number }>; rankSum: number }>();
   for (const row of todayRows) {
     const key = row.category ?? "未分类";
