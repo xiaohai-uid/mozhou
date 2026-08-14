@@ -144,20 +144,3 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
-
-  // 冷却：最近一次成功扫榜距今 < 60s 则拒绝，防止频繁触发。
-  const lastCapturedAt = await latestScanCapturedAt();
-  if (scanWithinCooldown(lastCapturedAt)) {
-    return NextResponse.json({
-      error: "扫榜过于频繁，请稍后再试",
-      retryAfter: 60,
-      lastCapturedAt,
-    }, { status: 429 });
-  }
-
-  const result = await scanAll();
-  return NextResponse.json(result);
-}
