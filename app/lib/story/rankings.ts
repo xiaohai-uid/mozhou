@@ -92,27 +92,32 @@ const fanqieSource = "fanqienovel.com" as const;
  * P0-A product catalog. The wider official catalog is intentionally kept out of
  * this API until its source adapters and quality gates exist in P1 Scan.
  */
+/**
+ * T1 (2026-08-14): core genre boards, one per Fanqie official category URL.
+ * URL semantics: /rank/{0女/1男}_{1短/2长}_{题材ID}. Board names follow the
+ * official menu labels (reading/new-book groups share the same category URLs).
+ */
 export const RANKING_BOARDS: RankingBoard[] = [
-  {
-    id: "long-hot",
-    displayName: "长篇热门榜",
-    source: fanqieSource,
-    sourceKind: "official-ranking",
-    workLength: "long",
-    rankingKind: "hot",
-    listUrl: "https://fanqienovel.com/rank/0_2_1139",
-    enabled: true,
-  },
-  {
-    id: "short-hot",
-    displayName: "短篇热门榜",
-    source: fanqieSource,
-    sourceKind: "official-ranking",
-    workLength: "short",
-    rankingKind: "hot",
-    listUrl: "https://fanqienovel.com/rank/0_1_1139",
-    enabled: true,
-  },
+  // 女频长篇
+  { id: "f-long-gufeng",   displayName: "女频长篇·古风世情", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_2_1139", enabled: true },
+  { id: "f-long-xuanyan",  displayName: "女频长篇·玄幻言情", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_2_248",  enabled: true },
+  { id: "f-long-xianyan",  displayName: "女频长篇·现言脑洞", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_2_267",  enabled: true },
+  { id: "f-long-gongdou",  displayName: "女频长篇·宫斗宅斗", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_2_246",  enabled: true },
+  { id: "f-long-haomen",   displayName: "女频长篇·豪门总裁", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_2_748",  enabled: true },
+  { id: "f-long-qingchun", displayName: "女频长篇·青春甜宠", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_2_749",  enabled: true },
+  // 女频短篇
+  { id: "f-short-gufeng",   displayName: "女频短篇·古风世情", source: fanqieSource, sourceKind: "official-ranking", workLength: "short", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_1_1139", enabled: true },
+  { id: "f-short-xianyan",  displayName: "女频短篇·现言脑洞", source: fanqieSource, sourceKind: "official-ranking", workLength: "short", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/0_1_267",  enabled: true },
+  // 男频长篇
+  { id: "m-long-dongfang",  displayName: "男频长篇·东方仙侠", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_2_1140", enabled: true },
+  { id: "m-long-chuantong", displayName: "男频长篇·传统玄幻", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_2_258",  enabled: true },
+  { id: "m-long-xiuzhen",   displayName: "男频长篇·都市修真", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_2_124",  enabled: true },
+  { id: "m-long-kehuan",    displayName: "男频长篇·科幻末世", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_2_8",    enabled: true },
+  { id: "m-long-dushi-nd",  displayName: "男频长篇·都市脑洞", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_2_262",  enabled: true },
+  { id: "m-long-xuanyi",    displayName: "男频长篇·悬疑灵异", source: fanqieSource, sourceKind: "official-ranking", workLength: "long", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_2_751",  enabled: true },
+  // 男频短篇
+  { id: "m-short-dongfang", displayName: "男频短篇·东方仙侠", source: fanqieSource, sourceKind: "official-ranking", workLength: "short", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_1_1140", enabled: true },
+  { id: "m-short-kehuan",   displayName: "男频短篇·科幻末世", source: fanqieSource, sourceKind: "official-ranking", workLength: "short", rankingKind: "genre", listUrl: "https://fanqienovel.com/rank/1_1_8",    enabled: true },
 ];
 
 /** Alias retained for story capability imports; it contains only enabled boards. */
@@ -233,7 +238,7 @@ export async function resolveFanqieRankingRows(input: {
 }): Promise<ResolvedRankingRows> {
   // P0-A intentionally attempts exactly five rows; it never promotes a sixth
   // row to conceal a rejected first-five detail page.
-  const cards = extractFanqieBookCards(input.listHtml).slice(0, 5);
+  const cards = extractFanqieBookCards(input.listHtml).slice(0, 20);
   if (cards.length === 0) return degraded("LIST_PARSE_FAILED", 0, 0);
 
   let fetchFailures = 0;
@@ -269,7 +274,7 @@ export async function resolveFanqieRankingRows(input: {
   const attempted = cards.length;
   const accepted = rows.length;
   const rejected = attempted - accepted;
-  if (accepted === attempted && accepted === 5) {
+  if (accepted === attempted && accepted === 20) {
     return { rows, degraded: false, attempted, accepted, rejected };
   }
 
