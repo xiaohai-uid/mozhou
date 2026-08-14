@@ -15,6 +15,7 @@ export type WritingContextSection = {
     | "selection"
     | "style"
     | "skill"
+    | "market"
     | "compression_summary";
   content: string;
 };
@@ -48,6 +49,7 @@ const SECTION_ORDER: WritingContextSection["kind"][] = [
   "selection",
   "style",
   "skill",
+  "market",
   "compression_summary",
 ];
 

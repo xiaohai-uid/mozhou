@@ -15,6 +15,10 @@ import { createLlmTransportFromEnv } from "./llm-transport";
 import { buildWritingContext, type WritingContextSection } from "./writing-context";
 import type { ChatMessage } from "./payload";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
+import {
+  buildBriefingResponse,
+  fetchRecentSnapshots,
+} from "@/lib/market/service";
 import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "./models";
@@ -139,6 +143,8 @@ export interface RunChatInput {
   /** 风格引用（工单 15）：风格库 id，服务端查表注入完整四维指南 */
   styleId?: number | null;
   skills?: string[];
+  /** marketRef（场景 A，本轮只做数据源）：true 时注入市场风向简报文本。 */
+  marketRef?: boolean;
   onDelta: (text: string) => void;
 }
 
@@ -240,6 +246,18 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     for (const row of skillRows) {
       skillCount += 1;
       contextSections.push({ kind: "skill", content: `[技能] ${row.name}：${row.systemPrompt}` });
+    }
+  }
+  // marketRef（T9 场景 A 数据源：只注入简报文本，改动最小，不动 chat 主链路）
+  if (input.marketRef) {
+    try {
+      const marketRows = await fetchRecentSnapshots(7);
+      const briefing = buildBriefingResponse(marketRows, new Date().toISOString(), new Date().toISOString());
+      if (briefing.status === 200) {
+        contextSections.push({ kind: "market", content: briefing.rendered });
+      }
+    } catch {
+      // 市场数据拉取失败不阻断对话；本轮仅作可选增强。
     }
   }
   if (summary) {
