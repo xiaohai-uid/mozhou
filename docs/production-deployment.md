@@ -135,6 +135,17 @@ one-api 读 PORT env → Cloud Run 自动 8080。部署后初始化：
 - API 级：注册/登录/登出 401/重登/建作品/章节/保存/刷新持久化/Unicode/malformed 400/IDOR 404/越界 400/错误响应无 stack
 - 浏览器级：SSE 多 delta 采样（300ms 高频采样看长度递增）、caret 精确插入（真实按键定位）、Undo/Redo、选区替换、selection source conflict（改选区后替换 → 冲突横幅 → 取消/force）、Style 创建/选择/聊天、Skill 注入、Websearch 真实 Bing 回流、Sync 未配置态、20k 长章节
 
+### V1.3 上线记录（2026-08-15，工作台 A 版 + Skill 运行时）
+
+- 迁移：0022_skill-runtime / 0023_skill-runs-run-id / 0024_runtime-artifacts / 0025_artifact-bindings / 0026_skills-contract 已全部应用到 Neon（tracking 27 条）
+- 镜像：asia-northeast1-docker.pkg.dev/mozhou-prod/mozhou/mozhou-web:ticket08-final（sha256:87dc608fea32，含 code-review 修复轮）
+- 线上 revision：mozhou-web-00028-guv（100% 流量；canary 先以 --no-traffic + --tag=candidate 验证后切流）
+- 回滚命令（切回 V1.2 稳定版 00026-gus）：
+```bash
+gcloud run services update-traffic mozhou-web --region=asia-northeast1 --project=mozhou-prod \
+  --to-revisions=mozhou-web-00026-gus=100
+```
+- 注意：回滚到 00026-gus 后，迁移 0022-0026 仍在库中（向前兼容的加表迁移，不破坏旧代码路径）。
 ## 11. 回滚
 
 ```bash
