@@ -91,6 +91,9 @@ export async function POST(request: Request) {
             messageId: result.messageId,
             injected: result.injected,
             compressed: result.compressed,
+            // V1.3 工单 01：本次创作链路证据（SkillRun 脱敏视图）
+            skillRuns: result.skillRuns,
+            generationId: result.generationId,
           });
         } else if (result.state.task?.status === "ok") {
           writer.error({ type: "error", message: "模型返回为空，请重试" });

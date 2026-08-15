@@ -22,6 +22,8 @@ export interface PreparedChatRequest {
 
 /** 只包含可用于结构化观测的 scope/context 元数据。 */
 export interface ChatObservationScope {
+  /** V1.3：技能运行时 generationId 锚点；manifest 与 PayloadObservation 共享同一 request_id。 */
+  requestId?: string;
   route: ChatRoute;
   mode: ChatMode;
   historyCountBefore: number;
@@ -109,7 +111,7 @@ export function buildPayloadObservation(request: PreparedChatRequest): PayloadOb
 
   return {
     payload_schema_version: "v1",
-    request_id: randomUUID(),
+    request_id: request.observation.requestId ?? randomUUID(),
     route: request.observation.route,
     mode: request.observation.mode,
     model: request.model,

@@ -10,7 +10,6 @@ import {
   skills as skillsTable,
   styles as stylesTable,
 } from "@/lib/schema";
-import { retrieveContext } from "./rag";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
 import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
@@ -37,6 +36,14 @@ import {
   type InsertResult,
   type InsertTarget,
 } from "./chapter-candidate";
+import {
+  buildGenerationManifest,
+  persistGenerationManifest,
+} from "@/lib/runtime/generation-manifest";
+import { runRuntimePipeline } from "@/lib/runtime/service";
+import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
+import { listSkillRunsByGeneration } from "@/lib/runtime/skill-run";
+import type { SkillRun } from "@/lib/runtime/types";
 import { buildChapterReplayHistory } from "./chapter-replay";
 import { resolveOwnedChapter } from "./ownership";
 
@@ -141,6 +148,10 @@ export interface ChapterChatResult {
   stopped: boolean;
   status: ChapterMessageStatus;
   injected: string[];
+  /** V1.3 工单 01：本次生成的技能运行时证据（done.skillRuns） */
+  skillRuns: SkillRun[];
+  /** V1.3 工单 01：生成计划锚点（= generationKey；证据端点路径） */
+  generationId: string;
 }
 
 /**
@@ -173,6 +184,9 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       stopped: normalizedStatus === "stopped",
       status: normalizedStatus,
       injected: [],
+      // 复用候选：读回同一 generationId 的既有证据
+      skillRuns: await listSkillRunsByGeneration(generationKey),
+      generationId: generationKey,
     };
   }
 
@@ -231,13 +245,24 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     const content = `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`;
     contextSections.push({ kind: "selection", content });
   }
-  const injectedRag = await retrieveContext(input.userId, input.content, {
+  // V1.3 工单 01：RAG 直拼迁移到技能运行时（story_grounding 执行器，经 ContextAssembler 组装）。
+  const builtinDefinitions = await loadBuiltinSkillDefinitions();
+  const pipeline = await runRuntimePipeline({
+    userId: input.userId,
     novelId: input.novelId,
+    chapterId: input.chapterId,
+    chapterContent: prepared.currentChapter.content,
+    request: input.content,
+    mode: "chapter",
+    scopeType: "chapter",
+    scopeId: input.chapterId,
+    generationId: generationKey,
+    definitions: builtinDefinitions.filter((d) => d.enabled),
   });
-  const ragLines = injectedRag.map(
+  contextSections.push(...pipeline.sections);
+  const ragLines = pipeline.ragEntries.map(
     (entry) => `[${entry.kind === "character" ? "人物" : "设定"}] ${entry.name}${entry.note ? `：${entry.note}` : ""}`,
   );
-  contextSections.push(...ragLines.map((content) => ({ kind: "owner_context" as const, content })));
   if (input.styleId) {
     const [styleRow] = await db
       .select({ name: stylesTable.name, guide: stylesTable.guide })
@@ -280,25 +305,39 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   }
 
   const snapshot = prepared.currentChapter.content; // 生成时正文快照（插入冲突检测基准）
-  const provider = makeChatProvider(buildWritingContext({
+  const preparedRequest = buildWritingContext({
     model: input.model,
     mode: "chapter",
     sections: contextSections,
     history: providerHistory,
     currentUser: { role: "user", content: currentMessage.content },
     observation: {
+      requestId: pipeline.generationId,
       route: "chapter-chat",
       mode: "chapter",
       historyCountBefore: history.length,
       compressionApplied: compressed,
-      ragEntryCount: injectedRag.length,
+      ragEntryCount: pipeline.ragEntryCount,
       stylePresent,
       skillCount,
       novelScopePresent: true,
       chapterScopePresent: true,
       ownerScopeResolved: true,
     },
-  }), transport);
+  });
+  // V1.3 工单 01：GenerationManifest 捕获（白名单脱敏；失败不阻断主请求）。
+  await persistGenerationManifest(
+    buildGenerationManifest({
+      generationId: pipeline.generationId,
+      requestId: pipeline.generationId,
+      model: input.model,
+      sections: contextSections,
+      messageRoles: preparedRequest.messages.map((message) => message.role),
+      runs: pipeline.runs,
+      currentUserPresent: true,
+    }),
+  ).catch(() => {});
+  const provider = makeChatProvider(preparedRequest, transport);
   let reply = "";
   let stopped = false;
 
@@ -346,6 +385,8 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
         .filter((section) => section.kind !== "owner_context")
         .map((section) => section.content),
     ],
+    skillRuns: pipeline.runs,
+    generationId: pipeline.generationId,
   };
 }
 

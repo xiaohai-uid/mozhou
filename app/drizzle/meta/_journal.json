@@ -149,12 +149,26 @@
       "tag": "0020_shiny_maggott",
       "breakpoints": true
     },
-{
-  "idx": 21,
-  "version": "7",
-  "when": 1786712635348,
-  "tag": "0021_bright_panda",
-  "breakpoints": true
-}
-]
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786712635348,
+      "tag": "0021_bright_panda",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786796316388,
+      "tag": "0022_skill-runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786796503364,
+      "tag": "0023_skill-runs-run-id",
+      "breakpoints": true
+    }
+  ]
 }

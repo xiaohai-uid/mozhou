@@ -142,6 +142,7 @@ export default async function setup() {
       "/api/v1/sync/push",
       "/api/v1/tools/checks",
       "/api/v1/chat",
+      "/api/v1/runtime/generations/0",
     ];
     // 每个 route 重试直到非 404（Turbopack 编译队列忙时首次请求可能 404 且不触发编译，
     // 重试可让编译队列空闲后的请求正常触发编译注册）

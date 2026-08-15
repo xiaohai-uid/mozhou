@@ -6,6 +6,11 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { skills } from "@/lib/schema";
 import { STORY_CAPABILITIES } from "@/lib/story/capabilities";
+import {
+  isExecutorConnected,
+  loadBuiltinSkillDefinitions,
+  missingExecutorReason,
+} from "@/lib/runtime/skill-registry";
 
 export interface SkillRow {
   id: number;
@@ -30,7 +35,21 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const scope = url.searchParams.get("scope") ?? "mine";
   if (scope === "plaza") {
-    return NextResponse.json({ skills: PLAZA_SKILLS, ohStorySkills: STORY_CAPABILITIES });
+    // V1.3 工单 01（契约 Delta 3）：内置五角色定义 + 接入状态（connected 才可标记「已接入正式写作」）
+    const builtinDefinitions = await loadBuiltinSkillDefinitions();
+    return NextResponse.json({
+      skills: PLAZA_SKILLS,
+      ohStorySkills: STORY_CAPABILITIES,
+      builtinSkills: builtinDefinitions.map((d) => ({
+        key: d.key,
+        name: d.name,
+        role: d.role,
+        trigger: d.trigger,
+        connected: isExecutorConnected(d.executor),
+        status: isExecutorConnected(d.executor) ? "已接入" : "待接入",
+        reason: isExecutorConnected(d.executor) ? null : missingExecutorReason(d.key),
+      })),
+    });
   }
   const rows = await db
     .select()
@@ -44,6 +63,9 @@ export async function GET(request: Request) {
       description: r.description,
       systemPrompt: r.systemPrompt,
       author: r.author,
+      // V1.3（契约 Delta 3）：自定义技能未声明完整契约前如实标记未接入（ADR-0002 决策 7）
+      connected: false,
+      contract: null,
     })),
   });
 }

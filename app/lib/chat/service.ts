@@ -14,7 +14,14 @@ import { makeChatProvider } from "./stream-provider";
 import { createLlmTransportFromEnv } from "./llm-transport";
 import { buildWritingContext, type WritingContextSection } from "./writing-context";
 import type { ChatMessage } from "./payload";
-import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
+import type { RagEntry } from "@/lib/novels/rag";
+import {
+  buildGenerationManifest,
+  persistGenerationManifest,
+} from "@/lib/runtime/generation-manifest";
+import { runRuntimePipeline } from "@/lib/runtime/service";
+import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
+import type { SkillRun } from "@/lib/runtime/types";
 import {
   buildBriefingResponse,
   fetchRecentSnapshots,
@@ -158,6 +165,10 @@ export interface RunChatResult {
   injected: RagEntry[];
   /** 本次是否触发上下文压缩（12 工单；UI 可见） */
   compressed: boolean;
+  /** V1.3 工单 01：本次生成的技能运行时证据（done.skillRuns） */
+  skillRuns: SkillRun[];
+  /** V1.3 工单 01：生成计划锚点（证据端点路径） */
+  generationId: string;
 }
 
 /**
@@ -209,15 +220,23 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       // 摘要器异常时 fail-open：不发送摘要，保留完整历史继续请求。
     }
   }
-  // RAG 注入（06 工单）：按当前输入 + 绑定作品检索相关设定条目，注入 system 提示
-  const injected = await retrieveContext(input.userId, input.content, {
+  // V1.3 工单 01：RAG 直拼迁移到技能运行时（story_grounding 执行器，经 ContextAssembler 组装）。
+  // 未绑定作品时 story_grounding 被输入门跳过（reason「未绑定作品」），不伪造产物。
+  const builtinDefinitions = await loadBuiltinSkillDefinitions();
+  const pipeline = await runRuntimePipeline({
+    userId: input.userId,
     novelId: ownedSession.novelId,
+    chapterId: null,
+    chapterContent: null,
+    request: input.content,
+    mode: "independent",
+    scopeType: "session",
+    scopeId: input.sessionId,
+    definitions: builtinDefinitions.filter((d) => d.enabled),
   });
-  // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验）
-  const contextSections: WritingContextSection[] = injected.map((entry) => ({
-    kind: "owner_context",
-    content: `[${entry.kind === "character" ? "人物" : "设定"}] ${entry.name}${entry.note ? `：${entry.note}` : ""}`,
-  }));
+  const injected: RagEntry[] = pipeline.ragEntries;
+  // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验；工单 04 迁移到 narrative_style 执行器）
+  const contextSections: WritingContextSection[] = [...pipeline.sections];
   let stylePresent = false;
   let skillCount = 0;
   if (input.styleId) {
@@ -263,13 +282,14 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   if (summary) {
     contextSections.push({ kind: "compression_summary", content: summary });
   }
-  const provider = makeChatProvider(buildWritingContext({
+  const prepared = buildWritingContext({
     model: input.model,
     mode: "independent",
     sections: contextSections,
     history: providerHistory,
     currentUser: currentMessage,
     observation: {
+      requestId: pipeline.generationId,
       route: "chat",
       mode: "independent",
       historyCountBefore: history.length,
@@ -281,7 +301,20 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       chapterScopePresent: false,
       ownerScopeResolved: true,
     },
-  }), transport);
+  });
+  // V1.3 工单 01：GenerationManifest 捕获（白名单脱敏；失败不阻断主请求）。
+  await persistGenerationManifest(
+    buildGenerationManifest({
+      generationId: pipeline.generationId,
+      requestId: pipeline.generationId,
+      model: input.model,
+      sections: contextSections,
+      messageRoles: prepared.messages.map((message) => message.role),
+      runs: pipeline.runs,
+      currentUserPresent: true,
+    }),
+  ).catch(() => {});
+  const provider = makeChatProvider(prepared, transport);
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },
@@ -303,7 +336,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       .insert(messages)
       .values({ sessionId: input.sessionId, role: "assistant", content: reply })
       .returning({ id: messages.id });
-    return { state, reply, messageId: assistantMsg?.id, injected, compressed };
+    return { state, reply, messageId: assistantMsg?.id, injected, compressed, skillRuns: pipeline.runs, generationId: pipeline.generationId };
   }
-  return { state, reply, injected, compressed };
+  return { state, reply, injected, compressed, skillRuns: pipeline.runs, generationId: pipeline.generationId };
 }

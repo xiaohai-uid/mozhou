@@ -126,7 +126,13 @@ export async function POST(
         } else if (result.stopped) {
           writer.error({ type: "error", code: "AiCancelled", message: "已停止生成" });
         } else if (result.reply && ["completed_candidate", "applied"].includes(result.status)) {
-          writer.done({ type: "done", messageId: result.messageId });
+          writer.done({
+            type: "done",
+            messageId: result.messageId,
+            // V1.3 工单 01：本次创作链路证据（SkillRun 脱敏视图）
+            skillRuns: result.skillRuns,
+            generationId: result.generationId,
+          });
         } else if (result.status === "error") {
           writer.error({ type: "error", code: "AiGenerationFailed", message: "生成失败，请重试" });
         } else {

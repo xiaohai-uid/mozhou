@@ -202,9 +202,22 @@ describe("章节对话引擎（工单 17）", () => {
     const events = parseSse(await res.text());
     expect(events[0].type).toBe("start");
     expect(events.some((e) => e.type === "delta")).toBe(true);
-    const done = events.find((e) => e.type === "done") as { messageId?: number };
+    // V1.3 工单 01（Contract Delta 2）：done 事件新增 skillRuns（脱敏证据）与 generationId（证据端点锚点）
+    const done = events.find((e) => e.type === "done") as {
+      messageId?: number;
+      skillRuns?: Array<{ skillKey: string; evidence: string; status: string }>;
+      generationId?: string;
+    };
     expect(done?.messageId).toBeTruthy();
-    expect(done).toEqual({ type: "done", messageId: done!.messageId });
+    expect(done).toMatchObject({ type: "done", messageId: done!.messageId });
+    expect(done?.generationId).toBeTruthy();
+    expect(done?.skillRuns).toBeDefined();
+    expect(done!.skillRuns!.length).toBeGreaterThan(0);
+    // 章节测试作品无追踪数据 → story_grounding 如实 degraded；其余执行器未接入 → skipped；全部 not_applied（无伪造）
+    expect(done!.skillRuns!.every((r) => r.evidence === "not_applied")).toBe(true);
+    expect(
+      done!.skillRuns!.every((r) => ["skipped", "degraded"].includes(r.status)),
+    ).toBe(true);
 
     const chapterObservation = readPayloadObservations().find((entry) => entry.route === "chapter-chat");
     expect(chapterObservation).toMatchObject({

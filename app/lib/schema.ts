@@ -10,6 +10,13 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type {
+  ArtifactRef,
+  GenerationManifest,
+  GenerationPlan,
+  SkillInputContract,
+  SkillOutputContract,
+} from "@/lib/runtime/types";
 
 /** 会员等级（11 工单消费） */
 export const tierEnum = pgEnum("tier", ["free", "member"]);
@@ -400,6 +407,82 @@ export const chapterMessages = pgTable("chapter_messages", {
   ),
 }));
 
+
+
+/** ===== 技能运行时（V1.3，工单 01；契约见 .scratch/mozhou-workbench-a/contracts/01-技能运行时契约.md） ===== */
+
+/** SkillDefinition：内置五角色（user_id NULL）+ 自定义（user_id 非空）。 */
+export const skillDefinitions = pgTable("skill_definitions", {
+  id: serial("id").primaryKey(),
+  /** 稳定键："story_grounding" 等；自定义前缀 "custom:"。 */
+  key: text("key").notNull().unique(),
+  /** NULL = 内置；非空 = 用户自定义。 */
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  role: text("role").notNull(),
+  kind: text("kind").notNull(),
+  trigger: text("trigger").notNull(),
+  /** 默认开启 = 可按阶段被路由调用；不是每轮注入。 */
+  enabled: boolean("enabled").notNull().default(true),
+  priority: integer("priority").notNull().default(0),
+  tokenBudget: integer("token_budget").notNull().default(0),
+  /** 执行器注册表 key（lib/runtime/skill-registry.ts）。 */
+  executor: text("executor").notNull(),
+  inputContract: jsonb("input_contract").$type<SkillInputContract>().notNull(),
+  outputContract: jsonb("output_contract").$type<SkillOutputContract>().notNull(),
+  /** 自定义技能的 system prompt（内置为 null）。 */
+  promptText: text("prompt_text"),
+  builtin: boolean("builtin").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/** SkillRun：一次生成中某技能的执行记录（planned→completed/failed/degraded/skipped + evidence）。 */
+export const skillRuns = pgTable("skill_runs", {
+  id: serial("id").primaryKey(),
+  /** uuid 运行证据身份；与 SSE done.skillRuns 的 runId 一致。 */
+  runId: text("run_id").notNull().unique(),
+  generationId: text("generation_id").notNull(),
+  skillKey: text("skill_key").notNull(),
+  status: text("status").notNull(),
+  inputRefs: jsonb("input_refs").$type<ArtifactRef[]>().notNull().default([]),
+  outputRefs: jsonb("output_refs").$type<ArtifactRef[]>().notNull().default([]),
+  /** 实际进入模型的区段（assembler 裁决后）：{ kind, tokens }，绝不记录正文。 */
+  promptSection: jsonb("prompt_section").$type<{ kind: string; tokens: number } | null>(),
+  evidence: text("evidence").notNull(),
+  reason: text("reason"),
+  tokens: integer("tokens").notNull().default(0),
+  executedAt: timestamp("executed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  generationIdx: index("skill_runs_generation_id_idx").on(table.generationId),
+}));
+
+/** GenerationPlan：模型调用之前冻结的计划；generationId 幂等（同候选重试复用）。 */
+export const generationPlans = pgTable("generation_plans", {
+  generationId: text("generation_id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** session | chapter（作用域归属验证后写入）。 */
+  scopeType: text("scope_type").notNull(),
+  scopeId: integer("scope_id"),
+  mode: text("mode").notNull(),
+  intentHash: text("intent_hash").notNull(),
+  plan: jsonb("plan_json").$type<GenerationPlan>().notNull(),
+  status: text("status").notNull().default("planned"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/** GenerationManifest：到达模型的精确载荷脱敏清单（白名单纪律）。 */
+export const generationManifests = pgTable("generation_manifests", {
+  generationId: text("generation_id").primaryKey(),
+  requestId: text("request_id").notNull(),
+  model: text("model").notNull(),
+  sections: jsonb("sections_json").$type<Array<{ kind: string; tokens: number }>>().notNull().default([]),
+  messageRoles: jsonb("message_roles_json").$type<Array<"user" | "assistant" | "system">>().notNull().default([]),
+  skillRunIds: jsonb("skill_run_ids_json").$type<Array<string>>().notNull().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 /** 榜单历史快照（T2/T3 趋势）：每轮扫榜把各 enabled 榜前 20 名落库。 */
 export const rankingSnapshots = pgTable("ranking_snapshots", {
