@@ -178,7 +178,7 @@ export async function runRuntimePipeline(
     }
   }
 
-  const assembled = assembleSkillSections(outputs);
+  const assembled = assembleSkillSections(outputs, plan.contextBudget.perSection);
   const assembledByRun = new Map(
     assembled.sections.map((section) => [section.runId, section]),
   );

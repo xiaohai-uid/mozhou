@@ -25,9 +25,6 @@ const EXECUTORS: Record<string, SkillExecutor> = {
   custom_prompt: customPromptExecutor,
 };
 
-/** 未实现执行器的归属工单（证据 reason 可读）。 */
-const EXECUTOR_TICKET: Record<string, string> = {};
-
 /**
  * 执行前置条件（async 输入门）：返回 skip 原因或 null。
  * 冻结的输入门（checkInputGate）管同步字段；本表管需要查询的绑定关系。
@@ -43,9 +40,8 @@ export function getExecutor(key: string): SkillExecutor | undefined {
   return EXECUTORS[key];
 }
 
-export function missingExecutorReason(key: string): string {
-  const ticket = EXECUTOR_TICKET[key];
-  return ticket ? `执行器未接入（工单 ${ticket} 实现）` : "执行器未接入";
+export function missingExecutorReason(_key: string): string {
+  return "执行器未注册";
 }
 
 export function isExecutorConnected(key: string): boolean {

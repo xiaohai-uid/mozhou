@@ -7,6 +7,7 @@ import {
   ChapterNotFoundError,
   ContentChangedError,
   insertChapterMessage,
+  recordQualityGateOverride,
   type InsertTarget,
 } from "@/lib/novels/chapter-chat";
 
@@ -77,7 +78,9 @@ export async function POST(
       force,
       target,
     );
-    return NextResponse.json({ ...result, message: { inserted: true } });
+    // 质量门（工单 03 收尾）：插入成功时把「存在未通过检查项仍确认插入」记录进证据（不静默放行）
+    const qualityGate = await recordQualityGateOverride(Number(id), messageId);
+    return NextResponse.json({ ...result, message: { inserted: true }, qualityGate });
   } catch (err) {
     if (err instanceof ChapterNotFoundError) {
       return NextResponse.json({ error: "章节不存在" }, { status: 404 });

@@ -6,9 +6,29 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generationManifests, skillRuns as skillRunsTable } from "@/lib/schema";
 import type { ChatMessage } from "@/lib/chat/payload";
-import type { WritingContextSection } from "@/lib/chat/writing-context";
+import {
+  BASE_IDENTITY,
+  CHAPTER_MODE_CONTRACT,
+  INDEPENDENT_MODE_CONTRACT,
+  type WritingContextSection,
+} from "@/lib/chat/writing-context";
 import type { GenerationManifest, SkillEvidence, SkillRun, SkillRunStatus } from "./types";
 import { estimateTokens } from "./units";
+
+/** 完整载荷区段 = 必选身份/模式区段 + 组装区段（manifest 须反映到达模型的精确载荷）。 */
+export function fullPayloadSections(
+  mode: "independent" | "chapter",
+  sections: WritingContextSection[],
+): WritingContextSection[] {
+  const required: WritingContextSection[] = [
+    { kind: "base_identity", content: BASE_IDENTITY },
+    {
+      kind: "mode_contract",
+      content: mode === "independent" ? INDEPENDENT_MODE_CONTRACT : CHAPTER_MODE_CONTRACT,
+    },
+  ];
+  return [...required, ...sections];
+}
 
 export function buildGenerationManifest(input: {
   generationId: string;

@@ -3,9 +3,9 @@
  * runId（uuid）与 SSE done.skillRuns / 证据端点保持一致。
  */
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { skillRuns as skillRunsTable } from "@/lib/schema";
+import { runtimeArtifacts, skillRuns as skillRunsTable } from "@/lib/schema";
 import type {
   ArtifactRef,
   SkillDefinition,
@@ -136,6 +136,38 @@ function rowToRun(row: typeof skillRunsTable.$inferSelect): SkillRun {
     reason: row.reason,
     executedAt: row.executedAt.toISOString(),
   };
+}
+
+/** 质量门摘要（generationId → check_report.summary）；候选确认路径展示检查结果用（工单 03 收尾）。 */
+export async function listQualityGateSummaries(
+  generationKeys: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (generationKeys.length === 0) return map;
+  const rows = await db
+    .select()
+    .from(skillRunsTable)
+    .where(
+      and(
+        eq(skillRunsTable.skillKey, "quality_gate"),
+        inArray(skillRunsTable.generationId, generationKeys),
+      ),
+    );
+  const artifactIds = [...new Set(rows.flatMap((r) => r.outputRefs.map((ref) => ref.artifactId)))];
+  const artifacts = artifactIds.length > 0
+    ? await db
+        .select()
+        .from(runtimeArtifacts)
+        .where(inArray(runtimeArtifacts.artifactId, artifactIds))
+    : [];
+  const summaryById = new Map(
+    artifacts.map((a) => [a.artifactId, (a.data as { summary?: string } | null)?.summary ?? ""]),
+  );
+  for (const row of rows) {
+    const summary = row.outputRefs[0] ? summaryById.get(row.outputRefs[0]!.artifactId) : undefined;
+    if (summary) map.set(row.generationId, summary);
+  }
+  return map;
 }
 
 /** 复用候选（同 generationKey 重试）时读取既有证据。 */

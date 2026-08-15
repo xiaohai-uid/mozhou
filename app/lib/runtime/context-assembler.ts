@@ -49,14 +49,19 @@ const RENDERERS: Partial<Record<ArtifactKind, Renderer>> = {
   custom_section: (data) => ({ kind: "skill", content: renderCustomSection(data) }),
 };
 
-export function assembleSkillSections(outputs: SkillOutputWithRun[]): AssembleResult {
+export function assembleSkillSections(
+  outputs: SkillOutputWithRun[],
+  perSectionBudgets?: Record<string, number>,
+): AssembleResult {
   const sections: AssembledSection[] = [];
   for (const { definition, output, runId } of outputs) {
     const renderer = RENDERERS[output.artifact.kind];
     if (!renderer) continue; // 未注册渲染器 → 不进入载荷（evidence 由调用方按 not_applied 处理）
     const rendered = renderer(output.artifact.data, definition);
     if (!rendered || !rendered.content.trim()) continue; // 空产物 → not_applied
-    const budgetChars = Math.max(0, definition.tokenBudget * 2);
+    // 契约 §7：tokenBudget 与 plan.contextBudget.perSection 双重预算，取更严者
+    const planBudget = perSectionBudgets?.[definition.key] ?? Infinity;
+    const budgetChars = Math.max(0, Math.min(definition.tokenBudget, planBudget) * 2);
     let content = rendered.content;
     let culled = false;
     if (budgetChars > 0 && content.length > budgetChars) {

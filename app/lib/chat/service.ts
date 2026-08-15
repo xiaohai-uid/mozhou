@@ -15,6 +15,7 @@ import type { ChatMessage } from "./payload";
 import type { RagEntry } from "@/lib/novels/rag";
 import {
   buildGenerationManifest,
+  fullPayloadSections,
   persistGenerationManifest,
 } from "@/lib/runtime/generation-manifest";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
@@ -268,10 +269,10 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       generationId: pipeline.generationId,
       requestId: pipeline.generationId,
       model: input.model,
-      sections: contextSections,
+      sections: fullPayloadSections("independent", contextSections),
       messageRoles: prepared.messages.map((message) => message.role),
       runs: pipeline.runs,
-      currentUserPresent: true,
+      currentUserPresent: prepared.messages.at(-1)?.role === "user",
     }),
   ).catch(() => {});
   const provider = makeChatProvider(prepared, transport);

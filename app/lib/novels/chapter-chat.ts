@@ -36,12 +36,14 @@ import {
 } from "./chapter-candidate";
 import {
   buildGenerationManifest,
+  fullPayloadSections,
   persistGenerationManifest,
 } from "@/lib/runtime/generation-manifest";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
 import { loadCustomSkillDefinitions } from "@/lib/runtime/custom-skills";
-import { listSkillRunsByGeneration } from "@/lib/runtime/skill-run";
+import { listQualityGateSummaries, listSkillRunsByGeneration } from "@/lib/runtime/skill-run";
+import { skillRuns as skillRunsTable } from "@/lib/schema";
 import type { SkillRun } from "@/lib/runtime/types";
 import { buildChapterReplayHistory } from "./chapter-replay";
 import { resolveOwnedChapter } from "./ownership";
@@ -82,6 +84,8 @@ export interface ChapterMessageRow {
   errorMessage: string | null;
   updatedAt: string;
   createdAt: string;
+  /** 质量门检查摘要（assistant 候选；候选确认路径展示用，工单 03 收尾） */
+  qualityGate?: string | null;
 }
 
 function toRow(m: typeof chapterMessages.$inferSelect): ChapterMessageRow {
@@ -104,6 +108,7 @@ function toRow(m: typeof chapterMessages.$inferSelect): ChapterMessageRow {
     errorMessage: m.errorMessage,
     updatedAt: m.updatedAt.toISOString(),
     createdAt: m.createdAt.toISOString(),
+    qualityGate: (m as { qualityGate?: string | null }).qualityGate ?? null,
   };
 }
 
@@ -120,7 +125,18 @@ export async function listChapterMessages(
     .from(chapterMessages)
     .where(eq(chapterMessages.chapterId, chapterId))
     .orderBy(desc(chapterMessages.createdAt), desc(chapterMessages.id));
-  return rows.map(toRow);
+  const messages = rows.map(toRow);
+  // 质量门摘要：候选确认路径展示检查结果（只挂 assistant 且有 generationKey 的候选）
+  const generationKeys = messages
+    .filter((m) => m.role === "assistant" && m.generationKey != null)
+    .map((m) => m.generationKey!);
+  if (generationKeys.length > 0) {
+    const summaries = await listQualityGateSummaries(generationKeys);
+    for (const m of messages) {
+      if (m.generationKey != null) m.qualityGate = summaries.get(m.generationKey) ?? null;
+    }
+  }
+  return messages;
 }
 
 export interface ChapterChatInput {
@@ -312,10 +328,10 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       generationId: pipeline.generationId,
       requestId: pipeline.generationId,
       model: input.model,
-      sections: contextSections,
+      sections: fullPayloadSections("chapter", contextSections),
       messageRoles: preparedRequest.messages.map((message) => message.role),
       runs: pipeline.runs,
-      currentUserPresent: true,
+      currentUserPresent: preparedRequest.messages.at(-1)?.role === "user",
     }),
   ).catch(() => {});
   const provider = makeChatProvider(preparedRequest, transport);
@@ -401,6 +417,42 @@ export async function insertChapterMessage(
     force,
     target,
   });
+}
+
+/**
+ * 质量门覆盖动作入证据（工单 03 收尾）：用户确认插入存在未通过检查项的候选时，
+ * 在 quality_gate 的 SkillRun.reason 追加覆盖记录（不静默放行）。
+ */
+export async function recordQualityGateOverride(
+  chapterId: number,
+  messageId: number,
+): Promise<{ summary: string | null; overridden: boolean }> {
+  const [msg] = await db
+    .select({ generationKey: chapterMessages.generationKey })
+    .from(chapterMessages)
+    .where(and(eq(chapterMessages.id, messageId), eq(chapterMessages.chapterId, chapterId)));
+  if (!msg?.generationKey) return { summary: null, overridden: false };
+  const summaries = await listQualityGateSummaries([msg.generationKey]);
+  const summary = summaries.get(msg.generationKey) ?? null;
+  if (!summary || !summary.includes("未通过")) return { summary, overridden: false };
+  const [run] = await db
+    .select({ id: skillRunsTable.id, reason: skillRunsTable.reason })
+    .from(skillRunsTable)
+    .where(
+      and(
+        eq(skillRunsTable.generationId, msg.generationKey),
+        eq(skillRunsTable.skillKey, "quality_gate"),
+      ),
+    )
+    .limit(1);
+  if (run) {
+    const note = "用户确认插入时存在未通过检查项（覆盖动作已记录）";
+    await db
+      .update(skillRunsTable)
+      .set({ reason: [run.reason, note].filter(Boolean).join("｜") })
+      .where(eq(skillRunsTable.id, run.id));
+  }
+  return { summary, overridden: true };
 }
 
 /** 用户忽略候选后将其标记为已丢弃，刷新/重登后不再出现可插入动作。 */

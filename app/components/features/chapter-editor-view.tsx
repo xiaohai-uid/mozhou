@@ -57,6 +57,8 @@ interface ChatMessage {
   confirmSelection?: boolean;
   /** 服务端错误码 */
   errorCode?: string;
+  /** 质量门检查摘要（候选确认路径展示，工单 03 收尾） */
+  qualityGate?: string | null;
 }
 
 /** one-api 中配置的可用模型 */
@@ -762,6 +764,13 @@ export function ChapterEditorView() {
                         className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-accent"
                       />
                     </>
+                  )}
+                  {/* 质量门检查摘要（候选确认前可见；存在未通过项时插入会记录覆盖动作） */}
+                  {m.role === "assistant" && m.qualityGate && (
+                    <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-surface-2 bg-surface/40 px-3 py-2">
+                      <Sparkle size={12} weight="duotone" className="mt-0.5 shrink-0 text-accent" aria-hidden />
+                      <p className="text-[11px] leading-4 text-muted">质量门：{m.qualityGate}</p>
+                    </div>
                   )}
                   {/* AI 消息操作区 */}
                   {m.role === "assistant" && m.status !== "streaming" && m.status !== "generating" && (
