@@ -147,6 +147,11 @@ gcloud run services update-traffic mozhou-web --region=asia-northeast1 --project
 ```
 - 注意：回滚到 00026-gus 后，迁移 0022-0026 仍在库中（向前兼容的加表迁移，不破坏旧代码路径）。
 
+### V1.3 上线后维护 2（2026-08-15，landing 重设计上线）
+
+- 重设计：修复 rounded-card 圆角类未定义（此前所有卡片直角）+ 榜单风格（紫色序号 01-06 / eyebrow / 元数据行 / hover 提亮），参考番茄榜单深色紫罗兰风
+- 新 revision：mozhou-web-00034-wiv（镜像 landing-v2，sha256:e6cd8d9684b0），100% 流量
+
 ### V1.3 上线后维护（2026-08-15，AR 清理 + landing 文案去零界道种）
 
 - AR 清理：删除 11 个未引用 mozhou-web 旧镜像（commercial-*/p0b-*/7db6ec4/9b9138c 及无 tag 孤儿），34→23 digest；保留全部 revision 引用与 v1.2.0 版本 tag
