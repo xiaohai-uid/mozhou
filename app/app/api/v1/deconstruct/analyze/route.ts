@@ -52,15 +52,15 @@ function publicFailureCode(errorClass: string): string {
 
 /** 测试用固定结果（DECONSTRUCT_PROVIDER=mock） */
 const MOCK_RESULT: DeconstructResult = {
-  structure: ["开场：灰罐火苗偏斜", "中段：阿雀醒来对话", "收束：铁灰飞鸟掠过"],
-  plot: ["伏笔：火苗朝零界偏斜", "人物：陆沉舟夜间外出", "推进：灯芯与药引"],
-  rhythm: ["短句密（对话段）", "缓（景物描写）", "悬（结尾鸟飞向零界）"],
+  structure: ["开场：雨巷夜归", "中段：窗边对话", "收束：未寄出的信"],
+  plot: ["伏笔：雨巷旧门牌", "人物：主角深夜归来", "推进：灯下翻旧稿"],
+  rhythm: ["短句密（对话段）", "缓（景物描写）", "悬（结尾信未寄出）"],
   mode: "short",
   stages: [
-    { stage: 0, name: "概要与章节边界", status: "completed", artifact: { id: "stage-0", kind: "overview", schemaVersion: 1, premise: "灰烬镇的火种指向未知边界", chapterCount: 1, chapterIndex: [{ chapter: "001", title: "灰烬有籽", wordCount: 120 }] } },
-    { stage: 2, name: "逐章摘要", status: "completed", artifact: { id: "stage-2", kind: "chapter-summaries", schemaVersion: 1, chapters: [{ chapter: "001", title: "灰烬有籽", summary: "火种异常引出人物与悬念", keyEvents: ["火苗偏斜", "陆沉舟外出"], characters: ["陆沉舟", "阿雀"], techniques: ["延迟揭示"], formula: "异常→调查→新钩子", endHook: "铁灰飞鸟飞向零界" }] } },
-    { stage: 3, name: "剧情聚合", status: "completed", artifact: { id: "stage-3", kind: "plot-rhythm-emotion", schemaVersion: 1, mainline: "追查火种与零界的关系", subplots: [], units: ["异常出现", "人物行动", "悬念升级"], foreshadowing: [], emotionCurve: [], coverage: 1 } },
-    { stage: 4, name: "设定与关系", status: "completed", artifact: { id: "stage-4", kind: "characters-settings-relations", schemaVersion: 1, characters: [{ name: "陆沉舟", role: "protagonist", aliases: [], motivation: "查清火种异常", arc: "待发展", evidenceChapters: ["001"] }], worldview: ["灰烬镇", "零界"], factions: [], relationships: [] } },
+    { stage: 0, name: "概要与章节边界", status: "completed", artifact: { id: "stage-0", kind: "overview", schemaVersion: 1, premise: "雨巷旧宅里一封未寄出的信", chapterCount: 1, chapterIndex: [{ chapter: "001", title: "示例章节", wordCount: 120 }] } },
+    { stage: 2, name: "逐章摘要", status: "completed", artifact: { id: "stage-2", kind: "chapter-summaries", schemaVersion: 1, chapters: [{ chapter: "001", title: "示例章节", summary: "旧信引出人物与悬念", keyEvents: ["雨夜归来", "发现旧信"], characters: ["主角"], techniques: ["延迟揭示"], formula: "异常→调查→新钩子", endHook: "信尾署名残缺" }] } },
+    { stage: 3, name: "剧情聚合", status: "completed", artifact: { id: "stage-3", kind: "plot-rhythm-emotion", schemaVersion: 1, mainline: "追查旧信的来处", subplots: [], units: ["异常出现", "人物行动", "悬念升级"], foreshadowing: [], emotionCurve: [], coverage: 1 } },
+    { stage: 4, name: "设定与关系", status: "completed", artifact: { id: "stage-4", kind: "characters-settings-relations", schemaVersion: 1, characters: [{ name: "主角", role: "protagonist", aliases: [], motivation: "查明旧信来历", arc: "待发展", evidenceChapters: ["001"] }], worldview: ["雨巷旧宅"], factions: [], relationships: [] } },
     { stage: 5, name: "汇总报告", status: "completed", artifact: { id: "stage-5", kind: "aggregate-report", schemaVersion: 1, readerNeeds: ["认知惊喜", "悬念追读"], emotionEngine: "异常→调查→悬念", writingTechniques: ["延迟揭示"], replicableModules: ["以异常物件打开主线"], risks: [] } },
     { stage: 6, name: "文风", status: "completed", artifact: { id: "stage-6", kind: "style-profile", schemaVersion: 1, sentence: "短句与中句交替", rhythm: "景物放缓、结尾收紧", dialogue: "信息留白", emotion: "平静→不安", techniques: [] } },
   ],
@@ -78,7 +78,7 @@ function buildMockResult(mode: DeconstructionMode, sourceLength: number): Decons
         id: "stage-1",
         kind: "golden-three",
         schemaVersion: 1,
-        goldenChapters: [{ chapter: "001", title: "灰烬有籽", reason: "异常物件在开篇建立悬念" }],
+        goldenChapters: [{ chapter: "001", title: "示例章节", reason: "异常物件在开篇建立悬念" }],
       },
     });
   }

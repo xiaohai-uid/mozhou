@@ -9,7 +9,7 @@ function MiniChat() {
       <div className="flex items-center justify-between border-b border-surface-2 px-5 py-3">
         <div className="flex items-center gap-2">
           <span className="size-2 rounded-full bg-accent" aria-hidden />
-          <span className="text-sm text-zinc-300">写作对话 · 灰烬有籽</span>
+          <span className="text-sm text-zinc-300">写作对话 · 示例作品</span>
         </div>
         <span className="rounded-full border border-surface-2 px-2.5 py-0.5 text-xs text-faint">
           deepseek-v4-flash
@@ -19,17 +19,17 @@ function MiniChat() {
       <div className="space-y-4 px-5 py-6">
         <div className="flex justify-end">
           <p className="max-w-[75%] rounded-2xl rounded-br-sm bg-accent px-4 py-2.5 text-sm leading-6 text-white">
-            第一章写完了，接下来该让阿雀出场了。
+            第一章写完了，接下来该让主角出场了。
           </p>
         </div>
         <div className="flex justify-start">
           <p className="max-w-[75%] rounded-2xl rounded-bl-sm border border-surface-2 bg-surface px-4 py-2.5 text-sm leading-6 text-zinc-200">
-            阿雀在门边站了一会儿，把怀里的灯芯裹紧。她没有进屋，先抬头看了一眼天边那点火苗的方向。
+            她站在雨巷口停了一会儿，把伞收拢。没有立刻进屋，先抬头看了一眼楼上亮着的那扇窗。
           </p>
         </div>
         <div className="flex justify-start">
           <p className="max-w-[75%] rounded-2xl rounded-bl-sm border border-surface-2 bg-surface px-4 py-2.5 text-sm leading-6 text-zinc-200">
-            写到这里，伏笔「火苗朝零界偏斜」已经埋下<span className="inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-accent" aria-label="流式输出光标" />
+            写到这里，伏笔「雨巷的那扇窗」已经埋下<span className="inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-accent" aria-label="流式输出光标" />
           </p>
         </div>
       </div>

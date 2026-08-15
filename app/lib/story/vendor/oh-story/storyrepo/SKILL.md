@@ -1,6 +1,6 @@
 ---
 name: storyrepo
-description: 长篇小说「故事仓库」v2 生产系统——完整复刻 webnovel-writer / oh-story / AI_NovelGenerator / chinese-novelist 的实现机制。当用户要求写、续写、规划、回炉、审查长篇小说(百万字、网文连载、零界道种 等项目)时使用。触发词:写小说、续写、写第N章、长篇小说、网文、百万字、开书、大纲、卷纲、细纲、设定、伏笔、信息差、去AI味、回炉、重写第N章、storyrepo。
+description: 长篇小说「故事仓库」v2 生产系统——完整复刻 webnovel-writer / oh-story / AI_NovelGenerator / chinese-novelist 的实现机制。当用户要求写、续写、规划、回炉、审查长篇小说(百万字、网文连载等项目)时使用。触发词:写小说、续写、写第N章、长篇小说、网文、百万字、开书、大纲、卷纲、细纲、设定、伏笔、信息差、去AI味、回炉、重写第N章、storyrepo。
 ---
 
 # 故事仓库 v2 · 长篇生产系统

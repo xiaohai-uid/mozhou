@@ -8,7 +8,7 @@
 ```json
 {
   "spec": 1,
-  "book": "零界道种",
+  "book": "示例作品",
   "imported_through_chapter": 152,
   "state_revision": 43,
   "chapters": {"152": {"status":"committed","words":3120,"volume":5}},
