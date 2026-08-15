@@ -11,6 +11,7 @@ import type {
 } from "./types";
 import { estimateTokens } from "./units";
 import { renderContextPack } from "./executors/story-grounding";
+import { renderChapterTaskCard } from "./executors/chapter-planning";
 
 export interface SkillOutputWithRun {
   definition: SkillDefinition;
@@ -39,6 +40,7 @@ type Renderer = (
 /** 产物渲染器注册表；未注册的产物类型不允许假装进入载荷。 */
 const RENDERERS: Partial<Record<ArtifactKind, Renderer>> = {
   context_pack: (data) => ({ kind: "owner_context", content: renderContextPack(data) }),
+  chapter_task_card: (data) => ({ kind: "planner", content: renderChapterTaskCard(data) }),
 };
 
 export function assembleSkillSections(outputs: SkillOutputWithRun[]): AssembleResult {

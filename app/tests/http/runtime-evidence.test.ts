@@ -93,9 +93,15 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
     expect(sg.evidence).toBe("applied");
     expect(sg.promptSection).not.toBeNull();
     expect(sg.promptSection!.kind).toBe("owner_context");
-    const others = done.skillRuns!.filter((r) => r.skillKey !== "story_grounding");
-    expect(others.every((r) => r.status === "skipped" && r.evidence === "not_applied" && r.reason)).toBe(true);
-    expect(others.find((r) => r.skillKey === "chapter_planning")!.reason).toContain("工单 02");
+    // 工单 02：章节规划已接入（追踪数据存在 → completed/applied）
+    const cp = done.skillRuns!.find((r) => r.skillKey === "chapter_planning")!;
+    expect(cp.status).toBe("completed");
+    expect(cp.evidence).toBe("applied");
+    expect(cp.promptSection?.kind).toBe("planner");
+    // 其余三个执行器未接入 → 如实 skipped + 可读原因
+    const pending = done.skillRuns!.filter((r) => ["audience_genre", "narrative_style", "quality_gate"].includes(r.skillKey));
+    expect(pending.every((r) => r.status === "skipped" && r.evidence === "not_applied" && r.reason)).toBe(true);
+    expect(pending.find((r) => r.skillKey === "audience_genre")!.reason).toContain("工单 05");
     expect(done.generationId).toBeTruthy();
   });
 
@@ -108,12 +114,15 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
     expect(done.skillRuns!.every((r) => r.evidence === "not_applied")).toBe(true);
   });
 
-  it("讨论请求 → quality_gate 因不生成正文而 skipped（可读原因）", async () => {
+  it("讨论请求 → 生成链路技能（章节规划/质量门）因不生成正文而 skipped（可读原因）", async () => {
     const events = await postChat({ content: "帮我分析一下主角的性格", novelId });
     const done = events.find((e) => e.type === "done")!;
     const qg = done.skillRuns!.find((r) => r.skillKey === "quality_gate")!;
     expect(qg.status).toBe("skipped");
     expect(qg.reason).toContain("讨论");
+    const cp = done.skillRuns!.find((r) => r.skillKey === "chapter_planning")!;
+    expect(cp.status).toBe("skipped");
+    expect(cp.reason).toContain("讨论");
   });
 });
 

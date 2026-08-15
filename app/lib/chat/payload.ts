@@ -79,8 +79,10 @@ const OBSERVABLE_SYSTEM_SECTIONS = new Set([
   "owner_context",
   "chapter_reference",
   "selection",
+  "planner",
   "style",
   "skill",
+  "market",
   "compression_summary",
 ]);
 

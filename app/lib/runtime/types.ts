@@ -131,10 +131,14 @@ export interface SkillExecutorContext {
   userId: number;
   novelId: number | null;
   chapterId: number | null;
-  /** 当前章节正文尾部（章节模式；供故事状态取最近正文摘要）。 */
+  /** 当前章节正文（章节模式；供故事状态/章节规划取参考）。 */
   chapterContent: string | null;
   request: string;
   definition: SkillDefinition;
+  /** post_write 校验输入：生成候选正文（质量门）。 */
+  candidate?: string | null;
+  /** 显式引用（风格/市场绑定等由执行器自查 DB）。 */
+  styleId?: number | null;
 }
 
 export interface SkillExecutorOutput {

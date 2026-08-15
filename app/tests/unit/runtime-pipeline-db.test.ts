@@ -52,7 +52,13 @@ describe("runRuntimePipeline (DB)", () => {
     const sg = result.runs.find((r) => r.skillKey === "story_grounding")!;
     expect(sg.status).toBe("completed");
     expect(sg.evidence).toBe("applied");
+    // 工单 02：章节规划同样接入（有追踪数据）
+    const cp = result.runs.find((r) => r.skillKey === "chapter_planning")!;
+    expect(cp.status).toBe("completed");
+    expect(cp.evidence).toBe("applied");
+    expect(cp.promptSection?.kind).toBe("planner");
     expect(result.sections.length).toBeGreaterThan(0);
+    expect(result.sections.some((s) => s.kind === "planner")).toBe(true);
     // 证据落库可查
     const { listSkillRunsByGeneration } = await import("@/lib/runtime/skill-run");
     const persisted = await listSkillRunsByGeneration(result.generationId);

@@ -122,6 +122,18 @@ export async function runRuntimePipeline(
       );
       continue;
     }
+    // 讨论请求：只保留 story_grounding 提供讨论所需上下文；计划/题材/风格技能不产出生成物料
+    if (definition.trigger === "pre_write" && definition.key !== "story_grounding" && !isPostWriteAllowed(input)) {
+      runs.push(
+        makeSkippedRun({
+          runId,
+          generationId,
+          definition,
+          reason: "当前请求是剧情讨论，不生成正文",
+        }),
+      );
+      continue;
+    }
     const executor = getExecutor(definition.executor);
     if (!executor) {
       runs.push(

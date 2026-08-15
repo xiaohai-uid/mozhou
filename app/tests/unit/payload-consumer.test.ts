@@ -308,6 +308,7 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
         current_user_present: true,
         current_user_occurrences: 1,
         chapter_scope_present: true,
+        // V1.3 工单 02：章节规划技能已接入；fixture 无追踪数据 → degraded（无 planner 区段，不伪造）
         system_sections: ["base_identity", "mode_contract", "chapter_reference", "skill"],
       },
     });

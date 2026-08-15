@@ -7,15 +7,16 @@ import { db } from "@/lib/db";
 import { skillDefinitions as skillDefinitionsTable } from "@/lib/schema";
 import type { SkillDefinition, SkillExecutor } from "./types";
 import { storyGroundingExecutor } from "./executors/story-grounding";
+import { chapterPlanningExecutor } from "./executors/chapter-planning";
 
-/** 已接入的执行器（工单 01：story_grounding）。 */
+/** 已接入的执行器。 */
 const EXECUTORS: Record<string, SkillExecutor> = {
   story_grounding: storyGroundingExecutor,
+  chapter_planning: chapterPlanningExecutor,
 };
 
 /** 未实现执行器的归属工单（证据 reason 可读）。 */
 const EXECUTOR_TICKET: Record<string, string> = {
-  chapter_planning: "02",
   quality_gate: "03",
   narrative_style: "04",
   audience_genre: "05",

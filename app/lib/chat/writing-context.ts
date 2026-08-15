@@ -13,6 +13,7 @@ export type WritingContextSection = {
     | "owner_context"
     | "chapter_reference"
     | "selection"
+    | "planner"
     | "style"
     | "skill"
     | "market"
@@ -47,6 +48,7 @@ const SECTION_ORDER: WritingContextSection["kind"][] = [
   "owner_context",
   "chapter_reference",
   "selection",
+  "planner",
   "style",
   "skill",
   "market",
