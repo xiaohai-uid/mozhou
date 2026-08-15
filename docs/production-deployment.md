@@ -146,6 +146,12 @@ gcloud run services update-traffic mozhou-web --region=asia-northeast1 --project
   --to-revisions=mozhou-web-00026-gus=100
 ```
 - 注意：回滚到 00026-gus 后，迁移 0022-0026 仍在库中（向前兼容的加表迁移，不破坏旧代码路径）。
+
+### V1.3 上线后维护（2026-08-15，AR 清理 + landing 文案去零界道种）
+
+- AR 清理：删除 11 个未引用 mozhou-web 旧镜像（commercial-*/p0b-*/7db6ec4/9b9138c 及无 tag 孤儿），34→23 digest；保留全部 revision 引用与 v1.2.0 版本 tag
+- 零界道种：本地 dev 库作品（novel 3）+ 生产首页/组件/deconstruct mock/vendor 文档全部替换为中性示例
+- 新 revision：mozhou-web-00032-dax（镜像 landing-clean3，sha256:e0202c6bc0a3），100% 流量
 ## 11. 回滚
 
 ```bash
