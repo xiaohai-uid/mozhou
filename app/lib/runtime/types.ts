@@ -144,6 +144,8 @@ export interface SkillExecutorContext {
 export interface SkillExecutorOutput {
   status: "completed" | "degraded";
   reason?: string;
+  /** 执行器读取的持久化产物引用（证据 inputRefs；如已绑定 MarketBrief/BenchmarkPack）。 */
+  inputRefs?: ArtifactRef[];
   artifact: {
     kind: ArtifactKind;
     /** 结构化产物数据；由 ContextAssembler 渲染为区段。 */

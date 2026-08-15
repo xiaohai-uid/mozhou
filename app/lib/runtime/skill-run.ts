@@ -76,7 +76,7 @@ export function makeExecutedRun(
     generationId: input.generationId,
     skillKey: input.definition.key,
     status: input.output.status,
-    inputRefs: [],
+    inputRefs: input.output.inputRefs ?? [],
     outputRefs: [artifactRef],
     promptSection: null,
     evidence: "not_applied", // 由 assembler 裁决后回填

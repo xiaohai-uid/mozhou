@@ -8,7 +8,6 @@ import {
   chapterMessages,
   chapters,
   skills as skillsTable,
-  styles as stylesTable,
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
@@ -257,23 +256,17 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     scopeType: "chapter",
     scopeId: input.chapterId,
     generationId: generationKey,
+    styleId: input.styleId,
     definitions: builtinDefinitions.filter((d) => d.enabled),
   });
   contextSections.push(...pipeline.sections);
   const ragLines = pipeline.ragEntries.map(
     (entry) => `[${entry.kind === "character" ? "人物" : "设定"}] ${entry.name}${entry.note ? `：${entry.note}` : ""}`,
   );
-  if (input.styleId) {
-    const [styleRow] = await db
-      .select({ name: stylesTable.name, guide: stylesTable.guide })
-      .from(stylesTable)
-      .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
-    if (styleRow) {
-      stylePresent = true;
-      const content = `[风格] ${styleRow.name}：叙事视角——${styleRow.guide.narrative}；句式节奏——${styleRow.guide.sentence}；意象偏好——${styleRow.guide.imagery}；情绪节奏——${styleRow.guide.rhythm}`;
-      contextSections.push({ kind: "style", content });
-    }
-  }
+  // 工单 04：style 注入已迁移到 narrative_style 执行器（经 ContextAssembler）；stylePresent 由证据派生
+  stylePresent = pipeline.runs.some(
+    (r) => r.skillKey === "narrative_style" && r.evidence === "applied",
+  );
   const skills = input.skills ?? [];
   const userSkillNames = skills.filter((s) => !SCENE_SKILLS[s]);
   if (userSkillNames.length > 0) {

@@ -6,7 +6,6 @@ import {
   novels,
   sessions,
   skills as skillsTable,
-  styles as stylesTable,
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
@@ -22,10 +21,6 @@ import {
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
 import type { SkillRun } from "@/lib/runtime/types";
-import {
-  buildBriefingResponse,
-  fetchRecentSnapshots,
-} from "@/lib/market/service";
 import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
 import { recordUsage } from "@/lib/account/service";
 import type { ChatModel } from "./models";
@@ -150,8 +145,6 @@ export interface RunChatInput {
   /** 风格引用（工单 15）：风格库 id，服务端查表注入完整四维指南 */
   styleId?: number | null;
   skills?: string[];
-  /** marketRef（场景 A，本轮只做数据源）：true 时注入市场风向简报文本。 */
-  marketRef?: boolean;
   onDelta: (text: string) => void;
 }
 
@@ -232,26 +225,16 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     mode: "independent",
     scopeType: "session",
     scopeId: input.sessionId,
+    styleId: input.styleId,
     definitions: builtinDefinitions.filter((d) => d.enabled),
   });
   const injected: RagEntry[] = pipeline.ragEntries;
-  // 风格（R4 决策 + 工单 15）：styleId 引用 → 查风格库注入完整四维指南（写路径归属校验；工单 04 迁移到 narrative_style 执行器）
+  // 工单 04：style 注入已迁移到 narrative_style 执行器（经 ContextAssembler）；stylePresent 由证据派生
   const contextSections: WritingContextSection[] = [...pipeline.sections];
-  let stylePresent = false;
+  const stylePresent = pipeline.runs.some(
+    (r) => r.skillKey === "narrative_style" && r.evidence === "applied",
+  );
   let skillCount = 0;
-  if (input.styleId) {
-    const styleRows = await db
-      .select({ name: stylesTable.name, guide: stylesTable.guide })
-      .from(stylesTable)
-      .where(and(eq(stylesTable.id, input.styleId), eq(stylesTable.userId, input.userId)));
-    for (const row of styleRows) {
-      stylePresent = true;
-      contextSections.push({
-        kind: "style",
-        content: `[风格] ${row.name}：叙事视角——${row.guide.narrative}；句式节奏——${row.guide.sentence}；意象偏好——${row.guide.imagery}；情绪节奏——${row.guide.rhythm}`,
-      });
-    }
-  }
   if (input.skills && input.skills.length > 0) {
     const skillRows = await db
       .select({ name: skillsTable.name, systemPrompt: skillsTable.systemPrompt })
@@ -267,18 +250,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       contextSections.push({ kind: "skill", content: `[技能] ${row.name}：${row.systemPrompt}` });
     }
   }
-  // marketRef（T9 场景 A 数据源：只注入简报文本，改动最小，不动 chat 主链路）
-  if (input.marketRef) {
-    try {
-      const marketRows = await fetchRecentSnapshots(7);
-      const briefing = buildBriefingResponse(marketRows, new Date().toISOString(), new Date().toISOString());
-      if (briefing.status === 200) {
-        contextSections.push({ kind: "market", content: briefing.rendered });
-      }
-    } catch {
-      // 市场数据拉取失败不阻断对话；本轮仅作可选增强。
-    }
-  }
+  // 工单 05：marketRef 直拼已移除（Contract Delta 5）；市场数据改由 audience_genre 消费已绑定 MarketBrief
   if (summary) {
     contextSections.push({ kind: "compression_summary", content: summary });
   }

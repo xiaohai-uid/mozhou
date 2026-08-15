@@ -106,7 +106,8 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
     // 题材/风格执行器未接入 → 如实 skipped + 可读原因
     const pending = done.skillRuns!.filter((r) => ["audience_genre", "narrative_style"].includes(r.skillKey));
     expect(pending.every((r) => r.status === "skipped" && r.evidence === "not_applied" && r.reason)).toBe(true);
-    expect(pending.find((r) => r.skillKey === "audience_genre")!.reason).toContain("工单 05");
+    // 工单 05：audience_genre 已接入，未绑定简报 → skipped「未绑定市场简报」
+    expect(pending.find((r) => r.skillKey === "audience_genre")!.reason).toBe("未绑定市场简报");
     expect(done.generationId).toBeTruthy();
   });
 

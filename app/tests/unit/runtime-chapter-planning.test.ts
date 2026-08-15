@@ -41,6 +41,7 @@ describe("buildTaskCard", () => {
       payoffSetup: [],
       chapterHook: [],
       sourceSummary: "",
+      methodHints: [],
     });
   });
 });
@@ -56,5 +57,12 @@ describe("renderChapterTaskCard", () => {
   it("空卡 → 空字符串", () => {
     expect(renderChapterTaskCard(buildTaskCard(null, { id: null, title: null, ch: null }))).toBe("");
     expect(renderChapterTaskCard(null)).toBe("");
+  });
+
+  it("方法参考（BenchmarkPack）：渲染只含抽象方法", () => {
+    const card = buildTaskCard(state, { id: 2, title: "灰烬有籽", ch: "002" });
+    card.methodHints = ["信息差悬念", "章尾钩子"];
+    const text = renderChapterTaskCard(card);
+    expect(text).toContain("方法参考（BenchmarkPack）：信息差悬念；章尾钩子");
   });
 });

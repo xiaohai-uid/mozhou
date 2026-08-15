@@ -498,6 +498,23 @@ export const runtimeArtifacts = pgTable("runtime_artifacts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** 产物-作品绑定（V1.3 工单 05）：MarketBrief/BenchmarkPack 按作品绑定，绑定须归属校验。 */
+export const artifactBindings = pgTable("artifact_bindings", {
+  id: serial("id").primaryKey(),
+  novelId: integer("novel_id")
+    .notNull()
+    .references(() => novels.id, { onDelete: "cascade" }),
+  artifactId: text("artifact_id").notNull(),
+  /** 绑定角色：market_brief / benchmark_pack。 */
+  role: text("role").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  novelArtifactIdx: uniqueIndex("artifact_bindings_novel_artifact_idx").on(
+    table.novelId,
+    table.artifactId,
+  ),
+}));
+
 /** 榜单历史快照（T2/T3 趋势）：每轮扫榜把各 enabled 榜前 20 名落库。 */
 export const rankingSnapshots = pgTable("ranking_snapshots", {
   id: serial("id").primaryKey(),

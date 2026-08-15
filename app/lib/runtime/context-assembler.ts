@@ -12,6 +12,8 @@ import type {
 import { estimateTokens } from "./units";
 import { renderContextPack } from "./executors/story-grounding";
 import { renderChapterTaskCard } from "./executors/chapter-planning";
+import { renderStyleNote } from "./executors/narrative-style";
+import { renderMarketNote } from "./executors/audience-genre";
 
 export interface SkillOutputWithRun {
   definition: SkillDefinition;
@@ -41,6 +43,8 @@ type Renderer = (
 const RENDERERS: Partial<Record<ArtifactKind, Renderer>> = {
   context_pack: (data) => ({ kind: "owner_context", content: renderContextPack(data) }),
   chapter_task_card: (data) => ({ kind: "planner", content: renderChapterTaskCard(data) }),
+  style_note: (data) => ({ kind: "style", content: renderStyleNote(data) }),
+  market_note: (data) => ({ kind: "market", content: renderMarketNote(data) }),
 };
 
 export function assembleSkillSections(outputs: SkillOutputWithRun[]): AssembleResult {

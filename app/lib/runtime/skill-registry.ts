@@ -9,18 +9,32 @@ import type { SkillDefinition, SkillExecutor } from "./types";
 import { storyGroundingExecutor } from "./executors/story-grounding";
 import { chapterPlanningExecutor } from "./executors/chapter-planning";
 import { qualityGateExecutor } from "./executors/quality-gate";
+import { narrativeStyleExecutor } from "./executors/narrative-style";
+import { audienceGenreExecutor } from "./executors/audience-genre";
+import { hasBoundBriefing } from "@/lib/market/briefing-artifacts";
+import type { SkillExecutorContext } from "./types";
 
 /** 已接入的执行器。 */
 const EXECUTORS: Record<string, SkillExecutor> = {
   story_grounding: storyGroundingExecutor,
   chapter_planning: chapterPlanningExecutor,
   quality_gate: qualityGateExecutor,
+  narrative_style: narrativeStyleExecutor,
+  audience_genre: audienceGenreExecutor,
 };
 
 /** 未实现执行器的归属工单（证据 reason 可读）。 */
-const EXECUTOR_TICKET: Record<string, string> = {
-  narrative_style: "04",
-  audience_genre: "05",
+const EXECUTOR_TICKET: Record<string, string> = {};
+
+/**
+ * 执行前置条件（async 输入门）：返回 skip 原因或 null。
+ * 冻结的输入门（checkInputGate）管同步字段；本表管需要查询的绑定关系。
+ */
+export const SKILL_PRECONDITIONS: Record<string, (ctx: SkillExecutorContext) => Promise<string | null>> = {
+  audience_genre: async (ctx) => {
+    if (ctx.novelId == null) return "未绑定作品";
+    return (await hasBoundBriefing(ctx.novelId)) ? null : "未绑定市场简报";
+  },
 };
 
 export function getExecutor(key: string): SkillExecutor | undefined {

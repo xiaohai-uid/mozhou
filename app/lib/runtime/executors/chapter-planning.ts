@@ -6,8 +6,9 @@
  * 无追踪数据 → degraded（不伪造任务卡）。
  */
 import { getStoryTracking } from "@/lib/story/tracking";
+import { getBoundBenchmarkPack } from "@/lib/story/benchmark-packs";
 import type { StoryTrackingState } from "@/lib/schema";
-import type { SkillExecutor, SkillExecutorContext, SkillExecutorOutput } from "../types";
+import type { ArtifactRef, SkillExecutor, SkillExecutorContext, SkillExecutorOutput } from "../types";
 import { estimateTokens } from "../units";
 
 export interface ChapterTaskCard {
@@ -17,6 +18,8 @@ export interface ChapterTaskCard {
   payoffSetup: string[];
   chapterHook: string[];
   sourceSummary: string;
+  /** BenchmarkPack 抽象方法参考（工单 06；只含方法，不含原文）。 */
+  methodHints: string[];
 }
 
 const EMPTY_CARD: ChapterTaskCard = {
@@ -26,6 +29,7 @@ const EMPTY_CARD: ChapterTaskCard = {
   payoffSetup: [],
   chapterHook: [],
   sourceSummary: "",
+  methodHints: [],
 };
 
 /** 从追踪状态派生任务卡（纯函数，可单测）。 */
@@ -57,6 +61,7 @@ export function buildTaskCard(
     sourceSummary: hasData
       ? `${settled} 章已结算 · ${openPromises.length} 条伏笔待回收 · ${characterCount} 个角色状态`
       : "",
+    methodHints: [],
   };
 }
 
@@ -73,6 +78,9 @@ export function renderChapterTaskCard(data: unknown): string {
   if (card.payoffSetup?.length) lines.push(`伏笔铺垫：${card.payoffSetup.join("；")}`);
   if (card.chapterHook?.length) lines.push(`章尾钩子：${card.chapterHook.join("；")}`);
   if (card.sourceSummary) lines.push(card.sourceSummary);
+  if (card.methodHints?.length) {
+    lines.push(`方法参考（BenchmarkPack）：${card.methodHints.slice(0, 4).join("；")}`);
+  }
   return lines.join("\n");
 }
 
@@ -89,6 +97,26 @@ export const chapterPlanningExecutor: SkillExecutor = {
       title: null,
       ch: null,
     });
+    // 工单 06：绑定 BenchmarkPack → 抽象方法参考（只消费方法，不消费原文）
+    const boundPack = await getBoundBenchmarkPack(novelId);
+    let inputRefs: ArtifactRef[] = [];
+    if (boundPack) {
+      const ref = (boundPack.data as { reference?: { style?: { techniques?: unknown } } })?.reference;
+      const techniques = Array.isArray(ref?.style?.techniques)
+        ? (ref.style.techniques as Array<unknown>).filter((t): t is string => typeof t === "string").slice(0, 4)
+        : [];
+      card.methodHints = techniques;
+      inputRefs = [{
+        artifactId: boundPack.artifactId,
+        kind: "benchmark_pack",
+        version: boundPack.version,
+        scope: "novel",
+        scopeId: novelId,
+        provenance: boundPack.provenance,
+        tokenBudget: 0,
+        culled: false,
+      }];
+    }
     const rendered = renderChapterTaskCard(card);
     if (!rendered.trim()) {
       return {
@@ -99,6 +127,7 @@ export const chapterPlanningExecutor: SkillExecutor = {
     }
     return {
       status: "completed",
+      inputRefs,
       artifact: { kind: "chapter_task_card", data: card, tokenEstimate: estimateTokens(rendered) },
     };
   },

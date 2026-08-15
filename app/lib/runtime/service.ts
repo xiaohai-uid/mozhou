@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { generationPlans } from "@/lib/schema";
 import type { SkillDefinition, SkillExecutorContext, SkillRun } from "./types";
 import { buildGenerationPlan, persistGenerationPlan } from "./generation-plan";
-import { getExecutor, isExecutorConnected, missingExecutorReason } from "./skill-registry";
+import { getExecutor, isExecutorConnected, missingExecutorReason, SKILL_PRECONDITIONS } from "./skill-registry";
 import { assembleSkillSections } from "./context-assembler";
 import { loadGenerationManifest } from "./generation-manifest";
 import { listSkillRunsByGeneration } from "./skill-run";
@@ -29,6 +29,8 @@ export interface RuntimePipelineInput {
   chapterId: number | null;
   /** 章节正文（章节模式；story_grounding 取最近正文摘要用）。 */
   chapterContent: string | null;
+  /** 风格引用（narrative_style 输入；缺省 = 未选择风格）。 */
+  styleId?: number | null;
   request: string;
   mode: "independent" | "chapter";
   scopeType: "session" | "chapter";
@@ -63,10 +65,13 @@ function checkInputGate(
       case "chapter":
         if (input.chapterId == null) return "未进入章节上下文";
         break;
+      case "style":
+        if (input.styleId == null) return "未选择风格";
+        break;
       case "candidate":
-        return null; // post_write 输入门由阶段路由处理（本票未接入执行器）
+        return null; // post_write 输入门由 runPostWriteValidators 处理
       default:
-        // style / market_brief / benchmark_pack：本期未接入执行器，不在此判门
+        // market_brief / benchmark_pack：工单 05/06 判门
         break;
     }
   }
@@ -147,7 +152,16 @@ export async function runRuntimePipeline(
       chapterContent: input.chapterContent,
       request: input.request,
       definition,
+      styleId: input.styleId ?? null,
     };
+    const precondition = SKILL_PRECONDITIONS[definition.key];
+    if (precondition) {
+      const skipReason = await precondition(ctx);
+      if (skipReason) {
+        runs.push(makeSkippedRun({ runId, generationId, definition, reason: skipReason }));
+        continue;
+      }
+    }
     try {
       const output = await executor.run(ctx);
       if (output.artifact.kind === "context_pack") {
