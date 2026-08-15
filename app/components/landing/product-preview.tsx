@@ -4,7 +4,7 @@ import Link from "next/link";
  *  禁止 div 假截图）。静态展示写作对话形态，元素全为真实语义标签。 */
 function MiniChat() {
   return (
-    <div className="rounded-card border border-surface-2 bg-zinc-950/70 shadow-[0_24px_80px_rgba(0,0,0,0.4)]">
+    <div className="overflow-hidden rounded-card-lg border border-surface-2 bg-zinc-950/70 shadow-[0_32px_90px_rgba(0,0,0,0.45)]">
       {/* 顶栏 */}
       <div className="flex items-center justify-between border-b border-surface-2 px-5 py-3">
         <div className="flex items-center gap-2">
@@ -29,9 +29,19 @@ function MiniChat() {
         </div>
         <div className="flex justify-start">
           <p className="max-w-[75%] rounded-2xl rounded-bl-sm border border-surface-2 bg-surface px-4 py-2.5 text-sm leading-6 text-zinc-200">
-            写到这里，伏笔「雨巷的那扇窗」已经埋下<span className="inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-accent" aria-label="流式输出光标" />
+            写到这里，伏笔「雨巷的那扇窗」已经埋下
+            <span className="inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-accent" aria-label="流式输出光标" />
           </p>
         </div>
+      </div>
+      {/* 技能徽标行 */}
+      <div className="flex items-center gap-2 px-5 pb-1">
+        <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-0.5 text-xs text-accent">
+          技能 · 章节续写
+        </span>
+        <span className="rounded-full border border-surface-2 px-3 py-0.5 text-xs text-faint">
+          参考当前正文
+        </span>
       </div>
       {/* 输入区 */}
       <div className="border-t border-surface-2 p-3">
@@ -54,7 +64,7 @@ function MiniChat() {
 /** 产品展示节：左文案右真实组件预览（本节用一次左文右图锚点）。 */
 export function ProductPreview() {
   return (
-    <section className="grid grid-cols-1 items-center gap-14 px-6 py-28 md:grid-cols-12 lg:px-16">
+    <section className="grid grid-cols-1 items-center gap-14 px-6 py-24 md:grid-cols-12 lg:px-16">
       <div className="md:col-span-5">
         <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent">
           写作对话

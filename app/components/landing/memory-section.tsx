@@ -1,5 +1,5 @@
 /** 记忆节：Off-grid editorial，中性示例档案卡（非真实作品数据）。
- *  全站第二个 eyebrow（预算 6 节 ≤ 2）。 */
+ *  全站第二个 eyebrow（预算 6 节 ≤ 2）。紫色序号呼应榜单风格。 */
 const cards = [
   { kind: "人物", name: "沈砚", note: "主角，白天是古籍修复师，夜里整理自己的手稿" },
   { kind: "设定", name: "雨巷", note: "主角常走的那条街，每次转折都发生在这里" },
@@ -8,7 +8,7 @@ const cards = [
 
 export function MemorySection() {
   return (
-    <section className="relative overflow-hidden px-6 py-32 lg:px-16">
+    <section className="relative overflow-hidden px-6 py-24 lg:px-16">
       {/* 极淡紫罗兰氛围（低饱和，唯一一次背景微光之外的径向） */}
       <div
         aria-hidden
@@ -31,18 +31,19 @@ export function MemorySection() {
             {cards.map((card, i) => (
               <div
                 key={card.name}
-                className="rounded-card border border-surface-2 bg-surface px-6 py-5 transition hover:border-zinc-600"
+                className="rounded-card border border-surface-2 bg-surface px-6 py-5 transition-colors hover:border-zinc-600"
                 style={{ transform: `translateX(${i * 14}px)` }}
               >
                 <div className="flex items-baseline justify-between gap-4">
-                  <h3 className="text-base font-semibold text-zinc-100">
-                    {card.name}
-                  </h3>
+                  <div className="flex items-baseline gap-3">
+                    <span className="rank-num text-sm">0{i + 1}</span>
+                    <h3 className="text-base font-semibold text-zinc-100">{card.name}</h3>
+                  </div>
                   <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-faint">
                     {card.kind}
                   </span>
                 </div>
-                <p className="mt-1.5 text-sm leading-6 text-muted">{card.note}</p>
+                <p className="mt-2 pl-8 text-sm leading-6 text-muted">{card.note}</p>
               </div>
             ))}
           </div>
