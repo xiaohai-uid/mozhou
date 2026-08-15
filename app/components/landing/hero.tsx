@@ -41,15 +41,15 @@ export function Hero() {
         </div>
       </div>
 
-      {/* 右侧：真实章节片段卡（《零界道种》第一章，非占位、非假截图） */}
+      {/* 右侧：章节片段示例卡（中性示例，非真实作品数据） */}
       <div className="md:col-span-5 md:pl-8">
         <figure className="mozhou-rise rounded-card border border-surface-2 bg-surface p-7 shadow-[0_24px_80px_rgba(0,0,0,0.35)]" style={{ animationDelay: "240ms" }}>
           <figcaption className="flex items-center gap-2 text-xs text-faint">
             <PenNib size={14} className="text-accent" weight="duotone" />
-            《零界道种》第一章 · 灰烬有籽
+            示例章节 · 第一章
           </figcaption>
           <blockquote className="mt-5 text-[15px] leading-7 text-zinc-300">
-            「火苗在灰罐里，静了一会儿，朝零界的方向，又偏了偏。」
+            「她合上笔记本时，窗外正好起了风。故事还没有名字，但人物已经在纸上醒来。」
           </blockquote>
           <p className="mt-4 text-xs leading-6 text-faint">
             你的故事从这里开始。墨舟记住每一个伏笔、每一次转身。

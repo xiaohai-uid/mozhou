@@ -1,9 +1,9 @@
-/** 记忆节：Off-grid editorial，真实《零界道种》数据档案卡（非占位）。
+/** 记忆节：Off-grid editorial，中性示例档案卡（非真实作品数据）。
  *  全站第二个 eyebrow（预算 6 节 ≤ 2）。 */
 const cards = [
-  { kind: "人物", name: "陆沉舟", note: "阿雀的兄长，沉默寡言，总在夜里出门" },
-  { kind: "设定", name: "零界", note: "火苗偏斜的方向，镇上无人提及的地名" },
-  { kind: "章节", name: "灰烬有籽", note: "第一章 · 灯芯在灰罐里亮了一整夜" },
+  { kind: "人物", name: "沈砚", note: "主角，白天是古籍修复师，夜里整理自己的手稿" },
+  { kind: "设定", name: "雨巷", note: "主角常走的那条街，每次转折都发生在这里" },
+  { kind: "章节", name: "第一章", note: "开头埋下信物伏笔，第三卷回收" },
 ];
 
 export function MemorySection() {
