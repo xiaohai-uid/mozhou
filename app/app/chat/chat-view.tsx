@@ -92,11 +92,11 @@ export function ChatView() {
       .then((data: { novels: NovelSummary[] } | null) => {
         if (data) setNovels(data.novels);
       });
-    // 技能链路（真实化）：加载我的技能名 → 胶囊可选中注入
+    // 技能链路（真实化）：只展示已声明契约（connected）的技能——未接入的不会注入（工单 08 收尾）
     fetch("/api/v1/skills?scope=mine")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { skills: Array<{ name: string }> } | null) => {
-        if (data) setMySkillNames(data.skills.map((s) => s.name));
+      .then((data: { skills: Array<{ name: string; connected: boolean }> } | null) => {
+        if (data) setMySkillNames(data.skills.filter((s) => s.connected).map((s) => s.name));
       });
     // 风格库（工单 15）：加载我的风格库 → 胶囊可选中；蒸馏页回流（{styleId,name}）校验后选中
     fetch("/api/v1/styles")
@@ -438,7 +438,7 @@ export function ChatView() {
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-faint">技能</span>
               {mySkillNames.length === 0 && (
-                <span className="text-xs text-zinc-600">（技能广场创建后出现）</span>
+                <span className="text-xs text-zinc-600">（技能页声明执行类型/触发阶段后接入）</span>
               )}
               {mySkillNames.map((sk) => (
                 <button

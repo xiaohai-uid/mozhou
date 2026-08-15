@@ -31,6 +31,8 @@ export interface RuntimePipelineInput {
   chapterContent: string | null;
   /** 风格引用（narrative_style 输入；缺省 = 未选择风格）。 */
   styleId?: number | null;
+  /** 显式选择的用户自定义技能（已声明契约；工单 08 收尾）。 */
+  customSkills?: SkillDefinition[];
   request: string;
   mode: "independent" | "chapter";
   scopeType: "session" | "chapter";
@@ -92,7 +94,7 @@ export async function runRuntimePipeline(
     generationId,
     request: input.request,
     mode: input.mode,
-    definitions: input.definitions,
+    definitions: [...input.definitions, ...(input.customSkills ?? [])],
   });
   await persistGenerationPlan({
     plan,
@@ -108,8 +110,9 @@ export async function runRuntimePipeline(
     runId: string;
   }> = [];
   let ragEntries: RuntimePipelineResult["ragEntries"] = [];
+  const definitions = [...input.definitions, ...(input.customSkills ?? [])];
 
-  for (const definition of input.definitions) {
+  for (const definition of definitions) {
     const runId = newRunId();
     const gateReason = checkInputGate(definition, input);
     if (gateReason) {

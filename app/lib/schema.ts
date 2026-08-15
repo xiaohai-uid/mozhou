@@ -323,6 +323,14 @@ export const shelfBooks = pgTable("shelf_books", {
   importedAt: timestamp("imported_at").notNull().defaultNow(),
 });
 
+/** 自定义技能契约（V1.3 工单 08 收尾）：声明执行类型/触发阶段后技能才「已接入正式写作」（ADR-0002 决策 7）。 */
+export interface CustomSkillContract {
+  kind: "context" | "planner";
+  trigger: "pre_write" | "explicit";
+  input: { sources: Array<{ kind: string; required: boolean }> };
+  output: { artifactKind: "custom_section"; structured: boolean };
+}
+
 /** 技能（任务二-A）：声明式技能 = 名称 + 说明 + 系统提示词，chat 可加载注入 */
 export const skills = pgTable("skills", {
   id: serial("id").primaryKey(),
@@ -334,6 +342,8 @@ export const skills = pgTable("skills", {
   systemPrompt: text("system_prompt").notNull(),
   /** 广场来源：墨舟官方 / 社区 */
   author: text("author").notNull().default("自定义"),
+  /** 输入契约（V1.3）：null = 未声明 → 不注入正式写作、UI 标记未接入 */
+  contract: jsonb("contract").$type<CustomSkillContract>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

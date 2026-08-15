@@ -63,9 +63,9 @@ export async function GET(request: Request) {
       description: r.description,
       systemPrompt: r.systemPrompt,
       author: r.author,
-      // V1.3（契约 Delta 3）：自定义技能未声明完整契约前如实标记未接入（ADR-0002 决策 7）
-      connected: false,
-      contract: null,
+      // V1.3（契约 Delta 3）：自定义技能声明完整契约才标记已接入（ADR-0002 决策 7）
+      connected: r.contract != null,
+      contract: r.contract ?? null,
     })),
   });
 }
@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     description?: unknown;
     systemPrompt?: unknown;
     author?: unknown;
+    contract?: unknown;
   } | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const description = typeof body?.description === "string" ? body.description.trim() : "";
@@ -90,6 +91,22 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  // V1.3（工单 08 收尾）：契约声明（kind/trigger）——声明后才「已接入正式写作」并进入技能运行时
+  const raw = (body?.contract ?? null) as { kind?: unknown; trigger?: unknown } | null;
+  let contract: typeof skills.$inferSelect["contract"] = null;
+  if (raw) {
+    const kind = raw.kind === "planner" ? "planner" : raw.kind === "context" ? "context" : null;
+    const trigger = raw.trigger === "pre_write" ? "pre_write" : raw.trigger === "explicit" ? "explicit" : null;
+    if (!kind || !trigger) {
+      return NextResponse.json({ error: "执行类型（kind）或触发阶段（trigger）无效" }, { status: 400 });
+    }
+    contract = {
+      kind,
+      trigger,
+      input: { sources: [] },
+      output: { artifactKind: "custom_section", structured: false },
+    };
+  }
   const [row] = await db
     .insert(skills)
     .values({
@@ -98,6 +115,7 @@ export async function POST(request: Request) {
       description,
       systemPrompt,
       author: typeof body?.author === "string" ? body.author : "自定义",
+      contract,
     })
     .returning({ id: skills.id, name: skills.name });
   return NextResponse.json({ skill: row }, { status: 201 });

@@ -7,7 +7,6 @@ import { db } from "@/lib/db";
 import {
   chapterMessages,
   chapters,
-  skills as skillsTable,
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
@@ -41,6 +40,7 @@ import {
 } from "@/lib/runtime/generation-manifest";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
+import { loadCustomSkillDefinitions } from "@/lib/runtime/custom-skills";
 import { listSkillRunsByGeneration } from "@/lib/runtime/skill-run";
 import type { SkillRun } from "@/lib/runtime/types";
 import { buildChapterReplayHistory } from "./chapter-replay";
@@ -246,6 +246,9 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   }
   // V1.3 工单 01：RAG 直拼迁移到技能运行时（story_grounding 执行器，经 ContextAssembler 组装）。
   const builtinDefinitions = await loadBuiltinSkillDefinitions();
+  // 工单 08 收尾：自定义技能（已声明契约）经运行时执行并留下证据；未声明契约不注入正式写作
+  const userSkillNames = (input.skills ?? []).filter((s) => !SCENE_SKILLS[s]);
+  const customSkillDefinitions = await loadCustomSkillDefinitions(input.userId, userSkillNames);
   const pipeline = await runRuntimePipeline({
     userId: input.userId,
     novelId: input.novelId,
@@ -258,6 +261,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     generationId: generationKey,
     styleId: input.styleId,
     definitions: builtinDefinitions.filter((d) => d.enabled),
+    customSkills: customSkillDefinitions,
   });
   contextSections.push(...pipeline.sections);
   const ragLines = pipeline.ragEntries.map(
@@ -268,23 +272,6 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     (r) => r.skillKey === "narrative_style" && r.evidence === "applied",
   );
   const skills = input.skills ?? [];
-  const userSkillNames = skills.filter((s) => !SCENE_SKILLS[s]);
-  if (userSkillNames.length > 0) {
-    const skillRows = await db
-      .select({ name: skillsTable.name, systemPrompt: skillsTable.systemPrompt })
-      .from(skillsTable)
-      .where(
-        and(
-          eq(skillsTable.userId, input.userId),
-          inArray(skillsTable.name, userSkillNames),
-        ),
-    );
-    for (const row of skillRows) {
-      skillCount += 1;
-      const content = `[技能] ${row.name}：${row.systemPrompt}`;
-      contextSections.push({ kind: "skill", content });
-    }
-  }
   for (const name of skills) {
     if (SCENE_SKILLS[name]) {
       skillCount += 1;
@@ -292,6 +279,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       contextSections.push({ kind: "skill", content });
     }
   }
+  skillCount += customSkillDefinitions.length;
 
   if (summary) {
     contextSections.push({ kind: "compression_summary", content: summary });

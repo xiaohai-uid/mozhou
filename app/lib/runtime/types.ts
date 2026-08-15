@@ -10,7 +10,8 @@ export type SkillRole =
   | "chapter_planning"
   | "audience_genre"
   | "narrative_style"
-  | "quality_gate";
+  | "quality_gate"
+  | "custom";
 
 export type SkillKind = "context" | "planner" | "validator";
 
@@ -36,7 +37,8 @@ export type ArtifactKind =
   | "style_note"
   | "check_report"
   | "market_brief"
-  | "benchmark_pack";
+  | "benchmark_pack"
+  | "custom_section";
 
 export interface SkillOutputContract {
   artifactKind: ArtifactKind;

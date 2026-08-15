@@ -158,23 +158,83 @@ describe("技能 CRUD（任务二-A）", () => {
   });
 });
 
-describe("chat 技能真实注入（任务二-A）", () => {
-  it("携带技能名 → chat 正常完成（技能 systemPrompt 注入不报错）", async () => {
+describe("chat 技能真实注入（任务二-A + 工单 08 收尾）", () => {
+  it("未声明契约的技能 → 不注入正式写作（connected=false，无 [技能] 回显）", async () => {
+    // 「悬念铺垫检查」创建于本文件顶部，无 contract → 不注入
+    const list = await fetch(`${BASE}/api/v1/skills?scope=mine`, { headers: { cookie } });
+    const { skills: mine } = (await list.json()) as {
+      skills: Array<{ name: string; connected: boolean; contract: unknown }>;
+    };
+    const target = mine.find((s) => s.name === "悬念铺垫检查")!;
+    expect(target.connected).toBe(false);
+    expect(target.contract).toBeNull();
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie },
-      body: JSON.stringify({
-        content: "写一段话",
-        skills: ["悬念铺垫检查"],
-      }),
+      body: JSON.stringify({ content: "写一段话", skills: ["悬念铺垫检查"] }),
     });
     expect(res.status).toBe(200);
-    const events = (await res.text())
+    const text = await res.text();
+    const events = text
       .split("\n\n")
       .filter((e) => e.startsWith("data:"))
       .map((e) => JSON.parse(e.slice(5).trim()));
     expect(events[0].type).toBe("start");
     expect(events.at(-1)?.type).toBe("done");
+    expect(text).not.toContain("[技能] 悬念铺垫检查");
+  });
+
+  it("已声明契约的技能 → 经技能运行时注入 + done.skillRuns 证据 applied", async () => {
+    const created = await fetch(`${BASE}/api/v1/skills`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "伏笔登记",
+        description: "登记伏笔",
+        systemPrompt: "写作时登记每个伏笔，章节结束前必须回收或推进。",
+        contract: { kind: "context", trigger: "explicit" },
+      }),
+    });
+    expect(created.status).toBe(201);
+    const list = await fetch(`${BASE}/api/v1/skills?scope=mine`, { headers: { cookie } });
+    const { skills: mine } = (await list.json()) as {
+      skills: Array<{ name: string; connected: boolean }>;
+    };
+    expect(mine.find((s) => s.name === "伏笔登记")?.connected).toBe(true);
+    const res = await fetch(`${BASE}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ content: "写一段话", skills: ["伏笔登记"] }),
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const events = text
+      .split("\n\n")
+      .filter((e) => e.startsWith("data:"))
+      .map((e) => JSON.parse(e.slice(5).trim()));
+    const done = events.find((e) => e.type === "done") as {
+      skillRuns?: Array<{ skillKey: string; status: string; evidence: string }>;
+    };
+    const run = done?.skillRuns?.find((r) => r.skillKey === "custom:伏笔登记");
+    expect(run).toBeDefined();
+    expect(run!.status).toBe("completed");
+    expect(run!.evidence).toBe("applied");
+    // mock 回显：技能区段真实进入 system
+    expect(text).toContain("[技能] 伏笔登记：写作时登记每个伏笔");
+  });
+
+  it("非法契约（kind 无效）→ 400", async () => {
+    const res = await fetch(`${BASE}/api/v1/skills`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "坏契约",
+        description: "x",
+        systemPrompt: "x",
+        contract: { kind: "validator", trigger: "explicit" },
+      }),
+    });
+    expect(res.status).toBe(400);
   });
 
   it("未安装的技能名 → 忽略不报错", async () => {

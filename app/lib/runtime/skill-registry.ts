@@ -11,6 +11,7 @@ import { chapterPlanningExecutor } from "./executors/chapter-planning";
 import { qualityGateExecutor } from "./executors/quality-gate";
 import { narrativeStyleExecutor } from "./executors/narrative-style";
 import { audienceGenreExecutor } from "./executors/audience-genre";
+import { customPromptExecutor } from "./custom-skills";
 import { hasBoundBriefing } from "@/lib/market/briefing-artifacts";
 import type { SkillExecutorContext } from "./types";
 
@@ -21,6 +22,7 @@ const EXECUTORS: Record<string, SkillExecutor> = {
   quality_gate: qualityGateExecutor,
   narrative_style: narrativeStyleExecutor,
   audience_genre: audienceGenreExecutor,
+  custom_prompt: customPromptExecutor,
 };
 
 /** 未实现执行器的归属工单（证据 reason 可读）。 */

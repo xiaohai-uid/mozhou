@@ -11,6 +11,19 @@ interface Skill {
   description: string;
   systemPrompt: string;
   author: string;
+  /** V1.3（工单 08 收尾）：声明契约后技能才接入正式写作 */
+  connected?: boolean;
+  contract?: { kind: string; trigger: string } | null;
+}
+
+interface BuiltinSkillInfo {
+  key: string;
+  name: string;
+  role: string;
+  trigger: string;
+  connected: boolean;
+  status: string;
+  reason: string | null;
 }
 
 interface OhStorySkill {
@@ -34,6 +47,9 @@ export function SkillsView() {
   const [skillName, setSkillName] = useState("");
   const [skillDesc, setSkillDesc] = useState("");
   const [skillPrompt, setSkillPrompt] = useState("");
+  const [skillKind, setSkillKind] = useState<"context" | "planner">("context");
+  const [skillTrigger, setSkillTrigger] = useState<"pre_write" | "explicit">("explicit");
+  const [builtinSkills, setBuiltinSkills] = useState<BuiltinSkillInfo[]>([]);
   const [saving, setSaving] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
   const [mySkills, setMySkills] = useState<Skill[]>([]);
@@ -50,6 +66,7 @@ export function SkillsView() {
     if (plaza) {
       setPlazaSkills(plaza.skills);
       setOhStorySkills(plaza.ohStorySkills ?? []);
+      setBuiltinSkills(plaza.builtinSkills ?? []);
     }
   }, []);
 
@@ -72,6 +89,7 @@ export function SkillsView() {
           name,
           description: skillDesc.trim() || "自定义技能",
           systemPrompt: skillPrompt.trim() || `执行「${name}」的规则。`,
+          contract: { kind: skillKind, trigger: skillTrigger },
         }),
       });
       if (!res.ok) throw new Error("保存失败");
@@ -99,6 +117,8 @@ export function SkillsView() {
           description: s.description,
           systemPrompt: s.systemPrompt,
           author: s.author,
+          // 广场安装默认显式触发（写前也可改）
+          contract: { kind: "context", trigger: "explicit" },
         }),
       });
       if (!res.ok) throw new Error("安装失败");
@@ -163,6 +183,30 @@ export function SkillsView() {
               />
             </label>
           </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="text-xs text-faint">执行类型</span>
+              <select
+                value={skillKind}
+                onChange={(e) => setSkillKind(e.target.value as "context" | "planner")}
+                className="mt-2 w-full rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition focus:border-accent"
+              >
+                <option value="context">context · 上下文增强</option>
+                <option value="planner">planner · 写作规划</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs text-faint">触发阶段</span>
+              <select
+                value={skillTrigger}
+                onChange={(e) => setSkillTrigger(e.target.value as "pre_write" | "explicit")}
+                className="mt-2 w-full rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition focus:border-accent"
+              >
+                <option value="explicit">explicit · 显式选择时调用</option>
+                <option value="pre_write">pre_write · 每次写作前调用</option>
+              </select>
+            </label>
+          </div>
           <label className="mt-4 block">
             <span className="text-xs text-faint">系统提示词</span>
             <textarea
@@ -194,6 +238,15 @@ export function SkillsView() {
                 {s.name}
               </span>
               <span className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] ${
+                    s.connected
+                      ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400"
+                      : "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
+                  }`}
+                >
+                  {s.connected ? "已接入正式写作" : "未接入（需声明执行类型/触发阶段）"}
+                </span>
                 <span className="rounded-full border border-surface-2 px-2.5 py-0.5 text-[10px] text-faint">
                   {s.author}
                 </span>
@@ -214,6 +267,31 @@ export function SkillsView() {
             还没有技能，创建或从广场安装
           </p>
         )}
+      </div>
+
+      {/* 内置默认创作技能（V1.3） */}
+      <h2 className="mt-10 text-sm font-semibold text-zinc-200">内置默认创作技能</h2>
+      <p className="mt-2 text-xs leading-5 text-muted">
+        平台内置五类默认技能，默认开启 = 按创作阶段自动路由调用；状态以真实执行器与 SkillRun 证据为准。
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        {builtinSkills.map((s) => (
+          <div key={s.key} className="rounded-xl border border-surface-2 bg-surface/50 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-zinc-100">{s.name}</span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] ${
+                  s.connected
+                    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400"
+                    : "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
+                }`}
+              >
+                {s.status}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] leading-4 text-faint">阶段：{s.trigger === "post_write" ? "写后校验" : "写前"} · {s.reason ?? "已接入正式写作链"}</p>
+          </div>
+        ))}
       </div>
 
       {/* 广场 */}

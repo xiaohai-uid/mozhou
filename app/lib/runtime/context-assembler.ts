@@ -14,6 +14,7 @@ import { renderContextPack } from "./executors/story-grounding";
 import { renderChapterTaskCard } from "./executors/chapter-planning";
 import { renderStyleNote } from "./executors/narrative-style";
 import { renderMarketNote } from "./executors/audience-genre";
+import { renderCustomSection } from "./custom-skills";
 
 export interface SkillOutputWithRun {
   definition: SkillDefinition;
@@ -45,6 +46,7 @@ const RENDERERS: Partial<Record<ArtifactKind, Renderer>> = {
   chapter_task_card: (data) => ({ kind: "planner", content: renderChapterTaskCard(data) }),
   style_note: (data) => ({ kind: "style", content: renderStyleNote(data) }),
   market_note: (data) => ({ kind: "market", content: renderMarketNote(data) }),
+  custom_section: (data) => ({ kind: "skill", content: renderCustomSection(data) }),
 };
 
 export function assembleSkillSections(outputs: SkillOutputWithRun[]): AssembleResult {

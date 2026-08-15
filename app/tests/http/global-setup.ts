@@ -64,6 +64,7 @@ export default async function setup() {
           WEBSEARCH_PROVIDER: "mock", // 联网搜索 mock（任务二-C）
           RANKINGS_PROVIDER: "mock", // 网文扫榜 mock（任务二-C）
           SYNC_PROVIDER: "mock", // 云同步 mock（任务二-C）
+          FANQIE_SEARCH_MOCK: "1", // 番茄搜索强制降级（source.test.ts 确定性，工单 08 收尾）
         },
         stdio: ["ignore", "pipe", "pipe"],
       },

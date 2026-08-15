@@ -5,7 +5,6 @@ import {
   messages,
   novels,
   sessions,
-  skills as skillsTable,
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
@@ -20,6 +19,7 @@ import {
 } from "@/lib/runtime/generation-manifest";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
+import { loadCustomSkillDefinitions } from "@/lib/runtime/custom-skills";
 import type { SkillRun } from "@/lib/runtime/types";
 import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
 import { recordUsage } from "@/lib/account/service";
@@ -216,6 +216,8 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   // V1.3 工单 01：RAG 直拼迁移到技能运行时（story_grounding 执行器，经 ContextAssembler 组装）。
   // 未绑定作品时 story_grounding 被输入门跳过（reason「未绑定作品」），不伪造产物。
   const builtinDefinitions = await loadBuiltinSkillDefinitions();
+  // 工单 08 收尾：自定义技能（已声明契约）经运行时执行并留下证据；未声明契约不注入正式写作
+  const customSkillDefinitions = await loadCustomSkillDefinitions(input.userId, input.skills ?? []);
   const pipeline = await runRuntimePipeline({
     userId: input.userId,
     novelId: ownedSession.novelId,
@@ -227,6 +229,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     scopeId: input.sessionId,
     styleId: input.styleId,
     definitions: builtinDefinitions.filter((d) => d.enabled),
+    customSkills: customSkillDefinitions,
   });
   const injected: RagEntry[] = pipeline.ragEntries;
   // 工单 04：style 注入已迁移到 narrative_style 执行器（经 ContextAssembler）；stylePresent 由证据派生
@@ -234,22 +237,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   const stylePresent = pipeline.runs.some(
     (r) => r.skillKey === "narrative_style" && r.evidence === "applied",
   );
-  let skillCount = 0;
-  if (input.skills && input.skills.length > 0) {
-    const skillRows = await db
-      .select({ name: skillsTable.name, systemPrompt: skillsTable.systemPrompt })
-      .from(skillsTable)
-      .where(
-        and(
-          eq(skillsTable.userId, input.userId),
-          inArray(skillsTable.name, input.skills),
-        ),
-    );
-    for (const row of skillRows) {
-      skillCount += 1;
-      contextSections.push({ kind: "skill", content: `[技能] ${row.name}：${row.systemPrompt}` });
-    }
-  }
+  const skillCount = customSkillDefinitions.length;
   // 工单 05：marketRef 直拼已移除（Contract Delta 5）；市场数据改由 audience_genre 消费已绑定 MarketBrief
   if (summary) {
     contextSections.push({ kind: "compression_summary", content: summary });

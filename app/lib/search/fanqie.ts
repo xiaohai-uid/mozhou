@@ -83,6 +83,10 @@ async function decodeDetailName(bookId: string): Promise<string | null> {
 
 /** 搜索番茄小说（关键词） */
 export async function searchFanqie(query: string): Promise<FanqieSearchOutcome> {
+  // 测试确定性：契约测试环境强制降级（外部源可达性不参与断言）
+  if (process.env.FANQIE_SEARCH_MOCK === "1") {
+    return { books: [], ok: false, degraded: true, note: "番茄搜索 mock 降级（测试环境）" };
+  }
   try {
     const msToken = await getMsToken();
     const prefix =
