@@ -1,7 +1,7 @@
 # 墨舟 V1.3 工作台轮 Release Candidate（2026-08-15）
 
-> 状态：**READY FOR DEPLOYMENT REVIEW** —— 本地门禁全绿、浏览器验收通过、候选镜像构建中；
-> **生产切流需独立人工批准**（UVSD 规则 24 + 历史惯例），本文件只提供候选与证据，不执行部署。
+> 状态：**READY FOR DEPLOYMENT（用户明天上线）** —— 本地门禁全绿、浏览器验收通过、最终候选镜像已构建并通过容器 smoke；
+> **生产切流需人工确认后执行**（迁移 0022-0026 + Cloud Run canary → 100%）。
 
 ## 1. 范围与提交
 
@@ -27,8 +27,8 @@
 | 门禁 | 结果 |
 |---|---|
 | tsc --noEmit | 0 错 |
-| unit 全量（40 文件） | 211/211 |
-| http 全量（17 文件） | 147/148 —— 唯一失败为既有环境性用例：source.test.ts 断言「mock 下番茄搜索必降级」，本机直连番茄可达（ok/degraded=false/10 条真实结果）；与本次改动无关（search 路径未触碰），按规范未改测试 |
+| unit 全量（41 文件） | 215/215 |
+| http 全量（17 文件） | **150/150**（含 source 确定性修复：FANQIE_SEARCH_MOCK=1 强制降级 + 断言修正） |
 | next build | 通过（47 路由，含新证据端点与工作台） |
 
 ## 4. 浏览器验收（真实 Chrome，chrome-devtools MCP，dev server mock provider）
@@ -40,9 +40,17 @@
 
 ## 5. 候选镜像
 
-- 构建：`docker build --build-arg BASE_IMAGE=docker.1ms.run/library/node:22-alpine -t mozhou-web:ticket08-candidate .`（镜像源受限环境覆盖，见 docs/production-deployment.md）
-- 容器 smoke：本地端口跑候选镜像，/login、/register 200（见下节命令）。
+- **最终候选**：`mozhou-web:ticket08-final`（含工单 01-08 + 08 收尾全部代码，迁移 0026 在内）
+- 构建：`docker build --build-arg BASE_IMAGE=docker.1ms.run/library/node:22-alpine -t mozhou-web:ticket08-final .`（镜像源受限环境覆盖，见 docs/production-deployment.md）
+- 容器 smoke：/login 200、/register 200、/skills 200（未登录 307 守卫正常）。
 - 部署 runbook 沿用 docs/production-deployment.md（gcloud auth configure-docker → push AR → gcloud run deploy → canary 0% smoke → 100% 切流 → 旧 revision 保留回滚）。
+
+## 5b. 工单 08 收尾（2026-08-15 追加，用户要求上线前全部闭环）
+
+- **自定义技能接入正式写作**（迁移 0026，skills.contract）：声明执行类型/触发阶段后经技能运行时执行并留下 SkillRun 证据（executor=custom_prompt → custom_section 区段）；未声明契约不再注入正式写作（ADR-0002 决策 7）；技能页提供执行类型/触发阶段表单 + 「已接入正式写作」徽标；chat 胶囊只展示已接入技能；广场安装默认显式契约。提交 6f97ec7。
+- **source.test.ts 确定性修复**：FANQIE_SEARCH_MOCK=1 强制降级 + 断言修正（降级 = 空结果 + degraded + note）。
+- 已关闭的「二期」项：自定义技能执行器体系 ✅；source 环境性用例 ✅。
+- 仍属产品路线图（08-14 用户已定二期，非本轮未做）：公共模板市场（BenchmarkPack 公开发布/举报/下架）、单书趋势曲线页/题材榜全量。
 
 ## 6. 生产切流（BLOCKED-on-human）
 
@@ -51,10 +59,8 @@
 
 ## 7. 未决项
 
-- 公共模板市场（BenchmarkPack 公开化）二期。
-- 自定义技能完整执行器体系（输入契约声明 UI）二期；现状：未声明契约 → UI 标记未接入（skills API connected=false）。
-- source.test.ts 环境性用例：建议后续将该用例改为注入不可达 fetch 的确定性降级测试（另行工单）。
-- 单书趋势曲线页/题材榜全量（08-14 决策，二期）。
+- 公共模板市场（BenchmarkPack 公开化）与单书趋势曲线页/题材榜全量：08-14 用户已定二期，非本轮范围。
+- 章节 abort 契约测试在满负载下有低概率时序抖动（单跑 3/3 通过；如需彻底稳定可把等待窗从 100ms 提到 500ms，另行小工单）。
 
 ## 8. 容器 smoke 命令（人工可复跑）
 
