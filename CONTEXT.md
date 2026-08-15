@@ -187,3 +187,27 @@
 
 关键设计：快照必须带题材维度（详情页 categoryV2 顺手入库）；AI 消费结构化摘要而非原始快照；marketRef 复用写作上下文注入链（与风格/技能注入同机制）。
 UI 形态：prototype V3（上升最快/新进横区 + 榜单涨跌徽标），原型 primary source 在 D:/a/_mozhou_review/prototype-trends.html。
+
+## V1.3 技能运行时 + A 版双栏工作台术语（2026-08-15 定案，handoff 批准）
+
+| 术语 | 定义 |
+|---|---|
+| 技能运行时（Skill Runtime） | 创作请求的编排层：意图/阶段路由 → pre_write 技能执行 → ContextAssembler 组装 → 正文生成 → post_write 质量门 → SkillRun 证据；技能产物必须经这条链进入正式写作或质量门 |
+| SkillDefinition | 技能的可执行定义：key/角色/类型/触发阶段/启用与优先级/token 预算/输入契约/输出契约/执行器；内置五角色 + 自定义（自定义未声明完整契约时 UI 标记「未接入正式写作」，不做假接线） |
+| SkillRun | 一次生成中某技能的执行记录：status planned→running→completed/failed/degraded/skipped + evidence applied/not_applied + inputRefs/outputRefs/promptSection（只记 kind+tokens）+ 原因；「已开启」不等于「本次已执行」 |
+| GenerationPlan | 模型调用之前冻结的生成计划：generationId（重试幂等锚点）/意图 hash/阶段路由结果/计划技能/候选产物引用/上下文预算 |
+| GenerationManifest | 实际到达模型的精确载荷的脱敏清单（区段 kind+tokens、消息角色、实际应用的 SkillRun），复用 PayloadObservation 白名单纪律 |
+| ArtifactRef | 产物引用：artifactId/kind/version/scope/provenance/tokenBudget/culled；必须可追溯来源与日期，裁剪不静默 |
+| ContextAssembler | 唯一允许决定最终写作载荷的组件；执行器只产 artifact，不直接拼 prompt；归属验证 + token 预算裁剪 + 区段排序 |
+| 五个默认角色 | 故事状态（写前上下文）/ 章节规划（写前计划）/ 读者与题材（写前市场约束，未绑定简报→skipped）/ 叙事声音（写前风格）/ 成稿质量门（写后校验）；AI 味预检是质量门的写后检查组，与叙事声音不同阶段 |
+| MarketBrief | 扫榜快照聚合出的版本化市场产物（vN，source=ranking-snapshot+capturedAt），用户确认后绑定作品，供 audience_genre 按阶段读取；替代 T9 直拼 marketRef |
+| BenchmarkPack | 拆解产物沉淀的方法包（vN，私有，保留来源与「仅作方法参考」边界，不含原作品正文），供章节规划/叙事声音消费；公共模板市场二期 |
+| 本次创作链路 | 候选回复可展开的运行证据：使用/跳过技能、读取产物、输出、检查结果、用户覆盖动作；数据源 = GET /api/v1/runtime/generations/:generationId + done.skillRuns |
+
+## V1.3 决策记录（2026-08-15，原型工作区 handoff + ADR-0002/0003）
+
+1. 采用 A 版双栏写作台为产品工作台基线（桌面三栏 + 移动端折叠 + 底部导航 + 证据二级面板）；B/C 版仅作局部交互参考。
+2. Skill 运行时契约已冻结于 `.scratch/mozhou-workbench-a/contracts/01-技能运行时契约.md`；变更必须 Contract Delta 并同步 schema/mock/实现/测试。
+3. 默认开启 = 按创作阶段自动路由调用，不是每轮无条件注入全部技能资料。
+4. 自由回答是一级入口；AI 先提问状态在任何模板选择之前可见；模板是次级入口。
+5. 实现入口：`.scratch/mozhou-workbench-a/spec.md` + issues/01-08（运行时骨架+故事状态 → 章节规划 → 质量门 → 叙事声音 → MarketBrief → BenchmarkPack → A 版 UI → 回归部署）；仓库 ADR：docs/adr/0006-skill-runtime-and-workbench-a.md。
