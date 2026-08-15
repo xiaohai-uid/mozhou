@@ -40,7 +40,7 @@
 
 ## 5. 候选镜像
 
-- **最终候选**：`mozhou-web:ticket08-final`（含工单 01-08 + 08 收尾全部代码，迁移 0026 在内）
+- **最终候选**：`mozhou-web:ticket08-final`（含工单 01-08 + 08 收尾 + code-review 修复轮全部代码，迁移 0026 在内；digest 87dc608fea32）
 - 构建：`docker build --build-arg BASE_IMAGE=docker.1ms.run/library/node:22-alpine -t mozhou-web:ticket08-final .`（镜像源受限环境覆盖，见 docs/production-deployment.md）
 - 容器 smoke：/login 200、/register 200、/skills 200（未登录 307 守卫正常）。
 - 部署 runbook 沿用 docs/production-deployment.md（gcloud auth configure-docker → push AR → gcloud run deploy → canary 0% smoke → 100% 切流 → 旧 revision 保留回滚）。
