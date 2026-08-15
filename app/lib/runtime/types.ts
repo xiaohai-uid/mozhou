@@ -150,6 +150,8 @@ export interface SkillExecutorOutput {
     data: unknown;
     /** 估算 token 数（assembler 预算裁剪依据）。 */
     tokenEstimate: number;
+    /** 持久化产物（runtime_artifacts）引用；运行时产物缺省用 runId。 */
+    artifactId?: string;
   };
 }
 

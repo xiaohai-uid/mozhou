@@ -59,7 +59,7 @@ export function makeExecutedRun(
   input: RunInputs & { output: SkillExecutorOutput },
 ): SkillRun {
   const artifactRef: ArtifactRef = {
-    artifactId: input.runId, // 运行期产物以 runId 为引用锚
+    artifactId: input.output.artifact.artifactId ?? input.runId, // 持久化产物用 artifactId；运行期产物以 runId 为锚
     kind: input.output.artifact.kind,
     version: "run",
     scope: "novel",

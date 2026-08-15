@@ -98,8 +98,13 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
     expect(cp.status).toBe("completed");
     expect(cp.evidence).toBe("applied");
     expect(cp.promptSection?.kind).toBe("planner");
-    // 其余三个执行器未接入 → 如实 skipped + 可读原因
-    const pending = done.skillRuns!.filter((r) => ["audience_genre", "narrative_style", "quality_gate"].includes(r.skillKey));
+    // 工单 03：质量门对生成回复执行（mock 候选存在 → completed/applied；报告不进模型载荷）
+    const qg = done.skillRuns!.find((r) => r.skillKey === "quality_gate")!;
+    expect(qg.status).toBe("completed");
+    expect(qg.evidence).toBe("applied");
+    expect(qg.promptSection).toBeNull();
+    // 题材/风格执行器未接入 → 如实 skipped + 可读原因
+    const pending = done.skillRuns!.filter((r) => ["audience_genre", "narrative_style"].includes(r.skillKey));
     expect(pending.every((r) => r.status === "skipped" && r.evidence === "not_applied" && r.reason)).toBe(true);
     expect(pending.find((r) => r.skillKey === "audience_genre")!.reason).toContain("工单 05");
     expect(done.generationId).toBeTruthy();
@@ -111,7 +116,11 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
     const sg = done.skillRuns!.find((r) => r.skillKey === "story_grounding")!;
     expect(sg.status).toBe("skipped");
     expect(sg.reason).toBe("未绑定作品");
-    expect(done.skillRuns!.every((r) => r.evidence === "not_applied")).toBe(true);
+    // 未绑定作品 → 无伪造产物：除质量门（对回复执行）外全部 not_applied
+    expect(done.skillRuns!.filter((r) => r.skillKey !== "quality_gate").every((r) => r.evidence === "not_applied")).toBe(true);
+    const qg = done.skillRuns!.find((r) => r.skillKey === "quality_gate")!;
+    expect(qg.status).toBe("completed");
+    expect(qg.evidence).toBe("applied");
   });
 
   it("讨论请求 → 生成链路技能（章节规划/质量门）因不生成正文而 skipped（可读原因）", async () => {

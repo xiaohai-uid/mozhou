@@ -3,7 +3,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { novelTrackings, novels, users } from "@/lib/schema";
-import { runRuntimePipeline } from "@/lib/runtime/service";
+import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
+import { getRuntimeArtifact } from "@/lib/runtime/artifacts";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
 
 const EMAIL = "runtime-db-probe@example.com";
@@ -48,7 +49,9 @@ describe("runRuntimePipeline (DB)", () => {
       scopeId: 1,
       definitions,
     });
-    expect(result.runs).toHaveLength(5);
+    // 工单 03：pre-write 阶段 4 个运行行（post_write 归质量门阶段）
+    expect(result.runs).toHaveLength(4);
+    expect(result.runs.some((r) => r.skillKey === "quality_gate")).toBe(false);
     const sg = result.runs.find((r) => r.skillKey === "story_grounding")!;
     expect(sg.status).toBe("completed");
     expect(sg.evidence).toBe("applied");
@@ -59,6 +62,33 @@ describe("runRuntimePipeline (DB)", () => {
     expect(cp.promptSection?.kind).toBe("planner");
     expect(result.sections.length).toBeGreaterThan(0);
     expect(result.sections.some((s) => s.kind === "planner")).toBe(true);
+    // 工单 03：post_write 质量门（候选存在 → 执行；两组检查分开记录；产物落 runtime_artifacts）
+    const postWriteRuns = await runPostWriteValidators({
+      userId,
+      novelId,
+      chapterId: null,
+      request: "续写第一章",
+      candidate: "火苗在灰罐里静了一会儿。值得注意的是，它没有熄灭。",
+      generationId: result.generationId,
+      definitions,
+    });
+    expect(postWriteRuns).toHaveLength(1);
+    const qg = postWriteRuns[0]!;
+    expect(qg.skillKey).toBe("quality_gate");
+    expect(qg.status).toBe("completed");
+    expect(qg.evidence).toBe("applied");
+    expect(qg.promptSection).toBeNull(); // 校验器不进模型载荷
+    expect(qg.outputRefs[0]!.kind).toBe("check_report");
+    const artifact = await getRuntimeArtifact(qg.outputRefs[0]!.artifactId);
+    expect(artifact).not.toBeNull();
+    const report = artifact!.data as {
+      consistency: Array<{ name: string; ok: boolean }>;
+      aiPattern: Array<{ name: string; ok: boolean }>;
+      summary: string;
+    };
+    expect(report.consistency.length).toBeGreaterThan(0);
+    expect(report.aiPattern.length).toBeGreaterThan(0);
+    expect(report.summary).toContain("AI 腔套话"); // 候选含「值得注意的是」→ 未通过项出现在摘要
     // 证据落库可查
     const { listSkillRunsByGeneration } = await import("@/lib/runtime/skill-run");
     const persisted = await listSkillRunsByGeneration(result.generationId);

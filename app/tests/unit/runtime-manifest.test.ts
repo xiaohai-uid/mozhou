@@ -62,6 +62,27 @@ describe("buildGenerationManifest", () => {
     expect(m.sections[0]).toEqual({ kind: "owner_context", tokens: 10 });
   });
 
+  it("post_write 校验器（applied 但无 promptSection）不进 manifest", () => {
+    const gateRun: SkillRun = {
+      ...skippedRun,
+      runId: "r-3",
+      skillKey: "quality_gate",
+      status: "completed",
+      evidence: "applied",
+      reason: null,
+    };
+    const m = buildGenerationManifest({
+      generationId: "g-1",
+      requestId: "g-1",
+      model: "m",
+      sections: [{ kind: "owner_context", content: "[人物] 阿雀" }],
+      messageRoles: ["user"],
+      runs: [appliedRun, gateRun],
+      currentUserPresent: true,
+    });
+    expect(m.skillRuns).toEqual([{ runId: "r-1", skillKey: "story_grounding", evidence: "applied" }]);
+  });
+
   it("空区段被过滤；空 runs → skillRuns 空数组", () => {
     const m = buildGenerationManifest({
       generationId: "g",

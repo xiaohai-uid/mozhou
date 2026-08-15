@@ -8,16 +8,17 @@ import { skillDefinitions as skillDefinitionsTable } from "@/lib/schema";
 import type { SkillDefinition, SkillExecutor } from "./types";
 import { storyGroundingExecutor } from "./executors/story-grounding";
 import { chapterPlanningExecutor } from "./executors/chapter-planning";
+import { qualityGateExecutor } from "./executors/quality-gate";
 
 /** 已接入的执行器。 */
 const EXECUTORS: Record<string, SkillExecutor> = {
   story_grounding: storyGroundingExecutor,
   chapter_planning: chapterPlanningExecutor,
+  quality_gate: qualityGateExecutor,
 };
 
 /** 未实现执行器的归属工单（证据 reason 可读）。 */
 const EXECUTOR_TICKET: Record<string, string> = {
-  quality_gate: "03",
   narrative_style: "04",
   audience_genre: "05",
 };

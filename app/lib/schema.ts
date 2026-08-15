@@ -484,6 +484,20 @@ export const generationManifests = pgTable("generation_manifests", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/** 持久化运行时产物（V1.3 工单 03）：check_report 等可查证据；MarketBrief/BenchmarkPack 复用（05/06）。 */
+export const runtimeArtifacts = pgTable("runtime_artifacts", {
+  id: serial("id").primaryKey(),
+  artifactId: text("artifact_id").notNull().unique(),
+  kind: text("kind").notNull(),
+  version: text("version").notNull(),
+  scope: text("scope").notNull(),
+  scopeId: integer("scope_id"),
+  provenance: jsonb("provenance_json").$type<{ source: string; capturedAt: string }>().notNull(),
+  tokenBudget: integer("token_budget").notNull().default(0),
+  data: jsonb("data_json").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** 榜单历史快照（T2/T3 趋势）：每轮扫榜把各 enabled 榜前 20 名落库。 */
 export const rankingSnapshots = pgTable("ranking_snapshots", {
   id: serial("id").primaryKey(),

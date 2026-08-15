@@ -40,7 +40,7 @@ import {
   buildGenerationManifest,
   persistGenerationManifest,
 } from "@/lib/runtime/generation-manifest";
-import { runRuntimePipeline } from "@/lib/runtime/service";
+import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
 import { listSkillRunsByGeneration } from "@/lib/runtime/skill-run";
 import type { SkillRun } from "@/lib/runtime/types";
@@ -369,6 +369,18 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   if (state.task?.status === "ok") {
     await recordUsage(input.userId, "章节对话", state.ledger.prompt, state.ledger.completion).catch(() => {});
   }
+  // V1.3 工单 03：post_write 质量门——候选生成后、确认前运行（两组检查分开记录）
+  const postWriteRuns: SkillRun[] = state.task?.status === "ok"
+    ? await runPostWriteValidators({
+        userId: input.userId,
+        novelId: input.novelId,
+        chapterId: input.chapterId,
+        request: input.content,
+        candidate: reply || null,
+        generationId: pipeline.generationId,
+        definitions: builtinDefinitions.filter((d) => d.enabled),
+      })
+    : [];
   // 非停止且失败 → 抛错（路由层转 error 事件）
   if (!stopped && state.task?.status !== "ok") {
     throw new ChapterChatError(state.task?.lastError ?? "生成失败");
@@ -385,7 +397,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
         .filter((section) => section.kind !== "owner_context")
         .map((section) => section.content),
     ],
-    skillRuns: pipeline.runs,
+    skillRuns: [...pipeline.runs, ...postWriteRuns],
     generationId: pipeline.generationId,
   };
 }

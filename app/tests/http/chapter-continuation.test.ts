@@ -205,7 +205,7 @@ describe("章节对话引擎（工单 17）", () => {
     // V1.3 工单 01（Contract Delta 2）：done 事件新增 skillRuns（脱敏证据）与 generationId（证据端点锚点）
     const done = events.find((e) => e.type === "done") as {
       messageId?: number;
-      skillRuns?: Array<{ skillKey: string; evidence: string; status: string }>;
+      skillRuns?: Array<{ skillKey: string; evidence: string; status: string; promptSection: { kind: string; tokens: number } | null }>;
       generationId?: string;
     };
     expect(done?.messageId).toBeTruthy();
@@ -213,11 +213,15 @@ describe("章节对话引擎（工单 17）", () => {
     expect(done?.generationId).toBeTruthy();
     expect(done?.skillRuns).toBeDefined();
     expect(done!.skillRuns!.length).toBeGreaterThan(0);
-    // 章节测试作品无追踪数据 → story_grounding 如实 degraded；其余执行器未接入 → skipped；全部 not_applied（无伪造）
-    expect(done!.skillRuns!.every((r) => r.evidence === "not_applied")).toBe(true);
-    expect(
-      done!.skillRuns!.every((r) => ["skipped", "degraded"].includes(r.status)),
-    ).toBe(true);
+    // 章节测试作品无追踪数据 → story_grounding/chapter_planning 如实 degraded；题材/风格执行器未接入 → skipped；
+    // 工单 03：质量门在生成后运行（mock 候选存在 → completed/applied，报告落 runtime_artifacts）
+    const preWrite = done!.skillRuns!.filter((r) => r.skillKey !== "quality_gate");
+    expect(preWrite.every((r) => r.evidence === "not_applied")).toBe(true);
+    expect(preWrite.every((r) => ["skipped", "degraded"].includes(r.status))).toBe(true);
+    const qg = done!.skillRuns!.find((r) => r.skillKey === "quality_gate")!;
+    expect(qg.status).toBe("completed");
+    expect(qg.evidence).toBe("applied");
+    expect(qg.promptSection).toBeNull();
 
     const chapterObservation = readPayloadObservations().find((entry) => entry.route === "chapter-chat");
     expect(chapterObservation).toMatchObject({

@@ -74,8 +74,14 @@ describe("章节链路 SkillRun 证据（工单 02）", () => {
     expect(cp.status).toBe("completed");
     expect(cp.evidence).toBe("applied");
     expect(cp.promptSection?.kind).toBe("planner");
+    // 工单 03：质量门在生成后运行（候选存在 → completed/applied；不进模型载荷）
+    const qg = result.skillRuns.find((r) => r.skillKey === "quality_gate")!;
+    expect(qg.status).toBe("completed");
+    expect(qg.evidence).toBe("applied");
+    expect(qg.promptSection).toBeNull();
+    expect(qg.outputRefs[0]!.kind).toBe("check_report");
     // 其余未接入执行器如实 skipped
-    const pending = result.skillRuns.filter((r) => ["audience_genre", "narrative_style", "quality_gate"].includes(r.skillKey));
+    const pending = result.skillRuns.filter((r) => ["audience_genre", "narrative_style"].includes(r.skillKey));
     expect(pending.every((r) => r.status === "skipped" && r.reason)).toBe(true);
     // mock 回显 system：owner_context + planner 区段真实进入载荷
     expect(result.reply).toContain("【planner】");

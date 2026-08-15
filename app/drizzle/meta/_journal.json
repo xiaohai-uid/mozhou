@@ -169,6 +169,13 @@
       "when": 1786796503364,
       "tag": "0023_skill-runs-run-id",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786799305060,
+      "tag": "0024_runtime-artifacts",
+      "breakpoints": true
     }
   ]
 }

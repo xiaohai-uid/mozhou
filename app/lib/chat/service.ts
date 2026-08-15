@@ -19,7 +19,7 @@ import {
   buildGenerationManifest,
   persistGenerationManifest,
 } from "@/lib/runtime/generation-manifest";
-import { runRuntimePipeline } from "@/lib/runtime/service";
+import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
 import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
 import type { SkillRun } from "@/lib/runtime/types";
 import {
@@ -322,6 +322,17 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   );
 
   const reply = state.task?.outputs.at(-1) ?? "";
+  // V1.3 工单 03：post_write 质量门（独立对话无候选 → skipped「无候选正文」，如实证据）
+  const postWriteRuns = await runPostWriteValidators({
+    userId: input.userId,
+    novelId: ownedSession.novelId,
+    chapterId: null,
+    request: input.content,
+    candidate: reply || null,
+    generationId: pipeline.generationId,
+    definitions: builtinDefinitions.filter((d) => d.enabled),
+  });
+  const skillRuns = [...pipeline.runs, ...postWriteRuns];
   // 用量记账（11 工单）：chat 每轮落 usage_events
   await recordUsage(
     input.userId,
@@ -336,7 +347,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       .insert(messages)
       .values({ sessionId: input.sessionId, role: "assistant", content: reply })
       .returning({ id: messages.id });
-    return { state, reply, messageId: assistantMsg?.id, injected, compressed, skillRuns: pipeline.runs, generationId: pipeline.generationId };
+    return { state, reply, messageId: assistantMsg?.id, injected, compressed, skillRuns, generationId: pipeline.generationId };
   }
-  return { state, reply, injected, compressed, skillRuns: pipeline.runs, generationId: pipeline.generationId };
+  return { state, reply, injected, compressed, skillRuns, generationId: pipeline.generationId };
 }

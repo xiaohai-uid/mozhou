@@ -111,15 +111,9 @@ export async function runRuntimePipeline(
       runs.push(makeSkippedRun({ runId, generationId, definition, reason: gateReason }));
       continue;
     }
-    if (definition.trigger === "post_write" && !isPostWriteAllowed(input)) {
-      runs.push(
-        makeSkippedRun({
-          runId,
-          generationId,
-          definition,
-          reason: "当前请求是剧情讨论，不生成正文",
-        }),
-      );
+    if (definition.trigger === "post_write") {
+      // post_write 技能（质量门）由 runPostWriteValidators 在生成后统一执行；
+      // pre-write 阶段不产生其运行行，避免重复证据。
       continue;
     }
     // 讨论请求：只保留 story_grounding 提供讨论所需上下文；计划/题材/风格技能不产出生成物料
@@ -198,6 +192,68 @@ export async function runRuntimePipeline(
 }
 
 export { isExecutorConnected };
+
+export interface PostWriteInput {
+  userId: number;
+  novelId: number | null;
+  chapterId: number | null;
+  request: string;
+  /** 生成候选正文；null/空 = 独立对话（无候选生命周期） */
+  candidate: string | null;
+  generationId: string;
+  definitions: SkillDefinition[];
+}
+
+/**
+ * post_write 阶段（工单 03）：质量门在候选生成后、确认前运行。
+ * 校验器产物不进模型载荷：evidence=applied 表示报告已产出并挂载候选证据；promptSection 保持 null。
+ */
+export async function runPostWriteValidators(input: PostWriteInput): Promise<SkillRun[]> {
+  const runs: SkillRun[] = [];
+  const phase = routePhase(input.request).phase;
+  for (const definition of input.definitions.filter((d) => d.trigger === "post_write")) {
+    const runId = newRunId();
+    if (phase === "discussion") {
+      runs.push(
+        makeSkippedRun({ runId, generationId: input.generationId, definition, reason: "当前请求是剧情讨论，不生成正文" }),
+      );
+      continue;
+    }
+    if (!input.candidate || !input.candidate.trim()) {
+      runs.push(
+        makeSkippedRun({ runId, generationId: input.generationId, definition, reason: "无候选正文（独立对话不执行质量门）" }),
+      );
+      continue;
+    }
+    const executor = getExecutor(definition.executor);
+    if (!executor) {
+      runs.push(
+        makeSkippedRun({ runId, generationId: input.generationId, definition, reason: missingExecutorReason(definition.key) }),
+      );
+      continue;
+    }
+    const ctx: SkillExecutorContext = {
+      userId: input.userId,
+      novelId: input.novelId,
+      chapterId: input.chapterId,
+      chapterContent: null,
+      request: input.request,
+      definition,
+      candidate: input.candidate,
+    };
+    try {
+      const output = await executor.run(ctx);
+      const run = makeExecutedRun({ runId, generationId: input.generationId, definition, output });
+      runs.push(settleRunEvidence(run, true, null, null));
+    } catch (err) {
+      runs.push(
+        makeFailedRun({ runId, generationId: input.generationId, definition, reason: (err as Error).message }),
+      );
+    }
+  }
+  await persistSkillRuns(runs);
+  return runs;
+}
 
 /** 证据端点/重试场景：读取一次生成的全部运行时证据（plan + runs + manifest）。 */
 export async function loadGenerationEvidence(generationId: string) {

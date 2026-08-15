@@ -27,8 +27,9 @@ export function buildGenerationManifest(input: {
       .filter((section) => section.content.trim())
       .map((section) => ({ kind: section.kind, tokens: estimateTokens(section.content) })),
     messageRoles: input.messageRoles,
+    // 只记录真实进入模型载荷的区段来源（promptSection 非空）；post_write 校验器不进载荷
     skillRuns: input.runs
-      .filter((run) => run.evidence === "applied")
+      .filter((run) => run.promptSection != null)
       .map((run) => ({ runId: run.runId, skillKey: run.skillKey, evidence: run.evidence })),
     currentUserPresent: input.currentUserPresent,
     createdAt: new Date().toISOString(),
