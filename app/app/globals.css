@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
-/* 墨舟品牌 token（深色编辑器风，主题锁定，Q18 决策） */
+/* 墨舟品牌 token，夜墨编辑工作室 */
 :root {
-  --background: #09090b; /* zinc-950 */
-  --foreground: #f4f4f5; /* zinc-100 */
-  --accent: #7f22fe; /* violet-600，唯一 accent */
-  --accent-2: #4f39f6; /* indigo-600，仅用于 logo 渐变 */
-  --surface: #18181b; /* zinc-900 */
-  --surface-2: #27272a; /* zinc-800 */
-  --text-muted: #9f9fa9; /* zinc-400 */
-  --text-faint: #71717b; /* zinc-500 */
+  --background: #0b0a0f;
+  --foreground: #f4f1fa;
+  --accent: #8b78ff;
+  --accent-strong: #9d8eff;
+  --accent-soft: rgba(139, 120, 255, 0.12);
+  --surface: #15131a;
+  --surface-2: #282330;
+  --surface-3: #1d1923;
+  --text-muted: #aba4b8;
+  --text-faint: #7c7487;
 }
 
 @theme inline {
@@ -20,7 +22,8 @@
   --color-muted: var(--text-muted);
   --color-faint: var(--text-faint);
   --color-accent: var(--accent);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --color-accent-strong: var(--accent-strong);
+  --font-sans: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
@@ -30,28 +33,49 @@ body {
   font-family: var(--font-sans);
 }
 
+::selection {
+  background: var(--accent);
+  color: white;
+}
+
+.site-container {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
 /* 焦点环统一（a11y） */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* 入场动效（MOTION 4：CSS cascade，不装动画库） */
+/* 入场动效只做渐进增强，首帧保持内容可见 */
 @keyframes mozhou-rise {
   from {
-    opacity: 0;
     transform: translateY(16px);
   }
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }
 .mozhou-rise {
-  animation: mozhou-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: mozhou-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   .mozhou-rise {
+    animation: none;
+  }
+
+  .mozhou-caret {
     animation: none;
   }
 }
@@ -62,6 +86,10 @@ body {
 }
 @utility rounded-card-lg {
   border-radius: 1.75rem;
+}
+@utility surface-panel {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
 }
 /* 参考图风格：紫色序号（榜单感） */
 @utility rank-num {

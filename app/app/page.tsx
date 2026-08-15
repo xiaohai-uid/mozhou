@@ -11,30 +11,39 @@ import { CtaSection } from "@/components/landing/cta-section";
 export default function Home() {
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      <header className="flex h-16 items-center justify-between border-b border-surface-2 px-6 lg:px-16">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">
-            墨
-          </span>
-          <span className="text-base font-semibold tracking-wide">墨舟</span>
-        </Link>
-        <nav className="flex items-center gap-3" aria-label="主导航">
-          <Link
-            href="/login"
-            className="rounded-full px-4 py-2 text-sm text-zinc-300 transition hover:text-white"
-          >
-            登录
+      <a
+        href="#main-content"
+        className="absolute left-4 top-4 z-50 -translate-y-20 rounded-full bg-foreground px-4 py-2 text-sm text-background transition-transform focus:translate-y-0"
+      >
+        跳到主要内容
+      </a>
+
+      <header className="border-b border-surface-2">
+        <div className="site-container flex h-16 items-center justify-between px-6 lg:px-16">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white shadow-[0_8px_24px_rgba(139,120,255,0.2)]">
+              墨
+            </span>
+            <span className="text-base font-semibold tracking-wide">墨舟</span>
           </Link>
-          <Link
-            href="/register"
-            className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-white transition hover:bg-violet-500 active:translate-y-px"
-          >
-            开始写作
-          </Link>
-        </nav>
+          <nav className="flex items-center gap-2" aria-label="主导航">
+            <Link
+              href="/login"
+              className="rounded-full px-4 py-2 text-sm text-muted transition-colors hover:text-foreground"
+            >
+              登录
+            </Link>
+            <Link
+              href="/register"
+              className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-white shadow-[0_8px_24px_rgba(139,120,255,0.18)] transition-[background-color,transform] hover:bg-accent-strong active:translate-y-px"
+            >
+              开始写作
+            </Link>
+          </nav>
+        </div>
       </header>
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <Hero />
         <FeatureBento />
         <ProductPreview />
@@ -44,9 +53,9 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-surface-2 px-6 py-8 lg:px-16">
-        <div className="flex flex-col items-start justify-between gap-3 text-sm text-faint md:flex-row md:items-center">
+        <div className="site-container flex flex-col items-start justify-between gap-3 text-sm text-faint md:flex-row md:items-center">
           <span>墨舟，为中文网文作者打造的 AI 写作平台</span>
-          <span>自有品牌 · 模型自由，数据自有</span>
+          <span>自有品牌 · 模型自由 · 数据自有</span>
         </div>
       </footer>
     </div>
