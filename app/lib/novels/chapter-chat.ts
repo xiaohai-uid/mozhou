@@ -68,6 +68,24 @@ export class ChapterChatError extends Error {
 /** 正文参考注入长度上限（契约 21 第 6 节） */
 const BODY_REF_LIMIT = 3000;
 
+function logChapterChatTiming(
+  generationKey: string,
+  startedAt: number,
+  stage: string,
+  extra: Record<string, number | string | boolean | null> = {},
+) {
+  if (process.env.MOZHOU_TIMING !== "1") return;
+  console.info(
+    JSON.stringify({
+      event: "chapter_chat_timing",
+      generationKey,
+      stage,
+      elapsedMs: Date.now() - startedAt,
+      ...extra,
+    }),
+  );
+}
+
 export type ChapterMessageStatus = CandidateStatus;
 
 export interface ChapterMessageRow {
@@ -176,6 +194,8 @@ export interface ChapterChatResult {
 export async function runChapterChat(input: ChapterChatInput): Promise<ChapterChatResult> {
   const generationKey = input.generationKey?.trim() || randomUUID();
   if (generationKey.length > 120) throw new ChapterChatError("生成请求键过长");
+  const startedAt = Date.now();
+  logChapterChatTiming(generationKey, startedAt, "started");
   const requestHash = createHash("sha256").update(input.content).digest("hex");
   const prepared = await prepareChapterCandidate({
     userId: input.userId,
@@ -185,6 +205,9 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     skills: input.skills ?? [],
     generationKey,
     requestHash,
+  });
+  logChapterChatTiming(generationKey, startedAt, "candidate_prepared", {
+    reused: prepared.reused,
   });
 
   const candidate = prepared.candidate;
@@ -262,9 +285,15 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   }
   // V1.3 工单 01：RAG 直拼迁移到技能运行时（story_grounding 执行器，经 ContextAssembler 组装）。
   const builtinDefinitions = await loadBuiltinSkillDefinitions();
+  logChapterChatTiming(generationKey, startedAt, "builtin_skills_loaded", {
+    count: builtinDefinitions.length,
+  });
   // 工单 08 收尾：自定义技能（已声明契约）经运行时执行并留下证据；未声明契约不注入正式写作
   const userSkillNames = (input.skills ?? []).filter((s) => !SCENE_SKILLS[s]);
   const customSkillDefinitions = await loadCustomSkillDefinitions(input.userId, userSkillNames);
+  logChapterChatTiming(generationKey, startedAt, "custom_skills_loaded", {
+    count: customSkillDefinitions.length,
+  });
   const pipeline = await runRuntimePipeline({
     userId: input.userId,
     novelId: input.novelId,
@@ -278,6 +307,10 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     styleId: input.styleId,
     definitions: builtinDefinitions.filter((d) => d.enabled),
     customSkills: customSkillDefinitions,
+  });
+  logChapterChatTiming(generationKey, startedAt, "runtime_pipeline_done", {
+    runCount: pipeline.runs.length,
+    sectionCount: pipeline.sections.length,
   });
   contextSections.push(...pipeline.sections);
   const ragLines = pipeline.ragEntries.map(
@@ -322,6 +355,9 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       ownerScopeResolved: true,
     },
   });
+  logChapterChatTiming(generationKey, startedAt, "writing_context_built", {
+    messageCount: preparedRequest.messages.length,
+  });
   // V1.3 工单 01：GenerationManifest 捕获（白名单脱敏；失败不阻断主请求）。
   await persistGenerationManifest(
     buildGenerationManifest({
@@ -334,15 +370,24 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       currentUserPresent: preparedRequest.messages.at(-1)?.role === "user",
     }),
   ).catch(() => {});
+  logChapterChatTiming(generationKey, startedAt, "manifest_persisted");
   const provider = makeChatProvider(preparedRequest, transport);
+  logChapterChatTiming(generationKey, startedAt, "provider_created");
   let reply = "";
   let stopped = false;
+  let firstDeltaAt: number | null = null;
 
   const state = await runNodeStream(
     initialState(),
     { nodeType: "章节对话", provider },
     (text) => {
       reply += text;
+      if (firstDeltaAt === null) {
+        firstDeltaAt = Date.now();
+        logChapterChatTiming(generationKey, startedAt, "first_delta", {
+          textLength: text.length,
+        });
+      }
       try {
         input.onDelta(text);
       } catch (err) {
@@ -353,6 +398,11 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     },
     input.signal,
   );
+  logChapterChatTiming(generationKey, startedAt, "stream_done", {
+    status: state.task?.status ?? null,
+    replyLength: reply.length,
+    firstDeltaWaitMs: firstDeltaAt === null ? null : firstDeltaAt - startedAt,
+  });
 
   // 流式引擎在收到 AbortSignal 后会以 aborted 终态返回；不能只依赖
   // onDelta 抛错，因为客户端取消后 SSE writer 可能直接丢弃后续字节。
@@ -368,6 +418,10 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     errorMessage: state.task?.lastError,
   }).catch((error) => {
     throw new ChapterChatError((error as Error).message);
+  });
+  logChapterChatTiming(generationKey, startedAt, "candidate_settled", {
+    status: settled.status,
+    replyLength: reply.length,
   });
 
   if (state.task?.status === "ok") {
@@ -385,6 +439,9 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
         definitions: builtinDefinitions.filter((d) => d.enabled),
       })
     : [];
+  logChapterChatTiming(generationKey, startedAt, "post_write_done", {
+    runCount: postWriteRuns.length,
+  });
   // 非停止且失败 → 抛错（路由层转 error 事件）
   if (!stopped && state.task?.status !== "ok") {
     throw new ChapterChatError(state.task?.lastError ?? "生成失败");
