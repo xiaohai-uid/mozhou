@@ -107,7 +107,7 @@ export async function POST(
 
   return createSseResponse(async (writer, signal) => {
       try {
-        writer.start({ type: "start" });
+        writer.start({ type: "start", phase: "preparing" });
         const result = await runChapterChat({
           userId: user.id,
           novelId,
@@ -119,6 +119,7 @@ export async function POST(
           generationKey,
           selection,
           signal,
+          onPhase: (phase) => writer.phase({ type: "phase", phase }),
           onDelta: (text) => writer.delta({ type: "delta", text }),
         });
         if (result.status === "generating") {

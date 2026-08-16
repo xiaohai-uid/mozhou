@@ -26,10 +26,12 @@ import {
   ContentChangedError,
   discardChapterCandidate,
   GenerationKeyConflictError,
+  isChapterCandidateStopped,
   normalizeCandidateStatus,
   normalizePersistedChapterMessageStatus,
   persistChapterCandidateSettlement,
   prepareChapterCandidate,
+  watchChapterCandidateStop,
   type CandidateStatus,
   type InsertResult,
   type InsertTarget,
@@ -172,6 +174,8 @@ export interface ChapterChatInput {
   onDelta: (text: string) => void;
   /** 客户端断开（停止语义）：流中 abort → 消息标记 stopped */
   signal?: AbortSignal;
+  /** 章节生成阶段反馈（准备上下文 → 流式生成 → 收尾）。 */
+  onPhase?: (phase: "preparing" | "streaming" | "finishing") => void;
 }
 
 export interface ChapterChatResult {
@@ -228,10 +232,20 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     };
   }
 
-  const currentMessage = prepared.storedMessages.find(
-    (message) => message.id === prepared.userMessageId,
+  const generationController = new AbortController();
+  const onRequestAbort = () => generationController.abort();
+  if (input.signal?.aborted) generationController.abort();
+  else input.signal?.addEventListener("abort", onRequestAbort, { once: true });
+  const stopMonitoring = watchChapterCandidateStop(
+    candidate.id,
+    () => generationController.abort(),
   );
-  if (!currentMessage) throw new Error("当前消息读取失败");
+
+  try {
+    const currentMessage = prepared.storedMessages.find(
+      (message) => message.id === prepared.userMessageId,
+    );
+    if (!currentMessage) throw new Error("当前消息读取失败");
 
   const history = buildChapterReplayHistory(
     prepared.storedMessages.map((message) => ({
@@ -371,33 +385,37 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     }),
   ).catch(() => {});
   logChapterChatTiming(generationKey, startedAt, "manifest_persisted");
+  if (await isChapterCandidateStopped(candidate.id)) {
+    generationController.abort();
+  }
   const provider = makeChatProvider(preparedRequest, transport);
   logChapterChatTiming(generationKey, startedAt, "provider_created");
   let reply = "";
   let stopped = false;
   let firstDeltaAt: number | null = null;
 
+  input.onPhase?.("streaming");
   const state = await runNodeStream(
-    initialState(),
-    { nodeType: "章节对话", provider },
-    (text) => {
-      reply += text;
-      if (firstDeltaAt === null) {
-        firstDeltaAt = Date.now();
-        logChapterChatTiming(generationKey, startedAt, "first_delta", {
-          textLength: text.length,
-        });
-      }
-      try {
-        input.onDelta(text);
-      } catch (err) {
-        // enqueue 失败（客户端断开）→ 传播为停止
-        if (input.signal?.aborted) stopped = true;
-        throw err;
-      }
-    },
-    input.signal,
-  );
+      initialState(),
+      { nodeType: "章节对话", provider },
+      (text) => {
+        reply += text;
+        if (firstDeltaAt === null) {
+          firstDeltaAt = Date.now();
+          logChapterChatTiming(generationKey, startedAt, "first_delta", {
+            textLength: text.length,
+          });
+        }
+        try {
+          input.onDelta(text);
+        } catch (err) {
+          // enqueue 失败（客户端断开）→ 传播为停止
+          if (generationController.signal.aborted) stopped = true;
+          throw err;
+        }
+      },
+      generationController.signal,
+    );
   logChapterChatTiming(generationKey, startedAt, "stream_done", {
     status: state.task?.status ?? null,
     replyLength: reply.length,
@@ -406,9 +424,11 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
 
   // 流式引擎在收到 AbortSignal 后会以 aborted 终态返回；不能只依赖
   // onDelta 抛错，因为客户端取消后 SSE writer 可能直接丢弃后续字节。
-  if (input.signal?.aborted || state.task?.status === "aborted") {
+  if (generationController.signal.aborted || state.task?.status === "aborted") {
     stopped = true;
   }
+
+  input.onPhase?.("finishing");
 
   const settled = await persistChapterCandidateSettlement({
     candidateId: candidate.id,
@@ -461,6 +481,10 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     skillRuns: [...pipeline.runs, ...postWriteRuns],
     generationId: pipeline.generationId,
   };
+  } finally {
+    stopMonitoring();
+    input.signal?.removeEventListener("abort", onRequestAbort);
+  }
 }
 
 export async function insertChapterMessage(

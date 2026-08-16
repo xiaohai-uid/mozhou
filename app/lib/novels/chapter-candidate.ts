@@ -212,7 +212,18 @@ export async function persistChapterCandidateSettlement(input: {
   stopped: boolean;
   errorMessage?: string | null;
 }) {
-  const settlement = settleChapterCandidate(input);
+  const [existing] = await db
+    .select({ status: chapterMessages.status })
+    .from(chapterMessages)
+    .where(eq(chapterMessages.id, input.candidateId))
+    .limit(1);
+  const settlement = settleChapterCandidate({
+    ...input,
+    // The explicit stop endpoint may settle the row before the upstream
+    // provider observes its abort. Never let the late provider completion
+    // turn that user decision back into a completed candidate.
+    stopped: input.stopped || existing?.status === "stopped",
+  });
   const [candidate] = await db
     .update(chapterMessages)
     .set({
@@ -223,8 +234,101 @@ export async function persistChapterCandidateSettlement(input: {
     })
     .where(and(eq(chapterMessages.id, input.candidateId), eq(chapterMessages.status, "generating")))
     .returning({ id: chapterMessages.id });
-  if (!candidate) throw new Error("生成候选状态已改变，请刷新后重试");
+  if (!candidate) {
+    const [stoppedCandidate] = await db
+      .select({ id: chapterMessages.id, status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(and(eq(chapterMessages.id, input.candidateId), eq(chapterMessages.status, "stopped")))
+      .limit(1);
+    if (!stoppedCandidate) throw new Error("生成候选状态已改变，请刷新后重试");
+    const [updatedStopped] = await db
+      .update(chapterMessages)
+      .set({ content: input.reply, errorMessage: null, updatedAt: sql`now()` })
+      .where(and(eq(chapterMessages.id, input.candidateId), eq(chapterMessages.status, "stopped")))
+      .returning({ id: chapterMessages.id });
+    if (!updatedStopped) throw new Error("生成候选状态已改变，请刷新后重试");
+    return { messageId: updatedStopped.id, status: "stopped" as const, errorMessage: null };
+  }
   return { messageId: candidate.id, ...settlement };
+}
+
+/**
+ * Cross-instance stop signal for Cloud Run. The browser's disconnected HTTP
+ * request is not a reliable cancellation channel, so the stop endpoint marks
+ * the candidate and the active generation polls this row while upstream work
+ * is running.
+ */
+export function watchChapterCandidateStop(
+  candidateId: number,
+  onStop: () => void,
+  intervalMs = 500,
+): () => void {
+  let active = true;
+  let checking = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const stop = () => {
+    if (!active) return;
+    active = false;
+    if (timer) clearInterval(timer);
+  };
+
+  const check = async () => {
+    if (!active || checking) return;
+    checking = true;
+    try {
+      const [row] = await db
+        .select({ status: chapterMessages.status })
+        .from(chapterMessages)
+        .where(eq(chapterMessages.id, candidateId))
+        .limit(1);
+      if (row?.status !== "generating") {
+        stop();
+        if (row?.status === "stopped") onStop();
+      }
+    } catch {
+      // A transient database read failure must not cancel a live generation.
+    } finally {
+      checking = false;
+    }
+  };
+
+  timer = setInterval(() => void check(), intervalMs);
+  void check();
+  return stop;
+}
+
+export async function requestStopChapterCandidate(input: {
+  userId: number;
+  novelId: number;
+  chapterId: number;
+  generationKey: string;
+}): Promise<boolean> {
+  const chapter = await resolveChapterOwnership(db, input);
+  if (!chapter) return false;
+  const rows = await db
+    .update(chapterMessages)
+    .set({ status: "stopped", errorMessage: null, updatedAt: sql`now()` })
+    .where(
+      and(
+        eq(chapterMessages.chapterId, input.chapterId),
+        eq(chapterMessages.userId, input.userId),
+        eq(chapterMessages.role, "assistant"),
+        eq(chapterMessages.generationKey, input.generationKey),
+        eq(chapterMessages.status, "generating"),
+      ),
+    )
+    .returning({ id: chapterMessages.id });
+  return rows.length > 0;
+}
+
+export async function isChapterCandidateStopped(candidateId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ status: chapterMessages.status })
+    .from(chapterMessages)
+    .where(eq(chapterMessages.id, candidateId))
+    .limit(1);
+  return row?.status === "stopped";
 }
 
 export interface InsertTarget {

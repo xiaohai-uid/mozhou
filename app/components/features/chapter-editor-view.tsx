@@ -37,6 +37,8 @@ type MessageStatus =
   | "applied"
   | "discarded";
 
+type GenerationSubphase = "preparing" | "streaming" | "finishing" | "cancelling";
+
 interface ChatMessage {
   id: number;
   role: "user" | "assistant";
@@ -85,7 +87,9 @@ export function ChapterEditorView() {
   const [mySkillNames, setMySkillNames] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [subphase, setSubphase] = useState<"preparing" | "streaming" | "cancelling">("preparing");
+  const [subphase, setSubphase] = useState<GenerationSubphase>("preparing");
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
+  const [generationElapsedMs, setGenerationElapsedMs] = useState(0);
   const [model, setModel] = useState<string>(CHAT_MODELS[0]);
   const [styleId, setStyleId] = useState<number | null>(null);
   // v3 技能驱动对话：可用技能按章节状态切换（空章节=起笔，非空=续写），默认选中场景技能
@@ -108,6 +112,14 @@ export function ChapterEditorView() {
   // 工单 18：插入中 + 插入错误提示
   const [insertingId, setInsertingId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!streaming || generationStartedAt === null) return;
+    const timer = window.setInterval(() => {
+      setGenerationElapsedMs(Date.now() - generationStartedAt);
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [generationStartedAt, streaming]);
 
   /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
   useEffect(() => {
@@ -264,6 +276,8 @@ export function ChapterEditorView() {
     const generationKey = crypto.randomUUID();
     generationKeyRef.current = generationKey;
     setSubphase("preparing");
+    setGenerationStartedAt(Date.now());
+    setGenerationElapsedMs(0);
     setStreaming(true);
     // 本地临时 id 用负命名空间（服务端 id 为正整数、全局序列——空库时从 1 起，正 id 会在 done
     // 替换后与 user 本地 id 撞车，find() 取错消息插入错误内容；生产 smoke 复现后修复）
@@ -327,9 +341,11 @@ export function ChapterEditorView() {
               messageId?: number;
               status?: MessageStatus;
               code?: string;
-            message?: string;
+              message?: string;
+              phase?: GenerationSubphase;
           };
           if (data.type === "delta" && data.text) {
+            setSubphase("streaming");
             current += data.text;
             setMessages((prev) =>
               prev.map((m) => (m.id === replyId ? { ...m, content: current } : m)),
@@ -353,6 +369,11 @@ export function ChapterEditorView() {
                   : m,
               ),
             );
+          } else if (data.type === "phase" && data.phase) {
+            const phase = data.phase;
+            if (phase === "preparing" || phase === "streaming" || phase === "finishing") {
+              setSubphase(phase);
+            }
           } else if (data.type === "error") {
             // 消息级错误：带 code 供人性化映射（工单 19）
             setMessages((prev) =>
@@ -385,11 +406,23 @@ export function ChapterEditorView() {
     } finally {
       abortRef.current = null;
       setStreaming(false);
+      setGenerationStartedAt(null);
+      setSubphase("preparing");
     }
   }
 
   /** stopReply → stopReply（工单 17）：abort 当前 SSE */
   function stopReply() {
+    const generationKey = generationKeyRef.current;
+    setSubphase("cancelling");
+    if (novelId && chapterId && generationKey) {
+      void fetch(`/api/v1/novels/${novelId}/chapters/chat/stop?chapterId=${chapterId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generationKey }),
+        keepalive: true,
+      }).catch(() => {});
+    }
     abortRef.current?.abort();
   }
 
@@ -756,8 +789,21 @@ export function ChapterEditorView() {
                   {m.content}
                   {m.role === "assistant" && m.status === "streaming" && (
                     <>
-                      {m.content === "" && subphase === "preparing" && (
-                        <span className="text-xs text-faint">正在组织上下文…</span>
+                      {m.content === "" && (
+                        <span className="text-xs text-faint">
+                          {subphase === "preparing"
+                            ? "正在组织上下文…"
+                            : subphase === "finishing"
+                              ? "正在保存并检查…"
+                              : subphase === "cancelling"
+                                ? "正在停止并保留已生成内容…"
+                                : "正在生成…"}
+                        </span>
+                      )}
+                      {m.content === "" && (
+                        <span className="ml-2 text-[10px] text-zinc-600">
+                          已等待 {Math.floor(generationElapsedMs / 1000)} 秒
+                        </span>
                       )}
                       <span
                         aria-label="正在生成"

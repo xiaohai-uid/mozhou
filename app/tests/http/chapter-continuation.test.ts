@@ -1,7 +1,7 @@
 // 章节级续写契约测试（V1.1 Journey ⑦，工单 16）：章节正文读写（content 落库 + 归属校验）
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
-import { and, eq, like, sql } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapterMessages, users } from "@/lib/schema";
 
@@ -173,6 +173,42 @@ describe("章节正文读写（工单 16）", () => {  it("GET 单章：初始 c
   });
 });
 
+describe("章节生成停止（跨实例信号）", () => {
+  it("停止接口将本人 generating 候选落为 stopped", async () => {
+    const generationKey = `stop-${RUN}`;
+    const [candidate] = await db
+      .insert(chapterMessages)
+      .values({
+        chapterId,
+        userId,
+        role: "assistant",
+        content: "",
+        snapshot: "",
+        generationKey,
+        requestHash: "test",
+        status: "generating",
+      })
+      .returning({ id: chapterMessages.id });
+
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat/stop?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ generationKey }),
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ stopped: true });
+
+    const [stopped] = await db
+      .select({ id: chapterMessages.id, status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(eq(chapterMessages.id, candidate!.id));
+    expect(stopped).toEqual({ id: candidate!.id, status: "stopped" });
+  });
+});
+
 describe("章节对话引擎（工单 17）", () => {
   /** SSE 文本 → 事件数组 */
   function parseSse(text: string) {
@@ -200,7 +236,9 @@ describe("章节对话引擎（工单 17）", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/event-stream");
     const events = parseSse(await res.text());
-    expect(events[0].type).toBe("start");
+    expect(events[0]).toMatchObject({ type: "start", phase: "preparing" });
+    expect(events).toContainEqual({ type: "phase", phase: "streaming" });
+    expect(events).toContainEqual({ type: "phase", phase: "finishing" });
     expect(events.some((e) => e.type === "delta")).toBe(true);
     // V1.3 工单 01（Contract Delta 2）：done 事件新增 skillRuns（脱敏证据）与 generationId（证据端点锚点）
     const done = events.find((e) => e.type === "done") as {
@@ -377,33 +415,42 @@ describe("章节对话引擎（工单 17）", () => {
 
   it("断开请求（abort）→ assistant 候选精确持久化为 stopped", async () => {
     const content = `abort-${RUN}`;
+    const generationKey = `abort-key-${RUN}`;
     const controller = new AbortController();
     const res = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", cookie },
-        body: JSON.stringify({ content, skills: ["章节续写"] }),
+        body: JSON.stringify({ content, skills: ["章节续写"], generationKey }),
         signal: controller.signal,
       },
     );
     controller.abort();
     await res.body?.cancel().catch(() => {});
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const [stopped] = await db
-      .select({ status: chapterMessages.status })
-      .from(chapterMessages)
-      .where(
-        and(
-          eq(chapterMessages.chapterId, chapterId),
-          eq(chapterMessages.userId, userId),
-          eq(chapterMessages.role, "assistant"),
-          sql`${chapterMessages.id} = (
-            select max(id) from chapter_messages
-            where chapter_id = ${chapterId} and user_id = ${userId}
-          )`,
-        ),
-      );
+    // Cloud Run may keep the original request alive after the browser closes
+    // its reader, so the UI's explicit stop signal is part of the contract.
+    await fetch(`${BASE}/api/v1/novels/${novelId}/chapters/chat/stop?chapterId=${chapterId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ generationKey }),
+    });
+    let stopped: { status: string } | undefined;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      [stopped] = await db
+        .select({ status: chapterMessages.status })
+        .from(chapterMessages)
+        .where(
+          and(
+            eq(chapterMessages.chapterId, chapterId),
+            eq(chapterMessages.userId, userId),
+            eq(chapterMessages.role, "assistant"),
+            eq(chapterMessages.generationKey, generationKey),
+          ),
+        );
+      if (stopped?.status === "stopped") break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     expect(stopped?.status).toBe("stopped");
     // 服务端仍健康
     const after = await fetch(
