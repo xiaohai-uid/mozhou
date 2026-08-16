@@ -22,6 +22,7 @@ import {
 interface NovelSummary {
   id: number;
   name: string;
+  description: string | null;
   meta: string;
   ragEnabled: boolean;
 }
@@ -82,6 +83,7 @@ export function ProjectsView() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [detail, setDetail] = useState<NovelDetail | null>(null);
   const [bookName, setBookName] = useState("");
+  const [bookDescription, setBookDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ragSaving, setRagSaving] = useState(false);
@@ -146,7 +148,11 @@ export function ProjectsView() {
       const res = await fetch("/api/v1/novels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, requestKey }),
+        body: JSON.stringify({
+          name,
+          description: bookDescription.trim() || undefined,
+          requestKey,
+        }),
       });
       const data = (await res.json()) as {
         novel?: { id: number; name: string };
@@ -155,6 +161,7 @@ export function ProjectsView() {
       };
       if (!res.ok) throw new Error(data.error ?? "创建失败");
       setBookName("");
+      setBookDescription("");
       bootstrapRequestKeyRef.current = null;
       router.push(
         `/chapter/${data.chapter!.id}?novelId=${data.novel!.id}&novel=${encodeURIComponent(data.novel!.name)}&ch=${data.chapter!.ch}&title=${encodeURIComponent(data.chapter!.title)}`,
@@ -389,8 +396,11 @@ export function ProjectsView() {
         </div>
         {/* 新建作品 */}
         <div className="mt-2 rounded-card border border-dashed border-surface-2 p-4">
-          <p className="text-xs text-muted">创建新作品</p>
-          <div className="mt-3 flex gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted">创建新作品</p>
+            <span className="text-[10px] text-faint">先说一句就够</span>
+          </div>
+          <div className="mt-3 grid gap-2">
             <input
               value={bookName}
               onChange={(e) => setBookName(e.target.value)}
@@ -401,6 +411,21 @@ export function ProjectsView() {
               aria-label="书名"
               className="w-full min-w-0 rounded-xl border border-surface-2 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
             />
+            <textarea
+              value={bookDescription}
+              onChange={(e) => setBookDescription(e.target.value)}
+              maxLength={500}
+              rows={4}
+              placeholder="作品方向（可跳过）：比如“近未来城市里，一个失去记忆的修理师追查自己的过去”"
+              aria-label="作品方向，可跳过"
+              className="w-full resize-none rounded-xl border border-surface-2 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
+            />
+            <div className="flex items-center justify-between gap-2 text-[10px] text-faint">
+              <span>墨舟会把它带进后续写作，不满意时可以继续在正文里纠正。</span>
+              <span className="shrink-0">{bookDescription.length}/500</span>
+            </div>
+          </div>
+          <div className="mt-2 flex justify-end">
             <button
               onClick={() => void createBook()}
               disabled={!bookName.trim() || creating}
@@ -428,7 +453,14 @@ export function ProjectsView() {
         ) : (
           <div className="flex h-full flex-col gap-6">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-xl font-semibold text-zinc-100">{detail.novel.name}</h2>
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold text-zinc-100">{detail.novel.name}</h2>
+                {detail.novel.description && (
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-muted">
+                    {detail.novel.description}
+                  </p>
+                )}
+              </div>
               <span className="text-xs text-faint">{detail.novel.meta}</span>
             </div>
 

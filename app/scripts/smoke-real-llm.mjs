@@ -6,6 +6,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { createServer } from "node:net";
+import postgres from "postgres";
 
 process.loadEnvFile(".env");
 const KEEP = process.argv.includes("--keep");
@@ -16,6 +17,20 @@ const fail = (...a) => {
   process.exitCode = 1;
 };
 const info = (...a) => console.log(`  · ${a.join(" ")}`);
+let smokeEmail = null;
+
+async function cleanupSmokeTenant() {
+  if (!smokeEmail || !process.env.DATABASE_URL) return;
+  const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+  try {
+    await sql`delete from users where email = ${smokeEmail}`;
+    pass("清理 smoke 临时账号与作品", smokeEmail);
+  } catch {
+    info("无法自动清理 smoke 临时账号，请按邮箱手动删除", smokeEmail);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
 
 async function pickFreePort() {
   const srv = createServer();
@@ -78,6 +93,7 @@ async function main() {
     // —— 2. 准备账号/作品/章节（模拟"章节编辑 UI"的保存动作）——
     const run = Date.now().toString(36);
     const email = `smoke-real-${run}@mozhou.local`;
+    smokeEmail = email;
     const password = "smoke-test-1a2b3c";
     const reg = await fetch(`${base}/api/v1/auth/register`, {
       method: "POST",
@@ -154,7 +170,11 @@ async function main() {
     console.error("  证据：tests/http/.smoke-real-llm.log");
     if (KEEP) process.exit(1);
   } finally {
-    if (!KEEP) { killTree(); log.end(); }
+    if (!KEEP) {
+      killTree();
+      await cleanupSmokeTenant();
+      log.end();
+    }
   }
 }
 

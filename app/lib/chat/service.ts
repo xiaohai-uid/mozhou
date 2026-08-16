@@ -146,6 +146,10 @@ export interface RunChatInput {
   /** 风格引用（工单 15）：风格库 id，服务端查表注入完整四维指南 */
   styleId?: number | null;
   skills?: string[];
+  /** 写作阶段：供 SSE/UI 展示准备、流式和收尾状态。 */
+  onPhase?: (phase: "preparing" | "streaming" | "finishing") => void;
+  /** 客户端断开后停止普通对话的模型流，并避免落库完整回复。 */
+  signal?: AbortSignal;
   onDelta: (text: string) => void;
 }
 
@@ -275,14 +279,28 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
       currentUserPresent: prepared.messages.at(-1)?.role === "user",
     }),
   ).catch(() => {});
+  if (input.signal?.aborted) throw new Error("生成已停止");
   const provider = makeChatProvider(prepared, transport);
+  input.onPhase?.("streaming");
   const state = await runNodeStream(
     initialState(),
     { nodeType: "写作对话", provider },
     input.onDelta,
+    input.signal,
   );
 
   const reply = state.task?.outputs.at(-1) ?? "";
+  if (input.signal?.aborted) {
+    return {
+      state,
+      reply: "",
+      injected,
+      compressed,
+      skillRuns: pipeline.runs,
+      generationId: pipeline.generationId,
+    };
+  }
+  input.onPhase?.("finishing");
   // V1.3 工单 03：post_write 质量门（独立对话无候选 → skipped「无候选正文」，如实证据）
   const postWriteRuns = await runPostWriteValidators({
     userId: input.userId,

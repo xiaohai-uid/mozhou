@@ -14,7 +14,7 @@ export interface LlmProvider {
 
 /** 流式 LLM 提供者（SSE 对话场景）：逐 delta 输出，流结束可带 usage */
 export interface StreamProvider {
-  stream(): AsyncIterable<StreamDelta>;
+  stream(signal?: AbortSignal): AsyncIterable<StreamDelta>;
 }
 
 export interface StreamDelta {
@@ -67,6 +67,7 @@ export async function runNodeStream(
   initial: PipelineState,
   cfg: StreamNodeConfig,
   onDelta: (text: string) => void,
+  signal?: AbortSignal,
 ): Promise<PipelineState> {
   const state = reducer(initial, {
     type: "start",
@@ -74,11 +75,13 @@ export async function runNodeStream(
     budget: cfg.budget,
   });
   if (state.task?.status !== "running") return state;
+  if (signal?.aborted) return reducer(state, { type: "abort" });
 
   let text = "";
   let usage: Usage = { prompt: 0, completion: 0 };
   try {
-    for await (const delta of cfg.provider.stream()) {
+    for await (const delta of cfg.provider.stream(signal)) {
+      if (signal?.aborted) return reducer(state, { type: "abort" });
       if (delta.text) {
         text += delta.text;
         onDelta(delta.text);
@@ -86,6 +89,7 @@ export async function runNodeStream(
       if (delta.usage) usage = delta.usage;
     }
   } catch (err) {
+    if (signal?.aborted) return reducer(state, { type: "abort" });
     return reducer(state, {
       type: "fail",
       reason: `调用失败：${(err as Error).message}`,

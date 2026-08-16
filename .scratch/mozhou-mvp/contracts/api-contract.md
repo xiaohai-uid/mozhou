@@ -48,9 +48,10 @@ interface ChatRequest {
   styleId?: number | null;  // 风格引用（工单 15）：风格库 id，服务端查表注入完整四维指南；可空
   skills?: string[];        // 技能名列表（任务二-A：按名查 skills 表注入 systemPrompt）
 }
-// SSE 事件流（每行 data: {...}，\n\n 分隔；事件顺序：start → delta* → done，出错时 error 替代后续流）：
+// SSE 事件流（每行 data: {...}，\n\n 分隔；事件顺序：start → phase* / delta* → done，出错时 error 替代后续流）：
 interface ChatStreamEvent =
-  | { type: "start";  sessionId: number }        // 会话已建立
+  | { type: "start";  sessionId: number; phase: "preparing" } // 会话已建立，准备上下文
+  | { type: "phase";  phase: "preparing" | "streaming" | "finishing" } // 阶段变化
   | { type: "delta";  text: string }             // 增量文本，前端累积渲染
   | { type: "done" }                             // 流结束（前端静默跳过，无需渲染）
   | { type: "error";  message: string };         // 生成失败

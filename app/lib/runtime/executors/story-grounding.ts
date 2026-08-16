@@ -3,13 +3,17 @@
  * 输入：novel_tracking（必填）+ rag（可选）+ chapter（可选）。
  * 输出：context_pack 产物（结构化；由 ContextAssembler 渲染为 owner_context 区段）。
  */
+import { and, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
 import type { StoryTrackingState } from "@/lib/schema";
+import { novels } from "@/lib/schema";
 import { retrieveContext, type RagEntry } from "@/lib/novels/rag";
 import { getStoryTracking } from "@/lib/story/tracking";
 import type { SkillExecutor, SkillExecutorContext, SkillExecutorOutput } from "../types";
 import { estimateTokens } from "../units";
 
 export interface ContextPackData {
+  description: string | null;
   entries: RagEntry[];
   tracking: StoryTrackingState | null;
 }
@@ -18,6 +22,9 @@ export interface ContextPackData {
 export function renderContextPack(data: unknown): string {
   const pack = (data ?? {}) as Partial<ContextPackData>;
   const lines: string[] = [];
+  if (pack.description?.trim()) {
+    lines.push(`[作品方向] ${pack.description.trim()}`);
+  }
   for (const entry of pack.entries ?? []) {
     lines.push(`[${entry.kind === "character" ? "人物" : "设定"}] ${entry.name}${entry.note ? `：${entry.note}` : ""}`);
   }
@@ -46,12 +53,22 @@ export const storyGroundingExecutor: SkillExecutor = {
     if (novelId == null) {
       throw new Error("未绑定作品，无法提供故事状态");
     }
-    const [entries, snapshot] = await Promise.all([
-      retrieveContext(userId, request, { novelId }),
-      getStoryTracking(userId, novelId),
+    const [[entries, snapshot], [novel]] = await Promise.all([
+      Promise.all([
+        retrieveContext(userId, request, { novelId }),
+        getStoryTracking(userId, novelId),
+      ]),
+      db
+        .select({ description: novels.description })
+        .from(novels)
+        .where(and(eq(novels.id, novelId), eq(novels.userId, userId))),
     ]);
     const tracking = snapshot?.tracking?.state ?? null;
-    const data: ContextPackData = { entries, tracking };
+    const data: ContextPackData = {
+      description: novel?.description?.trim() || null,
+      entries,
+      tracking,
+    };
     const rendered = renderContextPack(data);
     if (!rendered.trim()) {
       return {

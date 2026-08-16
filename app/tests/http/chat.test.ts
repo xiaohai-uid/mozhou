@@ -121,6 +121,9 @@ describe("POST /api/v1/chat（SSE 流式，mock provider）", () => {
 
     const types = events.map((e) => e.type);
     expect(types[0]).toBe("start");
+    expect(events[0]).toMatchObject({ type: "start", phase: "preparing" });
+    expect(events).toContainEqual({ type: "phase", phase: "streaming" });
+    expect(events).toContainEqual({ type: "phase", phase: "finishing" });
     expect(types).toContain("delta");
     expect(types[types.length - 1]).toBe("done");
     const sessionId = events.find((e) => e.type === "start").sessionId as number;

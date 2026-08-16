@@ -12,7 +12,9 @@
     "db:push": "drizzle-kit push",
     "test": "vitest run",
     "gate:ticket": "tsc --noEmit && vitest run --changed",
-    "gate:milestone": "tsc --noEmit && vitest run && next build"
+    "gate:milestone": "tsc --noEmit && vitest run && next build",
+    "smoke:real-llm": "node scripts/smoke-real-llm.mjs",
+    "gate:release": "npm run gate:milestone && npm run smoke:real-llm"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

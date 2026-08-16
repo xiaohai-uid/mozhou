@@ -76,6 +76,29 @@ describe("runNodeStream 流式驱动", () => {
     expect(state.task?.status).toBe("ok");
     expect(state.ledger.total).toBe(0);
   });
+
+  it("请求中止：保留已发 delta，但不把未完成流标记为成功", async () => {
+    const controller = new AbortController();
+    const deltas: string[] = [];
+    const provider: StreamProvider = {
+      async *stream() {
+        yield { text: "已生成" };
+        controller.abort();
+        yield { text: "不应继续消费" };
+      },
+    };
+
+    const state = await runNodeStream(
+      initialState(),
+      { nodeType: "写作对话", provider },
+      (text) => deltas.push(text),
+      controller.signal,
+    );
+
+    expect(deltas).toEqual(["已生成"]);
+    expect(state.task?.status).toBe("aborted");
+    expect(state.task?.outputs).toEqual([]);
+  });
 });
 
 describe("llmTextResult 组合语义", () => {

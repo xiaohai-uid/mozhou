@@ -21,6 +21,18 @@ npm run dev
   （不传 key 会创建占位渠道，之后在控制台补填；应用令牌 key 在控制台「令牌」页查看）
 - Postgres 端口 **5433**（避开本机 WSL 原生 Postgres 的 5432）；pgvector 扩展已启用（docker/init/01-init.sql）
 
+## 发布前真实模型门禁
+
+发布前在 `app/` 目录执行：
+
+```bash
+npm run gate:release
+```
+
+这条命令会依次执行完整测试、生产构建和真实 one-api smoke。真实 smoke 需要 `.env` 中配置可用的 `DATABASE_URL`、`AUTH_SECRET`、`ONEAPI_BASE_URL` 和 `ONEAPI_TOKEN`；它会启动临时 Web 服务，验证真实 SSE、消息持久化和候选插入，结束后自动清理测试账号与作品。不要把它加入日常开发门禁，也不要用 `CHAT_PROVIDER=mock` 代替发布前验证。
+
+如需保留服务和测试账号做浏览器复验，单独执行 `npm run smoke:real-llm -- --keep`，完成后手动清理该账号。
+
 ## 结构
 
 ```

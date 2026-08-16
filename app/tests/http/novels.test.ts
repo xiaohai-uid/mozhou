@@ -60,7 +60,11 @@ describe("POST/GET /api/v1/novels", () => {
     const res = await fetch(`${BASE}/api/v1/novels`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ name: "零界道种", requestKey: `legacy-route-${RUN}` }),
+      body: JSON.stringify({
+        name: "零界道种",
+        description: "一个失去记忆的修理师，在近未来城市追查自己的过去",
+        requestKey: `legacy-route-${RUN}`,
+      }),
     });
     expect(res.status).toBe(201);
     const { novel } = (await res.json()) as { novel: { id: number; name: string } };
@@ -90,10 +94,11 @@ describe("POST/GET /api/v1/novels", () => {
     });
     expect(res.status).toBe(200);
     const { novels } = (await res.json()) as {
-      novels: Array<{ id: number; name: string; meta: string }>;
+      novels: Array<{ id: number; name: string; description: string | null; meta: string }>;
     };
     expect(novels.length).toBeGreaterThan(0);
     expect(novels[0].meta).toContain("章");
+    expect(novels[0].description).toContain("失去记忆");
 
     const otherRes = await fetch(`${BASE}/api/v1/novels`, {
       headers: { cookie: other.cookie },
@@ -281,12 +286,13 @@ describe("GET/PATCH/DELETE /api/v1/novels/[id]", () => {
     });
     expect(res.status).toBe(200);
     const detail = (await res.json()) as {
-      novel: { name: string; meta: string };
+      novel: { name: string; description: string | null; meta: string };
       chapters: unknown[];
       characters: unknown[];
       worldviews: unknown[];
     };
     expect(detail.novel.name).toBe("零界道种");
+    expect(detail.novel.description).toContain("失去记忆");
     expect(detail.chapters).toHaveLength(1);
     expect(detail.characters).toEqual([]);
     expect(detail.worldviews).toEqual([]);

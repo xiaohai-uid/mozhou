@@ -19,6 +19,7 @@ export type WorldviewEntry = typeof worldviewEntries.$inferSelect;
 export interface NovelSummary {
   id: number;
   name: string;
+  description: string | null;
   meta: string; // "连载中 · 4 章"
   ragEnabled: boolean;
 }
@@ -217,6 +218,7 @@ export async function listNovels(userId: number): Promise<NovelSummary[]> {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
+    description: r.description,
     meta: `连载中 · ${r.chapterCount} 章`,
     ragEnabled: r.ragEnabled,
   }));
@@ -260,6 +262,7 @@ export async function getNovel(
     novel: {
       id: novel.id,
       name: novel.name,
+      description: novel.description,
       meta: `连载中 · ${chapterCount} 章`,
       ragEnabled: novel.ragEnabled,
     },

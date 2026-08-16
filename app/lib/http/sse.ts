@@ -1,5 +1,6 @@
 export type SseWriter = {
   start(data: unknown): void;
+  phase(data: unknown): void;
   delta(data: unknown): void;
   done(data: unknown): void;
   error(data: unknown): void;
@@ -40,6 +41,7 @@ export function createSseStream(run: SseRun, requestSignal?: AbortSignal): Reada
       };
       const writer: SseWriter = {
         start: (data) => write(data),
+        phase: (data) => write(data),
         delta: (data) => write(data),
         done: (data) => write(data, true),
         error: (data) => write(data, true),

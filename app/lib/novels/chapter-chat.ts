@@ -351,7 +351,14 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
         throw err;
       }
     },
+    input.signal,
   );
+
+  // 流式引擎在收到 AbortSignal 后会以 aborted 终态返回；不能只依赖
+  // onDelta 抛错，因为客户端取消后 SSE writer 可能直接丢弃后续字节。
+  if (input.signal?.aborted || state.task?.status === "aborted") {
+    stopped = true;
+  }
 
   const settled = await persistChapterCandidateSettlement({
     candidateId: candidate.id,

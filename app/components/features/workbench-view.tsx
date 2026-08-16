@@ -22,9 +22,11 @@ import {
   GearSix,
   Question,
   ArrowUp,
+  Pause,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { LogoutButton } from "@/app/workspace/logout-button";
+import { GenerationStageRail, type GenerationPhase } from "@/components/features/generation-stage-rail";
 
 /* ---------- 类型 ---------- */
 
@@ -159,12 +161,19 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [generationPhase, setGenerationPhase] = useState<GenerationPhase>("idle");
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
+  const [lastSentContent, setLastSentContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<EvidenceView | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("write");
   const [railExpanded, setRailExpanded] = useState<"chapters" | "characters" | "worldviews" | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const phaseResetRef = useRef<number | null>(null);
+  const completedRef = useRef(false);
+  const generationRunRef = useRef(0);
 
   const skillName = useCallback(
     (key: string) => builtinSkills.find((s) => s.key === key)?.name ?? SKILL_FALLBACK_NAMES[key] ?? key,
@@ -193,7 +202,22 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, streaming]);
 
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (phaseResetRef.current !== null) window.clearTimeout(phaseResetRef.current);
+  }, []);
+
   const loadNovel = useCallback(async (novelId: number) => {
+    generationRunRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    completedRef.current = false;
+    if (phaseResetRef.current !== null) window.clearTimeout(phaseResetRef.current);
+    setStreaming(false);
+    setGenerationPhase("idle");
+    setGenerationStartedAt(null);
+    setError(null);
+    setLastSentContent(null);
     setActiveNovelId(novelId);
     setEvidence(null);
     setMessages([]);
@@ -225,19 +249,30 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
     }
   }, [sessions]);
 
-  async function send() {
-    const content = input.trim();
+  async function send(contentOverride?: string) {
+    const content = (contentOverride ?? input).trim();
     if (!content || streaming) return;
     setInput("");
     setError(null);
+    setLastSentContent(content);
     setStreaming(true);
+    completedRef.current = false;
+    if (phaseResetRef.current !== null) window.clearTimeout(phaseResetRef.current);
+    setGenerationPhase("preparing");
+    setGenerationStartedAt(Date.now());
     setMessages((prev) => [...prev, { role: "user", content }, { role: "assistant", content: "" }]);
     let body = "";
+    let sawDone = false;
+    const runId = generationRunRef.current + 1;
+    generationRunRef.current = runId;
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, model: "deepseek-v4-flash", content, novelId: activeNovelId }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
@@ -254,6 +289,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
         const events = buffer.split("\n\n");
         buffer = events.pop() ?? "";
         for (const evt of events) {
+          if (generationRunRef.current !== runId) return;
           const line = evt.trim();
           if (!line.startsWith("data:")) continue;
           const data = JSON.parse(line.slice(5).trim()) as {
@@ -262,10 +298,15 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             sessionId?: number;
             message?: string;
             generationId?: string;
+            phase?: "preparing" | "streaming" | "finishing";
           };
           if (data.type === "start" && data.sessionId) {
             setSessionId(data.sessionId);
+            if (data.phase) setGenerationPhase(data.phase);
+          } else if (data.type === "phase" && data.phase) {
+            setGenerationPhase(data.phase);
           } else if (data.type === "delta" && data.text) {
+            setGenerationPhase("streaming");
             current += data.text;
             body = current;
             setMessages((prev) => {
@@ -274,12 +315,13 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
               return next;
             });
           } else if (data.type === "done") {
+            sawDone = true;
             // 右栏「本次创作链路」：拉取完整 plan/manifest（skillRuns 已在 done 中，这里取详情）
             if (data.generationId) {
               fetch("/api/v1/runtime/generations/" + data.generationId)
                 .then((res) => (res.ok ? res.json() : null))
                 .then((payload: { evidence?: EvidenceView } | null) => {
-                  if (payload?.evidence) setEvidence(payload.evidence);
+                  if (generationRunRef.current === runId && payload?.evidence) setEvidence(payload.evidence);
                 })
                 .catch(() => {});
             }
@@ -288,13 +330,42 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           }
         }
       }
+      if (!sawDone) throw new Error("生成连接中断，请重试");
       if (!body) throw new Error("没有收到回复");
+      setLastSentContent(null);
+      completedRef.current = true;
     } catch (err) {
-      setError((err as Error).message);
-      setMessages((prev) => prev.slice(0, -1));
+      if (generationRunRef.current !== runId) return;
+      if (controller.signal.aborted) {
+        setError(null);
+        setGenerationPhase("stopped");
+        if (!body) setMessages((prev) => prev.slice(0, -1));
+      } else {
+        setError((err as Error).message);
+        setGenerationPhase("error");
+        setMessages((prev) => prev.slice(0, -1));
+      }
     } finally {
+      if (generationRunRef.current !== runId) return;
       setStreaming(false);
+      if (abortRef.current === controller) abortRef.current = null;
+      if (completedRef.current) {
+        setGenerationPhase("complete");
+        phaseResetRef.current = window.setTimeout(() => {
+          setGenerationPhase("idle");
+          setGenerationStartedAt(null);
+        }, 2200);
+      }
     }
+  }
+
+  function stopGeneration() {
+    abortRef.current?.abort();
+  }
+
+  async function retryLast() {
+    if (!lastSentContent || streaming) return;
+    await send(lastSentContent);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -460,6 +531,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
               <select
                 id="workbench-novel"
                 value={activeNovelId ?? ""}
+                disabled={streaming}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   if (v) void loadNovel(v);
@@ -555,8 +627,17 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                 ))}
 
                 {error && (
-                  <div role="alert" className="mt-4 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 text-sm text-red-400">
-                    {error}
+                  <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 text-sm text-red-400">
+                    <span>{error}</span>
+                    {!streaming && lastSentContent && (
+                      <button
+                        type="button"
+                        onClick={() => void retryLast()}
+                        className="shrink-0 rounded-full border border-current px-3 py-1 text-xs transition hover:bg-current/10"
+                      >
+                        重试
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -567,6 +648,14 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           {novels.length > 0 && (
             <footer className="shrink-0 border-t border-surface-2 p-4">
               <div className="mx-auto max-w-3xl">
+                <div className="mb-3 lg:hidden">
+                  <GenerationStageRail
+                    phase={generationPhase}
+                    startedAt={generationStartedAt}
+                    onStop={stopGeneration}
+                    compact
+                  />
+                </div>
                 <div className="flex items-end gap-2 rounded-2xl border border-surface-2 bg-zinc-950 p-2 transition focus-within:border-accent">
                   <textarea
                     value={input}
@@ -577,15 +666,27 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                     placeholder={streaming ? "正在生成…" : "自由回答，告诉墨舟你想让这一章发生什么…"}
                     className="w-full resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-100 outline-none placeholder:text-faint"
                   />
-                  <button
-                    type="button"
-                    onClick={() => void send()}
-                    disabled={!input.trim() || streaming || activeNovelId == null}
-                    aria-label="发送"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"
-                  >
-                    <ArrowUp size={16} weight="bold" />
-                  </button>
+                  {streaming ? (
+                    <button
+                      type="button"
+                      onClick={stopGeneration}
+                      aria-label="停止生成"
+                      title="停止生成"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full border border-red-400/30 text-red-300 transition hover:bg-red-400/10"
+                    >
+                      <Pause size={15} weight="fill" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void send()}
+                      disabled={!input.trim() || activeNovelId == null}
+                      aria-label="发送"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"
+                    >
+                      <ArrowUp size={16} weight="bold" />
+                    </button>
+                  )}
                 </div>
                 <p className="mt-1.5 text-center text-[11px] text-faint">Enter 发送 · Shift + Enter 换行 · 自由回答是一级入口</p>
               </div>
@@ -595,6 +696,11 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
 
         {/* ===== 右栏（桌面）：本次创作链路 ===== */}
         <aside className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-surface-2 bg-zinc-950/40 px-4 py-4 lg:flex">
+          <GenerationStageRail
+            phase={generationPhase}
+            startedAt={generationStartedAt}
+            onStop={stopGeneration}
+          />
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">This generation</p>

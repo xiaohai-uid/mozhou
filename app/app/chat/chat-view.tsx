@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUp, Plus, Shuffle } from "@phosphor-icons/react/dist/ssr";
 import { WritingToolsPanel } from "@/components/features/writing-tools-panel";
+import { GenerationStageRail, type GenerationPhase } from "@/components/features/generation-stage-rail";
 import { MODELS } from "@/lib/chat/models";
 
 interface Session {
@@ -42,6 +43,8 @@ export function ChatView() {
   const [model, setModel] = useState<string>(MODELS[0]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [generationPhase, setGenerationPhase] = useState<GenerationPhase>("idle");
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Retrying 态（UVSD Stage 2）：失败后保留最后输入，可一键重试
   const [lastSentContent, setLastSentContent] = useState<string | null>(null);
@@ -61,6 +64,9 @@ export function ChatView() {
   const [drawing, setDrawing] = useState(false);
   const [candidates, setCandidates] = useState<DrawCandidate[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const phaseResetRef = useRef<number | null>(null);
+  const completedRef = useRef(false);
 
   const refreshSessions = useCallback(async () => {
     const res = await fetch("/api/v1/sessions");
@@ -175,8 +181,15 @@ export function ChatView() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, streaming]);
 
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (phaseResetRef.current !== null) window.clearTimeout(phaseResetRef.current);
+  }, []);
+
   async function newSession() {
     setStreaming(false);
+    setGenerationPhase("idle");
+    setGenerationStartedAt(null);
     setError(null);
     const res = await fetch("/api/v1/sessions", {
       method: "POST",
@@ -190,23 +203,31 @@ export function ChatView() {
     await refreshSessions();
   }
 
-  async function send() {
-    const content = input.trim();
+  async function send(contentOverride?: string) {
+    const content = (contentOverride ?? input).trim();
     if (!content || streaming) return;
     setInput("");
     setError(null);
     setLastSentContent(content);
     setStreaming(true);
+    completedRef.current = false;
+    if (phaseResetRef.current !== null) window.clearTimeout(phaseResetRef.current);
+    setGenerationPhase("preparing");
+    setGenerationStartedAt(Date.now());
     setMessages((prev) => [...prev, { role: "user", content }]);
     // 流式期间先插入占位 assistant 消息
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     let body = "";
+    let sawDone = false;
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, model, content, novelId, styleId: style?.id ?? null, skills }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
@@ -231,11 +252,16 @@ export function ChatView() {
             sessionId?: number;
             message?: string;
             compressed?: boolean;
+            phase?: "preparing" | "streaming" | "finishing";
           };
           if (data.type === "start" && data.sessionId && !sessionId) {
             setSessionId(data.sessionId);
-          } else if (data.type === "done" && data.compressed) {
-            setCompressedNotice(true); // 12 工单：历史被压缩，UI 可见
+            if (data.phase) setGenerationPhase(data.phase);
+          } else if (data.type === "phase" && data.phase) {
+            setGenerationPhase(data.phase);
+          } else if (data.type === "done") {
+            sawDone = true;
+            if (data.compressed) setCompressedNotice(true); // 12 工单：历史被压缩，UI 可见
           } else if (data.type === "delta" && data.text) {
             current += data.text;
             body = current;
@@ -249,22 +275,45 @@ export function ChatView() {
           }
         }
       }
+      if (!sawDone) throw new Error("生成连接中断，请重试");
       if (!body) throw new Error("没有收到回复");
       setLastSentContent(null); // 成功即清空重试缓存
+      completedRef.current = true;
     } catch (err) {
-      setError((err as Error).message);
-      setMessages((prev) => prev.slice(0, -1)); // 移除占位消息
+      if (controller.signal.aborted) {
+        setError(null);
+        setGenerationPhase("stopped");
+        if (!body) setMessages((prev) => prev.slice(0, -1)); // 没有正文时移除空占位
+      } else {
+        setError((err as Error).message);
+        setGenerationPhase("error");
+        setMessages((prev) => prev.slice(0, -1)); // 移除占位消息
+      }
     } finally {
       setStreaming(false);
-      await refreshSessions();
+      abortRef.current = null;
+      try {
+        await refreshSessions();
+      } finally {
+        if (completedRef.current) {
+          setGenerationPhase("complete");
+          phaseResetRef.current = window.setTimeout(() => {
+            setGenerationPhase("idle");
+            setGenerationStartedAt(null);
+          }, 2200);
+        }
+      }
     }
+  }
+
+  function stopGeneration() {
+    abortRef.current?.abort();
   }
 
   /** Retrying 态：重发上一次失败的内容 */
   async function retryLast() {
     if (!lastSentContent || streaming) return;
-    setInput(lastSentContent);
-    await send();
+    await send(lastSentContent);
   }
 
   /** 内联抽卡（10 工单真实化）：同一指令多模型并行生成候选，选中后才作为消息插入（不落库） */
@@ -536,6 +585,11 @@ export function ChatView() {
         </div>
 
         <footer className="border-t border-surface-2 p-4">
+          <GenerationStageRail
+            phase={generationPhase}
+            startedAt={generationStartedAt}
+            onStop={stopGeneration}
+          />
           {error && (
             <div
               role="alert"

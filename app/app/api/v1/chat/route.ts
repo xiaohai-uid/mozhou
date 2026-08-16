@@ -65,48 +65,50 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "作品不存在" }, { status: 404 });
   }
 
-  return createSseResponse(async (writer) => {
-      try {
-        const targetSession =
-          sessionId ??
-          (await createSession(user.id, undefined, novelId)).id;
-        writer.start({ type: "start", sessionId: targetSession });
-        const result = await runChat({
-          userId: user.id,
-          sessionId: targetSession,
-          model,
-          content,
-          novelId,
-          styleId,
-          skills,
-          onDelta: (text) => writer.delta({ type: "delta", text }),
+  return createSseResponse(async (writer, signal) => {
+    try {
+      const targetSession =
+        sessionId ??
+        (await createSession(user.id, undefined, novelId)).id;
+      writer.start({ type: "start", sessionId: targetSession, phase: "preparing" });
+      const result = await runChat({
+        userId: user.id,
+        sessionId: targetSession,
+        model,
+        content,
+        novelId,
+        styleId,
+        skills,
+        signal,
+        onPhase: (phase) => writer.phase({ type: "phase", phase }),
+        onDelta: (text) => writer.delta({ type: "delta", text }),
+      });
+      if (result.state.task?.status === "ok" && result.messageId) {
+        writer.done({
+          type: "done",
+          messageId: result.messageId,
+          injected: result.injected,
+          compressed: result.compressed,
+          // V1.3 工单 01：本次创作链路证据（SkillRun 脱敏视图）
+          skillRuns: result.skillRuns,
+          generationId: result.generationId,
         });
-        if (result.state.task?.status === "ok" && result.messageId) {
-          writer.done({
-            type: "done",
-            messageId: result.messageId,
-            injected: result.injected,
-            compressed: result.compressed,
-            // V1.3 工单 01：本次创作链路证据（SkillRun 脱敏视图）
-            skillRuns: result.skillRuns,
-            generationId: result.generationId,
-          });
-        } else if (result.state.task?.status === "ok") {
-          writer.error({ type: "error", message: "模型返回为空，请重试" });
-        } else {
-          writer.error({
-            type: "error",
-            message: safeSseErrorMessage(result.state.task?.lastError),
-          });
-        }
-      } catch (err) {
+      } else if (result.state.task?.status === "ok") {
+        writer.error({ type: "error", message: "模型返回为空，请重试" });
+      } else {
         writer.error({
           type: "error",
-          message:
-            err instanceof SessionNotFoundError
-              ? "会话不存在"
-              : safeSseErrorMessage(err),
+          message: safeSseErrorMessage(result.state.task?.lastError),
         });
       }
+    } catch (err) {
+      writer.error({
+        type: "error",
+        message:
+          err instanceof SessionNotFoundError
+            ? "会话不存在"
+            : safeSseErrorMessage(err),
+      });
+    }
   }, request.signal);
 }

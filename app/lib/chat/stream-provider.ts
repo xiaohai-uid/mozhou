@@ -26,8 +26,8 @@ export class CapturingChatProvider implements StreamProvider {
     private delegate: StreamProvider,
   ) {}
 
-  async *stream(): AsyncIterable<StreamDelta> {
+  async *stream(signal?: AbortSignal): AsyncIterable<StreamDelta> {
     capturePreparedChatRequest(this.request);
-    yield* this.delegate.stream();
+    yield* this.delegate.stream(signal);
   }
 }

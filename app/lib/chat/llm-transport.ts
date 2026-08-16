@@ -18,7 +18,7 @@ export interface CompletionAdapter {
 }
 
 export interface LlmTransport extends CompletionAdapter {
-  stream(request: PreparedChatRequest): StreamProvider;
+  stream(request: PreparedChatRequest, signal?: AbortSignal): StreamProvider;
 }
 
 export type OneApiTransportConfig = {
@@ -123,13 +123,13 @@ class OneApiLlmTransport implements LlmTransport {
     };
   }
 
-  stream(request: PreparedChatRequest): StreamProvider {
+  stream(request: PreparedChatRequest, signal?: AbortSignal): StreamProvider {
     return {
-      stream: () => this.streamRequest(request),
+      stream: (streamSignal) => this.streamRequest(request, streamSignal ?? signal),
     };
   }
 
-  private async *streamRequest(request: PreparedChatRequest): AsyncIterable<StreamDelta> {
+  private async *streamRequest(request: PreparedChatRequest, signal?: AbortSignal): AsyncIterable<StreamDelta> {
     let response: Response;
     try {
       response = await this.fetcher(this.endpoint, {
@@ -143,6 +143,7 @@ class OneApiLlmTransport implements LlmTransport {
           stream: true,
           messages: requestMessages(request.system, request.messages),
         }),
+        signal,
       });
     } catch (error) {
       throw fetchError(error, this.config.token);
