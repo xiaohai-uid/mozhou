@@ -1,12 +1,12 @@
-// POST /api/v1/search — 两级搜索（T5+T6 接线）：本地书目索引优先 → 番茄实时搜索降级。
+// POST /api/v1/search — 本地索引 + 四个正规平台实时搜索；结果只保留可验证书目。
 import { NextResponse } from "next/server";
 import { desc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { db } from "@/lib/db";
 import { rankingSnapshots } from "@/lib/schema";
 import { matchBooks, type BookEntry } from "@/lib/search/bookIndex";
-import { searchFanqie } from "@/lib/search/fanqie";
 import { decide } from "@/lib/search/pipeline";
+import { searchSources } from "@/lib/source/engine";
 
 // fanqie 搜索用 a_bogus 签名（require/eval），需 Node 运行时。
 export const runtime = "nodejs";
@@ -45,12 +45,10 @@ export async function POST(request: Request) {
   }));
   const localHits = matchBooks(entries, query);
 
-  // 第 2 级：仅本地未命中时走番茄实时搜索（失败/降级由 decide 折叠）。
-  let fanqieOutcome = null;
-  if (localHits.length === 0) {
-    fanqieOutcome = await searchFanqie(query);
-  }
-  const decision = decide(query, localHits, fanqieOutcome);
+  // 第 2 级：起点、番茄、七猫、晋江并行实时搜索；失败/部分失败由 decide 折叠。
+  // 即使本地命中也请求实时源，避免把历史榜单索引误当成唯一书源。
+  const sourceOutcome = await searchSources(query);
+  const decision = decide(query, localHits, sourceOutcome);
   return NextResponse.json({
     source: decision.source,
     results: decision.results,

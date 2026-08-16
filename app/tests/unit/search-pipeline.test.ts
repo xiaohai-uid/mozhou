@@ -1,25 +1,33 @@
 import { describe, it, expect } from "vitest";
 import { decide, type SourceResult } from "@/lib/search/pipeline";
 import type { BookMatch } from "@/lib/search/bookIndex";
-import type { FanqieSearchOutcome } from "@/lib/search/fanqie";
+import type { SearchOutcome } from "@/lib/source/engine";
 
 const localHit: BookMatch = {
   book: { bookId: "b1", name: "惹金枝", author: "佚名", category: "古风" },
   score: 3,
 };
 
-const fanqieOk: FanqieSearchOutcome = {
-  ok: true,
+const fanqieOk: SearchOutcome = {
   degraded: false,
-  books: [
-    { bookId: "f1", name: "凡人修仙传", author: "忘语", category: "仙侠" },
+  results: [
+    {
+      source: "fanqie",
+      sourceLabel: "番茄小说",
+      name: "凡人修仙传",
+      author: "忘语",
+      site: "fanqienovel.com",
+      status: "实时搜索",
+      capturedAt: "2026-08-16T00:00:00.000Z",
+      url: "https://fanqienovel.com/page/f1",
+      bookId: "f1",
+    },
   ],
 };
 
-const fanqieDegraded: FanqieSearchOutcome = {
-  ok: false,
+const fanqieDegraded: SearchOutcome = {
   degraded: true,
-  books: [],
+  results: [],
   note: "番茄搜索上游 429",
 };
 
@@ -52,20 +60,22 @@ describe("T5+T6 两级搜索决策", () => {
       author: "忘语",
       site: "fanqienovel.com",
       status: "实时搜索",
+      capturedAt: "2026-08-16T00:00:00.000Z",
+      url: "https://fanqienovel.com/page/f1",
       bookId: "f1",
     } satisfies SourceResult);
   });
 
   it("本地未命中 + 番茄降级 → empty results + degraded + note", () => {
     const d = decide("不存在", [], fanqieDegraded);
-    expect(d.source).toBe("fanqie");
+    expect(d.source).toBe("multi-source");
     expect(d.degraded).toBe(true);
     expect(d.results).toEqual([]);
     expect(d.note).toBe("番茄搜索上游 429");
   });
 
   it("本地未命中 + 番茄空结果(无降级) → treated as no-hit degraded", () => {
-    const emptyOk: FanqieSearchOutcome = { ok: true, degraded: false, books: [] };
+    const emptyOk: SearchOutcome = { degraded: false, results: [] };
     const d = decide("xyz", [], emptyOk);
     expect(d.degraded).toBe(true);
     expect(d.results).toEqual([]);
@@ -74,6 +84,6 @@ describe("T5+T6 两级搜索决策", () => {
   it("无番茄结果且无 note → 兜底 note", () => {
     const d = decide("找不到", [], null);
     expect(d.degraded).toBe(true);
-    expect(d.note).toContain("番茄源暂不可用");
+    expect(d.note).toContain("正规书源暂不可用");
   });
 });

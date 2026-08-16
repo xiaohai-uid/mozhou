@@ -28,6 +28,7 @@ describe("T6 番茄搜索包装", () => {
         { book_id: "1", book_name: "\uE49C枝", author: "空留" },
         { book_id: "2", book_name: "凡人修仙传", author: "忘语" },
       ] } }) },
+      "fanqienovel.com/page/1": { ok: true, text: JSON.stringify({ bookName: "惹金枝", author: "空留", category: "古风" }) },
     });
     const out = await searchFanqie("惹金枝");
     expect(out.ok).toBe(true);
@@ -40,10 +41,12 @@ describe("T6 番茄搜索包装", () => {
     routeFetch({
       "fanqienovel.com/": home,
       "search_book": { ok: true, text: JSON.stringify({ code: 0, data: { search_book_data_list: [{ book_id: "9", book_name: "\uE49C\uE49C枝" }] } }) },
-      "fanqienovel.com/page/9": { ok: true, text: JSON.stringify({ bookName: "惹金枝" }) },
+      "fanqienovel.com/page/9": { ok: true, text: JSON.stringify({ bookName: "惹金枝", author: "空留", category: "古风" }) },
     });
     const out = await searchFanqie("x");
     expect(out.books[0].name).toBe("惹金枝");
+    expect(out.books[0].author).toBe("空留");
+    expect(out.books[0].category).toBe("古风");
   });
 
   it("空 body（风控）→ degraded", async () => {

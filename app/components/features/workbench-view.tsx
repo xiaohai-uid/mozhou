@@ -19,7 +19,7 @@ import {
   UsersThree,
   GlobeHemisphereWest,
   ListNumbers,
-  GearSix,
+  UserCircle,
   Question,
   ArrowUp,
   Pause,
@@ -27,6 +27,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { LogoutButton } from "@/app/workspace/logout-button";
 import { GenerationStageRail, type GenerationPhase } from "@/components/features/generation-stage-rail";
+import { BackButton } from "@/components/navigation/back-button";
 
 /* ---------- 类型 ---------- */
 
@@ -385,6 +386,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       {/* ===== 顶栏 ===== */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-surface-2 bg-zinc-950/70 px-4 lg:px-5">
         <div className="flex items-center gap-3">
+          <BackButton />
           <Link href="/workspace" className="flex items-center gap-2.5" aria-label="墨舟创作台">
             <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">墨</span>
             <span className="hidden text-base font-semibold tracking-wide sm:inline">墨舟</span>
@@ -518,7 +520,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
 
           <div className="mt-auto flex items-center justify-between border-t border-surface-2 px-2 pt-3">
             <Link href="/projects" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><Question size={13} aria-hidden /> 使用说明</Link>
-            <Link href="/account" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><GearSix size={13} aria-hidden /> 工作台设置</Link>
+            <Link href="/account" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><UserCircle size={13} aria-hidden /> 账户与额度</Link>
           </div>
         </aside>
 

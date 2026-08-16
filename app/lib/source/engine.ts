@@ -1,10 +1,13 @@
-// 书源引擎：外部书源检索 + 明确降级状态。
-// 真实请求带 3s 超时；超时/非 200/解析失败 → 返回空结果并标记 degraded，绝不把固定样例冒充为线上书目。
-// 测试注入 SOURCE_PROVIDER=mock 直接返回降级数据（确定性）。
-import { filterPua } from "@/lib/source/quality";
+// 多源书名搜索：四个平台分别请求、分别解析，部分源失败不影响其他源。
+// 这里只返回作品元数据和官方作品页，不抓取章节正文；外部源不可验证时明确 degraded。
+import { searchFanqie } from "@/lib/search/fanqie";
+import { searchJjwxc } from "@/lib/search/jjwxc";
+import { searchQidian } from "@/lib/search/qidian";
+import { searchQimao } from "@/lib/search/qimao";
+import { filterPua } from "./quality";
 
 export interface SourceResult {
-  source: string; // 书源 key
+  source: string;
   sourceLabel: string;
   name: string;
   author: string;
@@ -12,96 +15,128 @@ export interface SourceResult {
   status: string;
   capturedAt: string;
   url: string;
+  bookId: string;
 }
 
 export interface SearchOutcome {
   results: SourceResult[];
-  degraded: boolean; // true = 外部源不可达或使用测试 provider
+  degraded: boolean;
   note?: string;
 }
 
-/**
- * 可用书源（2026-08-14 调查结论）：
- * - fanqie 搜索页是客户端渲染壳（服务端无 SSR 数据，crawl4ai 渲染后仍无结果，且有风控）；
- * - 旧书源（22biqu / shukuge / zxtyz）已全部不可达；
- * - 在出现「可服务端解析、且按 query 真实检索」的书源前，真实路径如实降级，
- *   绝不返回与 query 无关的榜单快照冒充搜索结果。
- */
-const SOURCES: Array<{
-  key: string;
-  label: string;
-  site: string;
-  url: (q: string) => string;
-}> = [];
+function capturedAt(): string {
+  return new Date().toISOString();
+}
 
-/** 仅测试 provider 使用的确定性数据；生产失败绝不返回这些数据。 */
 const TEST_RESULTS: SourceResult[] = [
-  { source: "fanqie-rank", sourceLabel: "番茄小说榜", name: "灰烬有籽", author: "佚名", site: "fanqienovel.com", status: "测试数据", capturedAt: "1970-01-01T00:00:00.000Z", url: "https://fanqienovel.com/rank" },
+  {
+    source: "fanqie",
+    sourceLabel: "番茄小说",
+    name: "灰烬有籽",
+    author: "佚名",
+    site: "fanqienovel.com",
+    status: "测试数据",
+    capturedAt: "1970-01-01T00:00:00.000Z",
+    url: "https://fanqienovel.com/page/test-book",
+    bookId: "test-book",
+  },
 ];
 
-const TIMEOUT_MS = 3000;
+function mapResult(input: {
+  source: string;
+  sourceLabel: string;
+  site: string;
+  bookId: string;
+  name: string;
+  author: string | null;
+  status: string | null;
+  url: string;
+}, at: string): SourceResult {
+  return {
+    source: input.source,
+    sourceLabel: input.sourceLabel,
+    name: input.name,
+    author: input.author ?? "未知作者",
+    site: input.site,
+    status: input.status ?? "未知状态",
+    capturedAt: at,
+    url: input.url,
+    bookId: input.bookId,
+  };
+}
 
-/** 真实检索：逐个源请求（带超时），收集成功源的结果；全部失败 → 空结果 */
+/** 真实检索：四个正规平台并发搜索，保留成功源，返回部分失败状态。 */
 export async function searchSources(query: string): Promise<SearchOutcome> {
   const q = query.trim();
   if (!q) return { results: [], degraded: false };
 
-  // 测试模式：直接返回确定性测试数据；生产路径永不使用这些数据。
+  // 测试模式：只允许确定性测试数据，不让单测依赖外部站点。
   if (process.env.SOURCE_PROVIDER === "mock") {
     return { results: TEST_RESULTS, degraded: true, note: "书源检索服务降级（测试数据）" };
   }
 
-  if (SOURCES.length === 0) {
+  const [qidian, fanqie, qimao, jjwxc] = await Promise.all([
+    searchQidian(q),
+    searchFanqie(q),
+    searchQimao(q),
+    searchJjwxc(q),
+  ]);
+
+  const at = capturedAt();
+  const results = filterPua([
+    ...qidian.books.map((book) => mapResult({
+      source: "qidian",
+      sourceLabel: "起点中文网",
+      site: "qidian.com",
+      bookId: book.bookId,
+      name: book.name,
+      author: book.author,
+      status: book.status,
+      url: book.url,
+    }, at)),
+    ...fanqie.books.map((book) => mapResult({
+      source: "fanqie",
+      sourceLabel: "番茄小说",
+      site: "fanqienovel.com",
+      bookId: book.bookId,
+      name: book.name,
+      author: book.author,
+      status: "实时搜索",
+      url: `https://fanqienovel.com/page/${book.bookId}`,
+    }, at)),
+    ...qimao.books.map((book) => mapResult({
+      source: "qimao",
+      sourceLabel: "七猫小说",
+      site: "qimao.com",
+      bookId: book.bookId,
+      name: book.name,
+      author: book.author,
+      status: book.status,
+      url: book.url,
+    }, at)),
+    ...jjwxc.books.map((book) => mapResult({
+      source: "jjwxc",
+      sourceLabel: "晋江文学城",
+      site: "jjwxc.net",
+      bookId: book.bookId,
+      name: book.name,
+      author: book.author,
+      status: book.status,
+      url: book.url,
+    }, at)),
+  ]);
+
+  const degraded = [qidian, fanqie, qimao, jjwxc].some((outcome) => outcome.degraded);
+  if (results.length > 0) {
     return {
-      results: [],
-      degraded: true,
-      note: "外部书源暂不可用，未返回虚构书目；请稍后重试",
+      results,
+      degraded,
+      ...(degraded ? { note: "部分正规书源暂时不可用，已保留可验证结果" } : {}),
     };
   }
-
-  const outcomes = await Promise.all(
-    SOURCES.map(async (src) => {
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-        const res = await fetch(src.url(q), {
-          signal: ctrl.signal,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MoZhou/1.0",
-            Accept: "text/html,application/xhtml+xml",
-          },
-        });
-        clearTimeout(timer);
-        if (!res.ok) return null;
-        const html = await res.text();
-        const capturedAt = new Date().toISOString();
-        const nameMatch = html.match(/<title>([^<]{2,30})<\/title>/);
-        if (!nameMatch) return null;
-        return {
-          source: src.key,
-          sourceLabel: src.label,
-          name: nameMatch[1].replace(/(搜索|结果|_|-).*$/, "").trim(),
-          author: "未知",
-          site: src.site,
-          status: "在线",
-          capturedAt,
-          url: src.url(q),
-        } satisfies SourceResult;
-      } catch {
-        return null; // 超时/网络失败 → 该源不可用
-      }
-    }),
-  );
-
-  const raw = outcomes.filter((r): r is SourceResult => r !== null);
-  // PUA 质量门：私用区字符 = 上游字体反爬混淆，剔除；全部不合格 → 降级
-  const results = filterPua(raw);
-  if (results.length === 0) {
-    return {
-      results: [],
-      degraded: true,
-      note: "外部书源返回内容异常（疑似反爬混淆），未返回虚构书目；请稍后重试",
-    };
-  }
-  return { results, degraded: false };
+  return {
+    results: [],
+    degraded: true,
+    note: degraded ? "正规书源暂时不可用，未返回虚构书目" : "未找到匹配的正规书源结果",
+  };
 }

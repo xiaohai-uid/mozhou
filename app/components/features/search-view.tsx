@@ -11,12 +11,14 @@ interface SourceResult {
   author: string;
   site: string;
   status: string;
+  bookId: string;
 }
 
 const sourceLabels: Record<string, string> = {
-  shukuge: "书古阁",
-  "22biqu": "22 笔趣阁",
-  zxtyz: "章溪书站",
+  qidian: "起点中文网",
+  fanqie: "番茄小说",
+  qimao: "七猫小说",
+  jjwxc: "晋江文学城",
 };
 
 export function SearchView() {
@@ -58,7 +60,8 @@ export function SearchView() {
 
   async function importBook(r: SourceResult) {
     if (importing) return;
-    setImporting(r.source);
+    const resultKey = `${r.source}:${r.bookId}`;
+    setImporting(resultKey);
     try {
       const res = await fetch("/api/v1/shelf", {
         method: "POST",
@@ -83,7 +86,7 @@ export function SearchView() {
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:px-8">
       <h1 className="text-xl font-semibold tracking-tight">书源搜索</h1>
-      <p className="mt-2 text-sm text-muted">从主流书源搜索并导入小说文本，用于参考与拆解</p>
+      <p className="mt-2 text-sm text-muted">从正规平台搜索并收录书目信息，用于后续参考与拆解</p>
 
       {/* 搜索框 */}
       <form
@@ -137,7 +140,7 @@ export function SearchView() {
           )}
           {results.map((r) => (
             <div
-              key={r.source}
+              key={`${r.source}:${r.bookId}`}
               className="flex items-center justify-between gap-4 rounded-card border border-surface-2 bg-surface/50 px-6 py-4 transition hover:border-zinc-600"
             >
               <div className="min-w-0">
@@ -157,7 +160,7 @@ export function SearchView() {
                 className="flex shrink-0 items-center gap-1.5 rounded-full border border-surface-2 px-4 py-2 text-xs text-zinc-200 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
               >
                 <DownloadSimple size={14} aria-hidden />
-                {importing === r.source ? "导入中…" : "导入"}
+                {importing === `${r.source}:${r.bookId}` ? "导入中…" : "导入"}
               </button>
             </div>
           ))}

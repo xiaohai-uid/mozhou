@@ -1,20 +1,10 @@
-// 两级搜索决策（T5+T6 接线）：本地书目索引优先，未命中才走番茄实时搜索。
-// 纯函数；输入本地命中与番茄结果，输出最终响应结构（含 SourceResult 兼容映射）。
+// 搜索决策：实时正规书源优先，本地榜单索引作为离线回退。
 import type { BookMatch } from "./bookIndex";
-import type { FanqieSearchOutcome } from "./fanqie";
+import type { SearchOutcome, SourceResult } from "@/lib/source/engine";
 
-/** 兼容现有前端 SourceResult 字段（source/sourceLabel/name/author/site/status）+ bookId。 */
-export interface SourceResult {
-  source: string;
-  sourceLabel: string;
-  name: string;
-  author: string;
-  site: string;
-  status: string;
-  bookId: string;
-}
+export type { SourceResult };
 
-export type PipelineSource = "book-index" | "fanqie";
+export type PipelineSource = "book-index" | "fanqie" | "multi-source";
 
 export interface PipelineDecision {
   source: PipelineSource;
@@ -24,7 +14,6 @@ export interface PipelineDecision {
 }
 
 const BOOK_INDEX_LABEL = "书源索引";
-const FANQIE_LABEL = "番茄小说";
 
 function toBookIndexResult(match: BookMatch): SourceResult {
   return {
@@ -34,49 +23,44 @@ function toBookIndexResult(match: BookMatch): SourceResult {
     author: match.book.author ?? "",
     site: "novel-ai",
     status: "本地索引",
+    capturedAt: new Date().toISOString(),
+    url: "",
     bookId: match.book.bookId,
   };
 }
 
-function toFanqieResult(book: { bookId: string; name: string; author: string | null }): SourceResult {
-  return {
-    source: "fanqie",
-    sourceLabel: FANQIE_LABEL,
-    name: book.name,
-    author: book.author ?? "",
-    site: "fanqienovel.com",
-    status: "实时搜索",
-    bookId: book.bookId,
-  };
-}
-
 /**
- * 决策：本地有命中 → book-index；否则番茄成功且非降级 → fanqie；
- * 否则返回空结果 + degraded + note。
+ * 决策：实时源有可验证结果时优先展示；实时源无结果时回退本地榜单索引；
+ * 两者都没有时返回空结果 + degraded，绝不拿无关榜单或固定样例冒充命中。
  */
 export function decide(
   _query: string,
   localHits: BookMatch[],
-  fanqieOutcome: FanqieSearchOutcome | null,
+  sourceOutcome: SearchOutcome | null,
 ): PipelineDecision {
+  if (sourceOutcome && sourceOutcome.results.length > 0) {
+    const onlyFanqie = sourceOutcome.results.every((result) => result.source === "fanqie");
+    return {
+      source: onlyFanqie ? "fanqie" : "multi-source",
+      results: sourceOutcome.results,
+      degraded: sourceOutcome.degraded,
+      ...(sourceOutcome.note ? { note: sourceOutcome.note } : {}),
+    };
+  }
+
   if (localHits.length > 0) {
     return {
       source: "book-index",
       results: localHits.map(toBookIndexResult),
-      degraded: false,
+      degraded: sourceOutcome?.degraded ?? false,
+      ...(sourceOutcome?.note ? { note: sourceOutcome.note } : {}),
     };
   }
-  if (fanqieOutcome && !fanqieOutcome.degraded && fanqieOutcome.books.length > 0) {
-    return {
-      source: "fanqie",
-      results: fanqieOutcome.books.map(toFanqieResult),
-      degraded: false,
-    };
-  }
+
   return {
-    source: "fanqie",
+    source: "multi-source",
     results: [],
     degraded: true,
-    note: fanqieOutcome?.note ?? "本地书目未命中，番茄源暂不可用；请稍后重试",
+    note: sourceOutcome?.note ?? "正规书源暂不可用，未返回虚构书目；请稍后重试",
   };
 }

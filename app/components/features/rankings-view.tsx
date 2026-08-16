@@ -299,7 +299,7 @@ export function RankingsView() {
             <Trophy size={22} weight="duotone" className="text-accent" aria-hidden />
             <h1 className="text-xl font-semibold tracking-tight">网文扫榜</h1>
           </div>
-          <p className="mt-2 text-sm text-muted">跟踪热门作品与市场风向，扫榜结果可写入参考库</p>
+          <p className="mt-2 text-sm text-muted">跟踪番茄小说官方榜单与市场风向，扫榜结果可写入参考库</p>
         </div>
         <div className="flex items-center gap-3">
           <button

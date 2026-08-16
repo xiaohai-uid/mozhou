@@ -19,7 +19,7 @@ const items = [
   {
     icon: BookOpenText,
     title: "长文记忆",
-    desc: "人物库、世界观、章节摘要，向量检索",
+    desc: "人物库、世界观、章节摘要，按写作内容召回",
     span: "md:col-span-2",
     variant: "memory" as const,
   },

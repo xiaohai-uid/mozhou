@@ -19,7 +19,7 @@ export function MemorySection() {
             AI 记得你笔下的世界
           </h2>
           <p className="mt-6 max-w-[42ch] text-base leading-7 text-muted">
-            人物库、世界观设定、章节摘要，向量检索，永不遗忘。三万字后，它还记得第一章埋下的那个伏笔。
+            人物库、世界观设定、章节摘要会在生成时作为故事参考。把关键事实放进工作台，写得更长也能少一些前后矛盾。
           </p>
         </div>
         <div className="md:col-span-5">

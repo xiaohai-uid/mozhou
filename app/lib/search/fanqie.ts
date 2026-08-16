@@ -60,8 +60,24 @@ async function getMsToken(): Promise<string> {
   }
 }
 
-/** 详情页解码书名（与榜单 detail-ssr 同机制），失败返回 null */
-async function decodeDetailName(bookId: string): Promise<string | null> {
+interface FanqieDetailMetadata {
+  name: string;
+  author: string | null;
+  category: string | null;
+}
+
+function readEmbeddedString(html: string, key: string): string | null {
+  const match = html.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+  if (!match) return null;
+  try {
+    return JSON.parse(`"${match[1]}"`) as string;
+  } catch {
+    return match[1] ?? null;
+  }
+}
+
+/** 详情页解码书名、作者和题材；失败返回 null */
+async function decodeDetailMetadata(bookId: string): Promise<FanqieDetailMetadata | null> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 10_000);
@@ -72,10 +88,11 @@ async function decodeDetailName(bookId: string): Promise<string | null> {
     clearTimeout(timer);
     if (!res.ok) return null;
     const html = await res.text();
-    const m = html.match(/"bookName"\s*:\s*"([^"\\]+)"/);
-    const title = m ? m[1] : null;
+    const title = readEmbeddedString(html, "bookName");
     if (!title || hasPua(title)) return null;
-    return title;
+    const author = readEmbeddedString(html, "author");
+    const category = readEmbeddedString(html, "category") ?? readEmbeddedString(html, "categoryV2");
+    return { name: title, author: author && !hasPua(author) ? author : null, category: category && !hasPua(category) ? category : null };
   } catch {
     return null;
   }
@@ -117,6 +134,7 @@ export async function searchFanqie(query: string): Promise<FanqieSearchOutcome> 
           book_id?: string | number;
           book_name?: string;
           author?: string;
+          category?: string;
           categoryV2?: string;
         }>;
       };
@@ -129,16 +147,23 @@ export async function searchFanqie(query: string): Promise<FanqieSearchOutcome> 
       bookId: String(item.book_id ?? ""),
       name: item.book_name ?? "",
       author: item.author ?? null,
-      category: item.categoryV2 ?? null,
+      category: item.category ?? item.categoryV2 ?? null,
     })).filter((b) => b.bookId && b.name);
     // PUA 书名用详情页 detail-ssr 解码（并发，超时兜底）
-    const books: FanqieSearchBook[] = await Promise.all(
+    const books = (await Promise.all(
       rawBooks.map(async (b) => {
-        if (!hasPua(b.name)) return { ...b, name: cleanName(b.name) };
-        const decoded = await decodeDetailName(b.bookId);
-        return { ...b, name: decoded ?? cleanName(b.name) };
+        const needsDetail = hasPua(b.name) || hasPua(b.author ?? "") || hasPua(b.category ?? "");
+        const detail = needsDetail ? await decodeDetailMetadata(b.bookId) : null;
+        const name = detail?.name ?? (hasPua(b.name) ? "" : cleanName(b.name));
+        if (!name || hasPua(name)) return null;
+        return {
+          ...b,
+          name,
+          author: detail?.author ?? (hasPua(b.author ?? "") ? null : b.author),
+          category: detail?.category ?? (hasPua(b.category ?? "") ? null : b.category),
+        } satisfies FanqieSearchBook;
       }),
-    );
+    )).filter((book): book is FanqieSearchBook => book !== null);
     return { books, ok: true, degraded: false };
   } catch (err) {
     return {

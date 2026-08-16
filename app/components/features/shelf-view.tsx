@@ -1,9 +1,9 @@
 "use client";
 
-// 书源书架（任务一已接真实后端）：从 /api/v1/shelf 加载导入的书。
-// 章节列表仍为 UI 占位（章节抓取归书源引擎后续切片）。
+// 书源书架：从 /api/v1/shelf 加载导入的书目元数据。
 import { useCallback, useEffect, useState } from "react";
-import { BookBookmark, BookOpen } from "@phosphor-icons/react/dist/ssr";
+import { BookBookmark } from "@phosphor-icons/react/dist/ssr";
+import { getShelfCapabilities } from "@/lib/shelf/capabilities";
 
 interface ShelfBook {
   id: number;
@@ -18,8 +18,7 @@ export function ShelfView() {
   const [books, setBooks] = useState<ShelfBook[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [active, setActive] = useState<number | null>(null);
-  const [expanding, setExpanding] = useState<number | null>(null);
+  const capabilities = getShelfCapabilities();
 
   const refresh = useCallback(async () => {
     setLoadingList(true);
@@ -42,23 +41,11 @@ export function ShelfView() {
     void refresh();
   }, [refresh]);
 
-  async function toggleBook(id: number) {
-    if (active === id) {
-      setActive(null);
-      return;
-    }
-    // 章节展开：模拟加载（真实章节抓取归书源引擎后续切片）
-    setExpanding(id);
-    await new Promise((r) => setTimeout(r, 500));
-    setExpanding(null);
-    setActive(id);
-  }
-
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:px-8">
       <h1 className="text-xl font-semibold tracking-tight">书源书架</h1>
       <p className="mt-2 text-sm text-muted">
-        从书源导入的小说，用于阅读参考与拆解分析
+        从正规书源收录书目元数据，用于后续参考与拆解分析
       </p>
 
       {error && (
@@ -95,14 +82,9 @@ export function ShelfView() {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => void toggleBook(b.id)}
-                  disabled={expanding !== null}
-                  className="flex shrink-0 items-center gap-1 rounded-full border border-surface-2 px-3.5 py-1.5 text-xs text-zinc-200 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
-                >
-                  <BookOpen size={13} aria-hidden />
-                  {expanding === b.id ? "加载中…" : active === b.id ? "收起" : "阅读"}
-                </button>
+                <span className="shrink-0 rounded-full border border-surface-2 px-3 py-1.5 text-xs text-faint">
+                  {capabilities.label}
+                </span>
               </div>
               {b.author && (
                 <p className="mt-4 text-xs text-faint">作者 {b.author}</p>
@@ -111,18 +93,9 @@ export function ShelfView() {
                 <p className="mt-1 text-xs text-faint">状态 {b.status}</p>
               )}
 
-              {/* 章节列表（占位：真实章节抓取归书源引擎后续切片） */}
-              {active === b.id && (
-                <ul className="mt-4 space-y-1 border-t border-surface-2 pt-3">
-                  {["第 1 章", "第 2 章", "第 3 章"].map((ch) => (
-                    <li key={ch}>
-                      <button className="w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-200">
-                        {ch}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p className="mt-4 border-t border-surface-2 pt-3 text-xs leading-5 text-faint">
+                {capabilities.description}。当前可在搜索结果中核对官方作品信息。
+              </p>
             </div>
           ))}
         </div>
