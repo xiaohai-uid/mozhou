@@ -1,6 +1,6 @@
 // 上下文自动压缩（12 工单）：会话历史超阈值 → 早期消息摘要化，保留近期原文。
 import type { ChatMessage } from "./payload";
-import type { CompletionAdapter } from "./llm-transport";
+import type { CompletionAdapter, CompletionResult } from "./llm-transport";
 
 /** 上下文窗口（对齐 UI 上下文面板 8K） */
 export const CONTEXT_MAX_TOKENS = 8000;
@@ -10,6 +10,15 @@ export const CONTEXT_TRIGGER_RATIO = 0.7;
 export const KEEP_RECENT = 6;
 /** 摘要目标长度 */
 export const SUMMARY_MAX_CHARS = 200;
+
+export type CompressionInferenceObservation = {
+  usage?: CompletionResult["usage"];
+  error?: unknown;
+};
+
+export type CompressionOptions = {
+  onInference?: (observation: CompressionInferenceObservation) => void | Promise<void>;
+};
 
 /** 只接受原历史的近期后缀，压缩器返回异常结构时由 consumer fail-open。 */
 export function isUsableKeptHistory(
@@ -68,6 +77,7 @@ export async function compressHistory(
   messages: ChatMessage[],
   completionAdapter: CompletionAdapter,
   model: string,
+  options: CompressionOptions = {},
 ): Promise<{ summary: string; kept: ChatMessage[] }> {
   const kept = messages.slice(-KEEP_RECENT);
   const early = messages.slice(0, Math.max(0, messages.length - KEEP_RECENT));
@@ -79,12 +89,14 @@ export async function compressHistory(
       system: SUMMARY_PROMPT,
       messages: [{ role: "user", content: early.map((m) => `${m.role}: ${m.content}`).join("\n\n") }],
     });
+    await options.onInference?.({ usage: result.usage });
     const summary = result.text.trim();
     return {
       summary: summary ? `（历史摘要）${summary}` : "",
       kept,
     };
-  } catch {
+  } catch (error) {
+    await options.onInference?.({ error });
     // 摘要失败不阻断对话：降级为不压缩
     return { summary: "", kept };
   }

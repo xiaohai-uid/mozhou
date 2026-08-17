@@ -293,9 +293,30 @@ export function ProjectsView() {
     setReviewResults((previous) => ({ ...previous, [chapter.id]: data.records.find((record) => record.chapterId === chapter.id)?.checks ?? [] }));
   }
 
-  function downloadNovel(format: "txt" | "json") {
+  async function downloadNovel(format: "txt" | "json") {
     if (!detail) return;
     const filenameBase = detail.novel.name.replace(/[\\/:*?"<>|]/g, "_").trim() || "作品";
+
+    if (format === "json") {
+      try {
+        const response = await fetch(`/api/v1/books/${detail.novel.id}/export?format=json`);
+        if (!response.ok) {
+          const data = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error ?? "导出失败");
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${filenameBase}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        setError((err as Error).message);
+      }
+      return;
+    }
+
     let body: string;
     let type: string;
     let extension: string;
@@ -305,11 +326,7 @@ export function ProjectsView() {
         .join("\n\n");
       type = "text/plain;charset=utf-8";
       extension = "txt";
-    } else {
-      body = JSON.stringify(detail, null, 2);
-      type = "application/json;charset=utf-8";
-      extension = "json";
-    }
+    } else return;
     const blob = new Blob([body], { type });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");

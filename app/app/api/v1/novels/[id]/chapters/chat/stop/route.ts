@@ -3,8 +3,12 @@
 // instance can observe the decision even when the SSE disconnect is delayed.
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { DEFAULT_MODEL } from "@/lib/chat/models";
 import { requestStopChapterCandidate } from "@/lib/novels/chapter-candidate";
 import { resolveOwnedChapter } from "@/lib/novels/ownership";
+import { resolveProviderBoundary } from "@/lib/ai/provider-boundary";
+import { appendEvent, cancelJobImmediately } from "@/lib/tasks/service";
+import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
 
 export async function POST(
   request: Request,
@@ -42,5 +46,36 @@ export async function POST(
     chapterId,
     generationKey,
   });
-  return NextResponse.json({ stopped });
+  const cancelledTask = stopped ? await cancelJobImmediately(generationKey) : null;
+  if (cancelledTask?.job) {
+    await appendEvent({
+      jobId: generationKey,
+      eventType: "error",
+      payload: { status: "cancelled", reason: "user_cancelled" },
+      clientKey: "cancelled",
+    }).catch(() => {});
+
+    await Promise.all(cancelledTask.attempts.map(async (attempt) => {
+      const boundary = resolveProviderBoundary({
+        route: "chapter",
+        model: attempt.model ?? DEFAULT_MODEL,
+      });
+      await recordAttemptUsage({
+        userId: user.id,
+        requestId: generationKey,
+        taskId: generationKey,
+        generationId: generationKey,
+        attemptId: attempt.id,
+        sourceClass: boundary.sourceClass,
+        provider: attempt.provider ?? boundary.provider,
+        model: attempt.model ?? boundary.model,
+        credentialOwner: boundary.credentialOwner,
+        billingOwner: boundary.billingOwner,
+        route: "chapter",
+        status: "cancelled",
+        usageStatus: "unknown",
+      });
+    })).catch(() => {});
+  }
+  return NextResponse.json({ stopped: stopped || Boolean(cancelledTask?.job) });
 }

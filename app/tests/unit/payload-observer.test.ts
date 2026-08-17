@@ -6,7 +6,7 @@ import {
   resetPayloadObservations,
 } from "@/lib/chat/payload";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
-import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
+import { createLlmTransportFromEnv, createOneApiLlmTransport } from "@/lib/chat/llm-transport";
 
 describe("final chat payload observability", () => {
   const originalCapture = process.env.CHAT_CAPTURE;
@@ -235,7 +235,14 @@ describe("final chat payload observability", () => {
           currentUserIndices: [0],
           systemSections: ["injected_context"],
         },
-      }, createLlmTransportFromEnv());
+      }, createOneApiLlmTransport({
+        baseUrl: "https://one-api.example",
+        token: "test-only",
+        fetch: async () => new Response(
+          'data: {"choices":[{"delta":{"content":"safe reply"}}]}\n\ndata: [DONE]\n\n',
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+      }));
       const deltas = [];
       for await (const delta of provider.stream()) deltas.push(delta);
       expect(deltas.some((delta) => "text" in delta)).toBe(true);

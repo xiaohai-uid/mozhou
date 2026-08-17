@@ -3,7 +3,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { and, eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chapterMessages, users } from "@/lib/schema";
+import { chapterMessages, generationAttempts, generationJobs, usageLedger, users } from "@/lib/schema";
+import { persistChapterCandidateSettlement } from "@/lib/novels/chapter-candidate";
 
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);
@@ -206,6 +207,23 @@ describe("章节生成停止（跨实例信号）", () => {
       .from(chapterMessages)
       .where(eq(chapterMessages.id, candidate!.id));
     expect(stopped).toEqual({ id: candidate!.id, status: "stopped" });
+
+    await db
+      .update(chapterMessages)
+      .set({ content: "用户保留的停止内容" })
+      .where(eq(chapterMessages.id, candidate!.id));
+    const late = await persistChapterCandidateSettlement({
+      candidateId: candidate!.id,
+      reply: "迟到模型结果",
+      providerSucceeded: true,
+      stopped: false,
+    });
+    expect(late).toMatchObject({ messageId: candidate!.id, status: "stopped", ignored: true });
+    const [afterLate] = await db
+      .select({ content: chapterMessages.content, status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(eq(chapterMessages.id, candidate!.id));
+    expect(afterLate).toEqual({ content: "用户保留的停止内容", status: "stopped" });
   });
 });
 
@@ -291,6 +309,53 @@ describe("章节对话引擎（工单 17）", () => {
     expect(messages[0].skills).toEqual(["章节续写", "去 AI 味"]);
     expect(messages[0].snapshot).toBe("黄土坡上，老周把锄头抡起来。");
     expect(messages[0].status).toBe("completed_candidate");
+  });
+
+  it("旧 Attempt 的迟到结算被忽略，且不覆盖候选正文", async () => {
+    const res = await fetch(
+      `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: "旧 Attempt 保护测试" }),
+      },
+    );
+    const events = (await res.text())
+      .split("\n\n")
+      .filter((event) => event.startsWith("data:"))
+      .map((event) => JSON.parse(event.slice(5).trim())) as Array<{ type: string; messageId?: number }>;
+    const messageId = events.find((event) => event.type === "done")?.messageId;
+    expect(messageId).toBeTruthy();
+
+    const [candidate] = await db
+      .select({ id: chapterMessages.id, attemptId: chapterMessages.attemptId })
+      .from(chapterMessages)
+      .where(eq(chapterMessages.id, messageId!));
+    expect(candidate?.attemptId).toBeTruthy();
+
+    await db
+      .update(chapterMessages)
+      .set({ status: "generating", content: "用户保留的候选正文" })
+      .where(eq(chapterMessages.id, messageId!));
+    await db
+      .update(generationAttempts)
+      .set({ status: "failed" })
+      .where(eq(generationAttempts.id, candidate!.attemptId!));
+
+    const late = await persistChapterCandidateSettlement({
+      candidateId: messageId!,
+      attemptId: candidate!.attemptId,
+      reply: "旧 Attempt 迟到结果",
+      providerSucceeded: true,
+      stopped: false,
+    });
+    expect(late).toMatchObject({ messageId, status: "generating", ignored: true });
+
+    const [afterLate] = await db
+      .select({ content: chapterMessages.content, status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(eq(chapterMessages.id, messageId!));
+    expect(afterLate).toEqual({ content: "用户保留的候选正文", status: "generating" });
   });
 
   it("注入链：mock 回显可见 [正文参考] 与 [技能] 与 [风格]", async () => {
@@ -452,6 +517,35 @@ describe("章节对话引擎（工单 17）", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     expect(stopped?.status).toBe("stopped");
+    let jobStatus: { status: string; cancelRequested: boolean } | undefined;
+    let attemptStatus: { status: string } | undefined;
+    let ledgerStatus: { status: string; usageStatus: string } | undefined;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      [jobStatus] = await db
+        .select({ status: generationJobs.status, cancelRequested: generationJobs.cancelRequested })
+        .from(generationJobs)
+        .where(eq(generationJobs.jobId, generationKey));
+      const [candidate] = await db
+        .select({ attemptId: chapterMessages.attemptId })
+        .from(chapterMessages)
+        .where(eq(chapterMessages.generationKey, generationKey));
+      if (candidate?.attemptId != null) {
+        [attemptStatus] = await db
+          .select({ status: generationAttempts.status })
+          .from(generationAttempts)
+          .where(eq(generationAttempts.id, candidate.attemptId));
+        [ledgerStatus] = await db
+          .select({ status: usageLedger.status, usageStatus: usageLedger.usageStatus })
+          .from(usageLedger)
+          .where(eq(usageLedger.attemptId, candidate.attemptId));
+      }
+      if (jobStatus?.status === "cancelled" && attemptStatus?.status === "cancelled" && ledgerStatus?.status === "cancelled") break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(jobStatus?.status).toBe("cancelled");
+    expect(jobStatus?.cancelRequested).toBe(true);
+    expect(attemptStatus?.status).toBe("cancelled");
+    expect(ledgerStatus).toMatchObject({ status: "cancelled", usageStatus: "unknown" });
     // 服务端仍健康
     const after = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
@@ -564,12 +658,24 @@ describe("插入与冲突保护（工单 18）", () => {
     force = false,
     extra: Record<string, unknown> = {},
   ) {
+    const candidateMode = extra.candidateMode === "edited" ? "edited" : "original";
+    const target: Record<string, unknown> = {
+      mode: extra.mode ?? "insert",
+    };
+    if (extra.position !== undefined) target.position = extra.position;
+    if (extra.range !== undefined) target.range = extra.range;
+    if (typeof extra.expectedContent === "string") target.expectedContent = extra.expectedContent;
     return fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/messages/${messageId}/insert?chapterId=${chapterId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", cookie },
-        body: JSON.stringify({ content, force, ...extra }),
+        body: JSON.stringify({
+          mode: candidateMode,
+          ...(candidateMode === "edited" ? { editedContent: extra.editedContent ?? content } : {}),
+          force,
+          target,
+        }),
       },
     );
   }
@@ -604,7 +710,7 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(target?.inserted).toBe(true);
   });
 
-  it("插入使用客户端提供的部分编辑，空正文保持 400", async () => {
+  it("编辑后确认只使用明确 editedContent，空正文保持 400", async () => {
     await fetch(`${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", cookie },
@@ -612,13 +718,13 @@ describe("插入与冲突保护（工单 18）", () => {
     });
     const candidate = await chatAndGetReply("刷新后确认");
     const partial = candidate.content.trim().slice(0, 12);
-    const response = await insert(candidate.id, partial);
+    const response = await insert(candidate.id, partial, false, { candidateMode: "edited" });
     expect(response.status).toBe(200);
     const data = (await response.json()) as { chapter: { content: string } };
     expect(data.chapter.content).toBe(`服务端候选基线\n\n${partial}`);
 
     const emptyCandidate = await chatAndGetReply("空客户端正文");
-    const empty = await insert(emptyCandidate.id, "  ");
+    const empty = await insert(emptyCandidate.id, "  ", false, { candidateMode: "edited" });
     expect(empty.status).toBe(400);
   });
 
@@ -869,7 +975,7 @@ describe("插入与冲突保护（工单 18）", () => {
 
   it("非法入参：空 content 400 / 非 assistant 消息 400 / 消息不存在 400", async () => {
     const messageId = await chatAndGetReplyId("空内容测试");
-    const empty = await insert(messageId, "  ");
+    const empty = await insert(messageId, "  ", false, { candidateMode: "edited" });
     expect(empty.status).toBe(400);
 
     // user 消息 id 不可插入
@@ -893,7 +999,7 @@ describe("插入与冲突保护（工单 18）", () => {
       {
         method: "POST",
         headers: { "Content-Type": "application/json", cookie: otherCookie },
-        body: JSON.stringify({ content: "x" }),
+        body: JSON.stringify({ mode: "original", target: { mode: "insert" } }),
       },
     );
     expect(cross.status).toBe(404);

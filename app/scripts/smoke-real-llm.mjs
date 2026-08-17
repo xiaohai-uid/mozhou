@@ -18,6 +18,7 @@ const fail = (...a) => {
 };
 const info = (...a) => console.log(`  · ${a.join(" ")}`);
 let smokeEmail = null;
+let auditSql = null;
 
 async function cleanupSmokeTenant() {
   if (!smokeEmail || !process.env.DATABASE_URL) return;
@@ -29,6 +30,53 @@ async function cleanupSmokeTenant() {
     info("无法自动清理 smoke 临时账号，请按邮箱手动删除", smokeEmail);
   } finally {
     await sql.end({ timeout: 5 });
+  }
+}
+
+async function readGenerationAudit(chapterId) {
+  if (!auditSql) return null;
+  try {
+    const [job] = await auditSql`
+      select job_id, status, error_class
+      from generation_jobs
+      where chapter_id = ${chapterId}
+      order by id desc
+      limit 1
+    `;
+    if (!job) return null;
+    const attempts = await auditSql`
+      select a.id as attempt_id, a.status, a.error_class, a.provider, a.model
+      from generation_attempts a
+      join generation_steps s on s.id = a.step_id
+      where s.job_id = ${job.job_id}
+      order by a.id
+    `;
+    const [ledger] = await auditSql`
+      select id, request_id, task_id, attempt_id, source_class, provider, model,
+             credential_owner, billing_owner, status, usage_status
+      from usage_ledger
+      where generation_id = ${job.job_id}
+      order by id desc
+      limit 1
+    `;
+    return {
+      requestId: ledger?.request_id ?? job.job_id,
+      taskId: ledger?.task_id ?? job.job_id,
+      attemptId: ledger?.attempt_id ?? attempts.at(-1)?.attempt_id ?? null,
+      boundaryEntered: attempts.length > 0 || Boolean(ledger),
+      sourceClass: ledger?.source_class ?? null,
+      provider: ledger?.provider ?? attempts.at(-1)?.provider ?? null,
+      model: ledger?.model ?? attempts.at(-1)?.model ?? null,
+      credentialOwner: ledger?.credential_owner ?? null,
+      billingOwner: ledger?.billing_owner ?? null,
+      terminalStatus: job.status,
+      errorClass: job.error_class ?? attempts.at(-1)?.error_class ?? null,
+      ledgerRecordId: ledger?.id ?? null,
+      usageStatus: ledger?.usage_status ?? null,
+      attemptCount: attempts.length,
+    };
+  } catch {
+    return { auditUnavailable: true };
   }
 }
 
@@ -56,6 +104,7 @@ async function main() {
   info(`dev server 端口 ${port}`);
 
   const log = createWriteStream("tests/http/.smoke-real-llm.log", { flags: "w" });
+  if (process.env.DATABASE_URL) auditSql = postgres(process.env.DATABASE_URL, { max: 1 });
   const child = spawn(
     process.execPath,
     ["node_modules/next/dist/bin/next", "dev", "-p", String(port), "-H", "127.0.0.1"],
@@ -131,6 +180,17 @@ async function main() {
     const deltas = events.filter((e) => e.type === "delta" && e.text);
     const done = events.find((e) => e.type === "done");
     const err = events.find((e) => e.type === "error");
+    const audit = await readGenerationAudit(chapter.id);
+    info("REAL_SMOKE_TRACE", JSON.stringify({
+      httpStatus: chatRes.status,
+      eventSequence: types,
+      streamStarted: types.includes("start"),
+      firstDeltaReceived: deltas.length > 0,
+      terminalEvent: types.at(-1) ?? null,
+      errorCode: err?.code ?? null,
+      generationId: done?.generationId ?? audit?.requestId ?? null,
+      audit,
+    }));
     if (err) throw new Error(`SSE error{code}: ${err.code}（${err.message ?? ""}）`);
     if (!done?.messageId) throw new Error(`SSE 无 done{messageId}，事件序列: ${types.join(",")}`);
     const aiText = deltas.map((d) => d.text).join("");
@@ -150,7 +210,7 @@ async function main() {
     // —— 5. AI 结果插入正文 + 正文真实保存 ——
     const ins = await fetch(`${base}/api/v1/novels/${n.id}/chapters/messages/${done.messageId}/insert?chapterId=${chapter.id}`, {
       method: "POST", headers: { "Content-Type": "application/json", cookie },
-      body: JSON.stringify({ content: aiText }),
+      body: JSON.stringify({ mode: "original", target: { mode: "insert" } }),
     });
     if (ins.status !== 200) throw new Error(`插入失败 HTTP ${ins.status}: ${(await ins.text()).slice(0, 200)}`);
     const got = await fetch(`${base}/api/v1/novels/${n.id}/chapters?chapterId=${chapter.id}`, { headers: { cookie } });
@@ -170,6 +230,10 @@ async function main() {
     console.error("  证据：tests/http/.smoke-real-llm.log");
     if (KEEP) process.exit(1);
   } finally {
+    if (auditSql) {
+      await auditSql.end({ timeout: 5 }).catch(() => {});
+      auditSql = null;
+    }
     if (!KEEP) {
       killTree();
       await cleanupSmokeTenant();

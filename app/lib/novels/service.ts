@@ -1,6 +1,6 @@
 // 小说项目管理服务层（05 工单）：novels / chapters / character_entries / worldview_entries。
 // 所有查询先做归属校验（novel.userId === user.id），防越权。
-import { and, count, desc, eq, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, max, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   chapters,
@@ -29,6 +29,28 @@ export interface NovelDetail {
   chapters: Chapter[];
   characters: CharacterEntry[];
   worldviews: WorldviewEntry[];
+}
+
+export interface CanonicalNovelExport {
+  schemaVersion: "mozhou.novel.export.v1";
+  kind: "novel";
+  novel: {
+    id: number;
+    name: string;
+    description: string | null;
+    ragEnabled: boolean;
+  };
+  chapters: Array<{
+    id: number;
+    ch: string;
+    title: string;
+    content: string;
+    status: Chapter["status"];
+    sortOrder: number;
+    revision: number;
+  }>;
+  characters: Array<{ id: number; name: string; note: string | null }>;
+  worldviews: Array<{ id: number; name: string; note: string | null }>;
 }
 
 export interface QuickStartResult {
@@ -266,6 +288,58 @@ export async function getNovel(
       meta: `连载中 · ${chapterCount} 章`,
       ragEnabled: novel.ragEnabled,
     },
+    chapters: chapterRows,
+    characters: characterRows,
+    worldviews: worldviewRows,
+  };
+}
+
+/** 服务端唯一的作品导出真源；不复用客户端详情 state，保证 revision/content 来自同一读取。 */
+export async function getCanonicalNovelExport(
+  userId: number,
+  novelId: number,
+): Promise<CanonicalNovelExport | null> {
+  const [novel] = await db
+    .select({
+      id: novels.id,
+      name: novels.name,
+      description: novels.description,
+      ragEnabled: novels.ragEnabled,
+    })
+    .from(novels)
+    .where(and(eq(novels.id, novelId), eq(novels.userId, userId)));
+  if (!novel) return null;
+
+  const [chapterRows, characterRows, worldviewRows] = await Promise.all([
+    db
+      .select({
+        id: chapters.id,
+        ch: chapters.ch,
+        title: chapters.title,
+        content: chapters.content,
+        status: chapters.status,
+        sortOrder: chapters.sortOrder,
+        revision: chapters.revision,
+      })
+      .from(chapters)
+      .where(eq(chapters.novelId, novelId))
+      .orderBy(asc(chapters.sortOrder), asc(chapters.id)),
+    db
+      .select({ id: characterEntries.id, name: characterEntries.name, note: characterEntries.note })
+      .from(characterEntries)
+      .where(eq(characterEntries.novelId, novelId))
+      .orderBy(asc(characterEntries.id)),
+    db
+      .select({ id: worldviewEntries.id, name: worldviewEntries.name, note: worldviewEntries.note })
+      .from(worldviewEntries)
+      .where(eq(worldviewEntries.novelId, novelId))
+      .orderBy(asc(worldviewEntries.id)),
+  ]);
+
+  return {
+    schemaVersion: "mozhou.novel.export.v1",
+    kind: "novel",
+    novel,
     chapters: chapterRows,
     characters: characterRows,
     worldviews: worldviewRows,

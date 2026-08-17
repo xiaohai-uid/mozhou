@@ -12,6 +12,7 @@ import {
   runChapterChat,
 } from "@/lib/novels/chapter-chat";
 import { createSseResponse, safeSseErrorMessage } from "@/lib/http/sse";
+import { ProviderBoundaryError } from "@/lib/ai/provider-boundary";
 
 export async function POST(
   request: Request,
@@ -135,7 +136,13 @@ export async function POST(
             generationId: result.generationId,
           });
         } else if (result.status === "error") {
-          writer.error({ type: "error", code: "AiGenerationFailed", message: "生成失败，请重试" });
+          writer.error({
+            type: "error",
+            code: result.errorCode ?? "AiGenerationFailed",
+            message: result.errorCode === "FREE_UNAVAILABLE"
+              ? "当前免费 AI 暂时不可用，你仍可以自己继续写作。"
+              : "生成失败，请重试",
+          });
         } else {
           writer.error({ type: "error", code: "AiInvalidResponse", message: "模型返回为空，请重试" });
         }
@@ -148,13 +155,19 @@ export async function POST(
               : err instanceof GenerationKeyConflictError
                 ? "GenerationKeyConflict"
                 : err instanceof ChapterChatError
-                  ? "AiGenerationFailed"
+                  ? err.code
+                  : err instanceof ProviderBoundaryError && err.code === "FREE_UNAVAILABLE"
+                    ? "FREE_UNAVAILABLE"
                 : "AiGenerationFailed",
           message:
             err instanceof ChapterNotFoundError
               ? "章节不存在"
               : err instanceof GenerationKeyConflictError
                 ? "生成请求键与原请求不一致"
+                : err instanceof ChapterChatError && err.code === "FREE_UNAVAILABLE"
+                  ? "当前免费 AI 暂时不可用，你仍可以自己继续写作。"
+                  : err instanceof ProviderBoundaryError && err.code === "FREE_UNAVAILABLE"
+                    ? "当前免费 AI 暂时不可用，你仍可以自己继续写作。"
                 : safeSseErrorMessage(err),
         });
       }

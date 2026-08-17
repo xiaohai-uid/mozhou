@@ -92,6 +92,58 @@ describe("one-api LLM transport", () => {
     expect(streamInit?.headers).toMatchObject({ Authorization: "Bearer shared-token" });
   });
 
+  it("aborting a stream cancels the upstream reader promptly", async () => {
+    let readerCancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        setTimeout(() => {
+          try {
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\\n\\n"));
+            controller.close();
+          } catch {
+            // The abort path is expected to cancel and close this stream first.
+          }
+        }, 300);
+      },
+      cancel() {
+        readerCancelled = true;
+      },
+    });
+    const transport = createOneApiLlmTransport({
+      baseUrl: "https://one-api.example",
+      token: "shared-token",
+      fetch: async () => new Response(body, { status: 200 }),
+    });
+    const controller = new AbortController();
+    const iterator = transport.stream({
+      ...request(),
+      observation: {
+        route: "chapter-chat",
+        mode: "chapter",
+        historyCountBefore: 0,
+        historyCountAfter: 1,
+        compressionApplied: false,
+        ragEntryCount: 0,
+        stylePresent: false,
+        skillCount: 0,
+        novelScopePresent: true,
+        chapterScopePresent: true,
+        ownerScopeResolved: true,
+        currentUserIndices: [0],
+        systemSections: ["base_identity"],
+      },
+    }).stream(controller.signal);
+    const pending = iterator[Symbol.asyncIterator]().next();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    controller.abort();
+    const result = await Promise.race([
+      pending,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 100)),
+    ]);
+    expect(result).not.toBeNull();
+    expect(readerCancelled).toBe(true);
+  });
+
   it("rejects an empty completion response with a normalized error", async () => {
     const transport = createOneApiLlmTransport({
       baseUrl: "https://one-api.example",

@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PROTOTYPE · 引导与生成等待</title>
+  <style>
+    :root {
+      --ink: #24313a;
+      --muted: #6a7a83;
+      --line: #d9e2e3;
+      --paper: #f5f8f7;
+      --panel: #ffffff;
+      --accent: #1d6f68;
+      --accent-2: #cf6a4d;
+      --accent-soft: #e4f1ee;
+      --warm-soft: #fff0e9;
+      --calm: #23775d;
+      --warn: #a66b1f;
+      --danger: #ae4b4b;
+      --shadow: 0 14px 34px rgba(36, 49, 58, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); }
+    main { width: min(1380px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 70px; }
+    h1 { margin: 8px 0 12px; max-width: 920px; font-size: clamp(30px, 4.8vw, 54px); line-height: 1.04; letter-spacing: -.045em; }
+    h2 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+    h3 { margin: 0; font-size: 14px; }
+    p { color: var(--muted); line-height: 1.65; }
+    small { color: var(--muted); }
+    .eyebrow { color: var(--accent-2); font-size: 12px; font-weight: 850; letter-spacing: .14em; text-transform: uppercase; }
+    .lede { max-width: 890px; font-size: 16px; }
+    .question { max-width: 980px; margin: 22px 0 18px; padding: 17px 19px; border-left: 4px solid var(--accent-2); background: var(--warm-soft); color: #6c392b; }
+    .question strong { display: block; margin-bottom: 5px; color: #51281e; }
+    .disclaimer { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 24px; }
+    .tag, .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 800; }
+    .tag { background: #eef3f2; color: #55716d; }
+    .tag.warn, .pill.warn { background: #fff1dc; color: var(--warn); }
+    .tag.danger, .pill.danger { background: #fae6e6; color: var(--danger); }
+    .pill { background: var(--accent-soft); color: var(--accent); }
+    .panel { border: 1px solid var(--line); border-radius: 16px; padding: 21px; background: var(--panel); box-shadow: var(--shadow); }
+    .panel + .panel { margin-top: 18px; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .panel-head small { display: block; margin-top: 5px; line-height: 1.45; }
+    .control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .field { display: grid; gap: 7px; }
+    .field label, .range-label { color: var(--ink); font-size: 12px; font-weight: 800; }
+    select, input[type="number"] { width: 100%; border: 1px solid #cbd7d6; border-radius: 9px; padding: 10px 11px; color: var(--ink); background: #fff; font: inherit; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .select-note { grid-column: 1 / -1; padding: 12px 13px; border-radius: 10px; background: #f2f7f5; color: #49655e; font-size: 13px; line-height: 1.5; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    button { border: 1px solid #c7d5d3; border-radius: 9px; padding: 9px 11px; cursor: pointer; color: var(--ink); background: #fff; font: inherit; font-size: 13px; }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { border-color: var(--accent); color: #fff; background: var(--accent); }
+    button.warm { border-color: var(--accent-2); color: #fff; background: var(--accent-2); }
+    button.subtle { background: #f3f6f5; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    .two-column { display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(310px, .86fr); gap: 18px; align-items: start; }
+    .state-top { display: grid; grid-template-columns: 1.18fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .state-card { min-height: 88px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #fbfcfc; }
+    .state-card small { display: block; margin-bottom: 6px; font-size: 11px; }
+    .state-card strong { font-size: 18px; }
+    .state-card .sub { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .meter-line { display: flex; justify-content: space-between; gap: 10px; margin: 9px 0 5px; color: var(--muted); font-size: 12px; }
+    .meter { height: 9px; overflow: hidden; border-radius: 999px; background: #e7eeee; }
+    .meter span { display: block; height: 100%; border-radius: inherit; background: var(--calm); transition: width .2s ease; }
+    .meter span.warn { background: var(--warn); }
+    .meter span.danger { background: var(--danger); }
+    .state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+    .kv { padding: 10px 11px; border-top: 2px solid #e5eceb; background: #fcfdfd; }
+    .kv small { display: block; margin-bottom: 4px; font-size: 11px; }
+    .kv strong { display: block; font-size: 13px; line-height: 1.4; }
+    .state-note { margin-top: 15px; padding: 12px 13px; border-radius: 10px; background: #eef7f4; color: #42645c; font-size: 13px; line-height: 1.55; }
+    details { margin-top: 14px; }
+    summary { cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 800; }
+    pre { max-height: 300px; overflow: auto; margin: 10px 0 0; padding: 12px; border-radius: 9px; color: #405057; background: #f4f7f6; font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+    .split-question { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .signal { min-height: 137px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+    .signal.guide { background: #f8fbfa; border-color: #cfe2dc; }
+    .signal.task { background: #fffaf7; border-color: #f0d5c8; }
+    .signal small { display: block; margin-bottom: 8px; font-size: 11px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .signal.guide small { color: var(--accent); }
+    .signal.task small { color: var(--accent-2); }
+    .signal strong { display: block; font-size: 16px; line-height: 1.45; }
+    .signal p { margin: 7px 0 0; font-size: 12px; }
+    .section-label { margin: 20px 0 9px; color: var(--muted); font-size: 11px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .walk-tabs { display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 1px solid var(--line); padding-bottom: 9px; }
+    .tab { border: 0; border-radius: 8px 8px 0 0; color: var(--muted); background: transparent; }
+    .tab.active { color: var(--accent); background: var(--accent-soft); }
+    .walk-copy { min-height: 78px; margin: 14px 0; padding: 13px 14px; border-radius: 10px; border: 1px solid var(--line); background: #fbfcfc; }
+    .walk-copy p { margin: 6px 0 0; font-size: 13px; }
+    .step-list { display: grid; gap: 8px; }
+    .step { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 9px; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 13px; }
+    .step.current { border-color: var(--accent); background: #f8fffc; color: var(--ink); }
+    .step.done { border-color: #cce1d7; background: #f1f8f4; color: #47715f; }
+    .step-num { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--muted); background: #edf1f0; font-size: 12px; font-weight: 850; }
+    .step.current .step-num { color: #fff; background: var(--accent); }
+    .step.done .step-num { color: #fff; background: var(--calm); }
+    .log { display: grid; gap: 8px; max-height: 620px; overflow: auto; }
+    .log-item { padding: 10px 11px; border-left: 3px solid #dbe6e3; background: #fbfcfc; font-size: 12px; }
+    .log-item strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .log-item span { color: var(--muted); line-height: 1.5; }
+    .log-item.bad { border-left-color: var(--danger); background: #fff8f7; }
+    .log-item.good { border-left-color: var(--calm); background: #f4faf7; }
+    .notice { padding: 13px 14px; border-radius: 10px; color: #6e5727; background: #fff8e8; font-size: 13px; line-height: 1.6; }
+    .notice + .notice { margin-top: 10px; }
+    .check-list { display: grid; gap: 8px; margin-top: 12px; }
+    .check { display: flex; align-items: flex-start; gap: 8px; color: #52646b; font-size: 13px; line-height: 1.45; }
+    .check::before { content: "•"; flex: 0 0 auto; color: var(--accent-2); font-weight: 900; }
+    .simulation { margin-top: 18px; }
+    .sim-grid { display: grid; grid-template-columns: minmax(250px, .7fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
+    .range-stack { display: grid; gap: 12px; }
+    .range-item { padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fcfdfd; }
+    .range-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .range-value { color: var(--accent); font-size: 12px; font-weight: 850; }
+    .intent-note { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .sim-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 13px; }
+    .sim-card { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfc; }
+    .sim-card small { display: block; margin-bottom: 5px; font-size: 11px; }
+    .sim-card strong { font-size: 16px; line-height: 1.35; }
+    .sim-card .delta { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+    table { width: 100%; min-width: 1080px; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 9px 8px; border-bottom: 1px solid #e6eceb; text-align: right; white-space: nowrap; }
+    th { color: var(--muted); background: #f5f8f7; font-size: 11px; }
+    th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+    tr:last-child td { border-bottom: 0; }
+    tr.baseline td { background: #fffaf1; }
+    .best-mark { color: var(--calm); font-weight: 850; }
+    .negative { color: var(--danger); }
+    .positive { color: var(--calm); }
+    .decision-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+    .decision { padding: 15px; border-radius: 11px; border: 1px solid var(--line); }
+    .decision h3 { margin-bottom: 8px; }
+    .decision p { margin: 0; font-size: 12px; }
+    .decision.supported { background: #f2faf6; border-color: #cde4d8; }
+    .decision.calibrate { background: #fffaf0; border-color: #f1dfb4; }
+    .decision.nope { background: #fff6f4; border-color: #efd2cb; }
+    .footer-note { margin-top: 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    code { font: .92em ui-monospace, SFMono-Regular, Consolas, monospace; }
+    @media (max-width: 980px) { .two-column, .sim-grid { grid-template-columns: 1fr; } .log { max-height: 350px; } }
+    @media (max-width: 700px) { main { width: min(100% - 20px, 1380px); padding-top: 24px; } .panel { padding: 16px; } .control-grid, .state-top, .state-grid, .split-question, .decision-grid, .sim-summary { grid-template-columns: 1fr 1fr; } .select-note { grid-column: 1 / -1; } }
+    @media (max-width: 480px) { .control-grid, .state-top, .state-grid, .split-question, .decision-grid, .sim-summary { grid-template-columns: 1fr; } .select-note { grid-column: auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">PROTOTYPE ONLY · THROWAWAY LOGIC DEMO</div>
+    <h1>引导与生成等待：用户会知道下一步吗？</h1>
+    <p class="lede">一个可双击打开的单文件原型，用来验证首次进入第一章前的三种引导形态，以及生成等待时不同反馈结构是否改变信任、继续编辑和“是不是卡住了”的行为趋势。</p>
+    <div class="question">
+      <strong>本原型要回答的问题</strong>
+      引导只回答“我现在该做什么”，任务反馈只回答“系统现在在做什么”。当两者分开、且首屏最多两次主动回答时，用户是否更容易进入第一章并继续编辑？
+    </div>
+    <div class="disclaimer">
+      <span class="tag warn">合成用户 ≠ 真人数据</span>
+      <span class="tag">默认仅内存运行</span>
+      <span class="tag danger">阈值不是已验证事实</span>
+      <span class="tag">不连接模型 / 不连接生产</span>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>当前验证组合</h2><small>切换变体后会重置单用户状态；cohort 参数需要点击“运行模拟”才会生成新结果。</small></div>
+        <button class="subtle" id="reset-btn">重置单用户</button>
+      </div>
+      <div class="control-grid">
+        <div class="field">
+          <label for="onboarding-variant">引导变体</label>
+          <select id="onboarding-variant">
+            <option value="options-first">options-first · 选项先行</option>
+            <option value="free-text-first+options+skip" selected>free-text-first+options+skip · 自由描述先行 + 选项 + 跳过</option>
+            <option value="empty-first">empty-first · 空白第一章先行</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="wait-variant">等待反馈变体</label>
+          <select id="wait-variant">
+            <option value="none">none · 无反馈</option>
+            <option value="spinner">spinner · 只有加载状态</option>
+            <option value="stage/progress/useful-preview" selected>stage/progress/useful-preview · 阶段 + 进度 + 可用预览</option>
+          </select>
+        </div>
+        <div class="select-note" id="variant-note"></div>
+      </div>
+    </section>
+
+    <div class="two-column" style="margin-top:18px">
+      <div>
+        <section class="panel" id="state-panel"></section>
+        <section class="panel">
+          <div class="panel-head"><div><h2>两条反馈轨道</h2><small>它们不是同一套文案：左边帮助用户决定动作，右边解释系统状态。</small></div></div>
+          <div class="split-question">
+            <div class="signal guide"><small>引导 · 我现在该做什么</small><strong id="guide-message"></strong><p id="guide-sub"></p></div>
+            <div class="signal task"><small>任务反馈 · 系统现在在做什么</small><strong id="task-message"></strong><p id="task-sub"></p></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><div><h2>单用户自由操作</h2><small>按钮可以故意乱点。非法或过早动作不会悄悄消失，而会进入证据日志。</small></div></div>
+          <div class="section-label">首屏理解与第一下点击</div>
+          <div class="button-row">
+            <button data-action="UNDERSTAND">我知道下一步</button>
+            <button data-action="HESITATE">我有点犹豫</button>
+          </div>
+          <div class="section-label">选择起点</div>
+          <div class="button-row">
+            <button class="primary" data-action="CHOOSE_INTENT" data-value="idea">我有故事想法</button>
+            <button data-action="CHOOSE_INTENT" data-value="genre">从题材开始</button>
+            <button class="subtle" data-action="CHOOSE_INTENT" data-value="skip">先跳过，直接写</button>
+          </div>
+          <div class="section-label">补充信息与轻确认</div>
+          <div class="button-row">
+            <button data-action="TYPE_IDEA">写一句故事想法</button>
+            <button data-action="CHOOSE_GENRE">选一个题材：悬疑</button>
+            <button data-action="CONFIRM_PLAN">轻确认并默认开始第一章</button>
+            <button data-action="OPEN_SUPPLEMENT">补充想法</button>
+          </div>
+          <div class="section-label">正文与有效写作</div>
+          <div class="button-row">
+            <button data-action="START_FIRST_CHAPTER">进入第一章</button>
+            <button data-action="WRITE_EFFECTIVE">写下第一段有效内容</button>
+            <button data-action="CONTINUE_EDIT">继续编辑 30 秒</button>
+          </div>
+          <div class="section-label">生成与等待</div>
+          <div class="button-row">
+            <button class="warm" data-action="START_GENERATION">开始生成</button>
+            <button data-action="WAIT" data-ms="800">快进 0.8 秒</button>
+            <button data-action="WAIT" data-ms="1800">快进 1.8 秒</button>
+            <button data-action="WAIT" data-ms="3200">快进 3.2 秒</button>
+            <button data-action="WAIT" data-ms="6000">快进 6 秒</button>
+            <button data-action="RECEIVE_FEEDBACK">模拟收到反馈</button>
+            <button data-action="VIEW_PREVIEW">查看可用预览</button>
+            <button data-action="COMPLETE_GENERATION">直接完成生成</button>
+          </div>
+          <div class="section-label">偏离、恢复与终止</div>
+          <div class="button-row">
+            <button data-action="RETRY">重试</button>
+            <button data-action="REFRESH">刷新页面</button>
+            <button data-action="CANCEL">取消生成</button>
+            <button data-action="ABANDON">放弃</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><div><h2>Tabbed walkthrough</h2><small>每一步都会更新左侧完整状态，并把动作和变化写入右侧证据日志。</small></div></div>
+          <div class="walk-tabs" id="walk-tabs"></div>
+          <div class="walk-copy" id="walk-copy"></div>
+          <div class="step-list" id="step-list"></div>
+        </section>
+      </div>
+
+      <aside>
+        <section class="panel">
+          <div class="panel-head"><div><h2>证据日志</h2><small>按时间倒序，包含用户动作、当前阶段、情绪和信任。</small></div><span class="pill" id="event-count">0 条</span></div>
+          <div class="log" id="event-log"></div>
+        </section>
+        <section class="panel">
+          <h2>原型边界</h2>
+          <div class="notice" style="margin-top:14px">这里的情绪、信任修正、等待阈值和合成用户概率是可调的工作假设。它们只能帮助团队看见状态关系，不能当作真人行为比例、内容质量或商业转化的证据。</div>
+          <div class="check-list">
+            <div class="check">可以证明：状态机是否允许三种入口、跳过后补充、最多两次回答、默认进入第一章。</div>
+            <div class="check">可以观察：不同反馈结构下，模拟用户的重试、刷新、取消、放弃和继续编辑如何变化。</div>
+            <div class="check">不能证明：真人是否真的这样理解、生成内容是否好、用户是否愿意付费。</div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <section class="panel simulation">
+      <div class="panel-head"><div><h2>Cohort simulation · 合成用户群体</h2><small>至少 100 人；默认 300 人、固定 seed 42，每次都在内存中重新抽样。比例会自动归一化。</small></div><button class="primary" id="run-sim">运行模拟</button></div>
+      <div class="sim-grid">
+        <div class="range-stack">
+          <div class="range-item"><div class="range-head"><span class="range-label">合成用户数</span><span class="range-value" id="users-value">300</span></div><input id="users" type="range" min="100" max="1000" step="50" value="300" /></div>
+          <div class="range-item"><div class="range-head"><span class="range-label">输入意图：有故事想法</span><span class="range-value" id="idea-ratio-value">55%</span></div><input id="idea-ratio" type="range" min="0" max="100" step="5" value="55" /></div>
+          <div class="range-item"><div class="range-head"><span class="range-label">输入意图：从题材开始</span><span class="range-value" id="genre-ratio-value">30%</span></div><input id="genre-ratio" type="range" min="0" max="100" step="5" value="30" /></div>
+          <div class="range-item"><div class="range-head"><span class="range-label">输入意图：先跳过</span><span class="range-value" id="skip-ratio-value">15%</span></div><input id="skip-ratio" type="range" min="0" max="100" step="5" value="15" /></div>
+          <div class="intent-note">意图比例仅用于制造不同入口压力，不代表真实用户构成。</div>
+          <div class="range-item"><div class="range-head"><span class="range-label">首屏理解率</span><span class="range-value" id="comprehension-value">78%</span></div><input id="comprehension" type="range" min="20" max="100" step="1" value="78" /></div>
+          <div class="range-item"><div class="range-head"><span class="range-label">生成等待时长</span><span class="range-value" id="wait-ms-value">6.4 秒</span></div><input id="wait-ms" type="range" min="1" max="15" step="0.2" value="6.4" /></div>
+          <div class="range-item"><div class="range-head"><span class="range-label">反馈延迟</span><span class="range-value" id="feedback-delay-value">1.0 秒</span></div><input id="feedback-delay" type="range" min="0" max="10" step="0.2" value="1" /></div>
+          <div class="range-item"><div class="range-head"><span class="range-label">反馈带来的信任修正</span><span class="range-value" id="trust-correction-value">+12</span></div><input id="trust-correction" type="range" min="-20" max="25" step="1" value="12" /></div>
+        </div>
+        <div>
+          <div id="sim-summary" class="sim-summary"></div>
+          <div class="table-wrap"><table id="sim-table"></table></div>
+        </div>
+      </div>
+      <div class="footer-note">阅读方式：先看同一个引导变体在三种等待反馈下的差异，再看同一个等待反馈在三种引导下的差异。表格中的“差异”始终相对 <code>options-first + none</code>，只是本次参数和 seed 下的合成信号。</div>
+    </section>
+
+    <div class="decision-grid">
+      <div class="decision supported"><h3>已支持 · 本原型能演示</h3><p>三入口、跳过后补充、最多两次回答、轻确认后默认第一章、引导与任务反馈分离，以及等待中重试/刷新/取消/放弃。</p></div>
+      <div class="decision calibrate"><h3>待真人校准 · 不可直接定阈值</h3><p>首屏理解率、第一下点击是否正确、用户何时把“无反馈”当成卡死、信任变化和继续编辑的概率。</p></div>
+      <div class="decision nope"><h3>不能证明 · 需要另一类证据</h3><p>内容质量、章节满意度、长期留存、付费意愿、真实模型延迟和生产系统在刷新/断线后的可恢复性。</p></div>
+    </div>
+  </main>
+
+  <script>
+    // Portable logic module. It deliberately knows nothing about the DOM.
+    const OnboardingWaitLogic = (() => {
+      const ONBOARDING_LABELS = {
+        'options-first': 'options-first · 选项先行',
+        'free-text-first+options+skip': 'free-text-first+options+skip · 自由描述先行 + 选项 + 跳过',
+        'empty-first': 'empty-first · 空白第一章先行'
+      };
+      const WAIT_LABELS = {
+        none: 'none · 无反馈',
+        spinner: 'spinner · 只有加载状态',
+        'stage/progress/useful-preview': 'stage/progress/useful-preview · 阶段 + 进度 + 可用预览'
+      };
+      const PHASE_LABELS = { onboarding: '引导中', chapter: '第一章', editing: '继续编辑', generating: '生成等待', cancelled: '已取消', abandoned: '已放弃' };
+      const EMOTION_LABELS = { curious: '好奇', uncertain: '开始犹豫', calm: '安心', impatient: '不耐烦', frustrated: '烦躁', distrustful: '不再信任', relieved: '松了一口气' };
+      const INTENT_LABELS = { idea: '有故事想法', genre: '从题材开始', skip: '先跳过直接写' };
+      const ACTION_LABELS = {
+        RESET: '重置', UNDERSTAND: '确认知道下一步', HESITATE: '表达犹豫', CHOOSE_INTENT: '选择起点', TYPE_IDEA: '补充故事想法', CHOOSE_GENRE: '选择题材', CONFIRM_PLAN: '轻确认', OPEN_SUPPLEMENT: '打开补充想法', START_FIRST_CHAPTER: '进入第一章', WRITE_EFFECTIVE: '开始有效写作', CONTINUE_EDIT: '继续编辑', START_GENERATION: '开始生成', WAIT: '等待', RECEIVE_FEEDBACK: '收到反馈', VIEW_PREVIEW: '查看可用预览', COMPLETE_GENERATION: '完成生成', RETRY: '重试', REFRESH: '刷新页面', CANCEL: '取消生成', ABANDON: '放弃'
+      };
+      const STAGES = ['准备上下文', '整理故事方向', '生成第一段', '检查可用性'];
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const clone = value => JSON.parse(JSON.stringify(value));
+      const percent = value => `${Math.round(value * 100)}%`;
+      const formatSeconds = ms => `${(ms / 1000).toFixed(1)} 秒`;
+      const boolLabel = value => value === true ? '是' : value === false ? '否' : '未判断';
+      const isTerminal = state => ['cancelled', 'abandoned'].includes(state.phase);
+
+      function initialState(config = {}) {
+        const normalized = {
+          onboardingVariant: config.onboardingVariant || 'free-text-first+options+skip',
+          waitVariant: config.waitVariant || 'stage/progress/useful-preview',
+          waitMs: Number(config.waitMs) || 6400,
+          feedbackDelayMs: Number.isFinite(config.feedbackDelayMs) ? config.feedbackDelayMs : 1000,
+          feedbackTrustCorrection: Number.isFinite(config.feedbackTrustCorrection) ? config.feedbackTrustCorrection : 12
+        };
+        return {
+          config: normalized,
+          phase: 'onboarding',
+          onboardingStep: 'first-screen',
+          intent: null,
+          storyIdea: '',
+          genre: null,
+          answers: 0,
+          planConfirmed: false,
+          supplementOpen: false,
+          firstClick: null,
+          firstScreenUnderstood: null,
+          enteredChapter: false,
+          effectiveWriting: false,
+          continuedEditing: false,
+          writingWords: 0,
+          emotion: 'curious',
+          trust: 65,
+          generation: { status: 'idle', elapsedMs: 0, feedbackState: 'none', feedbackVisible: false, usefulPreviewAvailable: false, usefulPreviewViewed: false, firstFeedbackAtMs: null, attempts: 0 },
+          retries: 0,
+          refreshes: 0,
+          cancellations: 0,
+          abandoned: false,
+          clockMs: 0,
+          lastAction: '页面已打开',
+          lastChange: '等待第一次点击',
+          events: [{ time: 0, action: '页面已打开', detail: '当前是首屏引导，尚未知道用户下一步。', phase: '引导中', emotion: '好奇', trust: 65, kind: 'system' }]
+        };
+      }
+
+      function actionLabel(action) {
+        if (action.type === 'CHOOSE_INTENT') return `${ACTION_LABELS[action.type]}：${INTENT_LABELS[action.value] || action.value}`;
+        if (action.type === 'WAIT') return `${ACTION_LABELS[action.type]} ${formatSeconds(action.ms || 0)}`;
+        return ACTION_LABELS[action.type] || action.type;
+      }
+
+      function firstClick(next, action) {
+        if (!next.firstClick && action.type !== 'RESET') next.firstClick = actionLabel(action);
+      }
+
+      function record(next, action, detail, kind = 'normal') {
+        next.lastAction = actionLabel(action);
+        next.lastChange = detail;
+        next.events.unshift({
+          time: next.clockMs,
+          action: next.lastAction,
+          detail,
+          phase: PHASE_LABELS[next.phase],
+          emotion: EMOTION_LABELS[next.emotion],
+          trust: Math.round(next.trust),
+          kind
+        });
+      }
+
+      function derive(next) {
+        next.trust = clamp(next.trust, 0, 100);
+        if (next.phase === 'abandoned' || next.phase === 'cancelled') next.emotion = 'distrustful';
+        else if (next.generation.status === 'succeeded') next.emotion = 'relieved';
+        else if (next.phase === 'generating') {
+          if (!next.generation.feedbackVisible && next.generation.elapsedMs >= 5600) next.emotion = next.retries > 0 ? 'distrustful' : 'frustrated';
+          else if (!next.generation.feedbackVisible && next.generation.elapsedMs >= 2600) next.emotion = 'impatient';
+          else if (!next.generation.feedbackVisible && next.generation.elapsedMs >= 1000) next.emotion = 'uncertain';
+          else if (next.generation.feedbackVisible) next.emotion = 'calm';
+          else next.emotion = 'curious';
+        } else if (next.firstScreenUnderstood === false) next.emotion = 'uncertain';
+        else if (next.phase === 'editing' || next.phase === 'chapter') next.emotion = 'calm';
+        else next.emotion = 'curious';
+        return next;
+      }
+
+      function transition(previous, action) {
+        const next = clone(previous);
+        if (action.type === 'RESET') return initialState(previous.config);
+        firstClick(next, action);
+        next.clockMs += action.type === 'WAIT' ? Math.max(0, Number(action.ms) || 0) : 120;
+
+        if (action.type === 'UNDERSTAND') {
+          next.firstScreenUnderstood = true;
+          next.trust += 5;
+          record(next, action, '用户明确表示知道下一步；首屏理解状态变为“是”。', 'good');
+        } else if (action.type === 'HESITATE') {
+          next.firstScreenUnderstood = false;
+          next.trust -= 4;
+          record(next, action, '用户表达犹豫；这不是放弃，但说明首屏理解需要真人校准。', 'bad');
+        } else if (action.type === 'CHOOSE_INTENT') {
+          if (next.phase !== 'onboarding') record(next, action, '当前已离开引导，选择起点被忽略。', 'bad');
+          else {
+            next.intent = action.value;
+            next.firstScreenUnderstood = true;
+            if (action.value === 'idea') next.onboardingStep = 'idea-input';
+            else if (action.value === 'genre') next.onboardingStep = 'genre-choice';
+            else next.onboardingStep = 'chapter-ready';
+            next.trust += 2;
+            record(next, action, action.value === 'skip' ? '跳过不封锁正文；用户仍可在第一章后补充。' : `已选“${INTENT_LABELS[action.value]}”，等待最多一次补充后轻确认。`, 'good');
+          }
+        } else if (action.type === 'TYPE_IDEA') {
+          if (next.phase !== 'onboarding' && !next.supplementOpen) record(next, action, '尚未打开可补充入口，故事想法没有写入。', 'bad');
+          else if (next.answers >= 2) record(next, action, '已达到最多两次主动回答；第三次输入不再增加引导门槛。', 'bad');
+          else {
+            next.storyIdea = '一位失去记忆的邮差，在暴雨夜收到寄给未来自己的信。';
+            next.answers += 1;
+            next.intent = next.intent || 'idea';
+            next.onboardingStep = 'confirm';
+            next.trust += 3;
+            record(next, action, `已记录一句想法（回答 ${next.answers}/2）；AI 只需做轻确认。`, 'good');
+          }
+        } else if (action.type === 'CHOOSE_GENRE') {
+          if (next.phase !== 'onboarding' && !next.supplementOpen) record(next, action, '当前不在题材选择入口，题材没有写入。', 'bad');
+          else if (next.answers >= 2) record(next, action, '已达到最多两次主动回答；第三次输入被忽略。', 'bad');
+          else {
+            next.genre = '悬疑';
+            next.answers += 1;
+            next.intent = next.intent || 'genre';
+            next.onboardingStep = 'confirm';
+            next.trust += 2;
+            record(next, action, `已选择“悬疑”（回答 ${next.answers}/2）；不要求用户填写完整策划案。`, 'good');
+          }
+        } else if (action.type === 'CONFIRM_PLAN') {
+          if (next.phase !== 'onboarding' || next.answers === 0) record(next, action, '没有可确认的轻量方向；先提供一句想法或一个题材。', 'bad');
+          else {
+            next.planConfirmed = true;
+            next.enteredChapter = true;
+            next.phase = 'chapter';
+            next.onboardingStep = 'chapter-ready';
+            next.trust += 4;
+            record(next, action, 'AI 整理只做轻确认；确认后默认进入第一章。', 'good');
+          }
+        } else if (action.type === 'OPEN_SUPPLEMENT') {
+          next.supplementOpen = true;
+          next.onboardingStep = 'supplement';
+          record(next, action, '补充入口保持可见；跳过不会把用户锁死在空白状态。', 'good');
+        } else if (action.type === 'START_FIRST_CHAPTER') {
+          next.enteredChapter = true;
+          next.phase = 'chapter';
+          next.onboardingStep = 'chapter-ready';
+          next.trust += 3;
+          record(next, action, '已进入第一章；下一步是写正文，不再继续填表。', 'good');
+        } else if (action.type === 'WRITE_EFFECTIVE') {
+          if (!next.enteredChapter) record(next, action, '尚未进入第一章，暂时没有可计为有效写作的正文。', 'bad');
+          else {
+            next.effectiveWriting = true;
+            next.writingWords = Math.max(next.writingWords, 46);
+            next.phase = 'editing';
+            next.trust += 3;
+            record(next, action, '写入一段可继续编辑的正文；首次有效写作已发生。', 'good');
+          }
+        } else if (action.type === 'CONTINUE_EDIT') {
+          if (!next.effectiveWriting) record(next, action, '没有首次有效写作，继续编辑指标暂不成立。', 'bad');
+          else {
+            next.continuedEditing = true;
+            next.writingWords = Math.max(next.writingWords, 112);
+            next.phase = 'editing';
+            next.trust += 2;
+            record(next, action, '用户继续编辑；这是本原型最接近“愿意留下来”的行为指标。', 'good');
+          }
+        } else if (action.type === 'START_GENERATION') {
+          if (!next.enteredChapter || isTerminal(next)) record(next, action, '只有进入第一章且未终止时，才能开始生成任务。', 'bad');
+          else {
+            next.phase = 'generating';
+            next.generation.status = 'running';
+            next.generation.elapsedMs = 0;
+            next.generation.feedbackState = 'none';
+            next.generation.feedbackVisible = false;
+            next.generation.usefulPreviewAvailable = false;
+            next.generation.usefulPreviewViewed = false;
+            next.generation.firstFeedbackAtMs = null;
+            next.generation.attempts += 1;
+            record(next, action, `任务已开始；等待时长参数为 ${formatSeconds(next.config.waitMs)}。`, 'normal');
+          }
+        } else if (action.type === 'WAIT') {
+          if (next.generation.status !== 'running') record(next, action, '当前没有运行中的生成任务，等待没有推进状态。', 'bad');
+          else {
+            const before = next.generation.elapsedMs;
+            const delta = Math.max(0, Number(action.ms) || 0);
+            next.generation.elapsedMs = Math.min(next.config.waitMs, before + delta);
+            const reachedFeedback = next.config.waitVariant !== 'none' && before < next.config.feedbackDelayMs && next.generation.elapsedMs >= next.config.feedbackDelayMs;
+            if (reachedFeedback) {
+              next.generation.feedbackVisible = true;
+              next.generation.feedbackState = next.config.waitVariant;
+              next.generation.firstFeedbackAtMs = next.generation.elapsedMs;
+              next.trust += next.config.feedbackTrustCorrection;
+            }
+            if (next.config.waitVariant === 'stage/progress/useful-preview' && next.generation.feedbackVisible && next.generation.elapsedMs >= Math.max(next.config.feedbackDelayMs, next.config.waitMs * .42)) next.generation.usefulPreviewAvailable = true;
+            if (next.config.waitVariant === 'none' && next.generation.elapsedMs > 2200) next.trust -= Math.min(8, (next.generation.elapsedMs - Math.max(2200, before)) / 1000 * 2);
+            if (next.generation.elapsedMs >= next.config.waitMs) {
+              next.generation.status = 'succeeded';
+              next.phase = 'chapter';
+              next.trust += 5;
+              record(next, action, reachedFeedback ? '先出现反馈，随后生成完成；结果可回到正文继续编辑。' : '生成完成；结果可回到正文继续编辑。', 'good');
+            } else {
+              const feedback = next.generation.feedbackVisible ? '已看到结构化反馈' : '尚未看到反馈';
+              record(next, action, `任务继续运行：${formatSeconds(next.generation.elapsedMs)}，${feedback}。`, next.generation.feedbackVisible ? 'good' : 'normal');
+            }
+          }
+        } else if (action.type === 'RECEIVE_FEEDBACK') {
+          if (next.generation.status !== 'running' || next.config.waitVariant === 'none') record(next, action, '当前变体没有可显示的反馈，或任务尚未运行。', 'bad');
+          else if (!next.generation.feedbackVisible) {
+            next.generation.feedbackVisible = true;
+            next.generation.feedbackState = next.config.waitVariant;
+            next.generation.firstFeedbackAtMs = next.generation.elapsedMs;
+            next.trust += next.config.feedbackTrustCorrection;
+            record(next, action, '模拟反馈到达；用户知道系统不是空转。', 'good');
+          } else record(next, action, '反馈已经可见，没有重复增加信任。', 'normal');
+        } else if (action.type === 'VIEW_PREVIEW') {
+          if (next.generation.status !== 'running' || next.config.waitVariant !== 'stage/progress/useful-preview' || !next.generation.usefulPreviewAvailable) record(next, action, '当前还没有可用预览，或等待变体不支持预览。', 'bad');
+          else {
+            next.generation.usefulPreviewViewed = true;
+            next.trust += 4;
+            record(next, action, '用户先看到一段可用预览；等待被转化为可判断的工作进展。', 'good');
+          }
+        } else if (action.type === 'COMPLETE_GENERATION') {
+          if (next.generation.status !== 'running') record(next, action, '当前没有运行中的生成任务。', 'bad');
+          else {
+            next.generation.elapsedMs = next.config.waitMs;
+            next.generation.status = 'succeeded';
+            next.phase = 'chapter';
+            next.generation.feedbackVisible = next.config.waitVariant !== 'none';
+            next.generation.usefulPreviewAvailable = next.config.waitVariant === 'stage/progress/useful-preview';
+            next.trust += 5;
+            record(next, action, '生成被直接推进到完成，用来快速检查完成后的继续编辑路径。', 'good');
+          }
+        } else if (action.type === 'RETRY') {
+          if (next.generation.status !== 'running' && next.generation.status !== 'succeeded') record(next, action, '当前没有可重试的生成任务。', 'bad');
+          else {
+            next.retries += 1;
+            next.phase = 'generating';
+            next.generation.status = 'running';
+            next.generation.elapsedMs = 0;
+            next.generation.feedbackVisible = false;
+            next.generation.feedbackState = 'none';
+            next.generation.usefulPreviewAvailable = false;
+            next.generation.attempts += 1;
+            next.trust -= 5;
+            record(next, action, `生成重新开始；累计重试 ${next.retries} 次。`, 'bad');
+          }
+        } else if (action.type === 'REFRESH') {
+          next.refreshes += 1;
+          next.trust -= 4;
+          record(next, action, next.generation.status === 'running' ? '刷新后任务状态仍在内存中；但刷新本身消耗了一部分信任。' : '刷新动作被记录；没有生产级恢复语义。', 'bad');
+        } else if (action.type === 'CANCEL') {
+          if (next.generation.status !== 'running') record(next, action, '当前没有运行中的任务可取消。', 'bad');
+          else {
+            next.cancellations += 1;
+            next.generation.status = 'cancelled';
+            next.phase = 'cancelled';
+            next.trust -= 8;
+            record(next, action, '用户主动取消；这是可恢复边界，不等同于完全放弃。', 'bad');
+          }
+        } else if (action.type === 'ABANDON') {
+          if (isTerminal(next)) record(next, action, '用户已经处于终止状态。', 'bad');
+          else {
+            next.abandoned = true;
+            next.phase = 'abandoned';
+            next.trust -= 14;
+            record(next, action, '用户放弃任务；这是最强的负向结果信号。', 'bad');
+          }
+        } else {
+          record(next, action, '没有对应的状态转换。', 'bad');
+        }
+        return derive(next);
+      }
+
+      function guideMessage(state) {
+        if (state.phase === 'abandoned') return ['本次已停止', '重新开始即可再试，当前不会继续要求回答。'];
+        if (state.phase === 'cancelled') return ['任务已取消', '可以回到正文继续编辑，或重新开始一次生成。'];
+        if (state.phase === 'generating') return ['观察任务反馈，必要时取消', '等待不应该让用户猜系统是否还活着。'];
+        if (state.phase === 'editing') return [state.continuedEditing ? '继续改下一段' : '先把这一段写完整', 'AI 不是进入正文前的必填门槛。'];
+        if (state.phase === 'chapter') return ['在第一章写下第一段', state.intent === 'skip' ? '想法之后仍可补充，不必现在补齐。' : '先写起来，后续可以继续调整方向。'];
+        if (state.onboardingStep === 'idea-input') return ['写一句故事想法就够了', '之后只做轻确认，不展开成完整策划问卷。'];
+        if (state.onboardingStep === 'genre-choice') return ['选一个题材作为起点', '少量选项只负责降低空白感。'];
+        if (state.onboardingStep === 'confirm') return ['确认这句方向，默认开始第一章', `当前主动回答 ${state.answers}/2。`];
+        if (state.onboardingStep === 'supplement') return ['补充一句，或回到正文直接写', '跳过后的补充入口仍然可见。'];
+        if (state.config.onboardingVariant === 'options-first') return ['先选一个起点', '有想法可以写一句；没想法可以从题材选。'];
+        if (state.config.onboardingVariant === 'empty-first') return ['直接写一小段，或者补一个起点', '空白不是错误，也不代表要先填完资料。'];
+        return ['先写下脑中最想写的一句话', '选项和跳过都在旁边，不会把自由描述藏起来。'];
+      }
+
+      function taskMessage(state) {
+        if (state.generation.status === 'idle') return ['还没有生成任务', '当前只在处理用户的引导选择或正文编辑。'];
+        if (state.generation.status === 'cancelled') return ['任务已取消', '系统停止了本次生成；用户仍可继续编辑。'];
+        if (state.generation.status === 'succeeded') return ['生成已完成', '结果可以回到第一章查看、修改和继续写。'];
+        if (state.generation.status === 'running') {
+          if (state.config.waitVariant === 'none') return ['系统正在生成，但没有阶段反馈', '这正是最容易让用户误以为卡死的对照条件。'];
+          if (state.config.waitVariant === 'spinner') return [state.generation.feedbackVisible ? '系统正在生成 · 加载状态可见' : '系统正在生成 · 等待加载状态', `已用 ${formatSeconds(state.generation.elapsedMs)}，预计总时长 ${formatSeconds(state.config.waitMs)}。`];
+          if (state.generation.usefulPreviewAvailable) return ['系统正在生成 · 已有一段可用预览', `阶段：${stageFor(state)}；用户可以先判断方向是否可用。`];
+          return [`系统正在生成 · ${stageFor(state)}`, `已用 ${formatSeconds(state.generation.elapsedMs)}，进度 ${percent(state.generation.elapsedMs / state.config.waitMs)}。`];
+        }
+        return ['系统状态待确认', ''];
+      }
+
+      function stageFor(state) {
+        const ratio = clamp(state.generation.elapsedMs / Math.max(1, state.config.waitMs), 0, .999);
+        return STAGES[Math.min(STAGES.length - 1, Math.floor(ratio * STAGES.length))];
+      }
+
+      function seededRandom(seed) {
+        let value = seed >>> 0;
+        return () => {
+          value += 0x6D2B79F5;
+          let t = value;
+          t = Math.imul(t ^ t >>> 15, t | 1);
+          t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+          return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+      }
+
+      function pickIntent(random, ratios) {
+        const point = random() * (ratios.idea + ratios.genre + ratios.skip);
+        if (point < ratios.idea) return 'idea';
+        if (point < ratios.idea + ratios.genre) return 'genre';
+        return 'skip';
+      }
+
+      function runVariant(params, onboardingVariant, waitVariant, seedOffset) {
+        const random = seededRandom(42 + seedOffset * 7919);
+        const metrics = { firstClick: 0, nextStepKnown: 0, enteredChapter: 0, effectiveWriting: 0, continuedEditing: 0, retry: 0, refresh: 0, cancel: 0, abandon: 0, trust: 0 };
+        const fit = {
+          'options-first': { idea: -.02, genre: .08, skip: -.06 },
+          'free-text-first+options+skip': { idea: .09, genre: .02, skip: .06 },
+          'empty-first': { idea: -.08, genre: -.07, skip: .12 }
+        }[onboardingVariant];
+        const waitSupport = { none: 0, spinner: .09, 'stage/progress/useful-preview': .19 }[waitVariant];
+        for (let i = 0; i < params.users; i += 1) {
+          const intent = pickIntent(random, params.ratios);
+          const clarity = clamp(params.comprehension / 100 + fit[intent], .08, .98);
+          const firstClick = random() < clamp(clarity + .08, .05, .99);
+          const knowsNext = random() < clamp(clarity + (intent === 'idea' && onboardingVariant === 'free-text-first+options+skip' ? .07 : 0), .05, .99);
+          const entered = random() < clamp(.70 + clarity * .22 + (intent === 'skip' ? .04 : 0), .08, .98);
+          const writing = entered && random() < clamp({ idea: .78, genre: .67, skip: .59 }[intent] + fit[intent] * .32, .12, .93);
+
+          const visibleFeedback = waitVariant !== 'none' && params.feedbackDelay < params.waitDuration;
+          const preview = waitVariant === 'stage/progress/useful-preview' && visibleFeedback && params.feedbackDelay + params.waitDuration * .42 < params.waitDuration;
+          const longWait = clamp((params.waitDuration - 2.5) / 9, 0, 1);
+          const hiddenExposure = clamp((Math.min(params.waitDuration, params.feedbackDelay) - 1.4) / Math.max(1, params.waitDuration), 0, 1);
+          const trustDelta = (clarity - .7) * 28 + (visibleFeedback ? params.trustCorrection * .65 : 0) + (preview ? 5 : 0) - longWait * 18 - hiddenExposure * 13;
+          const risk = clamp(.035 + longWait * .27 + hiddenExposure * .22 - waitSupport - (preview ? .08 : 0) - (visibleFeedback ? params.trustCorrection / 160 : 0), .01, .82);
+          const abandon = random() < risk * .22;
+          const cancel = !abandon && random() < risk * .21;
+          const retry = !abandon && !cancel && random() < risk * .43;
+          const refresh = !abandon && random() < risk * .29;
+          const continues = writing && !abandon && !cancel && random() < clamp(.53 + waitSupport * 1.1 + (preview ? .12 : 0) - risk * .33 + trustDelta / 260, .04, .93);
+
+          metrics.firstClick += firstClick ? 1 : 0;
+          metrics.nextStepKnown += knowsNext ? 1 : 0;
+          metrics.enteredChapter += entered ? 1 : 0;
+          metrics.effectiveWriting += writing ? 1 : 0;
+          metrics.continuedEditing += continues ? 1 : 0;
+          metrics.retry += retry ? 1 : 0;
+          metrics.refresh += refresh ? 1 : 0;
+          metrics.cancel += cancel ? 1 : 0;
+          metrics.abandon += abandon ? 1 : 0;
+          metrics.trust += clamp(65 + trustDelta, 0, 100);
+        }
+        const count = params.users;
+        return {
+          key: `${onboardingVariant}|${waitVariant}`,
+          onboardingVariant,
+          waitVariant,
+          firstClick: metrics.firstClick / count,
+          nextStepKnown: metrics.nextStepKnown / count,
+          enteredChapter: metrics.enteredChapter / count,
+          effectiveWriting: metrics.effectiveWriting / count,
+          continuedEditing: metrics.continuedEditing / count,
+          retry: metrics.retry / count,
+          refresh: metrics.refresh / count,
+          cancel: metrics.cancel / count,
+          abandon: metrics.abandon / count,
+          trust: metrics.trust / count
+        };
+      }
+
+      function simulateCohort(params) {
+        const rows = [];
+        const onboardingVariants = Object.keys(ONBOARDING_LABELS);
+        const waitVariants = Object.keys(WAIT_LABELS);
+        onboardingVariants.forEach((onboardingVariant, i) => waitVariants.forEach((waitVariant, j) => rows.push(runVariant(params, onboardingVariant, waitVariant, i * 11 + j))));
+        const baseline = rows.find(row => row.key === 'options-first|none');
+        const best = rows.reduce((winner, row) => row.continuedEditing > winner.continuedEditing ? row : winner, rows[0]);
+        return { rows, baseline, best, params };
+      }
+
+      return { ACTION_LABELS, EMOTION_LABELS, INTENT_LABELS, ONBOARDING_LABELS, WAIT_LABELS, PHASE_LABELS, initialState, transition, guideMessage, taskMessage, stageFor, simulateCohort, formatSeconds, percent, boolLabel };
+    })();
+
+    const $ = selector => document.querySelector(selector);
+    const $$ = selector => Array.from(document.querySelectorAll(selector));
+    const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const formatPercent = value => `${Math.round(value * 100)}%`;
+    const formatDelta = value => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}pp`;
+    const labelForOnboarding = value => OnboardingWaitLogic.ONBOARDING_LABELS[value].split(' · ')[1];
+    const labelForWait = value => OnboardingWaitLogic.WAIT_LABELS[value].split(' · ')[1];
+    let state = OnboardingWaitLogic.initialState({ onboardingVariant: $('#onboarding-variant').value, waitVariant: $('#wait-variant').value });
+    let activeWalkthrough = 'idea';
+    let walkthroughStep = 0;
+    let simulation = null;
+
+    const walkthroughs = {
+      idea: {
+        title: '有想法',
+        description: '验证自由描述是不是主入口：用户只回答一句，AI 轻确认后直接进入第一章。',
+        steps: [
+          { label: '选择“我有故事想法”', action: { type: 'CHOOSE_INTENT', value: 'idea' } },
+          { label: '写下一句想法', action: { type: 'TYPE_IDEA' } },
+          { label: '轻确认并默认进入第一章', action: { type: 'CONFIRM_PLAN' } },
+          { label: '写下第一段有效内容', action: { type: 'WRITE_EFFECTIVE' } },
+          { label: '继续编辑', action: { type: 'CONTINUE_EDIT' } }
+        ]
+      },
+      noIdea: {
+        title: '没想法',
+        description: '验证从题材开始是不是少量辅助，而不是把新用户送进一张完整策划表。',
+        steps: [
+          { label: '选择“从题材开始”', action: { type: 'CHOOSE_INTENT', value: 'genre' } },
+          { label: '选择悬疑题材', action: { type: 'CHOOSE_GENRE' } },
+          { label: '轻确认并默认进入第一章', action: { type: 'CONFIRM_PLAN' } },
+          { label: '写下第一段有效内容', action: { type: 'WRITE_EFFECTIVE' } },
+          { label: '继续编辑', action: { type: 'CONTINUE_EDIT' } }
+        ]
+      },
+      wait: {
+        title: '生成等待',
+        description: '验证任务状态是不是在回答“系统现在在做什么”，以及用户能否在等待中恢复判断，而不是重试或刷新。',
+        steps: [
+          { label: '从题材开始并选择悬疑', action: { type: 'CHOOSE_INTENT', value: 'genre' } },
+          { label: '选一个悬疑题材', action: { type: 'CHOOSE_GENRE' } },
+          { label: '轻确认并进入第一章', action: { type: 'CONFIRM_PLAN' } },
+          { label: '开始生成', action: { type: 'START_GENERATION' } },
+          { label: '等待 1.8 秒观察反馈', action: { type: 'WAIT', ms: 1800 } },
+          { label: '尝试查看可用预览', action: { type: 'VIEW_PREVIEW' } },
+          { label: '等待到完成', action: { type: 'COMPLETE_GENERATION' } },
+          { label: '继续编辑', action: { type: 'WRITE_EFFECTIVE' } }
+        ]
+      }
+    };
+
+    function currentConfig() {
+      return {
+        onboardingVariant: $('#onboarding-variant').value,
+        waitVariant: $('#wait-variant').value,
+        waitMs: Number($('#wait-ms').value) * 1000,
+        feedbackDelayMs: Number($('#feedback-delay').value) * 1000,
+        feedbackTrustCorrection: Number($('#trust-correction').value)
+      };
+    }
+
+    function resetSingleUser() {
+      state = OnboardingWaitLogic.initialState(currentConfig());
+      walkthroughStep = 0;
+      renderAll();
+    }
+
+    function dispatch(action) {
+      state = OnboardingWaitLogic.transition(state, action);
+      renderAll();
+    }
+
+    function renderState() {
+      const generation = state.generation;
+      const trustClass = state.trust < 35 ? 'danger' : state.trust < 60 ? 'warn' : '';
+      const generationStatus = generation.status === 'idle' ? '未开始' : generation.status === 'running' ? '运行中' : generation.status === 'succeeded' ? '已完成' : '已取消';
+      const snapshot = { ...state, events: state.events.slice(0, 12) };
+      $('#state-panel').innerHTML = `
+        <div class="panel-head"><div><h2>当前完整状态</h2><small>每次按钮动作都重新计算；状态字段是给讨论用的证据，不是生产契约。</small></div><span class="pill ${state.phase === 'abandoned' ? 'danger' : state.phase === 'generating' ? 'warn' : ''}">${escapeHtml(OnboardingWaitLogic.PHASE_LABELS[state.phase])}</span></div>
+        <div class="state-top">
+          <div class="state-card"><small>当前阶段 / 最后动作</small><strong>${escapeHtml(OnboardingWaitLogic.PHASE_LABELS[state.phase])}</strong><span class="sub">${escapeHtml(state.lastAction)}</span></div>
+          <div class="state-card"><small>情绪</small><strong>${escapeHtml(OnboardingWaitLogic.EMOTION_LABELS[state.emotion])}</strong><span class="sub">${escapeHtml(state.lastChange)}</span></div>
+          <div class="state-card"><small>信任</small><strong>${Math.round(state.trust)} / 100</strong><div class="meter"><span class="${trustClass}" style="width:${state.trust}%"></span></div></div>
+        </div>
+        <div class="state-grid">
+          <div class="kv"><small>引导变体</small><strong>${escapeHtml(labelForOnboarding(state.config.onboardingVariant))}</strong></div>
+          <div class="kv"><small>等待反馈变体</small><strong>${escapeHtml(labelForWait(state.config.waitVariant))}</strong></div>
+          <div class="kv"><small>引导步骤</small><strong>${escapeHtml(state.onboardingStep)}</strong></div>
+          <div class="kv"><small>首一下点击</small><strong>${escapeHtml(state.firstClick || '尚未点击')}</strong></div>
+          <div class="kv"><small>首屏理解</small><strong>${OnboardingWaitLogic.boolLabel(state.firstScreenUnderstood)}</strong></div>
+          <div class="kv"><small>输入意图</small><strong>${escapeHtml(state.intent ? OnboardingWaitLogic.INTENT_LABELS[state.intent] : '尚未选择')}</strong></div>
+          <div class="kv"><small>主动回答</small><strong>${state.answers} / 2</strong></div>
+          <div class="kv"><small>进入第一章</small><strong>${OnboardingWaitLogic.boolLabel(state.enteredChapter)}</strong></div>
+          <div class="kv"><small>首次有效写作</small><strong>${OnboardingWaitLogic.boolLabel(state.effectiveWriting)}${state.writingWords ? ` · ${state.writingWords} 字` : ''}</strong></div>
+          <div class="kv"><small>继续编辑</small><strong>${OnboardingWaitLogic.boolLabel(state.continuedEditing)}</strong></div>
+          <div class="kv"><small>重试 / 刷新</small><strong>${state.retries} / ${state.refreshes}</strong></div>
+          <div class="kv"><small>取消 / 放弃</small><strong>${state.cancellations} / ${state.abandoned ? '是' : '否'}</strong></div>
+          <div class="kv"><small>任务状态</small><strong>${generationStatus}</strong></div>
+          <div class="kv"><small>等待已用</small><strong>${OnboardingWaitLogic.formatSeconds(generation.elapsedMs)} / ${OnboardingWaitLogic.formatSeconds(state.config.waitMs)}</strong></div>
+          <div class="kv"><small>反馈 / 预览</small><strong>${generation.feedbackVisible ? '可见' : '不可见'} / ${generation.usefulPreviewViewed ? '已查看' : generation.usefulPreviewAvailable ? '可用' : '无'}</strong></div>
+        </div>
+        <div class="meter-line"><span>生成进度</span><strong>${Math.round(clamp(generation.elapsedMs / Math.max(1, state.config.waitMs), 0, 1) * 100)}%</strong></div>
+        <div class="meter"><span style="width:${clamp(generation.elapsedMs / Math.max(1, state.config.waitMs), 0, 1) * 100}%"></span></div>
+        <div class="state-note">${escapeHtml(state.lastChange)}</div>
+        <details><summary>展开原始 state snapshot（含最近 12 条事件）</summary><pre>${escapeHtml(JSON.stringify(snapshot, null, 2))}</pre></details>
+      `;
+    }
+
+    function renderSignals() {
+      const guide = OnboardingWaitLogic.guideMessage(state);
+      const task = OnboardingWaitLogic.taskMessage(state);
+      $('#guide-message').textContent = guide[0];
+      $('#guide-sub').textContent = guide[1];
+      $('#task-message').textContent = task[0];
+      $('#task-sub').textContent = task[1];
+      const note = `${labelForOnboarding(state.config.onboardingVariant)} × ${labelForWait(state.config.waitVariant)}：${state.config.waitVariant === 'none' ? '对照无反馈' : state.config.waitVariant === 'spinner' ? '反馈只证明任务还在转' : '反馈提供阶段、进度和可用内容'}。`;
+      $('#variant-note').textContent = note;
+    }
+
+    function renderLog() {
+      $('#event-count').textContent = `${state.events.length} 条`;
+      $('#event-log').innerHTML = state.events.map(event => `<div class="log-item ${event.kind === 'bad' ? 'bad' : event.kind === 'good' ? 'good' : ''}"><strong>${escapeHtml(event.action)} · ${escapeHtml(event.phase)} · ${escapeHtml(event.emotion)} · 信任 ${event.trust}</strong><span>${escapeHtml(event.detail)} · t=${escapeHtml(OnboardingWaitLogic.formatSeconds(event.time))}</span></div>`).join('');
+    }
+
+    function renderWalkthrough() {
+      $('#walk-tabs').innerHTML = Object.entries(walkthroughs).map(([id, walk]) => `<button class="tab ${id === activeWalkthrough ? 'active' : ''}" data-walkthrough="${id}">${escapeHtml(walk.title)}</button>`).join('');
+      const walk = walkthroughs[activeWalkthrough];
+      $('#walk-copy').innerHTML = `<strong>${escapeHtml(walk.title)} · 从同一初始状态开始</strong><p>${escapeHtml(walk.description)}</p><small>当前组合：${escapeHtml(labelForOnboarding(state.config.onboardingVariant))} × ${escapeHtml(labelForWait(state.config.waitVariant))}</small>`;
+      $('#step-list').innerHTML = walk.steps.map((step, index) => {
+        const status = index < walkthroughStep ? 'done' : index === walkthroughStep ? 'current' : '';
+        const button = index === walkthroughStep ? `<button class="${index === walk.steps.length - 1 ? 'warm' : 'primary'}" data-walk-step="${index}">执行</button>` : index < walkthroughStep ? '<span>已完成</span>' : '<span>等待中</span>';
+        return `<div class="step ${status}"><span class="step-num">${index + 1}</span><span>${escapeHtml(step.label)}</span>${button}</div>`;
+      }).join('');
+    }
+
+    function readSimulationParams() {
+      const raw = { idea: Number($('#idea-ratio').value), genre: Number($('#genre-ratio').value), skip: Number($('#skip-ratio').value) };
+      const total = Math.max(1, raw.idea + raw.genre + raw.skip);
+      return {
+        users: Math.max(100, Number($('#users').value)),
+        ratios: { idea: raw.idea / total * 100, genre: raw.genre / total * 100, skip: raw.skip / total * 100 },
+        comprehension: Number($('#comprehension').value),
+        waitDuration: Number($('#wait-ms').value),
+        feedbackDelay: Number($('#feedback-delay').value),
+        trustCorrection: Number($('#trust-correction').value)
+      };
+    }
+
+    function renderSimulation() {
+      if (!simulation) return;
+      const { rows, baseline, best, params } = simulation;
+      const currentKey = `${$('#onboarding-variant').value}|${$('#wait-variant').value}`;
+      const current = rows.find(row => row.key === currentKey) || best;
+      const rowDiff = metric => current[metric] - baseline[metric];
+      $('#sim-summary').innerHTML = `
+        <div class="sim-card"><small>当前组合 · 继续编辑</small><strong>${formatPercent(current.continuedEditing)}</strong><span class="delta ${rowDiff('continuedEditing') >= 0 ? 'positive' : 'negative'}">相对对照 ${formatDelta(rowDiff('continuedEditing'))}</span></div>
+        <div class="sim-card"><small>当前组合 · 放弃</small><strong>${formatPercent(current.abandon)}</strong><span class="delta ${rowDiff('abandon') <= 0 ? 'positive' : 'negative'}">相对对照 ${formatDelta(rowDiff('abandon'))}</span></div>
+        <div class="sim-card"><small>本轮最高继续编辑</small><strong>${escapeHtml(labelForOnboarding(best.onboardingVariant))}</strong><span class="delta">${escapeHtml(labelForWait(best.waitVariant))} · ${formatPercent(best.continuedEditing)}</span></div>
+      `;
+      const metric = (value, baselineValue, bestValue = false) => `<span class="${bestValue ? 'best-mark' : ''}">${formatPercent(value)}</span><br><small class="${value - baselineValue >= 0 ? 'positive' : 'negative'}">${formatDelta(value - baselineValue)}</small>`;
+      const rowsHtml = rows.map(row => `
+        <tr class="${row.key === baseline.key ? 'baseline' : ''}">
+          <td>${escapeHtml(labelForOnboarding(row.onboardingVariant))}${row.key === baseline.key ? ' · 对照' : ''}</td>
+          <td>${escapeHtml(labelForWait(row.waitVariant))}</td>
+          <td>${metric(row.firstClick, baseline.firstClick)}</td>
+          <td>${metric(row.nextStepKnown, baseline.nextStepKnown)}</td>
+          <td>${metric(row.enteredChapter, baseline.enteredChapter)}</td>
+          <td>${metric(row.effectiveWriting, baseline.effectiveWriting)}</td>
+          <td>${metric(row.continuedEditing, baseline.continuedEditing, row.key === best.key)}</td>
+          <td>${metric(row.retry, baseline.retry)}</td>
+          <td>${metric(row.refresh, baseline.refresh)}</td>
+          <td>${metric(row.cancel, baseline.cancel)}</td>
+          <td>${metric(row.abandon, baseline.abandon)}</td>
+          <td>${Math.round(row.trust)}<br><small class="${row.trust >= baseline.trust ? 'positive' : 'negative'}">${row.trust >= baseline.trust ? '+' : ''}${Math.round(row.trust - baseline.trust)}</small></td>
+        </tr>
+      `).join('');
+      $('#sim-table').innerHTML = `<thead><tr><th>引导变体</th><th>等待反馈</th><th>第一下点击</th><th>知道下一步</th><th>进入第一章</th><th>有效写作</th><th>继续编辑</th><th>重试</th><th>刷新</th><th>取消</th><th>放弃</th><th>平均信任</th></tr></thead><tbody>${rowsHtml}</tbody>`;
+      $('.simulation .footer-note').textContent = `本轮 ${params.users} 个合成用户，seed 42；反馈延迟 ${params.feedbackDelay.toFixed(1)} 秒，生成等待 ${params.waitDuration.toFixed(1)} 秒。每个百分比都是参数化模拟，不是已验证事实。表格中的“差异”相对 options-first + none。`;
+    }
+
+    function runSimulation() {
+      simulation = OnboardingWaitLogic.simulateCohort(readSimulationParams());
+      renderSimulation();
+    }
+
+    function updateRangeLabels() {
+      $('#users-value').textContent = $('#users').value;
+      $('#idea-ratio-value').textContent = `${$('#idea-ratio').value}%`;
+      $('#genre-ratio-value').textContent = `${$('#genre-ratio').value}%`;
+      $('#skip-ratio-value').textContent = `${$('#skip-ratio').value}%`;
+      $('#comprehension-value').textContent = `${$('#comprehension').value}%`;
+      $('#wait-ms-value').textContent = `${Number($('#wait-ms').value).toFixed(1)} 秒`;
+      $('#feedback-delay-value').textContent = `${Number($('#feedback-delay').value).toFixed(1)} 秒`;
+      const correction = Number($('#trust-correction').value);
+      $('#trust-correction-value').textContent = `${correction >= 0 ? '+' : ''}${correction}`;
+    }
+
+    function renderAll() {
+      renderState();
+      renderSignals();
+      renderLog();
+      renderWalkthrough();
+      updateRangeLabels();
+      if (simulation) renderSimulation();
+    }
+
+    document.addEventListener('click', event => {
+      const actionButton = event.target.closest('[data-action]');
+      if (actionButton) {
+        const action = { type: actionButton.dataset.action };
+        if (actionButton.dataset.value) action.value = actionButton.dataset.value;
+        if (actionButton.dataset.ms) action.ms = Number(actionButton.dataset.ms);
+        dispatch(action);
+        return;
+      }
+      const walkTab = event.target.closest('[data-walkthrough]');
+      if (walkTab) {
+        activeWalkthrough = walkTab.dataset.walkthrough;
+        walkthroughStep = 0;
+        state = OnboardingWaitLogic.initialState(currentConfig());
+        renderAll();
+        return;
+      }
+      const walkStep = event.target.closest('[data-walk-step]');
+      if (walkStep) {
+        const step = walkthroughs[activeWalkthrough].steps[Number(walkStep.dataset.walkStep)];
+        dispatch(step.action);
+        walkthroughStep = Math.min(walkthroughs[activeWalkthrough].steps.length, walkthroughStep + 1);
+      renderWalkthrough();
+      }
+    });
+
+    $('#reset-btn').addEventListener('click', resetSingleUser);
+    $('#onboarding-variant').addEventListener('change', resetSingleUser);
+    $('#wait-variant').addEventListener('change', resetSingleUser);
+    $('#run-sim').addEventListener('click', runSimulation);
+    $$('input[type="range"]').forEach(input => input.addEventListener('input', updateRangeLabels));
+    updateRangeLabels();
+    renderAll();
+    runSimulation();
+  </script>
+</body>
+</html>

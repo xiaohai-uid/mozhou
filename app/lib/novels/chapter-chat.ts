@@ -13,6 +13,30 @@ import { makeChatProvider } from "@/lib/chat/stream-provider";
 import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
 import { buildWritingContext, type WritingContextSection } from "@/lib/chat/writing-context";
 import { recordUsage } from "@/lib/account/service";
+import { resolveProviderBoundary } from "@/lib/ai/provider-boundary";
+import {
+
+  appendEvent,
+
+  beginAttempt,
+
+  cancelJob,
+
+  claimJob,
+
+  enqueueJob,
+
+  finalizeCancelled,
+
+  finishJob,
+
+  listSteps,
+
+  settleAttempt,
+
+} from "@/lib/tasks/service";
+import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
+
 import type { ChatModel } from "@/lib/chat/models";
 import type { ChatMessage } from "@/lib/chat/payload";
 import {
@@ -32,6 +56,7 @@ import {
   persistChapterCandidateSettlement,
   prepareChapterCandidate,
   watchChapterCandidateStop,
+  type CandidateApplyMode,
   type CandidateStatus,
   type InsertResult,
   type InsertTarget,
@@ -49,6 +74,7 @@ import { skillRuns as skillRunsTable } from "@/lib/schema";
 import type { SkillRun } from "@/lib/runtime/types";
 import { buildChapterReplayHistory } from "./chapter-replay";
 import { resolveOwnedChapter } from "./ownership";
+import { ChapterChatError, classifyChapterChatError } from "./chapter-chat-errors";
 
 /** 内置场景技能（工单 19 正式化；此处为注入链基础）：名称 → systemPrompt */
 export const SCENE_SKILLS: Record<string, string> = {
@@ -57,15 +83,8 @@ export const SCENE_SKILLS: Record<string, string> = {
 };
 
 export { ChapterNotFoundError, ContentChangedError, GenerationKeyConflictError } from "./chapter-candidate";
+export { ChapterChatError } from "./chapter-chat-errors";
 export type { InsertTarget } from "./chapter-candidate";
-
-/** 生成失败（非停止）：路由层转 error 事件 */
-export class ChapterChatError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ChapterChatError";
-  }
-}
 
 /** 正文参考注入长度上限（契约 21 第 6 节） */
 const BODY_REF_LIMIT = 3000;
@@ -102,6 +121,7 @@ export interface ChapterMessageRow {
   requestHash: string | null;
   baseRevision: number | null;
   errorMessage: string | null;
+  errorCode: string | null;
   updatedAt: string;
   createdAt: string;
   /** 质量门检查摘要（assistant 候选；候选确认路径展示用，工单 03 收尾） */
@@ -126,6 +146,7 @@ function toRow(m: typeof chapterMessages.$inferSelect): ChapterMessageRow {
     requestHash: m.requestHash,
     baseRevision: m.baseRevision,
     errorMessage: m.errorMessage,
+    errorCode: (m as { errorCode?: string | null }).errorCode ?? null,
     updatedAt: m.updatedAt.toISOString(),
     createdAt: m.createdAt.toISOString(),
     qualityGate: (m as { qualityGate?: string | null }).qualityGate ?? null,
@@ -189,6 +210,7 @@ export interface ChapterChatResult {
   skillRuns: SkillRun[];
   /** V1.3 工单 01：生成计划锚点（= generationKey；证据端点路径） */
   generationId: string;
+  errorCode?: string | null;
 }
 
 /**
@@ -213,6 +235,64 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   logChapterChatTiming(generationKey, startedAt, "candidate_prepared", {
     reused: prepared.reused,
   });
+  // 任务运行时接入（ADR-0007 / spec §6.2）：job_id = generationKey（Q6 1:1）；fail-open 不阻断写作链
+
+  let taskAttemptId: number | null = null;
+
+  let taskActive = false;
+
+  try {
+
+    const { job: taskJob } = await enqueueJob({
+      jobId: generationKey, // Q6：generationId 与 job_id 1:1
+
+      userId: input.userId,
+
+      novelId: input.novelId,
+
+      chapterId: input.chapterId,
+
+      operation: "chapter_generation",
+
+      idempotencyKey: generationKey,
+
+      inputHash: requestHash,
+
+      steps: [{ stepKey: "generate" }],
+
+    });
+
+    const claimed = await claimJob(taskJob.jobId, `req:${input.userId}`, 120);
+
+    if (claimed) {
+
+      const [taskStep] = await listSteps(taskJob.jobId);
+
+      if (taskStep) {
+
+        const attempt = await beginAttempt({ stepId: taskStep.id, trigger: "initial", provider: "one-api", model: input.model });
+
+        taskAttemptId = attempt.id;
+
+        await db
+          .update(chapterMessages)
+          .set({ attemptId: attempt.id })
+          .where(eq(chapterMessages.id, prepared.candidate.id));
+
+        taskActive = true;
+
+        await appendEvent({ jobId: generationKey, eventType: "phase", payload: { kind: "candidate_prepared" }, clientKey: "prepared" });
+
+      }
+
+    }
+
+  } catch {
+
+    // fail-open：任务登记失败不阻断既有写作链（候选生命周期仍是产品契约）
+
+  }
+
 
   const candidate = prepared.candidate;
   if (prepared.reused) {
@@ -225,6 +305,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
       reply: candidate.content,
       stopped: normalizedStatus === "stopped",
       status: normalizedStatus,
+      errorCode: candidate.errorCode,
       injected: [],
       // 复用候选：读回同一 generationId 的既有证据
       skillRuns: await listSkillRunsByGeneration(generationKey),
@@ -261,14 +342,36 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     currentMessage.id,
     candidate.id,
   );
-  const transport = createLlmTransportFromEnv();
+  const transport = createLlmTransportFromEnv("chapter");
+  const providerBoundary = resolveProviderBoundary({ route: "chapter", model: input.model });
 
   let compressed = false;
   let summary = "";
   let providerHistory = history;
   if (shouldCompress(history)) {
     try {
-      const result = await compressHistory(history, transport, input.model);
+      const result = await compressHistory(history, transport, input.model, {
+        onInference: async ({ usage, error }) => {
+          const usageReported = usage?.promptTokens != null && usage.completionTokens != null;
+          await recordAttemptUsage({
+            userId: input.userId,
+            requestId: generationKey,
+            taskId: taskActive ? generationKey : null,
+            generationId: generationKey,
+            attemptId: null,
+            sourceClass: providerBoundary.sourceClass,
+            provider: providerBoundary.provider,
+            model: providerBoundary.model,
+            credentialOwner: providerBoundary.credentialOwner,
+            billingOwner: providerBoundary.billingOwner,
+            route: "chapter-compression",
+            status: error ? "failed" : "succeeded",
+            usageStatus: usageReported ? "reported" : "unknown",
+            promptTokens: usageReported ? usage.promptTokens! : null,
+            completionTokens: usageReported ? usage.completionTokens! : null,
+          }).catch(() => {});
+        },
+      });
       const candidateSummary = typeof result.summary === "string" ? result.summary.trim() : "";
       if (candidateSummary && isUsableKeptHistory(history, result.kept)) {
         summary = candidateSummary;
@@ -395,6 +498,8 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   let firstDeltaAt: number | null = null;
 
   input.onPhase?.("streaming");
+  if (taskActive) { void appendEvent({ jobId: generationKey, eventType: "phase", payload: { kind: "streaming" }, clientKey: "streaming" }).catch(() => {}); }
+
   const state = await runNodeStream(
       initialState(),
       { nodeType: "章节对话", provider },
@@ -430,25 +535,61 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
 
   input.onPhase?.("finishing");
 
+  await recordAttemptUsage({
+    userId: input.userId,
+    requestId: generationKey,
+    taskId: taskActive ? generationKey : null,
+    generationId: generationKey,
+    attemptId: taskAttemptId,
+    sourceClass: providerBoundary.sourceClass,
+    provider: providerBoundary.provider,
+    model: providerBoundary.model,
+    credentialOwner: providerBoundary.credentialOwner,
+    billingOwner: providerBoundary.billingOwner,
+    route: "chapter",
+    status: stopped || state.task?.status === "aborted"
+      ? "cancelled"
+      : state.task?.status === "ok" ? "succeeded" : "failed",
+    usageStatus: state.usageObserved ? "reported" : "unknown",
+    promptTokens: state.usageObserved ? state.ledger.prompt : null,
+    completionTokens: state.usageObserved ? state.ledger.completion : null,
+  }).catch(() => {});
+
   const settled = await persistChapterCandidateSettlement({
     candidateId: candidate.id,
     reply,
     providerSucceeded: state.task?.status === "ok",
     stopped,
+    attemptId: taskAttemptId,
     errorMessage: state.task?.lastError,
+    errorCode: state.task?.errorCode
+      ? classifyChapterChatError({ code: state.task.errorCode })
+      : null,
   }).catch((error) => {
     throw new ChapterChatError((error as Error).message);
   });
   logChapterChatTiming(generationKey, startedAt, "candidate_settled", {
     status: settled.status,
+    ignored: settled.ignored,
     replyLength: reply.length,
   });
+  if (settled.ignored) {
+    stopped = stopped || settled.status === "stopped";
+    if (taskActive) {
+      void appendEvent({
+        jobId: generationKey,
+        eventType: "candidate_late_result_ignored",
+        payload: { candidateId: candidate.id, status: settled.status },
+        clientKey: `late-result:${candidate.id}`,
+      }).catch(() => {});
+    }
+  }
 
   if (state.task?.status === "ok") {
     await recordUsage(input.userId, "章节对话", state.ledger.prompt, state.ledger.completion).catch(() => {});
   }
   // V1.3 工单 03：post_write 质量门——候选生成后、确认前运行（两组检查分开记录）
-  const postWriteRuns: SkillRun[] = state.task?.status === "ok"
+  const postWriteRuns: SkillRun[] = state.task?.status === "ok" && !settled.ignored
     ? await runPostWriteValidators({
         userId: input.userId,
         novelId: input.novelId,
@@ -462,9 +603,96 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   logChapterChatTiming(generationKey, startedAt, "post_write_done", {
     runCount: postWriteRuns.length,
   });
+  if (taskActive && taskAttemptId != null && postWriteRuns.length > 0) {
+
+    void db.update(skillRunsTable).set({ attemptId: taskAttemptId }).where(eq(skillRunsTable.generationId, generationKey)).catch(() => {});
+
+  }
+
+  // 任务运行时终态（ADR-0007）：attempt 结算 + job 终态 + settled 事件（fail-open）
+
+  if (taskActive) {
+
+    const taskOutcome = stopped
+
+      ? "cancelled"
+
+      : state.task?.status === "ok"
+
+        ? "succeeded"
+
+        : "failed";
+
+    const taskErrorClass =
+
+      state.task?.status === "ok" || stopped
+
+        ? null
+
+        : classifyTaskError(state.task?.lastError ?? null);
+
+      try {
+
+        if (taskAttemptId != null) {
+
+          await settleAttempt({
+
+            attemptId: taskAttemptId,
+
+            status: taskOutcome === "cancelled" ? "cancelled" : taskOutcome === "succeeded" ? "succeeded" : "failed",
+
+            errorClass: taskErrorClass,
+
+            promptTokens: state.ledger.prompt,
+
+            completionTokens: state.ledger.completion,
+
+          });
+
+        }
+
+        if (taskOutcome === "cancelled") {
+
+          await cancelJob(generationKey);
+
+          await finalizeCancelled(generationKey, `req:${input.userId}`);
+
+        } else {
+
+          await finishJob(generationKey, `req:${input.userId}`, taskOutcome === "succeeded" ? "succeeded" : "failed", taskErrorClass);
+
+        }
+
+        await appendEvent({
+
+          jobId: generationKey,
+
+          eventType: taskOutcome === "succeeded" ? "done" : "error",
+
+          payload: { status: taskOutcome, replyLength: reply.length },
+
+          clientKey: "settled",
+
+        });
+
+      } catch {
+
+        // fail-open：任务终态失败不阻断写作链
+
+      }
+
+
+
+  }
+
   // 非停止且失败 → 抛错（路由层转 error 事件）
   if (!stopped && state.task?.status !== "ok") {
-    throw new ChapterChatError(state.task?.lastError ?? "生成失败");
+    throw new ChapterChatError(
+      state.task?.lastError ?? "生成失败",
+      state.task?.errorCode
+        ? classifyChapterChatError({ code: state.task.errorCode })
+        : classifyChapterChatError(state.task?.lastError),
+    );
   }
 
   return {
@@ -492,7 +720,8 @@ export async function insertChapterMessage(
   novelId: number,
   chapterId: number,
   messageId: number,
-  content: string,
+  mode: CandidateApplyMode,
+  editedContent: string | undefined,
   force: boolean,
   target?: InsertTarget,
 ): Promise<InsertResult> {
@@ -501,7 +730,8 @@ export async function insertChapterMessage(
     novelId,
     chapterId,
     messageId,
-    suppliedContent: content,
+    mode,
+    editedContent,
     force,
     target,
   });
@@ -551,4 +781,30 @@ export async function discardChapterMessage(
   messageId: number,
 ): Promise<boolean> {
   return discardChapterCandidate({ userId, novelId, chapterId, messageId });
+}
+
+
+
+/**
+
+ * 任务错误分类（ADR-0007）：把流式引擎的 lastError 文本映射到可恢复/终态分类；
+
+ * 默认 provider_network（可恢复），429/限流与超时单独归类。
+
+ */
+
+function classifyTaskError(lastError: string | null): string | null {
+
+  if (!lastError) return "provider_network";
+
+  const text = lastError.toLowerCase();
+
+  if (text.includes("429") || text.includes("rate") || text.includes("限流")) return "provider_rate_limit";
+
+  if (text.includes("timeout") || text.includes("超时")) return "provider_timeout";
+
+  if (text.includes("401") || text.includes("403") || text.includes("404")) return "provider_client_error";
+
+  return "provider_network";
+
 }

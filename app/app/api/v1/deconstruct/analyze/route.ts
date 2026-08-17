@@ -1,9 +1,30 @@
 // POST /api/v1/deconstruct/analyze — 小说拆解：正文 → oh-story 阶段化分析产物。
 // 使用现有 one-api 文本模型，不伪造阶段结果；运行记录支持恢复、幂等和失败重试。
 import { NextResponse } from "next/server";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import {
+
+  appendEvent,
+
+  beginAttempt,
+
+  claimJob,
+
+  enqueueJob,
+
+  finishJob,
+
+  listSteps,
+
+  settleAttempt,
+
+} from "@/lib/tasks/service";
+import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
+
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { createUnifiedCompletionProvider, type UnifiedCompletionProvider } from "@/lib/ai/provider";
+import { ProviderBoundaryError } from "@/lib/ai/provider-boundary";
 import { recordUsage } from "@/lib/account/service";
 import { db } from "@/lib/db";
 import {
@@ -13,10 +34,10 @@ import {
   type DeconstructionResult,
 } from "@/lib/schema";
 import {
-  classifyProviderResponse,
   runStructuredDeconstruction,
   attemptsOf,
   type ProviderCallResult,
+  type ProviderTransport,
 } from "@/lib/story/deconstruction-pipeline";
 
 export type DeconstructResult = DeconstructionResult;
@@ -96,12 +117,19 @@ const MODE_STAGES: Record<DeconstructionMode, number[]> = {
   short: [0, 2, 3, 4, 5, 6],
 };
 
-function retryDelayMs(response: Response | null, attempt: number): number {
-  const retryAfter = response?.headers.get("retry-after");
-  const seconds = retryAfter ? Number(retryAfter) : NaN;
-  const serverDelay = Number.isFinite(seconds) ? seconds * 1000 : 0;
+function retryDelayMs(attempt: number): number {
   const jitter = Math.floor(Math.random() * 250);
-  return Math.min(8_000, Math.max(serverDelay, 500 * 2 ** attempt) + jitter);
+  return Math.min(8_000, 500 * 2 ** attempt + jitter);
+}
+
+function classifyProviderError(error: unknown): Exclude<ProviderTransport, "success"> {
+  const status = error instanceof ProviderBoundaryError ? error.status : undefined;
+  if (status === 429) return "rate_limit";
+  if (status !== undefined && status >= 500) return "provider_5xx";
+  if (status !== undefined && status >= 400) return "provider_4xx";
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("aborted") || message.includes("timeout") || message.includes("超时")) return "timeout";
+  return "network";
 }
 
 async function requestDeconstructionModel(input: {
@@ -112,8 +140,8 @@ async function requestDeconstructionModel(input: {
   baseAttemptCount?: number;
   repairOutput?: string;
   deadline: number;
+  provider: UnifiedCompletionProvider;
 }): Promise<ProviderCallResult> {
-  let lastResponse: Response | null = null;
   const attempts = input.repairOutput ? REPAIR_ATTEMPTS : PRIMARY_ATTEMPTS;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const remaining = input.deadline - Date.now();
@@ -127,54 +155,47 @@ async function requestDeconstructionModel(input: {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), Math.min(input.repairOutput ? REPAIR_TIMEOUT_MS : PROVIDER_TIMEOUT_MS, remaining));
     try {
-      const response = await fetch(
-        `${process.env.ONEAPI_BASE_URL ?? "http://localhost:3001"}/v1/chat/completions`,
-        {
-          method: "POST",
-          signal: ctrl.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.ONEAPI_TOKEN ?? ""}`,
-          },
-        body: JSON.stringify({
-            model: process.env.DECONSTRUCT_MODEL ?? "deepseek-v4-flash",
-            stream: false,
-            response_format: { type: "json_object" },
-            max_tokens: 6000,
-            temperature: 0.1,
-            thinking: { type: "disabled" },
-            messages: [
-              { role: "system", content: `${PROMPT}\n本次请求 mode：${input.mode}\n本次请求必须完成阶段：${MODE_STAGES[input.mode].join(", ")}${input.repairOutput ? `\n这是一次结构修复请求。上一次输出未通过契约校验。请只输出修复后的完整 JSON，不要解释，不要删减任何必填字段。上一次输出如下：\n${input.repairOutput.slice(0, 50000)}` : ""}` },
-              { role: "user", content: input.repairOutput ? `请根据原始作品《${input.title}》的分析结果完成结构修复。` : `作品/章节《${input.title}》\n\n${input.text.slice(0, MAX_TEXT)}` },
-            ],
-          }),
+      const data = await input.provider.complete({
+        model: input.provider.boundary.model,
+        signal: ctrl.signal,
+        extraBody: {
+          response_format: { type: "json_object" },
+          max_tokens: 6000,
+          temperature: 0.1,
+          thinking: { type: "disabled" },
         },
-      );
-      lastResponse = response;
-      if (response.ok) {
-        const data = await response.json().catch(() => null) as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } } | null;
+        system: `${PROMPT}\n本次请求 mode：${input.mode}\n本次请求必须完成阶段：${MODE_STAGES[input.mode].join(", ")}${input.repairOutput ? `\n这是一次结构修复请求。上一次输出未通过契约校验。请只输出修复后的完整 JSON，不要解释，不要删减任何必填字段。上一次输出如下：\n${input.repairOutput.slice(0, 50000)}` : ""}`,
+        messages: [{
+          role: "user",
+          content: input.repairOutput
+            ? `请根据原始作品《${input.title}》的分析结果完成结构修复。`
+            : `作品/章节《${input.title}》\n\n${input.text.slice(0, MAX_TEXT)}`,
+        }],
+      });
+      return {
+        kind: "success",
+        raw: data.text,
+        usage: data.usage ? {
+          prompt_tokens: data.usage.promptTokens,
+          completion_tokens: data.usage.completionTokens,
+        } : undefined,
+        attempts: attempt + 1,
+      };
+    } catch (error) {
+      const transport = classifyProviderError(error);
+      if (!["timeout", "rate_limit", "provider_5xx"].includes(transport) || attempt === attempts - 1) {
         return {
-          kind: "success",
-          raw: data?.choices?.[0]?.message?.content ?? "",
-          usage: data?.usage,
+          kind: transport,
+          status: error instanceof ProviderBoundaryError ? error.status : undefined,
           attempts: attempt + 1,
         };
       }
-      const transport = classifyProviderResponse(response);
-      if (!["timeout", "rate_limit", "provider_5xx"].includes(transport) || attempt === attempts - 1) {
-        return { kind: transport === "success" ? "protocol_error" : transport, status: response.status, attempts: attempt + 1 };
-      }
-      await new Promise((resolve) => setTimeout(resolve, Math.min(retryDelayMs(response, attempt), Math.max(0, input.deadline - Date.now()))));
-    } catch (error) {
-      const aborted = error instanceof Error && (error.name === "AbortError" || error.message.toLowerCase().includes("aborted"));
-      if (attempt === attempts - 1) return { kind: aborted ? "timeout" : "network", attempts: attempt + 1 };
-      await new Promise((resolve) => setTimeout(resolve, Math.min(retryDelayMs(null, attempt), Math.max(0, input.deadline - Date.now()))));
+      await new Promise((resolve) => setTimeout(resolve, Math.min(retryDelayMs(attempt), Math.max(0, input.deadline - Date.now()))));
     } finally {
       clearTimeout(timer);
     }
   }
-  const transport = lastResponse ? classifyProviderResponse(lastResponse) : "network";
-  return { kind: transport === "success" ? "protocol_error" : transport, attempts };
+  return { kind: "network", attempts };
 }
 
 const PROMPT = `你是资深网络小说编辑。你要执行 oh-story 的结构化拆文管道。
@@ -266,6 +287,13 @@ export async function POST(request: Request) {
   }
 
   let runId: number | undefined;
+  // 任务运行时（ADR-0007 / 票 07）：作用域提升到 handler 层
+  let taskJobId: string | null = null;
+
+  let taskAttemptId: number | null = null;
+
+  let taskActive = false;
+
   if (requestKey) {
     const [run] = await db.insert(deconstructionRuns).values({ userId: user.id, novelId, title, sourceHash, sourceLength: text.length, requestKey, status: "running" }).onConflictDoNothing({ target: [deconstructionRuns.userId, deconstructionRuns.requestKey] }).returning({ id: deconstructionRuns.id });
     runId = run?.id;
@@ -284,6 +312,58 @@ export async function POST(request: Request) {
       errorMessage: null,
       updatedAt: new Date(),
     }).where(eq(deconstructionRuns.id, runId));
+  // 任务运行时登记（ADR-0007 / 票 07）：job_id = requestKey（幂等），fail-open
+
+  taskJobId = requestKey || `decon-${runId}`;
+
+
+
+  try {
+
+    const { job: taskJob } = await enqueueJob({
+
+      jobId: taskJobId,
+
+      userId: user.id,
+
+      novelId,
+
+      operation: "deconstruction",
+
+      idempotencyKey: taskJobId,
+
+      inputHash: sourceHash,
+
+      steps: [{ stepKey: "analyze" }],
+
+    });
+
+    const claimed = await claimJob(taskJob.jobId, `req:${user.id}`, 300);
+
+    if (claimed) {
+
+      const [taskStep] = await listSteps(taskJob.jobId);
+
+      if (taskStep) {
+
+        const attempt = await beginAttempt({ stepId: taskStep.id, trigger: "initial" });
+
+        taskAttemptId = attempt.id;
+
+        taskActive = true;
+
+        await appendEvent({ jobId: taskJobId, eventType: "phase", payload: { kind: "running" }, clientKey: "running" });
+
+      }
+
+    }
+
+  } catch {
+
+    // fail-open：任务登记失败不阻断拆解（deconstructionRuns 仍是业务真源）
+
+  }
+
   }
 
   const fail = async (input: {
@@ -317,13 +397,52 @@ export async function POST(request: Request) {
     }, { status: input.httpStatus });
   };
 
-  // 测试模式：返回固定结果
-  if (process.env.DECONSTRUCT_PROVIDER === "mock") {
-    if (process.env.NODE_ENV === "production") {
-      return fail({ message: "拆解服务配置无效", httpStatus: 500, errorClass: "configuration_error", workflow: "failed_terminal" });
-    }
+  const model = process.env.DECONSTRUCT_MODEL ?? "deepseek-v4-flash";
+  const provider = createUnifiedCompletionProvider({ route: "deconstruct", model });
+  const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
+  const recordLedger = (status: "succeeded" | "failed" | "cancelled", promptTokens?: number, completionTokens?: number) =>
+    recordAttemptUsage({
+      userId: user.id,
+      requestId,
+      taskId: taskJobId,
+      generationId: taskJobId ?? requestId,
+      attemptId: taskAttemptId,
+      sourceClass: provider.boundary.sourceClass,
+      provider: provider.boundary.provider,
+      model: provider.boundary.model,
+      credentialOwner: provider.boundary.credentialOwner,
+      billingOwner: provider.boundary.billingOwner,
+      route: "deconstruct",
+      status,
+      promptTokens,
+      completionTokens,
+    }).catch(() => {});
+
+  // 测试模式：返回固定结果；boundary 已在此处完成生产防火墙校验。
+  if (provider.boundary.sourceClass === "TEST_MOCK") {
     const mockResult = buildMockResult(mode, text.length);
     if (runId) await db.update(deconstructionRuns).set({ status: "completed", result: mockResult, errorMessage: null, updatedAt: new Date() }).where(eq(deconstructionRuns.id, runId));
+  if (taskActive) {
+
+    await (async () => {
+
+      try {
+
+        if (taskAttemptId != null) {
+          await settleAttempt({ attemptId: taskAttemptId, status: "succeeded", errorClass: null });
+        }
+        await recordLedger("succeeded");
+
+        await finishJob(taskJobId!, `req:${user.id}`, "succeeded", null);
+
+        await appendEvent({ jobId: taskJobId!, eventType: "done", payload: { status: "succeeded", mode }, clientKey: "done" });
+
+      } catch { /* fail-open */ }
+
+    })();
+
+  }
+
     return NextResponse.json({ runId, result: mockResult, title, mode, status: "completed" });
   }
 
@@ -346,6 +465,7 @@ export async function POST(request: Request) {
           baseAttemptCount: runMetadata?.attemptCount ?? 0,
           repairOutput: repair ? initialRaw : undefined,
           deadline,
+          provider,
         });
         attemptOffset += attemptsOf(response);
         if (runId) {
@@ -369,6 +489,11 @@ export async function POST(request: Request) {
             : pipeline.structured === "repair_failed"
               ? "拆解结果修复失败，可重新执行"
               : "拆解服务未返回可用结果，可重新执行";
+      await recordLedger(
+        "failed",
+        pipeline.usage.prompt_tokens,
+        pipeline.usage.completion_tokens,
+      );
       return fail({
         message,
         httpStatus,
@@ -388,9 +513,56 @@ export async function POST(request: Request) {
       pipeline.usage.prompt_tokens,
       pipeline.usage.completion_tokens,
     ).catch(() => {});
+    await recordLedger(
+      "succeeded",
+      pipeline.usage.prompt_tokens,
+      pipeline.usage.completion_tokens,
+    );
     if (runId) await db.update(deconstructionRuns).set({ status: "completed", result: pipeline.result, errorMessage: null, lastErrorClass: null, updatedAt: new Date() }).where(eq(deconstructionRuns.id, runId));
+  if (taskActive) {
+
+    await (async () => {
+
+      try {
+
+        if (taskAttemptId != null) {
+
+          await settleAttempt({ attemptId: taskAttemptId, status: "succeeded", errorClass: null });
+
+        }
+
+        await finishJob(taskJobId!, `req:${user.id}`, "succeeded", null);
+
+        await appendEvent({ jobId: taskJobId!, eventType: "done", payload: { status: "succeeded", mode }, clientKey: "done" });
+
+      } catch { /* fail-open */ }
+
+    })();
+
+  }
+
     return NextResponse.json({ runId, result: pipeline.result, title, mode, status: "completed", workflow: pipeline.workflow, structured: pipeline.structured, transport: pipeline.transport, providerAttempts: pipeline.providerAttempts, repairAttempts: pipeline.repairAttempts });
   } catch {
+    if (taskActive) {
+
+      await (async () => {
+
+        try {
+
+          if (taskAttemptId != null) await settleAttempt({ attemptId: taskAttemptId, status: "failed", errorClass: "provider_network" });
+
+          await finishJob(taskJobId!, `req:${user.id}`, "failed", "provider_network");
+
+          await appendEvent({ jobId: taskJobId!, eventType: "error", payload: { status: "failed" }, clientKey: "done" });
+
+        } catch { /* fail-open */ }
+
+      })();
+
+    }
+
+    await recordLedger("failed");
+
     return fail({ message: "拆解服务内部失败，可重新执行", httpStatus: 502, errorClass: "internal" });
   }
 }

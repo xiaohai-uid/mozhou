@@ -1,4 +1,8 @@
 import type { StreamDelta, StreamProvider } from "@/lib/pipeline/engine";
+import {
+  resolveProviderBoundary,
+  type ProviderRoute,
+} from "@/lib/ai/provider-boundary";
 import type { ChatMessage, PreparedChatRequest } from "./payload";
 
 export type CompletionRequest = {
@@ -6,6 +10,8 @@ export type CompletionRequest = {
   system?: string;
   messages: ChatMessage[];
   temperature?: number;
+  signal?: AbortSignal;
+  extraBody?: Record<string, unknown>;
 };
 
 export type CompletionResult = {
@@ -88,7 +94,9 @@ class OneApiLlmTransport implements LlmTransport {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.token}`,
         },
+        signal: request.signal,
         body: JSON.stringify({
+          ...request.extraBody,
           model: request.model,
           stream: false,
           ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
@@ -152,37 +160,49 @@ class OneApiLlmTransport implements LlmTransport {
     if (!response.body) throw new LlmTransportError("LLM transport returned an empty stream body");
 
     const reader = response.body.getReader();
+    const cancelReader = () => {
+      void reader.cancel().catch(() => {});
+    };
+    if (signal?.aborted) {
+      cancelReader();
+      return;
+    }
+    signal?.addEventListener("abort", cancelReader, { once: true });
     const decoder = new TextDecoder();
     let buffer = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const data = line.trim().replace(/^data:\s*/, "");
-        if (!data || data === "[DONE]") continue;
-        let chunk: {
-          choices?: Array<{ delta?: { content?: unknown } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        };
-        try {
-          chunk = JSON.parse(data);
-        } catch {
-          continue;
-        }
-        const text = chunk.choices?.[0]?.delta?.content;
-        if (typeof text === "string" && text) yield { text };
-        if (chunk.usage) {
-          yield {
-            usage: {
-              prompt: chunk.usage.prompt_tokens ?? 0,
-              completion: chunk.usage.completion_tokens ?? 0,
-            },
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const data = line.trim().replace(/^data:\s*/, "");
+          if (!data || data === "[DONE]") continue;
+          let chunk: {
+            choices?: Array<{ delta?: { content?: unknown } }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
           };
+          try {
+            chunk = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          const text = chunk.choices?.[0]?.delta?.content;
+          if (typeof text === "string" && text) yield { text };
+          if (chunk.usage) {
+            yield {
+              usage: {
+                prompt: chunk.usage.prompt_tokens ?? 0,
+                completion: chunk.usage.completion_tokens ?? 0,
+              },
+            };
+          }
         }
       }
+    } finally {
+      signal?.removeEventListener("abort", cancelReader);
     }
   }
 }
@@ -212,8 +232,12 @@ export function createOneApiLlmTransport(config: OneApiTransportConfig): LlmTran
 }
 
 /** Composition root factory: exactly one configuration path for completion and stream adapters. */
-export function createLlmTransportFromEnv(): LlmTransport {
-  if (process.env.CHAT_PROVIDER === "mock") return new MockLlmTransport();
+export function createLlmTransportFromEnv(route: ProviderRoute = "chat"): LlmTransport {
+  const boundary = resolveProviderBoundary({
+    route,
+    model: "chat-default",
+  });
+  if (boundary.sourceClass === "TEST_MOCK") return new MockLlmTransport();
   return createOneApiLlmTransport({
     baseUrl: process.env.ONEAPI_BASE_URL ?? "http://localhost:3001",
     token: process.env.ONEAPI_TOKEN ?? "",

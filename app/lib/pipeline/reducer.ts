@@ -12,6 +12,8 @@ export interface Task {
   attempts: number;
   maxRetries: number;
   lastError: string | null;
+  /** Stable domain error code; UI/API must not infer semantics from lastError text. */
+  errorCode: string | null;
   outputs: string[];
   lastOutput?: unknown; // 校验通过的 JSON
 }
@@ -21,6 +23,8 @@ export interface PipelineState {
   ledger: { prompt: number; completion: number; total: number };
   budget: number;
   lastAction: string;
+  /** Stream-only observation: false means the provider omitted authoritative usage. */
+  usageObserved?: boolean;
 }
 
 export interface Usage {
@@ -35,7 +39,7 @@ export type PipelineAction =
   | { type: "llmTextResult"; text: string; usage: Usage }
   | { type: "validateOk"; output: unknown }
   | { type: "validateFail"; reason: string }
-  | { type: "fail"; reason: string }
+  | { type: "fail"; reason: string; code?: string }
   | { type: "meter"; usage: Usage }
   | { type: "manualRetry" }
   | { type: "abort" }
@@ -69,6 +73,7 @@ function start(state: PipelineState, action: Extract<PipelineAction, { type: "st
       attempts: 0,
       maxRetries: action.maxRetries ?? DEFAULT_MAX_RETRIES,
       lastError: null,
+      errorCode: null,
       outputs: [],
     },
     budget: action.budget ?? state.budget,
@@ -107,7 +112,7 @@ function llmRaw(state: PipelineState, text: string): PipelineState {
   const attempts = state.task!.attempts + 1;
   return {
     ...state,
-    task: { ...state.task!, attempts, outputs: [...state.task!.outputs, text], lastError: null },
+    task: { ...state.task!, attempts, outputs: [...state.task!.outputs, text], lastError: null, errorCode: null },
     lastAction: `AI 第 ${attempts} 次返回（${text.length} 字符）`,
   };
 }
@@ -139,11 +144,11 @@ function validateFail(state: PipelineState, reason: string): PipelineState {
 }
 
 /** 流式调用失败直接置 failed（无校验修复重试语义，等人工重试） */
-function fail(state: PipelineState, reason: string): PipelineState {
+function fail(state: PipelineState, reason: string, code?: string): PipelineState {
   if (!isRunning(state)) return state;
   return {
     ...state,
-    task: { ...state.task!, status: "failed", lastError: reason },
+    task: { ...state.task!, status: "failed", lastError: reason, errorCode: code ?? null },
     lastAction: `任务失败：${reason}`,
   };
 }
@@ -204,7 +209,7 @@ export function reducer(state: PipelineState, action: PipelineAction): PipelineS
     case "validateFail":
       return validateFail(state, action.reason);
     case "fail":
-      return fail(state, action.reason);
+      return fail(state, action.reason, action.code);
     case "manualRetry":
       return manualRetry(state);
     case "abort":

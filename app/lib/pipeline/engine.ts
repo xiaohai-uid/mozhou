@@ -2,6 +2,7 @@
 // provider 抽象留 04 对接真实 one-api；本模块只依赖 LlmProvider 接口（mock 可注入）
 import { reducer, initialState, type PipelineState, type Usage } from "./reducer";
 import type { OutputSchema } from "./validate";
+import { classifyChapterChatError } from "@/lib/novels/chapter-chat-errors";
 
 export interface LlmProvider {
   /** 一次 LLM 调用。lastError 为上次校验失败原因（修复重试语义），attempt 从 0 计 */
@@ -79,24 +80,30 @@ export async function runNodeStream(
 
   let text = "";
   let usage: Usage = { prompt: 0, completion: 0 };
+  let usageObserved = false;
+  const finish = (next: PipelineState): PipelineState => ({ ...next, usageObserved });
   try {
     for await (const delta of cfg.provider.stream(signal)) {
-      if (signal?.aborted) return reducer(state, { type: "abort" });
+      if (signal?.aborted) return finish(reducer(state, { type: "abort" }));
       if (delta.text) {
         text += delta.text;
         onDelta(delta.text);
       }
-      if (delta.usage) usage = delta.usage;
+      if (delta.usage) {
+        usage = delta.usage;
+        usageObserved = true;
+      }
     }
   } catch (err) {
-    if (signal?.aborted) return reducer(state, { type: "abort" });
-    return reducer(state, {
+    if (signal?.aborted) return finish(reducer(state, { type: "abort" }));
+    return finish(reducer(state, {
       type: "fail",
       reason: `调用失败：${(err as Error).message}`,
-    });
+      code: classifyChapterChatError(err),
+    }));
   }
 
-  return reducer(state, { type: "llmTextResult", text, usage });
+  return finish(reducer(state, { type: "llmTextResult", text, usage }));
 }
 
 export interface StreamNodeConfig {

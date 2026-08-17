@@ -211,3 +211,30 @@ UI 形态：prototype V3（上升最快/新进横区 + 榜单涨跌徽标），�
 3. 默认开启 = 按创作阶段自动路由调用，不是每轮无条件注入全部技能资料。
 4. 自由回答是一级入口；AI 先提问状态在任何模板选择之前可见；模板是次级入口。
 5. 实现入口：`.scratch/mozhou-workbench-a/spec.md` + issues/01-08（运行时骨架+故事状态 → 章节规划 → 质量门 → 叙事声音 → MarketBrief → BenchmarkPack → A 版 UI → 回归部署）；仓库 ADR：docs/adr/0006-skill-runtime-and-workbench-a.md。
+
+## 2026-08-16 任务运行时 grilling 决策（Q1-Q6 全部按推荐定案）
+
+> 来源：五源炼化（DeterminFlow/ArcReel/inkos/oh-story/OpenWrite）+ 两份验收矩阵 + 机制考卷；spec 冻结于 `.scratch/mozhou-task-runtime/spec.md`（approved-frozen，变更须 Contract Delta）；ADR-0007；票：`.scratch/mozhou-task-runtime/issues/01-10`。
+
+| # | 决策 | 结论 |
+|---|---|---|
+| Q1 | 任务状态词表 | job 与 step 共用枚举 planned→queued→running→waiting_retry→succeeded/failed/cancelled；attempt 独立枚举（queued/running/succeeded/failed/cancelled） |
+| Q2 | 事件记录范围 | generation_events 表通用（scope/type/payload/client_key）；首版只写任务事件，业务事件 Phase 2 |
+| Q3 | 成本账本形态 | 新建 usage_ledger（attempt 级 + cost_status）；usage_events 保持聚合源不动 |
+| Q4 | 人工重试粒度 | step 级；首版仅「未产生结果」的 step 可重试（不重复扣费底线） |
+| Q5 | 接入形态 | 选项 A：请求内执行 + 全持久化 + 事件补发 + 失败人工重试；lease/claim 实现并测试，不部署常驻 worker |
+| Q6 | 锚点关系 | generationId 与 job_id 强制 1:1；SkillRun 挂 attempt |
+
+术语（新增）：任务运行时（可恢复创作任务运行时）、generation_jobs/steps/attempts/events（四类持久化记录）、结局分类（succeeded/failed_recoverable/failed_terminal/state_degraded）、调用级成本账本（usage_ledger）、事件游标（seq/Last-Event-ID 续传）。
+
+## 2026-08-17 Source-Class / Economics Gate 决策（T5-T6）
+
+| 术语 | 定义 |
+|---|---|
+| Provider source class | 推理来源的不可跨越分类：`PUBLIC_FREE` 公益免费、`PLATFORM_PAID` 平台付费、`USER_BYOK` 用户自带凭据、`TEST_MOCK` 测试模拟；source class 不是 provider 名称，也不由全局网关 token 推断。 |
+| Unified Provider Boundary | chat、chapter、distill、draw、deconstruct 进入模型前的统一 composition root；one-api 只能作为 Adapter，不能在业务路由内直接拼 endpoint/token。 |
+| 同类 fallback | fallback 候选必须与 primary source class 相同；`PUBLIC_FREE` 没有同类候选时返回 `FREE_UNAVAILABLE`，不得静默切到付费或 BYOK。 |
+| Authoritative usage ledger | 每次推理的 append-only 成本/来源证据，至少关联 request/task、source class、provider/model、credential owner、billing owner、tokens、cost、route、status；旧 `usage_events` 只服务产品 analytics。 |
+| 生产 Mock 防火墙 | `NODE_ENV=production` 下任何 `*_PROVIDER=mock` 或 `TEST_MOCK` 配置均 hard fail，不启动 mock，也不自动切 one-api。 |
+
+T5-T6 局部完成证据：76 个测试文件/452 个测试、tsc、Next production build 全绿；这证明 source/economics contract locally green，不等于真实公益 Provider 或 BYOK 已接入。Gate 3 之后仍需单独做真实公益模型 external acceptance，且先保持会员/支付后置。

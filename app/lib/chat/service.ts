@@ -24,6 +24,8 @@ import { loadCustomSkillDefinitions } from "@/lib/runtime/custom-skills";
 import type { SkillRun } from "@/lib/runtime/types";
 import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
 import { recordUsage } from "@/lib/account/service";
+import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
+import { resolveProviderBoundary } from "@/lib/ai/provider-boundary";
 import type { ChatModel } from "./models";
 
 export { DEFAULT_MODEL, MODELS, isChatModel } from "./models";
@@ -200,14 +202,24 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     .filter((message) => message.id !== currentMessage.id)
     .map(({ role, content }) => ({ role, content }));
   const transport = createLlmTransportFromEnv();
+  const providerBoundary = resolveProviderBoundary({ route: "chat", model: input.model });
 
   // 上下文压缩（12 工单）：只压缩历史，本轮 user 永远独立追加到末尾。
   let compressed = false;
   let summary = "";
   let providerHistory = history;
+  let compressionUsage: { promptTokens?: number; completionTokens?: number } | undefined;
+  let compressionObserved = false;
+  let compressionFailed = false;
   if (shouldCompress(history)) {
     try {
-      const r = await compressHistory(history, transport, input.model);
+      const r = await compressHistory(history, transport, input.model, {
+        onInference: ({ usage, error }) => {
+          compressionObserved = true;
+          compressionUsage = usage;
+          compressionFailed = Boolean(error);
+        },
+      });
       const candidateSummary = typeof r.summary === "string" ? r.summary.trim() : "";
       if (candidateSummary && isUsableKeptHistory(history, r.kept)) {
         summary = candidateSummary;
@@ -236,6 +248,26 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     definitions: builtinDefinitions.filter((d) => d.enabled),
     customSkills: customSkillDefinitions,
   });
+  if (compressionObserved) {
+    const usageReported = compressionUsage?.promptTokens != null && compressionUsage.completionTokens != null;
+    await recordAttemptUsage({
+      userId: input.userId,
+      requestId: pipeline.generationId,
+      taskId: null,
+      generationId: pipeline.generationId,
+      attemptId: null,
+      sourceClass: providerBoundary.sourceClass,
+      provider: providerBoundary.provider,
+      model: providerBoundary.model,
+      credentialOwner: providerBoundary.credentialOwner,
+      billingOwner: providerBoundary.billingOwner,
+      route: "chat-compression",
+      status: compressionFailed ? "failed" : "succeeded",
+      usageStatus: usageReported ? "reported" : "unknown",
+      promptTokens: usageReported ? compressionUsage!.promptTokens! : null,
+      completionTokens: usageReported ? compressionUsage!.completionTokens! : null,
+    }).catch(() => {});
+  }
   const injected: RagEntry[] = pipeline.ragEntries;
   // 工单 04：style 注入已迁移到 narrative_style 执行器（经 ContextAssembler）；stylePresent 由证据派生
   const contextSections: WritingContextSection[] = [...pipeline.sections];
@@ -290,6 +322,25 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   );
 
   const reply = state.task?.outputs.at(-1) ?? "";
+  await recordAttemptUsage({
+    userId: input.userId,
+    requestId: pipeline.generationId,
+    taskId: null,
+    generationId: pipeline.generationId,
+    attemptId: null,
+    sourceClass: providerBoundary.sourceClass,
+    provider: providerBoundary.provider,
+    model: providerBoundary.model,
+    credentialOwner: providerBoundary.credentialOwner,
+    billingOwner: providerBoundary.billingOwner,
+    route: "chat",
+    status: input.signal?.aborted || state.task?.status === "aborted"
+      ? "cancelled"
+      : state.task?.status === "ok" ? "succeeded" : "failed",
+    usageStatus: state.usageObserved ? "reported" : "unknown",
+    promptTokens: state.usageObserved ? state.ledger.prompt : null,
+    completionTokens: state.usageObserved ? state.ledger.completion : null,
+  }).catch(() => {});
   if (input.signal?.aborted) {
     return {
       state,

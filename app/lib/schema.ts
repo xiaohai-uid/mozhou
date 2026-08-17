@@ -1,15 +1,19 @@
 import {
+  bigint,
   boolean,
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type {
   ArtifactRef,
   GenerationManifest,
@@ -17,6 +21,7 @@ import type {
   SkillInputContract,
   SkillOutputContract,
 } from "@/lib/runtime/types";
+import type { TaskStatus } from "./tasks/status";
 
 /** 会员等级（11 工单消费） */
 export const tierEnum = pgEnum("tier", ["free", "member"]);
@@ -407,7 +412,11 @@ export const chapterMessages = pgTable("chapter_messages", {
   requestHash: text("request_hash"),
   /** 候选生成时章节的 revision；确认时必须仍匹配。 */
   baseRevision: integer("base_revision"),
+  /** 生成候选绑定的单次 Attempt；迟到的旧 Attempt 不得结算。 */
+  attemptId: integer("attempt_id").references(() => generationAttempts.id, { onDelete: "set null" }),
   errorMessage: text("error_message"),
+  /** Stable client-facing failure taxonomy; errorMessage remains a safe human hint. */
+  errorCode: text("error_code"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -459,6 +468,10 @@ export const skillRuns = pgTable("skill_runs", {
   outputRefs: jsonb("output_refs").$type<ArtifactRef[]>().notNull().default([]),
   /** 实际进入模型的区段（assembler 裁决后）：{ kind, tokens }，绝不记录正文。 */
   promptSection: jsonb("prompt_section").$type<{ kind: string; tokens: number } | null>(),
+  /** 任务运行时对齐（Q6）：挂到 generation_attempts.id。 */
+
+  attemptId: integer("attempt_id").references(() => generationAttempts.id, { onDelete: "set null" }),
+
   evidence: text("evidence").notNull(),
   reason: text("reason"),
   tokens: integer("tokens").notNull().default(0),
@@ -505,6 +518,15 @@ export const runtimeArtifacts = pgTable("runtime_artifacts", {
   provenance: jsonb("provenance_json").$type<{ source: string; capturedAt: string }>().notNull(),
   tokenBudget: integer("token_budget").notNull().default(0),
   data: jsonb("data_json").notNull(),
+  /** 任务运行时扩展（ADR-0007）：内容指纹与产物状态判定。 */
+  contentHash: text("content_hash"),
+  /** current | stale | missing | blocked（spec §6.2）。 */
+  artifactStatus: text("artifact_status").notNull().default("current"),
+  /** 产出来源 step（generation_steps.id）。 */
+  sourceStep: integer("source_step").references(() => generationSteps.id, { onDelete: "set null" }),
+  /** 被本产物取代的 artifact_id（版本链）。 */
+  supersedes: text("supersedes_artifact_id"),
+  staleReason: text("stale_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -548,4 +570,152 @@ export const rankingSnapshots = pgTable("ranking_snapshots", {
     table.boardId,
     table.capturedAt,
   ),
+}));
+/** ===== 可恢复创作任务运行时（ADR-0007；spec .scratch/mozhou-task-runtime/spec.md §6.2） ===== */
+
+/** generation_jobs：任务权威记录；job 与 step 共用状态枚举（spec §6.1 Q1）。 */
+export const generationJobs = pgTable("generation_jobs", {
+  id: serial("id").primaryKey(),
+  /** uuid；与 generationId 强制 1:1（Q6），SkillRun 挂 attempt。 */
+  jobId: text("job_id").notNull().unique(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  novelId: integer("novel_id").references(() => novels.id, { onDelete: "cascade" }),
+  chapterId: integer("chapter_id").references(() => chapters.id, { onDelete: "set null" }),
+  /** chapter_generation | deconstruction | import | ranking_scan | market_brief ... */
+  operation: text("operation").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  inputHash: text("input_hash").notNull(),
+  /** TaskStatus：planned→queued→running→waiting_retry→succeeded/failed/cancelled。 */
+  status: text("status").notNull().default("planned"),
+  cancelRequested: boolean("cancel_requested").notNull().default(false),
+  /** worker 身份与租约（claim/心跳/过期回收）。 */
+  owner: text("owner"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  retryAt: timestamp("retry_at", { withTimezone: true }),
+  /** 上游供应商 job 身份（恢复续跑/不重复扣费锚点）。 */
+  providerJobId: text("provider_job_id"),
+  /** 提交时冻结的 checkpoint（provider/model/endpoint 身份，防在途切换）。 */
+  executionCheckpoint: jsonb("execution_checkpoint_json").$type<Record<string, unknown>>(),
+  errorClass: text("error_class"),
+  /** 人工结束原因/终态说明（票 09）。 */
+
+  errorMessage: text("error_message"),
+
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  novelIdempotencyIdx: uniqueIndex("generation_jobs_novel_idempotency_idx").on(
+    // novel_id 可空（扫榜/市场等无作品任务）：NULL 不参与唯一约束，用 COALESCE 统一
+    sql`coalesce(${table.novelId}, 0)`,
+    table.idempotencyKey,
+  ),
+  statusIdx: index("generation_jobs_status_idx").on(table.status),
+}));
+
+/** generation_steps：job 的步骤投影；状态枚举与 job 共用。 */
+export const generationSteps = pgTable("generation_steps", {
+  id: serial("id").primaryKey(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => generationJobs.jobId, { onDelete: "cascade" }),
+  stepKey: text("step_key").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  status: text("status").notNull().default("planned"),
+  /** 步骤输入快照（冻结，重试/审计依据）。 */
+  inputSnapshot: jsonb("input_snapshot_json"),
+  outputArtifactId: text("output_artifact_id"),
+  retryAt: timestamp("retry_at", { withTimezone: true }),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  jobStepKeyIdx: uniqueIndex("generation_steps_job_step_key_idx").on(table.jobId, table.stepKey),
+}));
+
+/** generation_attempts：单次模型调用尝试；append-only（成本账本锚点）。 */
+export const generationAttempts = pgTable("generation_attempts", {
+  id: serial("id").primaryKey(),
+  stepId: integer("step_id")
+    .notNull()
+    .references(() => generationSteps.id, { onDelete: "cascade" }),
+  attemptNo: integer("attempt_no").notNull(),
+  /** initial | auto_retry | manual_retry | recovery_reissue */
+  trigger: text("trigger").notNull(),
+  provider: text("provider"),
+  model: text("model"),
+  /** AttemptStatus：queued/running/succeeded/failed/cancelled。 */
+  status: text("status").notNull().default("running"),
+  errorClass: text("error_class"),
+  promptTokens: integer("prompt_tokens").notNull().default(0),
+  completionTokens: integer("completion_tokens").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  stepAttemptIdx: uniqueIndex("generation_attempts_step_attempt_idx").on(
+    table.stepId,
+    table.attemptNo,
+  ),
+}));
+
+/** generation_events：append-only 事件日志；seq 为 SSE 续传游标（Q2：首版只写任务事件）。 */
+export const generationEvents = pgTable("generation_events", {
+  jobId: text("job_id")
+    .notNull()
+    .references(() => generationJobs.jobId, { onDelete: "cascade" }),
+  seq: bigint("seq", { mode: "number" }).notNull(),
+  eventType: text("event_type").notNull(),
+  /** 脱敏白名单字段（kind/status/tokens），绝不记正文/prompt。 */
+  payload: jsonb("payload_json").notNull().default({}),
+  /** 幂等键：同 (job, client_key) 只写一次。 */
+  clientKey: text("client_key"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  jobSeqPk: primaryKey({ columns: [table.jobId, table.seq] }),
+  jobClientKeyIdx: uniqueIndex("generation_events_job_client_key_idx").on(
+    table.jobId,
+    table.clientKey,
+  ),
+}));
+
+/** usage_ledger：调用级成本账本（Q3 新表）；attempt 级、append-only、未归因保留。 */
+export const usageLedger = pgTable("usage_ledger", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** 客户请求与任务身份；generationId 继续作为生成幂等/回放锚点。 */
+  requestId: text("request_id"),
+  taskId: text("task_id"),
+  /** 与 generation_plans.generationId 对齐（Q6：1:1）。 */
+  generationId: text("generation_id"),
+  attemptId: integer("attempt_id").references(() => generationAttempts.id, {
+    onDelete: "set null",
+  }),
+  /** T6 authoritative source/economics identity；不从全局 token 反推。 */
+  sourceClass: text("source_class").notNull().default("PUBLIC_FREE"),
+  provider: text("provider"),
+  model: text("model"),
+  credentialOwner: text("credential_owner").notNull().default("platform"),
+  billingOwner: text("billing_owner").notNull().default("provider"),
+  route: text("route").notNull().default("legacy"),
+  /** provider call terminal status：succeeded/failed/cancelled。 */
+  status: text("status").notNull().default("succeeded"),
+  /** reported = provider supplied usage; unknown = provider omitted usage. */
+  usageStatus: text("usage_status").notNull().default("unknown"),
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  /** 可空：无价格时 NULL，costStatus=unpriced（不显示 0 元）。 */
+  costAmount: numeric("cost_amount"),
+  currency: text("currency"),
+  /** priced | unpriced | partially_priced。 */
+  costStatus: text("cost_status").notNull().default("unpriced"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  attemptIdx: index("usage_ledger_attempt_idx").on(table.attemptId),
+  userIdx: index("usage_ledger_user_idx").on(table.userId),
+  generationIdx: index("usage_ledger_generation_idx").on(table.generationId),
 }));

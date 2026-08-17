@@ -75,6 +75,12 @@ describe("runNodeStream 流式驱动", () => {
     const { state } = await collect(mockStream([]));
     expect(state.task?.status).toBe("ok");
     expect(state.ledger.total).toBe(0);
+    expect(state.usageObserved).toBe(false);
+  });
+
+  it("Provider 返回 usage 时标记为已观测", async () => {
+    const { state } = await collect(mockStream([{ text: "有据可查" }, { usage: USAGE }]));
+    expect(state.usageObserved).toBe(true);
   });
 
   it("请求中止：保留已发 delta，但不把未完成流标记为成功", async () => {

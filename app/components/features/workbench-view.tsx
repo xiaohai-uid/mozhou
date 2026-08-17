@@ -12,6 +12,7 @@ import {
   BookOpenText,
   Feather,
   House,
+  ListChecks,
   PenNib,
   Scissors,
   Sparkle,
@@ -514,6 +515,9 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
               </Link>
               <Link href="/skills" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
                 <Sparkle size={16} weight="duotone" aria-hidden /> 技能广场
+              </Link>
+              <Link href="/tasks" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
+                <ListChecks size={16} weight="duotone" aria-hidden /> 任务中心
               </Link>
             </div>
           </div>

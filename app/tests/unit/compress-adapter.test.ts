@@ -87,4 +87,19 @@ describe("compression completion adapter", () => {
       kept: messages.slice(-KEEP_RECENT),
     });
   });
+
+  it("exposes compression inference usage without changing fail-open output", async () => {
+    const observations: Array<{ usage?: { promptTokens?: number; completionTokens?: number }; failed: boolean }> = [];
+    const adapter: CompletionAdapter = {
+      complete: async () => ({ text: "摘要", usage: { promptTokens: 9, completionTokens: 3 } }),
+    };
+
+    await compressHistory(messages, adapter, "deepseek-v4-flash", {
+      onInference: ({ usage, error }) => {
+        observations.push({ usage, failed: Boolean(error) });
+      },
+    });
+
+    expect(observations).toEqual([{ usage: { promptTokens: 9, completionTokens: 3 }, failed: false }]);
+  });
 });

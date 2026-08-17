@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored oh-story packages are maintained upstream and are not part of
+    // the application lint boundary.
+    "lib/story/vendor/**",
   ]),
 ]);
 

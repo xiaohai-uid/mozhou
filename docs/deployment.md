@@ -30,13 +30,35 @@ docker compose up -d
 export AUTH_SECRET=... ONEAPI_BASE_URL=... ONEAPI_TOKEN=...
 docker compose --profile prod up -d --build
 
-# 3. 迁移数据库（app 首次启动后执行）
-cd app && npx drizzle-kit migrate
+# 3. 先对 app 实际使用的 compose 网络数据库执行全部迁移
+#    不要直接在宿主机执行 `cd app && npx drizzle-kit migrate`：
+#    宿主机 .env 通常指向 localhost:5433，而 prod app 使用 postgres:5432，
+#    两者可能是不同数据库。
+docker run --rm --network novel-ai_default \
+  -v "$PWD/app:/src:ro" -w /src node:22-alpine sh -lc \
+  'cp -a /src/. /tmp/mozhou-app && cd /tmp/mozhou-app && npm ci --ignore-scripts >/dev/null && DATABASE_URL=postgres://mozhou:mozhou_dev@postgres:5432/mozhou npx drizzle-kit migrate'
 ```
+
+迁移容器必须加入运行中的 compose 网络，并使用与 `app` 服务完全相同的
+`DATABASE_URL`。若 compose 项目名不是 `novel-ai`，将 `--network` 改为实际的
+`<compose-project>_default`。当前仓库的迁移文件必须按 `app/drizzle/0000-0034`
+顺序全部应用；迁移完成后再执行 `docker compose --profile prod up -d --build`。
+
+单机 compose 会先等待 Postgres 健康，再等待 one-api 的 HTTP 根端点就绪后启动生产 Web 容器。one-api 进程异常退出时由 Docker 的 `restart: unless-stopped` 负责拉起；Web 不会因为运行中的 one-api 临时不可达而整体退出，AI 请求仍由 Provider Boundary 按稳定错误语义 fail-closed。
+
+部署前必须确认基础设施就绪：
+
+```bash
+docker compose ps
+curl -fsS http://127.0.0.1:3001/ >/dev/null
+curl -fsS http://127.0.0.1:3000/ >/dev/null
+```
+
+云端部署不使用 localhost：`ONEAPI_BASE_URL` 必须指向已部署的 HTTPS one-api 服务；Web 与 one-api 的部署成功、端点可达、Secret 注入和一次真实 PUBLIC_FREE smoke 是同一套上线验收条件，不能只以 Web 容器启动成功代替。
 
 ### B. 托管 Postgres（Neon/Supabase）+ Vercel
 
-1. 创建托管 Postgres，执行 `app/drizzle/*.sql`（0000-0009 按序）或 `npx drizzle-kit migrate`
+1. 创建托管 Postgres，针对生产 `DATABASE_URL` 按序执行当前全部 `app/drizzle/*.sql`（0000-0034）或 `npx drizzle-kit migrate`；不要连接开发机 localhost 数据库
 2. Vercel 环境变量：`DATABASE_URL` / `AUTH_SECRET` / `ONEAPI_BASE_URL` / `ONEAPI_TOKEN`
 3. one-api 必须独立公网部署（HTTPS），`ONEAPI_BASE_URL` 指向它
 4. `next build` 产物直接部署（standalone 已在 next.config 启用）

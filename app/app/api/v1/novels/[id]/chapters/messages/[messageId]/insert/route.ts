@@ -25,22 +25,27 @@ export async function POST(
     return NextResponse.json({ error: "缺少 chapterId" }, { status: 400 });
   }
   const body = (await request.json().catch(() => null)) as {
-    content?: unknown;
-    force?: unknown;
     mode?: unknown;
-    position?: unknown;
-    range?: unknown;
-    expectedContent?: unknown;
+    editedContent?: unknown;
+    force?: unknown;
+    target?: unknown;
   } | null;
-  const content = typeof body?.content === "string" ? body.content : "";
-  if (!content.trim()) {
-    return NextResponse.json({ error: "插入内容不能为空" }, { status: 400 });
+  const mode = body?.mode === "original" || body?.mode === "edited" ? body.mode : null;
+  if (!mode) {
+    return NextResponse.json({ error: "缺少有效的候选确认模式" }, { status: 400 });
+  }
+  const editedContent = typeof body?.editedContent === "string" ? body.editedContent : undefined;
+  if (mode === "edited" && !editedContent?.trim()) {
+    return NextResponse.json({ error: "编辑后的候选内容不能为空" }, { status: 400 });
   }
   const force = body?.force === true;
+  const rawTarget = typeof body?.target === "object" && body.target !== null
+    ? body.target as { mode?: unknown; position?: unknown; range?: unknown; expectedContent?: unknown }
+    : {};
   // 类型门禁：显式传入但类型错误（string/NaN 偷渡）→ NaN 交给 service isInt 拒绝（400），不静默忽略
-  const rawPos = body?.position;
+  const rawPos = rawTarget.position;
   const position = rawPos === undefined ? undefined : typeof rawPos === "number" ? rawPos : NaN;
-  const rawRange = body?.range;
+  const rawRange = rawTarget.range;
   const range =
     typeof rawRange === "object" && rawRange !== null
       ? {
@@ -56,16 +61,16 @@ export async function POST(
       : undefined;
   const target: InsertTarget = {
     mode:
-      body?.mode === "insert"
+      rawTarget.mode === "insert"
         ? "insert"
-        : body?.mode === "replace"
+        : rawTarget.mode === "replace"
           ? "replace"
-          : body?.mode === undefined
+          : rawTarget.mode === undefined
             ? "insert"
             : ("INVALID" as InsertTarget["mode"]), // 显式非法 mode → service 拒绝（400）
     ...(position !== undefined ? { position } : {}),
     ...(range !== undefined ? { range } : {}),
-    ...(typeof body?.expectedContent === "string" ? { expectedContent: body.expectedContent } : {}),
+    ...(typeof rawTarget.expectedContent === "string" ? { expectedContent: rawTarget.expectedContent } : {}),
   };
 
   try {
@@ -74,7 +79,8 @@ export async function POST(
       Number(id),
       chapterId,
       messageId,
-      content,
+      mode,
+      editedContent,
       force,
       target,
     );

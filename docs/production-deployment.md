@@ -69,7 +69,7 @@ drizzle-kit CLI 在 Windows 有挂起史 → 用官方等价手动路径（**has
 ```bash
 # 1) 建 tracking 表
 psql "$DB" -c "CREATE SCHEMA IF NOT EXISTS drizzle; CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);"
-# 2) 按序执行 0000-0012（drizzle/ 目录，ON_ERROR_STOP=1，失败即停）
+# 2) 按序执行当前全部迁移 0000-0034（drizzle/ 目录，ON_ERROR_STOP=1，失败即停）
 for f in drizzle/000*.sql; do psql "$DB" -v ON_ERROR_STOP=1 -q -f "$f"; done
 # 3) 落 tracking（sha256(LF 内容) + journal when）
 python - <<'EOF'
@@ -78,7 +78,9 @@ for e in json.load(open("drizzle/meta/_journal.json"))["entries"]:
     h = hashlib.sha256(open(f"drizzle/{e['tag']}.sql","rb").read().replace(b"\r\n",b"\n")).hexdigest()
     subprocess.run(["psql","$DB","-q","-c",f"INSERT INTO drizzle.__drizzle_migrations (hash,created_at) VALUES ('{h}',{e['when']});"],check=True)
 EOF
-# 4) 验证：tracking=13，13 张表（users/sessions/novels/chapters/messages/chapter_messages/styles/skills/sync_configs/shelf_books/usage_events/character_entries/worldview_entries）
+# 4) 验证：tracking 应等于当前 journal 条目数（本版本 35 条，0000-0034），
+#    并确认 generation_jobs/generation_steps/generation_attempts/generation_events/
+#    usage_ledger 等任务运行时表存在。
 ```
 
 ## 7. 构建镜像
@@ -166,8 +168,30 @@ gcloud run services update-traffic mozhou-web --region=asia-northeast1 --project
 # 代码修复必须走：Git → test → commit → rebuild image → redeploy（禁止进容器改）
 ```
 
+## 11.1 Release Candidate 门禁（2026-08-17）
+
+本轮验收将“应用真实链路”与“生产拓扑部署”分开判定：
+
+| 门禁 | 当前状态 | 证据 / 剩余条件 |
+|---|---|---|
+| R1 Deployment ownership | DOCUMENTED / PENDING FREEZE | Web 与 one-api 分离部署；Web 通过 `ONEAPI_BASE_URL` 使用 HTTPS；one-api 独立持久化库与 Secret Manager。发布负责人需冻结 provider/model/endpoint/credential/billing ownership。 |
+| R2 Infrastructure readiness | LOCAL COMPOSE PASS / REMOTE VERIFY PENDING | compose 已为 one-api 增加 HTTP readiness，并让 prod app 等待 one-api healthy；Cloud Run 仍需确认服务就绪、HTTPS 可达、Secret 注入。 |
+| R3 Remote real smoke | LOCAL PASS / REMOTE PENDING | 本地真实 CLI smoke 与 Edge normal slice 已通过；正式上线前需从部署后的 Web 发起一次真实 PUBLIC_FREE inference，取得 delta/done、attempt/ledger 与 usage 证据。 |
+| R4 Final browser acceptance | LOCAL PASS / DEPLOYED TOPOLOGY PENDING | 本地 Edge 已通过注册、建作、保存、真实 AI、插入、刷新和重入；仍需在最终部署拓扑执行一次冷启动后的真人路径，并验证一次停止生成。 |
+
+R1–R4 未全部满足前，状态保持 `RELEASE CANDIDATE — NORMAL PUBLIC_FREE REAL SLICE PASS; PRODUCTION TOPOLOGY ACCEPTANCE PENDING`。不得将本地 `localhost:3001` smoke 直接等同于 Cloud Run 正式上线通过，也不得为填满异常 Gate 而新增第二个 Provider 或改动已经通过的 AI 主链。
+
 ## 12. 成本保护
 
 - min 0 / max 2 / 1 vCPU / 1GiB / 无 GPU / scale-to-zero（冷启动几秒可接受）
 - $10/月预算 + 50/90/100% 阈值提醒（预算只是提醒，不是硬 cutoff）
 - Free Tier 覆盖：Cloud Run 200 万请求/月、36 万 GB-秒、18 万 vCPU-秒；Artifact Registry 0.5GB；Secret Manager 6 版本
+
+
+## 任务运行时部署说明（2026-08-17，ADR-0007 / 票 01-10）
+
+- 形态：选项 A——请求内执行 + PostgreSQL 全持久化 + 事件补发 + 失败人工重试。Cloud Run 无常驻 worker，不部署后台进程。
+- 数据：generation_jobs/steps/attempts/events + usage_ledger（迁移 0027-0030）。
+- 恢复：任务状态全部在 DB；浏览器断开经 GET /api/v1/runtime/jobs/[jobId]/events?afterSeq=N 补发；失败任务经 POST /api/v1/runtime/jobs/[jobId]/retry 人工重试（仅未产生结果的 step）；卡死任务经 .../end 人工结束。
+- 运维观察：GET /api/v1/runtime/jobs 列任务；usage_ledger 为调用级账本（本期无定价表，全部 unpriced，不显示 0 元）。
+- 扩展预留：TaskWorker.claimFilter/drain 已实现并测试；未来如需异步执行（长拆解/自动日更），以独立 runner（Cloud Run Job 或常驻小服务）消费队列即可，门面与 worker 语义不变。

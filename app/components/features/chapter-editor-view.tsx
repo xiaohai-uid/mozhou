@@ -26,6 +26,19 @@ import {
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { useBodyHistory, type SelectionState } from "./undo-history";
+import {
+  classifyChapterStream,
+  parseChapterSseEvent,
+  type ChapterStreamEvent,
+} from "@/lib/chat/chapter-stream-contract";
+import {
+  chapterModelPreferenceKey,
+  isStoredChapterModel,
+} from "@/lib/novels/chapter-model-preference";
+import {
+  CHAPTER_EDITOR_ARIA_LABEL,
+  CHAPTER_EDITOR_TEST_ID,
+} from "./chapter-editor-contract";
 
 type MessageStatus =
   | "streaming"
@@ -120,6 +133,16 @@ export function ChapterEditorView() {
     }, 100);
     return () => window.clearInterval(timer);
   }, [generationStartedAt, streaming]);
+
+  useEffect(() => {
+    if (!novelId || !chapterId) return;
+    try {
+      const stored = window.localStorage.getItem(chapterModelPreferenceKey(novelId, chapterId));
+      if (isStoredChapterModel(stored)) setModel(stored);
+    } catch {
+      // Private browsing/storage denial must not block chapter editing.
+    }
+  }, [novelId, chapterId]);
 
   /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
   useEffect(() => {
@@ -326,6 +349,8 @@ export function ChapterEditorView() {
       const decoder = new TextDecoder();
       let buffer = "";
       let current = "";
+      const streamEvents: ChapterStreamEvent[] = [];
+      let terminalSeen = false;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -335,15 +360,8 @@ export function ChapterEditorView() {
         for (const evt of events) {
           const line = evt.trim();
           if (!line.startsWith("data:")) continue;
-            const data = JSON.parse(line.slice(5).trim()) as {
-              type: string;
-              text?: string;
-              messageId?: number;
-              status?: MessageStatus;
-              code?: string;
-              message?: string;
-              phase?: GenerationSubphase;
-          };
+          const data = parseChapterSseEvent(line);
+          streamEvents.push(data);
           if (data.type === "delta" && data.text) {
             setSubphase("streaming");
             current += data.text;
@@ -351,6 +369,7 @@ export function ChapterEditorView() {
               prev.map((m) => (m.id === replyId ? { ...m, content: current } : m)),
             );
           } else if (data.type === "done") {
+            terminalSeen = true;
             // 用服务端 messageId 替换本地临时 id（插入/后续操作必须用真实 id）；bound snapshot 同步迁移
             const bound = boundRef.current.get(replyId);
             if (bound && data.messageId) {
@@ -375,6 +394,7 @@ export function ChapterEditorView() {
               setSubphase(phase);
             }
           } else if (data.type === "error") {
+            terminalSeen = true;
             // 消息级错误：带 code 供人性化映射（工单 19）
             setMessages((prev) =>
               prev.map((m) =>
@@ -383,9 +403,11 @@ export function ChapterEditorView() {
                   : m,
               ),
             );
-            return;
           }
         }
+      }
+      if (!terminalSeen || classifyChapterStream(streamEvents) === "protocol_error") {
+        throw new Error("PROTOCOL_ERROR");
       }
     } catch (err) {
       // 停止（abort）→ 保留已生成部分，标记 stopped；其他 → error
@@ -398,7 +420,8 @@ export function ChapterEditorView() {
                 content:
                   m.content ||
                   (aborted ? "" : (err as Error).message === "生成失败" ? "" : m.content),
-                status: aborted ? "stopped" : "error",
+                 status: aborted ? "stopped" : "error",
+                 errorCode: aborted ? undefined : (err as Error).message === "PROTOCOL_ERROR" ? "PROTOCOL_ERROR" : undefined,
               }
             : m,
         ),
@@ -461,13 +484,15 @@ export function ChapterEditorView() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            content,
+            mode: "original",
             force: msg.confirmInsert || msg.confirmSelection,
-            mode,
-            ...(mode === "insert"
-              ? { position: target.start }
-              : { range: { start: target.start, end: target.end } }),
-            expectedContent: body,
+            target: {
+              mode,
+              ...(mode === "insert"
+                ? { position: target.start }
+                : { range: { start: target.start, end: target.end } }),
+              expectedContent: body,
+            },
           }),
         },
       );
@@ -541,6 +566,10 @@ export function ChapterEditorView() {
         return { title: "网络连接失败", guidance: "请检查网络后重试。" };
       case "AiInvalidResponse":
         return { title: "AI 返回了无法理解的内容", guidance: "请重试，或切换模型。" };
+      case "FREE_UNAVAILABLE":
+        return { title: "当前免费 AI 暂时不可用", guidance: "你仍可以自己继续写作，稍后再试。" };
+      case "PROTOCOL_ERROR":
+        return { title: "AI 响应不完整", guidance: "本次生成没有收到完整结果，请重试。" };
       case "AiCancelled":
         return { title: "已取消生成", guidance: "生成已停止，你可以继续写作。" };
       case "ContentChanged":
@@ -605,7 +634,16 @@ export function ChapterEditorView() {
             模型
             <select
               value={model}
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setModel(next);
+                if (!isStoredChapterModel(next)) return;
+                try {
+                  window.localStorage.setItem(chapterModelPreferenceKey(novelId, chapterId), next);
+                } catch {
+                  // Preference persistence is best effort; generation remains available.
+                }
+              }}
               disabled={streaming}
               className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent disabled:opacity-50"
             >
@@ -693,6 +731,8 @@ export function ChapterEditorView() {
           )}
           <textarea
             ref={bodyTextareaRef}
+            aria-label={CHAPTER_EDITOR_ARIA_LABEL}
+            data-testid={CHAPTER_EDITOR_TEST_ID}
             value={body}
             onChange={(e) => onBodyChange(e.target.value)}
             onSelect={onEditorSelect}

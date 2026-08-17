@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PROTOTYPE · 墨舟质量数据与 Benchmark</title>
+  <style>
+    :root {
+      --ink: #1e2d2c;
+      --muted: #687875;
+      --line: #dce5e1;
+      --paper: #f4f7f5;
+      --panel: #ffffff;
+      --soft: #f7faf8;
+      --accent: #a45139;
+      --accent-soft: #f5e7e0;
+      --teal: #2e7166;
+      --teal-soft: #e5f1ed;
+      --gold: #9b6a22;
+      --gold-soft: #fbf1dc;
+      --danger: #a53e43;
+      --danger-soft: #f8e5e6;
+      --blue: #3f6178;
+      --blue-soft: #eaf0f5;
+      --shadow: 0 14px 34px rgba(30, 45, 42, .07);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); }
+    main { width: min(1320px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 70px; }
+    .eyebrow { color: var(--accent); font-size: 11px; font-weight: 850; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 920px; margin: 9px 0 12px; font-size: clamp(30px, 5vw, 56px); line-height: 1.02; letter-spacing: -.055em; }
+    h2 { margin: 0; font-size: 18px; letter-spacing: -.025em; }
+    h3 { margin: 0; font-size: 14px; }
+    h4 { margin: 0; font-size: 12px; }
+    p { color: var(--muted); line-height: 1.65; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    code { font-size: .92em; }
+    .lede { max-width: 900px; margin: 0; font-size: 15px; }
+    .question { margin: 23px 0 18px; max-width: 1040px; padding: 16px 18px; background: var(--accent-soft); border-left: 4px solid var(--accent); color: #633329; }
+    .question strong { display: block; margin-bottom: 4px; color: #4e281f; }
+    .guardrails { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 20px; }
+    .guardrail { padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.62); }
+    .guardrail strong { display: block; margin-bottom: 5px; font-size: 12px; }
+    .guardrail span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .panel { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); }
+    .panel + .panel { margin-top: 16px; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
+    .panel-head p { margin: 5px 0 0; font-size: 12px; }
+    .panel-head small { color: var(--muted); }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: #eef3f0; }
+    .toolbar-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    label { color: var(--muted); font-size: 12px; font-weight: 750; }
+    select, input { border: 1px solid #cad7d2; border-radius: 8px; padding: 8px 10px; color: var(--ink); background: #fff; font: inherit; font-size: 12px; }
+    button { border: 1px solid #cbd8d3; border-radius: 9px; padding: 8px 11px; color: var(--ink); background: #fff; cursor: pointer; font: inherit; font-size: 12px; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    button.primary { border-color: var(--accent); color: #fff; background: var(--accent); }
+    button.primary:hover { color: #fff; background: #8d402c; }
+    button.teal { border-color: var(--teal); color: #fff; background: var(--teal); }
+    button.soft { background: var(--soft); }
+    button.warn { border-color: #e2c78f; color: #7f591a; background: var(--gold-soft); }
+    button.danger { border-color: #e6b3b5; color: var(--danger); background: var(--danger-soft); }
+    .run-summary { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 18px; }
+    .chip, .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 9px; color: var(--muted); background: #edf2ef; font-size: 11px; font-weight: 800; }
+    .chip.accent, .pill.accent { color: var(--accent); background: var(--accent-soft); }
+    .chip.teal, .pill.teal { color: var(--teal); background: var(--teal-soft); }
+    .chip.gold, .pill.gold { color: var(--gold); background: var(--gold-soft); }
+    .chip.blue, .pill.blue { color: var(--blue); background: var(--blue-soft); }
+    .chip.danger, .pill.danger { color: var(--danger); background: var(--danger-soft); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.56fr) minmax(320px, .84fr); gap: 17px; align-items: start; }
+    .primary, .rail { min-width: 0; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+    .tab { border: 0; border-radius: 9px 9px 0 0; color: var(--muted); background: transparent; font-weight: 800; }
+    .tab.active { color: var(--accent); background: var(--accent-soft); }
+    .walkthrough-body { display: grid; grid-template-columns: minmax(210px, .72fr) minmax(0, 1.28fr); gap: 16px; }
+    .walk-copy { min-height: 120px; padding: 14px; border-radius: 12px; background: var(--soft); }
+    .walk-copy p { margin: 7px 0 0; font-size: 12px; }
+    .step-list { display: grid; gap: 8px; }
+    .step { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 47px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 12px; }
+    .step.current { border-color: var(--accent); background: #fff9f6; color: var(--ink); }
+    .step.done { border-color: #c8e0d6; background: #f0f8f4; color: #477265; }
+    .step-number { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: var(--muted); background: #e9efec; font-size: 11px; font-weight: 850; }
+    .step.current .step-number { color: #fff; background: var(--accent); }
+    .step.done .step-number { color: #fff; background: var(--teal); }
+    .step button { padding: 6px 8px; font-size: 11px; }
+    .section-label { margin: 20px 0 9px; color: var(--muted); font-size: 11px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .task-top { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(200px, .8fr); gap: 12px; margin-bottom: 14px; }
+    .task-meta, .context-card { padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--soft); }
+    .task-meta h3 { margin-bottom: 7px; }
+    .task-meta p, .context-card p { margin: 4px 0 0; font-size: 12px; }
+    .task-meta .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .source-text { margin: 0; padding: 11px 12px; border-radius: 9px; color: #465b56; background: #fff; font-size: 12px; line-height: 1.6; }
+    .output-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+    .output-card { position: relative; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .output-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(164,81,57,.1); }
+    .output-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .output-head strong { font-size: 13px; }
+    .output-text { min-height: 104px; margin: 0 0 12px; color: #40534f; font-size: 13px; line-height: 1.75; }
+    .rubric { display: grid; gap: 7px; }
+    .rubric-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; font-size: 11px; }
+    .rubric-row label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .score { display: inline-flex; align-items: center; gap: 4px; }
+    .score-track { width: 60px; height: 6px; border-radius: 999px; background: #e6ece9; overflow: hidden; }
+    .score-track i { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
+    .score-num { width: 25px; color: var(--muted); text-align: right; font-size: 11px; }
+    .action-bar { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
+    .action-help { margin: 9px 0 0; color: var(--muted); font-size: 11px; }
+    .notice { padding: 12px 13px; border-radius: 10px; color: #73571d; background: var(--gold-soft); font-size: 12px; line-height: 1.6; }
+    .notice strong { color: #5f4614; }
+    .last-action { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--accent); border-radius: 0 9px 9px 0; background: #fff8f4; color: #6f4132; font-size: 12px; }
+    .retention-line { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 13px; }
+    .retention-cell { padding: 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--soft); }
+    .retention-cell small { display: block; color: var(--muted); font-size: 10px; }
+    .retention-cell strong { display: block; margin-top: 3px; font-size: 13px; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .metric-group { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+    .metric-group.product { border-top: 3px solid var(--blue); }
+    .metric-group.quality { border-top: 3px solid var(--teal); }
+    .metric-group.economics { border-top: 3px solid var(--gold); }
+    .metric-group h3 { margin-bottom: 10px; }
+    .metric-list { display: grid; gap: 8px; }
+    .metric-row { display: flex; align-items: baseline; justify-content: space-between; gap: 9px; padding-bottom: 7px; border-bottom: 1px solid #e4ebe8; }
+    .metric-row:last-child { padding-bottom: 0; border-bottom: 0; }
+    .metric-row span { color: var(--muted); font-size: 11px; }
+    .metric-row strong { font-size: 16px; }
+    .metric-row em { color: var(--muted); font-size: 10px; font-style: normal; }
+    .subsection { margin-top: 17px; }
+    .subsection-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .subsection-head small { color: var(--muted); font-size: 11px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .data-table th, .data-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .data-table th { color: var(--muted); font-size: 10px; font-weight: 800; }
+    .data-table td strong { font-size: 12px; }
+    .delta-up { color: var(--teal); font-weight: 800; }
+    .delta-down { color: var(--danger); font-weight: 800; }
+    .benchmark-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .blind-card { min-height: 150px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--soft); }
+    .blind-card h4 { margin-bottom: 8px; color: var(--accent); }
+    .blind-card p { margin: 0; font-size: 12px; }
+    .benchmark-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .evidence-list { display: grid; gap: 8px; max-height: 680px; overflow: auto; }
+    .evidence-item { padding: 10px 11px; border-left: 3px solid #d8e3de; border-radius: 0 8px 8px 0; background: var(--soft); }
+    .evidence-item.blocked { border-color: var(--danger); background: #fff8f8; }
+    .evidence-item strong { display: block; margin-bottom: 3px; font-size: 11px; }
+    .evidence-item span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .evidence-item code { color: #526460; font-size: 10px; }
+    .state-json { max-height: 500px; overflow: auto; margin: 0; padding: 12px; border-radius: 10px; color: #40524e; background: #f1f5f3; font-size: 10px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .privacy-card { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--soft); }
+    .privacy-card + .privacy-card { margin-top: 9px; }
+    .privacy-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+    .privacy-card p { margin: 0; font-size: 11px; }
+    .answer-list { display: grid; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
+    .answer-list li { position: relative; padding-left: 14px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .answer-list li::before { position: absolute; left: 0; content: "•"; color: var(--teal); font-weight: 900; }
+    .answer-list.no li::before { color: var(--danger); }
+    .conclusion { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .conclusion-card { padding: 13px; border-radius: 12px; background: var(--soft); }
+    .conclusion-card.supported { border: 1px solid #c6dfd5; background: #f0f8f4; }
+    .conclusion-card.needs { border: 1px solid #e6d3a5; background: #fffaf0; }
+    .conclusion-card.unproven { border: 1px solid #e8c5c8; background: #fff6f7; }
+    .conclusion-card strong { display: block; margin-bottom: 6px; font-size: 12px; }
+    .conclusion-card p { margin: 0; font-size: 11px; }
+    .footer-note { margin-top: 17px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 800; }
+    @media (max-width: 1040px) { .layout { grid-template-columns: 1fr; } .rail { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; align-items: start; } .rail .panel + .panel { margin-top: 0; } .rail .state-panel { grid-column: 1 / -1; } }
+    @media (max-width: 760px) { main { width: min(100% - 20px, 1320px); padding-top: 24px; } .guardrails, .metrics-grid, .conclusion { grid-template-columns: 1fr; } .walkthrough-body, .task-top, .output-grid, .benchmark-pair { grid-template-columns: 1fr; } .retention-line { grid-template-columns: repeat(2, 1fr); } .rail { display: block; } .rail .panel + .panel { margin-top: 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">PROTOTYPE ONLY · QUALITY DATA / BENCHMARK</div>
+    <h1>质量数据不是功能点击的别名。</h1>
+    <p class="lede">这是一个可双击运行的逻辑原型：把一次生成从候选结果推进到接受、编辑、删除、重生成、撤销与 24h/7d 观察，再把同一组行为拆成 Product Data、Quality Data、Economics Data。</p>
+
+    <div class="question">
+      <strong>本原型要回答的问题</strong>
+      如果模型、Prompt 或上下文链路要变化，我们是否能用任务专属 rubric + blind A/B + 延迟后的保留行为支持工程决策；同时把用户正文留在隐私边界之外，除非用户主动 opt-in？
+    </div>
+
+    <div class="guardrails">
+      <div class="guardrail"><strong>三类数据分开</strong><span>Product 看完成与采纳；Quality 看保留、编辑与 rubric；Economics 看 token、延迟与成本。</span></div>
+      <div class="guardrail"><strong>质量不等于 accept</strong><span>接受只是当下动作；24h 保留、重用和编辑负担才是延迟质量 proxy。</span></div>
+      <div class="guardrail"><strong>模拟不是结论</strong><span>数据由固定种子生成，只验证记录结构与决策链，不代表真实用户、真实质量或长期护城河。</span></div>
+    </div>
+
+    <section class="toolbar" aria-label="simulation controls">
+      <div class="toolbar-group">
+        <button class="primary" id="generate-btn">生成模拟任务</button>
+        <button class="soft" id="cohort-btn">运行一组模拟行为</button>
+        <button class="soft" id="reset-btn">恢复默认演示</button>
+      </div>
+      <div class="toolbar-group">
+        <label for="task-count">任务数</label>
+        <select id="task-count"><option value="6">6</option><option value="12" selected>12</option><option value="24">24</option></select>
+        <label for="scenario">数据场景</label>
+        <select id="scenario"><option value="balanced">平衡样本</option><option value="counterexample">反例：采纳高 / 24h 保留低</option></select>
+      </div>
+    </section>
+
+    <div id="run-summary" class="run-summary"></div>
+
+    <div class="layout">
+      <div class="primary">
+        <section class="panel" id="walkthrough-panel"></section>
+        <section class="panel" id="task-panel"></section>
+        <section class="panel" id="metrics-panel"></section>
+        <section class="panel" id="conclusion-panel"></section>
+      </div>
+      <aside class="rail">
+        <section class="panel" id="privacy-panel"></section>
+        <section class="panel" id="evidence-panel"></section>
+        <section class="panel state-panel" id="state-panel"></section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    // Logic module: pure state transitions and metric derivation live here.
+    // The DOM layer below only renders state and dispatches domain actions.
+    const QualityDataPrototype = (() => {
+      const COST_PER_1K_TOKENS = 0.42;
+      const BENCHMARK_PARAMS = {
+        baselineModel: "MoZhou-Base-0.9",
+        candidateModel: "MoZhou-Base-1.0",
+        promptFingerprint: "prompt-v17",
+        contextChain: "ctx-v4 / scene → canon → recent",
+        rubricVersion: "rubric-pack-v1",
+        blindKey: "pair-order-randomized",
+        costPer1KTokens: COST_PER_1K_TOKENS
+      };
+      const TASK_TYPES = {
+        continuation: {
+          label: "续写",
+          color: "accent",
+          prompt: "接着上一段写 120 字，推进一个可观察的动作，并留一个小悬念。",
+          context: "上一段：雨停在城门外。沈砚握着半枚旧铜钱，听见城内传来第三声钟。",
+          rubric: [
+            { key: "continuity", label: "情节连续性", hint: "接住已有事件与因果" },
+            { key: "causality", label: "因果推进", hint: "新动作不是凭空出现" },
+            { key: "voice", label: "叙事声音", hint: "保持作品的句式与气质" },
+            { key: "forwardMotion", label: "前进动力", hint: "产生下一步写作抓手" }
+          ]
+        },
+        polish: {
+          label: "润色",
+          color: "teal",
+          prompt: "在不改动事实的前提下润色这一段，减少重复，保留作者声音。",
+          context: "原文：她其实很害怕，但是她还是走进了那间很黑的屋子。她听见了一个声音。",
+          rubric: [
+            { key: "meaning", label: "语义保真", hint: "不擅自改事实与意图" },
+            { key: "rhythm", label: "节奏改善", hint: "句子有呼吸，不只换同义词" },
+            { key: "precision", label: "表达精度", hint: "减少冗余并保留信息" },
+            { key: "preserveVoice", label: "作者声音保留", hint: "不把文本改成统一 AI 腔" }
+          ]
+        },
+        dialogue: {
+          label: "人物对话",
+          color: "blue",
+          prompt: "写一轮两人对话：顾遥想隐瞒钥匙的来源，林檐已经猜到一半。不要直接说出秘密。",
+          context: "人物卡：顾遥习惯用玩笑遮掩；林檐说话短，遇到关键处会停顿。场景：临江客栈后门。",
+          rubric: [
+            { key: "characterVoice", label: "人物声音", hint: "两个人说话能分开" },
+            { key: "subtext", label: "潜台词", hint: "没说出口的意图可被读到" },
+            { key: "turnTaking", label: "接话自然", hint: "每句回应上一句的压力" },
+            { key: "conflict", label: "关系张力", hint: "对话推动关系或选择" }
+          ]
+        }
+      };
+      const TYPE_KEYS = Object.keys(TASK_TYPES);
+      const WALKTHROUGHS = {
+        lifecycle: {
+          label: "单次结果生命周期",
+          description: "把一个候选结果当作有生命周期的对象：接受不等于永久质量，编辑和撤销会改变证据，24h/7d 才开始回答保留问题。",
+          steps: [
+            { label: "开始单次生命周期", action: "START_WALKTHROUGH" },
+            { label: "接受当前候选", action: "ACCEPT" },
+            { label: "编辑后保存", action: "EDIT" },
+            { label: "撤销最近一次编辑", action: "UNDO" },
+            { label: "推进到 24h", action: "ADVANCE_24" },
+            { label: "再推进到 D7 proxy", action: "ADVANCE_144" }
+          ]
+        },
+        benchmark: {
+          label: "A/B benchmark",
+          description: "先冻结模型、Prompt、上下文链与 rubric fingerprint，再以卡 1/卡 2 做 blind compare；揭盲前不把用户偏好解释成模型优劣。",
+          steps: [
+            { label: "开始 A/B benchmark", action: "START_WALKTHROUGH" },
+            { label: "冻结 benchmark 基线", action: "BENCHMARK_FREEZE" },
+            { label: "模拟提交一批盲评偏好", action: "SEED_BENCHMARK_VOTES" },
+            { label: "揭盲并汇总胜平负", action: "BENCHMARK_REVEAL" }
+          ]
+        },
+        privacy: {
+          label: "隐私 / 训练边界",
+          description: "先只保存派生指标，尝试读取正文会被拒绝；只有用户主动 opt-in，才允许保存一条脱敏样本 envelope，而且原文仍不进入训练集。",
+          steps: [
+            { label: "开始隐私边界场景", action: "START_WALKTHROUGH" },
+            { label: "保存派生指标", action: "PRIVACY_SAVE_DERIVED" },
+            { label: "尝试读取用户正文", action: "PRIVACY_REQUEST_RAW" },
+            { label: "用户主动 opt-in", action: "PRIVACY_OPT_IN" },
+            { label: "保存一条脱敏样本", action: "PRIVACY_SAVE_SAMPLE" }
+          ]
+        }
+      };
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function seededRandom(seed) {
+        let value = Math.abs(Number(seed) || 1) % 2147483647;
+        return () => {
+          value = value * 16807 % 2147483647;
+          return (value - 1) / 2147483646;
+        };
+      }
+
+      function pad(number) {
+        return String(number).padStart(2, "0");
+      }
+
+      function nowLabel() {
+        return new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      }
+
+      function taskTypeFor(index) {
+        return TYPE_KEYS[index % TYPE_KEYS.length];
+      }
+
+      function outputText(type, version, index) {
+        const person = ["沈砚", "顾遥", "林檐", "许栖"][index % 4];
+        const alternatives = {
+          continuation: {
+            baseline: `${person}在门槛外停住，等第三声钟沉进雨后的雾里，才把半枚铜钱按在门缝上。城内没有人应答，墙后的灯却一盏一盏亮了起来。`,
+            candidate: `${person}把折断的灯芯收进袖口，踩过门槛。第三声钟还没散，铜钱上的旧纹便朝城内转去——有人在等他，也有人不希望他看见那扇亮起的窗。`
+          },
+          polish: {
+            baseline: "她很害怕，但还是走进了那间黑屋。屋里传来一个声音，她停了下来。",
+            candidate: "她明明害怕，仍然走进那间没有灯的屋子。门在身后合上，一个声音贴着黑暗响起；她没有回头，只把手指抵住了门缝。"
+          },
+          dialogue: {
+            baseline: `顾遥笑了笑：“钥匙？路上捡的。”\n林檐看着他：“哪条路？”\n“你今天问题真多。”\n“你今天撒谎也很多。”`,
+            candidate: `顾遥把钥匙在指间转了一圈：“后门风大，什么都会吹过来。”\n林檐没有接他的玩笑：“包括你不想让我知道的事？”\n钥匙停住。顾遥抬眼：“你已经知道了？”`
+          }
+        };
+        return alternatives[type][version];
+      }
+
+      function makeScores(type, version, index, random) {
+        const base = 3.1 + random() * 1.25;
+        const candidateLift = type === "polish" ? .38 : (type === "dialogue" ? .27 : .2);
+        const scores = {};
+        TASK_TYPES[type].rubric.forEach((dimension, dimensionIndex) => {
+          const wobble = ((index + dimensionIndex) % 3) * .16 + random() * .22;
+          const score = Math.max(1, Math.min(5, base + (version === "candidate" ? candidateLift : 0) - wobble));
+          scores[dimension.key] = Number(score.toFixed(1));
+        });
+        return scores;
+      }
+
+      function averageScores(scores) {
+        const values = Object.values(scores);
+        return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : 0;
+      }
+
+      function makeTask(index, type, scenario, random) {
+        const scoresA = makeScores(type, "baseline", index, random);
+        const scoresB = makeScores(type, "candidate", index, random);
+        const baselineScore = averageScores(scoresA);
+        const candidateScore = averageScores(scoresB);
+        const preference = Math.abs(candidateScore - baselineScore) < .18 ? "tie" : (candidateScore > baselineScore ? "candidate" : "baseline");
+        const order = random() > .5 ? ["baseline", "candidate"] : ["candidate", "baseline"];
+        const baseTokens = 330 + Math.round(random() * 120);
+        const task = {
+          id: `task-${pad(index + 1)}`,
+          type,
+          typeLabel: TASK_TYPES[type].label,
+          prompt: TASK_TYPES[type].prompt,
+          context: TASK_TYPES[type].context,
+          status: "new",
+          selectedVersion: "candidate",
+          acceptedEver: false,
+          editedEver: false,
+          reused: false,
+          deleted: false,
+          regenerateCount: 0,
+          editChars: 0,
+          retention24h: null,
+          retention7d: null,
+          observedAtHours: 0,
+          actionHistory: [],
+          undoSnapshot: null,
+          rubric: clone(TASK_TYPES[type].rubric),
+          outputs: {
+            baseline: { label: "旧版", text: outputText(type, "baseline", index), rubricScores: scoresA, rubricAverage: baselineScore, tokensIn: 118 + Math.round(random() * 20), tokensOut: baseTokens, latencyMs: 1120 + Math.round(random() * 420) },
+            candidate: { label: "新版", text: outputText(type, "candidate", index), rubricScores: scoresB, rubricAverage: candidateScore, tokensIn: 121 + Math.round(random() * 20), tokensOut: baseTokens + 12, latencyMs: 980 + Math.round(random() * 420) }
+          },
+          benchmark: { order, vote: null, preferencePlan: preference, voteSource: null },
+          retentionPlan: {
+            h24: scenario === "counterexample" ? index % 5 === 0 : index % 4 !== 0,
+            d7: scenario === "counterexample" ? index % 7 === 0 : index % 3 !== 0
+          },
+          scenario
+        };
+        return task;
+      }
+
+      function createTasks(count, scenario, seed) {
+        const random = seededRandom(seed);
+        return Array.from({ length: count }, (_, index) => makeTask(index, taskTypeFor(index), scenario, random));
+      }
+
+      function emptyState() {
+        return {
+          version: "quality-data-benchmark-prototype.v1",
+          activeTab: "lifecycle",
+          activeTaskId: null,
+          clockHours: 0,
+          lastAction: "等待生成模拟数据",
+          run: {
+            id: "run-not-started",
+            seed: 20260817,
+            taskCount: 0,
+            scenario: "balanced",
+            generated: false,
+            simulatedCohort: false,
+            retentionWindowHours: 24,
+            d7ProxyWindowHours: 168
+          },
+          tasks: [],
+          benchmark: {
+            frozen: false,
+            revealed: false,
+            baselineFingerprint: null,
+            votesSubmitted: 0
+          },
+          privacy: {
+            mode: "derived-only",
+            optIn: false,
+            derivedSaved: false,
+            sampleSaved: false,
+            rawTextStored: false,
+            lastBoundary: "尚未演示"
+          },
+          walkthrough: {
+            lifecycle: { started: false, step: 0 },
+            benchmark: { started: false, step: 0 },
+            privacy: { started: false, step: 0 }
+          },
+          evidenceLog: []
+        };
+      }
+
+      function withEvidence(state, kind, title, detail, payload, blocked = false) {
+        const entry = { at: nowLabel(), kind, title, detail, payload: payload || {}, blocked };
+        state.evidenceLog = [entry, ...state.evidenceLog].slice(0, 80);
+        state.lastAction = blocked ? `已拦截：${title}` : title;
+        return state;
+      }
+
+      function activeTask(state) {
+        return state.tasks.find(task => task.id === state.activeTaskId) || state.tasks[0] || null;
+      }
+
+      function saveUndo(task) {
+        const snapshot = clone(task);
+        snapshot.undoSnapshot = null;
+        task.undoSnapshot = snapshot;
+      }
+
+      function updateRetention(state) {
+        state.tasks.forEach(task => {
+          if (!task.acceptedEver || task.deleted) return;
+          if (state.clockHours >= 24 && task.retention24h === null) {
+            task.retention24h = task.status === "regenerated" ? false : task.retentionPlan.h24;
+            task.observedAtHours = Math.max(task.observedAtHours, 24);
+          }
+          if (state.clockHours >= 168 && task.retention7d === null) {
+            task.retention7d = task.status === "regenerated" ? false : task.retentionPlan.d7;
+            task.observedAtHours = Math.max(task.observedAtHours, 168);
+          }
+        });
+      }
+
+      function seedCohort(state) {
+        state.clockHours = 168;
+        state.run.simulatedCohort = true;
+        state.tasks.forEach((task, index) => {
+          const counter = state.run.scenario === "counterexample";
+          const accepted = counter ? index < Math.ceil(state.tasks.length * .83) : index % 5 !== 0;
+          const edited = accepted && (counter ? index % 3 === 0 : index % 4 === 0);
+          const reused = accepted && !edited && (counter ? index % 4 === 0 : index % 3 === 0);
+          const deleted = !accepted || (counter && index === state.tasks.length - 2);
+          task.acceptedEver = accepted;
+          task.editedEver = edited;
+          task.reused = reused;
+          task.deleted = deleted;
+          task.status = deleted ? "deleted" : (reused ? "reused" : (edited ? "edited" : "accepted"));
+          task.editChars = edited ? 24 + index * 3 : 0;
+          task.retention24h = accepted && !deleted ? task.retentionPlan.h24 : false;
+          task.retention7d = accepted && !deleted ? task.retentionPlan.d7 : false;
+          task.observedAtHours = 168;
+          task.actionHistory = [{ event: "cohort_simulation", atHours: 0, detail: task.status }];
+          task.undoSnapshot = null;
+          task.benchmark.vote = null;
+          task.benchmark.voteSource = null;
+        });
+        return state;
+      }
+
+      function generate(state, count, scenario, seed) {
+        const next = emptyState();
+        next.activeTab = state.activeTab || "lifecycle";
+        next.run = { ...next.run, id: `run-${String(seed).slice(-6)}-${count}`, seed, taskCount: count, scenario, generated: true };
+        next.tasks = createTasks(count, scenario, seed);
+        next.activeTaskId = next.tasks[0] ? next.tasks[0].id : null;
+        withEvidence(next, "dataset", "生成模拟任务集", `生成 ${count} 个任务，包含续写 / 润色 / 人物对话。`, { seed, scenario, count, noPersistence: true });
+        seedCohort(next);
+        withEvidence(next, "simulation", "生成模拟 cohort 行为", `已将观察时钟快进到 ${next.clockHours}h，写入接受、编辑、删除、重用和保留 proxy。`, { scenario, clockHours: next.clockHours, synthetic: true });
+        return next;
+      }
+
+      function startWalkthrough(state, tab) {
+        const next = emptyState();
+        next.activeTab = tab;
+        next.run.seed = tab === "benchmark" ? 20260817 : (tab === "privacy" ? 20260818 : 20260819);
+        next.run.id = `guided-${tab}`;
+        next.run.taskCount = tab === "benchmark" ? 6 : 1;
+        next.run.scenario = tab === "lifecycle" ? "guided-lifecycle" : "balanced";
+        next.run.generated = true;
+        next.tasks = createTasks(next.run.taskCount, next.run.scenario === "guided-lifecycle" ? "balanced" : next.run.scenario, next.run.seed);
+        next.activeTaskId = next.tasks[0] ? next.tasks[0].id : null;
+        next.walkthrough[tab] = { started: true, step: 1 };
+        withEvidence(next, "walkthrough", `开始${WALKTHROUGHS[tab].label}`, "重置到可复现的已知初始状态；后续每一步都会刷新完整 state 与 evidence。", { tab, taskCount: next.run.taskCount, seed: next.run.seed });
+        return next;
+      }
+
+      function transitionTask(state, action) {
+        const task = activeTask(state);
+        if (!task) return withEvidence(state, "blocked", "无可操作任务", "请先生成模拟任务或开始一个 walkthrough。", {}, true);
+        if (action.type === "SELECT_TASK") {
+          state.activeTaskId = action.id;
+          return withEvidence(state, "navigation", `切换到 ${action.id}`, "当前任务已切换，其他任务状态保持不变。", { taskId: action.id });
+        }
+        if (action.type === "SELECT_VERSION") {
+          task.selectedVersion = action.version;
+          return withEvidence(state, "view", `查看${task.outputs[action.version].label}结果`, "只改变当前查看版本，不计入采纳或质量结论。", { taskId: task.id, version: action.version });
+        }
+        if (action.type === "ADVANCE_HOURS") {
+          state.clockHours += action.hours;
+          updateRetention(state);
+          return withEvidence(state, "observation", `时间推进到 ${state.clockHours}h`, "延迟观察窗口已更新；保留指标只在达到窗口后才落值。", { clockHours: state.clockHours, retention24h: state.clockHours >= 24, retention7d: state.clockHours >= 168 });
+        }
+        if (action.type === "UNDO") {
+          if (!task.undoSnapshot) return withEvidence(state, "blocked", "撤销无可用快照", "当前任务没有可撤销的最近一次候选变更。", { taskId: task.id }, true);
+          const restored = clone(task.undoSnapshot);
+          restored.undoSnapshot = null;
+          const index = state.tasks.findIndex(item => item.id === task.id);
+          state.tasks[index] = restored;
+          return withEvidence(state, "lifecycle", "撤销最近一次候选变更", "撤销只回退当前任务的最近一次接受、编辑、删除或重生成，不删除证据日志。", { taskId: task.id, restoredStatus: restored.status });
+        }
+        if (action.type === "ACCEPT") {
+          if (task.deleted) return withEvidence(state, "blocked", "接受被拦截", "已删除结果不能直接恢复为采纳；应先重生成新的候选。", { taskId: task.id, status: task.status }, true);
+          saveUndo(task);
+          task.acceptedEver = true;
+          task.deleted = false;
+          task.status = "accepted";
+          task.actionHistory.push({ event: "accept", atHours: state.clockHours, version: task.selectedVersion });
+          updateRetention(state);
+          return withEvidence(state, "lifecycle", "接受当前候选", "记录一个采纳事件；这还不能单独证明质量。", { taskId: task.id, version: task.selectedVersion, acceptIsNotQuality: true });
+        }
+        if (action.type === "EDIT") {
+          if (task.deleted) return withEvidence(state, "blocked", "编辑被拦截", "已删除结果没有可编辑的当前候选。", { taskId: task.id }, true);
+          saveUndo(task);
+          task.acceptedEver = true;
+          task.editedEver = true;
+          task.editChars = Math.max(task.editChars, 28);
+          task.status = "edited";
+          task.actionHistory.push({ event: "edit", atHours: state.clockHours, editChars: task.editChars });
+          updateRetention(state);
+          return withEvidence(state, "lifecycle", "编辑并保存候选", "接受后又发生编辑，说明采纳并非零成本；编辑率作为质量负担 proxy。", { taskId: task.id, editChars: task.editChars });
+        }
+        if (action.type === "DELETE") {
+          saveUndo(task);
+          task.deleted = true;
+          task.status = "deleted";
+          task.retention24h = false;
+          task.retention7d = false;
+          task.actionHistory.push({ event: "delete", atHours: state.clockHours });
+          return withEvidence(state, "lifecycle", "删除候选", "删除不抹掉此前的接受事件，但会让当前结果无法被视为保留。", { taskId: task.id, acceptedEver: task.acceptedEver, retained: false });
+        }
+        if (action.type === "REGENERATE") {
+          if (task.deleted) return withEvidence(state, "blocked", "重生成被拦截", "当前任务已删除；先撤销或切换任务，避免把删除误写成新版本质量。", { taskId: task.id }, true);
+          saveUndo(task);
+          task.regenerateCount += 1;
+          task.status = "regenerated";
+          task.retention24h = null;
+          task.retention7d = null;
+          task.observedAtHours = 0;
+          task.actionHistory.push({ event: "regenerate", atHours: state.clockHours, count: task.regenerateCount });
+          return withEvidence(state, "lifecycle", "重新生成候选", "重生成开启新候选周期；旧候选的接受与保留证据仍保留在任务历史里。", { taskId: task.id, regenerateCount: task.regenerateCount });
+        }
+        if (action.type === "REUSE") {
+          if (!task.acceptedEver || task.deleted) return withEvidence(state, "blocked", "重用被拦截", "只有曾被接受且未删除的结果才进入重用计数。", { taskId: task.id, acceptedEver: task.acceptedEver, deleted: task.deleted }, true);
+          task.reused = true;
+          task.status = "reused";
+          task.actionHistory.push({ event: "reuse", atHours: state.clockHours });
+          return withEvidence(state, "product", "重用已接受结果", "重用比一次性接受更接近持续工作价值。", { taskId: task.id });
+        }
+        return state;
+      }
+
+      function benchmarkTransition(state, action) {
+        if (action.type === "BENCHMARK_FREEZE") {
+          if (!state.tasks.length) return withEvidence(state, "blocked", "benchmark 冻结失败", "请先开始 A/B benchmark 或生成任务。", {}, true);
+          state.benchmark.frozen = true;
+          state.benchmark.revealed = false;
+          state.benchmark.baselineFingerprint = clone(BENCHMARK_PARAMS);
+          return withEvidence(state, "benchmark", "冻结 benchmark 基线", "模型、Prompt、上下文链和 rubric fingerprint 已固定，之后才允许提交 blind compare。", { fingerprint: state.benchmark.baselineFingerprint, blind: true });
+        }
+        if (action.type === "SEED_BENCHMARK_VOTES") {
+          if (!state.benchmark.frozen) return withEvidence(state, "blocked", "盲评提交被拦截", "没有固定 benchmark 基线时，偏好结果不能与版本变化绑定。", { frozen: false }, true);
+          state.tasks.forEach(task => {
+            task.benchmark.vote = task.benchmark.preferencePlan === "baseline" ? (task.benchmark.order[0] === "baseline" ? "card1" : "card2") : (task.benchmark.preferencePlan === "candidate" ? (task.benchmark.order[0] === "candidate" ? "card1" : "card2") : "tie");
+            task.benchmark.voteSource = "simulated-blind-user";
+          });
+          state.benchmark.votesSubmitted = state.tasks.length;
+          state.benchmark.revealed = false;
+          return withEvidence(state, "benchmark", "提交盲评偏好", `已对 ${state.tasks.length} 对结果提交模拟用户偏好；揭盲前只保存卡片选择。`, { votes: state.tasks.length, identityHidden: true });
+        }
+        if (action.type === "BENCHMARK_VOTE") {
+          if (!state.benchmark.frozen) return withEvidence(state, "blocked", "盲评提交被拦截", "请先冻结 benchmark 基线。", { frozen: false }, true);
+          const task = activeTask(state);
+          if (!task) return withEvidence(state, "blocked", "盲评提交失败", "没有当前 benchmark 任务。", {}, true);
+          task.benchmark.vote = action.choice;
+          task.benchmark.voteSource = "manual-blind-user";
+          state.benchmark.votesSubmitted = state.tasks.filter(item => item.benchmark.vote).length;
+          return withEvidence(state, "benchmark", "提交当前盲评偏好", "当前只记录卡 1 / 卡 2 / 平局，不暴露真实版本身份。", { taskId: task.id, choice: action.choice, identityHidden: true });
+        }
+        if (action.type === "BENCHMARK_REVEAL") {
+          if (!state.benchmark.votesSubmitted) return withEvidence(state, "blocked", "揭盲被拦截", "还没有盲评偏好，不能生成胜平负。", {}, true);
+          state.benchmark.revealed = true;
+          return withEvidence(state, "benchmark", "揭盲并汇总 A/B", "把盲评卡片选择映射回旧版 / 新版，形成胜、平、负，而不是只看一次点击。", { votes: state.benchmark.votesSubmitted, revealed: true });
+        }
+        return state;
+      }
+
+      function privacyTransition(state, action) {
+        if (action.type === "PRIVACY_SAVE_DERIVED") {
+          state.privacy.derivedSaved = true;
+          state.privacy.lastBoundary = "仅保存派生指标：taskType、rubric、accept、edit、retention、token、latency、cost。";
+          return withEvidence(state, "privacy", "保存派生指标", "保存字段不含用户正文、完整 Prompt 或可还原原文的内容。", { mode: "derived-only", rawTextStored: false, fields: ["taskType", "rubric", "accept", "edit", "retention", "token", "latency", "cost"] });
+        }
+        if (action.type === "PRIVACY_REQUEST_RAW") {
+          if (!state.privacy.optIn) {
+            state.privacy.lastBoundary = "拒绝读取正文：当前只有派生指标许可。";
+            return withEvidence(state, "blocked", "正文读取被拒绝", "只保存派生指标的模式不能回答“原文到底写了什么”，也不能把正文偷偷送进训练集。", { mode: state.privacy.mode, rawTextStored: false, trainingUse: false }, true);
+          }
+          state.privacy.lastBoundary = "opt-in 只允许脱敏样本 envelope，不开放原文读取。";
+          return withEvidence(state, "privacy", "正文读取仍被限制", "即使 opt-in，也只允许保存脱敏样本 envelope；原文不进入训练集。", { optIn: true, deidentifiedOnly: true, rawTextStored: false, trainingUse: false });
+        }
+        if (action.type === "PRIVACY_OPT_IN") {
+          state.privacy.optIn = true;
+          state.privacy.mode = "opt-in-deidentified";
+          state.privacy.lastBoundary = "用户主动 opt-in：可保存脱敏样本，不等于授权原文训练。";
+          return withEvidence(state, "privacy", "用户主动 opt-in", "许可边界从派生指标扩展到脱敏样本，但仍明确禁止保存原文与默认训练。", { optIn: true, rawTextStored: false, defaultTraining: false });
+        }
+        if (action.type === "PRIVACY_SAVE_SAMPLE") {
+          if (!state.privacy.optIn) return withEvidence(state, "blocked", "脱敏样本保存被拦截", "没有用户主动 opt-in，只能保存派生指标。", { optIn: false }, true);
+          state.privacy.sampleSaved = true;
+          state.privacy.rawTextStored = false;
+          state.privacy.lastBoundary = "已保存一条脱敏 envelope：无正文、无完整 Prompt、无可逆用户标识。";
+          return withEvidence(state, "privacy", "保存脱敏样本 envelope", "样本包含任务类型、rubric 版本、编辑距离分桶与延迟保留结果，不包含用户正文。", { sampleId: "sample-deidentified-001", fields: ["taskType", "rubricVersion", "editDistanceBucket", "retention24h", "latencyBucket"], rawTextStored: false, trainingUse: false });
+        }
+        return state;
+      }
+
+      function reduce(state, action) {
+        const next = clone(state);
+        if (action.type === "SET_TAB") {
+          next.activeTab = action.tab;
+          withEvidence(next, "navigation", `查看 walkthrough：${WALKTHROUGHS[action.tab].label}`, "切换 tab 不改变任务数据，只改变当前探索入口。", { tab: action.tab });
+          return next;
+        }
+        if (action.type === "GENERATE") return generate(next, action.count, action.scenario, action.seed);
+        if (action.type === "RUN_COHORT") {
+          if (!next.tasks.length) return generate(next, action.count, action.scenario, action.seed);
+          seedCohort(next);
+          return withEvidence(next, "simulation", "再次运行模拟 cohort", "当前任务集已按所选场景重新写入模拟行为与观察结果。", { scenario: next.run.scenario, clockHours: next.clockHours });
+        }
+        if (action.type === "RESET_DEFAULT") return generate(next, 12, "counterexample", 20260817);
+        if (action.type === "START_WALKTHROUGH") return startWalkthrough(next, action.tab || next.activeTab);
+        if (action.type === "BENCHMARK_FREEZE" || action.type === "SEED_BENCHMARK_VOTES" || action.type === "BENCHMARK_VOTE" || action.type === "BENCHMARK_REVEAL") return benchmarkTransition(next, action);
+        if (action.type.indexOf("PRIVACY_") === 0) return privacyTransition(next, action);
+        if (action.type === "ADVANCE_24") return transitionTask(next, { type: "ADVANCE_HOURS", hours: 24 });
+        if (action.type === "ADVANCE_144") return transitionTask(next, { type: "ADVANCE_HOURS", hours: 144 });
+        if (action.type === "ACCEPT" || action.type === "EDIT" || action.type === "DELETE" || action.type === "REGENERATE" || action.type === "UNDO" || action.type === "REUSE" || action.type === "SELECT_TASK" || action.type === "SELECT_VERSION" || action.type === "ADVANCE_HOURS") return transitionTask(next, action);
+        return next;
+      }
+
+      function percent(numerator, denominator) {
+        return denominator ? Math.round((numerator / denominator) * 100) : 0;
+      }
+
+      function average(values) {
+        return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+      }
+
+      function benchmarkResults(state) {
+        const result = { baseline: 0, candidate: 0, tie: 0, votes: 0 };
+        state.tasks.forEach(task => {
+          const vote = task.benchmark.vote;
+          if (!vote) return;
+          result.votes += 1;
+          if (vote === "tie") return void (result.tie += 1);
+          const identity = task.benchmark.order[vote === "card1" ? 0 : 1];
+          result[identity] += 1;
+        });
+        return result;
+      }
+
+      function deriveMetrics(state) {
+        const tasks = state.tasks;
+        const total = tasks.length;
+        const adopted = tasks.filter(task => task.acceptedEver).length;
+        const completed = tasks.filter(task => ["accepted", "edited", "reused"].includes(task.status)).length;
+        const reused = tasks.filter(task => task.reused).length;
+        const edited = tasks.filter(task => task.editedEver).length;
+        const retained24 = tasks.filter(task => task.retention24h === true).length;
+        const retained7 = tasks.filter(task => task.retention7d === true).length;
+        const observed24 = state.clockHours >= 24;
+        const observed7 = state.clockHours >= 168;
+        const acceptedRetentionBase = tasks.filter(task => task.acceptedEver && task.retention24h !== null).length;
+        const rubricRows = TYPE_KEYS.map(type => {
+          const typed = tasks.filter(task => task.type === type);
+          const dims = TASK_TYPES[type].rubric.map(dimension => {
+            const scores = typed.map(task => task.outputs.candidate.rubricScores[dimension.key]);
+            const baselineScores = typed.map(task => task.outputs.baseline.rubricScores[dimension.key]);
+            return { ...dimension, candidate: average(scores), baseline: average(baselineScores), delta: average(scores) - average(baselineScores) };
+          });
+          return { type, label: TASK_TYPES[type].label, dimensions: dims, candidateAverage: average(typed.map(task => task.outputs.candidate.rubricAverage)), baselineAverage: average(typed.map(task => task.outputs.baseline.rubricAverage)) };
+        });
+        const economicTasks = tasks.length ? tasks : [{ outputs: { baseline: { tokensIn: 0, tokensOut: 0, latencyMs: 0 }, candidate: { tokensIn: 0, tokensOut: 0, latencyMs: 0 } } }];
+        const tokenAverage = average(economicTasks.map(task => task.outputs.baseline.tokensIn + task.outputs.baseline.tokensOut + task.outputs.candidate.tokensIn + task.outputs.candidate.tokensOut)) / 2;
+        const latencyAverage = average(economicTasks.map(task => (task.outputs.baseline.latencyMs + task.outputs.candidate.latencyMs) / 2));
+        const benchmark = benchmarkResults(state);
+        return {
+          total,
+          product: {
+            completion: percent(completed, total),
+            adoption: percent(adopted, total),
+            reuse: percent(reused, adopted),
+            d1Proxy: observed24 ? percent(retained24, total) : null,
+            d7Proxy: observed7 ? percent(retained7, total) : null,
+            completed, adopted, reused
+          },
+          quality: {
+            retention24: observed24 ? percent(retained24, acceptedRetentionBase || adopted) : null,
+            retention7: observed7 ? percent(retained7, adopted) : null,
+            editRate: percent(edited, adopted),
+            retained24,
+            retained7,
+            edited,
+            rubricRows,
+            benchmark
+          },
+          economics: {
+            tokenAverage: Math.round(tokenAverage),
+            latencyAverage: Math.round(latencyAverage),
+            userCost: Number((tokenAverage * COST_PER_1K_TOKENS / 1000).toFixed(3)),
+            costPer1K: COST_PER_1K_TOKENS
+          }
+        };
+      }
+
+      function stateSnapshot(state) {
+        return {
+          version: state.version,
+          activeTab: state.activeTab,
+          activeTaskId: state.activeTaskId,
+          clockHours: state.clockHours,
+          lastAction: state.lastAction,
+          run: state.run,
+          benchmark: state.benchmark,
+          privacy: state.privacy,
+          walkthrough: state.walkthrough,
+          tasks: state.tasks.map(task => ({
+            id: task.id,
+            type: task.typeLabel,
+            status: task.status,
+            selectedVersion: task.selectedVersion,
+            acceptedEver: task.acceptedEver,
+            editedEver: task.editedEver,
+            reused: task.reused,
+            deleted: task.deleted,
+            regenerateCount: task.regenerateCount,
+            retention24h: task.retention24h,
+            retention7d: task.retention7d,
+            observedAtHours: task.observedAtHours,
+            actionHistory: task.actionHistory,
+            benchmark: task.benchmark,
+            outputs: task.outputs,
+            rubric: task.rubric
+          }))
+        };
+      }
+
+      return { BENCHMARK_PARAMS, TASK_TYPES, WALKTHROUGHS, emptyState, generate, reduce, deriveMetrics, stateSnapshot, activeTask };
+    })();
+
+    let appState = QualityDataPrototype.generate(QualityDataPrototype.emptyState(), 12, "counterexample", 20260817);
+    const $ = selector => document.querySelector(selector);
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[character]));
+    }
+
+    function formatPercent(value) {
+      return value === null ? "待观察" : `${value}%`;
+    }
+
+    function formatScore(value) {
+      return value ? value.toFixed(1) : "—";
+    }
+
+    function statusClass(status) {
+      if (["accepted", "edited", "reused"].includes(status)) return "teal";
+      if (status === "deleted") return "danger";
+      if (status === "regenerated") return "gold";
+      return "blue";
+    }
+
+    function actionButton(label, action, extraClass = "") {
+      return `<button class="${extraClass}" data-action="${action}">${label}</button>`;
+    }
+
+    function dispatch(action) {
+      const next = QualityDataPrototype.reduce(appState, action);
+      const walkthrough = next.walkthrough[next.activeTab];
+      const definition = QualityDataPrototype.WALKTHROUGHS[next.activeTab];
+      if (action.type !== "START_WALKTHROUGH" && walkthrough.started && walkthrough.step < definition.steps.length && definition.steps[walkthrough.step].action === action.type) {
+        walkthrough.step += 1;
+      }
+      appState = next;
+      render();
+    }
+
+    function renderSummary(metrics) {
+      const run = appState.run;
+      const privacy = appState.privacy;
+      $("#run-summary").innerHTML = [
+        `<span class="chip accent">${escapeHtml(run.id)}</span>`,
+        `<span class="chip">seed ${run.seed}</span>`,
+        `<span class="chip">${run.taskCount} tasks</span>`,
+        `<span class="chip ${run.scenario === "counterexample" ? "danger" : "teal"}">${run.scenario === "counterexample" ? "反例场景" : "平衡场景"}</span>`,
+        `<span class="chip blue">时钟 ${appState.clockHours}h</span>`,
+        `<span class="chip ${privacy.optIn ? "gold" : "teal"}">隐私：${privacy.optIn ? "opt-in 脱敏样本" : "仅派生指标"}</span>`,
+        `<span class="chip">Product ${formatPercent(metrics.product.adoption)} adopted</span>`,
+        `<span class="chip">Quality ${formatPercent(metrics.quality.retention24)} 24h retained</span>`
+      ].join("");
+    }
+
+    function renderWalkthrough() {
+      const active = appState.activeTab;
+      const definition = QualityDataPrototype.WALKTHROUGHS[active];
+      const progress = appState.walkthrough[active];
+      const steps = definition.steps;
+      const rows = steps.map((step, index) => {
+        const state = index < progress.step ? "done" : (index === progress.step ? "current" : "");
+        const enabled = progress.started && index === progress.step;
+        const isStart = index === 0;
+        const buttonText = isStart && !progress.started ? "开始" : (index < progress.step ? "已完成" : "执行");
+        return `<div class="step ${state}"><span class="step-number">${index + 1}</span><span>${escapeHtml(step.label)}</span><button data-walk-action="${step.action}" data-walk-tab="${active}" ${enabled || (!progress.started && isStart) ? "" : "disabled"}>${buttonText}</button></div>`;
+      }).join("");
+      $("#walkthrough-panel").innerHTML = `
+        <div class="panel-head"><div><h2>Tabbed walkthrough · 每一步都留下证据</h2><p>选一个场景开始；完成按钮会推进状态机，右侧同时显示完整 state 与 evidence log。</p></div><span class="pill accent">${progress.started ? `进度 ${Math.min(progress.step, steps.length - 1)} / ${steps.length - 1}` : "未开始"}</span></div>
+        <div class="tabs">${Object.keys(QualityDataPrototype.WALKTHROUGHS).map(tab => `<button class="tab ${tab === active ? "active" : ""}" data-tab="${tab}">${QualityDataPrototype.WALKTHROUGHS[tab].label}</button>`).join("")}</div>
+        <div class="walkthrough-body" style="margin-top: 15px"><div class="walk-copy"><h3>${definition.label}</h3><p>${definition.description}</p><div class="section-label">观察点</div><p>不要只看最后的数字；看每一步的状态、被拦截动作和保存字段。</p></div><div class="step-list">${rows}</div></div>`;
+    }
+
+    function renderTaskPanel(metrics) {
+      const task = QualityDataPrototype.activeTask(appState);
+      if (!task) {
+        $("#task-panel").innerHTML = `<div class="panel-head"><div><h2>当前任务</h2><p>还没有任务，请先生成模拟任务。</p></div></div>`;
+        return;
+      }
+      const type = QualityDataPrototype.TASK_TYPES[task.type];
+      const output = version => task.outputs[version];
+      const outputCard = version => {
+        const item = output(version);
+        const rows = task.rubric.map(dimension => `<div class="rubric-row"><label title="${escapeHtml(dimension.hint)}">${escapeHtml(dimension.label)}</label><span class="score"><span class="score-track"><i style="width:${item.rubricScores[dimension.key] / 5 * 100}%"></i></span><span class="score-num">${item.rubricScores[dimension.key].toFixed(1)}</span></span></div>`).join("");
+        return `<article class="output-card ${task.selectedVersion === version ? "selected" : ""}"><div class="output-head"><strong>${item.label}</strong><span class="pill ${version === "candidate" ? "teal" : "blue"}">${version === task.selectedVersion ? "当前查看" : "切换查看"}</span></div><p class="output-text">${escapeHtml(item.text).replace(/\n/g, "<br />")}</p><div class="rubric">${rows}</div><div class="action-bar"><button data-version="${version}">查看这版</button><span class="pill">rubric avg ${item.rubricAverage.toFixed(2)} / 5</span></div></article>`;
+      };
+      const retention = [
+        ["当前状态", task.status],
+        ["采纳事件", task.acceptedEver ? "已发生" : "未发生"],
+        ["24h 保留", task.retention24h === null ? "待观察" : (task.retention24h ? "保留" : "未保留")],
+        ["D7 proxy", task.retention7d === null ? "待观察" : (task.retention7d ? "保留" : "未保留")]
+      ].map(([label, value]) => `<div class="retention-cell"><small>${label}</small><strong>${escapeHtml(value)}</strong></div>`).join("");
+      const taskRows = appState.tasks.map(item => `<button class="${item.id === task.id ? "primary" : "soft"}" data-task="${item.id}">${item.id} · ${item.typeLabel}</button>`).join("");
+      $("#task-panel").innerHTML = `
+        <div class="panel-head"><div><h2>当前 state · 单次结果生命周期</h2><p>自由操作区：接受、编辑、删除、重新生成、撤销、重用与推进观察时间都可直接点击。</p></div><span class="pill ${statusClass(task.status)}">${escapeHtml(task.status)}</span></div>
+        <div class="task-top"><div class="task-meta"><h3>${escapeHtml(task.id)} · ${escapeHtml(task.typeLabel)}</h3><div class="chips"><span class="chip ${type.color}">任务专属 rubric</span><span class="chip">选择：${task.outputs[task.selectedVersion].label}</span><span class="chip">重生成 ${task.regenerateCount} 次</span></div><p>${escapeHtml(task.prompt)}</p></div><div class="context-card"><h4>上下文链路输入</h4><p>${escapeHtml(task.context)}</p></div></div>
+        <div class="section-label">候选输出与任务专属 rubric</div><div class="output-grid">${outputCard("baseline")}${outputCard("candidate")}</div>
+        <div class="action-bar">${actionButton("接受", "ACCEPT", "teal")}${actionButton("编辑并保存", "EDIT", "soft")}${actionButton("删除", "DELETE", "danger")}${actionButton("重新生成", "REGENERATE", "warn")}${actionButton("撤销最近变更", "UNDO", "soft")}${actionButton("重用", "REUSE", "soft")}${actionButton("+24h", "ADVANCE_HOURS", "soft")}${actionButton("+6d", "ADVANCE_144", "soft")}</div>
+        <p class="action-help">按钮即使在当前状态不合法也保留，点击后会记录“被拦截”的证据；这样可以检查状态边界，而不是只看 happy path。</p>
+        <div class="last-action"><strong>刚刚发生：</strong> ${escapeHtml(appState.lastAction)}</div>
+        <div class="retention-line">${retention}</div>
+        <div class="section-label">任务切换</div><div class="toolbar-group">${taskRows}</div>`;
+    }
+
+    function renderMetrics(metrics) {
+      const p = metrics.product;
+      const q = metrics.quality;
+      const e = metrics.economics;
+      const rubricRows = q.rubricRows.map(row => `<tr><td><strong>${row.label}</strong><br /><span class="chip">${row.type}</span></td><td>${formatScore(row.baselineAverage)} → <strong>${formatScore(row.candidateAverage)}</strong></td><td>${row.dimensions.map(dimension => `<div>${dimension.label}：${formatScore(dimension.candidate)} <span class="${dimension.delta >= 0 ? "delta-up" : "delta-down"}">${dimension.delta >= 0 ? "+" : ""}${dimension.delta.toFixed(2)}</span></div>`).join("")}</td></tr>`).join("");
+      const b = q.benchmark;
+      const benchmarkCopy = appState.benchmark.revealed ? `旧版 ${b.baseline} 胜 · 新版 ${b.candidate} 胜 · 平局 ${b.tie}` : `已提交 ${b.votes} 票 · 揭盲前不解释版本身份`;
+      $("#metrics-panel").innerHTML = `
+        <div class="panel-head"><div><h2>三类数据分层</h2><p>同一批模拟任务，按不同决策问题分成 Product Data、Quality Data、Economics Data。</p></div><span class="pill teal">${metrics.total} tasks · clock ${appState.clockHours}h</span></div>
+        <div class="metrics-grid">
+          <article class="metric-group product"><h3>Product Data</h3><div class="metric-list"><div class="metric-row"><span>完成率</span><strong>${formatPercent(p.completion)}</strong></div><div class="metric-row"><span>采纳率</span><strong>${formatPercent(p.adoption)}</strong><em>${p.adopted}/${metrics.total}</em></div><div class="metric-row"><span>重用率</span><strong>${formatPercent(p.reuse)}</strong><em>${p.reused}/${p.adopted || 0}</em></div><div class="metric-row"><span>D1 proxy · 24h</span><strong>${formatPercent(p.d1Proxy)}</strong></div><div class="metric-row"><span>D7 proxy · 168h</span><strong>${formatPercent(p.d7Proxy)}</strong></div></div></article>
+          <article class="metric-group quality"><h3>Quality Data</h3><div class="metric-list"><div class="metric-row"><span>24h 保留率</span><strong>${formatPercent(q.retention24)}</strong><em>accept 后观察</em></div><div class="metric-row"><span>编辑率</span><strong>${formatPercent(q.editRate)}</strong><em>${q.edited}/${p.adopted || 0}</em></div><div class="metric-row"><span>7d 保留率</span><strong>${formatPercent(q.retention7)}</strong></div><div class="metric-row"><span>任务 rubric</span><strong>${q.rubricRows.length} 套</strong><em>非统一 AI 分</em></div><div class="metric-row"><span>A/B 胜平负</span><strong>${benchmarkCopy}</strong></div></div></article>
+          <article class="metric-group economics"><h3>Economics Data</h3><div class="metric-list"><div class="metric-row"><span>A/B 平均 token</span><strong>${e.tokenAverage}</strong><em>input + output</em></div><div class="metric-row"><span>平均延迟</span><strong>${e.latencyAverage}ms</strong></div><div class="metric-row"><span>单用户估算成本</span><strong>¥${e.userCost.toFixed(3)}</strong></div><div class="metric-row"><span>成本参数</span><strong>¥${e.costPer1K}/1k</strong><em>原型假设</em></div></div></article>
+        </div>
+        <div class="subsection"><div class="subsection-head"><h3>任务专属 rubric 结果</h3><small>旧版 → 新版；维度分数为 1–5 的模拟评估</small></div><table class="data-table"><thead><tr><th>任务</th><th>总体平均</th><th>维度分数 / delta</th></tr></thead><tbody>${rubricRows}</tbody></table></div>
+        <div class="subsection"><div class="subsection-head"><h3>A/B benchmark 汇总</h3><small>${escapeHtml(benchmarkCopy)}</small></div><div class="notice"><strong>固定参数：</strong> model ${QualityDataPrototype.BENCHMARK_PARAMS.baselineModel} vs ${QualityDataPrototype.BENCHMARK_PARAMS.candidateModel} · ${QualityDataPrototype.BENCHMARK_PARAMS.promptFingerprint} · ${QualityDataPrototype.BENCHMARK_PARAMS.contextChain} · ${QualityDataPrototype.BENCHMARK_PARAMS.rubricVersion}</div></div>`;
+    }
+
+    function renderPrivacy() {
+      const privacy = appState.privacy;
+      const derived = ["任务类型与 rubric 版本", "accept / edit / delete / regenerate / undo 事件", "24h / D7 保留 proxy", "token、延迟、成本分桶"];
+      const notAnswer = ["用户正文具体写了什么", "哪一句被删改、完整 Prompt 是什么", "把用户正文当训练样本的授权结论", "仅凭模拟数据证明真实质量或护城河"];
+      $("#privacy-panel").innerHTML = `
+        <div class="panel-head"><div><h2>隐私边界</h2><p>当前模式：<strong>${privacy.optIn ? "opt-in 脱敏样本" : "仅派生指标"}</strong></p></div><span class="pill ${privacy.optIn ? "gold" : "teal"}">${privacy.rawTextStored ? "含原文" : "原文未存"}</span></div>
+        <div class="privacy-card"><h3>能回答什么 <span class="pill teal">可回答</span></h3><ul class="answer-list">${derived.map(item => `<li>${item}</li>`).join("")}</ul></div>
+        <div class="privacy-card"><h3>不能回答什么 <span class="pill danger">不可回答</span></h3><ul class="answer-list no">${notAnswer.map(item => `<li>${item}</li>`).join("")}</ul></div>
+        <div class="privacy-card"><h3>边界操作</h3><p>${escapeHtml(privacy.lastBoundary)}</p><div class="benchmark-actions">${actionButton("保存派生指标", "PRIVACY_SAVE_DERIVED", "soft")}${actionButton("尝试读取正文", "PRIVACY_REQUEST_RAW", "danger")}${actionButton("用户主动 opt-in", "PRIVACY_OPT_IN", "warn")}${actionButton("保存脱敏样本", "PRIVACY_SAVE_SAMPLE", "teal")}</div></div>`;
+    }
+
+    function renderEvidence() {
+      const rows = appState.evidenceLog.length ? appState.evidenceLog.map(entry => `<div class="evidence-item ${entry.blocked ? "blocked" : ""}"><strong>${escapeHtml(entry.at)} · ${escapeHtml(entry.title)}</strong><span>${escapeHtml(entry.detail)}</span><code>${escapeHtml(JSON.stringify(entry.payload))}</code></div>`).join("") : `<p>还没有证据。</p>`;
+      $("#evidence-panel").innerHTML = `<div class="panel-head"><div><h2>Evidence log</h2><p>事件日志只追加，不因撤销而删除；payload 记录能被审计的字段。</p></div><span class="pill">${appState.evidenceLog.length} events</span></div><div class="evidence-list">${rows}</div>`;
+    }
+
+    function renderState() {
+      const snapshot = QualityDataPrototype.stateSnapshot(appState);
+      $("#state-panel").innerHTML = `<div class="panel-head"><div><h2>完整 state</h2><p>这是当前内存态快照；关闭文件即丢失，不写 localStorage、数据库或网络。</p></div><span class="pill blue">in-memory only</span></div><details open><summary>展开完整 JSON state</summary><pre class="state-json">${escapeHtml(JSON.stringify(snapshot, null, 2))}</pre></details>`;
+    }
+
+    function renderConclusion(metrics) {
+      const counterexample = appState.run.scenario === "counterexample";
+      const gap = counterexample && metrics.product.adoption > metrics.quality.retention24;
+      $("#conclusion-panel").innerHTML = `
+        <div class="panel-head"><div><h2>结论分层 · 只说原型真正支持的部分</h2><p>${gap ? "当前反例：采纳率高于 24h 保留率，accept 不能直接等于质量。" : "当前数据集不是质量结论，只是验证数据结构与决策路径。"}</p></div><span class="pill ${gap ? "danger" : "gold"}">${gap ? "反例已触发" : "模拟边界"}</span></div>
+        <div class="conclusion"><div class="conclusion-card supported"><strong>已支持的工程可行性</strong><p>可以在单次结果生命周期中区分接受、编辑、删除、重生成、撤销、重用与延迟保留；可以按任务类型挂载不同 rubric；可以冻结 benchmark 参数并记录 blind compare；可以把派生指标和脱敏样本分开。</p></div><div class="conclusion-card needs"><strong>需要真实用户数据的判断</strong><p>真实作者是否愿意接受、编辑还是删除；rubric 是否与作者判断一致；24h / D7 是否是有效质量 proxy；不同题材与熟练度是否改变结果；真实 token、延迟和成本分布。</p></div><div class="conclusion-card unproven"><strong>原型无法证明的护城河判断</strong><p>质量数据是否会形成长期、难以复制的护城河；数据量是否足够支撑训练或模型改进；用户是否愿意 opt-in；任何市场需求、留存提升或商业化结果。</p></div></div>
+        <p class="footer-note">注意：所有任务、输出、rubric 分数、用户行为与成本都是固定种子生成的模拟数据，不是真实用户记录，也不构成真实质量结论。</p>`;
+    }
+
+    function render() {
+      const metrics = QualityDataPrototype.deriveMetrics(appState);
+      renderSummary(metrics);
+      renderWalkthrough();
+      renderTaskPanel(metrics);
+      renderMetrics(metrics);
+      renderPrivacy();
+      renderEvidence();
+      renderState();
+      renderConclusion(metrics);
+    }
+
+    document.addEventListener("click", event => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      if (button.dataset.tab) return dispatch({ type: "SET_TAB", tab: button.dataset.tab });
+      if (button.dataset.walkAction) {
+        const action = button.dataset.walkAction;
+        const tab = button.dataset.walkTab;
+        if (action === "START_WALKTHROUGH") return dispatch({ type: action, tab });
+        return dispatch({ type: action });
+      }
+      if (button.dataset.action) {
+        if (button.dataset.action === "ADVANCE_HOURS") return dispatch({ type: "ADVANCE_HOURS", hours: 24 });
+        return dispatch({ type: button.dataset.action });
+      }
+      if (button.dataset.task) return dispatch({ type: "SELECT_TASK", id: button.dataset.task });
+      if (button.dataset.version) return dispatch({ type: "SELECT_VERSION", version: button.dataset.version });
+    });
+
+    $("#generate-btn").addEventListener("click", () => {
+      const count = Number($("#task-count").value);
+      const scenario = $("#scenario").value;
+      dispatch({ type: "GENERATE", count, scenario, seed: Date.now() % 1000000 + 20260817 });
+    });
+    $("#cohort-btn").addEventListener("click", () => dispatch({ type: "RUN_COHORT", count: Number($("#task-count").value), scenario: $("#scenario").value, seed: 20260817 }));
+    $("#reset-btn").addEventListener("click", () => dispatch({ type: "RESET_DEFAULT" }));
+
+    render();
+  </script>
+</body>
+</html>

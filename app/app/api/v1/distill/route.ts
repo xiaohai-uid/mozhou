@@ -1,9 +1,12 @@
 // POST /api/v1/distill — 风格蒸馏：上传文本 → LLM 分析生成四维风格指南（07 工单）
-// 免费模型走 one-api 网关；测试注入 DISTILL_PROVIDER=mock 返回固定指南（与 CHAT_PROVIDER 模式一致）
+// Provider 只从统一 source-class boundary 进入；测试注入 DISTILL_PROVIDER=mock 返回固定指南。
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { recordUsage } from "@/lib/account/service";
 import type { StyleGuide } from "@/lib/schema";
+import { createUnifiedCompletionProvider } from "@/lib/ai/provider";
+import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
 
 const MAX_TEXT = 20000;
 const MIN_TEXT = 200;
@@ -70,52 +73,58 @@ export async function POST(request: Request) {
     );
   }
 
-  // 测试模式：返回固定指南
-  if (process.env.DISTILL_PROVIDER === "mock") {
+  const model = process.env.DISTILL_MODEL ?? "deepseek-v4-flash";
+  const provider = createUnifiedCompletionProvider({
+    route: "distill",
+    model,
+    mockResult: { text: JSON.stringify(MOCK_GUIDE) },
+  });
+  const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
+  const recordLedger = (status: "succeeded" | "failed", promptTokens?: number, completionTokens?: number) =>
+    recordAttemptUsage({
+      userId: user.id,
+      requestId,
+      taskId: null,
+      generationId: requestId,
+      attemptId: null,
+      sourceClass: provider.boundary.sourceClass,
+      provider: provider.boundary.provider,
+      model: provider.boundary.model,
+      credentialOwner: provider.boundary.credentialOwner,
+      billingOwner: provider.boundary.billingOwner,
+      route: "distill",
+      status,
+      promptTokens,
+      completionTokens,
+    }).catch(() => {});
+
+  // 测试模式：返回固定指南；boundary 已在此处完成生产防火墙校验。
+  if (provider.boundary.sourceClass === "TEST_MOCK") {
+    await recordLedger("succeeded");
     return NextResponse.json({ guide: MOCK_GUIDE });
   }
 
   try {
-    const res = await fetch(
-      `${process.env.ONEAPI_BASE_URL ?? "http://localhost:3001"}/v1/chat/completions`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.ONEAPI_TOKEN ?? ""}`,
-        },
-        body: JSON.stringify({
-          model: process.env.DISTILL_MODEL ?? "deepseek-v4-flash",
-          stream: false,
-          messages: [
-            { role: "system", content: PROMPT },
-            { role: "user", content: text.slice(0, MAX_TEXT) },
-          ],
-        }),
-      },
-    );
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `风格分析服务暂不可用（${res.status}）` },
-        { status: 502 },
-      );
-    }
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
-    const raw = data.choices?.[0]?.message?.content ?? "";
+    const data = await provider.complete({
+      model,
+      system: PROMPT,
+      messages: [{ role: "user", content: text.slice(0, MAX_TEXT) }],
+    });
+    const raw = data.text;
     const guide = parseGuide(raw);
     if (!guide) {
+      await recordLedger("failed", data.usage?.promptTokens, data.usage?.completionTokens);
       return NextResponse.json(
         { error: "风格分析结果解析失败，请重试" },
         { status: 502 },
       );
     }
+    await recordLedger("succeeded", data.usage?.promptTokens, data.usage?.completionTokens);
     // 用量记账（11 工单）
-    await recordUsage(user.id, "风格蒸馏", data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0).catch(() => {});
+    await recordUsage(user.id, "风格蒸馏", data.usage?.promptTokens ?? 0, data.usage?.completionTokens ?? 0).catch(() => {});
     return NextResponse.json({ guide });
   } catch (err) {
+    await recordLedger("failed");
     return NextResponse.json(
       { error: `风格分析失败：${(err as Error).message}` },
       { status: 502 },

@@ -1,7 +1,8 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chapterMessages, chapters } from "@/lib/schema";
+import { chapterMessages, chapters, generationAttempts } from "@/lib/schema";
 import { resolveChapterOwnership } from "./ownership";
+import type { ChapterChatErrorCode } from "./chapter-chat-errors";
 
 export type CandidateStatus =
   | "done"
@@ -11,6 +12,8 @@ export type CandidateStatus =
   | "error"
   | "applied"
   | "discarded";
+
+export type CandidateApplyMode = "original" | "edited";
 
 export interface CandidateRecord {
   status: CandidateStatus;
@@ -41,10 +44,15 @@ export function settleChapterCandidate(input: {
   providerSucceeded: boolean;
   stopped: boolean;
   errorMessage?: string | null;
-}): { status: CandidateStatus; errorMessage: string | null } {
+  errorCode?: ChapterChatErrorCode | null;
+}): { status: CandidateStatus; errorMessage: string | null; errorCode?: ChapterChatErrorCode | null } {
   if (input.stopped) return { status: "stopped", errorMessage: null };
   if (input.providerSucceeded) return { status: "completed_candidate", errorMessage: null };
-  return { status: "error", errorMessage: input.errorMessage?.trim() || "生成失败" };
+  return {
+    status: "error",
+    errorMessage: input.errorMessage?.trim() || "生成失败",
+    ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+  };
 }
 
 export type CandidateApplyFailure = "not_found" | "status" | "revision" | "content";
@@ -59,7 +67,7 @@ export function canApplyChapterCandidate(input: {
 }): { ok: true } | { ok: false; reason: CandidateApplyFailure } {
   if (input.candidateUserId !== input.requesterUserId) return { ok: false, reason: "not_found" };
   const normalizedStatus = normalizeCandidateStatus({ status: input.status, inserted: false });
-  if (normalizedStatus !== "completed_candidate" && normalizedStatus !== "stopped") {
+  if (normalizedStatus !== "completed_candidate") {
     return { ok: false, reason: "status" };
   }
   if (input.baseRevision === null || input.baseRevision !== input.chapterRevision) {
@@ -67,6 +75,16 @@ export function canApplyChapterCandidate(input: {
   }
   if (!input.content.trim()) return { ok: false, reason: "content" };
   return { ok: true };
+}
+
+export function resolveChapterCandidateContent(input: {
+  mode: CandidateApplyMode;
+  originalContent: string;
+  editedContent?: string;
+}): { ok: true; content: string } | { ok: false; reason: "content" } {
+  const content = input.mode === "original" ? input.originalContent : input.editedContent;
+  if (typeof content !== "string" || !content.trim()) return { ok: false, reason: "content" };
+  return { ok: true, content: content.trim() };
 }
 
 export class ChapterNotFoundError extends Error {
@@ -210,19 +228,61 @@ export async function persistChapterCandidateSettlement(input: {
   reply: string;
   providerSucceeded: boolean;
   stopped: boolean;
+  attemptId?: number | null;
   errorMessage?: string | null;
+  errorCode?: ChapterChatErrorCode | null;
 }) {
   const [existing] = await db
-    .select({ status: chapterMessages.status })
+    .select({
+      id: chapterMessages.id,
+      status: chapterMessages.status,
+      errorMessage: chapterMessages.errorMessage,
+      errorCode: chapterMessages.errorCode,
+      attemptId: chapterMessages.attemptId,
+    })
     .from(chapterMessages)
     .where(eq(chapterMessages.id, input.candidateId))
     .limit(1);
+  if (!existing) throw new Error("生成候选不存在，请刷新后重试");
+  if (existing.status !== "generating") {
+    return {
+      messageId: existing.id,
+      status: normalizeCandidateStatus({ status: existing.status as CandidateStatus, inserted: false }),
+      errorMessage: existing.errorMessage,
+      errorCode: existing.errorCode,
+      ignored: true as const,
+    };
+  }
+  if (input.attemptId != null && existing.attemptId != null && input.attemptId !== existing.attemptId) {
+    return {
+      messageId: existing.id,
+      status: "generating" as const,
+      errorMessage: existing.errorMessage,
+      errorCode: existing.errorCode,
+      ignored: true as const,
+    };
+  }
+  if (input.attemptId != null) {
+    const [attempt] = await db
+      .select({ status: generationAttempts.status })
+      .from(generationAttempts)
+      .where(eq(generationAttempts.id, input.attemptId))
+      .limit(1);
+    if (!attempt || attempt.status !== "running") {
+      return {
+        messageId: existing.id,
+        status: "generating" as const,
+        errorMessage: existing.errorMessage,
+        ignored: true as const,
+      };
+    }
+  }
   const settlement = settleChapterCandidate({
     ...input,
     // The explicit stop endpoint may settle the row before the upstream
     // provider observes its abort. Never let the late provider completion
     // turn that user decision back into a completed candidate.
-    stopped: input.stopped || existing?.status === "stopped",
+    stopped: input.stopped,
   });
   const [candidate] = await db
     .update(chapterMessages)
@@ -230,26 +290,27 @@ export async function persistChapterCandidateSettlement(input: {
       content: input.reply,
       status: settlement.status,
       errorMessage: settlement.errorMessage,
+      errorCode: settlement.errorCode ?? null,
       updatedAt: sql`now()`,
     })
     .where(and(eq(chapterMessages.id, input.candidateId), eq(chapterMessages.status, "generating")))
     .returning({ id: chapterMessages.id });
   if (!candidate) {
-    const [stoppedCandidate] = await db
-      .select({ id: chapterMessages.id, status: chapterMessages.status })
+    const [currentCandidate] = await db
+      .select({ id: chapterMessages.id, status: chapterMessages.status, errorMessage: chapterMessages.errorMessage, errorCode: chapterMessages.errorCode })
       .from(chapterMessages)
-      .where(and(eq(chapterMessages.id, input.candidateId), eq(chapterMessages.status, "stopped")))
+      .where(eq(chapterMessages.id, input.candidateId))
       .limit(1);
-    if (!stoppedCandidate) throw new Error("生成候选状态已改变，请刷新后重试");
-    const [updatedStopped] = await db
-      .update(chapterMessages)
-      .set({ content: input.reply, errorMessage: null, updatedAt: sql`now()` })
-      .where(and(eq(chapterMessages.id, input.candidateId), eq(chapterMessages.status, "stopped")))
-      .returning({ id: chapterMessages.id });
-    if (!updatedStopped) throw new Error("生成候选状态已改变，请刷新后重试");
-    return { messageId: updatedStopped.id, status: "stopped" as const, errorMessage: null };
+    if (!currentCandidate) throw new Error("生成候选状态已改变，请刷新后重试");
+    return {
+      messageId: currentCandidate.id,
+      status: normalizeCandidateStatus({ status: currentCandidate.status as CandidateStatus, inserted: false }),
+      errorMessage: currentCandidate.errorMessage,
+      errorCode: currentCandidate.errorCode,
+      ignored: true as const,
+    };
   }
-  return { messageId: candidate.id, ...settlement };
+  return { messageId: candidate.id, ...settlement, ignored: false as const };
 }
 
 /**
@@ -306,20 +367,43 @@ export async function requestStopChapterCandidate(input: {
 }): Promise<boolean> {
   const chapter = await resolveChapterOwnership(db, input);
   if (!chapter) return false;
-  const rows = await db
-    .update(chapterMessages)
-    .set({ status: "stopped", errorMessage: null, updatedAt: sql`now()` })
-    .where(
-      and(
-        eq(chapterMessages.chapterId, input.chapterId),
-        eq(chapterMessages.userId, input.userId),
-        eq(chapterMessages.role, "assistant"),
-        eq(chapterMessages.generationKey, input.generationKey),
-        eq(chapterMessages.status, "generating"),
-      ),
-    )
-    .returning({ id: chapterMessages.id });
-  return rows.length > 0;
+  // The SSE route flushes its start event before candidate preparation finishes.
+  // A stop request can therefore arrive while the row does not exist yet. Keep
+  // the stop endpoint deterministic by waiting briefly for that row, instead
+  // of losing the user's stop decision to this normal startup race.
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    const rows = await db
+      .update(chapterMessages)
+      .set({ status: "stopped", errorMessage: null, updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(chapterMessages.chapterId, input.chapterId),
+          eq(chapterMessages.userId, input.userId),
+          eq(chapterMessages.role, "assistant"),
+          eq(chapterMessages.generationKey, input.generationKey),
+          eq(chapterMessages.status, "generating"),
+        ),
+      )
+      .returning({ id: chapterMessages.id });
+    if (rows.length > 0) return true;
+
+    const [candidate] = await db
+      .select({ status: chapterMessages.status })
+      .from(chapterMessages)
+      .where(
+        and(
+          eq(chapterMessages.chapterId, input.chapterId),
+          eq(chapterMessages.userId, input.userId),
+          eq(chapterMessages.role, "assistant"),
+          eq(chapterMessages.generationKey, input.generationKey),
+        ),
+      )
+      .limit(1);
+    if (candidate && candidate.status !== "generating") return candidate.status === "stopped";
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return false;
 }
 
 export async function isChapterCandidateStopped(candidateId: number): Promise<boolean> {
@@ -352,7 +436,8 @@ export async function applyChapterCandidate(input: {
   novelId: number;
   chapterId: number;
   messageId: number;
-  suppliedContent: string;
+  mode: CandidateApplyMode;
+  editedContent?: string;
   force: boolean;
   target?: InsertTarget;
 }): Promise<InsertResult> {
@@ -367,8 +452,13 @@ export async function applyChapterCandidate(input: {
     if (!candidate) throw new Error("消息不存在");
     if (candidate.userId !== input.userId) throw new ChapterNotFoundError();
     if (candidate.role !== "assistant") throw new Error("只能插入 AI 回复");
-    const insertText = input.suppliedContent.trim();
-    if (!insertText) throw new Error("插入内容不能为空");
+    const resolvedContent = resolveChapterCandidateContent({
+      mode: input.mode,
+      originalContent: candidate.content,
+      editedContent: input.editedContent,
+    });
+    if (!resolvedContent.ok) throw new Error("插入内容不能为空");
+    const insertText = resolvedContent.content;
     if (
       normalizeCandidateStatus({
         inserted: candidate.inserted,
