@@ -22,10 +22,8 @@ FROM ${BASE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# Cloud Run 会注入 HOSTNAME（实例名）；Next standalone 用 HOSTNAME 绑定监听地址 → 必须固定 0.0.0.0
+# Cloud Run 会注入 HOSTNAME（实例名）；Next 用它绑定监听地址 → 必须固定 0.0.0.0
 ENV HOSTNAME=0.0.0.0
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder /app ./
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "npm run start -- -p ${PORT:-8080}"]
