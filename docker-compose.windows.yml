@@ -1,0 +1,14 @@
+# LOCAL WINDOWS/WSL DEVELOPMENT OVERLAY (not for Cloud Run / production)
+# On this Docker Desktop + WSL machine, the default bridge network can reach
+# token.sensenova.cn but is unreliable (intermittent connect/read timeouts).
+# Host networking has been stable for local real smoke.
+#
+# This file is NOT auto-loaded. Use it explicitly on Windows/WSL:
+#   docker compose -f docker-compose.yml -f docker-compose.windows.yml up -d
+#
+# Production / Cloud Run / Linux hosts must use only the base docker-compose.yml
+# (standard bridge + port mapping 3001:3000).
+services:
+  one-api:
+    network_mode: host
+    ports: []

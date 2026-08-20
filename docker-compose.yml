@@ -23,7 +23,8 @@ services:
       retries: 10
 
   one-api:
-    image: justsong/one-api:latest
+    # Pinned digest verified with MoZhou real PUBLIC_FREE smoke on 2026-08-20.
+    image: justsong/one-api@sha256:a55fb5181854aa0823cc04797ee875dfc5a953c0deb5e7e7ec39a8148e70cbc3
     container_name: mozhou-one-api
     environment:
       TZ: Asia/Shanghai
