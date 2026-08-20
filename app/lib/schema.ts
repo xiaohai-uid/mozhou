@@ -16,12 +16,10 @@ import {
 import { sql } from "drizzle-orm";
 import type {
   ArtifactRef,
-  GenerationManifest,
   GenerationPlan,
   SkillInputContract,
   SkillOutputContract,
 } from "@/lib/runtime/types";
-import type { TaskStatus } from "./tasks/status";
 
 /** 会员等级（11 工单消费） */
 export const tierEnum = pgEnum("tier", ["free", "member"]);

@@ -40,7 +40,7 @@ export function getExecutor(key: string): SkillExecutor | undefined {
   return EXECUTORS[key];
 }
 
-export function missingExecutorReason(_key: string): string {
+export function missingExecutorReason(): string {
   return "执行器未注册";
 }
 

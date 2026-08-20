@@ -1,5 +1,5 @@
 // 对话会话服务：会话 CRUD + runChat（管线流式 + 持久化）
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   messages,

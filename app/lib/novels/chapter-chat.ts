@@ -1,12 +1,11 @@
 // 章节对话引擎（工单 17，V1.1 Journey ⑦）：章节 AI 对话——消息持久化 + 技能驱动生成。
 // 注入链（system，按序）：正文参考（末尾 3000 字）→ RAG 设定（novelId，复用 06 工单）→ 风格（styleId，复用 15）→ 技能（内置场景技能 + 我的技能）。
 // 生成内核复用 runNodeStream（管线 seam 不新增）；mock provider 回显 system 使注入可断言。
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import {
   chapterMessages,
-  chapters,
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
@@ -38,7 +37,6 @@ import {
 import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
 
 import type { ChatModel } from "@/lib/chat/models";
-import type { ChatMessage } from "@/lib/chat/payload";
 import {
   compressHistory,
   isUsableKeptHistory,
@@ -46,10 +44,7 @@ import {
 } from "@/lib/chat/compress";
 import {
   applyChapterCandidate,
-  ChapterNotFoundError,
-  ContentChangedError,
   discardChapterCandidate,
-  GenerationKeyConflictError,
   isChapterCandidateStopped,
   normalizeCandidateStatus,
   normalizePersistedChapterMessageStatus,
@@ -390,16 +385,12 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   const contextSections: WritingContextSection[] = [];
   let stylePresent = false;
   let skillCount = 0;
-  let hasBodyReference = false;
-  let hasValidatedSelection = false;
   const bodyRef = prepared.currentChapter.content.slice(-BODY_REF_LIMIT);
   if (bodyRef.trim()) {
-    hasBodyReference = true;
     const content = `[正文参考] 当前章节前文（末尾 ${bodyRef.length} 字）：\n${bodyRef}`;
     contextSections.push({ kind: "chapter_reference", content });
   }
   if (input.selection) {
-    hasValidatedSelection = true;
     const content = `[所选片段] 用户选中的 ${input.selection.text.length} 字（若本条请求是针对该片段处理，请严格以其内容为对象）：\n${input.selection.text}`;
     contextSections.push({ kind: "selection", content });
   }
@@ -454,7 +445,6 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     contextSections.push({ kind: "compression_summary", content: summary });
   }
 
-  const snapshot = prepared.currentChapter.content; // 生成时正文快照（插入冲突检测基准）
   const preparedRequest = buildWritingContext({
     model: input.model,
     mode: "chapter",

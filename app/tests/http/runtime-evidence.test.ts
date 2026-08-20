@@ -1,6 +1,6 @@
 // V1.3 工单 01：技能运行时契约测试——done.skillRuns 证据 + 证据端点 + 归属边界
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { novelTrackings, users } from "@/lib/schema";
 

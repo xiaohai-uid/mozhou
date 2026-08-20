@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { and, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { generationAttempts, generationEvents, generationJobs, generationSteps, users } from "@/lib/schema";
 
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";

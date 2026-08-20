@@ -1,6 +1,6 @@
 // MarketBrief 绑定 → audience_genre 消费链路（DB：runChat 直调 + mock provider）
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { and, eq, inArray, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { novels, rankingSnapshots, sessions, users } from "@/lib/schema";
 import { runChat } from "@/lib/chat/service";

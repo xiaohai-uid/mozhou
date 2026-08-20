@@ -85,7 +85,7 @@ export function answerFiveQuestions(
   steps: FiveStep[],
   attempts: FiveAttempt[],
 ): TaskFiveQuestionAnswer {
-  const ordered = [...steps].sort((a, b) => 0); // 保持 API 顺序（按 ordinal 已排）
+  const ordered = [...steps].sort(() => 0); // 保持 API 顺序（按 ordinal 已排）
   const current =
     ordered.find((s) => s.status === "running") ??
     ordered.find((s) => s.status === "planned") ??

@@ -143,7 +143,7 @@ export async function runRuntimePipeline(
           runId,
           generationId,
           definition,
-          reason: missingExecutorReason(definition.key),
+          reason: missingExecutorReason(),
         }),
       );
       continue;
@@ -245,7 +245,7 @@ export async function runPostWriteValidators(input: PostWriteInput): Promise<Ski
     const executor = getExecutor(definition.executor);
     if (!executor) {
       runs.push(
-        makeSkippedRun({ runId, generationId: input.generationId, definition, reason: missingExecutorReason(definition.key) }),
+        makeSkippedRun({ runId, generationId: input.generationId, definition, reason: missingExecutorReason() }),
       );
       continue;
     }

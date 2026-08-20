@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generationJobs, users } from "@/lib/schema";
-import { enqueueJob, finishJob, listSteps, claimJob } from "@/lib/tasks/service";
+import { enqueueJob, listSteps, claimJob } from "@/lib/tasks/service";
 
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);

@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { chapters, novelTrackings, novels, users } from "@/lib/schema";
+import { chapters, novels, users } from "@/lib/schema";
 import {
   insertChapterMessage,
   listChapterMessages,

@@ -2,7 +2,7 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { generationAttempts, generationJobs, generationSteps, users } from "@/lib/schema";
+import { generationAttempts, generationJobs, users } from "@/lib/schema";
 import { TaskWorker } from "@/lib/tasks/worker";
 import { enqueueJob, getJob, listSteps, recoverScan, requeueDue, retryStep } from "@/lib/tasks/service";
 
@@ -60,7 +60,7 @@ describe("任务 worker (票 04)", () => {
     const { job } = await enqueueJob({ userId, novelId: null, operation: "chapter_generation", idempotencyKey: "w3", inputHash: "h", steps: [{ stepKey: "a" }, { stepKey: "b" }] });
     const w = new TaskWorker("w-C", { claimFilter: { idempotencyKeyLike: "w%" } });
     let stepNo = 0;
-    const r = await w.runOnce(async ({ step }) => {
+    const r = await w.runOnce(async () => {
       stepNo += 1;
       if (stepNo === 1) {
         // 第一次 handler 期间用户取消
@@ -94,7 +94,7 @@ describe("任务 worker (票 04)", () => {
     // worker1 只完成 step a 然后"崩溃"（不 finish）
     const w1 = new TaskWorker("w-D", { heartbeatMs: 0, claimFilter: { idempotencyKeyLike: "w%" } });
     let firstRun = true;
-    await w1.runOnce(async ({ step, attempt }) => {
+    await w1.runOnce(async ({ step }) => {
       if (step.stepKey === "b") {
         if (firstRun) {
           firstRun = false;
@@ -113,7 +113,7 @@ describe("任务 worker (票 04)", () => {
     expect((await getJob(job.jobId))?.status).toBe("queued");
     // worker2 接手：step a 不重放，从 b 继续
     const w2 = new TaskWorker("w-E", { claimFilter: { idempotencyKeyLike: "w%" } });
-    const r2 = await w2.runOnce(async ({ step }) => ({ status: "succeeded" }));
+    const r2 = await w2.runOnce(async () => ({ status: "succeeded" }));
     expect(r2.finalStatus).toBe("succeeded");
     const steps = await listSteps(job.jobId);
     expect(steps.every((s) => s.status === "succeeded")).toBe(true);

@@ -10,12 +10,6 @@ import {
   type RankingDegradation,
   type RankingRow,
 } from "@/lib/story/rankings";
-import {
-  latestScanCapturedAt,
-  scanAll,
-  scanWithinCooldown,
-} from "@/lib/rankings/scan";
-
 export type { RankingBoard, RankingDegradation, RankingRow } from "@/lib/story/rankings";
 
 const MOCK_ROWS: RankingRow[] = [
@@ -143,4 +137,3 @@ export async function GET(request: Request) {
     } satisfies Omit<RankingResponse, "boards">));
   }
 }
-

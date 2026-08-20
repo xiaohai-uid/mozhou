@@ -1,6 +1,6 @@
 // 任务门面测试（票 03）：真实 Postgres，场景对应原型 17 断言与 spec §6.3
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from "vitest";
-import { and, eq, like } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { generationJobs, generationSteps, users } from "@/lib/schema";
 import {
@@ -13,7 +13,6 @@ import {
   finalizeCancelled,
   finishJob,
   getJob,
-  heartbeatJob,
   readEvents,
   recoverScan,
   requeueDue,

@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         trigger: d.trigger,
         connected: isExecutorConnected(d.executor),
         status: isExecutorConnected(d.executor) ? "已接入" : "待接入",
-        reason: isExecutorConnected(d.executor) ? null : missingExecutorReason(d.key),
+        reason: isExecutorConnected(d.executor) ? null : missingExecutorReason(),
       })),
     });
   }

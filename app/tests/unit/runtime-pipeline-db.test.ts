@@ -1,6 +1,6 @@
 // 临时复现：runtime 管线 DB 路径（保留为正式 DB 单测）
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { eq, like } from "drizzle-orm";
+import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { novelTrackings, novels, users } from "@/lib/schema";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
