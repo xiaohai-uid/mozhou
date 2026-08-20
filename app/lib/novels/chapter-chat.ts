@@ -190,6 +190,8 @@ export interface ChapterChatInput {
   skills?: string[];
   /** 客户端生成请求键；重试同一请求时复用，重试失败结果必须生成新键。 */
   generationKey?: string;
+  /** P0-C Retry：复用原始 assistant generationKey 对应的 user message，不重复插入 user 行。 */
+  retryOfGenerationKey?: string;
   /** J9：AI 请求以选区为输入的绑定快照（改写/润色等；注入 [所选片段]，不持久化） */
   selection?: { start: number; end: number; text: string };
   onDelta: (text: string) => void;
@@ -231,6 +233,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     skills: input.skills ?? [],
     generationKey,
     requestHash,
+    retryOfGenerationKey: input.retryOfGenerationKey,
   });
   logChapterChatTiming(generationKey, startedAt, "candidate_prepared", {
     reused: prepared.reused,

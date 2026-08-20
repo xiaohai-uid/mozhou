@@ -35,6 +35,7 @@ export async function POST(
     styleId?: unknown;
     skills?: unknown;
     generationKey?: unknown;
+    retryOfGenerationKey?: unknown;
     selection?: unknown;
   };
   try {
@@ -70,6 +71,15 @@ export async function POST(
         : null;
   if (generationKey === null) {
     return NextResponse.json({ error: "生成请求键无效" }, { status: 400 });
+  }
+  const retryOfGenerationKey =
+    body.retryOfGenerationKey === undefined
+      ? undefined
+      : typeof body.retryOfGenerationKey === "string" && body.retryOfGenerationKey.trim().length <= 120
+        ? body.retryOfGenerationKey.trim()
+        : null;
+  if (retryOfGenerationKey === null) {
+    return NextResponse.json({ error: "重试请求键无效" }, { status: 400 });
   }
 
   // J9：选区绑定（改写/润色等）。校验：整数、0<=start<=end、text 与正文区间一致（防伪造注入）
@@ -118,6 +128,7 @@ export async function POST(
           styleId,
           skills,
           generationKey,
+          retryOfGenerationKey,
           selection,
           signal,
           onPhase: (phase) => writer.phase({ type: "phase", phase }),

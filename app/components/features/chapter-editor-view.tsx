@@ -31,6 +31,7 @@ import {
   parseChapterSseEvent,
   type ChapterStreamEvent,
 } from "@/lib/chat/chapter-stream-contract";
+import { toUserFacingAiError } from "@/lib/chat/user-facing-error";
 import {
   chapterModelPreferenceKey,
   isStoredChapterModel,
@@ -120,11 +121,19 @@ export function ChapterEditorView() {
   const boundRef = useRef<Map<number, { start: number; end: number; text: string }>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const generationKeyRef = useRef<string | null>(null);
+  /** P0-D：本地消息变更版本号；初始历史请求返回时若版本已变则丢弃，防止旧响应覆盖新消息。 */
+  const messagesVersionRef = useRef(0);
   // 工单 17：真实风格库（styleId 注入路径）
   const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
   // 工单 18：插入中 + 插入错误提示
   const [insertingId, setInsertingId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  /** 所有用户触发的本地消息变更都走这里，使进行中的历史加载失效。 */
+  const mutateMessages = (updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    messagesVersionRef.current += 1;
+    setMessages(updater);
+  };
 
   useEffect(() => {
     if (!streaming || generationStartedAt === null) return;
@@ -156,9 +165,12 @@ export function ChapterEditorView() {
           setBodyLoaded(true);
         }
       });
+    const messagesVersionAtStart = messagesVersionRef.current;
     fetch(`/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { messages?: ChatMessage[] } | null) => {
+        // P0-D：历史请求返回时若用户已经发过消息/本地状态已变化，旧响应不得覆盖新状态。
+        if (messagesVersionRef.current !== messagesVersionAtStart) return;
         if (data?.messages) setMessages(data.messages);
       });
     fetch("/api/v1/skills?scope=mine")
@@ -286,7 +298,7 @@ export function ChapterEditorView() {
   }
 
   /** 章节对话：POST 真实 chat SSE 流式，技能驱动；停止=abort */
-  async function sendChat(text?: string, skillsOverride?: string[]) {
+  async function sendChat(text?: string, skillsOverride?: string[], retryOfGenerationKey?: string) {
     const content = (text ?? input).trim();
     if (!content || streaming) return;
     const skills =
@@ -317,11 +329,19 @@ export function ChapterEditorView() {
         }
       : undefined;
     if (selection) boundRef.current.set(replyId, selection);
-    setMessages((prev) => [
-      ...prev,
-      { id: --msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
-      { id: replyId, role: "assistant", content: "", status: "streaming", skills, snapshot, inserted: false, confirmInsert: false },
-    ]);
+    if (retryOfGenerationKey) {
+      // P0-C Retry：复用已存在的 user 消息，不新增第二条 user 行/UI 消息。
+      mutateMessages((prev) => [
+        ...prev,
+        { id: replyId, role: "assistant", content: "", status: "streaming", skills, snapshot, inserted: false, confirmInsert: false, generationKey },
+      ]);
+    } else {
+      mutateMessages((prev) => [
+        ...prev,
+        { id: --msgSeq, role: "user", content, status: "done", skills: [], snapshot, inserted: false, confirmInsert: false },
+        { id: replyId, role: "assistant", content: "", status: "streaming", skills, snapshot, inserted: false, confirmInsert: false, generationKey },
+      ]);
+    }
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -337,6 +357,7 @@ export function ChapterEditorView() {
             skills,
             ...(selection ? { selection } : {}),
             generationKey,
+            ...(retryOfGenerationKey ? { retryOfGenerationKey } : {}),
           }),
           signal: controller.signal,
         },
@@ -365,7 +386,7 @@ export function ChapterEditorView() {
           if (data.type === "delta" && data.text) {
             setSubphase("streaming");
             current += data.text;
-            setMessages((prev) =>
+            mutateMessages((prev) =>
               prev.map((m) => (m.id === replyId ? { ...m, content: current } : m)),
             );
           } else if (data.type === "done") {
@@ -376,7 +397,7 @@ export function ChapterEditorView() {
               boundRef.current.delete(replyId);
               boundRef.current.set(data.messageId, bound);
             }
-            setMessages((prev) =>
+            mutateMessages((prev) =>
               prev.map((m) =>
                 m.id === replyId
                   ? {
@@ -396,7 +417,7 @@ export function ChapterEditorView() {
           } else if (data.type === "error") {
             terminalSeen = true;
             // 消息级错误：带 code 供人性化映射（工单 19）
-            setMessages((prev) =>
+            mutateMessages((prev) =>
               prev.map((m) =>
                 m.id === replyId
                   ? { ...m, status: "error", errorCode: data.code ?? "UNKNOWN" }
@@ -412,7 +433,7 @@ export function ChapterEditorView() {
     } catch (err) {
       // 停止（abort）→ 保留已生成部分，标记 stopped；其他 → error
       const aborted = controller.signal.aborted;
-      setMessages((prev) =>
+      mutateMessages((prev) =>
         prev.map((m) =>
           m.id === replyId
             ? {
@@ -449,6 +470,19 @@ export function ChapterEditorView() {
     abortRef.current?.abort();
   }
 
+  /** retryMessage（P0-C）：失败消息的一键重试 = 用上一条用户消息发起一次新生成 */
+  function retryMessage(msgId: number) {
+    if (streaming) return;
+    const idx = messages.findIndex((m) => m.id === msgId);
+    if (idx <= 0) return;
+    const failedMsg = messages[idx];
+    const userMsg = messages[idx - 1];
+    if (failedMsg.role !== "assistant" || !failedMsg.generationKey) return;
+    if (userMsg.role !== "user" || !userMsg.content.trim()) return;
+    // P0-C Retry：服务端按 retryOfGenerationKey 复用原 user message，只创建新 attempt。
+    void sendChat(userMsg.content, undefined, failedMsg.generationKey);
+  }
+
   /** insertToChapter（工单 18 + J9 精确插入）：点击插入 → 两层冲突 → 服务端 splice → caret 恢复 */
   async function insertToChapter(msgId: number) {
     const msg = messages.find((m) => m.id === msgId);
@@ -468,7 +502,7 @@ export function ChapterEditorView() {
         const currentText = body.slice(target.start, target.end);
         if (currentText !== bound.text) {
           // 目标文字与 AI 当初处理的不同 → 轻量冲突（不静默覆盖；复用 ContentChanged 视觉）
-          setMessages((prev) =>
+          mutateMessages((prev) =>
             prev.map((m) => (m.id === msgId ? { ...m, confirmSelection: true } : m)),
           );
           return;
@@ -498,7 +532,7 @@ export function ChapterEditorView() {
       );
       if (res.status === 409) {
         // 第一层冲突：点击插入后到服务端执行之间正文被改 → 确认，不覆盖（灵笔 DocumentConflict 语义）
-        setMessages((prev) =>
+        mutateMessages((prev) =>
           prev.map((m) => (m.id === msgId ? { ...m, confirmInsert: true } : m)),
         );
         return;
@@ -518,7 +552,7 @@ export function ChapterEditorView() {
         setSaveState("saved");
         restoreSelection({ start: caret, end: caret });
       }
-      setMessages((prev) =>
+      mutateMessages((prev) =>
         prev.map((m) =>
           m.id === msgId
             ? { ...m, inserted: true, confirmInsert: false, confirmSelection: false }
@@ -544,7 +578,7 @@ export function ChapterEditorView() {
         { method: "POST" },
       );
       if (!res.ok) throw new Error("忽略失败，请刷新后重试");
-      setMessages((prev) =>
+      mutateMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, status: "discarded", confirmInsert: false, confirmSelection: false } : m)),
       );
     } catch (err) {
@@ -552,33 +586,10 @@ export function ChapterEditorView() {
     }
   }
 
-  /** 错误人性化（工单 19 正式化）：标题 + 怎么办（灵笔 humanizeError 语义，映射契约 21 错误码） */
+  /** 错误人性化（工单 19 正式化 + P0-C）：标题 + 怎么办；纯映射见 lib/chat/user-facing-error.ts */
   function humanizeError(code: string): { title: string; guidance: string } {
-    switch (code) {
-      case "AiNoApiKey":
-        return { title: "还没有配置 AI", guidance: "先选择模型并配置可用渠道。" };
-      case "AiRateLimited":
-        return { title: "请求太频繁", guidance: "模型暂时繁忙，稍后重试或切换模型。" };
-      case "AiServerError":
-        return { title: "模型暂时繁忙", guidance: "稍后重试或切换模型。" };
-      case "AiTimeout":
-      case "AiNetworkError":
-        return { title: "网络连接失败", guidance: "请检查网络后重试。" };
-      case "AiInvalidResponse":
-        return { title: "AI 返回了无法理解的内容", guidance: "请重试，或切换模型。" };
-      case "FREE_UNAVAILABLE":
-        return { title: "当前免费 AI 暂时不可用", guidance: "你仍可以自己继续写作，稍后再试。" };
-      case "PROTOCOL_ERROR":
-        return { title: "AI 响应不完整", guidance: "本次生成没有收到完整结果，请重试。" };
-      case "AiCancelled":
-        return { title: "已取消生成", guidance: "生成已停止，你可以继续写作。" };
-      case "ContentChanged":
-        return { title: "正文已经变化", guidance: "这条回复基于旧正文，请重新生成。" };
-      case "ChapterNotFound":
-        return { title: "章节不存在", guidance: "返回作品列表重新选择。" };
-      default:
-        return { title: "操作没有成功", guidance: "请稍后重试。" };
-    }
+    const mapped = toUserFacingAiError(code);
+    return { title: mapped.title, guidance: mapped.guidance };
   }
 
   const startPlaceholder = emptyChapter
@@ -864,10 +875,22 @@ export function ChapterEditorView() {
                       {m.status === "discarded" ? (
                         <span className="text-xs text-faint">已忽略候选</span>
                       ) : m.status === "error" ? (
-                        <span className="flex items-center gap-1 text-xs text-red-400">
-                          <Warning size={13} aria-hidden />
-                          {humanizeError(m.errorCode ?? "UNKNOWN").title} ·{" "}
-                          {humanizeError(m.errorCode ?? "UNKNOWN").guidance}
+                        <span className="flex flex-wrap items-center gap-2 text-xs text-red-400">
+                          <span className="flex items-center gap-1">
+                            <Warning size={13} aria-hidden />
+                            {humanizeError(m.errorCode ?? "UNKNOWN").title} ·{" "}
+                            {humanizeError(m.errorCode ?? "UNKNOWN").guidance}
+                          </span>
+                          {toUserFacingAiError(m.errorCode ?? "UNKNOWN").retryable && (
+                            <button
+                              type="button"
+                              onClick={() => retryMessage(m.id)}
+                              disabled={streaming}
+                              className="rounded-full border border-current px-2.5 py-0.5 transition hover:bg-current/10 disabled:opacity-40"
+                            >
+                              重新尝试
+                            </button>
+                          )}
                         </span>
                       ) : (
                         <>
@@ -888,7 +911,7 @@ export function ChapterEditorView() {
                               </button>
                               <button
                                 onClick={() =>
-                                  setMessages((prev) =>
+                                  mutateMessages((prev) =>
                                     prev.map((x) =>
                                       x.id === m.id ? { ...x, confirmInsert: false } : x,
                                     ),
@@ -912,7 +935,7 @@ export function ChapterEditorView() {
                               </button>
                               <button
                                 onClick={() =>
-                                  setMessages((prev) =>
+                                  mutateMessages((prev) =>
                                     prev.map((x) =>
                                       x.id === m.id ? { ...x, confirmSelection: false } : x,
                                     ),

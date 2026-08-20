@@ -322,6 +322,7 @@ describe("上下文自动压缩（12 工单）", () => {
     }
 
     // 再发一条正常消息：此时历史已超阈值，应触发压缩
+    const observationsBefore = readPayloadObservations().length;
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
@@ -337,9 +338,11 @@ describe("上下文自动压缩（12 工单）", () => {
     };
     expect(done?.compressed).toBe(true);
 
-    const compressedObservation = readPayloadObservations().find(
-      (entry) => entry.route === "chat" && entry.compression_applied,
-    );
+    const compressedObservation = readPayloadObservations()
+      .slice(observationsBefore)
+      .find(
+        (entry) => entry.route === "chat" && entry.compression_applied,
+      );
     expect(compressedObservation).toMatchObject({
       compression_applied: true,
     });

@@ -14,6 +14,8 @@
     "gate:ticket": "tsc --noEmit && vitest run --changed",
     "gate:milestone": "tsc --noEmit && vitest run && next build",
     "smoke:real-llm": "node scripts/smoke-real-llm.mjs",
+    "e2e": "playwright test",
+    "e2e:prod": "npm run build && E2E_PROD=1 playwright test",
     "gate:release": "npm run gate:milestone && npm run smoke:real-llm"
   },
   "dependencies": {
@@ -33,6 +35,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chapterMessages, chapters, generationAttempts } from "@/lib/schema";
 import { resolveChapterOwnership } from "./ownership";
@@ -123,6 +123,8 @@ export interface PrepareChapterCandidateInput {
   skills: string[];
   generationKey: string;
   requestHash: string;
+  /** P0-C Retry：复用这条原始 assistant generationKey 对应的 user message，不再插入重复 user 行。 */
+  retryOfGenerationKey?: string;
 }
 
 export async function prepareChapterCandidate(input: PrepareChapterCandidateInput) {
@@ -158,6 +160,112 @@ export async function prepareChapterCandidate(input: PrepareChapterCandidateInpu
         throw new GenerationKeyConflictError();
       }
       return { currentChapter, candidate: existingCandidate, reused: true as const };
+    }
+
+    // P0-C Retry：复用原始用户消息，只为新的 generationKey 创建新 assistant 候选。
+    if (input.retryOfGenerationKey) {
+      const [originalCandidate] = await tx
+        .select({ id: chapterMessages.id })
+        .from(chapterMessages)
+        .where(
+          and(
+            eq(chapterMessages.chapterId, input.chapterId),
+            eq(chapterMessages.userId, input.userId),
+            eq(chapterMessages.generationKey, input.retryOfGenerationKey),
+            eq(chapterMessages.role, "assistant"),
+          ),
+        )
+        .limit(1);
+      if (!originalCandidate) {
+        throw new Error("原始生成不存在，无法重试");
+      }
+      const [originalUser] = await tx
+        .select({ id: chapterMessages.id })
+        .from(chapterMessages)
+        .where(
+          and(
+            eq(chapterMessages.chapterId, input.chapterId),
+            eq(chapterMessages.userId, input.userId),
+            eq(chapterMessages.role, "user"),
+            lt(chapterMessages.id, originalCandidate.id),
+          ),
+        )
+        .orderBy(desc(chapterMessages.id))
+        .limit(1);
+      if (!originalUser) {
+        throw new Error("找不到原始用户消息，无法重试");
+      }
+
+      const [candidate] = await tx
+        .insert(chapterMessages)
+        .values({
+          chapterId: input.chapterId,
+          userId: input.userId,
+          role: "assistant",
+          content: "",
+          skills: input.skills,
+          snapshot: currentChapter.content,
+          baseRevision: currentChapter.revision,
+          generationKey: input.generationKey,
+          requestHash: input.requestHash,
+          status: "generating",
+        })
+        .onConflictDoNothing({ target: [chapterMessages.chapterId, chapterMessages.generationKey] })
+        .returning();
+      if (candidate) {
+        const storedMessages = await tx
+          .select({
+            id: chapterMessages.id,
+            role: chapterMessages.role,
+            content: chapterMessages.content,
+            status: chapterMessages.status,
+            inserted: chapterMessages.inserted,
+          })
+          .from(chapterMessages)
+          .where(eq(chapterMessages.chapterId, input.chapterId))
+          .orderBy(chapterMessages.createdAt, chapterMessages.id);
+        return {
+          currentChapter,
+          candidate,
+          userMessageId: originalUser.id,
+          storedMessages,
+          reused: false as const,
+        };
+      }
+
+      const [racedCandidate] = await tx
+        .select()
+        .from(chapterMessages)
+        .where(
+          and(
+            eq(chapterMessages.chapterId, input.chapterId),
+            eq(chapterMessages.userId, input.userId),
+            eq(chapterMessages.generationKey, input.generationKey),
+            eq(chapterMessages.role, "assistant"),
+          ),
+        );
+      if (!racedCandidate) throw new Error("生成候选创建失败");
+      if (racedCandidate.requestHash && racedCandidate.requestHash !== input.requestHash) {
+        throw new GenerationKeyConflictError();
+      }
+      const racedMessages = await tx
+        .select({
+          id: chapterMessages.id,
+          role: chapterMessages.role,
+          content: chapterMessages.content,
+          status: chapterMessages.status,
+          inserted: chapterMessages.inserted,
+        })
+        .from(chapterMessages)
+        .where(eq(chapterMessages.chapterId, input.chapterId))
+        .orderBy(chapterMessages.createdAt, chapterMessages.id);
+      return {
+        currentChapter,
+        candidate: racedCandidate,
+        userMessageId: originalUser.id,
+        storedMessages: racedMessages,
+        reused: true as const,
+      };
     }
 
     const [userMessage] = await tx

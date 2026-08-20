@@ -29,6 +29,11 @@ import {
 import { LogoutButton } from "@/app/workspace/logout-button";
 import { GenerationStageRail, type GenerationPhase } from "@/components/features/generation-stage-rail";
 import { BackButton } from "@/components/navigation/back-button";
+import {
+  readCurrentNovelId,
+  resolveCurrentNovelId,
+  writeCurrentNovelId,
+} from "@/lib/novels/current-novel";
 
 /* ---------- 类型 ---------- */
 
@@ -117,6 +122,7 @@ interface BoundPack {
 }
 
 type MobileTab = "write" | "chapters" | "story" | "tools";
+type WorkbenchPanel = "outline" | "characters" | "world" | null;
 
 const SKILL_FALLBACK_NAMES: Record<string, string> = {
   story_grounding: "故事状态",
@@ -151,6 +157,75 @@ function StatusDot({ state }: { state: string }) {
   );
 }
 
+/* ---------- Workbench 中央主面板（P0-B：左侧导航与中央内容必须同源切换） ---------- */
+
+function OutlinePanel({ chapters }: { chapters: ChapterRow[] }) {
+  return (
+    <section aria-label="章节与大纲面板" className="mozhou-rise">
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Outline</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">章节与大纲</h1>
+      <p className="mt-2 text-sm leading-6 text-muted">管理章节顺序、标题与大纲入口。</p>
+      <div className="mt-5 flex flex-col gap-2">
+        {chapters.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-sm text-faint">暂无章节</p>
+        ) : (
+          [...chapters]
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map((ch) => (
+              <div key={ch.id} className="rounded-xl border border-surface-2 bg-surface/40 px-4 py-3 text-sm text-zinc-200">
+                <span className="font-mono text-xs text-faint">{ch.ch}</span> · {ch.title || "未命名"}
+              </div>
+            ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CharactersPanel({ characters }: { characters: EntryRow[] }) {
+  return (
+    <section aria-label="人物关系面板" className="mozhou-rise">
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Characters</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">人物关系</h1>
+      <p className="mt-2 text-sm leading-6 text-muted">管理人物与关系网。</p>
+      <div className="mt-5 flex flex-col gap-2">
+        {characters.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-sm text-faint">暂无人物</p>
+        ) : (
+          characters.map((c) => (
+            <div key={c.id} className="rounded-xl border border-surface-2 bg-surface/40 px-4 py-3 text-sm text-zinc-200">
+              {c.name}
+              {c.note ? <span className="mt-0.5 block text-xs text-faint">{c.note}</span> : null}
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function WorldPanel({ worldviews }: { worldviews: EntryRow[] }) {
+  return (
+    <section aria-label="世界规则面板" className="mozhou-rise">
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">World</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">世界规则</h1>
+      <p className="mt-2 text-sm leading-6 text-muted">管理世界观与规则设定。</p>
+      <div className="mt-5 flex flex-col gap-2">
+        {worldviews.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-surface-2 px-4 py-3 text-sm text-faint">暂无世界观</p>
+        ) : (
+          worldviews.map((w) => (
+            <div key={w.id} className="rounded-xl border border-surface-2 bg-surface/40 px-4 py-3 text-sm text-zinc-200">
+              {w.name}
+              {w.note ? <span className="mt-0.5 block text-xs text-faint">{w.note}</span> : null}
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [novels, setNovels] = useState<NovelSummary[]>([]);
   const [activeNovelId, setActiveNovelId] = useState<number | null>(null);
@@ -159,6 +234,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [boundPacks, setBoundPacks] = useState<BoundPack[]>([]);
   const [builtinSkills, setBuiltinSkills] = useState<BuiltinSkillInfo[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [sessionsReady, setSessionsReady] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -170,7 +246,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [evidence, setEvidence] = useState<EvidenceView | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("write");
-  const [railExpanded, setRailExpanded] = useState<"chapters" | "characters" | "worldviews" | null>(null);
+  const [activePanel, setActivePanel] = useState<WorkbenchPanel>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const phaseResetRef = useRef<number | null>(null);
@@ -197,6 +273,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { sessions: SessionRow[] } | null) => {
         if (data) setSessions(data.sessions);
+        setSessionsReady(true);
       });
   }, []);
 
@@ -221,6 +298,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
     setError(null);
     setLastSentContent(null);
     setActiveNovelId(novelId);
+    writeCurrentNovelId(novelId);
     setEvidence(null);
     setMessages([]);
     setSessionId(null);
@@ -250,6 +328,20 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       }
     }
   }, [sessions]);
+
+  // P0-A: 挂载后把“当前作品”解析到唯一状态源并加载详情。
+  // newlyCreatedId 不需要从这里传入：创建页已把新作品 id 写入同一 localStorage 源。
+  useEffect(() => {
+    if (!sessionsReady || novels.length === 0) return;
+    const resolved = resolveCurrentNovelId({
+      newlyCreatedId: null,
+      persistedId: readCurrentNovelId(),
+      availableNovelIds: novels.map((n) => n.id),
+    });
+    if (resolved != null && resolved !== activeNovelId) {
+      void loadNovel(resolved);
+    }
+  }, [novels, sessions, sessionsReady, activeNovelId, loadNovel]);
 
   async function send(contentOverride?: string) {
     const content = (contentOverride ?? input).trim();
@@ -382,6 +474,13 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const settledCount = latestChapter ? Number(latestChapter.ch) : 0;
   const evidenceRuns = evidence?.runs ?? [];
 
+  // 章节链接必须携带 novelId/novel/ch/title，否则章节页拿不到作品上下文。
+  const chapterHref = (ch: ChapterRow) => {
+    const novelId = activeNovelId ?? detail?.novel.id ?? 0;
+    const novelName = detail?.novel.name ?? "";
+    return `/chapter/${ch.id}?novelId=${novelId}&novel=${encodeURIComponent(novelName)}&ch=${encodeURIComponent(ch.ch)}&title=${encodeURIComponent(ch.title || "未命名")}`;
+  };
+
   return (
     <div className="flex h-[100dvh] flex-col bg-background text-foreground">
       {/* ===== 顶栏 ===== */}
@@ -442,23 +541,23 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           <nav className="mt-4 flex flex-col gap-0.5" aria-label="作品导航">
             <button
               type="button"
-              onClick={() => setRailExpanded(null)}
-              className={"flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition " + (railExpanded === null ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
+              onClick={() => setActivePanel(null)}
+              className={"flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === null ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
             >
               <PenNib size={16} weight="duotone" aria-hidden /> 写作对话
             </button>
             <button
               type="button"
-              onClick={() => setRailExpanded(railExpanded === "chapters" ? null : "chapters")}
-              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (railExpanded === "chapters" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
+              onClick={() => setActivePanel(activePanel === "outline" ? null : "outline")}
+              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === "outline" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
             >
               <span className="flex items-center gap-2.5"><ListNumbers size={16} weight="duotone" aria-hidden /> 章节与大纲</span>
               <b className="text-xs text-faint">{detail?.chapters.length ?? 0}</b>
             </button>
-            {railExpanded === "chapters" && (
+            {activePanel === "outline" && (
               <div className="ml-6 flex flex-col gap-0.5 border-l border-surface-2 pl-2">
                 {[...(detail?.chapters ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((ch) => (
-                  <Link key={ch.id} href={"/chapter/" + ch.id} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
+                  <Link key={ch.id} href={chapterHref(ch)} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
                     {ch.ch} · {ch.title || "未命名"}
                   </Link>
                 ))}
@@ -467,13 +566,13 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             )}
             <button
               type="button"
-              onClick={() => setRailExpanded(railExpanded === "characters" ? null : "characters")}
-              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (railExpanded === "characters" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
+              onClick={() => setActivePanel(activePanel === "characters" ? null : "characters")}
+              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === "characters" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
             >
               <span className="flex items-center gap-2.5"><UsersThree size={16} weight="duotone" aria-hidden /> 人物关系</span>
               <b className="text-xs text-faint">{detail?.characters.length ?? 0}</b>
             </button>
-            {railExpanded === "characters" && (
+            {activePanel === "characters" && (
               <div className="ml-6 flex flex-col gap-0.5 border-l border-surface-2 pl-2">
                 {(detail?.characters ?? []).slice(0, 12).map((c) => (
                   <p key={c.id} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400" title={c.note ?? undefined}>{c.name}</p>
@@ -483,13 +582,13 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             )}
             <button
               type="button"
-              onClick={() => setRailExpanded(railExpanded === "worldviews" ? null : "worldviews")}
-              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (railExpanded === "worldviews" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
+              onClick={() => setActivePanel(activePanel === "world" ? null : "world")}
+              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === "world" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
             >
               <span className="flex items-center gap-2.5"><GlobeHemisphereWest size={16} weight="duotone" aria-hidden /> 世界规则</span>
               <b className="text-xs text-faint">{detail?.worldviews.length ?? 0}</b>
             </button>
-            {railExpanded === "worldviews" && (
+            {activePanel === "world" && (
               <div className="ml-6 flex flex-col gap-0.5 border-l border-surface-2 pl-2">
                 {(detail?.worldviews ?? []).slice(0, 12).map((w) => (
                   <p key={w.id} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400" title={w.note ?? undefined}>{w.name}</p>
@@ -567,7 +666,15 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
               </div>
             )}
 
-            {novels.length > 0 && (
+            {novels.length > 0 && activePanel !== null && (
+              <div className="mx-auto max-w-3xl">
+                {activePanel === "outline" && <OutlinePanel chapters={detail?.chapters ?? []} />}
+                {activePanel === "characters" && <CharactersPanel characters={detail?.characters ?? []} />}
+                {activePanel === "world" && <WorldPanel worldviews={detail?.worldviews ?? []} />}
+              </div>
+            )}
+
+            {novels.length > 0 && activePanel === null && (
               <div className="mx-auto max-w-3xl">
                 <div className="mozhou-rise">
                   <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Continue the story</p>
@@ -650,8 +757,8 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             )}
           </div>
 
-          {/* 自由回答主输入 */}
-          {novels.length > 0 && (
+          {/* 自由回答主输入（仅写作对话面板显示） */}
+          {novels.length > 0 && activePanel === null && (
             <footer className="shrink-0 border-t border-surface-2 p-4">
               <div className="mx-auto max-w-3xl">
                 <div className="mb-3 lg:hidden">
@@ -823,7 +930,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           {mobileTab === "chapters" && (
             <div className="flex flex-col gap-1.5">
               {[...(detail?.chapters ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((ch) => (
-                <Link key={ch.id} href={"/chapter/" + ch.id} className="rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200">
+                <Link key={ch.id} href={chapterHref(ch)} className="rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200">
                   {ch.ch} · {ch.title || "未命名"}
                 </Link>
               ))}

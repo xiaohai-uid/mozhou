@@ -215,6 +215,8 @@ class MockLlmTransport implements LlmTransport {
   stream(request: PreparedChatRequest): StreamProvider {
     return {
       async *stream(): AsyncIterable<StreamDelta> {
+        // 给 abort/stop 测试留出“attempt 已创建但尚未完成”的确定性窗口。
+        await new Promise((resolve) => setTimeout(resolve, 100));
         if (request.system) yield { text: `（已注入：${request.system}）` };
         yield { text: "你好，我是墨舟。" };
         yield { text: "（模拟流式输出）" };

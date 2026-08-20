@@ -243,6 +243,7 @@ describe("章节对话引擎（工单 17）", () => {
       headers: { "Content-Type": "application/json", cookie },
       body: JSON.stringify({ content: "黄土坡上，老周把锄头抡起来。" }),
     });
+    const observationsBefore = readPayloadObservations().length;
     const res = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
       {
@@ -279,7 +280,9 @@ describe("章节对话引擎（工单 17）", () => {
     expect(qg.evidence).toBe("applied");
     expect(qg.promptSection).toBeNull();
 
-    const chapterObservation = readPayloadObservations().find((entry) => entry.route === "chapter-chat");
+    const chapterObservation = readPayloadObservations()
+      .slice(observationsBefore)
+      .find((entry) => entry.route === "chapter-chat");
     expect(chapterObservation).toMatchObject({
       route: "chapter-chat",
       message_count: 1,
@@ -491,6 +494,21 @@ describe("章节对话引擎（工单 17）", () => {
         signal: controller.signal,
       },
     );
+    // 只有 attempt 已创建并绑定候选后，abort 才可能产生“attempt cancelled”语义；
+    // 如果请求在 attempt 创建前就被客户端断开，服务端根本没有 attempt 行可取消。
+    let attemptReady = false;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const [candidate] = await db
+        .select({ attemptId: chapterMessages.attemptId })
+        .from(chapterMessages)
+        .where(and(eq(chapterMessages.chapterId, chapterId), eq(chapterMessages.generationKey, generationKey)));
+      if (candidate?.attemptId != null) {
+        attemptReady = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(attemptReady).toBe(true);
     controller.abort();
     await res.body?.cancel().catch(() => {});
     // Cloud Run may keep the original request alive after the browser closes

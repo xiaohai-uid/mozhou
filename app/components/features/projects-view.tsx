@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { writeCurrentNovelId } from "@/lib/novels/current-novel";
 import {
   BookOpenText,
   CloudArrowUp,
@@ -163,6 +164,8 @@ export function ProjectsView() {
       setBookName("");
       setBookDescription("");
       bootstrapRequestKeyRef.current = null;
+      // 新作品立即成为“当前作品”，Workbench 重新挂载后仍保持。
+      writeCurrentNovelId(data.novel!.id);
       router.push(
         `/chapter/${data.chapter!.id}?novelId=${data.novel!.id}&novel=${encodeURIComponent(data.novel!.name)}&ch=${data.chapter!.ch}&title=${encodeURIComponent(data.chapter!.title)}`,
       );
