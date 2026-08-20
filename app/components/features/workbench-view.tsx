@@ -365,7 +365,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model: "deepseek-v4-flash", content, novelId: activeNovelId }),
+        body: JSON.stringify({ sessionId, model: "glm-4.5-flash", content, novelId: activeNovelId }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {

@@ -78,7 +78,7 @@ interface ChatMessage {
 }
 
 /** one-api 中配置的可用模型 */
-const CHAT_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
+const CHAT_MODELS = ["glm-4.5-flash", "deepseek-v4-flash"] as const;
 
 let msgSeq = 0;
 

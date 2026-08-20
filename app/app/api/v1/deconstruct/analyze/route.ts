@@ -397,7 +397,7 @@ export async function POST(request: Request) {
     }, { status: input.httpStatus });
   };
 
-  const model = process.env.DECONSTRUCT_MODEL ?? "deepseek-v4-flash";
+  const model = process.env.DECONSTRUCT_MODEL ?? "glm-4.5-flash";
   const provider = createUnifiedCompletionProvider({ route: "deconstruct", model });
   const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
   const recordLedger = (status: "succeeded" | "failed" | "cancelled", promptTokens?: number, completionTokens?: number) =>

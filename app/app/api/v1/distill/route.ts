@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const model = process.env.DISTILL_MODEL ?? "deepseek-v4-flash";
+  const model = process.env.DISTILL_MODEL ?? "glm-4.5-flash";
   const provider = createUnifiedCompletionProvider({
     route: "distill",
     model,

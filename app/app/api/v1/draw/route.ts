@@ -7,7 +7,7 @@ import { assertQuota, recordUsage } from "@/lib/account/service";
 import { createUnifiedCompletionProvider } from "@/lib/ai/provider";
 import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
 
-export const DRAW_MODELS = ["deepseek-v4-flash", "glm-4.5-flash"] as const;
+export const DRAW_MODELS = ["glm-4.5-flash", "deepseek-v4-flash"] as const;
 export type DrawModel = (typeof DRAW_MODELS)[number];
 
 const MAX_INSTRUCTION = 2000;
