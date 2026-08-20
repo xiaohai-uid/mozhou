@@ -339,7 +339,8 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       availableNovelIds: novels.map((n) => n.id),
     });
     if (resolved != null && resolved !== activeNovelId) {
-      void loadNovel(resolved);
+      // Defer the stateful loader past the effect body to avoid a cascading render.
+      void Promise.resolve().then(() => loadNovel(resolved));
     }
   }, [novels, sessions, sessionsReady, activeNovelId, loadNovel]);
 
