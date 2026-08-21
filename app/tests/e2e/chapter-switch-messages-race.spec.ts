@@ -84,6 +84,10 @@ test("重试加载后，首次运行的迟到对话历史不得覆盖新结果",
   await expect(page.getByLabel("章节正文编辑器")).toBeEnabled({ timeout: 30_000 });
   await expect(page.getByText("已保存", { exact: true })).toBeVisible();
 
+  // 正向检查：面板已渲染 B 的真实空历史（该空态仅在 messages.length===0 时出现），
+  // 排除「面板根本未渲染导致负向断言空洞通过」
+  await expect(page.getByText("空章节：让 AI 起笔，再逐轮调整")).toBeVisible();
+
   // 等过 run#1 迟到响应的预定落地时刻（发出后 ~4.5s），再断言标记未出现
   await page.waitForTimeout(5000);
   await expect(page.getByText(MARKER)).toHaveCount(0);
