@@ -114,6 +114,8 @@ export function ChapterEditorView() {
   const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
 
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 当前正在查看的章节：迟到的防抖保存落地时据此判定是否转为后台保存（不污染新章节状态） */
+  const activeChapterRef = useRef({ novelId, chapterId });
   /** 最后保存/服务端确认的正文（撤销/重做后的保存状态比较基准，Journey ⑧） */
   const lastSavedRef = useRef("");
   /** J9：正文 textarea 引用（插入后 caret/focus 恢复） */
@@ -155,6 +157,10 @@ export function ChapterEditorView() {
     } catch {
       // Private browsing/storage denial must not block chapter editing.
     }
+  }, [novelId, chapterId]);
+
+  useEffect(() => {
+    activeChapterRef.current = { novelId, chapterId };
   }, [novelId, chapterId]);
 
   /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
@@ -207,10 +213,12 @@ export function ChapterEditorView() {
     };
   }, [novelId, chapterId, reloadNonce, bodyHist]); // bodyHist 实例稳定（useState 惰性初始化）；随章节/重试重载
 
-  /** 工单 16：保存正文（PATCH content；自动保存与显式保存同端点；content 显式传参防闭包过期） */
-  async function saveBody(content: string): Promise<boolean> {
+  /** 工单 16：保存正文（PATCH content；自动保存与显式保存同端点；content 显式传参防闭包过期）。
+   *  background=true：章节切换后触发的迟到的防抖保存——仍落库保护用户输入，
+   *  但不更新当前章节的保存基线（lastSavedRef）与徽标状态，防跨章节污染。 */
+  async function saveBody(content: string, opts?: { background?: boolean }): Promise<boolean> {
     if (!novelId || !chapterId) return false;
-    setSaveState("saving");
+    if (!opts?.background) setSaveState("saving");
     try {
       const res = await fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
         method: "PATCH",
@@ -218,11 +226,13 @@ export function ChapterEditorView() {
         body: JSON.stringify({ content }),
       });
       if (!res.ok) throw new Error("保存失败");
-      lastSavedRef.current = content;
-      setSaveState("saved");
+      if (!opts?.background) {
+        lastSavedRef.current = content;
+        setSaveState("saved");
+      }
       return true;
     } catch {
-      setSaveState("failed");
+      if (!opts?.background) setSaveState("failed");
       return false;
     }
   }
@@ -241,14 +251,19 @@ export function ChapterEditorView() {
     );
   }
 
-  /** 正文变更统一入口（Journey ⑧）：保存状态 = 与最后保存内容比较；不同则进 2s 防抖自动保存（保存不清 undo 栈） */
+  /** 正文变更统一入口（Journey ⑧）：保存状态 = 与最后保存内容比较；不同则进 2s 防抖自动保存（保存不清 undo 栈）。
+   *  防抖回调触发时若已切换章节，转为后台保存：落库目标仍是打字时的章节（闭包 id），但不再污染新章节的基线与徽标。 */
   function markChanged(next: string) {
     const sameAsSaved = next === lastSavedRef.current;
     setSaveState(sameAsSaved ? "saved" : "dirty");
     if (!sameAsSaved) {
       if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
+      const savedAt = { novelId, chapterId };
       dirtyTimerRef.current = setTimeout(() => {
-        void saveBody(next);
+        const active = activeChapterRef.current;
+        const stillActive =
+          active.novelId === savedAt.novelId && active.chapterId === savedAt.chapterId;
+        void saveBody(next, { background: !stillActive });
       }, 2000);
     }
   }
