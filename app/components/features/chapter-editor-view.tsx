@@ -166,7 +166,8 @@ export function ChapterEditorView() {
   /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
   useEffect(() => {
     if (!novelId || !chapterId) {
-      // 参数缺失无法加载：显式失败态（可重试），而非可编辑的空白正文。
+      // 参数缺失无法加载：显式失败态（可重试），并退出加载门控语义，不残留旧正文的可误读状态。
+      setBodyLoaded(false);
       setLoadFailed(true);
       return;
     }
@@ -194,6 +195,8 @@ export function ChapterEditorView() {
     fetch(`/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { messages?: ChatMessage[] } | null) => {
+        // 章节切换/重试后过期响应丢弃（与正文通道同款 cancelled 守卫）。
+        if (cancelled) return;
         // P0-D：历史请求返回时若用户已经发过消息/本地状态已变化，旧响应不得覆盖新状态。
         if (messagesVersionRef.current !== messagesVersionAtStart) return;
         if (data?.messages) setMessages(data.messages);
@@ -258,11 +261,12 @@ export function ChapterEditorView() {
     setSaveState(sameAsSaved ? "saved" : "dirty");
     if (!sameAsSaved) {
       if (dirtyTimerRef.current) clearTimeout(dirtyTimerRef.current);
-      const savedAt = { novelId, chapterId };
+      const armedForChapter = { novelId, chapterId };
       dirtyTimerRef.current = setTimeout(() => {
         const active = activeChapterRef.current;
         const stillActive =
-          active.novelId === savedAt.novelId && active.chapterId === savedAt.chapterId;
+          active.novelId === armedForChapter.novelId &&
+          active.chapterId === armedForChapter.chapterId;
         void saveBody(next, { background: !stillActive });
       }, 2000);
     }
@@ -633,6 +637,19 @@ export function ChapterEditorView() {
     ? "让 AI 起笔这一章（对话式，可多轮调整）"
     : "和 AI 对话，继续写这一章…";
 
+  /** 顶栏状态徽标：加载态优先于保存态；文案与色调单一派生点 */
+  const saveBadge = !bodyLoaded
+    ? loadFailed
+      ? { text: "加载失败", tone: "text-red-400" }
+      : { text: "加载中…", tone: "text-faint" }
+    : saveState === "dirty"
+      ? { text: "未保存", tone: "text-yellow-400" }
+      : saveState === "failed"
+        ? { text: "保存失败", tone: "text-red-400" }
+        : saveState === "saving"
+          ? { text: "保存中…", tone: "text-faint" }
+          : { text: "已保存", tone: "text-faint" };
+
   return (
     <main className="mz-page mz-chapter-page flex w-full flex-1 flex-col px-6 py-6 lg:px-8">
       {/* 顶栏：返回 + 章节标识 + 模型/风格 + 保存态 */}
@@ -650,29 +667,7 @@ export function ChapterEditorView() {
           <span className="rounded-full border border-surface-2 px-2 py-0.5 text-[10px] text-faint">
             草稿
           </span>
-          <span
-            className={`text-[10px] ${
-              loadFailed
-                ? "text-red-400"
-                : saveState === "dirty"
-                  ? "text-yellow-400"
-                  : saveState === "failed"
-                    ? "text-red-400"
-                    : "text-faint"
-            }`}
-          >
-            {!bodyLoaded
-              ? loadFailed
-                ? "加载失败"
-                : "加载中…"
-              : saveState === "dirty"
-                ? "未保存"
-                : saveState === "failed"
-                  ? "保存失败"
-                  : saveState === "saving"
-                    ? "保存中…"
-                    : "已保存"}
-          </span>
+          <span className={`text-[10px] ${saveBadge.tone}`}>{saveBadge.text}</span>
           <button
             onClick={() => void saveBody(body)}
             disabled={!bodyLoaded || saveState === "saving"}
