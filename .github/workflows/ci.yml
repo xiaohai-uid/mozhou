@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    name: typecheck / lint / unit+http / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mozhou
+          POSTGRES_PASSWORD: mozhou_dev
+          POSTGRES_DB: mozhou
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U mozhou"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://mozhou:mozhou_dev@localhost:5433/mozhou
+      AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+      CHAT_PROVIDER: mock
+      DISTILL_PROVIDER: mock
+      DECONSTRUCT_PROVIDER: mock
+      DRAW_PROVIDER: mock
+      SOURCE_PROVIDER: mock
+      WEBSEARCH_PROVIDER: mock
+      RANKINGS_PROVIDER: mock
+      FANQIE_SEARCH_MOCK: "1"
+      SYNC_PROVIDER: mock
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Apply database schema
+        run: npx drizzle-kit migrate
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: playwright e2e
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mozhou
+          POSTGRES_PASSWORD: mozhou_dev
+          POSTGRES_DB: mozhou
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U mozhou"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://mozhou:mozhou_dev@localhost:5433/mozhou
+      AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+      CHAT_PROVIDER: mock
+      DISTILL_PROVIDER: mock
+      DECONSTRUCT_PROVIDER: mock
+      DRAW_PROVIDER: mock
+      SOURCE_PROVIDER: mock
+      WEBSEARCH_PROVIDER: mock
+      RANKINGS_PROVIDER: mock
+      FANQIE_SEARCH_MOCK: "1"
+      SYNC_PROVIDER: mock
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Apply database schema
+        run: npx drizzle-kit migrate
+      - run: npx playwright install --with-deps chromium
+      - run: node node_modules/@playwright/test/cli.js test
