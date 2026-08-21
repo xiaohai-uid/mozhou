@@ -7,6 +7,11 @@ import { ArrowUp, Plus, Shuffle } from "@phosphor-icons/react/dist/ssr";
 import { WritingToolsPanel } from "@/components/features/writing-tools-panel";
 import { GenerationStageRail, type GenerationPhase } from "@/components/features/generation-stage-rail";
 import { MODELS } from "@/lib/chat/models";
+import {
+  readCurrentNovelId,
+  resolveCurrentNovelId,
+  writeCurrentNovelId,
+} from "@/lib/novels/current-novel";
 
 interface Session {
   id: number;
@@ -36,9 +41,13 @@ interface DrawCandidate {
   text: string;
 }
 
+type LoadStatus = "loading" | "ready" | "error";
+
 export function ChatView() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionsLoadStatus, setSessionsLoadStatus] = useState<LoadStatus>("loading");
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [model, setModel] = useState<string>(MODELS[0]);
   const [input, setInput] = useState("");
@@ -52,7 +61,8 @@ export function ChatView() {
   const [compressedNotice, setCompressedNotice] = useState(false);
   // 当前作品绑定（R3 决策）：顶部选择器，RAG 按作品过滤
   const [novels, setNovels] = useState<NovelSummary[]>([]);
-  const [novelId, setNovelId] = useState<number | null>(null);
+  const [novelsLoadStatus, setNovelsLoadStatus] = useState<LoadStatus>("loading");
+  const [novelId, setNovelId] = useState<number | null>(() => readCurrentNovelId());
   // 风格/技能选择（R4 决策）：胶囊单选/多选，注入 system 提示
   // 工单 15：风格引用真实风格库（{id,name}），请求带 styleId；演示三件套已删除
   const [style, setStyle] = useState<StyleRef | null>(null);
@@ -67,37 +77,94 @@ export function ChatView() {
   const abortRef = useRef<AbortController | null>(null);
   const phaseResetRef = useRef<number | null>(null);
   const completedRef = useRef(false);
+  const sessionsLoadVersionRef = useRef(0);
+  const novelsLoadVersionRef = useRef(0);
+  const sessionLoadVersionRef = useRef(0);
+  // 初始持久化作品允许立即新建会话；作品列表返回后仍会校验它。
+  // 已有会话或用户手动选择的上下文优先，不能被稍晚的列表覆盖。
+  const novelSelectionSourceRef = useRef<"persisted" | "session" | "user">("persisted");
 
-  const refreshSessions = useCallback(async () => {
-    const res = await fetch("/api/v1/sessions");
-    if (!res.ok) return;
-    const data = (await res.json()) as { sessions: Session[] };
-    setSessions(data.sessions);
+  const loadSessions = useCallback(async () => {
+    const requestVersion = ++sessionsLoadVersionRef.current;
+    setSessionsLoadStatus("loading");
+    try {
+      const res = await fetch("/api/v1/sessions");
+      if (!res.ok) throw new Error("会话列表加载失败");
+      const data = (await res.json()) as { sessions: Session[] };
+      if (requestVersion !== sessionsLoadVersionRef.current) return;
+      setSessions(data.sessions);
+      setSessionsLoadStatus("ready");
+    } catch {
+      if (requestVersion !== sessionsLoadVersionRef.current) return;
+      setSessionsLoadStatus("error");
+    }
   }, []);
 
+  const loadNovels = useCallback(async () => {
+    const requestVersion = ++novelsLoadVersionRef.current;
+    setNovelsLoadStatus("loading");
+    try {
+      const res = await fetch("/api/v1/novels");
+      if (!res.ok) throw new Error("作品列表加载失败");
+      const data = (await res.json()) as { novels: NovelSummary[] };
+      if (requestVersion !== novelsLoadVersionRef.current) return;
+      setNovels(data.novels);
+      if (novelSelectionSourceRef.current === "persisted") {
+        setNovelId(
+          resolveCurrentNovelId({
+            persistedId: readCurrentNovelId(),
+            availableNovelIds: data.novels.map((novel) => novel.id),
+          }),
+        );
+      }
+      setNovelsLoadStatus("ready");
+    } catch {
+      if (requestVersion !== novelsLoadVersionRef.current) return;
+      setNovelsLoadStatus("error");
+    }
+  }, []);
+
+  const refreshSessions = useCallback(async () => {
+    await loadSessions();
+  }, [loadSessions]);
+
   const loadSession = useCallback(async (id: number) => {
-    const res = await fetch(`/api/v1/sessions/${id}/messages`);
-    if (!res.ok) return;
-    const data = (await res.json()) as { messages: ChatMessage[] };
-    setMessages(data.messages);
-    setSessionId(id);
-    // 会话绑定的作品回填选择器
-    const s = sessions.find((x) => x.id === id);
-    if (s) setNovelId(s.novelId);
+    const session = sessions.find((item) => item.id === id);
+    if (!session) {
+      setError("会话不存在，请重新加载");
+      return;
+    }
+    const requestVersion = ++sessionLoadVersionRef.current;
+    setSessionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/sessions/${id}/messages`);
+      if (!res.ok) throw new Error("会话加载失败");
+      const data = (await res.json()) as { messages: ChatMessage[] };
+      if (requestVersion !== sessionLoadVersionRef.current) return;
+      // 只有消息成功返回后，才把会话、作品和消息一起切换，避免半提交上下文。
+      novelSelectionSourceRef.current = "session";
+      setMessages(data.messages);
+      setSessionId(id);
+      setNovelId(session.novelId);
+      setCompressedNotice(false);
+    } catch {
+      if (requestVersion === sessionLoadVersionRef.current) {
+        setError("会话加载失败，请重试");
+      }
+    } finally {
+      if (requestVersion === sessionLoadVersionRef.current) {
+        setSessionLoading(false);
+      }
+    }
   }, [sessions]);
 
   useEffect(() => {
     // 初始加载会话列表 + 作品列表 + 技能（异步 fetch，setState 均在 promise 回调）
-    fetch("/api/v1/sessions")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { sessions: Session[] } | null) => {
-        if (data) setSessions(data.sessions);
-      });
-    fetch("/api/v1/novels")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { novels: NovelSummary[] } | null) => {
-        if (data) setNovels(data.novels);
-      });
+    void Promise.resolve().then(() => {
+      void loadSessions();
+      void loadNovels();
+    });
     // 技能链路（真实化）：只展示已声明契约（connected）的技能——未接入的不会注入（工单 08 收尾）
     fetch("/api/v1/skills?scope=mine")
       .then((res) => (res.ok ? res.json() : null))
@@ -149,7 +216,8 @@ export function ChatView() {
               (b) => `\n${b.name}：\n` + b.lines.map((l) => `  - ${l}`).join("\n"),
             ),
           ].join("");
-          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]); // eslint-disable-line react-hooks/set-state-in-effect -- 一次性初始化回流，同类豁免
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- 一次性初始化回流
+          setMessages([{ role: "user", content: "（导入拆解结果）" }, { role: "assistant", content: text }]);
         }
       }
     } catch {
@@ -175,7 +243,7 @@ export function ChatView() {
     } catch {
       // 暂存数据损坏则忽略
     }
-  }, []);
+  }, [loadNovels, loadSessions]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -186,26 +254,72 @@ export function ChatView() {
     if (phaseResetRef.current !== null) window.clearTimeout(phaseResetRef.current);
   }, []);
 
+  const contextLoadError =
+    sessionsLoadStatus === "error"
+      ? "会话加载失败，请重试"
+      : novelsLoadStatus === "error"
+        ? "作品加载失败，请重试"
+        : null;
+  const chatActionsReady =
+    sessionsLoadStatus === "ready" && novelsLoadStatus === "ready" && !sessionLoading;
+
+  function reloadContextData() {
+    setError(null);
+    void loadSessions();
+    void loadNovels();
+  }
+
+  function selectNovel(nextNovelId: number | null) {
+    // 手动切换作品必须让下一次发送创建新会话；旧会话的服务端绑定不能继续复用。
+    sessionLoadVersionRef.current += 1;
+    setSessionLoading(false);
+    novelSelectionSourceRef.current = "user";
+    writeCurrentNovelId(nextNovelId);
+    setNovelId(nextNovelId);
+    setSessionId(null);
+    setMessages([]);
+    setCompressedNotice(false);
+    setCandidates([]);
+    setError(null);
+  }
+
   async function newSession() {
+    if (!chatActionsReady || streaming) return;
+    const requestVersion = ++sessionLoadVersionRef.current;
     setStreaming(false);
     setGenerationPhase("idle");
     setGenerationStartedAt(null);
     setError(null);
-    const res = await fetch("/api/v1/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ novelId }),
-    });
-    if (!res.ok) return;
-    const data = (await res.json()) as { session: Session };
-    setMessages([]);
-    setSessionId(data.session.id);
-    await refreshSessions();
+    setSessionLoading(true);
+    try {
+      const res = await fetch("/api/v1/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ novelId }),
+      });
+      if (!res.ok) throw new Error("新会话创建失败");
+      const data = (await res.json()) as { session: Session };
+      if (requestVersion !== sessionLoadVersionRef.current) return;
+      novelSelectionSourceRef.current = "session";
+      setMessages([]);
+      setSessionId(data.session.id);
+      setNovelId(data.session.novelId);
+      setCompressedNotice(false);
+      await refreshSessions();
+    } catch {
+      if (requestVersion === sessionLoadVersionRef.current) {
+        setError("新会话创建失败，请重试");
+      }
+    } finally {
+      if (requestVersion === sessionLoadVersionRef.current) {
+        setSessionLoading(false);
+      }
+    }
   }
 
   async function send(contentOverride?: string) {
     const content = (contentOverride ?? input).trim();
-    if (!content || streaming) return;
+    if (!content || streaming || !chatActionsReady) return;
     setInput("");
     setError(null);
     setLastSentContent(content);
@@ -312,7 +426,7 @@ export function ChatView() {
 
   /** Retrying 态：重发上一次失败的内容 */
   async function retryLast() {
-    if (!lastSentContent || streaming) return;
+    if (!lastSentContent || streaming || !chatActionsReady) return;
     await send(lastSentContent);
   }
 
@@ -368,40 +482,48 @@ export function ChatView() {
   }
 
   return (
-    <main className="flex min-h-[100dvh] flex-1 gap-4 px-6 py-6">
+    <main className="mz-chat-page flex min-h-[100dvh] flex-1 gap-4">
       {/* 会话侧栏 */}
       <aside className="flex w-60 shrink-0 flex-col gap-3">
         <Button
           onClick={newSession}
-          disabled={streaming}
+          disabled={streaming || !chatActionsReady}
           className="w-full rounded-full bg-accent hover:bg-violet-500"
         >
           <Plus size={16} weight="bold" className="mr-1" />
           新会话
         </Button>
         <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {sessions.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => void loadSession(s.id)}
-              disabled={streaming}
-              className={`relative truncate rounded-xl px-3.5 py-2.5 text-left text-sm transition ${
-                s.id === sessionId
-                  ? "bg-accent/10 text-zinc-100"
-                  : "text-zinc-400 hover:bg-surface hover:text-zinc-200"
-              }`}
-              title={s.title}
-            >
-              {s.id === sessionId && (
-                <span
-                  aria-hidden
-                  className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
-                />
-              )}
-              {s.title}
-            </button>
-          ))}
-          {sessions.length === 0 && (
+          {sessionsLoadStatus === "loading" && (
+            <div role="status" className="px-3.5 py-8 text-center text-sm text-faint">
+              正在加载会话…
+            </div>
+          )}
+          {sessionsLoadStatus === "error" && (
+            <div className="px-3.5 py-8 text-center text-sm text-faint">会话暂时不可用</div>
+          )}
+          {sessionsLoadStatus === "ready" && sessions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => void loadSession(s.id)}
+                disabled={streaming}
+                className={`relative truncate rounded-xl px-3.5 py-2.5 text-left text-sm transition ${
+                  s.id === sessionId
+                    ? "bg-accent/10 text-zinc-100"
+                    : "text-zinc-400 hover:bg-surface hover:text-zinc-200"
+                }`}
+                title={s.title}
+              >
+                {s.id === sessionId && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-accent"
+                  />
+                )}
+                {s.title}
+              </button>
+            ))}
+          {sessionsLoadStatus === "ready" && sessions.length === 0 && (
             <div className="px-3.5 py-8 text-center">
               <p className="text-sm text-faint">还没有会话</p>
               <p className="mt-1 text-xs text-zinc-600">新建一个，开始与 AI 共同创作</p>
@@ -411,8 +533,9 @@ export function ChatView() {
       </aside>
 
       {/* 对话区 */}
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-2 bg-surface/40">
-        <header className="flex items-center justify-between border-b border-surface-2 px-5 py-3.5">
+      <section className="mz-chat-surface flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-surface-2 bg-surface/40">
+        <header className="mz-chat-header border-b border-surface-2 px-5 py-3.5">
+          <div className="mz-chat-headline">
           <h1 className="text-sm font-medium text-zinc-300">写作对话</h1>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-faint">
@@ -421,12 +544,18 @@ export function ChatView() {
                 value={novelId ?? ""}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setNovelId(v === "" ? null : Number(v));
+                  selectNovel(v === "" ? null : Number(v));
                 }}
-                disabled={streaming}
+                disabled={streaming || !chatActionsReady}
                 className="rounded-xl border border-surface-2 bg-zinc-950 px-3 py-1.5 text-zinc-200 outline-none transition focus:border-accent"
               >
-                <option value="">未绑定</option>
+                <option value="">
+                  {novelsLoadStatus === "loading"
+                    ? "正在加载作品…"
+                    : novelsLoadStatus === "error"
+                      ? "作品暂时不可用"
+                      : "未绑定"}
+                </option>
                 {novels.map((n) => (
                   <option key={n.id} value={n.id}>
                     {n.name}
@@ -450,7 +579,8 @@ export function ChatView() {
             </select>
             </label>
           </div>
-          <div className="flex items-center gap-2">
+          </div>
+          <div className="mz-chat-chip-row flex items-center gap-2">
             {/* 风格胶囊（R4：单选，同时只生效一种文风；工单 15：数据源 = 我的风格库） */}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-faint">风格</span>
@@ -590,28 +720,37 @@ export function ChatView() {
             startedAt={generationStartedAt}
             onStop={stopGeneration}
           />
-          {error && (
+          {(contextLoadError ?? error) && (
             <div
               role="alert"
+              data-chat-error
               className={`mb-2 flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm ${
-                /额度|次数已用完|402|429/.test(error)
+                /额度|次数已用完|402|429/.test(contextLoadError ?? error ?? "")
                   ? "border-yellow-500/30 bg-yellow-500/5 text-yellow-400"
                   : "border-red-500/30 bg-red-500/5 text-red-400"
               }`}
             >
               <span>
-                {/额度|次数已用完|402|429/.test(error) && (
+                {/额度|次数已用完|402|429/.test(contextLoadError ?? error ?? "") && (
                   <span className="mr-2 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[10px]">
                     额度不足
                   </span>
                 )}
-                {error}
+                {contextLoadError ?? error}
               </span>
+              {contextLoadError && (
+                <button
+                  onClick={reloadContextData}
+                  className="shrink-0 rounded-full border border-current px-3 py-1 text-xs transition hover:bg-current/10"
+                >
+                  重新加载
+                </button>
+              )}
               {/* Retrying 态：失败后提供重试（重发最后一条输入） */}
-              {!streaming && lastSentContent && (
+              {!contextLoadError && !streaming && lastSentContent && (
                 <button
                   onClick={() => void retryLast()}
-                  disabled={streaming}
+                  disabled={streaming || !chatActionsReady}
                   className="shrink-0 rounded-full border border-current px-3 py-1 text-xs transition hover:bg-current/10 disabled:opacity-40"
                 >
                   重试
@@ -640,7 +779,7 @@ export function ChatView() {
             </button>
             <button
               onClick={() => void send()}
-              disabled={!input.trim() || streaming}
+              disabled={!input.trim() || streaming || !chatActionsReady}
               aria-label="发送"
               className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-white transition hover:bg-violet-500 active:translate-y-px disabled:opacity-40"
             >

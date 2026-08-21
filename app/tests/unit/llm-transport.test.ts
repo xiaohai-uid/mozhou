@@ -3,6 +3,7 @@ import {
   LlmTransportError,
   createOneApiLlmTransport,
 } from "@/lib/chat/llm-transport";
+import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 
 function request() {
   return {
@@ -10,6 +11,45 @@ function request() {
     system: "system contract",
     messages: [{ role: "user" as const, content: "current request" }],
   };
+}
+
+function preparedRequest() {
+  return {
+    ...request(),
+    observation: {
+      route: "chapter-chat" as const,
+      mode: "chapter" as const,
+      historyCountBefore: 0,
+      historyCountAfter: 1,
+      compressionApplied: false,
+      ragEntryCount: 0,
+      stylePresent: false,
+      skillCount: 0,
+      novelScopePresent: true,
+      chapterScopePresent: true,
+      ownerScopeResolved: true,
+      currentUserIndices: [0],
+      systemSections: ["base_identity"],
+    },
+  };
+}
+
+function settleWithin<T>(promise: Promise<T>, timeoutMs = 150): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("transport did not enforce its app-owned timeout"));
+    }, timeoutMs);
+    void promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 describe("one-api LLM transport", () => {
@@ -186,5 +226,67 @@ describe("one-api LLM transport", () => {
       expect((error as Error).message).not.toContain(token);
       return true;
     });
+  });
+
+  it("times out a completion without aborting the caller signal", async () => {
+    const caller = new AbortController();
+    const transport = createOneApiLlmTransport({
+      baseUrl: "https://one-api.example",
+      token: "shared-token",
+      timeoutMs: 20,
+      fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal;
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      }),
+    });
+
+    await expect(settleWithin(transport.complete({ ...request(), signal: caller.signal }))).rejects.toMatchObject({
+      code: "AiTimeout",
+    });
+    expect(caller.signal.aborted).toBe(false);
+  });
+
+  it("does not start a completion once the route-wide budget is exhausted", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "should not be requested" } }],
+    }), { status: 200 }));
+    const transport = createOneApiLlmTransport({
+      baseUrl: "https://one-api.example",
+      token: "shared-token",
+      fetch: fetcher,
+    });
+
+    await expect(transport.complete({ ...request(), timeoutMs: 0 })).rejects.toMatchObject({
+      code: "AiTimeout",
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("turns a stalled stream read into AiTimeout and cancels the upstream reader", async () => {
+    const caller = new AbortController();
+    let readerCancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        readerCancelled = true;
+      },
+    });
+    const transport = createOneApiLlmTransport({
+      baseUrl: "https://one-api.example",
+      token: "shared-token",
+      timeoutMs: 20,
+      fetch: async () => new Response(body, { status: 200 }),
+    });
+
+    const state = await settleWithin(runNodeStream(
+      initialState(),
+      { nodeType: "章节对话", provider: transport.stream(preparedRequest()) },
+      () => {},
+      caller.signal,
+    ));
+
+    expect(state.task?.status).toBe("failed");
+    expect(state.task?.errorCode).toBe("AiTimeout");
+    expect(readerCancelled).toBe(true);
+    expect(caller.signal.aborted).toBe(false);
   });
 });

@@ -11,6 +11,7 @@
   `justsong/one-api@sha256:a55fb5181854aa0823cc04797ee875dfc5a953c0deb5e7e7ec39a8148e70cbc3`
 - persistent storage: Docker named volume (created by compose)
 - SenseNova credential available in Windows environment variable: `SENSENOVA_API_KEY`
+- Zhipu GLM credential available in Windows environment variable: `GLM_API_KEY`
 - local MoZhou `app/.env` has `ONEAPI_TOKEN` pointing to a valid one-api token
 
 ## Architecture
@@ -25,11 +26,15 @@ one-api (justsong/one-api@sha256:a55fb...cbc3)
 SenseNova PUBLIC_FREE (https://token.sensenova.cn)
    │ model: deepseek-v4-flash
    ▼
+Zhipu GLM (https://open.bigmodel.cn/api/paas/v4)
+   │ model: glm-4.5-flash (MoZhou default)
+   ▼
 OpenAI-compatible /v1/chat/completions
 ```
 
 Secrets are **not** baked into the image:
 - `SENSENOVA_API_KEY` is injected at channel-creation time via the one-api API.
+- `GLM_API_KEY` is injected at channel-creation time via the one-api API.
 - `ONEAPI_TOKEN` is created inside one-api and stored in the persistent SQLite DB.
 - `app/.env` is local-only and gitignored.
 
@@ -89,20 +94,44 @@ curl -s -b /tmp/oc.txt -X POST http://127.0.0.1:3000/api/channel/ \
   -H 'Content-Type: application/json' --data @/tmp/channel.json
 ```
 
+Create the GLM channel as well. MoZhou defaults to `glm-4.5-flash` and exposes
+`deepseek-v4-flash` as a selectable model, so a gateway with only one of them is
+not a release-equivalent local environment.
+
+```bash
+export GLM_API_KEY="<GLM_API_KEY>"
+cat > /tmp/glm-channel.json <<JSON
+{
+  "name": "GLM PUBLIC_FREE",
+  "type": 50,
+  "key": "$GLM_API_KEY",
+  "base_url": "https://open.bigmodel.cn/api/paas/v4",
+  "models": "glm-4.5-flash",
+  "model_mapping": "",
+  "group": "default",
+  "status": 1
+}
+JSON
+curl -s -b /tmp/oc.txt -X POST http://127.0.0.1:3000/api/channel/ \
+  -H 'Content-Type: application/json' --data @/tmp/glm-channel.json
+```
+
 **Critical:** `base_url` must be `https://token.sensenova.cn` (no `/v1`).
 one-api appends `/v1/chat/completions`; adding `/v1` creates `/v1/v1/chat/completions` → 404.
 
 ## Configure ModelRatio
 
-`deepseek-v4-flash` must exist in one-api `ModelRatio`, otherwise one-api fails with
-`model ratio not found: deepseek-v4-flash`.
+`glm-4.5-flash` and `deepseek-v4-flash` must both exist in one-api `ModelRatio`,
+otherwise one-api fails with `model ratio not found` or reports that the selected
+model has no available channel.
 
 ```bash
-# Read current ratio, add deepseek-v4-flash, then PUT the full object.
-# Example minimal value (0.07 ≈ deepseek-chat class):
+# Read current ratio, add both product models, then PUT the full object.
+# Use the provider-account rate appropriate to the channel; the example only
+# demonstrates the required keys.
 curl -s -b /tmp/oc.txt -X PUT http://127.0.0.1:3000/api/option/ \
   -H 'Content-Type: application/json' \
-  -d '{"key":"ModelRatio","value":"{\"deepseek-v4-flash\":0.07}"}'
+  -d '{"key":"ModelRatio","value":"{\"glm-4.5-flash\":0.07,\"deepseek-v4-flash\":0.07}"}'
 ```
 
 > If the volume already exists, this is already persisted and does not need to be repeated.
@@ -147,7 +176,7 @@ eventSequence: start → phase → delta ≥ 1 → done
 audit:
   sourceClass=PUBLIC_FREE
   provider=one-api
-  model=deepseek-v4-flash
+  model=glm-4.5-flash
   terminalStatus=succeeded
 ```
 
@@ -156,7 +185,7 @@ audit:
 | Symptom | Cause / check |
 |---|---|
 | `invalid token` / `record not found` | one-api token does not exist; recreate token and update `app/.env` |
-| `model ratio not found: deepseek-v4-flash` | `ModelRatio` missing; configure it |
+| `model ratio not found` / `无可用渠道` | the selected product model is missing from `ModelRatio` or has no enabled channel; restore both GLM and DeepSeek channels before treating local smoke as release-equivalent |
 | `404` and upstream path `/v1/v1/chat/completions` | channel `base_url` incorrectly includes `/v1`; use `https://token.sensenova.cn` |
 | `network unreachable` / `connection timed out` | Docker bridge to SenseNova unstable on this machine; use `docker-compose.windows.yml` host network, or fix host network/proxy |
 | `AiTimeout` / `provider_network` | SenseNova free API is rate-limited/flaky; wait and retry smoke |
@@ -196,7 +225,7 @@ The container is disposable. All one-api configuration lives in the named volume
    curl -s -b /tmp/oc.txt http://127.0.0.1:3000/api/token/
    curl -s -b /tmp/oc.txt http://127.0.0.1:3000/api/option/
    ```
-   Expected: channel `SenseNova Free PUBLIC_FREE`, token `mozhou-smoke`, ModelRatio contains `deepseek-v4-flash`.
+   Expected: enabled SenseNova and GLM channels, token `mozhou-smoke`, and ModelRatio contains both `glm-4.5-flash` and `deepseek-v4-flash`.
 4. Run smoke.
 
 ### If the volume is also lost

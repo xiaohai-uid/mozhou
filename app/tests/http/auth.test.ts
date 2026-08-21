@@ -121,6 +121,18 @@ describe("POST /api/v1/auth/logout", () => {
   });
 });
 
+describe("GET /api/v1/auth/logout", () => {
+  it("会话失效回跳：303 + 相对 /login，不依赖代理内部 origin", async () => {
+    const res = await fetch(`${BASE}/api/v1/auth/logout`, {
+      redirect: "manual",
+    });
+
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/login");
+    expect(res.headers.get("set-cookie")).toMatch(/Max-Age=0|Expires=/i);
+  });
+});
+
 describe("受保护路由（proxy 守卫，真实 HTTP）", () => {
   async function get(path: string, cookie?: string) {
     const res = await fetch(`${BASE}${path}`, {
@@ -191,8 +203,7 @@ describe("受保护路由（proxy 守卫，真实 HTTP）", () => {
       headers: { cookie: `${SESSION_COOKIE}=${token}` },
     });
     expect(hop2.status).toBe(303);
-    const location = new URL(hop2.headers.get("location")!);
-    expect(location.pathname).toBe("/login");
+    expect(hop2.headers.get("location")).toBe("/login");
     expect(hop2.headers.get("set-cookie")).toMatch(/Max-Age=0|Expires=/i);
   });
 });

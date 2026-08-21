@@ -42,9 +42,9 @@ export function ShelfView() {
   }, [refresh]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:px-8">
-      <h1 className="text-xl font-semibold tracking-tight">书源书架</h1>
-      <p className="mt-2 text-sm text-muted">
+    <main className="mz-page">
+      <h1 className="mz-page-title text-xl font-semibold tracking-tight">书源书架</h1>
+      <p className="mz-page-description mt-2 text-sm text-muted">
         从正规书源收录书目元数据，用于后续参考与拆解分析
       </p>
 

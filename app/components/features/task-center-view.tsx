@@ -212,7 +212,7 @@ export function TaskCenterView() {
   const detailTokens = detail ? sumTokens(detail.attempts) : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="mz-task-page flex h-full min-h-0 flex-col gap-4">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <ListChecks size={20} weight="duotone" className="text-accent" aria-hidden />
@@ -291,10 +291,10 @@ export function TaskCenterView() {
           <button
             type="button"
             aria-label="关闭详情"
-            className="fixed inset-0 z-40 bg-black/50"
+            className="mz-task-scrim fixed inset-0 z-40 bg-black/50"
             onClick={() => setSelected(null)}
           />
-          <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-surface-2 bg-surface-3 shadow-2xl">
+          <aside className="mz-task-drawer fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-surface-2 bg-surface-3 shadow-2xl">
             <header className="flex items-start justify-between gap-3 border-b border-surface-2 px-5 py-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">

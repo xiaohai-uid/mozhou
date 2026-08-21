@@ -9,7 +9,7 @@ import {
 } from "@/lib/schema";
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import { makeChatProvider } from "@/lib/chat/stream-provider";
-import { createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
+import { createLlmRequestDeadline, createLlmTransportFromEnv } from "@/lib/chat/llm-transport";
 import { buildWritingContext, type WritingContextSection } from "@/lib/chat/writing-context";
 import { recordUsage } from "@/lib/account/service";
 import { resolveProviderBoundary } from "@/lib/ai/provider-boundary";
@@ -69,7 +69,7 @@ import { skillRuns as skillRunsTable } from "@/lib/schema";
 import type { SkillRun } from "@/lib/runtime/types";
 import { buildChapterReplayHistory } from "./chapter-replay";
 import { resolveOwnedChapter } from "./ownership";
-import { ChapterChatError, classifyChapterChatError } from "./chapter-chat-errors";
+import { ChapterChatError, classifyChapterChatError, classifyTaskError } from "./chapter-chat-errors";
 
 /** 内置场景技能（工单 19 正式化；此处为注入链基础）：名称 → systemPrompt */
 export const SCENE_SKILLS: Record<string, string> = {
@@ -192,6 +192,8 @@ export interface ChapterChatInput {
   onDelta: (text: string) => void;
   /** 客户端断开（停止语义）：流中 abort → 消息标记 stopped */
   signal?: AbortSignal;
+  /** 请求级上游预算；压缩与主生成共用，防止跨越 Cloud Run 的 300s 上限。 */
+  timeoutMs?: number;
   /** 章节生成阶段反馈（准备上下文 → 流式生成 → 收尾）。 */
   onPhase?: (phase: "preparing" | "streaming" | "finishing") => void;
 }
@@ -215,6 +217,7 @@ export interface ChapterChatResult {
  * 停止：onDelta 抛错（enqueue 失败）且 signal.aborted → AI 消息 status=stopped（保留已生成部分）。
  */
 export async function runChapterChat(input: ChapterChatInput): Promise<ChapterChatResult> {
+  const requestDeadline = createLlmRequestDeadline(input.timeoutMs);
   const generationKey = input.generationKey?.trim() || randomUUID();
   if (generationKey.length > 120) throw new ChapterChatError("生成请求键过长");
   const startedAt = Date.now();
@@ -349,6 +352,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   if (shouldCompress(history)) {
     try {
       const result = await compressHistory(history, transport, input.model, {
+        timeoutMs: requestDeadline.remainingMs(),
         onInference: async ({ usage, error }) => {
           const usageReported = usage?.promptTokens != null && usage.completionTokens != null;
           await recordAttemptUsage({
@@ -484,7 +488,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
   if (await isChapterCandidateStopped(candidate.id)) {
     generationController.abort();
   }
-  const provider = makeChatProvider(preparedRequest, transport);
+  const provider = makeChatProvider(preparedRequest, transport, requestDeadline.remainingMs());
   logChapterChatTiming(generationKey, startedAt, "provider_created");
   let reply = "";
   let stopped = false;
@@ -622,7 +626,10 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
 
         ? null
 
-        : classifyTaskError(state.task?.lastError ?? null);
+        : classifyTaskError({
+          code: state.task?.errorCode,
+          message: state.task?.lastError,
+        });
 
       try {
 
@@ -774,30 +781,4 @@ export async function discardChapterMessage(
   messageId: number,
 ): Promise<boolean> {
   return discardChapterCandidate({ userId, novelId, chapterId, messageId });
-}
-
-
-
-/**
-
- * 任务错误分类（ADR-0007）：把流式引擎的 lastError 文本映射到可恢复/终态分类；
-
- * 默认 provider_network（可恢复），429/限流与超时单独归类。
-
- */
-
-function classifyTaskError(lastError: string | null): string | null {
-
-  if (!lastError) return "provider_network";
-
-  const text = lastError.toLowerCase();
-
-  if (text.includes("429") || text.includes("rate") || text.includes("限流")) return "provider_rate_limit";
-
-  if (text.includes("timeout") || text.includes("超时")) return "provider_timeout";
-
-  if (text.includes("401") || text.includes("403") || text.includes("404")) return "provider_client_error";
-
-  return "provider_network";
-
 }

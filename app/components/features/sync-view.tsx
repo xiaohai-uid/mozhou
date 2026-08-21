@@ -101,9 +101,9 @@ export function SyncView() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
-      <h1 className="text-xl font-semibold tracking-tight">云同步</h1>
-      <p className="mt-2 text-sm text-muted">
+    <main className="mz-page mz-page-compact">
+      <h1 className="mz-page-title text-xl font-semibold tracking-tight">云同步</h1>
+      <p className="mz-page-description mt-2 text-sm text-muted">
         通过 WebDAV 备份你的作品章节（支持坚果云等）
       </p>
 

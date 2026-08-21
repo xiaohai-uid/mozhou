@@ -11,9 +11,10 @@ import {
 export function makeChatProvider(
   request: PreparedChatRequest,
   transport: LlmTransport,
+  timeoutMs?: number,
 ): StreamProvider {
   observePreparedChatRequest(request);
-  const provider = transport.stream(request);
+  const provider = transport.stream(request, timeoutMs);
   return isPayloadCaptureEnabled()
     ? new CapturingChatProvider(request, provider)
     : provider;

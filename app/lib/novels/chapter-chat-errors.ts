@@ -1,3 +1,5 @@
+import type { TaskErrorClass } from "@/lib/tasks/status";
+
 export type ChapterChatErrorCode =
   | "FREE_UNAVAILABLE"
   | "AiNoApiKey"
@@ -45,6 +47,36 @@ export function classifyChapterChatError(value: unknown): ChapterChatErrorCode {
     return "AiNetworkError";
   }
   return "AiGenerationFailed";
+}
+
+/** Map the stable chapter-stream code into the task runtime's audit taxonomy. */
+export function classifyTaskError(value: unknown): TaskErrorClass {
+  const shape = errorShape(value);
+  const code = typeof shape.code === "string" ? shape.code : "";
+
+  switch (code) {
+    case "FREE_UNAVAILABLE":
+    case "AiServerError":
+      return "provider_unavailable";
+    case "AiNetworkError":
+      return "provider_network";
+    case "AiRateLimited":
+      return "provider_rate_limit";
+    case "AiTimeout":
+      return "provider_timeout";
+    case "AiNoApiKey":
+      return "provider_client_error";
+    case "AiInvalidResponse":
+      return "provider_protocol";
+    case "AiCancelled":
+      return "user_cancelled";
+  }
+
+  const text = typeof shape.message === "string" ? shape.message.toLowerCase() : "";
+  if (text.includes("429") || text.includes("rate") || text.includes("限流")) return "provider_rate_limit";
+  if (text.includes("timeout") || text.includes("超时")) return "provider_timeout";
+  if (text.includes("401") || text.includes("403") || text.includes("404")) return "provider_client_error";
+  return "provider_network";
 }
 
 export class ChapterChatError extends Error {

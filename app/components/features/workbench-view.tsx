@@ -3,7 +3,7 @@
 // 创作台（A 版双栏写作台，工单 07）：
 // 桌面三栏（左：作品/章节/人物/世界观/专项工具；中：AI 先提问 + 自由回答 + 最近正文 + 对话；
 // 右：本次创作链路 + 默认技能状态 + ContextAssembler 输出 + 绑定参考）。
-// 移动端：折叠左右栏 + 底部导航（写作/章节/故事/工具）+ 链路证据二级面板（抽屉）。
+// 工作台侧栏在窄视口也保持展开；主内容横向延伸，避免入口被另一套导航替换。
 // 自由回答是一级入口；「AI 先提问」态在任何模板选择之前可见。
 // 原型仅作交互参考（sites-plugin-sites-openai-bundled/app/prototype/mozhou-workbench），不复刻代码。
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,60 +11,35 @@ import Link from "next/link";
 import {
   BookOpenText,
   Feather,
-  House,
-  ListChecks,
+  ListNumbers,
   PenNib,
   Scissors,
   Sparkle,
   Trophy,
   UsersThree,
-  GlobeHemisphereWest,
-  ListNumbers,
-  UserCircle,
-  Question,
   ArrowUp,
   Pause,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { LogoutButton } from "@/app/workspace/logout-button";
 import { GenerationStageRail, type GenerationPhase } from "@/components/features/generation-stage-rail";
+import {
+  WorkbenchSidebar,
+  type BoundBrief,
+  type BoundPack,
+  type ChapterRow,
+  type EntryRow,
+  type NovelDetail,
+  type NovelSummary,
+  type WorkbenchPanel,
+} from "@/components/features/workbench-sidebar";
 import { BackButton } from "@/components/navigation/back-button";
+import { BrandLockup } from "@/components/brand-lockup";
 import {
   readCurrentNovelId,
   resolveCurrentNovelId,
   writeCurrentNovelId,
 } from "@/lib/novels/current-novel";
-
-/* ---------- 类型 ---------- */
-
-interface NovelSummary {
-  id: number;
-  name: string;
-  meta: string;
-  ragEnabled: boolean;
-}
-
-interface ChapterRow {
-  id: number;
-  ch: string;
-  title: string;
-  content: string;
-  status: string;
-  sortOrder: number;
-}
-
-interface EntryRow {
-  id: number;
-  name: string;
-  note: string | null;
-}
-
-interface NovelDetail {
-  novel: NovelSummary;
-  chapters: ChapterRow[];
-  characters: EntryRow[];
-  worldviews: EntryRow[];
-}
 
 interface SessionRow {
   id: number;
@@ -110,19 +85,8 @@ interface ChatMsg {
   content: string;
 }
 
-interface BoundBrief {
-  artifactId: string;
-  version: string;
-  provenance: { source: string; capturedAt: string };
-}
-interface BoundPack {
-  artifactId: string;
-  version: string;
-  sourceRunId: number | null;
-}
-
 type MobileTab = "write" | "chapters" | "story" | "tools";
-type WorkbenchPanel = "outline" | "characters" | "world" | null;
+type WorkbenchLoadState = "loading" | "ready" | "error";
 
 const SKILL_FALLBACK_NAMES: Record<string, string> = {
   story_grounding: "故事状态",
@@ -141,20 +105,16 @@ const STATUS_TONE: Record<string, string> = {
   not_applied: "bg-zinc-500",
 };
 
-/* ---------- 小组件 ---------- */
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
-      {children}
-    </p>
-  );
-}
-
 function StatusDot({ state }: { state: string }) {
   return (
     <span aria-hidden className={"inline-block size-1.5 shrink-0 rounded-full " + (STATUS_TONE[state] ?? "bg-zinc-500")} />
   );
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return (await response.json()) as T;
 }
 
 /* ---------- Workbench 中央主面板（P0-B：左侧导航与中央内容必须同源切换） ---------- */
@@ -228,8 +188,11 @@ function WorldPanel({ worldviews }: { worldviews: EntryRow[] }) {
 
 export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [novels, setNovels] = useState<NovelSummary[]>([]);
+  const [novelsLoadState, setNovelsLoadState] = useState<WorkbenchLoadState>("loading");
+  const [novelsReloadVersion, setNovelsReloadVersion] = useState(0);
   const [activeNovelId, setActiveNovelId] = useState<number | null>(null);
   const [detail, setDetail] = useState<NovelDetail | null>(null);
+  const [contextLoadState, setContextLoadState] = useState<WorkbenchLoadState>("ready");
   const [boundBriefs, setBoundBriefs] = useState<BoundBrief[]>([]);
   const [boundPacks, setBoundPacks] = useState<BoundPack[]>([]);
   const [builtinSkills, setBuiltinSkills] = useState<BuiltinSkillInfo[]>([]);
@@ -252,6 +215,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const phaseResetRef = useRef<number | null>(null);
   const completedRef = useRef(false);
   const generationRunRef = useRef(0);
+  const contextLoadRef = useRef(0);
 
   const skillName = useCallback(
     (key: string) => builtinSkills.find((s) => s.key === key)?.name ?? SKILL_FALLBACK_NAMES[key] ?? key,
@@ -259,11 +223,23 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   );
 
   useEffect(() => {
-    fetch("/api/v1/novels")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { novels: NovelSummary[] } | null) => {
-        if (data) setNovels(data.novels);
+    let alive = true;
+    void fetchJson<{ novels: NovelSummary[] }>("/api/v1/novels")
+      .then((data) => {
+        if (!Array.isArray(data.novels)) throw new Error("Invalid novel list response");
+        if (!alive) return;
+        setNovels(data.novels);
+        setNovelsLoadState("ready");
+      })
+      .catch(() => {
+        if (alive) setNovelsLoadState("error");
       });
+    return () => {
+      alive = false;
+    };
+  }, [novelsReloadVersion]);
+
+  useEffect(() => {
     fetch("/api/v1/skills?scope=plaza")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { builtinSkills?: BuiltinSkillInfo[] } | null) => {
@@ -287,6 +263,8 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   }, []);
 
   const loadNovel = useCallback(async (novelId: number) => {
+    const contextLoadId = contextLoadRef.current + 1;
+    contextLoadRef.current = contextLoadId;
     generationRunRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
@@ -302,27 +280,41 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
     setEvidence(null);
     setMessages([]);
     setSessionId(null);
-    const [d, briefs, packs] = await Promise.all([
-      fetch("/api/v1/novels/" + novelId).then((res) => (res.ok ? res.json() : null)),
-      fetch("/api/v1/novels/" + novelId + "/briefings").then((res) => (res.ok ? res.json() : null)),
-      fetch("/api/v1/novels/" + novelId + "/benchmark-packs").then((res) => (res.ok ? res.json() : null)),
-    ]);
-    if (d) setDetail(d as NovelDetail);
-    setBoundBriefs((briefs as { briefings: BoundBrief[] } | null)?.briefings ?? []);
-    setBoundPacks((packs as { packs: BoundPack[] } | null)?.packs ?? []);
+    setDetail(null);
+    setBoundBriefs([]);
+    setBoundPacks([]);
+    setContextLoadState("loading");
+    try {
+      const [nextDetail, briefs, packs] = await Promise.all([
+        fetchJson<NovelDetail>(`/api/v1/novels/${novelId}`),
+        fetchJson<{ briefings: BoundBrief[] }>(`/api/v1/novels/${novelId}/briefings`),
+        fetchJson<{ packs: BoundPack[] }>(`/api/v1/novels/${novelId}/benchmark-packs`),
+      ]);
+      if (!nextDetail.novel || !Array.isArray(nextDetail.chapters) || !Array.isArray(nextDetail.characters) || !Array.isArray(nextDetail.worldviews) || !Array.isArray(briefs.briefings) || !Array.isArray(packs.packs)) {
+        throw new Error("Invalid workbench context response");
+      }
+      if (contextLoadId !== contextLoadRef.current) return;
+      setDetail(nextDetail);
+      setBoundBriefs(briefs.briefings);
+      setBoundPacks(packs.packs);
+      setContextLoadState("ready");
+    } catch {
+      if (contextLoadId === contextLoadRef.current) setContextLoadState("error");
+      return;
+    }
     // 会话：优先复用该作品已有会话，否则新建
     const existing = sessions.find((s) => s.novelId === novelId);
     if (existing) {
       setSessionId(existing.id);
       const msgs = await fetch("/api/v1/sessions/" + existing.id + "/messages").then((res) => (res.ok ? res.json() : null));
-      if (msgs) setMessages((msgs as { messages: ChatMsg[] }).messages);
+      if (contextLoadId === contextLoadRef.current && msgs) setMessages((msgs as { messages: ChatMsg[] }).messages);
     } else {
       const created = await fetch("/api/v1/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ novelId }),
       }).then((res) => (res.ok ? res.json() : null));
-      if (created) {
+      if (contextLoadId === contextLoadRef.current && created) {
         setSessionId((created as { session: SessionRow }).session.id);
         setSessions((prev) => [...prev, (created as { session: SessionRow }).session]);
       }
@@ -332,7 +324,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   // P0-A: 挂载后把“当前作品”解析到唯一状态源并加载详情。
   // newlyCreatedId 不需要从这里传入：创建页已把新作品 id 写入同一 localStorage 源。
   useEffect(() => {
-    if (!sessionsReady || novels.length === 0) return;
+    if (novelsLoadState !== "ready" || !sessionsReady || novels.length === 0) return;
     const resolved = resolveCurrentNovelId({
       newlyCreatedId: null,
       persistedId: readCurrentNovelId(),
@@ -342,7 +334,16 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       // Defer the stateful loader past the effect body to avoid a cascading render.
       void Promise.resolve().then(() => loadNovel(resolved));
     }
-  }, [novels, sessions, sessionsReady, activeNovelId, loadNovel]);
+  }, [novelsLoadState, novels, sessions, sessionsReady, activeNovelId, loadNovel]);
+
+  const retryWorkbenchLoad = useCallback(() => {
+    if (novelsLoadState !== "ready") {
+      setNovelsLoadState("loading");
+      setNovelsReloadVersion((version) => version + 1);
+      return;
+    }
+    if (activeNovelId != null) void loadNovel(activeNovelId);
+  }, [activeNovelId, loadNovel, novelsLoadState]);
 
   async function send(contentOverride?: string) {
     const content = (contentOverride ?? input).trim();
@@ -470,9 +471,19 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
     }
   }
 
+  const hasReadyNovels = novelsLoadState === "ready" && novels.length > 0;
+  const sidebarLoadState: WorkbenchLoadState = novelsLoadState === "error"
+    ? "error"
+    : novelsLoadState === "loading"
+      ? "loading"
+      : novels.length === 0
+        ? "ready"
+        : activeNovelId == null
+          ? "loading"
+          : contextLoadState;
+  const hasReadyContext = sidebarLoadState === "ready" && detail != null;
   const latestChapter = [...(detail?.chapters ?? [])].sort((a, b) => b.sortOrder - a.sortOrder)[0];
   const draftText = latestChapter?.content.trim() ? latestChapter.content.trim().slice(0, 120) : null;
-  const settledCount = latestChapter ? Number(latestChapter.ch) : 0;
   const evidenceRuns = evidence?.runs ?? [];
 
   // 章节链接必须携带 novelId/novel/ch/title，否则章节页拿不到作品上下文。
@@ -483,15 +494,12 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   };
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background text-foreground">
+    <div className="mz-workbench-shell flex h-[100dvh] flex-col bg-background text-foreground">
       {/* ===== 顶栏 ===== */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-surface-2 bg-zinc-950/70 px-4 lg:px-5">
         <div className="flex items-center gap-3">
           <BackButton />
-          <Link href="/workspace" className="flex items-center gap-2.5" aria-label="墨舟创作台">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">墨</span>
-            <span className="hidden text-base font-semibold tracking-wide sm:inline">墨舟</span>
-          </Link>
+          <BrandLockup href="/workspace" ariaLabel="墨舟创作台" compact />
           <span aria-hidden className="hidden h-4 w-px bg-surface-2 sm:block" />
           <span className="flex items-center gap-1.5 text-sm text-zinc-300">
             <span aria-hidden className="inline-block size-1.5 rounded-full bg-accent" />
@@ -507,7 +515,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             type="button"
             onClick={() => setEvidenceOpen(true)}
             disabled={!evidence}
-            className="flex items-center gap-1.5 rounded-full border border-surface-2 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-accent disabled:opacity-40 lg:hidden"
+            className="hidden items-center gap-1.5 rounded-full border border-surface-2 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-accent disabled:opacity-40"
           >
             <Sparkle size={14} weight="duotone" aria-hidden />
             本次链路
@@ -519,119 +527,21 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
 
       <div className="flex min-h-0 flex-1">
         {/* ===== 左栏（桌面） ===== */}
-        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-surface-2 bg-zinc-950/60 px-3 py-4 lg:flex">
-          <SectionLabel>Current Work</SectionLabel>
-          <div className="rounded-xl border border-surface-2 bg-surface/50 px-4 py-3">
-            {detail ? (
-              <>
-                <p className="text-sm font-semibold text-zinc-100">{detail.novel.name}</p>
-                <p className="mt-0.5 text-xs text-faint">{detail.novel.meta}</p>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full rounded-full bg-accent" style={{ width: Math.min(100, settledCount * 5) + "%" }} />
-                </div>
-                <p className="mt-1 text-[11px] text-faint">已写至第 {settledCount} 章</p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-zinc-100">还没有作品</p>
-                <p className="mt-0.5 text-xs text-faint">创建作品后在这里继续写作</p>
-              </>
-            )}
-          </div>
-
-          <nav className="mt-4 flex flex-col gap-0.5" aria-label="作品导航">
-            <button
-              type="button"
-              onClick={() => setActivePanel(null)}
-              className={"flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === null ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
-            >
-              <PenNib size={16} weight="duotone" aria-hidden /> 写作对话
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePanel(activePanel === "outline" ? null : "outline")}
-              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === "outline" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
-            >
-              <span className="flex items-center gap-2.5"><ListNumbers size={16} weight="duotone" aria-hidden /> 章节与大纲</span>
-              <b className="text-xs text-faint">{detail?.chapters.length ?? 0}</b>
-            </button>
-            {activePanel === "outline" && (
-              <div className="ml-6 flex flex-col gap-0.5 border-l border-surface-2 pl-2">
-                {[...(detail?.chapters ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((ch) => (
-                  <Link key={ch.id} href={chapterHref(ch)} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
-                    {ch.ch} · {ch.title || "未命名"}
-                  </Link>
-                ))}
-                {(!detail || detail.chapters.length === 0) && <p className="px-2 py-1 text-xs text-zinc-600">暂无章节</p>}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setActivePanel(activePanel === "characters" ? null : "characters")}
-              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === "characters" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
-            >
-              <span className="flex items-center gap-2.5"><UsersThree size={16} weight="duotone" aria-hidden /> 人物关系</span>
-              <b className="text-xs text-faint">{detail?.characters.length ?? 0}</b>
-            </button>
-            {activePanel === "characters" && (
-              <div className="ml-6 flex flex-col gap-0.5 border-l border-surface-2 pl-2">
-                {(detail?.characters ?? []).slice(0, 12).map((c) => (
-                  <p key={c.id} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400" title={c.note ?? undefined}>{c.name}</p>
-                ))}
-                {(!detail || detail.characters.length === 0) && <p className="px-2 py-1 text-xs text-zinc-600">暂无人物</p>}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setActivePanel(activePanel === "world" ? null : "world")}
-              className={"flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition " + (activePanel === "world" ? "bg-accent/10 text-zinc-100" : "text-zinc-400 hover:bg-surface hover:text-zinc-100")}
-            >
-              <span className="flex items-center gap-2.5"><GlobeHemisphereWest size={16} weight="duotone" aria-hidden /> 世界规则</span>
-              <b className="text-xs text-faint">{detail?.worldviews.length ?? 0}</b>
-            </button>
-            {activePanel === "world" && (
-              <div className="ml-6 flex flex-col gap-0.5 border-l border-surface-2 pl-2">
-                {(detail?.worldviews ?? []).slice(0, 12).map((w) => (
-                  <p key={w.id} className="truncate rounded-lg px-2 py-1 text-xs text-zinc-400" title={w.note ?? undefined}>{w.name}</p>
-                ))}
-                {(!detail || detail.worldviews.length === 0) && <p className="px-2 py-1 text-xs text-zinc-600">暂无世界观</p>}
-              </div>
-            )}
-          </nav>
-
-          <div className="mt-4 border-t border-surface-2 pt-3">
-            <SectionLabel>Tools</SectionLabel>
-            <div className="flex flex-col gap-0.5">
-              <Link href="/rankings" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
-                <Trophy size={16} weight="duotone" aria-hidden /> 扫榜简报
-                {boundBriefs.length > 0 && <em className="ml-auto rounded-full bg-accent/10 px-2 py-0.5 text-[10px] not-italic text-accent">已绑定 {boundBriefs[0].version}</em>}
-              </Link>
-              <Link href="/deconstruct" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
-                <Scissors size={16} weight="duotone" aria-hidden /> 参考拆解
-                {boundPacks.length > 0 && <em className="ml-auto rounded-full bg-accent/10 px-2 py-0.5 text-[10px] not-italic text-accent">已绑定 {boundPacks[0].version}</em>}
-              </Link>
-              <Link href="/chat" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
-                <House size={16} weight="duotone" aria-hidden /> 独立写作对话
-              </Link>
-              <Link href="/skills" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
-                <Sparkle size={16} weight="duotone" aria-hidden /> 技能广场
-              </Link>
-              <Link href="/tasks" className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-zinc-400 transition hover:bg-surface hover:text-zinc-100">
-                <ListChecks size={16} weight="duotone" aria-hidden /> 任务中心
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-auto flex items-center justify-between border-t border-surface-2 px-2 pt-3">
-            <Link href="/projects" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><Question size={13} aria-hidden /> 使用说明</Link>
-            <Link href="/account" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><UserCircle size={13} aria-hidden /> 账户与额度</Link>
-          </div>
-        </aside>
+        <WorkbenchSidebar
+          detail={hasReadyContext ? detail : null}
+          boundBriefs={hasReadyContext ? boundBriefs : []}
+          boundPacks={hasReadyContext ? boundPacks : []}
+          activePanel={activePanel}
+          onPanelChange={setActivePanel}
+          chapterHref={chapterHref}
+          loadState={sidebarLoadState}
+          onRetry={retryWorkbenchLoad}
+        />
 
         {/* ===== 中栏 ===== */}
         <main className="flex min-w-0 flex-1 flex-col">
           {/* 作品切换（有作品时显示） */}
-          {novels.length > 0 && (
+          {hasReadyNovels && (
             <div className="flex items-center gap-2 border-b border-surface-2 px-4 py-2">
               <label htmlFor="workbench-novel" className="text-xs text-faint">当前作品</label>
               <select
@@ -654,7 +564,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
 
           <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 lg:px-8">
             {/* 无作品空态 */}
-            {novels.length === 0 && (
+            {novelsLoadState === "ready" && novels.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <BookOpenText size={30} weight="duotone" className="text-zinc-500" aria-hidden />
                 <h1 className="mt-4 text-xl font-semibold">欢迎来到墨舟创作台</h1>
@@ -667,7 +577,15 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
               </div>
             )}
 
-            {novels.length > 0 && activePanel !== null && (
+            {hasReadyNovels && !hasReadyContext && (
+              <div className="flex h-full items-center justify-center text-center">
+                <p className="text-sm text-faint">
+                  {sidebarLoadState === "error" ? "当前作品加载失败，请在左侧重试。" : "正在加载当前作品…"}
+                </p>
+              </div>
+            )}
+
+            {hasReadyContext && activePanel !== null && (
               <div className="mx-auto max-w-3xl">
                 {activePanel === "outline" && <OutlinePanel chapters={detail?.chapters ?? []} />}
                 {activePanel === "characters" && <CharactersPanel characters={detail?.characters ?? []} />}
@@ -675,7 +593,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
               </div>
             )}
 
-            {novels.length > 0 && activePanel === null && (
+            {hasReadyContext && activePanel === null && (
               <div className="mx-auto max-w-3xl">
                 <div className="mozhou-rise">
                   <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Continue the story</p>
@@ -759,7 +677,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           </div>
 
           {/* 自由回答主输入（仅写作对话面板显示） */}
-          {novels.length > 0 && activePanel === null && (
+          {hasReadyContext && activePanel === null && (
             <footer className="shrink-0 border-t border-surface-2 p-4">
               <div className="mx-auto max-w-3xl">
                 <div className="mb-3 lg:hidden">
@@ -809,7 +727,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
         </main>
 
         {/* ===== 右栏（桌面）：本次创作链路 ===== */}
-        <aside className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-surface-2 bg-zinc-950/40 px-4 py-4 lg:flex">
+        <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-surface-2 bg-zinc-950/40 px-4 py-4">
           <GenerationStageRail
             phase={generationPhase}
             startedAt={generationStartedAt}
@@ -891,8 +809,8 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                 <em className="ml-auto not-italic text-faint">{boundPacks[0] ? boundPacks[0].version : "未绑定"}</em>
               </p>
               <div className="flex gap-3 pt-1">
-                <Link href="/rankings" className="text-[11px] text-accent">管理市场简报 ↗</Link>
-                <Link href="/deconstruct" className="text-[11px] text-accent">管理方法包 ↗</Link>
+                <Link href="/rankings?surface=workbench" className="text-[11px] text-accent">管理市场简报 ↗</Link>
+                <Link href="/deconstruct?surface=workbench" className="text-[11px] text-accent">管理方法包 ↗</Link>
               </div>
             </div>
           </div>
@@ -900,7 +818,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       </div>
 
       {/* ===== 移动端底部导航 ===== */}
-      <nav className="flex shrink-0 border-t border-surface-2 bg-zinc-950/90 lg:hidden" aria-label="移动端导航">
+      <nav className="hidden shrink-0 border-t border-surface-2 bg-zinc-950/90" aria-label="移动端导航">
         {([
           ["write", "写作", PenNib],
           ["chapters", "章节", ListNumbers],
@@ -956,10 +874,10 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           )}
           {mobileTab === "tools" && (
             <div className="flex flex-col gap-1.5">
-              <Link href="/rankings" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Trophy size={16} weight="duotone" aria-hidden /> 扫榜简报</Link>
-              <Link href="/deconstruct" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Scissors size={16} weight="duotone" aria-hidden /> 参考拆解</Link>
-              <Link href="/chat" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Feather size={16} weight="duotone" aria-hidden /> 独立写作对话</Link>
-              <Link href="/skills" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Sparkle size={16} weight="duotone" aria-hidden /> 技能广场</Link>
+              <Link href="/rankings?surface=workbench" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Trophy size={16} weight="duotone" aria-hidden /> 扫榜简报</Link>
+              <Link href="/deconstruct?surface=workbench" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Scissors size={16} weight="duotone" aria-hidden /> 参考拆解</Link>
+              <Link href="/chat?surface=workbench" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Feather size={16} weight="duotone" aria-hidden /> 独立写作对话</Link>
+              <Link href="/skills?surface=workbench" className="flex items-center gap-2.5 rounded-xl border border-surface-2 bg-surface/40 px-3.5 py-2.5 text-sm text-zinc-200"><Sparkle size={16} weight="duotone" aria-hidden /> 技能广场</Link>
             </div>
           )}
         </div>

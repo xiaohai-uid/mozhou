@@ -18,6 +18,8 @@ export type CompressionInferenceObservation = {
 
 export type CompressionOptions = {
   onInference?: (observation: CompressionInferenceObservation) => void | Promise<void>;
+  /** Remaining time from the parent chat request; prevents a second upstream call after expiry. */
+  timeoutMs?: number;
 };
 
 /** 只接受原历史的近期后缀，压缩器返回异常结构时由 consumer fail-open。 */
@@ -88,6 +90,7 @@ export async function compressHistory(
       model,
       system: SUMMARY_PROMPT,
       messages: [{ role: "user", content: early.map((m) => `${m.role}: ${m.content}`).join("\n\n") }],
+      timeoutMs: options.timeoutMs,
     });
     await options.onInference?.({ usage: result.usage });
     const summary = result.text.trim();

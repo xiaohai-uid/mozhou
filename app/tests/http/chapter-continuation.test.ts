@@ -574,12 +574,10 @@ describe("章节对话引擎（工单 17）", () => {
       },
     );
     expect(after.status).toBe(200);
+    await after.text();
   });
 
   it("越权在 provider 调用和候选写入前同步返回 404", async () => {
-    // 前一条 abort 测试的服务端流可能仍在完成落库；先等观察流稳定，
-    // 再断言本次非 owner 请求没有进入 provider seam。
-    await new Promise((resolve) => setTimeout(resolve, 100));
     const before = providerCallCount();
     const cross = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`,
@@ -590,7 +588,6 @@ describe("章节对话引擎（工单 17）", () => {
       },
     );
     expect(cross.status).toBe(404);
-    await new Promise((resolve) => setTimeout(resolve, 100));
     expect(providerCallCount()).toBe(before);
   });
 

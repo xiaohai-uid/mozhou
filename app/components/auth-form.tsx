@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BrandLockup } from "@/components/brand-lockup";
 import {
   Card,
   CardContent,
@@ -65,33 +66,41 @@ export function AuthForm({
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <div className="w-full max-w-sm">
-        {/* 品牌区：应用身份，非官网 */}
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-xl font-bold text-white shadow-[0_12px_40px_rgba(127,34,254,0.3)]">
-            墨
-          </span>
-          <span className="text-lg font-semibold tracking-wide">墨舟</span>
+    <div className="mz-auth-shell">
+      <aside className="mz-auth-aside">
+        <BrandLockup href="/" ariaLabel="返回墨舟首页" showStudio />
+        <div className="mz-auth-aside-copy">
+          <p className="mz-page-kicker">a quiet place to write</p>
+          <h1 className="mz-auth-aside-title">把故事留在<br />自己的墨色里。</h1>
+          <p className="mz-auth-aside-note">
+            人物、世界观、章节和每一次修改，都在同一个写作上下文里安静地接上。
+          </p>
         </div>
-        <Card className="w-full rounded-2xl border-surface-2 bg-surface/60 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+        <p className="hidden text-xs text-faint sm:block">自有品牌 · 模型自由 · 数据自有</p>
+      </aside>
+
+      <main className="mz-auth-main">
+        <div className="mz-auth-card">
+          <div className="mb-6 sm:hidden">
+            <p className="mz-page-kicker">继续你的创作</p>
+          </div>
+          <Card className="w-full border-surface-2 bg-surface/80">
           <CardHeader>
             <CardTitle className="text-xl">{title}</CardTitle>
             <CardDescription className="text-muted">{description}</CardDescription>
           </CardHeader>
           <form onSubmit={onSubmit}>
             <CardContent className="flex flex-col gap-4">
-              <label className="flex flex-col gap-1.5 text-sm text-zinc-300">
+              <label className="mz-auth-field">
                 邮箱
                 <input
                   name="email"
                   type="email"
                   autoComplete="email"
                   required
-                  className="rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-zinc-100 outline-none transition focus:border-accent"
                 />
               </label>
-              <label className="flex flex-col gap-1.5 text-sm text-zinc-300">
+              <label className="mz-auth-field">
                 密码
                 <input
                   name="password"
@@ -99,7 +108,6 @@ export function AuthForm({
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   required
                   minLength={8}
-                  className="rounded-xl border border-surface-2 bg-zinc-950 px-3.5 py-2.5 text-zinc-100 outline-none transition focus:border-accent"
                 />
                 {passwordHint && (
                   <span className="text-xs text-faint">{passwordHint}</span>
@@ -115,7 +123,7 @@ export function AuthForm({
               <Button
                 type="submit"
                 disabled={pending}
-                className="w-full rounded-full bg-accent hover:bg-violet-500"
+                className="w-full bg-accent text-white hover:bg-accent-strong"
               >
                 {pending ? submitPendingLabel : submitLabel}
               </Button>
@@ -127,9 +135,13 @@ export function AuthForm({
               </p>
             </CardFooter>
           </form>
-        </Card>
-      </div>
-    </main>
+          </Card>
+          <p className="mt-4 text-center text-[11px] leading-5 text-faint">
+            你可以随时导出作品，服务不会替你虚构已保存的内容。
+          </p>
+        </div>
+      </main>
+    </div>
   );
 }
 

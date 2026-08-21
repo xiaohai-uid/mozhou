@@ -380,7 +380,7 @@ export function ProjectsView() {
   }
 
   return (
-    <main className="flex flex-1 gap-6 px-6 py-8 lg:px-10">
+    <main className="mz-projects-page">
       {/* 作品列表 */}
       <aside className="flex w-64 shrink-0 flex-col gap-3">
         <div className="flex items-center justify-between">

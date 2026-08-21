@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLockup } from "@/components/brand-lockup";
 import { Hero } from "@/components/landing/hero";
 import { FeatureBento } from "@/components/landing/feature-bento";
 import { ProductPreview } from "@/components/landing/product-preview";
@@ -20,12 +21,7 @@ export default function Home() {
 
       <header className="border-b border-surface-2">
         <div className="site-container flex h-16 items-center justify-between px-6 lg:px-16">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white shadow-[0_8px_24px_rgba(139,120,255,0.2)]">
-              墨
-            </span>
-            <span className="text-base font-semibold tracking-wide">墨舟</span>
-          </Link>
+          <BrandLockup href="/" ariaLabel="墨舟首页" />
           <nav className="flex items-center gap-2" aria-label="主导航">
             <Link
               href="/login"

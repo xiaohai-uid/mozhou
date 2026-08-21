@@ -135,9 +135,9 @@ export function DistillView() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
-      <h1 className="text-xl font-semibold tracking-tight">风格蒸馏</h1>
-      <p className="mt-2 text-sm text-muted">
+    <main className="mz-page mz-page-compact">
+      <h1 className="mz-page-title text-xl font-semibold tracking-tight">风格蒸馏</h1>
+      <p className="mz-page-description mt-2 text-sm text-muted">
         上传文本，分析写作风格，生成可复用的风格指南
       </p>
 

@@ -24,7 +24,7 @@ async function registerAndOpenWorkbench(page: Page) {
   await expect(page.getByRole("button", { name: "创建" })).toBeEnabled();
   await page.getByRole("button", { name: "创建" }).click();
   await expect(page).toHaveURL(/\/chapter\//);
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   await page.waitForTimeout(500);
 }

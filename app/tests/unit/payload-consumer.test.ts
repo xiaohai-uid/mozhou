@@ -288,6 +288,52 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
     });
   });
 
+  it("does not start independent generation after compression exhausts the request budget", async () => {
+    const sessionId = await createSession();
+    await db.insert(messages).values(
+      Array.from({ length: 8 }, (_, index) => ({
+        sessionId,
+        role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+        content: `${index}-超时历史`.repeat(2000),
+      })),
+    );
+
+    const originalProvider = process.env.CHAT_PROVIDER;
+    const originalFetch = globalThis.fetch;
+    process.env.CHAT_PROVIDER = "one-api";
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 650));
+      if (fetchCount === 1) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: "迟到摘要" } }] }), { status: 200 });
+      }
+      return new Response(
+        'data: {"choices":[{"delta":{"content":"不应开始主生成"}}]}\n\ndata: [DONE]\n\n',
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      );
+    };
+
+    try {
+      const result = await runChat({
+        userId,
+        sessionId,
+        model: "deepseek-v4-flash",
+        content: "压缩耗尽预算后不能继续请求",
+        timeoutMs: 500,
+        onDelta: () => {},
+      });
+      expect(result.state.task?.status).toBe("failed");
+      expect(result.state.task?.errorCode).toBe("AiTimeout");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalProvider === undefined) delete process.env.CHAT_PROVIDER;
+      else process.env.CHAT_PROVIDER = originalProvider;
+    }
+
+    expect(fetchCount).toBe(1);
+  });
+
   it("captures the chapter consumer payload through the same provider seam", async () => {
     await runChapterChat({
       userId,
@@ -461,6 +507,57 @@ describe("real chat consumers at the PreparedChatRequest seam", () => {
       role: "user",
       content: "章节压缩失败当前请求",
     });
+  });
+
+  it("settles the chapter candidate as AiTimeout when compression exhausts the request budget", async () => {
+    await db.insert(chapterMessages).values(
+      Array.from({ length: 8 }, (_, index) => ({
+        chapterId,
+        userId,
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `${index}-章节超时历史`.repeat(2000),
+      })),
+    );
+    const generationKey = `payload-timeout-${RUN}`;
+    const originalProvider = process.env.CHAT_PROVIDER;
+    const originalFetch = globalThis.fetch;
+    process.env.CHAT_PROVIDER = "one-api";
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 650));
+      if (fetchCount === 1) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: "迟到章节摘要" } }] }), { status: 200 });
+      }
+      return new Response(
+        'data: {"choices":[{"delta":{"content":"不应开始章节主生成"}}]}\n\ndata: [DONE]\n\n',
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      );
+    };
+
+    try {
+      await expect(runChapterChat({
+        userId,
+        novelId,
+        chapterId,
+        model: "deepseek-v4-flash",
+        content: "章节压缩耗尽预算后不能继续请求",
+        generationKey,
+        timeoutMs: 500,
+        onDelta: () => {},
+      })).rejects.toMatchObject({ code: "AiTimeout" });
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalProvider === undefined) delete process.env.CHAT_PROVIDER;
+      else process.env.CHAT_PROVIDER = originalProvider;
+    }
+
+    const [candidate] = await db
+      .select({ status: chapterMessages.status, errorCode: chapterMessages.errorCode })
+      .from(chapterMessages)
+      .where(and(eq(chapterMessages.chapterId, chapterId), eq(chapterMessages.generationKey, generationKey)));
+    expect(candidate).toMatchObject({ status: "error", errorCode: "AiTimeout" });
+    expect(fetchCount).toBe(1);
   });
 
 });

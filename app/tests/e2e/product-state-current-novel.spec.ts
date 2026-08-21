@@ -29,7 +29,7 @@ async function createNovel(page: Page, title: string) {
 
 async function openWorkbenchFromChapter(page: Page) {
   // Chapter/project pages are wrapped in AppShell; use visible navigation.
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   // Let the client bundle hydrate before interacting with controlled inputs.
   await page.waitForTimeout(500);
@@ -76,7 +76,7 @@ test("switching novels persists across leaving and returning to Workbench", asyn
   await removeDevOverlay(page);
   await page.getByRole("link", { name: "使用说明" }).click();
   await expect(page).toHaveURL(/\/projects/);
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
 
   await expectCurrentNovel(page, second);
@@ -122,7 +122,7 @@ test("deleting the active novel leaves a deterministic fallback state", async ({
   await expect(page.getByText(second, { exact: true })).toHaveCount(0);
 
   // Workbench must fall back to the remaining owned novel.
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   await expectCurrentNovel(page, first);
 });

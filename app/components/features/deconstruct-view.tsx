@@ -203,9 +203,9 @@ export function DeconstructView() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
-      <h1 className="text-xl font-semibold tracking-tight">小说拆解</h1>
-      <p className="mt-2 text-sm text-muted">输入书名或上传文本，拆解结构、剧情与节奏</p>
+    <main className="mz-page mz-page-compact">
+      <h1 className="mz-page-title text-xl font-semibold tracking-tight">小说拆解</h1>
+      <p className="mz-page-description mt-2 text-sm text-muted">输入书名或上传文本，拆解结构、剧情与节奏</p>
 
       {/* 输入方式切换 */}
       <div className="mt-8 flex gap-2">
@@ -502,7 +502,8 @@ export function DeconstructView() {
                   at: Date.now(),
                 }),
               );
-              router.push("/chat");
+              const openedFromWorkbench = new URLSearchParams(window.location.search).get("surface") === "workbench";
+              router.push(openedFromWorkbench ? "/chat?surface=workbench" : "/chat");
             }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-accent/50 py-2.5 text-sm font-medium text-accent transition hover:bg-accent/10"
           >

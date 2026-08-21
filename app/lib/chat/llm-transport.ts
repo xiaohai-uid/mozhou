@@ -11,6 +11,8 @@ export type CompletionRequest = {
   messages: ChatMessage[];
   temperature?: number;
   signal?: AbortSignal;
+  /** Remaining time from the caller's request-wide provider budget. */
+  timeoutMs?: number;
   extraBody?: Record<string, unknown>;
 };
 
@@ -24,17 +26,37 @@ export interface CompletionAdapter {
 }
 
 export interface LlmTransport extends CompletionAdapter {
-  stream(request: PreparedChatRequest, signal?: AbortSignal): StreamProvider;
+  stream(request: PreparedChatRequest, timeoutMs?: number): StreamProvider;
 }
 
 export type OneApiTransportConfig = {
   baseUrl: string;
   token: string;
   fetch?: typeof globalThis.fetch;
+  /** Keep an application-owned failure path ahead of Cloud Run's 300s cap. */
+  timeoutMs?: number;
 };
 
+/** Cloud Run allows 300 seconds; reserve 30 seconds for SSE/error settlement. */
+export const LLM_UPSTREAM_TIMEOUT_MS = 270_000;
+
+/** A request-wide budget shared by sequential compression and generation calls. */
+export function createLlmRequestDeadline(timeoutMs = LLM_UPSTREAM_TIMEOUT_MS) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+    throw new Error("LLM request deadline must be a non-negative finite number");
+  }
+  const expiresAt = Date.now() + timeoutMs;
+  return {
+    remainingMs: () => Math.max(0, expiresAt - Date.now()),
+  };
+}
+
 export class LlmTransportError extends Error {
-  constructor(message: string, readonly status?: number) {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly code?: "AiTimeout",
+  ) {
     super(message);
     this.name = "LlmTransportError";
   }
@@ -62,6 +84,49 @@ function fetchError(error: unknown, token: string): LlmTransportError {
   return new LlmTransportError(`LLM transport request failed: ${safeErrorDetail((error as Error)?.message, token) || "network error"}`);
 }
 
+function timeoutError(): LlmTransportError {
+  return new LlmTransportError("LLM transport request timed out", undefined, "AiTimeout");
+}
+
+function resolveTimeoutMs(remainingMs: number | undefined, defaultTimeoutMs: number): number {
+  if (remainingMs === undefined) return defaultTimeoutMs;
+  if (!Number.isFinite(remainingMs)) {
+    throw new Error("LLM transport timeout must be a finite number");
+  }
+  return Math.max(0, remainingMs);
+}
+
+type RequestDeadline = {
+  signal: AbortSignal;
+  timedOut: () => boolean;
+  dispose: () => void;
+};
+
+/**
+ * The provider gets a private abort signal: timeout must not mutate the
+ * caller's signal, because caller abort represents an intentional stop.
+ */
+function createRequestDeadline(callerSignal: AbortSignal | undefined, timeoutMs: number): RequestDeadline {
+  const controller = new AbortController();
+  let expired = false;
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+  if (callerSignal?.aborted) onCallerAbort();
+  else callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+  const timer = setTimeout(() => {
+    expired = true;
+    controller.abort(new DOMException("LLM transport request timed out", "TimeoutError"));
+  }, timeoutMs);
+
+  return {
+    signal: controller.signal,
+    timedOut: () => expired,
+    dispose: () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onCallerAbort);
+    },
+  };
+}
+
 async function responseError(response: Response, token: string): Promise<LlmTransportError> {
   let detail = "";
   try {
@@ -86,91 +151,117 @@ class OneApiLlmTransport implements LlmTransport {
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResult> {
-    let response: Response;
+    const timeoutMs = resolveTimeoutMs(request.timeoutMs, this.config.timeoutMs);
+    if (timeoutMs <= 0) throw timeoutError();
+    const deadline = createRequestDeadline(request.signal, timeoutMs);
     try {
-      response = await this.fetcher(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.config.token}`,
-        },
-        signal: request.signal,
-        body: JSON.stringify({
-          ...request.extraBody,
-          model: request.model,
-          stream: false,
-          ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
-          messages: requestMessages(request.system, request.messages),
-        }),
-      });
-    } catch (error) {
-      throw fetchError(error, this.config.token);
-    }
-    if (!response.ok) throw await responseError(response, this.config.token);
+      let response: Response;
+      try {
+        response = await this.fetcher(this.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.config.token}`,
+          },
+          signal: deadline.signal,
+          body: JSON.stringify({
+            ...request.extraBody,
+            model: request.model,
+            stream: false,
+            ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
+            messages: requestMessages(request.system, request.messages),
+          }),
+        });
+      } catch (error) {
+        throw deadline.timedOut() ? timeoutError() : fetchError(error, this.config.token);
+      }
+      if (deadline.timedOut()) throw timeoutError();
+      if (!response.ok) {
+        const error = await responseError(response, this.config.token);
+        throw deadline.timedOut() ? timeoutError() : error;
+      }
 
-    let payload: {
-      choices?: Array<{ message?: { content?: unknown } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-    };
-    try {
-      payload = await response.json();
-    } catch {
-      throw new LlmTransportError("LLM transport returned invalid completion JSON");
+      let payload: {
+        choices?: Array<{ message?: { content?: unknown } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+      try {
+        payload = await response.json();
+      } catch {
+        throw deadline.timedOut()
+          ? timeoutError()
+          : new LlmTransportError("LLM transport returned invalid completion JSON");
+      }
+      const text = payload.choices?.[0]?.message?.content;
+      if (typeof text !== "string" || !text.trim()) {
+        throw new LlmTransportError("LLM transport returned no completion choices");
+      }
+      return {
+        text: text.trim(),
+        usage: payload.usage ? {
+          promptTokens: payload.usage.prompt_tokens,
+          completionTokens: payload.usage.completion_tokens,
+          totalTokens: payload.usage.total_tokens,
+        } : undefined,
+      };
+    } finally {
+      deadline.dispose();
     }
-    const text = payload.choices?.[0]?.message?.content;
-    if (typeof text !== "string" || !text.trim()) {
-      throw new LlmTransportError("LLM transport returned no completion choices");
-    }
+  }
+
+  stream(request: PreparedChatRequest, timeoutMs?: number): StreamProvider {
     return {
-      text: text.trim(),
-      usage: payload.usage ? {
-        promptTokens: payload.usage.prompt_tokens,
-        completionTokens: payload.usage.completion_tokens,
-        totalTokens: payload.usage.total_tokens,
-      } : undefined,
+      stream: (signal) => this.streamRequest(request, signal, timeoutMs),
     };
   }
 
-  stream(request: PreparedChatRequest, signal?: AbortSignal): StreamProvider {
-    return {
-      stream: (streamSignal) => this.streamRequest(request, streamSignal ?? signal),
-    };
-  }
-
-  private async *streamRequest(request: PreparedChatRequest, signal?: AbortSignal): AsyncIterable<StreamDelta> {
-    let response: Response;
-    try {
-      response = await this.fetcher(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.config.token}`,
-        },
-        body: JSON.stringify({
-          model: request.model,
-          stream: true,
-          messages: requestMessages(request.system, request.messages),
-        }),
-        signal,
-      });
-    } catch (error) {
-      throw fetchError(error, this.config.token);
-    }
-    if (!response.ok) throw await responseError(response, this.config.token);
-    if (!response.body) throw new LlmTransportError("LLM transport returned an empty stream body");
-
-    const reader = response.body.getReader();
+  private async *streamRequest(
+    request: PreparedChatRequest,
+    signal: AbortSignal | undefined,
+    remainingMs: number | undefined,
+  ): AsyncIterable<StreamDelta> {
+    const timeoutMs = resolveTimeoutMs(remainingMs, this.config.timeoutMs);
+    if (timeoutMs <= 0) throw timeoutError();
+    const deadline = createRequestDeadline(signal, timeoutMs);
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     const cancelReader = () => {
-      void reader.cancel().catch(() => {});
+      void reader?.cancel().catch(() => {});
     };
-    if (signal?.aborted) {
-      cancelReader();
-      return;
-    }
-    signal?.addEventListener("abort", cancelReader, { once: true });
-    const decoder = new TextDecoder();
-    let buffer = "";
     try {
+      let response: Response;
+      try {
+        response = await this.fetcher(this.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.config.token}`,
+          },
+          body: JSON.stringify({
+            model: request.model,
+            stream: true,
+            messages: requestMessages(request.system, request.messages),
+          }),
+          signal: deadline.signal,
+        });
+      } catch (error) {
+        throw deadline.timedOut() ? timeoutError() : fetchError(error, this.config.token);
+      }
+      if (deadline.timedOut()) throw timeoutError();
+      if (!response.ok) {
+        const error = await responseError(response, this.config.token);
+        throw deadline.timedOut() ? timeoutError() : error;
+      }
+      if (!response.body) throw new LlmTransportError("LLM transport returned an empty stream body");
+
+      reader = response.body.getReader();
+      if (deadline.signal.aborted) {
+        cancelReader();
+        if (deadline.timedOut()) throw timeoutError();
+        return;
+      }
+      deadline.signal.addEventListener("abort", cancelReader, { once: true });
+      const decoder = new TextDecoder();
+      let buffer = "";
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -201,8 +292,12 @@ class OneApiLlmTransport implements LlmTransport {
           }
         }
       }
+      if (deadline.timedOut()) throw timeoutError();
+    } catch (error) {
+      throw deadline.timedOut() ? timeoutError() : error;
     } finally {
-      signal?.removeEventListener("abort", cancelReader);
+      deadline.signal.removeEventListener("abort", cancelReader);
+      deadline.dispose();
     }
   }
 }
@@ -227,9 +322,14 @@ class MockLlmTransport implements LlmTransport {
 }
 
 export function createOneApiLlmTransport(config: OneApiTransportConfig): LlmTransport {
+  const timeoutMs = config.timeoutMs ?? LLM_UPSTREAM_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error("LLM transport timeout must be a positive finite number");
+  }
   return new OneApiLlmTransport({
     ...config,
     fetch: config.fetch ?? globalThis.fetch,
+    timeoutMs,
   });
 }
 

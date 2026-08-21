@@ -9,7 +9,7 @@ import {
 import { initialState, runNodeStream } from "@/lib/pipeline/engine";
 import type { PipelineState } from "@/lib/pipeline/reducer";
 import { makeChatProvider } from "./stream-provider";
-import { createLlmTransportFromEnv } from "./llm-transport";
+import { createLlmRequestDeadline, createLlmTransportFromEnv } from "./llm-transport";
 import { buildWritingContext, type WritingContextSection } from "./writing-context";
 import type { ChatMessage } from "./payload";
 import type { RagEntry } from "@/lib/novels/rag";
@@ -152,6 +152,8 @@ export interface RunChatInput {
   onPhase?: (phase: "preparing" | "streaming" | "finishing") => void;
   /** 客户端断开后停止普通对话的模型流，并避免落库完整回复。 */
   signal?: AbortSignal;
+  /** 请求级上游预算；压缩与主生成共用，防止跨越 Cloud Run 的 300s 上限。 */
+  timeoutMs?: number;
   onDelta: (text: string) => void;
 }
 
@@ -176,6 +178,7 @@ export interface RunChatResult {
  * 会话标题取首条用户消息前 20 字。
  */
 export async function runChat(input: RunChatInput): Promise<RunChatResult> {
+  const requestDeadline = createLlmRequestDeadline(input.timeoutMs);
   const ownedSession = await getOwnedSessionContext(input.sessionId, input.userId);
   if (!ownedSession) throw new SessionNotFoundError();
 
@@ -214,6 +217,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
   if (shouldCompress(history)) {
     try {
       const r = await compressHistory(history, transport, input.model, {
+        timeoutMs: requestDeadline.remainingMs(),
         onInference: ({ usage, error }) => {
           compressionObserved = true;
           compressionUsage = usage;
@@ -312,7 +316,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     }),
   ).catch(() => {});
   if (input.signal?.aborted) throw new Error("生成已停止");
-  const provider = makeChatProvider(prepared, transport);
+  const provider = makeChatProvider(prepared, transport, requestDeadline.remainingMs());
   input.onPhase?.("streaming");
   const state = await runNodeStream(
     initialState(),

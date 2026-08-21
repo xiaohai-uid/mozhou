@@ -10,8 +10,11 @@ export async function POST() {
   return NextResponse.json({ ok: true });
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
-  return NextResponse.redirect(new URL("/login", request.url), 303);
+  return new NextResponse(null, {
+    status: 303,
+    headers: { Location: "/login" },
+  });
 }

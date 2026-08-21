@@ -18,6 +18,7 @@ next-env.d.ts
 
 # tests / scratch / design assets
 tests
+test-results
 .scratch
 figma-upload
 *.log

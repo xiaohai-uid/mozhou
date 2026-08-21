@@ -44,6 +44,17 @@ export type DeconstructResult = DeconstructionResult;
 
 const MAX_TEXT = 30000;
 const MIN_TEXT = 200;
+// Cloud Run terminates the web request at 300s. Keep an explicit reserve for
+// database settlement and the JSON response, so the route owns its timeout
+// result instead of being cut off by the platform.
+const CLOUD_RUN_REQUEST_TIMEOUT_MS = 300_000;
+const DECONSTRUCTION_FINALIZATION_RESERVE_MS = 30_000;
+export const DECONSTRUCTION_TOTAL_DEADLINE_MS =
+  CLOUD_RUN_REQUEST_TIMEOUT_MS - DECONSTRUCTION_FINALIZATION_RESERVE_MS;
+
+export function deconstructionRequestDeadline(now = Date.now()): number {
+  return now + DECONSTRUCTION_TOTAL_DEADLINE_MS;
+}
 // Evidence-based hard bounds: the approved provider probes complete a valid
 // short artifact in under 100s, so the old 90s primary budget was too tight.
 // These remain finite and are still capped by the run deadline.
@@ -122,13 +133,13 @@ function retryDelayMs(attempt: number): number {
   return Math.min(8_000, 500 * 2 ** attempt + jitter);
 }
 
-function classifyProviderError(error: unknown): Exclude<ProviderTransport, "success"> {
+export function classifyProviderError(error: unknown): Exclude<ProviderTransport, "success"> {
   const status = error instanceof ProviderBoundaryError ? error.status : undefined;
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("aborted") || message.includes("timeout") || message.includes("超时")) return "timeout";
   if (status === 429) return "rate_limit";
   if (status !== undefined && status >= 500) return "provider_5xx";
   if (status !== undefined && status >= 400) return "provider_4xx";
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("aborted") || message.includes("timeout") || message.includes("超时")) return "timeout";
   return "network";
 }
 
@@ -234,6 +245,7 @@ const PROMPT = `你是资深网络小说编辑。你要执行 oh-story 的结构
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const requestDeadline = deconstructionRequestDeadline();
 
   const body = (await request.json().catch(() => null)) as {
     text?: unknown;
@@ -447,7 +459,6 @@ export async function POST(request: Request) {
   }
 
   try {
-      const deadline = Date.now() + (mode === "long" ? 420_000 : 300_000);
     let initialRaw = "";
     let attemptOffset = 0;
     const [runMetadata] = runId
@@ -464,7 +475,7 @@ export async function POST(request: Request) {
           runId,
           baseAttemptCount: runMetadata?.attemptCount ?? 0,
           repairOutput: repair ? initialRaw : undefined,
-          deadline,
+          deadline: requestDeadline,
           provider,
         });
         attemptOffset += attemptsOf(response);

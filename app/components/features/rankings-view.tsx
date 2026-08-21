@@ -292,14 +292,14 @@ export function RankingsView() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
-      <div className="flex items-center justify-between">
+    <main className="mz-page mz-page-compact">
+      <div className="mz-page-header">
         <div>
           <div className="flex items-center gap-2">
             <Trophy size={22} weight="duotone" className="text-accent" aria-hidden />
-            <h1 className="text-xl font-semibold tracking-tight">网文扫榜</h1>
+            <h1 className="mz-page-title text-xl font-semibold tracking-tight">网文扫榜</h1>
           </div>
-          <p className="mt-2 text-sm text-muted">跟踪番茄小说官方榜单与市场风向，扫榜结果可写入参考库</p>
+          <p className="mz-page-description mt-2 text-sm text-muted">跟踪番茄小说官方榜单与市场风向，扫榜结果可写入参考库</p>
         </div>
         <div className="flex items-center gap-3">
           <button

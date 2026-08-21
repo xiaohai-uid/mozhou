@@ -6,10 +6,10 @@
 
 ```text
 Cloud Run (asia-northeast1)
-├── mozhou-web      # 墨舟 Web（Next.js standalone, 公网 HTTPS）
+├── mozhou-web      # 墨舟 Web（Next.js `next start`, 公网 HTTPS）
 └── mozhou-one-api  # one-api 网关（公网 HTTPS，Neon PostgreSQL 持久化）
 Neon PostgreSQL (us-east-2, 免费计划)
-├── neondb   # 墨舟主库（13 个迁移）
+├── neondb   # 墨舟主库（35 个迁移，0000–0034）
 └── oneapi   # one-api 独立库（避免 users 表冲突）
 Google Secret Manager：DATABASE_URL / AUTH_SECRET / ONEAPI_TOKEN / ONEAPI_DB_URL / ONEAPI_SESSION_SECRET
 ```
@@ -108,8 +108,8 @@ gcloud run deploy mozhou-web \
   --update-secrets=AUTH_SECRET=AUTH_SECRET:1,DATABASE_URL=DATABASE_URL:1,ONEAPI_TOKEN=ONEAPI_TOKEN:1
 ```
 
-- Dockerfile 已含 `ENV HOSTNAME=0.0.0.0`（Cloud Run 注入 HOSTNAME 会破坏 Next standalone 监听地址）
-- PORT 由 Cloud Run 注入，server.js 自动读取
+- Dockerfile 已含 `ENV HOSTNAME=0.0.0.0`；运行时使用 `next start`
+- PORT 由 Cloud Run 注入，并作为 `next start -p` 的端口传入
 
 ## 9. 部署 one-api
 

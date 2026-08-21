@@ -47,12 +47,12 @@ export function AccountView() {
   // 移除原 mock 开通（setTimeout + setIsMember(true)）——正式产品不得把假数据冒充真实功能
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 lg:px-8">
+    <main className="mz-page mz-page-compact">
       {/* 当前状态 */}
       <div className="rounded-card border border-surface-2 bg-surface/50 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-base font-bold text-white">
+            <span className="flex size-11 items-center justify-center rounded-full bg-accent text-base font-bold text-white">
               墨
             </span>
             <div>
@@ -94,7 +94,7 @@ export function AccountView() {
           </ul>
         </div>
 
-        <div className="relative rounded-card border border-accent/40 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(127,34,254,0.14),transparent_55%),var(--surface)] p-6">
+        <div className="relative rounded-card border border-accent/40 bg-surface p-6">
           <span className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 text-[10px] text-accent">
             <Crown size={11} weight="fill" aria-hidden />
             推荐

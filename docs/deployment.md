@@ -1,6 +1,6 @@
 # 墨舟公网部署指南（V1.0）
 
-> 状态：基建就绪（Dockerfile standalone + compose prod profile），**生产密钥需部署者设置**。
+> 状态：基建就绪（Dockerfile 使用 `next start` + compose prod profile），**生产密钥需部署者设置**。
 > 本文件是部署前置清单，逐项完成后才可上线。
 
 ## 前置：三个必须设置的环境变量（缺一不可，缺则启动失败）
@@ -61,7 +61,7 @@ curl -fsS http://127.0.0.1:3000/ >/dev/null
 1. 创建托管 Postgres，针对生产 `DATABASE_URL` 按序执行当前全部 `app/drizzle/*.sql`（0000-0034）或 `npx drizzle-kit migrate`；不要连接开发机 localhost 数据库
 2. Vercel 环境变量：`DATABASE_URL` / `AUTH_SECRET` / `ONEAPI_BASE_URL` / `ONEAPI_TOKEN`
 3. one-api 必须独立公网部署（HTTPS），`ONEAPI_BASE_URL` 指向它
-4. `next build` 产物直接部署（standalone 已在 next.config 启用）
+4. 执行 `next build` 后以托管平台的标准 Next.js 运行时部署（本仓库 Dockerfile 使用 `next start`）
 
 ## 上线前安全核对（本仓库已就绪项 ✅ / 待部署者项 ⚠️）
 

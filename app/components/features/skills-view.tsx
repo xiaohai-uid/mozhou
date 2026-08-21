@@ -137,11 +137,11 @@ export function SkillsView() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10 lg:px-8">
-      <div className="flex items-center justify-between">
+    <main className="mz-page">
+      <div className="mz-page-header">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">技能广场</h1>
-          <p className="mt-2 text-sm text-muted">
+          <h1 className="mz-page-title text-xl font-semibold tracking-tight">技能广场</h1>
+          <p className="mz-page-description mt-2 text-sm text-muted">
             声明式技能：提示词 + 规则，按需加载到写作对话
           </p>
         </div>

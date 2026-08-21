@@ -597,7 +597,7 @@ export function ChapterEditorView() {
     : "和 AI 对话，继续写这一章…";
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-6 lg:px-8">
+    <main className="mz-page mz-chapter-page flex w-full flex-1 flex-col px-6 py-6 lg:px-8">
       {/* 顶栏：返回 + 章节标识 + 模型/风格 + 保存态 */}
       <header className="flex flex-wrap items-center gap-3">
         <Link

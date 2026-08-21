@@ -44,7 +44,7 @@ test("golden journey: create, current-novel consistency, panels, AI retry, persi
   await page.waitForTimeout(300);
 
   // enter first chapter (already there); return to Workbench → novel is current
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   await page.waitForTimeout(500);
   await expectCurrentNovel(page, novelTitle);
@@ -119,7 +119,7 @@ test("golden journey: create, current-novel consistency, panels, AI retry, persi
   await expect(bodyEditor).toHaveValue("");
 
   // navigate away/back: current novel remains correct
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   await page.waitForTimeout(500);
   await expectCurrentNovel(page, novelTitle);
@@ -128,7 +128,7 @@ test("golden journey: create, current-novel consistency, panels, AI retry, persi
   await removeDevOverlay(page);
   await page.getByRole("link", { name: "使用说明" }).click();
   await expect(page).toHaveURL(/\/projects/);
-  await page.getByRole("link", { name: "工作台" }).click();
+  await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   await page.waitForTimeout(500);
   await expectCurrentNovel(page, novelTitle);
