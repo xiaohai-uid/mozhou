@@ -441,6 +441,62 @@
             }
           }
         }
+      },
+      "patch": {
+        "summary": "更新章节（标题/状态/正文；正文保存必须携带 expectedRevision 做乐观并发）",
+        "operationId": "chapterUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "chapterId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "status": { "type": "string", "enum": ["draft", "final"] },
+                  "content": { "type": "string" },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "比较并交换：与当前 revision 不一致 → 409 ContentChanged；未携带则无条件写入（客户端保存正文时必须携带）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新后的章节行（含 revision）",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "400": {
+            "description": "参数缺失/非法",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "404": {
+            "description": "章节不存在或不归属当前用户",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "409": {
+            "description": "ContentChanged：expectedRevision 与当前 revision 不一致；响应含当前章节行供客户端对账",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
       }
     },
     "/api/v1/novels/{id}/entries": {

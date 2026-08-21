@@ -118,6 +118,8 @@ export function ChapterEditorView() {
   const activeChapterRef = useRef({ novelId, chapterId });
   /** 最后保存/服务端确认的正文（撤销/重做后的保存状态比较基准，Journey ⑧） */
   const lastSavedRef = useRef("");
+  /** 最后确认的章节 revision（乐观并发：PATCH 携带 expectedRevision 做比较并交换） */
+  const lastSavedRevisionRef = useRef<number | null>(null);
   /** J9：正文 textarea 引用（插入后 caret/focus 恢复） */
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   /** J9：editor insertion target（DOM focus ≠ target：blur 不重置；用户重新点击正文才更新） */
@@ -178,11 +180,13 @@ export function ChapterEditorView() {
     setLoadFailed(false);
     fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { chapter?: { content?: string } } | null) => {
+      .then((data: { chapter?: { content?: string; revision?: number } } | null) => {
         if (cancelled) return;
         if (data?.chapter) {
           bodyHist.reset(data.chapter.content ?? "");
           lastSavedRef.current = data.chapter.content ?? "";
+          lastSavedRevisionRef.current =
+            typeof data.chapter.revision === "number" ? data.chapter.revision : null;
           setBodyLoaded(true);
         } else {
           setLoadFailed(true);
@@ -226,12 +230,38 @@ export function ChapterEditorView() {
       const res = await fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          ...(lastSavedRevisionRef.current !== null
+            ? { expectedRevision: lastSavedRevisionRef.current }
+            : {}),
+        }),
       });
+      if (res.status === 409) {
+        // 乐观并发冲突：另一窗口已修改。保留本地文本，显式报错要求人工核对（不静默覆盖）。
+        const conflict = (await res.json().catch(() => null)) as {
+          chapter?: { revision?: number };
+        } | null;
+        if (typeof conflict?.chapter?.revision === "number") {
+          lastSavedRevisionRef.current = conflict.chapter.revision;
+        }
+        if (!opts?.background) {
+          setSaveState("failed");
+          setErrorMsg("正文已在其他窗口被修改——本地内容已保留，请刷新页面对比后再保存");
+        }
+        return false;
+      }
       if (!res.ok) throw new Error("保存失败");
+      const data = (await res.json().catch(() => null)) as {
+        chapter?: { revision?: number };
+      } | null;
+      if (typeof data?.chapter?.revision === "number") {
+        lastSavedRevisionRef.current = data.chapter.revision;
+      }
       if (!opts?.background) {
         lastSavedRef.current = content;
         setSaveState("saved");
+        setErrorMsg(null);
       }
       return true;
     } catch {
@@ -579,7 +609,7 @@ export function ChapterEditorView() {
         return;
       }
       const data = (await res.json().catch(() => null)) as {
-        chapter?: { content?: string };
+        chapter?: { content?: string; revision?: number };
         error?: string;
       } | null;
       if (!res.ok) throw new Error(data?.error ?? "插入失败");
@@ -590,6 +620,9 @@ export function ChapterEditorView() {
         bodyHist.apply(after, { start: caret, end: caret }); // 服务端正文为准（原子一层，一次撤销整体回退）
         targetRef.current = { start: caret, end: caret };
         lastSavedRef.current = after;
+        if (typeof data.chapter.revision === "number") {
+          lastSavedRevisionRef.current = data.chapter.revision;
+        }
         setSaveState("saved");
         restoreSelection({ start: caret, end: caret });
       }

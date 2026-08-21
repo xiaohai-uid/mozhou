@@ -367,7 +367,7 @@ interface StyleGuide {
 2. 同步更新本文件对应节 + 实现 + 测试
 3. 禁止 `data?: any` / 未文档化响应字段绕过契约
 
-**历史 DELTA**：无（V1.0 契约随实现即时补齐；抽卡并入对话为结构调整，已在本文件第 7 节记录）。
+**历史 DELTA**：[DELTA-001](deltas/DELTA-001.md) 章节正文保存乐观并发（2026-08-21，见第 24 节）；此前无（V1.0 契约随实现即时补齐）。
 
 **覆盖核对（2026-08-11 更新）**：全站 13 界面 + 认证 → **23 组端点全部入契约**；✅ 已实现 23 组；无冷冻组。
 
@@ -397,3 +397,17 @@ interface StyleGuide {
 
 > 完整四层契约（Interaction/API/Domain/Persistence）见 `contracts/21-章节级续写契约.md`；工单 16-19 按此实现。
 > 已实现端点以后端发射端 + 契约测试为准（工单 16/17/18 已落测试）。
+
+## 24. 章节正文保存与乐观并发（DELTA-001，2026-08-21）
+
+```typescript
+// PATCH /api/v1/novels/[id]/chapters?chapterId=N
+// 请求：{ title?, status?: "draft"|"final", content?, expectedRevision? }
+// expectedRevision 语义：携带即强制（比较并交换，与 insert 的 expectedContent 同构）
+//   - 与当前 revision 一致 → 应用变更；content 实际变化时 revision +1
+//   - 不一致 → 409 { error: "正文已在其他窗口被修改", code: "ContentChanged", chapter: 当前行 }
+//   - 未携带 → 无条件写入（契约要求客户端保存正文时必须携带；服务端不代偿）
+//   - 非法值（负数/非整数）→ 400
+// 客户端义务：编辑器每次保存正文必须携带上次确认的 revision（GET/PATCH/insert 响应均含）；
+// 收到 409 时保留本地文本、显式报错，由用户刷新对账，禁止静默覆盖。
+```

@@ -396,15 +396,22 @@ export async function createChapter(
   return row;
 }
 
-/** 编辑章节标题/状态/正文，归属校验（经 novel 归属） */
+/** 编辑章节标题/状态/正文，归属校验（经 novel 归属）。
+ *  乐观并发（Contract Delta 2026-08-21）：opts.expectedRevision 携带时做比较并交换，
+ *  不一致返回 "conflict"（路由层据此区分 404 / 409 ContentChanged）。 */
 export async function updateChapter(
   userId: number,
   novelId: number,
   chapterId: number,
   patch: { title?: string; status?: "draft" | "final"; content?: string },
-): Promise<Chapter | null> {
+  opts?: { expectedRevision?: number },
+): Promise<Chapter | null | "conflict"> {
   const novel = await getNovel(userId, novelId);
   if (!novel) return null;
+  const conditions = [eq(chapters.id, chapterId), eq(chapters.novelId, novelId)];
+  if (opts?.expectedRevision !== undefined) {
+    conditions.push(eq(chapters.revision, opts.expectedRevision));
+  }
   const [row] = await db
     .update(chapters)
     .set({
@@ -416,9 +423,11 @@ export async function updateChapter(
         : {}),
       updatedAt: sql`now()`,
     })
-    .where(and(eq(chapters.id, chapterId), eq(chapters.novelId, novelId)))
+    .where(and(...conditions))
     .returning();
-  return row ?? null;
+  if (row) return row;
+  const existing = await getChapter(userId, novelId, chapterId);
+  return existing ? "conflict" : null;
 }
 
 /** 单章详情（含正文 content），归属校验（16 工单，章节编辑器加载） */

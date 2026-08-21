@@ -58,6 +58,7 @@ export async function PATCH(
     title?: string;
     status?: "draft" | "final";
     content?: string;
+    expectedRevision?: unknown;
   } | null;
   const patch: { title?: string; status?: "draft" | "final"; content?: string } = {};
   if (body?.title !== undefined) patch.title = body.title.trim();
@@ -66,13 +67,35 @@ export async function PATCH(
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "无可更新字段" }, { status: 400 });
   }
-  const chapter = await updateChapter(user.id, Number(id), chapterId, patch);
-  if (!chapter) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
+  // 乐观并发（Contract Delta 2026-08-21）：expectedRevision 携带即强制（比较并交换）。
+  let expectedRevision: number | undefined;
+  if (body?.expectedRevision !== undefined) {
+    const v = body.expectedRevision;
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {
+      return NextResponse.json({ error: "缺少有效的 expectedRevision" }, { status: 400 });
+    }
+    expectedRevision = v;
+  }
+  const updated = await updateChapter(
+    user.id,
+    Number(id),
+    chapterId,
+    patch,
+    expectedRevision === undefined ? undefined : { expectedRevision },
+  );
+  if (updated === "conflict") {
+    const current = await getChapter(user.id, Number(id), chapterId);
+    return NextResponse.json(
+      { error: "正文已在其他窗口被修改", code: "ContentChanged", chapter: current },
+      { status: 409 },
+    );
+  }
+  if (!updated) return NextResponse.json({ error: "章节不存在" }, { status: 404 });
   // 工单 20：autoSync 开启时正文保存后后台推送（fire-and-forget，失败静默）
   if (patch.content !== undefined) {
     void maybeAutoSync(user.id);
   }
-  return NextResponse.json({ chapter });
+  return NextResponse.json({ chapter: updated });
 }
 
 export async function DELETE(
