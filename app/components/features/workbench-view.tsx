@@ -515,7 +515,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             type="button"
             onClick={() => setEvidenceOpen(true)}
             disabled={!evidence}
-            className="hidden items-center gap-1.5 rounded-full border border-surface-2 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-accent disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-full border border-surface-2 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-accent disabled:opacity-40 lg:hidden"
           >
             <Sparkle size={14} weight="duotone" aria-hidden />
             本次链路
@@ -726,8 +726,8 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
           )}
         </main>
 
-        {/* ===== 右栏（桌面）：本次创作链路 ===== */}
-        <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-surface-2 bg-zinc-950/40 px-4 py-4">
+        {/* ===== 右栏（桌面）：本次创作链路（窄屏用顶部「本次链路」抽屉替代） ===== */}
+        <aside className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-surface-2 bg-zinc-950/40 px-4 py-4 lg:flex">
           <GenerationStageRail
             phase={generationPhase}
             startedAt={generationStartedAt}
@@ -818,7 +818,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       </div>
 
       {/* ===== 移动端底部导航 ===== */}
-      <nav className="hidden shrink-0 border-t border-surface-2 bg-zinc-950/90" aria-label="移动端导航">
+      <nav className="flex h-14 shrink-0 border-t border-surface-2 bg-zinc-950/90 lg:hidden" aria-label="移动端导航">
         {([
           ["write", "写作", PenNib],
           ["chapters", "章节", ListNumbers],
@@ -829,7 +829,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
             key={key}
             type="button"
             onClick={() => setMobileTab(key)}
-            className={"flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition " + (mobileTab === key ? "text-accent" : "text-faint")}
+            className={"flex flex-1 flex-col items-center justify-center gap-1 py-1.5 text-[11px] transition " + (mobileTab === key ? "text-accent" : "text-faint")}
           >
             <Icon size={18} weight={mobileTab === key ? "fill" : "duotone"} aria-hidden />
             {label}
@@ -839,7 +839,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
 
       {/* ===== 移动端二级内容面板 ===== */}
       {mobileTab !== "write" && (
-        <div className="fixed inset-x-0 bottom-12 top-14 z-20 overflow-y-auto border-t border-surface-2 bg-background px-4 py-4 lg:hidden">
+        <div className="fixed inset-x-0 bottom-14 top-14 z-20 overflow-y-auto border-t border-surface-2 bg-background px-4 py-4 lg:hidden">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">
               {mobileTab === "chapters" ? "章节与大纲" : mobileTab === "story" ? "人物与世界观" : "专项工具"}

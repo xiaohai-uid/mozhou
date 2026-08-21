@@ -486,7 +486,6 @@ body {
 
 .mz-workbench-shell {
   min-height: 100dvh;
-  min-width: 64rem;
   background: var(--background);
 }
 
@@ -510,7 +509,6 @@ body {
   display: flex;
   height: 100dvh;
   min-height: 100dvh;
-  min-width: 64rem;
   flex-direction: column;
   overflow: hidden;
   background: var(--background);

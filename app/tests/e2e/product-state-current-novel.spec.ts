@@ -75,7 +75,7 @@ test("switching novels persists across leaving and returning to Workbench", asyn
   // Leave Workbench via visible link, then come back.
   await removeDevOverlay(page);
   await page.getByRole("link", { name: "使用说明" }).click();
-  await expect(page).toHaveURL(/\/projects/);
+  await expect(page).toHaveURL(/\/guide/);
   await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
 
@@ -116,6 +116,8 @@ test("deleting the active novel leaves a deterministic fallback state", async ({
   // Delete the active novel from Projects.
   await removeDevOverlay(page);
   await page.getByRole("link", { name: "使用说明" }).click();
+  await expect(page).toHaveURL(/\/guide/);
+  await page.getByRole("link", { name: "我的作品" }).click();
   await expect(page).toHaveURL(/\/projects/);
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: `删除 ${second}`, exact: true }).click();

@@ -109,7 +109,7 @@ export function WorkbenchSidebar({
   const latestChapter = [...(detail?.chapters ?? [])].sort((a, b) => b.sortOrder - a.sortOrder)[0];
 
   return (
-    <aside data-workbench-sidebar className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-surface-2 bg-zinc-950/60 px-3 py-4">
+    <aside data-workbench-sidebar className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-surface-2 bg-zinc-950/60 px-3 py-4 lg:flex">
       <SectionLabel>Current Work</SectionLabel>
       <div className="rounded-xl border border-surface-2 bg-surface/50 px-4 py-3">
         {loadState === "error" ? (
@@ -235,7 +235,7 @@ export function WorkbenchSidebar({
       </div>
 
       <div className="mt-auto flex items-center justify-between border-t border-surface-2 px-2 pt-3">
-        <Link href="/projects" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><Question size={13} aria-hidden /> 使用说明</Link>
+        <Link href="/guide" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><Question size={13} aria-hidden /> 使用说明</Link>
         <Link href="/account" className="flex items-center gap-1.5 text-xs text-faint transition hover:text-zinc-200"><UserCircle size={13} aria-hidden /> 账户与额度</Link>
       </div>
     </aside>

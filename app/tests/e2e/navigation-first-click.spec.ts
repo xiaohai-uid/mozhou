@@ -61,16 +61,17 @@ test("workbench tool links keep the workbench shell", async ({ page }) => {
   }
 });
 
-test("workbench navigation stays expanded at narrow viewports", async ({ page }) => {
+test("workbench collapses to mobile layout at narrow viewports", async ({ page }) => {
   await register(page);
   await page.setViewportSize({ width: 640, height: 900 });
   await page.goto("/workspace", { waitUntil: "networkidle" });
 
-  await expect(page.locator(".mz-workbench-shell > div > aside").first()).toBeVisible();
+  // 窄屏：桌面侧栏隐藏，底部移动导航接管（写作/章节/故事/工具）。
+  await expect(page.locator(".mz-workbench-shell > div > aside").first()).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "移动端导航" })).toBeVisible();
 
   await page.goto("/rankings?surface=workbench", { waitUntil: "networkidle" });
   await expect(page.locator('[data-shell="workbench-tool"]')).toBeVisible();
-  await expect(page.locator("[data-workbench-sidebar]")).toBeVisible();
 });
 
 test("workbench tools reuse the full workbench sidebar", async ({ page }) => {

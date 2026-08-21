@@ -95,6 +95,10 @@ export function ChapterEditorView() {
   const bodyHist = useBodyHistory("");
   const body = bodyHist.body;
   const [bodyLoaded, setBodyLoaded] = useState(false);
+  /** 正文加载失败：显式失败态而非永久「加载中」，可通过重试按钮再次加载 */
+  const [loadFailed, setLoadFailed] = useState(false);
+  /** 重试计数：自增触发正文加载 effect 重跑（过期响应经 cancelled 守卫丢弃） */
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "failed">("saved");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // 工单 17：我的技能（真实 /api/v1/skills?scope=mine）+ 场景技能（内置）
@@ -155,15 +159,30 @@ export function ChapterEditorView() {
 
   /** 工单 16：加载真实正文（GET 单章含 content）+ 工单 17：加载对话历史（留存 Q1）+ 我的技能 */
   useEffect(() => {
-    if (!novelId || !chapterId) return;
+    if (!novelId || !chapterId) {
+      // 参数缺失无法加载：显式失败态（可重试），而非可编辑的空白正文。
+      setLoadFailed(true);
+      return;
+    }
+    // 加载竞态防护（2026-08-21 GUI 体检缺陷）：bodyLoaded=false 期间 textarea/撤销重做/
+    // 保存/插入全部禁用，杜绝「加载值覆盖用户输入」；章节切换/重试后，过期响应一律丢弃。
+    let cancelled = false;
+    setBodyLoaded(false);
+    setLoadFailed(false);
     fetch(`/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { chapter?: { content?: string } } | null) => {
+        if (cancelled) return;
         if (data?.chapter) {
           bodyHist.reset(data.chapter.content ?? "");
           lastSavedRef.current = data.chapter.content ?? "";
           setBodyLoaded(true);
+        } else {
+          setLoadFailed(true);
         }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
       });
     const messagesVersionAtStart = messagesVersionRef.current;
     fetch(`/api/v1/novels/${novelId}/chapters/messages?chapterId=${chapterId}`)
@@ -183,7 +202,10 @@ export function ChapterEditorView() {
       .then((data: { styles?: Array<{ id: number; name: string }> } | null) => {
         if (data?.styles) setStyleLibrary(data.styles);
       });
-  }, [novelId, chapterId, bodyHist]); // bodyHist 实例稳定（useState 惰性初始化），仅随章节变化重载
+    return () => {
+      cancelled = true;
+    };
+  }, [novelId, chapterId, reloadNonce, bodyHist]); // bodyHist 实例稳定（useState 惰性初始化）；随章节/重试重载
 
   /** 工单 16：保存正文（PATCH content；自动保存与显式保存同端点；content 显式传参防闭包过期） */
   async function saveBody(content: string): Promise<boolean> {
@@ -615,30 +637,42 @@ export function ChapterEditorView() {
           </span>
           <span
             className={`text-[10px] ${
-              saveState === "dirty"
-                ? "text-yellow-400"
-                : saveState === "failed"
-                  ? "text-red-400"
-                  : saveState === "saving"
-                    ? "text-faint"
+              loadFailed
+                ? "text-red-400"
+                : saveState === "dirty"
+                  ? "text-yellow-400"
+                  : saveState === "failed"
+                    ? "text-red-400"
                     : "text-faint"
             }`}
           >
-            {saveState === "dirty"
-              ? "未保存"
-              : saveState === "failed"
-                ? "保存失败"
-                : saveState === "saving"
-                  ? "保存中…"
-                  : "已保存"}
+            {!bodyLoaded
+              ? loadFailed
+                ? "加载失败"
+                : "加载中…"
+              : saveState === "dirty"
+                ? "未保存"
+                : saveState === "failed"
+                  ? "保存失败"
+                  : saveState === "saving"
+                    ? "保存中…"
+                    : "已保存"}
           </span>
           <button
             onClick={() => void saveBody(body)}
-            disabled={saveState === "saving"}
+            disabled={!bodyLoaded || saveState === "saving"}
             className="rounded-full border border-surface-2 px-2.5 py-0.5 text-[10px] text-faint transition hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40"
           >
             保存
           </button>
+          {loadFailed && (
+            <button
+              onClick={() => setReloadNonce((n) => n + 1)}
+              className="rounded-full border border-red-500/40 px-2.5 py-0.5 text-[10px] text-red-400 transition hover:border-red-400 hover:text-red-300"
+            >
+              重试加载
+            </button>
+          )}
         </div>
         <div className="ml-auto flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-faint">
@@ -701,7 +735,7 @@ export function ChapterEditorView() {
 
       </header>
 
-      <div className="mt-5 flex min-h-0 flex-1 gap-5">
+      <div className="mt-5 flex min-h-0 flex-1 flex-col gap-5 lg:flex-row">
         {/* 正文编辑区（对话期间永不锁定，可随时编辑） */}
         <section className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center justify-between">
@@ -716,7 +750,7 @@ export function ChapterEditorView() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={doUndo}
-                  disabled={!bodyHist.canUndo}
+                  disabled={!bodyLoaded || !bodyHist.canUndo}
                   title="撤销 (Ctrl+Z)"
                   aria-label="撤销"
                   className="rounded-lg border border-surface-2 p-1 text-faint transition hover:text-zinc-200 disabled:opacity-30"
@@ -725,7 +759,7 @@ export function ChapterEditorView() {
                 </button>
                 <button
                   onClick={doRedo}
-                  disabled={!bodyHist.canRedo}
+                  disabled={!bodyLoaded || !bodyHist.canRedo}
                   title="重做 (Ctrl+Shift+Z)"
                   aria-label="重做"
                   className="rounded-lg border border-surface-2 p-1 text-faint transition hover:text-zinc-200 disabled:opacity-30"
@@ -748,14 +782,17 @@ export function ChapterEditorView() {
             onChange={(e) => onBodyChange(e.target.value)}
             onSelect={onEditorSelect}
             onKeyDown={onBodyKeyDown}
+            disabled={!bodyLoaded}
             placeholder={
               !bodyLoaded
-                ? "加载中…"
+                ? loadFailed
+                  ? "正文加载失败，请点顶部「重试加载」"
+                  : "加载中…"
                 : emptyChapter
-                  ? "这一章还没有正文。在右侧和 AI 对话让它起笔，或直接开写。"
+                  ? "这一章还没有正文。和 AI 对话让它起笔，或直接开写。"
                   : "从这里继续写你的故事…"
             }
-            className="mt-2 min-h-[62vh] w-full flex-1 resize-none rounded-card border border-surface-2 bg-surface/40 px-6 py-5 text-[15px] leading-8 text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent"
+            className="mt-2 min-h-[40vh] w-full flex-1 resize-none rounded-card border border-surface-2 bg-surface/40 px-6 py-5 text-[15px] leading-8 text-zinc-100 outline-none transition placeholder:text-faint focus:border-accent lg:min-h-[62vh]"
           />
           {bodyLoaded && emptyChapter && (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -778,8 +815,8 @@ export function ChapterEditorView() {
           )}
         </section>
 
-        {/* 右侧 AI 对话面板（对话代理式：多轮对话 + 产出插入正文） */}
-        <aside className="flex w-[360px] shrink-0 flex-col rounded-card border border-surface-2 bg-surface/60">
+        {/* 右侧 AI 对话面板（对话代理式：多轮对话 + 产出插入正文；窄屏堆叠到正文下方） */}
+        <aside className="flex w-full shrink-0 flex-col rounded-card border border-surface-2 bg-surface/60 lg:w-[360px]">
           <div className="border-b border-surface-2 px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
@@ -905,7 +942,8 @@ export function ChapterEditorView() {
                               正文已变化，这条回复基于旧正文
                               <button
                                 onClick={() => forceInsert(m.id)}
-                                className="rounded-full border border-current px-2.5 py-0.5 transition hover:bg-current/10"
+                                disabled={!bodyLoaded}
+                                className="rounded-full border border-current px-2.5 py-0.5 transition hover:bg-current/10 disabled:opacity-40"
                               >
                                 仍要插入
                               </button>
@@ -929,7 +967,8 @@ export function ChapterEditorView() {
                               选中内容已发生变化——AI 是根据之前的选中文字生成的
                               <button
                                 onClick={() => forceInsert(m.id)}
-                                className="rounded-full border border-current px-2.5 py-0.5 transition hover:bg-current/10"
+                                disabled={!bodyLoaded}
+                                className="rounded-full border border-current px-2.5 py-0.5 transition hover:bg-current/10 disabled:opacity-40"
                               >
                                 仍要替换
                               </button>
@@ -950,7 +989,7 @@ export function ChapterEditorView() {
                             <>
                               <button
                                 onClick={() => void insertToChapter(m.id)}
-                                disabled={!m.content.trim() || insertingId === m.id}
+                                disabled={!bodyLoaded || !m.content.trim() || insertingId === m.id}
                                 className="flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-medium text-white transition hover:bg-violet-500 disabled:opacity-40"
                               >
                                 {/* J9：有效非空 selection target（blur 不丢）→ 替换选中内容；否则插入正文 */}

@@ -127,7 +127,7 @@ test("golden journey: create, current-novel consistency, panels, AI retry, persi
   // leave via visible link and come back
   await removeDevOverlay(page);
   await page.getByRole("link", { name: "使用说明" }).click();
-  await expect(page).toHaveURL(/\/projects/);
+  await expect(page).toHaveURL(/\/guide/);
   await page.getByRole("link", { name: "工作台", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace/);
   await page.waitForTimeout(500);
@@ -141,7 +141,7 @@ test("golden journey: create, current-novel consistency, panels, AI retry, persi
   // resource navigation responds on first click (from an AppShell page)
   await removeDevOverlay(page);
   await page.getByRole("link", { name: "使用说明" }).click();
-  await expect(page).toHaveURL(/\/projects/);
+  await expect(page).toHaveURL(/\/guide/);
   await page.getByRole("link", { name: "书源搜索" }).click();
   await expect(page).toHaveURL(/\/search$/);
   await expect(page.getByRole("heading", { name: "书源搜索" })).toBeVisible();
