@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { searchSources } from "@/lib/source/engine";
 
 function response(body: string, status = 200, token?: string) {
@@ -10,6 +10,26 @@ function response(body: string, status = 200, token?: string) {
     headers: { get: (name: string) => name.toLowerCase() === "x-ms-token" ? token ?? null : null },
   } as unknown as Response;
 }
+
+
+beforeAll(() => {
+  // 本组走真实管线（fetch 已桩）：SOURCE_PROVIDER=mock 会整体短路；
+  // FANQIE_SEARCH_MOCK=1 会把管线内的番茄源打回降级——两个旗标都须摘除（勿依赖文件执行顺序）
+  process.env.SOURCE_PROVIDER_SAVED = process.env.SOURCE_PROVIDER;
+  process.env.FANQIE_SAVED = process.env.FANQIE_SEARCH_MOCK;
+  delete process.env.SOURCE_PROVIDER;
+  delete process.env.FANQIE_SEARCH_MOCK;
+});
+afterAll(() => {
+  const restore = (saved: string | undefined, key: string) => {
+    if (saved === undefined) delete process.env[key];
+    else process.env[key] = saved;
+  };
+  restore(process.env.SOURCE_PROVIDER_SAVED, "SOURCE_PROVIDER");
+  restore(process.env.FANQIE_SAVED, "FANQIE_SEARCH_MOCK");
+  delete process.env.SOURCE_PROVIDER_SAVED;
+  delete process.env.FANQIE_SAVED;
+});
 
 describe("书源引擎", () => {
   afterEach(() => {

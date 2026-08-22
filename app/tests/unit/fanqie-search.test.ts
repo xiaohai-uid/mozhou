@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { searchFanqie, __resetMsTokenCacheForTests } from "@/lib/search/fanqie";
 
 function routeFetch(routes: Record<string, { ok: boolean; text: string; headers?: Record<string, string> }>) {
@@ -14,6 +14,18 @@ function routeFetch(routes: Record<string, { ok: boolean; text: string; headers?
     return { ok: r.ok, text: async () => r.text, headers: { get: (k: string) => r.headers?.[k] ?? null } } as unknown as Response;
   }));
 }
+
+
+beforeAll(() => {
+  process.env.FANQIE_SEARCH_MOCK_SAVED = process.env.FANQIE_SEARCH_MOCK;
+  delete process.env.FANQIE_SEARCH_MOCK; // 本组为纯解析单测（fetch 已桩），mock 短路会掩盖真实路径
+});
+afterAll(() => {
+  const v = process.env.FANQIE_SEARCH_MOCK_SAVED;
+  if (v === undefined) delete process.env.FANQIE_SEARCH_MOCK;
+  else process.env.FANQIE_SEARCH_MOCK = v;
+  delete process.env.FANQIE_SEARCH_MOCK_SAVED;
+});
 
 describe("T6 番茄搜索包装", () => {
   beforeEach(() => __resetMsTokenCacheForTests());
