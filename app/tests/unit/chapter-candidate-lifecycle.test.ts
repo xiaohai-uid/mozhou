@@ -46,14 +46,14 @@ describe("chapter candidate lifecycle", () => {
     });
   });
 
-  it("allows application only for owner-scoped completed candidates at the candidate revision", () => {
+  it("allows application for owner-scoped completed candidates regardless of content drift since generation", () => {
+    // 基线过期不再拒绝（2026-08-22）：多候选顺序插入是核心工作流，
+    // 内容漂移由 expectedContent 确认 + force + CAS 三层防护，基线守卫属重复设防。
     expect(
       canApplyChapterCandidate({
         candidateUserId: 7,
         requesterUserId: 7,
         status: "completed_candidate",
-        baseRevision: 3,
-        chapterRevision: 3,
         content: "candidate",
       }),
     ).toEqual({ ok: true });
@@ -63,8 +63,6 @@ describe("chapter candidate lifecycle", () => {
         candidateUserId: 7,
         requesterUserId: 7,
         status: "stopped",
-        baseRevision: 3,
-        chapterRevision: 3,
         content: "partial candidate",
       }),
     ).toEqual({ ok: false, reason: "status" });
@@ -74,8 +72,6 @@ describe("chapter candidate lifecycle", () => {
         candidateUserId: 8,
         requesterUserId: 7,
         status: "completed_candidate",
-        baseRevision: 3,
-        chapterRevision: 3,
         content: "candidate",
       }),
     ).toEqual({ ok: false, reason: "not_found" });
@@ -84,8 +80,6 @@ describe("chapter candidate lifecycle", () => {
         candidateUserId: 7,
         requesterUserId: 7,
         status: "generating",
-        baseRevision: 3,
-        chapterRevision: 3,
         content: "candidate",
       }),
     ).toEqual({ ok: false, reason: "status" });
@@ -94,18 +88,6 @@ describe("chapter candidate lifecycle", () => {
         candidateUserId: 7,
         requesterUserId: 7,
         status: "completed_candidate",
-        baseRevision: 2,
-        chapterRevision: 3,
-        content: "candidate",
-      }),
-    ).toEqual({ ok: false, reason: "revision" });
-    expect(
-      canApplyChapterCandidate({
-        candidateUserId: 7,
-        requesterUserId: 7,
-        status: "completed_candidate",
-        baseRevision: 3,
-        chapterRevision: 3,
         content: " ",
       }),
     ).toEqual({ ok: false, reason: "content" });

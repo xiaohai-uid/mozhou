@@ -703,16 +703,17 @@ describe("插入与冲突保护（工单 18）", () => {
     return chapter.content;
   }
 
-  it("插入成功：正文末尾追加 + 消息 inserted（刷新后仍在）", async () => {
+  it("插入成功：正文末尾追加 + 消息 inserted（刷新后仍在）+ 响应携带新 revision", async () => {
     const before = await currentContent();
     const candidate = await chatAndGetReply("插入测试一轮");
     const res = await insert(candidate.id, candidate.content);
     expect(res.status).toBe(200);
     const data = (await res.json()) as {
-      chapter: { content: string };
+      chapter: { content: string; revision: number };
       message: { inserted: boolean };
     };
     expect(data.chapter.content).toBe(before + "\n\n" + candidate.content.trim());
+    expect(typeof data.chapter.revision).toBe("number");
     expect(data.message.inserted).toBe(true);
 
     // 刷新（重新 GET 消息）→ inserted 持久
@@ -723,6 +724,25 @@ describe("插入与冲突保护（工单 18）", () => {
     const { messages } = (await list.json()) as { messages: Array<{ id: number; inserted: boolean }> };
     const target = messages.find((m) => m.id === candidate.id);
     expect(target?.inserted).toBe(true);
+  });
+
+  it("连续插入两条候选：第二条不因基线过期被拒（2026-08-22 用户复现回归）", async () => {
+    // 两条候选同批生成（共享 baseRevision）；第一条插入后 revision+1，
+    // 第二条此前会被 baseRevision 相等守卫拒绝（409 ContentChanged）——修复后必须成功。
+    const first = await chatAndGetReply("连续插入候选一");
+    const second = await chatAndGetReply("连续插入候选二");
+    const res1 = await insert(first.id, first.content);
+    expect(res1.status).toBe(200);
+    const data1 = (await res1.json()) as { chapter: { revision: number } };
+    expect(typeof data1.chapter.revision).toBe("number");
+    const contentAfterFirst = await currentContent();
+    expect(contentAfterFirst).toContain(first.content.trim());
+
+    const res2 = await insert(second.id, second.content);
+    expect(res2.status).toBe(200);
+    const contentAfterSecond = await currentContent();
+    expect(contentAfterSecond).toContain(first.content.trim());
+    expect(contentAfterSecond).toContain(second.content.trim());
   });
 
   it("编辑后确认只使用明确 editedContent，空正文保持 400", async () => {
@@ -845,9 +865,10 @@ describe("插入与冲突保护（工单 18）", () => {
     expect(persisted.filter((row) => row.role === "user" && row.content === freshContent)).toHaveLength(1);
   });
 
-  it("生成期间正文发生变化 → 候选基线冲突；用户确认后 force 应用", async () => {
-    const candidate = await chatAndGetReply("候选基线冲突测试");
-    // 生成后修改正文：候选 baseRevision 过期，默认确认必须拒绝，不能静默覆盖。
+  it("生成期间正文发生变化：expectedContent 与当前一致 → 仍可确认插入（基线过期不再拒绝，2026-08-22）", async () => {
+    const candidate = await chatAndGetReply("候选基线过期仍可插入");
+    // 生成后修改正文：候选 baseRevision 过期。expectedContent 与服务端当前正文一致，
+    // 说明客户端确认时看到的就是这份内容 → splice 安全，不再被基线守卫拒绝。
     const patched = await fetch(
       `${BASE}/api/v1/novels/${novelId}/chapters?chapterId=${chapterId}`,
       {
@@ -860,15 +881,12 @@ describe("插入与冲突保护（工单 18）", () => {
     const res = await insert(candidate.id, candidate.content, false, {
       expectedContent: "（用户在生成后手动修改的正文）",
     });
-    expect(res.status).toBe(409);
-
-    const forced = await insert(candidate.id, candidate.content, true, {
-      expectedContent: "（用户在生成后手动修改的正文）",
-    });
-    expect(forced.status).toBe(409);
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as { chapter: { revision: number } };
+    expect(typeof data.chapter.revision).toBe("number");
     const content = await currentContent();
     expect(content).toContain("（用户在生成后手动修改的正文）");
-    expect(content).not.toContain("这条基于点击时的正文");
+    expect(content).toContain(candidate.content.trim());
   });
 
   it("并发确认同一候选 → 只有一次正文变更，失败方不覆盖正文", async () => {

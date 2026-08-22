@@ -55,23 +55,18 @@ export function settleChapterCandidate(input: {
   };
 }
 
-export type CandidateApplyFailure = "not_found" | "status" | "revision" | "content";
+export type CandidateApplyFailure = "not_found" | "status" | "content";
 
 export function canApplyChapterCandidate(input: {
   candidateUserId: number;
   requesterUserId: number;
   status: CandidateStatus;
-  baseRevision: number | null;
-  chapterRevision: number;
   content: string;
 }): { ok: true } | { ok: false; reason: CandidateApplyFailure } {
   if (input.candidateUserId !== input.requesterUserId) return { ok: false, reason: "not_found" };
   const normalizedStatus = normalizeCandidateStatus({ status: input.status, inserted: false });
   if (normalizedStatus !== "completed_candidate") {
     return { ok: false, reason: "status" };
-  }
-  if (input.baseRevision === null || input.baseRevision !== input.chapterRevision) {
-    return { ok: false, reason: "revision" };
   }
   if (!input.content.trim()) return { ok: false, reason: "content" };
   return { ok: true };
@@ -531,7 +526,7 @@ export interface InsertTarget {
 }
 
 export interface InsertResult {
-  chapter: { content: string; updatedAt: string };
+  chapter: { content: string; revision: number; updatedAt: string };
   messageId: number;
 }
 
@@ -580,13 +575,10 @@ export async function applyChapterCandidate(input: {
       candidateUserId: candidate.userId,
       requesterUserId: input.userId,
       status: candidate.status as CandidateStatus,
-      baseRevision: candidate.baseRevision,
-      chapterRevision: chapter.revision,
       content: candidate.content,
     });
     if (!applicability.ok) {
       if (applicability.reason === "not_found") throw new ChapterNotFoundError();
-      if (applicability.reason === "revision") throw new ContentChangedError();
       if (applicability.reason === "content") throw new Error("候选内容为空，不能插入");
       throw new Error("该回复尚未成为可确认候选");
     }
@@ -616,7 +608,7 @@ export async function applyChapterCandidate(input: {
       .update(chapters)
       .set({ content: next, revision: sql`${chapters.revision} + 1`, updatedAt: sql`now()` })
       .where(and(eq(chapters.id, input.chapterId), eq(chapters.revision, chapter.revision)))
-      .returning({ content: chapters.content, updatedAt: chapters.updatedAt });
+      .returning({ content: chapters.content, revision: chapters.revision, updatedAt: chapters.updatedAt });
     if (!updatedChapter) throw new ContentChangedError();
 
     const [updatedCandidate] = await tx
@@ -633,7 +625,11 @@ export async function applyChapterCandidate(input: {
     if (!updatedCandidate) throw new CandidateAlreadyAppliedError();
 
     return {
-      chapter: { content: updatedChapter.content, updatedAt: updatedChapter.updatedAt.toISOString() },
+      chapter: {
+        content: updatedChapter.content,
+        revision: updatedChapter.revision,
+        updatedAt: updatedChapter.updatedAt.toISOString(),
+      },
       messageId: input.messageId,
     };
   });

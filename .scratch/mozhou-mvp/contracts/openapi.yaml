@@ -1895,7 +1895,7 @@
         ],
         "responses": {
           "200": {
-            "description": "事务写入 revision+1，候选置 applied，附质量门覆盖证据"
+            "description": "事务写入 revision+1，候选置 applied。响应体 {chapter:{content,revision,updatedAt}, messageId, message:{inserted}, qualityGate}；chapter.revision 供客户端推进保存基线（DELTA-003）"
           },
           "400": {
             "description": "模式/位置/区间等校验失败（position/range 不静默 clamp）"
@@ -1907,7 +1907,7 @@
             "description": "章节或候选不存在"
           },
           "409": {
-            "description": "J9 两层冲突：{error, code:'ContentChanged'}；确认后带 force:true 重发"
+            "description": "冲突：{error, code:'ContentChanged'}——expectedContent 与当前正文不一致，或 CAS 竞态失败；确认后带 force:true 重发（DELTA-003 后基线过期不再拒绝）"
           }
         }
       }
