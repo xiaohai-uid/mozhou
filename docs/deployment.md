@@ -117,7 +117,7 @@ gunzip -c /var/backups/mozhou-2026-08-21.sql.gz | docker exec -i $(docker ps -qf
 | 容器化启动 + env 契约 | ✅ | `mozhou-web:nextstart-debug2` 容器注入 DATABASE_URL/AUTH_SECRET/ONEAPI_* 后正常启动 |
 | 跨边界 DB 连接 + 迁移 | ✅ | 独立 drill 库 `drizzle-kit migrate` 31 表；容器内注册 201 / 登录 200 |
 | 健康探测 | ✅（代码层） | `/api/v1/health` 契约测试通过；演练镜像早于该端点故 404，属预期 |
-| 真实 LLM 冒烟 | ✅（2026-08-22 补测通过） | 根因=one-api 缺 glm 渠道。修复：增配智谱免费渠道（`glm-4.5-flash`，type=50 OpenAICompatible，base=`open.bigmodel.cn/api/paas/v4`，ModelRatio 归零；经验见 OB《one-api 渠道配置经验》）。复跑证据：渠道测试 7.9s ✓；dev 起服（无 mock）注册→bootstrap→`POST /api/v1/chat` → 200 text/event-stream，36 事件 / 5.4s / 无降级标记，回答切题 |
+| 真实 LLM 冒烟 | ✅（2026-08-22 补测通过） | 根因=one-api 渠道面不足。修复两条：①SenseNova 渠道扩展声明 `glm-5.2`（上游 `/v1/models` 实供 5 模型；glm-5.2 直连可通但工作区配额极紧，连发即 429，适合低频任务）；②增配智谱免费渠道（`glm-4.5-flash`，type=50 OpenAICompatible，ModelRatio 归零）。复跑证据：网关渠道测试 glm-5.2 1.8s ✓ / deepseek-v4-flash 2.9s ✓ / glm-4.5-flash 7.9s ✓；dev 起服（无 mock）注册→bootstrap→`POST /api/v1/chat` → 200 SSE 36 事件 / 5.4s / 无降级标记，回答切题 |
 | 当前代码镜像重建 | ⛔ BLOCKED（本机网络） | `docker compose build` 的容器内 `npm ci` 无法走宿主代理（host.docker.internal→192.168.1.191 拒连）。**修复：Docker Desktop 设置代理或在 Dockerfile 用镜像源 BASE_IMAGE 后重跑** |
 
 > 演练方法（可复跑）：`docker exec mozhou-postgres-local psql -U mozhou -c 'CREATE DATABASE mozhou_drill'` →
