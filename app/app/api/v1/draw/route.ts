@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { AI_LIMIT_PER_MIN, consumeRateLimit, rateLimit429 } from "@/lib/http/rate-limit";
+import { enforceAiLimit } from "@/lib/http/rate-limit";
 import { assertQuota, recordUsage } from "@/lib/account/service";
 import { createUnifiedCompletionProvider } from "@/lib/ai/provider";
 import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
@@ -24,9 +24,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
-  // 工单 C：AI 昂贵端点按用户限流（10/分钟）
-  const rl = consumeRateLimit(`ai:${user.id}:draw`, AI_LIMIT_PER_MIN, 60_000);
-  if (!rl.ok) return rateLimit429(rl.retryAfterSec);
+  // 工单 C：AI 昂贵端点按用户限流（阈值 RATE_LIMIT_AI_PER_MIN，默认 30/分钟）
+  const limited = enforceAiLimit(user.id, "draw");
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as {
     model?: unknown;

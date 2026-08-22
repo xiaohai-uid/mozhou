@@ -238,13 +238,9 @@ export function ChapterEditorView() {
         }),
       });
       if (res.status === 409) {
-        // 乐观并发冲突：另一窗口已修改。保留本地文本，显式报错要求人工核对（不静默覆盖）。
-        const conflict = (await res.json().catch(() => null)) as {
-          chapter?: { revision?: number };
-        } | null;
-        if (typeof conflict?.chapter?.revision === "number") {
-          lastSavedRevisionRef.current = conflict.chapter.revision;
-        }
+        // 乐观并发冲突：另一窗口已修改。保留本地文本 + 保留过期 revision，
+        // 后续保存持续 409，逼出「刷新对账」的人工路径（契约§24：禁止静默覆盖——
+        // 若在此采纳服务器 revision，下一次保存即通过 CAS 覆盖对方文本）。
         if (!opts?.background) {
           setSaveState("failed");
           setErrorMsg("正文已在其他窗口被修改——本地内容已保留，请刷新页面对比后再保存");
