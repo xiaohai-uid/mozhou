@@ -411,3 +411,20 @@ interface StyleGuide {
 // 客户端义务：编辑器每次保存正文必须携带上次确认的 revision（GET/PATCH/insert 响应均含）；
 // 收到 409 时保留本地文本、显式报错，由用户刷新对账，禁止静默覆盖。
 ```
+
+## 25. 应用内限流与健康探测（2026-08-22，商用阻断项 C/D）
+
+```typescript
+// GET /api/v1/health —— 公开探测（无鉴权，无业务数据）
+// 200 { ok: true, db: "up", uptimeSec }   实例存活且 db 可达
+// 503 { ok: true, db: "down", uptimeSec } 实例存活但 db 不可达（编排层摘流/重启依据）
+//
+// 限流（固定窗口，单实例内存；多实例需共享存储）——超限统一：
+// 429 { error: "操作过于频繁，请稍后再试" } + Retry-After: <秒>
+//   登录 POST /api/v1/auth/login      键=邮箱+来源IP，RATE_LIMIT_LOGIN_PER_MIN 默认 10/分钟
+//                                     （密码校验前计数，失败尝试同样计入）
+//   AI 昂贵端点按用户                  RATE_LIMIT_AI_PER_MIN 默认 30/分钟：
+//     POST /api/v1/chat、POST /api/v1/novels/[id]/chapters/chat、
+//     POST /api/v1/distill、POST /api/v1/draw、POST /api/v1/websearch、
+//     POST /api/v1/deconstruct/analyze
+```

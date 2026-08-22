@@ -81,6 +81,12 @@ curl -fsS http://127.0.0.1:3000/ >/dev/null
 - 书源 HTML 规则解析器（当前简化 title 提取）
 - sync 文件级同步执行（当前仅配置保存）
 
+## 可观测性挂载点（2026-08-22 明确）
+
+- **存活/就绪**：`/api/v1/health` 即挂载点——compose healthcheck、负载均衡、uptime 监控（UptimeRobot 等）统一打这里；503 = db 不可达。
+- **错误追踪**：当前无外部 APM。接入 Sentry 类服务时挂在 Next 的 `instrumentation.ts` / `global-error.tsx` 两处（路由级错误已有可读文案 + 审计轨迹，见 `lib/chat/user-facing-error.ts`），无需改业务代码。
+- **日志**：容器 stdout（`docker logs`）即日志面；结构化改造留待接入 APM 时一并做。
+
 ## 数据备份（自托管 compose 栈）
 
 Postgres 数据卷（`db-data`）是唯一持久状态；应用容器无状态，可随时重建。

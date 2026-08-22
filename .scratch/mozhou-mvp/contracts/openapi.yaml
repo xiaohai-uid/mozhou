@@ -50,6 +50,9 @@
         "summary": "登录",
         "operationId": "authLogin",
         "responses": {
+          "429": {
+            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+          },
           "200": {
             "description": "OK"
           }
@@ -189,6 +192,9 @@
         "summary": "流式写作对话（SSE）",
         "operationId": "chatSend",
         "responses": {
+          "429": {
+            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+          },
           "200": {
             "description": "SSE stream (text/event-stream)"
           }
@@ -565,6 +571,9 @@
         "summary": "风格蒸馏",
         "operationId": "distill",
         "responses": {
+          "429": {
+            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -620,6 +629,9 @@
         "summary": "小说拆解",
         "operationId": "deconstruct",
         "responses": {
+          "429": {
+            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -684,6 +696,9 @@
         "summary": "抽卡（单模型候选）",
         "operationId": "draw",
         "responses": {
+          "429": {
+            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -1037,6 +1052,9 @@
         "summary": "联网搜索",
         "operationId": "websearch",
         "responses": {
+          "429": {
+            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -1172,6 +1190,22 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "存活 + 数据库可达性探测（公开，无业务数据）",
+        "operationId": "healthProbe",
+        "responses": {
+          "200": {
+            "description": "实例存活且 db 可达：{ ok: true, db: 'up', uptimeSec }",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "503": {
+            "description": "实例存活但 db 不可达：{ ok: true, db: 'down', uptimeSec }——编排层据此摘流/重启",
+            "content": { "application/json": { "schema": { "type": "object" } } }
           }
         }
       }
