@@ -102,3 +102,19 @@ gunzip -c /var/backups/mozhou-2026-08-21.sql.gz | docker exec -i $(docker ps -qf
 ### 用户侧导出
 
 作品级导出（含正文/审查记录）走产品内导出功能；整库备份是运营者责任，两者互补。
+
+## 实机演练记录（2026-08-22，商用就绪轮）
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| 生产构建（next build） | ✅ | 本地 `npm run build` 通过（CI 亦会跑） |
+| 容器化启动 + env 契约 | ✅ | `mozhou-web:nextstart-debug2` 容器注入 DATABASE_URL/AUTH_SECRET/ONEAPI_* 后正常启动 |
+| 跨边界 DB 连接 + 迁移 | ✅ | 独立 drill 库 `drizzle-kit migrate` 31 表；容器内注册 201 / 登录 200 |
+| 健康探测 | ✅（代码层） | `/api/v1/health` 契约测试通过；演练镜像早于该端点故 404，属预期 |
+| 真实 LLM 冒烟 | ⛔ BLOCKED（网关层） | `smoke:real-llm`：app→one-api 链路正确（鉴权/路由/审计上抛均正常），one-api 返回「default 分组下 glm-4.5-flash 无可用渠道」。**修复：在 one-api 后台为 glm-4.5-flash / deepseek-v4-flash 配置可用渠道后重跑 `npm run smoke:real-llm`** |
+| 当前代码镜像重建 | ⛔ BLOCKED（本机网络） | `docker compose build` 的容器内 `npm ci` 无法走宿主代理（host.docker.internal→192.168.1.191 拒连）。**修复：Docker Desktop 设置代理或在 Dockerfile 用镜像源 BASE_IMAGE 后重跑** |
+
+> 演练方法（可复跑）：`docker exec mozhou-postgres-local psql -U mozhou -c 'CREATE DATABASE mozhou_drill'` →
+> `set DATABASE_URL=...mozhou_drill&& npx drizzle-kit migrate`（注意：env 必须在 cmd.exe 内部传递）→
+> `docker run -d -p 3101:8080 -e DATABASE_URL=... -e AUTH_SECRET=... mozhou-web:nextstart-debug2` →
+> curl register/login 回环。
