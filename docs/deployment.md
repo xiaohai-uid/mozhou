@@ -73,10 +73,32 @@ curl -fsS http://127.0.0.1:3000/ >/dev/null
 | sync 密码加密存储 | ⚠️ 当前明文（schema 已标注）；上线前应改加密列 |
 | HTTPS / 反向代理（Caddy/Nginx） | ⚠️ 部署环境配置 |
 | CSP / security headers | ⚠️ next.config 可加 `headers()`（见 Next 文档） |
-| API 频率限制（chat 防滥用） | ⚠️ 当前仅抽卡配额；上线前建议加 rate limit |
+| API 频率限制（AI 昂贵端点 + 登录防爆破） | ✅ 固定窗口内存限流（lib/http/rate-limit.ts；多实例部署需换共享存储） |
 
 ## 遗留（不影响上线，V1.1 切片）
 - 会员支付（收款渠道）
 - projects 审查记录 / 导出备份
 - 书源 HTML 规则解析器（当前简化 title 提取）
 - sync 文件级同步执行（当前仅配置保存）
+
+## 数据备份（自托管 compose 栈）
+
+Postgres 数据卷（`db-data`）是唯一持久状态；应用容器无状态，可随时重建。
+
+### 每日备份（宿主机 cron）
+
+```bash
+# crontab -e，每天 04:00 备份，保留 14 天
+0 4 * * * docker exec $(docker ps -qf name=mozhou-db) pg_dump -U mozhou mozhou | gzip > /var/backups/mozhou-$(date +\%F).sql.gz && find /var/backups -name 'mozhou-*.sql.gz' -mtime +14 -delete
+```
+
+### 恢复演练（上线前必须实测一次）
+
+```bash
+gunzip -c /var/backups/mozhou-2026-08-21.sql.gz | docker exec -i $(docker ps -qf name=mozhou-db) psql -U mozhou mozhou
+# 验证：登录一个既有账号，确认作品列表完整
+```
+
+### 用户侧导出
+
+作品级导出（含正文/审查记录）走产品内导出功能；整库备份是运营者责任，两者互补。

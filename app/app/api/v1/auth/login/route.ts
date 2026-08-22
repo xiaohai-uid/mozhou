@@ -7,6 +7,7 @@ import { users } from "@/lib/schema";
 import { parseCredentials } from "@/lib/auth/validation";
 import { verifyPassword } from "@/lib/auth/password";
 import { signSession, setSessionCookie } from "@/lib/auth/session";
+import { consumeRateLimit, rateLimit429 } from "@/lib/http/rate-limit";
 
 // 用户不存在时也对假哈希做一次 compare，抹平「邮箱未注册」的响应时差
 const DUMMY_HASH =
@@ -25,6 +26,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
   const { email, password } = parsed.data;
+
+  // 工单 C：登录防爆破。键 = 邮箱+来源 IP，10 次/分钟，失败尝试同样计数
+  // （计数在密码校验前消耗）。多实例部署需共享存储，见 lib/http/rate-limit.ts。
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
+  const rl = consumeRateLimit(`login:${email.toLowerCase()}|${ip}`, 10, 60_000);
+  if (!rl.ok) return rateLimit429(rl.retryAfterSec);
 
   const [user] = await db.select().from(users).where(eq(users.email, email));
   // 统一文案 + 恒定时间：不暴露「邮箱未注册」还是「密码错误」

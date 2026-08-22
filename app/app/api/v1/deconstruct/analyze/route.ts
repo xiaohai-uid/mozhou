@@ -23,6 +23,7 @@ import {
 import { recordAttemptUsage } from "@/lib/tasks/usage-ledger";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { consumeRateLimit, rateLimit429 } from "@/lib/http/rate-limit";
 import { createUnifiedCompletionProvider, type UnifiedCompletionProvider } from "@/lib/ai/provider";
 import { ProviderBoundaryError } from "@/lib/ai/provider-boundary";
 import { recordUsage } from "@/lib/account/service";
@@ -244,7 +245,12 @@ const PROMPT = `你是资深网络小说编辑。你要执行 oh-story 的结构
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+  // 工单 C：AI 昂贵端点按用户限流（10/分钟）
+  const rl = consumeRateLimit(`ai:${user.id}:deconstruct`, 10, 60_000);
+  if (!rl.ok) return rateLimit429(rl.retryAfterSec);
   const requestDeadline = deconstructionRequestDeadline();
 
   const body = (await request.json().catch(() => null)) as {

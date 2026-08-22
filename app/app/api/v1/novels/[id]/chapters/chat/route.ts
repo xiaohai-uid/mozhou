@@ -3,6 +3,7 @@
 // 停止：客户端断开 SSE（request.signal abort）→ AI 消息标记 stopped（保留已生成部分）。
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { consumeRateLimit, rateLimit429 } from "@/lib/http/rate-limit";
 import { DEFAULT_MODEL, isChatModel } from "@/lib/chat/models";
 import { resolveOwnedChapter } from "@/lib/novels/ownership";
 import {
@@ -22,6 +23,9 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
+  // 工单 C：AI 昂贵端点按用户限流（30/分钟）
+  const rl = consumeRateLimit(`ai:${user.id}:chapter-chat`, 30, 60_000);
+  if (!rl.ok) return rateLimit429(rl.retryAfterSec);
   const { id } = await params;
   const url = new URL(request.url);
   const chapterId = Number(url.searchParams.get("chapterId"));
