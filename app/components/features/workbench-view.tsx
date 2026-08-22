@@ -89,6 +89,15 @@ interface ChatMsg {
 type MobileTab = "write" | "chapters" | "story" | "tools";
 type WorkbenchLoadState = "loading" | "ready" | "error";
 
+/** 风格库条目（GET /api/v1/styles 列表项；chat 只持 id+name，四维指南由服务端按 styleId 注入） */
+type StyleOption = { id: number; name: string };
+
+/** 胶囊按钮形态：选中=accent 填充，未选=描边（风格/技能胶囊共用此视觉） */
+const capsuleClass = (active: boolean) =>
+  `rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+    active ? "bg-accent/15 text-accent" : "border border-surface-2 text-faint hover:text-zinc-300"
+  }`;
+
 const SKILL_FALLBACK_NAMES: Record<string, string> = {
   story_grounding: "故事状态",
   chapter_planning: "章节规划",
@@ -212,7 +221,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [mySkillNames, setMySkillNames] = useState<string[]>([]);
   // R4 残留补全：风格单选胶囊——同时只生效一个；「无」= null（服务端不注入）
   const [styleId, setStyleId] = useState<number | null>(null);
-  const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
+  const [styleLibrary, setStyleLibrary] = useState<StyleOption[]>([]);
   const [evidence, setEvidence] = useState<EvidenceView | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("write");
@@ -264,7 +273,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       .catch(() => {});
     fetch("/api/v1/styles")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { styles?: Array<{ id: number; name: string }> } | null) => {
+      .then((data: { styles?: StyleOption[] } | null) => {
         if (data?.styles) setStyleLibrary(data.styles);
       })
       .catch(() => {});
@@ -720,11 +729,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                     disabled={streaming}
                     aria-pressed={styleId === null}
                     title="不使用写作风格"
-                    className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
-                      styleId === null
-                        ? "bg-accent/15 text-accent"
-                        : "border border-surface-2 text-faint hover:text-zinc-300"
-                    }`}
+                    className={capsuleClass(styleId === null)}
                   >
                     无
                   </button>
@@ -736,11 +741,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                       disabled={streaming}
                       aria-pressed={styleId === s.id}
                       title={`应用「${s.name}」文风（单选）`}
-                      className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
-                        styleId === s.id
-                          ? "bg-accent/15 text-accent"
-                          : "border border-surface-2 text-faint hover:text-zinc-300"
-                      }`}
+                      className={capsuleClass(styleId === s.id)}
                     >
                       {s.name}
                     </button>

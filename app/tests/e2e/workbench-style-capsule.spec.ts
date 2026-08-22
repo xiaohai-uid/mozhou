@@ -107,8 +107,11 @@ test("workbench style capsule defaults to 无 and carries selected styleId on ch
   await expect.poll(() => chatBodies.length).toBeGreaterThanOrEqual(2);
   expect(chatBodies[chatBodies.length - 1]).toMatchObject({ novelId: novel.id, styleId });
 
-  // 点回「无」：恢复不注入
+  // 点回「无」：选中态翻转 + 请求体恢复不注入（wire 行为回归保护）
   await noneButton.click();
   await expect(noneButton).toHaveAttribute("aria-pressed", "true");
   await expect(styleButton).toHaveAttribute("aria-pressed", "false");
+  await sendAndWaitSettled(page, "最后回到无风格再写一段");
+  await expect.poll(() => chatBodies.length).toBeGreaterThanOrEqual(3);
+  expect(chatBodies[chatBodies.length - 1]).toMatchObject({ novelId: novel.id, styleId: null });
 });
