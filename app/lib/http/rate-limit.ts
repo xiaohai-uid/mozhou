@@ -42,8 +42,17 @@ export function resetRateLimitsForTest(): void {
   buckets.clear();
 }
 
+/** AI 限流业务域（字面量联合：防 typo 静默分裂计数桶） */
+export type AiScope =
+  | "chat"
+  | "chapter-chat"
+  | "distill"
+  | "draw"
+  | "websearch"
+  | "deconstruct";
+
 /** AI 昂贵端点统一限流入口：按用户+业务域计数；超限返回 429 响应，否则 null */
-export function enforceAiLimit(userId: number, scope: string): NextResponse | null {
+export function enforceAiLimit(userId: number, scope: AiScope): NextResponse | null {
   const rl = consumeRateLimit(`ai:${userId}:${scope}`, AI_LIMIT_PER_MIN, 60_000);
   return rl.ok ? null : rateLimit429(rl.retryAfterSec);
 }

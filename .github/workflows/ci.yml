@@ -5,6 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  DATABASE_URL: postgres://mozhou:mozhou_dev@localhost:5433/mozhou
+  AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+  CHAT_PROVIDER: mock
+  DISTILL_PROVIDER: mock
+  DECONSTRUCT_PROVIDER: mock
+  DRAW_PROVIDER: mock
+  SOURCE_PROVIDER: mock
+  WEBSEARCH_PROVIDER: mock
+  RANKINGS_PROVIDER: mock
+  SYNC_PROVIDER: mock
+  FANQIE_SEARCH_MOCK: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+
 jobs:
   gate:
     name: typecheck / lint / unit+http / build
@@ -26,19 +40,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
-    env:
-      DATABASE_URL: postgres://mozhou:mozhou_dev@localhost:5433/mozhou
-      AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
-      CHAT_PROVIDER: mock
-      DISTILL_PROVIDER: mock
-      DECONSTRUCT_PROVIDER: mock
-      DRAW_PROVIDER: mock
-      SOURCE_PROVIDER: mock
-      WEBSEARCH_PROVIDER: mock
-      RANKINGS_PROVIDER: mock
-      FANQIE_SEARCH_MOCK: "1"
-      SYNC_PROVIDER: mock
-      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -74,19 +75,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
-    env:
-      DATABASE_URL: postgres://mozhou:mozhou_dev@localhost:5433/mozhou
-      AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
-      CHAT_PROVIDER: mock
-      DISTILL_PROVIDER: mock
-      DECONSTRUCT_PROVIDER: mock
-      DRAW_PROVIDER: mock
-      SOURCE_PROVIDER: mock
-      WEBSEARCH_PROVIDER: mock
-      RANKINGS_PROVIDER: mock
-      FANQIE_SEARCH_MOCK: "1"
-      SYNC_PROVIDER: mock
-      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

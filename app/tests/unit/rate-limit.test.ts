@@ -2,6 +2,33 @@
 import { describe, it, expect } from "vitest";
 import { consumeRateLimit, resetRateLimitsForTest } from "@/lib/http/rate-limit";
 
+describe("enforceAiLimit 路由助手", () => {
+  it("未超限返回 null（放行）", async () => {
+    resetRateLimitsForTest();
+    const { enforceAiLimit } = await import("@/lib/http/rate-limit");
+    expect(enforceAiLimit(1, "chat")).toBeNull();
+  });
+
+  it("超限返回 429 响应，带 Retry-After 头", async () => {
+    resetRateLimitsForTest();
+    const { enforceAiLimit, AI_LIMIT_PER_MIN } = await import("@/lib/http/rate-limit");
+    let last: Response | null = null;
+    for (let i = 0; i <= AI_LIMIT_PER_MIN; i++) {
+      last = enforceAiLimit(2, "distill");
+    }
+    expect(last).not.toBeNull();
+    expect(last!.status).toBe(429);
+    expect(Number(last!.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("scope 参与键隔离：同用户不同业务域互不影响", async () => {
+    resetRateLimitsForTest();
+    const { enforceAiLimit } = await import("@/lib/http/rate-limit");
+    expect(enforceAiLimit(3, "draw")).toBeNull();
+    expect(enforceAiLimit(3, "websearch")).toBeNull();
+  });
+});
+
 describe("consumeRateLimit 固定窗口限流", () => {
   it("窗口内达到上限前全部放行", () => {
     resetRateLimitsForTest();

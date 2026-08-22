@@ -51,7 +51,7 @@
         "operationId": "authLogin",
         "responses": {
           "429": {
-            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+            "$ref": "#/components/responses/RateLimited"
           },
           "200": {
             "description": "OK"
@@ -193,7 +193,7 @@
         "operationId": "chatSend",
         "responses": {
           "429": {
-            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+            "$ref": "#/components/responses/RateLimited"
           },
           "200": {
             "description": "SSE stream (text/event-stream)"
@@ -505,6 +505,43 @@
         }
       }
     },
+    "/api/v1/novels/{id}/chapters/chat": {
+      "post": {
+        "summary": "章节对话（SSE 流式续写/问答，按用户限流）",
+        "operationId": "chapterChat",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "chapterId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE 事件流（start/phase/delta/error/done 事件序）",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          },
+          "400": {
+            "description": "参数缺失/非法",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "404": {
+            "description": "章节不存在或不归属当前用户",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/api/v1/novels/{id}/entries": {
       "post": {
         "summary": "新增人物/世界观条目",
@@ -572,7 +609,7 @@
         "operationId": "distill",
         "responses": {
           "429": {
-            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+            "$ref": "#/components/responses/RateLimited"
           },
           "200": {
             "description": "OK",
@@ -630,7 +667,7 @@
         "operationId": "deconstruct",
         "responses": {
           "429": {
-            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+            "$ref": "#/components/responses/RateLimited"
           },
           "200": {
             "description": "OK",
@@ -697,7 +734,7 @@
         "operationId": "draw",
         "responses": {
           "429": {
-            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+            "$ref": "#/components/responses/RateLimited"
           },
           "200": {
             "description": "OK",
@@ -1053,7 +1090,7 @@
         "operationId": "websearch",
         "responses": {
           "429": {
-            "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25"
+            "$ref": "#/components/responses/RateLimited"
           },
           "200": {
             "description": "OK",
@@ -1212,6 +1249,12 @@
     }
   },
   "components": {
+    "responses": {
+      "RateLimited": {
+        "description": "Too Many Requests：触发限流；Retry-After 头为建议等待秒数。桶与阈值见 api-contract.md §25",
+        "content": { "application/json": { "schema": { "type": "object" } } }
+      }
+    },
     "schemas": {
       "Session": {
         "type": "object",

@@ -423,8 +423,10 @@ interface StyleGuide {
 // 429 { error: "操作过于频繁，请稍后再试" } + Retry-After: <秒>
 //   登录 POST /api/v1/auth/login      键=邮箱+来源IP，RATE_LIMIT_LOGIN_PER_MIN 默认 10/分钟
 //                                     （密码校验前计数，失败尝试同样计入）
-//   AI 昂贵端点按用户                  RATE_LIMIT_AI_PER_MIN 默认 30/分钟：
+//   AI 昂贵端点按「用户+业务域」计数（每端点独立 30/分钟桶，互不共享）：
+//                                     RATE_LIMIT_AI_PER_MIN 默认 30/分钟：
 //     POST /api/v1/chat、POST /api/v1/novels/[id]/chapters/chat、
 //     POST /api/v1/distill、POST /api/v1/draw、POST /api/v1/websearch、
 //     POST /api/v1/deconstruct/analyze
+// （六端点均已入 openapi，含 429 $ref；阈值经 RATE_LIMIT_AI_PER_MIN 环境可调）
 ```
