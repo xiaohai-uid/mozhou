@@ -210,6 +210,9 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   // 选项乙（2026-08-22）：技能胶囊——开关型内置技能 + 我的技能，随请求送入 skills[]（正式链真实生效）
   const [activeSkills, setActiveSkills] = useState<string[]>([]);
   const [mySkillNames, setMySkillNames] = useState<string[]>([]);
+  // R4 残留补全：风格单选胶囊——同时只生效一个；「无」= null（服务端不注入）
+  const [styleId, setStyleId] = useState<number | null>(null);
+  const [styleLibrary, setStyleLibrary] = useState<Array<{ id: number; name: string }>>([]);
   const [evidence, setEvidence] = useState<EvidenceView | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("write");
@@ -257,6 +260,12 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { skills?: Array<{ name: string }> } | null) => {
         if (data?.skills) setMySkillNames(data.skills.map((s) => s.name));
+      })
+      .catch(() => {});
+    fetch("/api/v1/styles")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { styles?: Array<{ id: number; name: string }> } | null) => {
+        if (data?.styles) setStyleLibrary(data.styles);
       })
       .catch(() => {});
     fetch("/api/v1/sessions")
@@ -381,7 +390,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model: "glm-4.5-flash", content, novelId: activeNovelId, skills: activeSkills }),
+        body: JSON.stringify({ sessionId, model: "glm-4.5-flash", content, novelId: activeNovelId, skills: activeSkills, styleId }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -701,6 +710,44 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                     onStop={stopGeneration}
                     compact
                   />
+                </div>
+                {/* 风格胶囊行：单选（R4）——「无」为显式选项，风格同时只生效一个 */}
+                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] text-faint">风格</span>
+                  <button
+                    type="button"
+                    onClick={() => setStyleId(null)}
+                    disabled={streaming}
+                    aria-pressed={styleId === null}
+                    title="不使用写作风格"
+                    className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                      styleId === null
+                        ? "bg-accent/15 text-accent"
+                        : "border border-surface-2 text-faint hover:text-zinc-300"
+                    }`}
+                  >
+                    无
+                  </button>
+                  {styleLibrary.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setStyleId(s.id)}
+                      disabled={streaming}
+                      aria-pressed={styleId === s.id}
+                      title={`应用「${s.name}」文风（单选）`}
+                      className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                        styleId === s.id
+                          ? "bg-accent/15 text-accent"
+                          : "border border-surface-2 text-faint hover:text-zinc-300"
+                      }`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                  {styleLibrary.length === 0 && (
+                    <span className="text-[10px] text-faint">（蒸馏页保存后出现）</span>
+                  )}
                 </div>
                 {/* 技能胶囊行：开关型内置技能 + 我的技能（多选；默认全选内置，关闭后不注入本次生成） */}
                 {(builtinSkills.some((s) => s.toggleable && s.connected) || mySkillNames.length > 0) && (
