@@ -92,7 +92,7 @@ type WorkbenchLoadState = "loading" | "ready" | "error";
 /** 风格库条目（GET /api/v1/styles 列表项；chat 只持 id+name，四维指南由服务端按 styleId 注入） */
 type StyleOption = { id: number; name: string };
 
-/** 胶囊按钮形态：选中=accent 填充，未选=描边（风格/技能胶囊共用此视觉） */
+/** 胶囊按钮形态：选中=accent 填充，未选=描边（当前仅风格胶囊使用；技能胶囊收编时替换其内联写法） */
 const capsuleClass = (active: boolean) =>
   `rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
     active ? "bg-accent/15 text-accent" : "border border-surface-2 text-faint hover:text-zinc-300"
