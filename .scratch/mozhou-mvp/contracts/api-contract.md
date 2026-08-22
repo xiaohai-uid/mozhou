@@ -428,5 +428,16 @@ interface StyleGuide {
 //     POST /api/v1/chat、POST /api/v1/novels/[id]/chapters/chat、
 //     POST /api/v1/distill、POST /api/v1/draw、POST /api/v1/websearch、
 //     POST /api/v1/deconstruct/analyze
-// （六端点均已入 openapi，含 429 $ref；阈值经 RATE_LIMIT_AI_PER_MIN 环境可调）
+//     POST /api/v1/deconstruct/analyze
+//   （六端点均已入 openapi，含 429 $ref；阈值经 RATE_LIMIT_AI_PER_MIN 环境可调）
+//   任务重试 POST /api/v1/runtime/jobs/[jobId]/retry
+//                                     键=用户，RATE_LIMIT_JOB_RETRY_PER_MIN 默认 6/分钟
+//                                     （鉴权后、归属检查前消耗，DELTA-002）
+//   WebDAV 推送 POST /api/v1/sync/push 键=用户，RATE_LIMIT_SYNC_PUSH_PER_MIN 默认 6/分钟
+//   扫榜 POST /api/v1/rankings/scan    全局 60s 冷却（路由内置，非通用限流器）
 ```
+
+## 历史
+
+- DELTA-001：PATCH 正文乐观并发（expectedRevision + 409 ContentChanged）
+- DELTA-002（2026-08-22）：任务重试与 WebDAV 推送限流；同日完成全量契约回填（openapi 23→53 paths，覆盖全部已实现路由）

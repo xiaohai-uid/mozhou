@@ -1202,6 +1202,716 @@
         }
       }
     },
+    "/api/v1/styles": {
+      "get": {
+        "summary": "获取我的风格库列表",
+        "operationId": "listStyles",
+        "responses": {
+          "200": {
+            "description": "当前用户全部风格（新→旧，无分页）"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      },
+      "post": {
+        "summary": "保存风格指南",
+        "operationId": "createStyle",
+        "responses": {
+          "201": {
+            "description": "新建行摘要 {style:{id,name}}"
+          },
+          "400": {
+            "description": "name 为空或 guide 非四维对象"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      },
+      "delete": {
+        "summary": "删除我的风格",
+        "operationId": "deleteStyle",
+        "parameters": [
+          {"name": "id", "in": "query", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{ok:true}"
+          },
+          "400": {
+            "description": "缺少风格 id"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "风格不存在或不归属当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/sync/push": {
+      "post": {
+        "summary": "推送章节到 WebDAV 备份",
+        "operationId": "pushSyncToWebdav",
+        "responses": {
+          "200": {
+            "description": "{pushed:number, at:ISO8601}；SYNC_PROVIDER=mock 时确定性成功"
+          },
+          "400": {
+            "description": "业务失败（未配置/解密失败/MKCOL|PUT 失败，错误已脱敏）"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/story/capabilities": {
+      "get": {
+        "summary": "获取 oh-story 能力清单",
+        "operationId": "getStoryCapabilities",
+        "responses": {
+          "200": {
+            "description": "静态能力注册表快照"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/v1/story/cover": {
+      "post": {
+        "summary": "封面生成能力边界",
+        "operationId": "postStoryCover",
+        "responses": {
+          "503": {
+            "description": "Provider 未配置明确拒绝 {error, code:'CONFIGURATION_REQUIRED', capability:'story-cover'}"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/v1/deconstruct/runs": {
+      "get": {
+        "summary": "列出可恢复拆解运行记录",
+        "operationId": "listDeconstructionRuns",
+        "responses": {
+          "200": {
+            "description": "{runs:[…]} 按 updatedAt 倒序最多 50 条；源文只存哈希与长度"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/v1/deconstruct/runs/{runId}/reference": {
+      "get": {
+        "summary": "获取拆解运行写作参考",
+        "operationId": "getDeconstructRunReference",
+        "parameters": [
+          {"name": "runId", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "completed 运行的下游写作消费投影"
+          },
+          "400": {
+            "description": "运行记录无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "运行不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "拆解尚未完成"
+          }
+        }
+      }
+    },
+    "/api/v1/books/{bookId}/export": {
+      "get": {
+        "summary": "导出作品规范JSON附件",
+        "operationId": "exportBook",
+        "parameters": [
+          {"name": "bookId", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "format", "in": "query", "required": true, "schema": { "type": "string（仅 json）" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "application/json attachment：{schemaVersion:'mozhou.novel.export.v1', novel, chapters[], characters[], worldviews[]}"
+          },
+          "400": {
+            "description": "format≠json 或编号无效"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品不存在或不属于当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/market/briefing": {
+      "get": {
+        "summary": "获取近7天市场风向简报",
+        "operationId": "getMarketBriefing",
+        "responses": {
+          "200": {
+            "description": "{summary:MarketSummary, rendered:string}"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "无快照数据 code:'NO_DATA'"
+          }
+        }
+      }
+    },
+    "/api/v1/market/briefings": {
+      "post": {
+        "summary": "生成版本化市场简报产物",
+        "operationId": "createMarketBriefing",
+        "responses": {
+          "201": {
+            "description": "{briefing:{artifactId, version}}"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "暂无市场数据"
+          }
+        }
+      }
+    },
+    "/api/v1/market/briefings/{briefingId}/bind": {
+      "post": {
+        "summary": "绑定市场简报到作品",
+        "operationId": "bindMarketBriefingToNovel",
+        "parameters": [
+          {"name": "briefingId", "in": "path", "required": true, "schema": { "type": "string" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{ok:true}"
+          },
+          "400": {
+            "description": "缺少 novelId"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品或简报不存在"
+          }
+        }
+      }
+    },
+    "/api/v1/market/titles": {
+      "post": {
+        "summary": "规则生成候选书名",
+        "operationId": "generateMarketTitleCandidates",
+        "responses": {
+          "200": {
+            "description": "{genre, references[≤10], candidates[≤10]}（词缀模板，二期接 LLM）"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/bootstrap": {
+      "post": {
+        "summary": "快速开始：原子建作品+首章+工作流",
+        "operationId": "bootstrapNovel",
+        "responses": {
+          "201": {
+            "description": "同事务创建 {novel, chapter(revision:0), workflow(state:'ready'), created:true}"
+          },
+          "200": {
+            "description": "幂等重放 created:false"
+          },
+          "400": {
+            "description": "书名/requestKey 校验失败"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "500": {
+            "description": "事务异常"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/import": {
+      "post": {
+        "summary": "导入正文，原子建作品与首章",
+        "operationId": "importNovel",
+        "responses": {
+          "201": {
+            "description": "{novel, chapter(revision:1), workflow(state:'active'), created:true}"
+          },
+          "200": {
+            "description": "幂等重放 created:false"
+          },
+          "400": {
+            "description": "校验失败"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "413": {
+            "description": "正文超 200000 字符"
+          },
+          "500": {
+            "description": "事务异常"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/start-writing": {
+      "post": {
+        "summary": "历史空作品恢复首写入口",
+        "operationId": "startNovelWriting",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "补齐缺失行（幂等，created 恒 false）"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品不存在或不属于当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/tracking": {
+      "get": {
+        "summary": "获取storyrepo作品追踪快照",
+        "operationId": "getNovelTracking",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{tracking, records, reviews, runs}；首次访问惰性建空行"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品不存在或不属于当前用户"
+          }
+        }
+      },
+      "post": {
+        "summary": "章节结算：机检+合并追踪状态",
+        "operationId": "settleChapterTracking",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "机检通过：乐观并发合并 stateRevision+1"
+          },
+          "422": {
+            "description": "机检未过：rejected 并落审查记录，不改状态"
+          },
+          "400": {
+            "description": "参数非法/幂键冲突"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品或章节不存在"
+          },
+          "409": {
+            "description": "expectedStateRevision 不一致（乐观并发冲突）"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/benchmark-packs": {
+      "post": {
+        "summary": "从已完成拆解运行建方法包",
+        "operationId": "createBenchmarkPack",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "201": {
+            "description": "{pack:{artifactId, version:'vN'}}（产物不含原文）"
+          },
+          "400": {
+            "description": "缺少 runId"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品不存在或拆解运行未完成"
+          }
+        }
+      },
+      "get": {
+        "summary": "列出作品绑定方法包",
+        "operationId": "listBenchmarkPacks",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{packs:[脱敏元数据]}"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品不存在"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/briefings": {
+      "get": {
+        "summary": "列出作品绑定的市场简报",
+        "operationId": "listNovelBriefings",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{briefings:[脱敏元数据]}"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "作品不存在"
+          }
+        }
+      }
+    },
+    "/api/v1/rankings/scan": {
+      "post": {
+        "summary": "手动触发全榜扫榜落库",
+        "operationId": "triggerRankingsScan",
+        "responses": {
+          "200": {
+            "description": "{boardsAttempted, boardsFailed, rowsInserted, capturedAt, failures[]}"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "429": {
+            "description": "60 秒全局冷却内重复扫榜 {error, retryAfter:60, lastCapturedAt}"
+          }
+        }
+      }
+    },
+    "/api/v1/rankings/trends": {
+      "get": {
+        "summary": "查询单榜两次快照趋势",
+        "operationId": "getRankingTrends",
+        "parameters": [
+          {"name": "board", "in": "query", "required": false, "schema": { "type": "string, 默认 long-hot" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{board, baseline, current, rows, risers, newEntries, gone, degraded}"
+          },
+          "400": {
+            "description": "未知榜单 code:'UNKNOWN_BOARD'"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "该榜暂无快照"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/jobs": {
+      "get": {
+        "summary": "任务列表",
+        "operationId": "listRuntimeJobs",
+        "parameters": [
+          {"name": "limit", "in": "query", "required": false, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{jobs:[…]} 按 id 倒序，limit 上限 200"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/jobs/{jobId}": {
+      "get": {
+        "summary": "任务详情",
+        "operationId": "getRuntimeJobDetail",
+        "parameters": [
+          {"name": "jobId", "in": "path", "required": true, "schema": { "type": "string" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "job+steps+attempts+events 聚合"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "任务不存在或不属于当前用户（越权统一 404）"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/jobs/{jobId}/cancel": {
+      "post": {
+        "summary": "取消任务",
+        "operationId": "cancelRuntimeJob",
+        "parameters": [
+          {"name": "jobId", "in": "path", "required": true, "schema": { "type": "string" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "queued 直接取消 / running 置 cancelRequested 由 worker 收口"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "任务不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "任务已处于终态"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/jobs/{jobId}/end": {
+      "post": {
+        "summary": "人工结束卡死任务",
+        "operationId": "endRuntimeJob",
+        "parameters": [
+          {"name": "jobId", "in": "path", "required": true, "schema": { "type": "string" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "置 failed(errorClass='manual_ended')"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "任务不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "已终态"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/jobs/{jobId}/events": {
+      "get": {
+        "summary": "事件游标补发（JSON 轮询，非 SSE）",
+        "operationId": "getRuntimeJobEvents",
+        "parameters": [
+          {"name": "jobId", "in": "path", "required": true, "schema": { "type": "string" }},
+          {"name": "afterSeq", "in": "query", "required": false, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "seq > afterSeq 的事件（语义对应 Last-Event-ID 续传）"
+          },
+          "400": {
+            "description": "afterSeq 非法"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "任务不存在或不属于当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/jobs/{jobId}/retry": {
+      "post": {
+        "summary": "重试指定步骤",
+        "operationId": "retryRuntimeJobStep",
+        "parameters": [
+          {"name": "jobId", "in": "path", "required": true, "schema": { "type": "string" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "step 重置 planned、job 回 queued"
+          },
+          "400": {
+            "description": "缺合法 stepId"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "任务不存在或不属于当前用户"
+          },
+          "409": {
+            "description": "该步骤已产生结果或不可重试（不重复扣费底线）"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/generations/{generationId}": {
+      "get": {
+        "summary": "本次创作链路证据",
+        "operationId": "getGenerationEvidence",
+        "parameters": [
+          {"name": "generationId", "in": "path", "required": true, "schema": { "type": "string" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "脱敏证据视图 {evidence:{plan, runs, manifest}}"
+          },
+          "400": {
+            "description": "缺少 generationId"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "生成记录不存在或不属于当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/chapters/messages": {
+      "get": {
+        "summary": "获取章节对话历史（新→旧）",
+        "operationId": "listChapterMessages",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "chapterId", "in": "query", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{messages:[…]} 全量无分页，assistant 附质量门摘要"
+          },
+          "400": {
+            "description": "chapterId 缺失"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "章节不存在或不属于当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/chapters/chat/stop": {
+      "post": {
+        "summary": "请求停止章节生成",
+        "operationId": "stopChapterGeneration",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "chapterId", "in": "query", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{stopped:boolean}；命中时补写 cancelled SSE 事件并按 cancelled 记账"
+          },
+          "400": {
+            "description": "参数非法"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "章节不存在或不属于当前用户"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/chapters/messages/{messageId}/discard": {
+      "post": {
+        "summary": "丢弃AI候选回复（不改正文）",
+        "operationId": "discardChapterMessage",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "messageId", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "chapterId", "in": "query", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "{ok:true, status:'discarded'}"
+          },
+          "400": {
+            "description": "参数缺失"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "候选不存在/不归属/状态不可丢弃"
+          }
+        }
+      }
+    },
+    "/api/v1/novels/{id}/chapters/messages/{messageId}/insert": {
+      "post": {
+        "summary": "确认插入候选到章节正文",
+        "operationId": "insertChapterMessage",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "messageId", "in": "path", "required": true, "schema": { "type": "integer" }},
+          {"name": "chapterId", "in": "query", "required": true, "schema": { "type": "integer" }}
+        ],
+        "responses": {
+          "200": {
+            "description": "事务写入 revision+1，候选置 applied，附质量门覆盖证据"
+          },
+          "400": {
+            "description": "模式/位置/区间等校验失败（position/range 不静默 clamp）"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "章节或候选不存在"
+          },
+          "409": {
+            "description": "J9 两层冲突：{error, code:'ContentChanged'}；确认后带 force:true 重发"
+          }
+        }
+      }
+    },
     "/api/v1/account": {
       "get": {
         "summary": "账户概览（tier+用量）",

@@ -70,7 +70,7 @@ curl -fsS http://127.0.0.1:3000/ >/dev/null
 | `.env` 已 gitignore（密钥不入库） | ✅ |
 | 生产缺 AUTH_SECRET 启动抛错 | ✅ |
 | compose 强制注入 AUTH_SECRET/ONEAPI_TOKEN（`${VAR:?}` 语法） | ✅ |
-| sync 密码加密存储 | ⚠️ 当前明文（schema 已标注）；上线前应改加密列 |
+| sync 密码加密存储 | ✅ AES-256-GCM（lib/sync/credentials.ts，密钥派生自 AUTH_SECRET，v1:iv:tag:ciphertext）；历史明文行解密时报「请重新保存」，重存即迁移（2026-08-22 复核） |
 | HTTPS / 反向代理（Caddy/Nginx） | ⚠️ 部署环境配置 |
 | CSP / security headers | ⚠️ next.config 可加 `headers()`（见 Next 文档） |
 | API 频率限制（AI 昂贵端点 + 登录防爆破） | ✅ 固定窗口内存限流（lib/http/rate-limit.ts；多实例部署需换共享存储） |
