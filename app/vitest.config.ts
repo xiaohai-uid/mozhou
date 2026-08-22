@@ -1,8 +1,12 @@
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// 加载 app/.env（DATABASE_URL / AUTH_SECRET）
-process.loadEnvFile();
+// 加载 app/.env（DATABASE_URL / AUTH_SECRET）；CI 无该文件（值来自 workflow env），容错跳过
+try {
+  process.loadEnvFile();
+} catch {
+  /* .env 不存在时忽略 */
+}
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
