@@ -84,7 +84,8 @@ afterAll(async () => {
 
 describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1）", () => {
   it("绑定作品 + 续写 → story_grounding completed/applied，其余技能如实 skipped", async () => {
-    const events = await postChat({ content: "续写第一章", novelId });
+    // DELTA-004：开关型内置技能需显式选中才注入（本用例覆盖全部五技能链路）
+    const events = await postChat({ content: "续写第一章", novelId, skills: ["章节规划", "读者与题材", "叙事声音"] });
     const done = events.find((e) => e.type === "done")!;
     expect(done.skillRuns).toBeDefined();
     expect(done.skillRuns!.length).toBe(5);
@@ -125,7 +126,7 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
   });
 
   it("讨论请求 → 生成链路技能（章节规划/质量门）因不生成正文而 skipped（可读原因）", async () => {
-    const events = await postChat({ content: "帮我分析一下主角的性格", novelId });
+    const events = await postChat({ content: "帮我分析一下主角的性格", novelId, skills: ["章节规划"] });
     const done = events.find((e) => e.type === "done")!;
     const qg = done.skillRuns!.find((r) => r.skillKey === "quality_gate")!;
     expect(qg.status).toBe("skipped");
@@ -138,7 +139,7 @@ describe("POST /api/v1/chat done 事件携带 SkillRun 证据（契约 Delta 1�
 
 describe("GET /api/v1/runtime/generations/:generationId（证据端点）", () => {
   it("返回 plan + runs + manifest（脱敏：无正文内容）", async () => {
-    const events = await postChat({ content: "续写第一章", novelId });
+    const events = await postChat({ content: "续写第一章", novelId, skills: ["章节规划", "读者与题材", "叙事声音"] });
     const done = events.find((e) => e.type === "done")!;
     const generationId = done.generationId!;
     const res = await fetch(`${BASE}/api/v1/runtime/generations/${generationId}`, {

@@ -386,7 +386,8 @@ describe("chat styleId 注入（工单 15，mock 回显 system 提示）", () =>
     const res = await fetch(`${BASE}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", cookie: me.cookie },
-      body: JSON.stringify({ content: "写一段", styleId: style.id }),
+      // DELTA-004：风格经叙事声音技能注入——选中才生效（开关型内置）
+        body: JSON.stringify({ content: "写一段", styleId: style.id, skills: ["叙事声音"] }),
     });
     expect(res.status).toBe(200);
     const text = await res.text();

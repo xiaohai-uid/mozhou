@@ -140,7 +140,7 @@ describe("Gate 1：第一章生产纵向切片", () => {
     });
   });
 
-  it("discard 不改正文，revision 冲突返回 409", async () => {
+  it("discard 不改正文；候选过期按 expectedContent 冲突语义处理（DELTA-003）", async () => {
     const { novelId, chapterId } = await createFirstChapter("discard-conflict");
     const discardedId = await generateCandidate(novelId, chapterId, "生成后丢弃", `discard-${RUN}`);
     const discard = await fetch(
@@ -162,11 +162,17 @@ describe("Gate 1：第一章生产纵向切片", () => {
       body: JSON.stringify({ content: "用户在候选期间保存的正文" }),
     });
     expect(changed.status).toBe(200);
+    // DELTA-003：基线过期不再拒绝；expectedContent 与服务端当前正文不一致 → 仍 409（不静默覆盖）
+    const staleExpected = await applyCandidate(novelId, chapterId, conflictId, {
+      mode: "original",
+      target: { mode: "insert", expectedContent: "" },
+    });
+    expect(staleExpected.status).toBe(409);
     const conflictApply = await applyCandidate(novelId, chapterId, conflictId, {
       mode: "original",
       target: { mode: "insert" },
     });
-    expect(conflictApply.status).toBe(409);
+    expect(conflictApply.status).toBe(200);
   });
 
   it("同一 Candidate 重复确认只允许第一次改变正文", async () => {
