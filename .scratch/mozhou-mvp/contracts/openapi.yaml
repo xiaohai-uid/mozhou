@@ -921,7 +921,7 @@
         "operationId": "skillList",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "OK（scope=mine 返回 skills[]；scope=plaza 另返回 ohStorySkills[] 与 builtinSkills[]）",
             "content": {
               "application/json": {
                 "schema": {
@@ -929,6 +929,26 @@
                   "properties": {
                     "skills": {
                       "type": "array"
+                    },
+                    "ohStorySkills": {
+                      "type": "array"
+                    },
+                    "builtinSkills": {
+                      "type": "array",
+                      "description": "内置五角色技能定义（DELTA-004：toggleable 标记开关型——进胶囊由用户选择；基础设施型始终注入）",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "name": { "type": "string" },
+                          "role": { "type": "string" },
+                          "trigger": { "type": "string" },
+                          "toggleable": { "type": "boolean" },
+                          "connected": { "type": "boolean" },
+                          "status": { "type": "string" },
+                          "reason": { "type": "string", "nullable": true }
+                        }
+                      }
                     }
                   }
                 }
