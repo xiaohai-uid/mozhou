@@ -36,6 +36,7 @@ import {
   chapterModelPreferenceKey,
   isStoredChapterModel,
 } from "@/lib/novels/chapter-model-preference";
+import { revisionAfterSave } from "@/lib/novels/save-conflict";
 import {
   CHAPTER_EDITOR_ARIA_LABEL,
   CHAPTER_EDITOR_TEST_ID,
@@ -185,8 +186,11 @@ export function ChapterEditorView() {
         if (data?.chapter) {
           bodyHist.reset(data.chapter.content ?? "");
           lastSavedRef.current = data.chapter.content ?? "";
-          lastSavedRevisionRef.current =
-            typeof data.chapter.revision === "number" ? data.chapter.revision : null;
+          lastSavedRevisionRef.current = revisionAfterSave(
+            lastSavedRevisionRef.current,
+            data.chapter.revision,
+            false,
+          );
           setBodyLoaded(true);
         } else {
           setLoadFailed(true);
@@ -238,9 +242,9 @@ export function ChapterEditorView() {
         }),
       });
       if (res.status === 409) {
-        // 乐观并发冲突：另一窗口已修改。保留本地文本 + 保留过期 revision，
-        // 后续保存持续 409，逼出「刷新对账」的人工路径（契约§24：禁止静默覆盖——
-        // 若在此采纳服务器 revision，下一次保存即通过 CAS 覆盖对方文本）。
+        // 乐观并发冲突：另一窗口已修改。经决策点保留过期基准——后续保存持续 409，
+        // 逼出「刷新对账」的人工路径（契约§24：禁止静默覆盖）。
+        lastSavedRevisionRef.current = revisionAfterSave(lastSavedRevisionRef.current, undefined, true);
         if (!opts?.background) {
           setSaveState("failed");
           setErrorMsg("正文已在其他窗口被修改——本地内容已保留，请刷新页面对比后再保存");
@@ -251,9 +255,11 @@ export function ChapterEditorView() {
       const data = (await res.json().catch(() => null)) as {
         chapter?: { revision?: number };
       } | null;
-      if (typeof data?.chapter?.revision === "number") {
-        lastSavedRevisionRef.current = data.chapter.revision;
-      }
+      lastSavedRevisionRef.current = revisionAfterSave(
+        lastSavedRevisionRef.current,
+        data?.chapter?.revision,
+        false,
+      );
       if (!opts?.background) {
         lastSavedRef.current = content;
         setSaveState("saved");
@@ -616,9 +622,11 @@ export function ChapterEditorView() {
         bodyHist.apply(after, { start: caret, end: caret }); // 服务端正文为准（原子一层，一次撤销整体回退）
         targetRef.current = { start: caret, end: caret };
         lastSavedRef.current = after;
-        if (typeof data.chapter.revision === "number") {
-          lastSavedRevisionRef.current = data.chapter.revision;
-        }
+        lastSavedRevisionRef.current = revisionAfterSave(
+          lastSavedRevisionRef.current,
+          data.chapter.revision,
+          false,
+        );
         setSaveState("saved");
         restoreSelection({ start: caret, end: caret });
       }
