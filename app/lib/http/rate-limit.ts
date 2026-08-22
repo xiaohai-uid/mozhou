@@ -2,6 +2,10 @@
 // 多实例部署需换共享存储（Redis 等）——见 docs/deployment.md 备注再动。
 import { NextResponse } from "next/server";
 
+/** 限流阈值（环境变量可调；http 契约测试环境调高 AI 上限，避免套件自我限流） */
+export const AI_LIMIT_PER_MIN = Number(process.env.RATE_LIMIT_AI_PER_MIN ?? 30);
+export const LOGIN_LIMIT_PER_MIN = Number(process.env.RATE_LIMIT_LOGIN_PER_MIN ?? 10);
+
 export interface RateLimitResult {
   ok: boolean;
   retryAfterSec: number;

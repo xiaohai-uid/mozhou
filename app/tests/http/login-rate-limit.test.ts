@@ -4,6 +4,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { like } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/schema";
+import { LOGIN_LIMIT_PER_MIN } from "@/lib/http/rate-limit";
 
 const BASE = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3100";
 const RUN = Date.now().toString(36);
@@ -34,9 +35,9 @@ async function login(password: string) {
 
 describe("POST /api/v1/auth/login 防爆破限流", () => {
   it("同邮箱连续失败达到上限后返回 429 + Retry-After", async () => {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < LOGIN_LIMIT_PER_MIN; i++) {
       const res = await login("wrong-密码");
-      expect(res.status).toBe(401); // 前 10 次仍是常规认证失败
+      expect(res.status).toBe(401); // 达到上限前仍是常规认证失败
     }
     const blocked = await login("wrong-密码");
     expect(blocked.status).toBe(429);

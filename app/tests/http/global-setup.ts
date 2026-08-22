@@ -65,6 +65,7 @@ export default async function setup() {
           RANKINGS_PROVIDER: "mock", // 网文扫榜 mock（任务二-C）
           SYNC_PROVIDER: "mock", // 云同步 mock（任务二-C）
           FANQIE_SEARCH_MOCK: "1", // 番茄搜索强制降级（source.test.ts 确定性，工单 08 收尾）
+          RATE_LIMIT_AI_PER_MIN: "100000", // 契约套件单用户高频调用，不得被 AI 限流截断（登录限流保持真实值并被专项测试）
         },
         stdio: ["ignore", "pipe", "pipe"],
       },
