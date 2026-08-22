@@ -1,6 +1,7 @@
 // POST /api/v1/runtime/jobs/[jobId]/retry — 人工重试指定 step（Q4：仅「未产生结果」的 step；越权统一 404）
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { enforceJobRetryLimit } from "@/lib/http/rate-limit";
 import { getJob, retryStep } from "@/lib/tasks/service";
 
 export async function POST(
@@ -9,6 +10,9 @@ export async function POST(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  // 工单 D 延伸：重试会把任务重新入队再执行（可能产生新的模型调用费用），鉴权后先过限流
+  const limited = enforceJobRetryLimit(user.id);
+  if (limited) return limited;
   const { jobId } = await params;
   const job = await getJob(jobId);
   if (!job || job.userId !== user.id) {

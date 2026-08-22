@@ -51,6 +51,21 @@ export type AiScope =
   | "websearch"
   | "deconstruct";
 
+export const JOB_RETRY_LIMIT_PER_MIN = Number(process.env.RATE_LIMIT_JOB_RETRY_PER_MIN ?? 6);
+export const SYNC_PUSH_LIMIT_PER_MIN = Number(process.env.RATE_LIMIT_SYNC_PUSH_PER_MIN ?? 6);
+
+/** 任务步骤重试限流：重试会把 job 重新入队触发 worker 再执行（可能产生新的模型调用费用） */
+export function enforceJobRetryLimit(userId: number): NextResponse | null {
+  const rl = consumeRateLimit(`jobretry:${userId}`, JOB_RETRY_LIMIT_PER_MIN, 60_000);
+  return rl.ok ? null : rateLimit429(rl.retryAfterSec);
+}
+
+/** WebDAV 推送限流：每次推送对全部作品逐章发起外部请求（最多 3 次重试），保护上游服务 */
+export function enforceSyncPushLimit(userId: number): NextResponse | null {
+  const rl = consumeRateLimit(`syncpush:${userId}`, SYNC_PUSH_LIMIT_PER_MIN, 60_000);
+  return rl.ok ? null : rateLimit429(rl.retryAfterSec);
+}
+
 /** AI 昂贵端点统一限流入口：按用户+业务域计数；超限返回 429 响应，否则 null */
 export function enforceAiLimit(userId: number, scope: AiScope): NextResponse | null {
   const rl = consumeRateLimit(`ai:${userId}:${scope}`, AI_LIMIT_PER_MIN, 60_000);
