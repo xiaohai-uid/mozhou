@@ -59,6 +59,13 @@ services:
       ONEAPI_TOKEN: ${ONEAPI_TOKEN:?生产必须设置 ONEAPI_TOKEN}
     ports:
       - "3000:3000"
+    healthcheck:
+      # /api/v1/health 公开探测端点（含 db ping，503=库不可达）
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
