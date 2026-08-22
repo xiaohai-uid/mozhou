@@ -10,6 +10,7 @@ import {
   isExecutorConnected,
   loadBuiltinSkillDefinitions,
   missingExecutorReason,
+  TOGGLEABLE_BUILTIN_KEYS,
 } from "@/lib/runtime/skill-registry";
 
 export interface SkillRow {
@@ -45,6 +46,8 @@ export async function GET(request: Request) {
         name: d.name,
         role: d.role,
         trigger: d.trigger,
+        // 选项乙（2026-08-22）：开关型内置技能进胶囊由用户选择；基础设施型始终注入
+        toggleable: TOGGLEABLE_BUILTIN_KEYS.has(d.key),
         connected: isExecutorConnected(d.executor),
         status: isExecutorConnected(d.executor) ? "已接入" : "待接入",
         reason: isExecutorConnected(d.executor) ? null : missingExecutorReason(),

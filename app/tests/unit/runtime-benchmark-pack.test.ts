@@ -78,6 +78,7 @@ describe("BenchmarkPack（工单 06）", () => {
       chapterId,
       model: "deepseek-v4-flash",
       content: "续写这一章",
+      skills: ["章节规划"],
       onDelta: () => {},
     });
     const cp = result.skillRuns.find((r) => r.skillKey === "chapter_planning")!;

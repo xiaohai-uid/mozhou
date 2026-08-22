@@ -52,6 +52,7 @@ interface BuiltinSkillInfo {
   name: string;
   role: string;
   trigger: string;
+  toggleable: boolean;
   connected: boolean;
   status: string;
   reason: string | null;
@@ -206,6 +207,9 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
   const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
   const [lastSentContent, setLastSentContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 选项乙（2026-08-22）：技能胶囊——开关型内置技能 + 我的技能，随请求送入 skills[]（正式链真实生效）
+  const [activeSkills, setActiveSkills] = useState<string[]>([]);
+  const [mySkillNames, setMySkillNames] = useState<string[]>([]);
   const [evidence, setEvidence] = useState<EvidenceView | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("write");
@@ -243,8 +247,18 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
     fetch("/api/v1/skills?scope=plaza")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { builtinSkills?: BuiltinSkillInfo[] } | null) => {
-        if (data?.builtinSkills) setBuiltinSkills(data.builtinSkills);
+        if (!data?.builtinSkills) return;
+        setBuiltinSkills(data.builtinSkills);
+        // 选项乙（2026-08-22）：开关型内置技能默认选中（对齐「默认技能按阶段自动调用」），可手动关
+        const names = data.builtinSkills.filter((s) => s.toggleable && s.connected).map((s) => s.name);
+        setActiveSkills((prev) => [...new Set([...prev, ...names])]);
       });
+    fetch("/api/v1/skills?scope=mine")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { skills?: Array<{ name: string }> } | null) => {
+        if (data?.skills) setMySkillNames(data.skills.map((s) => s.name));
+      })
+      .catch(() => {});
     fetch("/api/v1/sessions")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { sessions: SessionRow[] } | null) => {
@@ -367,7 +381,7 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, model: "glm-4.5-flash", content, novelId: activeNovelId }),
+        body: JSON.stringify({ sessionId, model: "glm-4.5-flash", content, novelId: activeNovelId, skills: activeSkills }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -688,6 +702,52 @@ export function WorkbenchView({ userEmail }: { userEmail: string }) {
                     compact
                   />
                 </div>
+                {/* 技能胶囊行：开关型内置技能 + 我的技能（多选；默认全选内置，关闭后不注入本次生成） */}
+                {(builtinSkills.some((s) => s.toggleable && s.connected) || mySkillNames.length > 0) && (
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-faint">技能</span>
+                    {builtinSkills.filter((s) => s.toggleable && s.connected).map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() =>
+                          setActiveSkills((prev) =>
+                            prev.includes(s.name) ? prev.filter((x) => x !== s.name) : [...prev, s.name],
+                          )
+                        }
+                        disabled={streaming}
+                        title="内置技能（可开关，关闭后不注入本次生成）"
+                        className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                          activeSkills.includes(s.name)
+                            ? "bg-accent/15 text-accent"
+                            : "border border-surface-2 text-faint hover:text-zinc-300"
+                        }`}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                    {mySkillNames.map((name) => (
+                      <button
+                        key={"mine:" + name}
+                        type="button"
+                        onClick={() =>
+                          setActiveSkills((prev) =>
+                            prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name],
+                          )
+                        }
+                        disabled={streaming}
+                        title="我的技能（声明契约后注入正式写作链）"
+                        className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
+                          activeSkills.includes(name)
+                            ? "bg-accent/15 text-accent"
+                            : "border border-surface-2 text-faint hover:text-zinc-300"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-end gap-2 rounded-2xl border border-surface-2 bg-zinc-950 p-2 transition focus-within:border-accent">
                   <textarea
                     value={input}

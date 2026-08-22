@@ -63,6 +63,8 @@ describe("章节链路 SkillRun 证据（工单 02）", () => {
       chapterId,
       model: "deepseek-v4-flash",
       content: "续写这一章",
+      // DELTA-004：开关型内置技能需显式选中才注入（本用例覆盖全部五技能链路）
+      skills: ["章节规划", "读者与题材", "叙事声音"],
       onDelta: () => {},
     });
     expect(result.status).toBe("completed_candidate");

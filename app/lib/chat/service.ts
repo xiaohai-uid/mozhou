@@ -19,7 +19,7 @@ import {
   persistGenerationManifest,
 } from "@/lib/runtime/generation-manifest";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
-import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
+import { loadBuiltinSkillDefinitions, selectBuiltinDefinitions } from "@/lib/runtime/skill-registry";
 import { loadCustomSkillDefinitions } from "@/lib/runtime/custom-skills";
 import type { SkillRun } from "@/lib/runtime/types";
 import { compressHistory, isUsableKeptHistory, shouldCompress } from "./compress";
@@ -249,7 +249,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     scopeType: "session",
     scopeId: input.sessionId,
     styleId: input.styleId,
-    definitions: builtinDefinitions.filter((d) => d.enabled),
+    definitions: selectBuiltinDefinitions(builtinDefinitions, input.skills ?? []),
     customSkills: customSkillDefinitions,
   });
   if (compressionObserved) {
@@ -364,7 +364,7 @@ export async function runChat(input: RunChatInput): Promise<RunChatResult> {
     request: input.content,
     candidate: reply || null,
     generationId: pipeline.generationId,
-    definitions: builtinDefinitions.filter((d) => d.enabled),
+    definitions: selectBuiltinDefinitions(builtinDefinitions, input.skills ?? []),
   });
   const skillRuns = [...pipeline.runs, ...postWriteRuns];
   // 用量记账（11 工单）：chat 每轮落 usage_events

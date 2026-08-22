@@ -113,6 +113,8 @@ export function ChapterEditorView() {
   const [styleId, setStyleId] = useState<number | null>(null);
   // v3 技能驱动对话：可用技能按章节状态切换（空章节=起笔，非空=续写），默认选中场景技能
   const [activeSkills, setActiveSkills] = useState<string[]>(["章节续写"]);
+  // 选项乙（2026-08-22）：开关型内置技能从 plaza 拉取，默认选中（对齐「默认技能按阶段自动调用」，可手动关）
+  const [builtinSkillNames, setBuiltinSkillNames] = useState<string[]>([]);
 
   const dirtyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 当前正在查看的章节：迟到的防抖保存落地时据此判定是否转为后台保存（不污染新章节状态） */
@@ -214,6 +216,16 @@ export function ChapterEditorView() {
       .then((data: { skills?: Array<{ name: string }> } | null) => {
         if (data?.skills) setMySkillNames(data.skills.map((s) => s.name));
       });
+    fetch("/api/v1/skills?scope=plaza")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { builtinSkills?: Array<{ name: string; toggleable: boolean; connected: boolean }> } | null) => {
+        if (cancelled || !data?.builtinSkills) return;
+        const names = data.builtinSkills.filter((s) => s.toggleable && s.connected).map((s) => s.name);
+        if (names.length === 0) return;
+        setBuiltinSkillNames(names);
+        setActiveSkills((prev) => [...new Set([...prev, ...names])]);
+      })
+      .catch(() => {});
     fetch("/api/v1/styles")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { styles?: Array<{ id: number; name: string }> } | null) => {
@@ -277,6 +289,7 @@ export function ChapterEditorView() {
   /** 可用技能（空章节=起笔场景；非空=续写场景；内置场景技能 + 我的技能） */
   const availableSkills: string[] = [
     ...(emptyChapter ? ["章节起笔"] : ["章节续写"]),
+    ...builtinSkillNames,
     ...mySkillNames,
   ].filter((n, i, arr) => arr.indexOf(n) === i); // 去重（我的技能里可能有同名）
 
@@ -880,7 +893,7 @@ export function ChapterEditorView() {
                   key={sk}
                   onClick={() => toggleSkill(sk)}
                   disabled={streaming}
-                  title={sk === "章节续写" || sk === "章节起笔" ? "平台内置场景技能" : "我的技能"}
+                  title={sk === "章节续写" || sk === "章节起笔" ? "平台内置场景技能" : builtinSkillNames.includes(sk) ? "内置技能（可开关，关闭后不注入本次生成）" : "我的技能"}
                   className={`rounded-full px-2.5 py-0.5 text-xs transition disabled:opacity-50 ${
                     activeSkills.includes(sk)
                       ? "bg-accent/15 text-accent"

@@ -48,6 +48,23 @@ export function isExecutorConnected(key: string): boolean {
   return Boolean(EXECUTORS[key]);
 }
 
+/**
+ * 用户可通过技能胶囊开关的内置技能 key（2026-08-22 拍板「选项乙：真实开关」）。
+ * 其余内置技能（story_grounding / quality_gate）是链路基础设施，始终注入、不进胶囊。
+ */
+export const TOGGLEABLE_BUILTIN_KEYS = new Set(["chapter_planning", "audience_genre", "narrative_style"]);
+
+/** 按用户选择过滤内置技能：基础设施始终保留；开关型仅在用户选中（按显示名）时注入。调用方无需再自行过滤 enabled。 */
+export function selectBuiltinDefinitions(
+  definitions: SkillDefinition[],
+  selectedNames: string[],
+): SkillDefinition[] {
+  const selected = new Set(selectedNames);
+  return definitions.filter(
+    (d) => d.enabled && (!TOGGLEABLE_BUILTIN_KEYS.has(d.key) || selected.has(d.name)),
+  );
+}
+
 function rowToDefinition(row: typeof skillDefinitionsTable.$inferSelect): SkillDefinition {
   return {
     key: row.key,

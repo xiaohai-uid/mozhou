@@ -52,6 +52,7 @@ describe("MarketBrief 绑定与消费（工单 05）", () => {
       sessionId: session!.id,
       model: "deepseek-v4-flash",
       content: "续写第一章",
+      skills: ["读者与题材"],
       onDelta: () => {},
     });
     const ag = result.skillRuns.find((r) => r.skillKey === "audience_genre")!;
@@ -68,6 +69,7 @@ describe("MarketBrief 绑定与消费（工单 05）", () => {
       sessionId: session!.id,
       model: "deepseek-v4-flash",
       content: "续写第一章",
+      skills: ["读者与题材"],
       onDelta: () => {},
     });
     const ag = result.skillRuns.find((r) => r.skillKey === "audience_genre")!;

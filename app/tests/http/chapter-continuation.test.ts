@@ -381,7 +381,8 @@ describe("章节对话引擎（工单 17）", () => {
         body: JSON.stringify({
           content: "写一段",
           styleId: s.id,
-          skills: ["章节续写"],
+          // DELTA-004：风格经叙事声音技能注入——选中才生效（开关型内置）
+          skills: ["章节续写", "叙事声音"],
         }),
       },
     );
@@ -962,6 +963,44 @@ describe("插入与冲突保护（工单 18）", () => {
     const res = await insert(candidate.id, candidate.content, false, { mode: "replace", range: { start: 1, end: 3 } });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { chapter: { content: string } }).chapter.content).toBe(`A${candidate.content.trim()}DEF`);
+  });
+
+  it("技能可选挂载：开关型内置技能按 skills[] 过滤（DELTA-004 plannedSkills 证据）", async () => {
+    async function chatPlannedSkills(skills: string[]): Promise<string[]> {
+      const res = await fetch(`${BASE}/api/v1/novels/${novelId}/chapters/chat?chapterId=${chapterId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ content: `技能开关验证 ${skills.join("/")}`, skills }),
+      });
+      const text = await res.text();
+      const done = text
+        .split("\n\n")
+        .filter((e) => e.startsWith("data:"))
+        .map((e) => JSON.parse(e.slice(5).trim()))
+        .find((e) => e.type === "done") as { generationId?: string } | undefined;
+      expect(done?.generationId).toBeTruthy();
+      const evidenceRes = await fetch(`${BASE}/api/v1/runtime/generations/${done!.generationId}`, {
+        headers: { cookie },
+      });
+      expect(evidenceRes.status).toBe(200);
+      const payload = (await evidenceRes.json()) as {
+        evidence?: { plan?: { plannedSkills?: Array<{ skillKey: string }> } };
+      };
+      return (payload.evidence?.plan?.plannedSkills ?? []).map((s) => s.skillKey);
+    }
+
+    // 只带场景技能 → 开关型内置全部不注入；基础设施型始终注入
+    const minimal = await chatPlannedSkills(["章节续写"]);
+    expect(minimal).toContain("story_grounding");
+    expect(minimal).toContain("quality_gate");
+    expect(minimal).not.toContain("chapter_planning");
+    expect(minimal).not.toContain("narrative_style");
+    expect(minimal).not.toContain("audience_genre");
+
+    // 显式选中章节规划 → 注入
+    const withPlanning = await chatPlannedSkills(["章节续写", "章节规划"]);
+    expect(withPlanning).toContain("chapter_planning");
+    expect(withPlanning).not.toContain("narrative_style");
   });
 
   it("J9 非法 target：负数/越界/NaN/字符串/非整数 position 与 range → 400 且正文不变", async () => {

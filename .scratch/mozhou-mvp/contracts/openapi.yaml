@@ -232,7 +232,8 @@
                     "type": "array",
                     "items": {
                       "type": "string"
-                    }
+                    },
+                    "description": "技能名（我的技能 + 开关型内置技能：章节规划/读者与题材/叙事声音）。开关型未列出不注入；基础设施内置（故事状态/成稿质量门）不受此列表控制，始终注入（DELTA-004）"
                   }
                 },
                 "required": [
@@ -523,6 +524,27 @@
             "schema": { "type": "integer" }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": { "type": "string" },
+                  "skills": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "技能名（场景技能 + 我的技能 + 开关型内置：章节规划/读者与题材/叙事声音）。开关型未列出不注入；基础设施内置（故事状态/成稿质量门）始终注入（DELTA-004）"
+                  },
+                  "styleId": { "type": "integer", "nullable": true },
+                  "generationKey": { "type": "string" }
+                },
+                "required": ["content"]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "SSE 事件流（start/phase/delta/error/done 事件序）",

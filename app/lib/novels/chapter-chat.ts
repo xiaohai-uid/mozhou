@@ -62,7 +62,7 @@ import {
   persistGenerationManifest,
 } from "@/lib/runtime/generation-manifest";
 import { runPostWriteValidators, runRuntimePipeline } from "@/lib/runtime/service";
-import { loadBuiltinSkillDefinitions } from "@/lib/runtime/skill-registry";
+import { loadBuiltinSkillDefinitions, selectBuiltinDefinitions } from "@/lib/runtime/skill-registry";
 import { loadCustomSkillDefinitions } from "@/lib/runtime/custom-skills";
 import { listQualityGateSummaries, listSkillRunsByGeneration } from "@/lib/runtime/skill-run";
 import { skillRuns as skillRunsTable } from "@/lib/schema";
@@ -420,7 +420,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
     scopeId: input.chapterId,
     generationId: generationKey,
     styleId: input.styleId,
-    definitions: builtinDefinitions.filter((d) => d.enabled),
+    definitions: selectBuiltinDefinitions(builtinDefinitions, input.skills ?? []),
     customSkills: customSkillDefinitions,
   });
   logChapterChatTiming(generationKey, startedAt, "runtime_pipeline_done", {
@@ -594,7 +594,7 @@ export async function runChapterChat(input: ChapterChatInput): Promise<ChapterCh
         request: input.content,
         candidate: reply || null,
         generationId: pipeline.generationId,
-        definitions: builtinDefinitions.filter((d) => d.enabled),
+        definitions: selectBuiltinDefinitions(builtinDefinitions, input.skills ?? []),
       })
     : [];
   logChapterChatTiming(generationKey, startedAt, "post_write_done", {
