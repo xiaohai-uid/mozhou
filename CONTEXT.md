@@ -104,6 +104,22 @@ _Avoid_: Full context, prompt text, context window
 A transparent, user-inspectable breakdown accounting for every token, included entity, and excluded rule in a compiled Context Packet, detailing why each item was included or omitted.
 _Avoid_: Context viewer, prompt log, debug trace
 
+**Reserved Allocation**:
+The two-phase budget algorithm that first reserves final-form token costs for candidate entries strictly in desirability sequence, then places the reserved prefix; inclusion is therefore equivalent to occupying a prefix of that order.
+_Avoid_: Best-effort fill, skip-ahead packing, greedy insertion
+
+**Desirability Order**:
+The deterministic total order over candidate entries — manual pin, tier rank, relevance score, identifier tie-break — along which reservation proceeds and against which eviction is defined.
+_Avoid_: Insertion Order (hand-tuned scalar), priority number, sort index
+
+**Atomic Entry**:
+An entry governed by Do-Not-Trim semantics: it enters the packet whole or is evicted whole, never truncated mid-content; atomicity bars truncation but never bars eviction.
+_Avoid_: Protected entry, undeletable entry, eviction-immune entry
+
+**Story Text Quota**:
+The pre-deducted token floor reserving prose capacity ahead of any setting-entry competition; setting-like entries can never spend it, while prose itself may absorb unused pool slack beyond the floor.
+_Avoid_: Prose budget cap, quota refund, story text limit
+
 **Continuity Gate**:
 A series of deterministic and LLM-assisted verification checks executed before chapter commit to detect logic errors, knowledge leaks, timeline paradoxes, and dead promises.
 _Avoid_: Linter, fact checker, review agent
