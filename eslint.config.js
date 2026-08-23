@@ -6,7 +6,8 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        // 根 scripts/ 的独立运维脚本（不入任何 tsconfig project）仍接受类型化 lint
+        projectService: { allowDefaultProject: ['scripts/*.mjs'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },

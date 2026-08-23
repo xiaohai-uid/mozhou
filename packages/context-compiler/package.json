@@ -7,5 +7,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p ."
+  },
+  "dependencies": {
+    "fastembed": "^2.1.0"
   }
 }
