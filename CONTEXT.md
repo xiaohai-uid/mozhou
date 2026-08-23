@@ -10,7 +10,7 @@ tags:
 
 MoZhou Novel OS is a local-first novel operating system and data flywheel designed to make long-form fiction a plannable, generative, editable, traceable, rollbackable, and author-adaptive engineering discipline.
 
-> Related notes: [[kernel-schema-draft]] · [[kernel-schema-decisions]] · [[ADR-0019 Research-Driven Amendments]]
+> Related notes: [[kernel-schema-draft]] · [[kernel-schema-decisions]] · [[dual-plane-sync-spec]] · [[ADR-0019 Research-Driven Amendments]]
 
 ## Language
 
@@ -71,6 +71,34 @@ _Avoid_: Fact deletion, garbage collection, memory purge
 **Chapter Commit**:
 An atomic, transactional unit of finalized narrative output containing final prose, extracted deltas (facts, relationships, knowledge, promises, timeline, items), chapter summary, and a dependency manifest.
 _Avoid_: Saved file, chapter markdown, draft accept
+
+**Active Draft**:
+A chapter file in the manuscript tree that has not been committed yet, or is being re-edited after a prior commit; freely editable in any editor without triggering reconciliation.
+_Avoid_: Dirty file, temp draft, WIP copy
+
+**Sync Layering**:
+The dual-plane rule that planning-layer entities (author intent, outline nodes, scenes, manually created promises, style profiles) persist to canon files immediately on save, while narrative-state deltas (facts, knowledge, relationships, timeline) land only upon Chapter Commit.
+_Avoid_: Autosave everything, deferred write-back, batch flush
+
+**Hash Baseline**:
+The application-maintained fingerprint record of what MoZhou itself last wrote to each canon file, kept outside the disposable projection, used to tell external modifications apart from the app's own writes.
+_Avoid_: Cache key, checksum log, git index
+
+**Write Verification**:
+The mandatory pre-write hash check that suspends any application-side save when the file on disk differs from its baseline, routing the collision into reconciliation instead of silently overwriting it.
+_Avoid_: Last-writer-wins, force save, merge-on-save
+
+**Full-Absorption Rebuild**:
+Reconstruction of the projection by deterministically rescanning every canon file as truth and establishing a fresh baseline; requires no model involvement.
+_Avoid_: Ledger replay, backup restore, resync wizard
+
+**Runtime Zone**:
+The book-local non-canon area (`.mozhou/`) holding the disposable projection, the audit ledger, receipts, and snapshots; excluded from reconciliation and never treated as truth.
+_Avoid_: Hidden state, system folder, cache directory
+
+**Snapshot**:
+A point-in-time copy of the entire book directory taken after each Chapter Commit and on demand, serving as the data source for rollback.
+_Avoid_: Autosave, version history, undo stack
 
 **External Modified Proposal**:
 An unverified state delta generated when an external modification to canonical Markdown/JSONL files is detected via SHA-256 mismatch, staged for author reconciliation.
