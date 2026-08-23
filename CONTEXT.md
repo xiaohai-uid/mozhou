@@ -10,7 +10,7 @@ tags:
 
 MoZhou Novel OS is a local-first novel operating system and data flywheel designed to make long-form fiction a plannable, generative, editable, traceable, rollbackable, and author-adaptive engineering discipline.
 
-> Related notes: [[kernel-schema-draft]] · [[kernel-schema-decisions]] · [[dual-plane-sync-spec]] · [[ADR-0019 Research-Driven Amendments]]
+> Related notes: [[kernel-schema-draft]] · [[kernel-schema-decisions]] · [[dual-plane-sync-spec]] · [[entity-directory-spec]] · [[ADR-0019 Research-Driven Amendments]]
 
 ## Language
 
@@ -27,6 +27,14 @@ _Avoid_: Flat outline, chapter list, story roadmap
 **Scene**:
 The atomic synchronization unit shared across planning, writing, chat, and review, hanging below a Chapter and carrying beats, summary, and POV; prose itself lives only in the Chapter Commit.
 _Avoid_: Beat list, chapter fragment, outline leaf
+
+**Entity Directory Card**:
+The per-entity Markdown card under `设定/<类型>/` whose YAML frontmatter carries the machine fields (`ref`, `name`, `aiContext` four-tier strategy, alias table, exclusion phrases, `brief`, `tags`) while its body stays human-facing and is never assembled into prompts wholesale.
+_Avoid_: Free setting note, lore entry, config object
+
+**Entity Ref**:
+A stable, human-readable slug reference to a story entity within the five frozen namespaces (`char:`, `item:`, `location:`, `faction:`, `concept:`), unique per book and frozen once any tracked row or card cites it.
+_Avoid_: Opaque ID, mutable name, numeric key
 
 **Temporal Fact**:
 A canonical atomic truth assertion tied to a subject, predicate, and value, bounded by valid chapter intervals (`valid_from` to `valid_until`) and explicit confirmation state (`planned`, `candidate`, `confirmed`, `rejected`). Secrets are temporal facts in the reserved `secret` predicate namespace whose disclosure closes the validity interval.
@@ -175,6 +183,10 @@ _Avoid_: Linter, fact checker, review agent
 ---
 
 ### Runtime & Capabilities
+
+**AI Context Tier**:
+The entity-level assembly strategy in four grades—`always`, `detected` (default), `detectedOff`, `never`—deciding activation only; secret-authorization and POV-slicing gates remain centrally enforced and cannot be bypassed by any tier.
+_Avoid_: Include flag, prompt toggle, permission level
 
 **Novel Runtime**:
 The stateful execution engine that coordinates workflows, event buses, schedulers, checkpoints, and transactions across the novel lifecycle.

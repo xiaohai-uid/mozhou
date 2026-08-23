@@ -54,7 +54,7 @@ tags:
 │       └── 第0001章.md          # ChapterNode 规划态 + scenes[] 数组（Scene 安家处）
 ├── 设定/
 │   ├── 作者意图.md              # AuthorIntent
-│   └── 人物/ 世界/ 地点/ 势力/  # Codex 自由 md（可选 ref: 字段声明 EntityRef 映射）
+│   └── 人物/ 物品/ 地点/ 势力/ 概念/  # 实体目录卡（工单 #13 冻结 Schema：entity-directory-spec.md）
 ├── 追踪/                        # 叙事状态层真源
 │   ├── 事实.jsonl               # TemporalFact[]（压缩留行，I6）
 │   ├── 认知.jsonl               # KnowledgeState[]
@@ -113,7 +113,7 @@ detected → extracting → awaiting_author → applied | partially_applied | di
 
 ## frontmatter 冻结格式（Q13）
 
-- **范围**：仅内核实体文件——正文章 md、大纲四层节点 md、`设定/作者意图.md`；Codex 自由 md 可选 `ref:` 字段声明 EntityRef 映射，其余不冻。
+- **范围**：仅内核实体文件——正文章 md、大纲四层节点 md、`设定/作者意图.md`；实体目录卡的 frontmatter 字段集由工单 #13 单独冻结（entity-directory-spec.md），不适用本节字段集。
 - **格式**：YAML frontmatter 承载机器字段，正文区承载人读内容；Scene 以 `scenes:` YAML 数组挂在章大纲文件里（`{id, orderIndex, povEntity, status, summary, beats[{description, intentionNote?}]}`，多行文本用块标量）。
 - **字段集**：`mozhouId`、`nodeType/kind`、`parentId`、`orderIndex`、`revision`、`status`、`originAuthor`、`protected`、`dependencyNodeIds`（大纲章）；正文章文件额外：`chapterIndex`、`phase: draft|committed`、`commitId?`。
 - **身份规则**：id 在 frontmatter，文件名只是皮——作者重命名/移动文件不断链，watcher 按 id 归并 rename 事件。
@@ -144,6 +144,7 @@ detected → extracting → awaiting_author → applied | partially_applied | di
 1. **ADR-0006**：新增 `book.json`、`.mozhou/manifest.json`、`.mozhou/receipts/`；Arc 层文件明确；Scene 安家于章大纲文件；摘要文件获得保护规则。
 2. **ADR-0010**：检测面从"启动时"扩为"启动必检 + 运行期 watcher"；提案细化为五态状态机 + 逐条取舍粒度；澄清拒绝 ≠ 回滚文件；新增 jsonl 行级三分法与写前校验前置防线。
 3. **US#19**："launch 检测" ⊂ 启动必检，语义被 Q4 吸收并扩展。
+4. **工单 #13**：`设定/` 子目录四目改五目对齐 EntityRef 五前缀（原「世界/」并入概念，新增物品）；Codex 自由 md 的可选 `ref:` 升格为必填身份字段，frontmatter 即目录卡正式 Schema。
 
 ## 验收对照（地图 Destination 判据）
 
