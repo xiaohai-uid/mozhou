@@ -115,7 +115,14 @@ describe('verifyBaseline', () => {
     makeBook()
     const plane = LocalDataPlane.open(bookRoot)
     const report = plane.verifyBaseline()
-    expect(report).toEqual({ modified: [], missing: [], untracked: [] })
+    // T3 起报告含 S2 分面：reconcileSurface（对账检测面）与 draftFreeEdits（草稿豁免）
+    expect(report).toEqual({
+      modified: [],
+      missing: [],
+      untracked: [],
+      reconcileSurface: [],
+      draftFreeEdits: [],
+    })
     plane.close()
   })
 
@@ -133,6 +140,9 @@ describe('verifyBaseline', () => {
     expect(report.modified).toEqual(['文风.md'])
     expect(report.missing).toEqual(['追踪/事实.jsonl'])
     expect(report.untracked).toEqual(['设定/人物/林枫.md'])
+    // 规划层修改入面；缺失保守入面
+    expect(report.reconcileSurface).toEqual(['文风.md', '追踪/事实.jsonl'])
+    expect(report.draftFreeEdits).toEqual([])
   })
 })
 

@@ -9,6 +9,8 @@ import type {
   AuthorIntentId,
   BookId,
   BookNodeId,
+  ChapterCommitId,
+  ChapterNodeId,
   StyleProfileId,
   Ulid,
   VolumeNodeId,
@@ -91,4 +93,13 @@ export function newAuthorIntentId(): AuthorIntentId {
 
 export function newStyleProfileId(): StyleProfileId {
   return `style_${newUlid()}` as StyleProfileId
+}
+
+/** T3（实现票 #17）：章大纲节点与正文文件共用同一章身份。 */
+export function newChapterNodeId(): ChapterNodeId {
+  return `chapter_${newUlid()}` as ChapterNodeId
+}
+
+export function newChapterCommitId(): ChapterCommitId {
+  return `cmit_${newUlid()}` as ChapterCommitId
 }
