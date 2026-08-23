@@ -9,6 +9,7 @@
     "build": "tsc -p ."
   },
   "dependencies": {
+    "@mozhou/kernel": "workspace:*",
     "better-sqlite3": "^12.2.0"
   },
   "devDependencies": {

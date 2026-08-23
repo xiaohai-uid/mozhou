@@ -28,6 +28,9 @@ importers:
 
   packages/data-plane:
     dependencies:
+      '@mozhou/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       better-sqlite3:
         specifier: ^12.2.0
         version: 12.11.1
