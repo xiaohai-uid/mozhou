@@ -345,7 +345,8 @@ export interface StyleProfile extends KernelEntityHead {
 }
 
 /* ----------------------------------------------------------------------------
- * 8. ContextReceipt（Phase 2 一等产物的预留冻结；Q6：只冻条目 schema 与枚举）
+ * 8. ContextReceipt（Phase 2 一等产物的预留冻结；Q6 冻结条目 schema 与枚举，
+ *    Q15/Q16 为工单 #9 收敛定案的受控增补：activation / replayInputs）
  * -------------------------------------------------------------------------- */
 
 export type CompileTaskType = 'chapter_writing' | 'scene_beat' | 'review' | 'fact_extraction';
@@ -367,15 +368,27 @@ export type ExclusionReason =
   | 'story_text_quota_protected' // 正文保底配额挤压设定条目（ADR-0019 §2）
   | 'duplicate';
 
+/** 激活证据（Q15）：按召回通道判别的「为何成为候选」凭据，NAI Context Viewer Key 列的类型化对应物。
+ *  structural 注入不经过召回，无此证据；双通道合并打分时记胜出（主）通道的证据。 */
+export type ActivationEvidence =
+  | { readonly kind: 'keyword'; readonly keys: readonly string[] } // 命中的激活键
+  | {
+      readonly kind: 'graph_khop';
+      readonly sourceEntity: string; // 触发遍历的源实体（ULID 或 EntityRef）
+      readonly hops: number;
+      readonly score: number;
+    }
+  | { readonly kind: 'embedding'; readonly score: number } // 查询指纹在 ReplayInputs.embeddingQueryDigest 编译级单值
+  | { readonly kind: 'manual_pin' }; // 作者钉选动作本身即凭据
+
 export interface ReceiptEntry {
   readonly stage: string; // 装配阶段标识（编译器自定义，回放时逐阶段重算）
   readonly order: number; // 插入顺序
   readonly identifier: string; // 条目标识（实体 id / 分区名）
   readonly included: boolean;
   readonly assemblySource?: AssemblyChannel | undefined;
-  /** 激活证据（工单 #9 增补）：经召回通道进入候选的凭据压缩串，
-   *  词法 key:<命中词> | khop:<源实体>·<n>hop | emb:<邻居id> | pin；对标 NAI Viewer Key 列 */
-  readonly recallEvidence?: string | undefined;
+  /** 激活证据（Q15）：为何成为候选；structural 条目恒 undefined */
+  readonly activation?: ActivationEvidence | undefined;
   /** 运行时不变量：included=false 时必填 */
   readonly exclusionReason?: ExclusionReason | undefined;
   readonly reservedTokens?: number | undefined; // 两阶段装配的预订额（NAI 先例）
@@ -387,6 +400,35 @@ export interface ReceiptEntry {
 export interface ParseFailure {
   readonly source: string; // 失败的输入源（DSL 表达式/文件路径/引用串）
   readonly detail: string; // 失败原因
+}
+
+/** 重放候选（Q16）：竞争池条目的重放描述——只存标量与摘要，内容本体不内嵌（真源唯一）。 */
+export interface ReplayCandidate {
+  readonly id: string; // ULID 或 EntityRef
+  readonly tier: string; // ADR-0004 修剪层级词表
+  readonly channel: AssemblyChannel;
+  readonly relevanceScore: number;
+  readonly pinned?: boolean | undefined;
+  readonly atomicOverride?: boolean | undefined;
+  readonly contentDigest: string; // SHA-256；codex 自由 md 无 revision，摘要兜底变异检测
+}
+
+/** 重放输入面（Q16）：复算预算装配阶段（structural/reserve/converge/story_text）所需的
+ *  最小输入集。候选恒按 desirability 终序存储——前缀完备性（INV-2）在文件中直接可见，
+ *  重放即顺序走查。recall_filter 阶段的透传条目不在此列（召回不承诺逐字节重放）。 */
+export interface ReplayInputs {
+  readonly configVersion: string;
+  readonly tokenizerVersion: string;
+  readonly modelProfileId: string;
+  readonly contextWindowTokens: number;
+  /** 双通道合并打分的查询指纹（编译级单值，不逐条存）；无 embedding 通道时缺省 */
+  readonly embeddingQueryDigest?: string | undefined;
+  readonly candidates: readonly ReplayCandidate[];
+  readonly structuralSections: readonly {
+    readonly section: string;
+    readonly contentDigest: string;
+  }[];
+  readonly storyTextSlices: readonly { readonly digest: string; readonly tokens: number }[];
 }
 
 export interface ContextReceipt extends KernelEntityHead {
@@ -403,7 +445,9 @@ export interface ContextReceipt extends KernelEntityHead {
   readonly totalTokens: number;
   /** 恒为 'server'（N10，I4）——类型层面把客户端装配表达为非法状态 */
   readonly assembledBy: 'server';
-  /** 输入固化摘要（工单 #9 增补）：漂移检测锚点，语义见 context-receipt-physical-format-spec §3.1 */
+  /** 重放输入面（Q16）：复算边界与漂移定位语义见 context-receipt-physical-format-spec §3 */
+  readonly replayInputs: ReplayInputs;
+  /** 输入固化摘要（INV-R6）：恒 = sha256(canonicalJson(replayInputs))，漂移检测锚点 */
   readonly inputsDigest: string;
   /** 同输入重算装配应得到同哈希；receipt 间 diff 即审计（可复算可 diff） */
   readonly recomputationHash: string;

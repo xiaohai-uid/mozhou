@@ -166,7 +166,8 @@ receipt.storyTextQuota = { reservedTokens: S_floor, actualTokens: tok.count(stor
 
 ## 8. Receipt 发射
 
-`ReceiptEntry.stage` 词表（编译器侧冻结，物理格式归 #9）：
+`ReceiptEntry.stage` 词表（编译器侧冻结；物理存储与 EventLedger 关系已由
+[context-receipt-physical-format-spec](./context-receipt-physical-format-spec.md) / ADR-0021 定案）：
 
 | stage | 记录内容 |
 |---|---|
@@ -178,6 +179,8 @@ receipt.storyTextQuota = { reservedTokens: S_floor, actualTokens: tok.count(stor
 
 `recomputationHash = sha256(canonicalJson({configVersion, tokenizerVersion,
 modelProfileId, inputsDigest, entries[], storyTextQuota, totalTokens}))`——同输入重算必相等。
+其中 `inputsDigest := sha256(canonicalJson(replayInputs))`（重放输入面定义与复算边界见
+[context-receipt-physical-format-spec](./context-receipt-physical-format-spec.md) §3.1）。
 
 ## 9. 不变量与错误模式
 

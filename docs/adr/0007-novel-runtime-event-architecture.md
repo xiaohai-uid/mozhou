@@ -13,8 +13,8 @@ We establish an asynchronous, append-only **Novel Runtime Event Architecture**:
 1. **First-Class Event Bus**:
    Every lifecycle transition in the novel creation process publishes a strongly-typed domain event to `.mozhou/events.jsonl` and the SQLite event projection:
    - `ChapterGenerateRequested`
-   - `ContextCompiled` (carrying `ContextReceipt` & `DependencyManifest`)
-   - `GenerationStarted` (recording model provider, temperature, recipe ID)
+   - `ContextCompiled` (carrying a **pointer** to the `ContextReceipt` — `{receiptId, taskType, chapterIndex?, recomputationHash, totalTokens, storyTextQuota, entryCount}`; receipt bodies live once in `.mozhou/receipts/`, never inline — ADR-0021)
+   - `GenerationStarted` (recording model provider, temperature, recipe ID, and the `receiptId` of the compile it consumes)
    - `CandidateCreated` (storing raw LLM candidate outputs)
    - `AutomatedReviewCompleted` (recording continuity & quality findings)
    - `UserEditRecorded` (capturing diffs between candidate and user final text)

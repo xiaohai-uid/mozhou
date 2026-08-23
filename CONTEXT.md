@@ -149,12 +149,16 @@ The pre-deducted token floor reserving prose capacity ahead of any setting-entry
 _Avoid_: Prose budget cap, quota refund, story text limit
 
 **Recomputability**:
-The audit property of a Context Receipt: given un-drifted inputs, recompilation reproduces the identical recomputation hash, and any input drift is detectable and localizable to specific dependencies — never silent divergence.
-_Avoid_: Full input snapshot, determinism claim without verification, best-effort replay
+The audit property of a Context Receipt: it archives a minimal replay input surface, so re-running the budget assembly reproduces the identical recomputation hash at any later time; mutated or retired inputs fail loudly and localize the drift to specific entries — never silent divergence.
+_Avoid_: Digest-only anchoring, determinism claim without verification, best-effort replay
 
 **Activation Evidence**:
-The compressed record of why a candidate entered recall through its channel — matched keyword, graph hop path, embedding neighbor, or manual pin — carried per receipt entry.
-_Avoid_: Activation key dump, search log, relevance explanation prose
+The typed record of why a candidate entered recall through its channel — matched keywords, graph hop source and depth, embedding score, or manual pin — carried optionally per receipt entry; structural injections have none.
+_Avoid_: Compressed evidence string, activation key dump, search log, relevance explanation prose
+
+**Replay Inputs**:
+The minimal input snapshot archived inside a Context Receipt — config/tokenizer/model versions plus the desirability-ordered candidate list with scores and content digests, structural section digests, and story-text slice digests — sufficient to deterministically re-run the budget assembly phase; entity contents themselves are never duplicated. Recall-filter pass-throughs sit outside the replay contract.
+_Avoid_: Raw prompt archive, full input snapshot, digest-only anchor
 
 **Continuity Gate**:
 A series of deterministic and LLM-assisted verification checks executed before chapter commit to detect logic errors, knowledge leaks, timeline paradoxes, and dead promises.
