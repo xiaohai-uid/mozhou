@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>墨舟 MoZhou Novel OS 2.0 — 终极专业小说中控台</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: '#0c0c0e',
+              sidebar: '#141417',
+              canvas: '#101013',
+              inspector: '#141417',
+              surface: 'rgba(28, 28, 32, 0.75)',
+              border: 'rgba(255, 255, 255, 0.08)',
+              borderSubtle: 'rgba(255, 255, 255, 0.04)',
+              accent: '#6366F1', // Indigo / Purple
+              accentHover: '#4F46E5',
+              emerald: '#10B981',
+              amber: '#F59E0B',
+              rose: '#F43F5E',
+              purple: '#A855F7',
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"PingFang SC"', 'sans-serif'],
+            serif: ['"Noto Serif SC"', '"Source Han Serif SC"', 'STSong', 'Georgia', 'serif'],
+            mono: ['"SF Mono"', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+    /* Apple-grade Liquid Glass Material */
+    .apple-glass {
+      background: rgba(20, 20, 24, 0.82);
+      backdrop-filter: blur(36px) saturate(190%);
+      -webkit-backdrop-filter: blur(36px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    
+    .apple-glass-card {
+      background: rgba(28, 28, 34, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* Tactile button response */
+    button {
+      transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    button:active {
+      transform: scale(0.96) !important;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Popover entrance */
+    .pop-in {
+      animation: popIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.96) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-app-bg text-zinc-200 min-h-screen flex flex-col font-sans select-none overflow-hidden">
+
+  <!-- ========================================================================= -->
+  <!-- TOP UNIFIED APP BAR -->
+  <!-- ========================================================================= -->
+  <header class="h-13 border-b border-app-border bg-app-sidebar/80 backdrop-blur-xl px-4 flex items-center justify-between shrink-0 z-40">
+    
+    <!-- Left: Brand + Project Switcher + Traffic Lights -->
+    <div class="flex items-center gap-3">
+      <!-- Traffic Lights -->
+      <div class="flex items-center gap-1.5 px-1">
+        <div class="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/50"></div>
+        <div class="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/50"></div>
+        <div class="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/50"></div>
+      </div>
+
+      <div class="h-4 w-px bg-white/10 mx-1"></div>
+
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-md shadow-indigo-500/20">
+          舟
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-xs text-zinc-100 tracking-tight">墨舟 MoZhou 2.0</span>
+            <span class="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Pro OS</span>
+          </div>
+          <span class="text-[10px] text-zinc-400">《零界道种》· 100万字长篇 (第 45 章)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Main Module Navigation (创作台 / 拆文炼化 / 技能广场 / 市场大盘) -->
+    <div class="flex items-center bg-black/40 p-1 rounded-xl border border-white/8 text-xs">
+      <button onclick="switchMainTab('workbench')" id="nav-workbench" class="px-3.5 py-1.5 rounded-lg font-semibold bg-white/15 text-white shadow-sm flex items-center gap-1.5">
+        <i class="ph ph-layout text-indigo-400"></i> 三栏创作台
+      </button>
+      <button onclick="switchMainTab('distill')" id="nav-distill" class="px-3.5 py-1.5 rounded-lg font-medium text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5">
+        <i class="ph ph-fire text-amber-400"></i> 拆文与炼化 (Distill)
+      </button>
+      <button onclick="switchMainTab('skills')" id="nav-skills" class="px-3.5 py-1.5 rounded-lg font-medium text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5">
+        <i class="ph ph-cube text-purple-400"></i> Skill 生态广场
+      </button>
+      <button onclick="switchMainTab('rankings')" id="nav-rankings" class="px-3.5 py-1.5 rounded-lg font-medium text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5">
+        <i class="ph ph-chart-line-up text-pink-400"></i> 官方市场大盘
+      </button>
+    </div>
+
+    <!-- Right: Model Switcher, Checks HUD & Commit -->
+    <div class="flex items-center gap-2.5">
+      <!-- Active Style Pill -->
+      <button onclick="openModal('styleModal')" class="px-2.5 py-1 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] text-xs text-zinc-300 flex items-center gap-1.5">
+        <i class="ph ph-feather text-amber-400"></i>
+        <span id="active-style-name">文风：古典白描智斗</span>
+      </button>
+
+      <!-- Chapter Commit Action -->
+      <button onclick="triggerCommit()" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/40">
+        <i class="ph ph-check-circle"></i>
+        <span>结章 Commit</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 flex overflow-hidden relative">
+
+    <!-- ========================================================================= -->
+    <!-- MODULE 1: WORKBENCH (三栏专业小说中控台) -->
+    <!-- ========================================================================= -->
+    <section id="module-workbench" class="flex-1 flex w-full h-full overflow-hidden">
+      
+      <!-- 1. LEFT SIDEBAR: OUTLINE, CHARACTERS, WORLDVIEW, TOOLS -->
+      <aside class="w-68 bg-app-sidebar border-r border-app-border flex flex-col shrink-0">
+        <!-- Sidebar Segmented Selector -->
+        <div class="p-2 border-b border-app-borderSubtle">
+          <div class="bg-black/30 p-1 rounded-lg flex items-center text-xs">
+            <button onclick="switchSidebarTab('outline')" id="stab-outline" class="flex-1 py-1 font-semibold rounded bg-white/15 text-white shadow-sm">
+              卷章大纲
+            </button>
+            <button onclick="switchSidebarTab('canon')" id="stab-canon" class="flex-1 py-1 font-medium text-zinc-400 hover:text-zinc-200">
+              人物与设定
+            </button>
+            <button onclick="switchSidebarTab('skills-attached')" id="stab-skills" class="flex-1 py-1 font-medium text-zinc-400 hover:text-zinc-200">
+              挂载技能
+            </button>
+          </div>
+        </div>
+
+        <!-- Sidebar Tab 1: Outline Tree -->
+        <div id="spanel-outline" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
+          <div class="text-[11px] font-semibold text-zinc-400 px-1 flex justify-between items-center">
+            <span>第一卷：残界拾荒</span>
+            <span class="text-[9px] font-mono text-zinc-500 bg-white/5 px-1.5 py-0.5 rounded">30章完</span>
+          </div>
+          <div class="space-y-1">
+            <div class="p-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 flex items-center justify-between cursor-pointer">
+              <span>第 0001 章 废土里的微火</span>
+              <i class="ph ph-check text-emerald-400"></i>
+            </div>
+            <div class="p-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 flex items-center justify-between cursor-pointer">
+              <span>第 0023 章 断臂与生死劫</span>
+              <span class="text-[9px] bg-amber-500/15 text-amber-300 px-1 rounded">时序事实</span>
+            </div>
+          </div>
+
+          <div class="text-[11px] font-semibold text-zinc-200 px-1 pt-3 flex justify-between items-center border-t border-white/5">
+            <span>第二卷：中州问鼎</span>
+            <span class="text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">第 45 章连载中</span>
+          </div>
+          <div class="space-y-1">
+            <div class="p-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 flex items-center justify-between cursor-pointer">
+              <span>第 0044 章 潜伏万宝楼</span>
+              <i class="ph ph-check text-emerald-400"></i>
+            </div>
+            <!-- Active Chapter -->
+            <div class="p-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-100 flex items-center justify-between font-semibold shadow-sm">
+              <div class="flex items-center gap-2 truncate">
+                <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                <span class="truncate">第 0045 章 帝崩秘闻与道种</span>
+              </div>
+              <span class="text-[9px] px-1.5 py-0.5 bg-indigo-500 text-white rounded font-bold">正文编辑</span>
+            </div>
+            <div class="p-2 rounded-lg text-zinc-600 flex items-center justify-between cursor-not-allowed">
+              <span>第 0046 章 杀机暗涌</span>
+              <span class="text-[10px]">待生成</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar Tab 2: Characters & Worldview Wiki (A+B 结构化档案库) -->
+        <div id="spanel-canon" class="hidden flex-1 overflow-y-auto p-3 space-y-3 text-xs">
+          <div class="flex items-center justify-between font-bold text-zinc-200">
+            <span>人物关系卡片 (8位)</span>
+            <button class="p-1 rounded hover:bg-white/10 text-indigo-400">+ 添加人物</button>
+          </div>
+          <div class="space-y-1.5">
+            <div class="p-2.5 rounded-xl bg-black/30 border border-white/5 space-y-1">
+              <div class="flex items-center justify-between font-medium text-zinc-100">
+                <span>林玄 (主角)</span>
+                <span class="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 rounded">筑基圆满</span>
+              </div>
+              <p class="text-[11px] text-zinc-400 leading-snug">废土拾荒少年，得吞噬因果道种。性格沉稳狠厉，绝不拖泥带水。</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-black/30 border border-white/5 space-y-1">
+              <div class="flex items-center justify-between font-medium text-zinc-100">
+                <span>沈清雪 (女主/剑阁传人)</span>
+                <span class="text-[9px] bg-purple-500/15 text-purple-400 px-1.5 rounded">天命剑主</span>
+              </div>
+              <p class="text-[11px] text-zinc-400 leading-snug">表面清冷如仙，身负灭门血仇。目前佩戴天命剑与林玄同行。</p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between font-bold text-zinc-200 pt-2 border-t border-white/5">
+            <span>世界规则设定库</span>
+            <button class="p-1 rounded hover:bg-white/10 text-indigo-400">+ 新增规则</button>
+          </div>
+          <div class="p-2.5 rounded-xl bg-black/30 border border-white/5 text-[11px] text-zinc-300 space-y-1">
+            <div class="font-medium text-amber-300">《因果道种运转法则》</div>
+            <p class="text-zinc-400">吞噬敌人因果后获得修为，但死者生前怨念会引来天罚因果劫。</p>
+          </div>
+        </div>
+
+        <!-- Sidebar Tab 3: Attached Skills (当前挂载技能) -->
+        <div id="spanel-skills" class="hidden flex-1 overflow-y-auto p-3 space-y-2 text-xs">
+          <div class="font-semibold text-zinc-200 mb-1">当前本章生效技能：</div>
+          <div class="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between">
+            <div>
+              <div class="font-medium text-indigo-200">⚡ 凌厉动作推演</div>
+              <div class="text-[10px] text-zinc-400">强化打斗与杀招张力</div>
+            </div>
+            <span class="text-emerald-400 font-bold">已挂载</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between">
+            <div>
+              <div class="font-medium text-purple-200">✂️ 彻底去 AI 味 (story-deslop)</div>
+              <div class="text-[10px] text-zinc-400">剔除空洞比喻与套话</div>
+            </div>
+            <span class="text-emerald-400 font-bold">已挂载</span>
+          </div>
+          <div class="p-2.5 rounded-xl bg-black/30 border border-white/5 flex items-center justify-between">
+            <div>
+              <div class="font-medium text-zinc-300">🏛️ 智斗破局因果链 (自炼化)</div>
+              <div class="text-[10px] text-zinc-500">来源于《宿命之环》炼化包</div>
+            </div>
+            <button class="px-2 py-0.5 rounded bg-white/10 text-[10px] text-zinc-300 hover:bg-white/20">启用</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 2. CENTER: CHAPTER PROSE CANVAS & MULTI-DRAW STUDIO -->
+      <section class="flex-1 flex flex-col bg-app-canvas overflow-hidden relative">
+        
+        <!-- Editor Header Controls -->
+        <div class="h-11 px-6 border-b border-app-border flex items-center justify-between text-xs text-zinc-400 bg-black/20">
+          <div class="flex items-center gap-3">
+            <span class="font-bold text-zinc-100 text-sm">第 0045 章：帝崩秘闻与道种</span>
+            <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">2,480 字</span>
+            <span class="text-emerald-400 flex items-center gap-1 text-[11px]"><i class="ph ph-check"></i> 本地即时安全存盘</span>
+          </div>
+
+          <!-- Quick Actions: Multi-Model Draw, Single-Stream, Typography -->
+          <div class="flex items-center gap-2">
+            <!-- Multi-Model / Multi-Prompt Draw Toggle (用户自主开关) -->
+            <button onclick="toggleDrawMode()" id="btn-draw-mode" class="px-3 py-1 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-medium flex items-center gap-1.5 text-xs shadow-sm">
+              <i class="ph ph-cards text-sm"></i>
+              <span>多模型/多提示词抽卡比稿 (开启)</span>
+            </button>
+            <div class="h-3.5 w-px bg-white/10"></div>
+            <button onclick="toggleFontSettings()" class="p-1.5 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-zinc-200" title="排版偏好">
+              <i class="ph ph-text-aa text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Typography Floating Flyout -->
+        <div id="font-settings-flyout" class="hidden absolute top-12 right-6 z-30 apple-glass rounded-2xl p-4 w-60 shadow-2xl space-y-3 text-xs pop-in">
+          <div class="font-semibold text-zinc-200 pb-2 border-b border-white/8 flex justify-between">
+            <span>排版视觉调节</span>
+            <button onclick="toggleFontSettings()" class="text-zinc-400 hover:text-white">✕</button>
+          </div>
+          <div>
+            <span class="text-[11px] text-zinc-400">字体选择</span>
+            <div class="flex bg-black/40 p-0.5 rounded-lg mt-1">
+              <button onclick="setFontFamily('serif')" class="flex-1 py-1 rounded font-serif bg-white/15 text-white">精修宋体</button>
+              <button onclick="setFontFamily('sans')" class="flex-1 py-1 rounded font-sans text-zinc-400">现代黑体</button>
+            </div>
+          </div>
+          <div>
+            <span class="text-[11px] text-zinc-400">字号大小</span>
+            <div class="flex gap-1.5 mt-1">
+              <button onclick="setFontSize(16)" class="flex-1 py-1 rounded bg-black/40 hover:bg-white/10 text-zinc-300">16px</button>
+              <button onclick="setFontSize(18)" class="flex-1 py-1 rounded bg-indigo-600 text-white font-bold">18px</button>
+              <button onclick="setFontSize(20)" class="flex-1 py-1 rounded bg-black/40 hover:bg-white/10 text-zinc-300">20px</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prose Writing Text Area -->
+        <div class="flex-1 overflow-y-auto px-12 md:px-20 py-8 max-w-4xl mx-auto w-full font-serif text-[18px] leading-[2.2] tracking-wide text-zinc-200 space-y-6" id="editor-body">
+          
+          <p class="p-1 rounded hover:bg-white/[0.02] cursor-text">
+            夜雨如瀑，冲刷着万宝楼巍峨的飞檐。密室之中，青铜灯火微晃，将两道身影拉得修长而冷峻。
+          </p>
+
+          <p class="p-1 rounded hover:bg-white/[0.02] cursor-text">
+            林玄将手中的雨伞靠在门侧，水渍在青石地板上晕开一小片水洼。他没有立刻落座，目光在老者的枯瘦面容上停留了片刻。
+          </p>
+
+          <p class="p-1 rounded hover:bg-white/[0.02] cursor-text" id="sample-target">
+            “皇城里那位，”阁老缓缓吐出一口浊气，指尖敲击着冰冷的桌面，“早在三个月前，就已经断气了。”
+          </p>
+
+          <!-- MULTI-DRAW SAMPLING RESULTS (比稿卡片区，仅在抽卡时优雅展开，绝不常驻干扰正文) -->
+          <div id="draw-comparison-card" class="hidden my-6 p-4 rounded-2xl apple-glass border border-purple-500/40 shadow-2xl space-y-3 pop-in">
+            <div class="flex items-center justify-between text-xs pb-2 border-b border-white/8">
+              <div class="flex items-center gap-2">
+                <i class="ph ph-cards text-purple-400 text-base"></i>
+                <span class="font-bold text-zinc-100">双模型/多提示词比稿候选 (可自由挑选中意方案)</span>
+              </div>
+              <button onclick="closeDrawComparison()" class="text-zinc-400 hover:text-white">✕ 关闭比稿</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs font-sans">
+              <!-- Candidate 1: DeepSeek-V4 (动作凌厉派) -->
+              <div class="p-3.5 rounded-xl bg-black/40 border border-purple-500/50 flex flex-col justify-between space-y-3">
+                <div>
+                  <div class="flex items-center justify-between text-[11px] font-bold text-purple-300 mb-1.5">
+                    <span>方案 A · DeepSeek-V4 (动作派)</span>
+                    <span class="text-[9px] bg-purple-500/20 px-1.5 py-0.5 rounded text-purple-200">高张力</span>
+                  </div>
+                  <p class="text-zinc-200 leading-relaxed text-[12px]">
+                    阁老指尖骤然抠死桌面，青筋暴凸：“皇城里那位早就断了气。今夜万宝楼若不反，明日你我皆为刀下亡魂！”
+                  </p>
+                </div>
+                <button onclick="adoptCandidate('A')" class="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-xs shadow">
+                  采纳并插入正文
+                </button>
+              </div>
+
+              <!-- Candidate 2: GLM-4.5 (白描沉稳派) -->
+              <div class="p-3.5 rounded-xl bg-black/40 border border-white/10 hover:border-white/20 flex flex-col justify-between space-y-3">
+                <div>
+                  <div class="flex items-center justify-between text-[11px] font-bold text-zinc-300 mb-1.5">
+                    <span>方案 B · GLM-4.5 (白描克制)</span>
+                    <span class="text-[9px] bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">暗涌智斗</span>
+                  </div>
+                  <p class="text-zinc-400 leading-relaxed text-[12px]">
+                    阁老合上双目，声音轻如飞灰：“天子龙驭宾天三月有余。满朝文武，不过在陪死人演一出太平大戏。”
+                  </p>
+                </div>
+                <button onclick="adoptCandidate('B')" class="w-full py-1.5 bg-white/10 hover:bg-white/20 text-zinc-200 font-medium rounded-lg text-xs">
+                  采纳并插入正文
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p class="p-1 rounded hover:bg-white/[0.02] cursor-text">
+            林玄的瞳孔微微收缩。这一刻，他脑海中所有的线索骤然咬合——为何边关急报被扣，为何国师闭关三年，为何连万宝楼都在暗中转移资产。
+          </p>
+
+          <p class="p-1 rounded hover:bg-white/[0.02] cursor-text">
+            “所以，传位诏书是假的。”林玄的声音很轻，却如惊雷落入平湖。
+          </p>
+        </div>
+
+        <!-- Bottom Stream Bar (一键顺滑续写与抽卡触发) -->
+        <div class="p-3 border-t border-app-border bg-app-sidebar/70 backdrop-blur flex items-center justify-between px-6">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-xs text-zinc-400">光标所在：第 4 段末尾</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="triggerDrawTest()" class="px-3.5 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center gap-1.5">
+              <i class="ph ph-cards"></i>
+              <span>双模型并发抽卡比稿</span>
+            </button>
+            <button onclick="triggerQuickContinuation()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow">
+              <i class="ph ph-sparkle"></i>
+              <span>顺滑流式续写 (Cmd+J)</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. RIGHT SIDEBAR: INSPECTOR (6 维智能机检 + 创作链路) -->
+      <aside class="w-76 bg-app-inspector border-l border-app-border flex flex-col shrink-0">
+        <!-- Right Header Tabs -->
+        <div class="p-2 border-b border-app-borderSubtle">
+          <div class="bg-black/30 p-1 rounded-lg flex items-center text-xs">
+            <button onclick="switchRightTab('checks')" id="rtab-checks" class="flex-1 py-1 font-semibold rounded bg-white/15 text-white shadow-sm flex items-center justify-center gap-1">
+              <i class="ph ph-shield-check text-emerald-400"></i> 6维智能机检
+            </button>
+            <button onclick="switchRightTab('pipeline')" id="rtab-pipeline" class="flex-1 py-1 font-medium text-zinc-400 hover:text-zinc-200 flex items-center justify-center gap-1">
+              <i class="ph ph-tree-structure text-indigo-400"></i> 链路与回执
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Panel 1: 6 维智能写作机检 HUD -->
+        <div id="rpanel-checks" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
+          <div class="flex items-center justify-between font-bold text-zinc-100">
+            <span>实时质量门禁 (Quality Gate)</span>
+            <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">6 / 6 ALL PASS</span>
+          </div>
+
+          <div class="space-y-2">
+            <!-- 1. 认知隔离 -->
+            <div class="p-2.5 rounded-xl bg-black/30 border border-emerald-500/30 space-y-1">
+              <div class="flex items-center justify-between text-emerald-400 font-semibold">
+                <span class="flex items-center gap-1"><i class="ph ph-check-circle"></i> 认知隔离保护</span>
+                <span class="text-[9px]">零穿帮</span>
+              </div>
+              <p class="text-[11px] text-zinc-400">林玄在第 45 章合法知晓先帝驾崩，符合既定剧情进度。</p>
+            </div>
+
+            <!-- 2. 时序事实 -->
+            <div class="p-2.5 rounded-xl bg-black/30 border border-emerald-500/30 space-y-1">
+              <div class="flex items-center justify-between text-emerald-400 font-semibold">
+                <span class="flex items-center gap-1"><i class="ph ph-check-circle"></i> 时序事实一致性</span>
+                <span class="text-[9px]">自洽</span>
+              </div>
+              <p class="text-[11px] text-zinc-400">林玄左臂痊愈状态正确，未引用已移交法宝。</p>
+            </div>
+
+            <!-- 3. 去AI味评分 -->
+            <div class="p-2.5 rounded-xl bg-black/30 border border-emerald-500/30 space-y-1">
+              <div class="flex items-center justify-between text-emerald-400 font-semibold">
+                <span class="flex items-center gap-1"><i class="ph ph-check-circle"></i> 去AI味评分 (story-deslop)</span>
+                <span class="text-[10px] font-mono font-bold text-emerald-300">94 分</span>
+              </div>
+              <p class="text-[11px] text-zinc-400">0 处生硬陈词滥调，动作为主导推进。</p>
+            </div>
+
+            <!-- 4. 黄金节奏与钩子 -->
+            <div class="p-2.5 rounded-xl bg-black/30 border border-emerald-500/30 space-y-1">
+              <div class="flex items-center justify-between text-emerald-400 font-semibold">
+                <span class="flex items-center gap-1"><i class="ph ph-check-circle"></i> 悬念与钩子强度</span>
+                <span class="text-[9px]">强钩子</span>
+              </div>
+              <p class="text-[11px] text-zinc-400">末尾揭示传位诏书伪造，留有强烈翻页欲望。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel 2: 创作链路与 ContextAssembler 回执 -->
+        <div id="rpanel-pipeline" class="hidden flex-1 overflow-y-auto p-3 space-y-3 text-xs">
+          <div class="font-bold text-zinc-100">本次 ContextAssembler 装配清单</div>
+          <div class="p-3 bg-black/30 rounded-xl border border-white/5 space-y-1.5 text-[11px]">
+            <div class="flex justify-between text-zinc-300"><span>1. 小说宪法 (禁忌/爽点)</span><span class="text-amber-400 font-mono">426 tok</span></div>
+            <div class="flex justify-between text-zinc-300"><span>2. 本章主线任务卡</span><span class="text-amber-400 font-mono">712 tok</span></div>
+            <div class="flex justify-between text-zinc-300"><span>3. 人物时序事实 (林玄/沈清雪)</span><span class="text-indigo-400 font-mono">831 tok</span></div>
+            <div class="flex justify-between text-zinc-300"><span>4. 前两章滚动正文 (43-44章)</span><span class="text-indigo-400 font-mono">1,873 tok</span></div>
+            <div class="pt-1.5 border-t border-white/5 flex justify-between font-bold text-emerald-400"><span>总占用</span><span class="font-mono">3,842 tok</span></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- MODULE 2: DISTILL & DECONSTRUCT (小说拆文与技能炼化) -->
+    <!-- ========================================================================= -->
+    <section id="module-distill" class="hidden flex-1 w-full h-full p-8 overflow-y-auto max-w-5xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-app-border pb-4">
+        <div>
+          <h2 class="text-xl font-bold text-zinc-100 flex items-center gap-2">
+            <i class="ph ph-fire text-amber-400"></i>
+            小说拆文与技能炼化 (Deconstruct & Distill)
+          </h2>
+          <p class="text-xs text-zinc-400 mt-1">导入任意外部爆款小说，自动拆解其叙事节奏、动作密度与对白句式，炼化为专属可复用的 Skill！</p>
+        </div>
+        <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow">
+          + 导入新小说开始炼化
+        </button>
+      </div>
+
+      <!-- Distillation Pipeline Process Card -->
+      <div class="apple-glass rounded-2xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg font-bold">
+              📚
+            </div>
+            <div>
+              <div class="font-bold text-sm text-zinc-100">正在炼化的目标：《宿命之环》前50章</div>
+              <div class="text-xs text-zinc-400">已解析 18.5 万字 · 智斗反转与克系序列题材</div>
+            </div>
+          </div>
+          <span class="text-xs font-mono px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full font-bold">
+            炼化完成度 100%
+          </span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-3 text-xs pt-2">
+          <div class="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
+            <span class="text-zinc-400 text-[10px]">动作描写占比</span>
+            <div class="text-base font-bold text-emerald-400 font-mono">76.4%</div>
+            <span class="text-[10px] text-zinc-500">短促有力无拖沓</span>
+          </div>
+          <div class="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
+            <span class="text-zinc-400 text-[10px]">对白平均长度</span>
+            <div class="text-base font-bold text-indigo-400 font-mono">11.8 字/句</div>
+            <span class="text-[10px] text-zinc-500">高密度智斗言语</span>
+          </div>
+          <div class="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
+            <span class="text-zinc-400 text-[10px]">情绪反转周期</span>
+            <div class="text-base font-bold text-purple-400 font-mono">1,800 字/次</div>
+            <span class="text-[10px] text-zinc-500">黄金三章闭环率高</span>
+          </div>
+          <div class="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
+            <span class="text-zinc-400 text-[10px]">提炼生成物</span>
+            <div class="text-xs font-bold text-amber-300 mt-1">Skill: 乌贼序列智斗</div>
+            <span class="text-[10px] text-emerald-400">可一键挂载到写作台</span>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button class="px-3.5 py-1.5 bg-white/10 hover:bg-white/15 text-zinc-200 rounded-lg text-xs font-medium">
+            导出 Skill 代码包 (.ts)
+          </button>
+          <button onclick="publishToMarketplace()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow">
+            发布到 Skill 生态广场
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- MODULE 3: SKILL MARKETPLACE (技能生态广场) -->
+    <!-- ========================================================================= -->
+    <section id="module-skills" class="hidden flex-1 w-full h-full p-8 overflow-y-auto max-w-5xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-app-border pb-4">
+        <div>
+          <h2 class="text-xl font-bold text-zinc-100 flex items-center gap-2">
+            <i class="ph ph-cube text-purple-400"></i>
+            Skill 生态广场 (Marketplace)
+          </h2>
+          <p class="text-xs text-zinc-400 mt-1">探索其他作者公开分享的炼化技能包，或一键导入挂载到自己的小说中。</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <input class="bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-zinc-200 placeholder-zinc-500 outline-none w-48" placeholder="搜索写作技能..." />
+          <button class="px-3 py-1.5 bg-white/10 text-zinc-200 rounded-xl hover:bg-white/15">搜索</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4">
+        <!-- Skill 1 -->
+        <div class="apple-glass-card rounded-2xl p-4 space-y-3 flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-zinc-100">斩神·都市高武情绪流</span>
+              <span class="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono">4.9 ★ (1,208用)</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              专攻神明复苏、热血中二救赎感、单刀赴会型高潮场景。
+            </p>
+          </div>
+          <button class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">
+            一键安装并挂载
+          </button>
+        </div>
+
+        <!-- Skill 2 -->
+        <div class="apple-glass-card rounded-2xl p-4 space-y-3 flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-zinc-100">十日终焉·极限制衡智斗</span>
+              <span class="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-mono">4.8 ★ (892用)</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              强逻辑推演、微表情抓谎、多重心理博弈与规则陷阱构建。
+            </p>
+          </div>
+          <button class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">
+            一键安装并挂载
+          </button>
+        </div>
+
+        <!-- Skill 3 -->
+        <div class="apple-glass-card rounded-2xl p-4 space-y-3 flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs text-zinc-100">知乎盐言·极速第一人称反转</span>
+              <span class="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">4.9 ★ (2,410用)</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">
+              前 500 字高压冲突、第一人称情绪共鸣、结尾大逆转。
+            </p>
+          </div>
+          <button class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">
+            一键安装并挂载
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- MODULE 4: MARKET RANKINGS (官方主流平台大盘) -->
+    <!-- ========================================================================= -->
+    <section id="module-rankings" class="hidden flex-1 w-full h-full p-8 overflow-y-auto max-w-5xl mx-auto space-y-6">
+      <div class="flex items-center justify-between border-b border-app-border pb-4">
+        <div>
+          <h2 class="text-xl font-bold text-zinc-100 flex items-center gap-2">
+            <i class="ph ph-chart-line-up text-pink-400"></i>
+            官方正规小说大盘 (Market Brain)
+          </h2>
+          <p class="text-xs text-zinc-400 mt-1">覆盖起点、番茄、晋江等各大主流正规平台，严禁盗版小网站。</p>
+        </div>
+        <button class="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-zinc-200 flex items-center gap-1.5">
+          <i class="ph ph-arrows-clockwise"></i> 刷新官方数据
+        </button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4">
+        <div class="apple-glass rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between text-xs font-bold text-red-400">
+            <span>起点中文网 · 畅销榜</span>
+            <span class="text-[9px] bg-red-500/10 px-1.5 py-0.5 rounded">月票总榜</span>
+          </div>
+          <div class="space-y-1.5 text-xs text-zinc-300">
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>1. 《宿命之环》</span><span class="text-zinc-500">诡秘</span></div>
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>2. 《道诡异仙》</span><span class="text-zinc-500">克系</span></div>
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>3. 《赤心巡天》</span><span class="text-zinc-500">仙侠</span></div>
+          </div>
+        </div>
+
+        <div class="apple-glass rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between text-xs font-bold text-amber-400">
+            <span>番茄小说 · 完读热门榜</span>
+            <span class="text-[9px] bg-amber-500/10 px-1.5 py-0.5 rounded">读者大盘</span>
+          </div>
+          <div class="space-y-1.5 text-xs text-zinc-300">
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>1. 《我在精神病院学斩神》</span><span class="text-zinc-500">高武</span></div>
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>2. 《十日终焉》</span><span class="text-zinc-500">智斗</span></div>
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>3. 《异兽迷城》</span><span class="text-zinc-500">异能</span></div>
+          </div>
+        </div>
+
+        <div class="apple-glass rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between text-xs font-bold text-pink-400">
+            <span>晋江文学城 · 积分总榜</span>
+            <span class="text-[9px] bg-pink-500/10 px-1.5 py-0.5 rounded">女性向头部</span>
+          </div>
+          <div class="space-y-1.5 text-xs text-zinc-300">
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>1. 《偷偷藏不住》</span><span class="text-zinc-500">言情</span></div>
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>2. 《天官赐福》</span><span class="text-zinc-500">古风</span></div>
+            <div class="p-2 rounded bg-black/30 flex justify-between"><span>3. 《黑莲花攻略手册》</span><span class="text-zinc-500">穿书</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Navigation Switcher
+    function switchMainTab(tab) {
+      document.getElementById('module-workbench').classList.add('hidden');
+      document.getElementById('module-distill').classList.add('hidden');
+      document.getElementById('module-skills').classList.add('hidden');
+      document.getElementById('module-rankings').classList.add('hidden');
+
+      const tabs = ['workbench', 'distill', 'skills', 'rankings'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('nav-' + t);
+        if (t === tab) {
+          btn.className = "px-3.5 py-1.5 rounded-lg font-semibold bg-white/15 text-white shadow-sm flex items-center gap-1.5";
+        } else {
+          btn.className = "px-3.5 py-1.5 rounded-lg font-medium text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5";
+        }
+      });
+
+      document.getElementById('module-' + tab).classList.remove('hidden');
+    }
+
+    // Left Sidebar Switcher
+    function switchSidebarTab(tab) {
+      document.getElementById('spanel-outline').classList.add('hidden');
+      document.getElementById('spanel-canon').classList.add('hidden');
+      document.getElementById('spanel-skills').classList.add('hidden');
+
+      const tabs = ['outline', 'canon', 'skills'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('stab-' + t);
+        if (t === tab) {
+          btn.className = "flex-1 py-1 font-semibold rounded bg-white/15 text-white shadow-sm";
+        } else {
+          btn.className = "flex-1 py-1 font-medium text-zinc-400 hover:text-zinc-200";
+        }
+      });
+
+      if (tab === 'outline') document.getElementById('spanel-outline').classList.remove('hidden');
+      if (tab === 'canon') document.getElementById('spanel-canon').classList.remove('hidden');
+      if (tab === 'skills-attached') document.getElementById('spanel-skills').classList.remove('hidden');
+    }
+
+    // Right Sidebar Switcher
+    function switchRightTab(tab) {
+      document.getElementById('rpanel-checks').classList.add('hidden');
+      document.getElementById('rpanel-pipeline').classList.add('hidden');
+
+      const btnChecks = document.getElementById('rtab-checks');
+      const btnPipeline = document.getElementById('rtab-pipeline');
+
+      if (tab === 'checks') {
+        document.getElementById('rpanel-checks').classList.remove('hidden');
+        btnChecks.className = "flex-1 py-1 font-semibold rounded bg-white/15 text-white shadow-sm flex items-center justify-center gap-1";
+        btnPipeline.className = "flex-1 py-1 font-medium text-zinc-400 hover:text-zinc-200 flex items-center justify-center gap-1";
+      } else {
+        document.getElementById('rpanel-pipeline').classList.remove('hidden');
+        btnPipeline.className = "flex-1 py-1 font-semibold rounded bg-white/15 text-white shadow-sm flex items-center justify-center gap-1";
+        btnChecks.className = "flex-1 py-1 font-medium text-zinc-400 hover:text-zinc-200 flex items-center justify-center gap-1";
+      }
+    }
+
+    // Toggle Multi-Model Draw Mode
+    let drawModeActive = true;
+    function toggleDrawMode() {
+      drawModeActive = !drawModeActive;
+      const btn = document.getElementById('btn-draw-mode');
+      if (drawModeActive) {
+        btn.className = "px-3 py-1 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-medium flex items-center gap-1.5 text-xs shadow-sm";
+        btn.innerHTML = '<i class="ph ph-cards text-sm"></i><span>多模型/多提示词抽卡比稿 (开启)</span>';
+      } else {
+        btn.className = "px-3 py-1 rounded-lg border border-white/10 bg-white/[0.02] text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 text-xs";
+        btn.innerHTML = '<i class="ph ph-cards text-sm"></i><span>抽卡比稿 (已关闭·单模型省token)</span>';
+      }
+    }
+
+    // Trigger Draw Comparison Demo
+    function triggerDrawTest() {
+      const card = document.getElementById('draw-comparison-card');
+      card.classList.remove('hidden');
+      card.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function closeDrawComparison() {
+      document.getElementById('draw-comparison-card').classList.add('hidden');
+    }
+
+    function adoptCandidate(type) {
+      const target = document.getElementById('sample-target');
+      if (type === 'A') {
+        target.innerHTML = '阁老指尖骤然抠死桌面，青筋暴凸：“皇城里那位早就断了气。今夜万宝楼若不反，明日你我皆为刀下亡魂！”';
+      } else {
+        target.innerHTML = '阁老合上双目，声音轻如飞灰：“天子龙驭宾天三月有余。满朝文武，不过在陪死人演一出太平大戏。”';
+      }
+      closeDrawComparison();
+    }
+
+    // Stream Next Sentence
+    function triggerQuickContinuation() {
+      const container = document.getElementById('editor-body');
+      const p = document.createElement('p');
+      p.className = "p-1 rounded text-zinc-100 border-l-2 border-indigo-500 pl-3 bg-indigo-500/5 pop-in";
+      p.innerHTML = "阁老冷笑一声，从袖中取出一枚残破的黑玉虎符，缓缓推到林玄面前：“满朝文武皆以为天下太平，殊不知，这头困兽，已经饿了整整一百天。”";
+      container.appendChild(p);
+      p.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function toggleFontSettings() {
+      document.getElementById('font-settings-flyout').classList.toggle('hidden');
+    }
+
+    function setFontFamily(mode) {
+      const body = document.getElementById('editor-body');
+      if (mode === 'serif') {
+        body.className = "flex-1 overflow-y-auto px-12 md:px-20 py-8 max-w-4xl mx-auto w-full font-serif text-[18px] leading-[2.2] tracking-wide text-zinc-200 space-y-6";
+      } else {
+        body.className = "flex-1 overflow-y-auto px-12 md:px-20 py-8 max-w-4xl mx-auto w-full font-sans text-[16px] leading-[2.0] tracking-normal text-zinc-200 space-y-6";
+      }
+    }
+
+    function publishToMarketplace() {
+      alert("🎉 恭喜！《乌贼序列智斗》Skill 已成功打包并发布到 Skill 生态广场！其他作者已可下载或挂载。");
+    }
+
+    function triggerCommit() {
+      alert("【结章事务 Commit 成功】\n\n1. 第 45 章正文已落盘为 Markdown。\n2. 6 维智能机检全部通过 (Zero Conflict)。\n3. 提取 3 条事实与 1 条认知更新至 SQLite。\n4. 作者文风偏好模型已完成静默自适应。");
+    }
+  </script>
+</body>
+</html>
