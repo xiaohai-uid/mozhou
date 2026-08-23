@@ -29,6 +29,25 @@ export type TrackingKind = (typeof TRACKING_STREAMS)[number]['kind']
 /** 设定/ 五子目录对齐 EntityRef 五前缀（entity-directory-spec Q7：char/item/location/faction/concept）。 */
 export const ENTITY_CARD_DIRS = ['设定/人物', '设定/物品', '设定/地点', '设定/势力', '设定/概念'] as const
 
+/** EntityRef 前缀 ↔ 目录卡子目录的一一映射（spec Q7；扫描与建卡共用）。 */
+export const ENTITY_CARD_DIR_BY_PREFIX = {
+  char: '设定/人物',
+  item: '设定/物品',
+  location: '设定/地点',
+  faction: '设定/势力',
+  concept: '设定/概念',
+} as const
+
+export type EntityRefPrefix = keyof typeof ENTITY_CARD_DIR_BY_PREFIX
+
+/** Research 参考区（市场/）：条目永不进入生成 prompt、永不成为候选（#14 US17 硬隔离）。 */
+export const RESEARCH_DIRS = ['市场'] as const
+
+/** Research 区判定：这些目录下的文件不得被任何候选来源吸收。 */
+export function isResearchRelPath(relPosixPath: string): boolean {
+  return RESEARCH_DIRS.some((dir) => relPosixPath === dir || relPosixPath.startsWith(`${dir}/`))
+}
+
 export const OUTLINE_DIR = '大纲'
 export const CHAPTER_OUTLINE_DIR = '大纲/章节'
 export const TRACKING_DIR = '追踪'
@@ -41,6 +60,28 @@ export const VOLUME_ONE_PROSE_DIR = `${PROSE_DIR}/${VOLUME_ONE_TITLE}`
 export const AUTHOR_INTENT_PATH = '设定/作者意图.md'
 export const STYLE_PROFILE_PATH = '文风.md'
 export const MARKET_BRIEF_PATH = '市场/market-brief.md'
+
+/** 崩溃恢复日志（T3）：提交意图 + 各目标文件基线偏移与待写载荷。运行时区，非 canon。 */
+export const PENDING_COMMIT_PATH = `${RUNTIME_DIR}/pending-commit.json`
+
+const CHAPTER_INDEX_WIDTH = 4
+
+function chapterFileStem(chapterIndex: number): string {
+  if (!Number.isInteger(chapterIndex) || chapterIndex < 1) {
+    throw new Error(`chapterIndex must be a positive integer, got ${chapterIndex}`)
+  }
+  return `第${String(chapterIndex).padStart(CHAPTER_INDEX_WIDTH, '0')}章`
+}
+
+/** 章大纲节点文件路径（规划态；Scene 挂其 YAML 数组）。 */
+export function chapterOutlinePath(chapterIndex: number): string {
+  return `${CHAPTER_OUTLINE_DIR}/${chapterFileStem(chapterIndex)}.md`
+}
+
+/** 正文章文件路径（相位机载体：draft 或 committed）。 */
+export function proseChapterPath(chapterIndex: number): string {
+  return `${VOLUME_ONE_PROSE_DIR}/${chapterFileStem(chapterIndex)}.md`
+}
 
 /** createBook 初始落盘的全部 canon 文件（相对书根，POSIX）。 */
 export function canonSeedFilePaths(): string[] {

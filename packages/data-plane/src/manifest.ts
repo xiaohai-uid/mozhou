@@ -79,3 +79,29 @@ function statSyncSafe(path: string): boolean {
 export function writeManifest(root: string, manifest: HashManifest): void {
   writeFileSync(join(root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`)
 }
+
+/**
+ * 定向刷新：对给定 canon 路径按盘上现状重算指纹并并入基线（S4——基线只记
+ * 应用自己的写入；全量 buildManifest 会把无关的外部漂移一并吸进基线，故
+ * 增量写路径一律走此处）。返回新 manifest，不落盘。
+ */
+export function refreshManifestEntries(
+  manifest: HashManifest,
+  root: string,
+  relPaths: readonly string[],
+): HashManifest {
+  const files: Record<string, ManifestFileEntry> = { ...manifest.files }
+  for (const rel of relPaths) {
+    if (!isCanonRelPath(rel)) {
+      continue
+    }
+    const absolute = join(root, rel)
+    files[rel] = { sha256: sha256FileHex(absolute), bytes: statSync(absolute).size }
+  }
+  // 键序与 buildManifest（全树排序扫描）对齐：增量补丁后的基线与全量重建逐字节一致
+  const sorted: Record<string, ManifestFileEntry> = {}
+  for (const key of Object.keys(files).sort()) {
+    sorted[key] = files[key] as ManifestFileEntry
+  }
+  return { ...manifest, files: sorted }
+}

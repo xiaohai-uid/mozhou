@@ -488,3 +488,42 @@ export interface ChapterCommit extends KernelEntityHead {
   /** 内容 SHA-256（外部对账哈希基准，ADR-0010） */
   readonly contentHash: string;
 }
+
+/* ----------------------------------------------------------------------------
+ * 10. 实体目录层（工单 #13 受控增补；规划·宪法层工件，非九柱实体——#4 决策：
+ *     "Codex 实体不在九柱内，以稳定字符串引用"。不进追踪 jsonl、不扩 EntityKind；
+ *     落盘为 设定/<类型>/*.md frontmatter，规格见 entity-directory-spec.md）
+ * -------------------------------------------------------------------------- */
+
+/** AI Context 装配策略四档（#7 决议③；对齐 Novelcrafter AI Context）。
+ *  仅裁决激活与否——secret.* 授权行与 POV 切片门禁中央强制，
+ *  任何档位含 always / never / manual_pin 均不得绕过（entity-directory-spec D1）。 */
+export type AiContextTier = 'always' | 'detected' | 'detectedOff' | 'never';
+
+/** 别名规则：中文检测以 exact 全串匹配优先、regex 兜底变体；
+ *  数组顺序即优先级；caseSensitive 仅影响拉丁字母，默认 false（spec Q3）。 */
+export interface AliasRule {
+  readonly text: string;
+  readonly kind: 'exact' | 'regex';
+  readonly caseSensitive?: boolean;
+}
+
+/** 实体目录卡 frontmatter（设定/<类型>/*.md；规划·宪法层，保存即落盘）。
+ *  正文区人读且永不整体入包；AI 面仅 brief（缺省回退正文按 world_rule 截断）。
+ *  ref 一经引用即冻结、全书唯一；文件名只是皮（Q13 身份规则延续）。 */
+export interface EntityCardFrontmatter {
+  readonly ref: EntityRef;
+  /** 规范显示名，可随时改、不回写 ref；建卡时自动入 aliases 首位（作者可删）。 */
+  readonly name: string;
+  /** 装配策略四档，默认 'detected'。always ⇒ structural.sections 注入，
+   *  受 structuralCapTokens 约束，超出 = 配置错误（spec D5）。 */
+  readonly aiContext?: AiContextTier;
+  /** 检测表；数组顺序即优先级。 */
+  readonly aliases?: readonly AliasRule[];
+  /** 卡级排除词表：命中但不触发检测。 */
+  readonly excludedPhrases?: readonly string[];
+  /** 进 prompt 的压缩面；缺省回退 = 正文按 world_rule truncateCap 截断。 */
+  readonly brief?: string;
+  /** 作者组织用标签，永不入包（spec D4）。 */
+  readonly tags?: readonly string[];
+}
