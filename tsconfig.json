@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/kernel" },
+    { "path": "packages/data-plane" },
+    { "path": "packages/context-compiler" }
+  ]
+}
