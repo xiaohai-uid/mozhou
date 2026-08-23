@@ -148,6 +148,14 @@ _Avoid_: Protected entry, undeletable entry, eviction-immune entry
 The pre-deducted token floor reserving prose capacity ahead of any setting-entry competition; setting-like entries can never spend it, while prose itself may absorb unused pool slack beyond the floor.
 _Avoid_: Prose budget cap, quota refund, story text limit
 
+**Recomputability**:
+The audit property of a Context Receipt: given un-drifted inputs, recompilation reproduces the identical recomputation hash, and any input drift is detectable and localizable to specific dependencies — never silent divergence.
+_Avoid_: Full input snapshot, determinism claim without verification, best-effort replay
+
+**Activation Evidence**:
+The compressed record of why a candidate entered recall through its channel — matched keyword, graph hop path, embedding neighbor, or manual pin — carried per receipt entry.
+_Avoid_: Activation key dump, search log, relevance explanation prose
+
 **Continuity Gate**:
 A series of deterministic and LLM-assisted verification checks executed before chapter commit to detect logic errors, knowledge leaks, timeline paradoxes, and dead promises.
 _Avoid_: Linter, fact checker, review agent

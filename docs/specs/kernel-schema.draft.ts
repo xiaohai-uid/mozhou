@@ -373,6 +373,9 @@ export interface ReceiptEntry {
   readonly identifier: string; // 条目标识（实体 id / 分区名）
   readonly included: boolean;
   readonly assemblySource?: AssemblyChannel | undefined;
+  /** 激活证据（工单 #9 增补）：经召回通道进入候选的凭据压缩串，
+   *  词法 key:<命中词> | khop:<源实体>·<n>hop | emb:<邻居id> | pin；对标 NAI Viewer Key 列 */
+  readonly recallEvidence?: string | undefined;
   /** 运行时不变量：included=false 时必填 */
   readonly exclusionReason?: ExclusionReason | undefined;
   readonly reservedTokens?: number | undefined; // 两阶段装配的预订额（NAI 先例）
@@ -400,6 +403,8 @@ export interface ContextReceipt extends KernelEntityHead {
   readonly totalTokens: number;
   /** 恒为 'server'（N10，I4）——类型层面把客户端装配表达为非法状态 */
   readonly assembledBy: 'server';
+  /** 输入固化摘要（工单 #9 增补）：漂移检测锚点，语义见 context-receipt-physical-format-spec §3.1 */
+  readonly inputsDigest: string;
   /** 同输入重算装配应得到同哈希；receipt 间 diff 即审计（可复算可 diff） */
   readonly recomputationHash: string;
 }
