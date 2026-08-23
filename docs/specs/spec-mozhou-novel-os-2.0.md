@@ -108,6 +108,10 @@ interface ChapterCommitPacket {
 
 ---
 
+### Research Amendments (2026-08-23)
+
+[ADR-0019](../adr/0019-research-driven-amendments-protected-edits-compaction-receipts-knowledgestate.md) records four amendments from the two-volume reference retrospective (`docs/research/reference-retrospective*.md`): protected author edits with stale propagation (amends 0010), LLM-only long-range compaction — keyword extraction banned (amends 0011), first-class Context Receipts with story-text quota and server-side-only assembly (amends 0004), first-class KnowledgeState schema with dual-channel recall (amends 0002). The Gate A behavioral freeze list (MUST M1-M20 / MUST NOT N1-N12, retrospective vol2 终章) is normative for every implementation ticket. Note: the `Drizzle/better-sqlite3` slash in this document is an open decision tracked by the SQLite access-layer research issue.
+
 ## Testing Decisions
 
 1. **Behavioral Black-Box Testing**:

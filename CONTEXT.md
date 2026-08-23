@@ -62,6 +62,14 @@ _Avoid_: Saved file, chapter markdown, draft accept
 An unverified state delta generated when an external modification to canonical Markdown/JSONL files is detected via SHA-256 mismatch, staged for author reconciliation.
 _Avoid_: Overwrite prompt, dirty state, sync error
 
+**Protected Author Content**:
+Human-authored prose or canon edits carrying a protection flag; automated passes may never overwrite them, and upstream recomputation may only mark affected downstream artifacts stale (ADR-0019 §4).
+_Avoid_: Lock file, read-only mode
+
+**Stale Marker**:
+A non-destructive flag placed on downstream artifacts whose upstream inputs changed, signaling re-verification without deleting or regenerating author content.
+_Avoid_: Deletion, cache purge, rewrite
+
 **Dependency Manifest**:
 An exact, deterministic record of all canonical entities, facts, outline nodes, promises, world rules, and style versions read during the compilation and generation of a specific chapter.
 _Avoid_: Context dump, read log, prompt history
