@@ -160,6 +160,14 @@ _Avoid_: Compressed evidence string, activation key dump, search log, relevance 
 The minimal input snapshot archived inside a Context Receipt — config/tokenizer/model versions plus the desirability-ordered candidate list with scores and content digests, structural section digests, and story-text slice digests — sufficient to deterministically re-run the budget assembly phase; entity contents themselves are never duplicated. Recall-filter pass-throughs sit outside the replay contract.
 _Avoid_: Raw prompt archive, full input snapshot, digest-only anchor
 
+**Graph Trigger Source**:
+An EntityRef resolved by the keyword fast channel from a draft mention through the alias table; it roots the k-hop graph recall, and its entity card enters the candidate set unconditionally while its one-hop facts bypass relevance threshold but never budget or gating.
+_Avoid_: Mention hit, activation key, anchor entity
+
+**K-Hop Recall**:
+The deterministic breadth-limited traversal of the POV-visible Temporal Canon subgraph that expands from trigger sources across relationship, reference, and event edges under hard branch caps to surface neighborhood facts as candidates.
+_Avoid_: Graph search, recursive scanning, memory walk
+
 **Continuity Gate**:
 A series of deterministic and LLM-assisted verification checks executed before chapter commit to detect logic errors, knowledge leaks, timeline paradoxes, and dead promises.
 _Avoid_: Linter, fact checker, review agent

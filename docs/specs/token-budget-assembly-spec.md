@@ -12,7 +12,7 @@ tags:
 
 > 工单 [#8](https://github.com/xiaohai-uid/mozhou/issues/8) · 决策记录见 ADR-0020 · 消费冻结 schema
 > `kernel-schema.draft.ts §8`（`ReceiptEntry` / `ExclusionReason` / `storyTextQuota`）
-> 边界：召回与打分归 #7（Context 查询 API）；Receipt 物理存储与 EventLedger 关系归 #9。
+> 边界：召回与打分归 #7（Context 查询 API），k-hop 算子细节归 #12（[khop-graph-recall-spec](./khop-graph-recall-spec.md)，含 entity_card 档与 overdue 升档两处本表增补）；Receipt 物理存储与 EventLedger 关系归 #9。
 
 ## 0. 算法一句话
 
@@ -49,8 +49,9 @@ budget:
     review: 0.15
     fact_extraction: 0.10
 tiers:                                  # rank 小者优先；defaultTrim 层默认，atomicOverride 可逐条覆盖
+  entity_card:       { rank: 1, defaultTrim: atomic }   # 实体卡（#12 受控增补档：触发必入 / embedding 直达）
   active_fact:       { rank: 1, defaultTrim: atomic }
-  promise_due:       { rank: 1, defaultTrim: atomic }   # 仅 status∈{due} 的 Promise；未到期归 distant_recall 档
+  promise_due:       { rank: 1, defaultTrim: atomic }   # status∈{due, overdue}（#12：overdue 升档）；其余活跃态归 distant_recall 档
   world_rule:        { rank: 2, defaultTrim: truncated, truncateCap: 512 }
   rolling_recap:     { rank: 3, defaultTrim: truncated, truncateCap: 256 }
   distant_recall:    { rank: 4, defaultTrim: truncated, truncateCap: 128 }
