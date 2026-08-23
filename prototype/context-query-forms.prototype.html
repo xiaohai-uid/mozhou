@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>墨舟原型 · Context 查询形态对照：结构化查询 vs 声明式引用</title>
+<style>
+  :root{
+    --ink:#1c2333; --ink-2:#5a6478; --line:#e4e7ee; --bg:#fafbfd; --card:#ffffff;
+    --accent:#4353c4; --accent-soft:#eef0fc; --ok:#1d7a4f; --ok-soft:#e9f6ef;
+    --warn:#b4232a; --warn-soft:#fdeeee; --chip:#f0f2f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.65}
+  header{max-width:1080px;margin:0 auto;padding:36px 24px 8px}
+  h1{font-size:22px;margin:0 0 10px}
+  .question{background:var(--accent-soft);border-left:4px solid var(--accent);padding:12px 16px;border-radius:0 8px 8px 0;color:var(--ink)}
+  .question b{color:var(--accent)}
+  main{max-width:1080px;margin:0 auto;padding:16px 24px 64px}
+  /* 任务设定栏 */
+  .setup{display:flex;flex-wrap:wrap;gap:18px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:18px 0;align-items:center}
+  .setup .grp{display:flex;align-items:center;gap:8px}
+  .setup label{color:var(--ink-2);font-size:13px}
+  button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 12px;cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{opacity:.88;color:#fff}
+  button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  button.step-btn{width:100%;text-align:left;margin-top:6px}
+  select,textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--card);color:var(--ink)}
+  textarea{width:100%;min-height:220px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.7;padding:12px}
+  /* 页签 */
+  .tabs{display:flex;gap:6px;margin:20px 0 0;border-bottom:2px solid var(--line)}
+  .tabs button{border:none;border-radius:8px 8px 0 0;background:none;color:var(--ink-2);padding:9px 18px;font-size:15px}
+  .tabs button.active{color:var(--accent);font-weight:700;background:var(--card);border:1px solid var(--line);border-bottom:2px solid var(--card);margin-bottom:-2px}
+  .panel{display:none}.panel.active{display:block}
+  /* 输出三区 */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:900px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h3{margin:0 0 8px;font-size:14px;color:var(--ink-2);font-weight:600}
+  .sec{margin:10px 0 2px;font-size:12px;color:var(--accent);font-weight:700;letter-spacing:.04em}
+  .entry{padding:5px 8px;border-radius:6px;margin:2px 0;display:flex;justify-content:space-between;gap:10px;background:var(--bg)}
+  .entry.dim{color:var(--ink-2)}
+  .tk{color:var(--ink-2);font-size:12px;white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{color:var(--ink-2);font-weight:600;text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+  td{padding:4px 6px;border-bottom:1px solid var(--bg)}
+  .yes{color:var(--ok);font-weight:600}.no{color:var(--warn)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);border-radius:999px;padding:2px 10px;font-size:12px;font-family:ui-monospace,monospace}
+  .leak{display:none;background:var(--warn-soft);border:1px solid #efb9bc;color:var(--warn);border-radius:8px;padding:10px 14px;margin-top:12px;font-weight:600}
+  .leak.show{display:block}
+  .failures .fail{background:var(--warn-soft);border-radius:8px;padding:8px 12px;margin:6px 0;font-size:13px}
+  .failures .fail code{color:var(--warn)}
+  .hash{font-family:ui-monospace,monospace;color:var(--ink-2);font-size:12px;margin-top:8px}
+  .note{color:var(--ink-2);font-size:13px;background:var(--bg);border-radius:8px;padding:10px 14px;margin-top:10px}
+  /* 走查 */
+  .walk{margin-top:26px}
+  .walk-tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .walk-tabs button{font-size:13px}
+  .walk-box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-top:10px}
+  .walk-box p.desc{margin:4px 0 10px;color:var(--ink-2)}
+  ol.steps{margin:0;padding:0 0 0 4px;list-style:none}
+  .walk-note{font-size:13px;color:var(--accent);margin-top:8px;font-weight:600}
+  ul.tight{margin:6px 0;padding-left:18px}ul.tight li{margin:4px 0}
+  footer{max-width:1080px;margin:0 auto;padding:0 24px 48px;color:var(--ink-2);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>墨舟原型 · Context Compiler 调用形态对照</h1>
+  <div class="question">
+    <b>本原型回答的问题</b>：Context Compiler 的调用形态应该长什么样——
+    <b>方案 A 结构化查询</b>（规格四缝里的 <code>queryActiveFacts(chapter, entityIds, pov)</code> + <code>compile(...)</code>，
+    调用方用带类型的函数把"要什么"说清楚），还是
+    <b>方案 B 声明式引用</b>（NovelForge 式 <code>@卡:角色[过滤].{字段}</code> 配方文本，展开器照单解析）？
+    两侧吃<b>同一份内核快照、同一个任务设定</b>，产出同样的三件套：上下文包、装配凭证、依赖清单。请点按钮摸手感。
+  </div>
+</header>
+
+<main>
+  <!-- 共享任务设定 -->
+  <div class="setup">
+    <div class="grp"><label>当前章</label>
+      <button id="ch-minus">−</button><b id="ch-val">12</b><button id="ch-plus">＋</button>
+    </div>
+    <div class="grp"><label>编译视角 POV</label><select id="pov-sel"></select></div>
+    <div class="grp" id="mention-grp"><label>草稿已提及（激活）</label></div>
+    <div class="grp" id="pin-grp"><label>钉选</label></div>
+    <div class="grp"><label>预算</label><b>600 tok</b></div>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="a" class="active">方案 A · 结构化查询</button>
+    <button data-tab="b">方案 B · 声明式引用配方</button>
+    <button data-tab="notes">对照笔记（grilling 议题）</button>
+  </div>
+
+  <!-- ================= 方案 A ================= -->
+  <section class="panel active" id="panel-a">
+    <div class="note">
+      调用方式：<code>queryActiveFacts(chapterIndex, entityIds, pov)</code> →
+      <code>compile(taskType, scope, budget, …) → { packet, receipt, manifest }</code>。
+      视角与区间是<b>缝的签名参数</b>——调用方没法"忘传"，编译器统一强制。
+      草稿提及驱动激活；钉选走 manual_pin；图一跳自动扩展进「关联召回」层。
+    </div>
+    <div style="margin-top:12px"><button class="primary" id="a-run">重新编译第 <span class="echo-ch">12</span> 章</button></div>
+    <div id="a-out"></div>
+    <div class="walk" id="a-walk"></div>
+  </section>
+
+  <!-- ================= 方案 B ================= -->
+  <section class="panel" id="panel-b">
+    <div class="note">
+      调用方式：作者写一段<b>引用配方</b>（每条 @ 引用 = 一条可静态提取的依赖声明），展开器单遍非递归展开；
+      解析失败显性化成红牌 + <code>[Error]</code> 行，其余行继续。注意：方案 B <b>不看草稿提及</b>——
+      进什么完全由配方决定（这正是差异点之一）。
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button data-preset="standard">载入·标准配方</button>
+      <button data-preset="leaky">载入·缺知情过滤</button>
+      <button data-preset="typo">载入·含错字</button>
+      <button class="primary" id="b-run">按配方展开编译</button>
+      <button id="b-staticdeps">静态依赖预览（不执行）</button>
+    </div>
+    <div style="margin-top:10px"><textarea id="recipe" spellcheck="false"></textarea></div>
+    <div id="b-deps"></div>
+    <div id="b-out"></div>
+    <div class="walk" id="b-walk"></div>
+  </section>
+
+  <!-- ================= 对照笔记 ================= -->
+  <section class="panel" id="panel-notes">
+    <div class="card">
+      <h3>两侧都跑一遍后值得拍板的议题（供 grilling）</h3>
+      <ul class="tight">
+        <li><b>泄漏防线放在哪一层？</b> A 里"知情=pov"是查询签名的强制参数，不存在"忘写"这个错误类别；
+          B 里它是配方里的一节过滤器——作者每处都要自觉，漏一处就是全量泄密（见走查二的红牌）。
+          防线强度 vs 表达自由的取舍怎么定？</li>
+        <li><b>错误何时暴露？</b> B 的引用写错在运行期得到响亮的 ParseFailure 红牌；
+          A 的拼写错被编码期类型系统拦住，但运行期传错 ID 只是<b>安静地空结果</b>——审计面上只表现为清单变短。
+          你更怕哪一种静默失败？</li>
+        <li><b>依赖清单何时可知？</b> B 每条 @ 引用在展开前就能静态提取成 Dependency Manifest 声明（变更影响分析可提前到保存配方时）；
+          A 的清单是执行后的读账。提前声明值多少钱？</li>
+        <li><b>"正文提到了谁"由谁发现？</b> A 由草稿提及（关键词激活）驱动；B 完全由配方声明。
+          网文写作流里，作者愿意手工维护"本章要哪些设定"吗，还是要 Codex 式 Detected 自动命中？</li>
+        <li><b>谁来写这些调用？</b> A 的受众是写代码的人（类型、IDE 补全）；B 的受众可能是高级作者/模板作者（类 lorebook 手感）。
+          墨舟 Phase 2 的真实调用方是产品功能还是作者模板？</li>
+        <li><b>混合形态值不值得开票？</b> 研究卷二 D.4 的暗示：声明式做"配方/模板层"，底层仍是确定性查询算子，
+          配方里的 @ 引用静态提取进 Manifest、知情过滤下沉为算子默认行为。若走混合，边界画在哪？</li>
+        <li><b>与冻结约束的咬合：</b> 两案都能产出 ReceiptEntry(AssemblyChannel/ExclusionReason)/ParseFailure/recomputationHash，
+          都满足服务端装配（N10）。差异不在能不能，而在<b>错误分布与维护成本</b>。</li>
+      </ul>
+    </div>
+  </section>
+</main>
+<footer>PROTOTYPE — throwaway demo for wayfinder 工单「Context 查询 API 形态」· 数据为演示内核快照 · 判定后本页进 throwaway 分支留档，主分支只留结论。</footer>
+
+<script>
+'use strict';
+/* ============================================================================
+ * 共享固定数据：内核快照 v@12（形状对齐 docs/specs/kernel-schema.draft.ts 子集）
+ * ==========================================================================*/
+const NAMES = {
+  'char:lin-xuan':'林轩', 'char:ye-qingluo':'叶青萝', 'char:xuanming-laozu':'玄冥老祖',
+  'item:qingyun-jian':'青云剑', 'location:tianyan-city':'天衍城', 'faction:tianji-pavilion':'天机阁'
+};
+const KERNEL = {
+  book:{ id:'book_01', title:'逆刃登仙录', revision:3 },
+  authorIntent:{ premise:'废柴少年以断刃逆修，掀翻宗门棋局', tokens:42 },
+  scene:{ id:'scene_01', chapterOutlineNodeId:'chapter_12', orderIndex:1,
+          povEntity:'char:lin-xuan', summary:'夜探天机阁档房，林轩撞破叶青萝密室取令',
+          beats:[{description:'潜入档房，避开盘查'},{description:'撞见叶青萝开启暗格'},{description:'两人对峙，各自试探'}] },
+  facts:[
+    { id:'fact_01', subject:'char:lin-xuan', predicate:'当前境界', value:'筑基后期',
+      validFrom:1, validUntil:null, importance:'critical', riskClass:'high', status:'confirmed', revision:2 },
+    { id:'fact_02', subject:'char:lin-xuan', predicate:'佩剑', value:'青云剑',
+      validFrom:2, validUntil:null, importance:'notable', riskClass:'low', status:'confirmed', revision:1 },
+    { id:'fact_03', subject:'char:ye-qingluo', predicate:'secret.真实身份', value:'天机阁暗桩',
+      validFrom:5, validUntil:null, importance:'critical', riskClass:'high', status:'confirmed', revision:1 },
+    { id:'fact_04', subject:'char:lin-xuan', predicate:'服饰', value:'月白长袍',
+      validFrom:3, validUntil:5, importance:'trivial', riskClass:'low', status:'confirmed', revision:1 },
+    { id:'fact_05', subject:'location:tianyan-city', predicate:'城主', value:'裴无咎',
+      validFrom:1, validUntil:null, importance:'notable', riskClass:'low', status:'confirmed', revision:1 }
+  ],
+  knowledgeStates:[
+    { id:'knst_01', factId:'fact_03', holder:'reader', knownSinceChapter:8 },
+    { id:'knst_02', factId:'fact_03', holder:'char:ye-qingluo', knownSinceChapter:5 },
+    { id:'knst_03', factId:'fact_01', holder:'char:xuanming-laozu', knownSinceChapter:11, distortion:'筑基中期' }
+  ],
+  promises:[
+    { id:'prom_01', type:'countdown', description:'青云剑封印将在数章内反噬', introducedChapter:9, targetChapter:18, status:'reinforced', revision:1 },
+    { id:'prom_02', type:'foreshadowing', description:'天机阁密令的内容未揭晓', introducedChapter:5, targetChapter:null, status:'introduced', revision:1 }
+  ],
+  relationships:[
+    { id:'rels_01', entityA:'char:lin-xuan', entityB:'char:ye-qingluo', relationshipType:'并肩之谊', affinityScore:35, validFrom:4, validUntil:null },
+    { id:'rels_02', entityA:'char:xuanming-laozu', entityB:'char:lin-xuan', relationshipType:'猎杀目标', affinityScore:-80, validFrom:8, validUntil:null },
+    { id:'rels_03', entityA:'char:ye-qingluo', entityB:'faction:tianji-pavilion', relationshipType:'暗桩隶属', affinityScore:0, validFrom:5, validUntil:null }
+  ],
+  recaps:[
+    { chapterIndex:11, text:'叶青萝夜访林轩，赠疗伤丹，言语试探断刃来历。', tokens:30 },
+    { chapterIndex:10, text:'玄冥老祖座下鹰犬现身天衍城，林轩险胜脱身。', tokens:30 }
+  ]
+};
+const ALL_ENTITIES = Object.keys(NAMES);
+const DEFAULT_MENTIONS = { 'char:lin-xuan':true, 'item:qingyun-jian':true, 'char:ye-qingluo':false,
+                           'char:xuanming-laozu':false, 'location:tianyan-city':false };
+/* 图一跳邻接：由关系端点 + 事实主体→实体值推导（演示简化） */
+function neighbors(ref, chapter){
+  const set = new Set();
+  for(const r of KERNEL.relationships){
+    if(r.validFrom<=chapter && (r.validUntil===null || chapter<=r.validUntil)){
+      if(r.entityA===ref) set.add(r.entityB);
+      if(r.entityB===ref) set.add(r.entityA);
+    }
+  }
+  const f2 = KERNEL.facts.find(f=>f.subject===ref && f.predicate==='佩剑');
+  if(f2) ALL_ENTITIES.forEach(e=>{ if(NAMES[e]===f2.value) set.add(e); });
+  set.delete(ref);
+  return [...set];
+}
+
+/* ============================================================================
+ * 共享语义（两案同一套判定，保证对照公平）
+ * ==========================================================================*/
+const SECRET_RE = /^secret\./;
+const activeAt = (f,n)=> f.validFrom<=n && (f.validUntil===null || n<=f.validUntil);
+/* 知情门禁：秘密事实要求「当前 POV 本人」的授权行（reader 行只对 reader 视角生效）；
+ * 非秘密事实人人可见（扭曲另作渲染叠加） */
+function povKnows(fact, pov, n){
+  if(!SECRET_RE.test(fact.predicate)) return true;
+  return KERNEL.knowledgeStates.some(k=> k.factId===fact.id &&
+    k.holder===pov && k.knownSinceChapter<=n );
+}
+/* 扭曲渲染：POV 对该事实持畸变信念时显示其认知版本 */
+function renderFact(fact, pov){
+  const base = `${NAMES[fact.subject]||fact.subject} · ${fact.predicate.replace(/^secret\./,'')} = ${fact.value}`;
+  const d = KERNEL.knowledgeStates.find(k=>k.factId===fact.id && k.holder===pov && k.distortion);
+  return d ? `${base.replace(fact.value, d.distortion)}（${NAMES[pov]||pov}的认知，实为 ${fact.value}）` : base;
+}
+const estTokens = s => Math.max(4, Math.round([...s].reduce((a,c)=>a+(c.charCodeAt(0)>255?2:1),0)/2));
+function djb2(str){ let h=5381; for(let i=0;i<str.length;i++){ h=((h<<5)+h+str.charCodeAt(i))>>>0; } return h.toString(16).padStart(8,'0'); }
+
+/* 泄漏检查器（演示侧 Continuity Gate 替身）：入包秘密事实若 pov 无授权即报警 */
+function checkLeaks(includedFacts, pov, n){
+  return includedFacts.filter(f=> SECRET_RE.test(f.predicate) && !povKnows(f,pov,n));
+}
+
+/* ============================================================================
+ * 模块 A —— 结构化查询（可移植纯函数；对应 StoryKernelService/ContextCompiler 缝）
+ * 无 DOM、无全局状态；kernel 与请求全部显式传入。
+ * ==========================================================================*/
+const StructuredQuery = {
+  /** 规格签名：queryActiveFacts(chapter, entityIds, pov)
+   *  返回 {included:[{fact,view}], excluded:[{fact,reason}]}，reason∈pov_filtered|interval_not_active */
+  queryActiveFacts(kernel, req){
+    const { chapterIndex, entityIds, pov } = req;
+    const included=[], excluded=[];
+    for(const f of kernel.facts){
+      if(f.status!=='confirmed'){ continue; }
+      if(!activeAt(f,chapterIndex)){ excluded.push({fact:f, reason:'interval_not_active'}); continue; }
+      if(!entityIds.has(f.subject)){ continue; }               // 未激活不进候选（无收据噪音）
+      if(!povKnows(f,pov,chapterIndex)){ excluded.push({fact:f, reason:'pov_filtered'}); continue; }
+      included.push({ fact:f, view:renderFact(f,pov) });
+    }
+    return { included, excluded };
+  },
+  /** 编译入口：compile(taskType, scope, tokenBudget, …) -> { packet, receipt, manifest } */
+  compile(kernel, req){
+    const { taskType, chapterIndex, pov, mentioned, pinned, tokenBudget } = req;
+    const entitySet = new Set([...mentioned, ...pinned]);
+    // 图一跳扩展：邻居的事实进「关联召回」层（触发源必入候选集）
+    const khopSet = new Set();
+    for(const e of entitySet) for(const nb of neighbors(e, chapterIndex)) if(!entitySet.has(nb)) khopSet.add(nb);
+
+    const qBase = this.queryActiveFacts(kernel,{chapterIndex,entityIds:entitySet,pov});
+    const qKhop = this.queryActiveFacts(kernel,{chapterIndex,entityIds:khopSet,pov});
+
+    // 候选条目（分层 = ADR-0004 trim 层级）
+    const cands=[];
+    cands.push({tier:1,label:`宪法 · Author Intent：${kernel.authorIntent.premise}`,channel:'structural',kind:'authorIntent',id:kernel.book.id,rev:kernel.book.revision});
+    cands.push({tier:2,label:`任务框架 · 第${chapterIndex}章 场景「${kernel.scene.summary}」（拍：${kernel.scene.beats.map(b=>b.description).join(' / ')}）`,channel:'structural',kind:'scene',id:kernel.scene.id,rev:0});
+    for(const {fact,view} of qBase.included)
+      cands.push({tier:3,label:view,channel:pinned.includes(fact.subject)&&!mentioned.includes(fact.subject)?'manual_pin':'keyword',kind:'temporalFact',id:fact.id,fact});
+    for(const p of kernel.promises)
+      cands.push({tier:4,label:`承诺(${p.type}) · ${p.description}［第${p.introducedChapter}章埋，目标第${p.targetChapter??'—'}章］`,channel:'structural',kind:'narrativePromise',id:p.id,rev:p.revision});
+    for(const r of kernel.recaps)
+      cands.push({tier:5,label:`回顾 ch${r.chapterIndex} · ${r.text}`,channel:'structural',kind:'recap',id:'recap_'+r.chapterIndex});
+    for(const {fact,view} of qKhop.included)
+      cands.push({tier:6,label:view+'　〈关联召回〉',channel:'graph_khop',kind:'temporalFact',id:fact.id,fact});
+
+    // 预算填充：层级顺序、原子整条、超支记 budget_exhausted
+    let used=0; const packet=[], receipt=[], manifest=[];
+    for(const c of cands){
+      c.tokens = estTokens(c.label);
+      if(used + c.tokens <= tokenBudget){ used+=c.tokens; c.included=true; packet.push(c); receipt.push(c);
+        if(c.kind!=='recap') manifest.push({kind:c.kind,id:c.id,rev:c.rev??null});
+      } else { c.included=false; c.reason='budget_exhausted'; receipt.push(c); }
+    }
+    // 未进候选的事实也要有账（pov/interval 两类淘汰）
+    for(const e of [...qBase.excluded,...qKhop.excluded])
+      receipt.push({tier:0,label:`${NAMES[e.fact.subject]||e.fact.subject}·${e.fact.predicate}`,tokens:estTokens(String(e.fact.value)),included:false,reason:e.reason,channel:'keyword'});
+    const hash = djb2(JSON.stringify(packet.map(p=>[p.tier,p.label])));
+    return { packet, used, receipt, manifest, hash, parseFailures:[] };
+  }
+};
+
+/* ============================================================================
+ * 模块 B —— 声明式引用展开器（可移植纯函数；NovelForge @DSL 改造版）
+ * 文法：@intent | @task | @卡:<ref>.{字段,…|*} | @facts:[键=值][…] | @kg:<ref>
+ *       | @promises:[状态=active] | @recap:previous:N
+ * 单遍非递归；解析失败显性化（ParseFailure + [Error] 行），其余行继续。
+ * staticDependencies() 不接触内核即可提取依赖声明。
+ * ==========================================================================*/
+const RecipeResolver = {
+  _parseLine(line){
+    const t=line.trim();
+    if(t===''||t.startsWith('#')) return null;
+    if(t==='@intent'||t==='@task') return {op:t.slice(1)};
+    let m=t.match(/^@卡:(\S+)\.\{(.*)\}$/); if(m) return {op:'card',ref:m[1],fields:m[2]};
+    m=t.match(/^@facts:((?:\[[^\]]*\])+)$/); if(m){
+      const conds=[...m[1].matchAll(/\[([^=\]]+)=([^\]]*)\]/g)].map(x=>({key:x[1],val:x[2]}));
+      return {op:'facts',conds}; }
+    m=t.match(/^@kg:(\S+)$/); if(m) return {op:'kg',ref:m[1]};
+    m=t.match(/^@promises:((?:\[[^\]]*\])*)$/); if(m) return {op:'promises'};
+    m=t.match(/^@recap:previous:(\d+)$/); if(m) return {op:'recap',n:+m[1]};
+    throw new Error('无法解析的引用语法');
+  },
+  /** 静态依赖预览：只看文本，不碰内核（NovelForge 亮点②的移植） */
+  staticDependencies(text){
+    const deps=[]; const fails=[];
+    for(const line of text.split('\n')){
+      let node; try{ node=this._parseLine(line); }catch(e){ fails.push({source:line.trim(),detail:e.message}); continue; }
+      if(!node) continue;
+      if(node.ref && !NAMES[node.ref]) { fails.push({source:line.trim(),detail:`未知实体 ${node.ref}`}); continue; }
+      const kind = node.op==='card'||node.op==='facts' ? 'temporalFact(声明)'
+                 : node.op==='kg' ? 'graph(一跳)' : node.op==='promises' ? 'narrativePromise'
+                 : node.op==='recap' ? `recap×${node.n}` : node.op;
+      deps.push(kind + (node.ref?`:${node.ref}`:'') + (node.conds?node.conds.map(c=>`[${c.key}=${c.val}]`).join(''):''));
+    }
+    return {deps,fails};
+  },
+  expand(kernel, ctx, text){
+    const { chapterIndex, pov, pinned } = ctx;
+    const out={ sections:[], receipt:[], manifest:[], parseFailures:[], errorLines:[] };
+    let used=0; const tierOf={intent:1,task:2,facts:3,card:3,promises:4,recap:5,kg:6};
+    const push=(tier,label,channel,kind,id,rev)=>out.sections.push({tier,label,tokens:estTokens(label),channel,kind,id,rev:rev??null});
+    const budget=ctx.tokenBudget;
+    const fits=(tok)=>used+tok<=budget;
+
+    for(const line of text.split('\n')){
+      let node;
+      try{ node=this._parseLine(line); }
+      catch(e){ out.parseFailures.push({source:line.trim(),detail:e.message}); out.errorLines.push(`[Error] ${line.trim()} ← ${e.message}`); continue; }
+      if(!node) continue;
+      try{
+        if(node.op==='intent'){
+          const L=`宪法 · Author Intent：${kernel.authorIntent.premise}`;
+          if(fits(estTokens(L))){used+=estTokens(L);push(1,L,'structural','authorIntent',kernel.book.id,kernel.book.revision);} else out.receipt.push({label:L,included:false,reason:'budget_exhausted',channel:'structural'});
+        } else if(node.op==='task'){
+          const L=`任务框架 · 第${chapterIndex}章 场景「${kernel.scene.summary}」（拍：${kernel.scene.beats.map(b=>b.description).join(' / ')}）`;
+          if(fits(estTokens(L))){used+=estTokens(L);push(2,L,'structural','scene',kernel.scene.id,0);} else out.receipt.push({label:L,included:false,reason:'budget_exhausted',channel:'structural'});
+        } else if(node.op==='card'){
+          const facts=kernel.facts.filter(f=>f.subject===node.ref&&activeAt(f,chapterIndex)&&f.status==='confirmed');
+          if(node.fields!=='*'&&!node.fields.split(',').map(s=>s.trim()).includes('姓名')&&node.ref.startsWith('char:'))
+            facts.unshift({subject:node.ref,predicate:'姓名',value:NAMES[node.ref]});
+          for(const f of facts){
+            const want=node.fields==='*'||node.fields.split(',').map(s=>s.trim()).some(fd=>f.predicate.endsWith(fd));
+            if(!want) continue;
+            if(!povKnows(f,pov,chapterIndex)){ out.receipt.push({label:`${NAMES[f.subject]}·${f.predicate}`,included:false,reason:'pov_filtered',channel:'keyword'}); continue; }
+            const L=renderFact(f,pov);
+            if(fits(estTokens(L))){used+=estTokens(L);push(3,L,'keyword','temporalFact',f.id);} else out.receipt.push({label:L,included:false,reason:'budget_exhausted',channel:'keyword'});
+          }
+        } else if(node.op==='facts'){
+          const cond=(f)=>{
+            for(const c of node.conds){
+              if(c.key==='主体'&&f.subject!==c.val) return false;
+              if(c.key==='区间'&&c.val==='本章'&&!activeAt(f,chapterIndex)) return false;
+              if(c.key==='重要性'&&c.val==='>=notable'&&f.importance==='trivial') return false;
+            }
+            return true;
+          };
+          for(const f of kernel.facts.filter(cond)){
+            if(node.conds.some(c=>c.key==='知情'&&c.val==='pov') && !povKnows(f,pov,chapterIndex)){
+              out.receipt.push({label:`${NAMES[f.subject]}·${f.predicate}`,included:false,reason:'pov_filtered',channel:'keyword'}); continue;
+            }
+            const L=renderFact(f,pov);
+            if(fits(estTokens(L))){used+=estTokens(L);push(3,L,'keyword','temporalFact',f.id);} else out.receipt.push({label:L,included:false,reason:'budget_exhausted',channel:'keyword'});
+          }
+        } else if(node.op==='kg'){
+          if(!NAMES[node.ref]) throw new Error(`未知实体 ${node.ref}`);
+          for(const nb of neighbors(node.ref, chapterIndex))
+            for(const f of kernel.facts.filter(f=>f.subject===nb&&activeAt(f,chapterIndex)&&f.status==='confirmed')){
+              if(!povKnows(f,pov,chapterIndex)){ out.receipt.push({label:`${NAMES[f.subject]}·${f.predicate}`,included:false,reason:'pov_filtered',channel:'graph_khop'}); continue; }
+              const L=renderFact(f,pov)+'　〈关联召回〉';
+              if(fits(estTokens(L))){used+=estTokens(L);push(6,L,'graph_khop','temporalFact',f.id);}
+            }
+        } else if(node.op==='promises'){
+          for(const p of kernel.promises.filter(p=>!['paid_off','abandoned'].includes(p.status))){
+            const L=`承诺(${p.type}) · ${p.description}［第${p.introducedChapter}章埋，目标第${p.targetChapter??'—'}章］`;
+            if(fits(estTokens(L))){used+=estTokens(L);push(4,L,'structural','narrativePromise',p.id,p.revision);} else out.receipt.push({label:L,included:false,reason:'budget_exhausted',channel:'structural'});
+          }
+        } else if(node.op==='recap'){
+          for(const r of kernel.recaps.slice(0,node.n)){
+            const L=`回顾 ch${r.chapterIndex} · ${r.text}`;
+            if(fits(estTokens(L))){used+=estTokens(L);push(5,L,'structural','recap','recap_'+r.chapterIndex);} else out.receipt.push({label:L,included:false,reason:'budget_exhausted',channel:'structural'});
+          }
+        }
+      }catch(e){
+        out.parseFailures.push({source:line.trim(),detail:e.message});
+        out.errorLines.push(`[Error] ${line.trim()} ← ${e.message}`);
+      }
+    }
+    // 钉选（manual_pin）：配方之外仍可钉——两案对齐的作者通道
+    for(const ref of pinned){
+      for(const f of kernel.facts.filter(f=>f.subject===ref&&activeAt(f,chapterIndex)&&f.status==='confirmed')){
+        if(!povKnows(f,pov,chapterIndex)) continue;
+        const L=renderFact(f,pov)+'　〈钉选〉';
+        if(fits(estTokens(L))){used+=estTokens(L);push(3,L,'manual_pin','temporalFact',f.id);}
+      }
+    }
+    // 排序 + 清单 + 哈希
+    out.sections.sort((a,b)=>a.tier-b.tier);
+    for(const s of out.sections) if(s.kind!=='recap') out.manifest.push({kind:s.kind,id:s.id,rev:s.rev});
+    out.used=used; out.hash=djb2(JSON.stringify(out.sections.map(s=>[s.tier,s.label])));
+    return out;
+  }
+};
+
+/* ============================================================================
+ * 页面壳（一次性状态 + 渲染；逻辑全在上面两个模块里）
+ * ==========================================================================*/
+const PRESETS = {
+standard:`# 宪法与任务框架
+@intent
+@task
+
+# 人物卡与活跃事实（知情=pov 防全知泄漏）
+@卡:char:lin-xuan.{当前境界,佩剑}
+@卡:char:ye-qingluo.{姓名}
+@facts:[主体=char:lin-xuan][区间=本章][知情=pov]
+@facts:[主体=char:ye-qingluo][区间=本章][知情=pov]
+
+# 图一跳召回
+@kg:char:lin-xuan
+
+# 承诺与回顾
+@promises:[状态=active]
+@recap:previous:2`,
+leaky:`# 宪法与任务框架
+@intent
+@task
+
+# 人物卡与活跃事实（⚠ 这版忘了写 [知情=pov]）
+@卡:char:lin-xuan.{当前境界,佩剑}
+@卡:char:ye-qingluo.{姓名}
+@facts:[主体=char:lin-xuan][区间=本章]
+@facts:[主体=char:ye-qingluo][区间=本章]
+
+# 图一跳召回
+@kg:char:lin-xuan
+
+# 承诺与回顾
+@promises:[状态=active]
+@recap:previous:2`,
+typo:`# 宪法与任务框架
+@intent
+@task
+
+# 人物卡与活跃事实
+@卡:char:lin-xaun.{当前境界}
+@facts:[主体=char:lin-xuan][区间=本章][知情=pov]
+
+# 承诺与回顾
+@promises:[状态=active]
+@recap:previous:2`
+};
+const state = {
+  chapter:12, pov:'char:lin-xuan',
+  mentions:{...DEFAULT_MENTIONS}, pins:[],
+  recipe:PRESETS.standard,
+};
+const POVS = [ ['char:lin-xuan','主角视角 · 林轩'], ['reader','读者视角 · 审校'], ['char:xuanming-laozu','反派视角 · 玄冥老祖'] ];
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function buildSetupBar(){
+  $('#pov-sel').innerHTML = POVS.map(([v,l])=>`<option value="${v}" ${v===state.pov?'selected':''}>${l}</option>`).join('');
+  $('#ch-val').textContent = state.chapter;
+  document.querySelectorAll('.echo-ch').forEach(el=>el.textContent=state.chapter);
+  $('#mention-grp').querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('on', !!state.mentions[b.dataset.ent]);
+  });
+  $('#pin-grp').querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('on', state.pins.includes(b.dataset.ent));
+  });
+}
+function mentionButtons(){
+  const g=$('#mention-grp');
+  [...g.querySelectorAll('button')].forEach(b=>b.remove());
+  for(const ent of Object.keys(DEFAULT_MENTIONS)){
+    const b=document.createElement('button'); b.dataset.ent=ent; b.textContent=NAMES[ent];
+    b.onclick=()=>{ state.mentions[ent]=!state.mentions[ent]; renderAll(); }; g.appendChild(b);
+  }
+  const p=$('#pin-grp'); [...p.querySelectorAll('button')].forEach(b=>b.remove());
+  for(const ent of ['location:tianyan-city']){
+    const b=document.createElement('button'); b.dataset.ent=ent; b.textContent='钉 '+NAMES[ent];
+    b.onclick=()=>{ state.pins = state.pins.includes(ent)?state.pins.filter(x=>x!==ent):[...state.pins,ent]; renderAll(); };
+    p.appendChild(b);
+  }
+}
+function currentReq(){
+  const mentioned = Object.keys(state.mentions).filter(k=>state.mentions[k]);
+  return { taskType:'chapter_writing', chapterIndex:state.chapter, pov:state.pov,
+           mentioned, pinned:state.pins, tokenBudget:600 };
+}
+const CHANNEL_CN = { structural:'结构', keyword:'关键词', graph_khop:'图一跳', embedding:'向量', manual_pin:'钉选' };
+const REASON_CN = { budget_exhausted:'预算超支', pov_filtered:'视角过滤', interval_not_active:'区间失效', relevance_below_threshold:'相关性不足', story_text_quota_protected:'正文配额保护', duplicate:'重复' };
+
+function renderResult(rootId, res){
+  const root=$(rootId);
+  const items = res.packet || res.sections || [];
+  const leaks=checkLeaks(items.filter(p=>p.kind==='temporalFact')
+    .map(p=>KERNEL.facts.find(f=>f.id===p.id)).filter(Boolean), state.pov, state.chapter);
+  const secNames={1:'① 宪法',2:'② 任务框架',3:'③ 活跃事实',4:'④ 承诺',5:'⑤ 回顾',6:'⑥ 关联召回'};
+  let html='';
+  html+= leaks.length? `<div class="leak show">⚠ 全知泄漏：${esc(leaks.map(f=>`${NAMES[f.subject]}的「${f.predicate.replace('secret.','')}=${f.value}」`).join('；'))} 进入了 ${esc(POVS.find(p=>p[0]===state.pov)?.[1]||state.pov)} 的上下文包——该视角没有授权行。</div>` : `<div class="leak"></div>`;
+  html+= res.errorLines?.length? `<div class="failures">${res.errorLines.map(l=>`<div class="fail"><code>${esc(l)}</code></div>`).join('')}</div>`:'';
+  html+='<div class="cols">';
+  html+='<div class="card"><h3>上下文包 Context Packet</h3>';
+  if(items.length===0) html+='<div class="note">（空包）</div>';
+  let lastTier=0;
+  for(const it of items){
+    if(it.tier!==lastTier){ html+=`<div class="sec">${secNames[it.tier]||''}</div>`; lastTier=it.tier; }
+    html+=`<div class="entry${it.channel==='graph_khop'?' dim':''}"><span>${esc(it.label)}</span><span class="tk">${it.tokens}t</span></div>`;
+  }
+  html+=`<div class="hash">合计 ${res.used}/600 tok · recomputationHash=<b>${res.hash}</b>（重跑应同哈希）</div></div>`;
+  html+='<div class="card"><h3>装配凭证 Receipt（为什么 AI 看到/没看到）</h3><table><tr><th>条目</th><th>通道</th><th>结果</th><th>原因</th></tr>';
+  for(const r of (res.receipt||[])){
+    html+=`<tr><td>${esc((r.label||'').slice(0,34))}</td><td>${CHANNEL_CN[r.channel]||r.channel||''}</td><td class="${r.included?'yes':'no'}">${r.included?'入包':'剔除'}</td><td>${REASON_CN[r.reason]||''}</td></tr>`;
+  }
+  html+='</table>';
+  if(res.parseFailures?.length){
+    html+='<div class="failures" style="margin-top:10px"><h3>解析失败 ParseFailure</h3>'+res.parseFailures.map(f=>`<div class="fail"><code>${esc(f.source)}</code> ← ${esc(f.detail)}</div>`).join('')+'</div>';
+  }
+  html+='</div></div>';
+  html+=`<div class="card"><h3>依赖清单 Dependency Manifest（读到的精确版本）</h3><div class="chips">${
+    (res.manifest||[]).map(m=>`<span class="chip">${m.kind}:${m.id}${m.rev!==null&&m.rev!==undefined?('@'+m.rev):''}</span>`).join('')||'<span class="note">空</span>'
+  }</div></div>`;
+  root.innerHTML=html;
+}
+
+function runA(){ renderResult('#a-out', StructuredQuery.compile(KERNEL, currentReq())); }
+function runB(){
+  const res = RecipeResolver.expand(KERNEL, {...currentReq()}, state.recipe);
+  renderResult('#b-out', res);
+}
+
+/* ---- 走查 ---- */
+function baseline(){ state.chapter=12; state.pov='char:lin-xuan'; state.mentions={...DEFAULT_MENTIONS}; state.pins=[]; state.recipe=PRESETS.standard; }
+const WALKS = {
+  a:[
+    { title:'一 · 常规编译（happy path）', desc:'标准章节写作任务。观察：六层分区、每条的通道标注、凭证里入包/剔除各得其因、依赖清单逐条带版本号。',
+      steps:[ {label:'以默认设定编译第 12 章', act:()=>{ baseline(); runA(); } },
+              {label:'再跑一次（验证同哈希·确定性）', act:()=>runA() } ] },
+    { title:'二 · 秘密与知情边界（核心戏）', desc:'叶青萝的秘密身份是 secret.* 事实。主角视角必须看不到；读者视角（审校）可以看到；反派视角还带着对主角境界的误判。',
+      steps:[ {label:'打开提及：叶青萝', act:()=>{ baseline(); state.mentions['char:ye-qingluo']=true; runA(); } },
+              {label:'切反派视角 · 玄冥老祖（秘密被过滤；境界显示为他的误判）', act:()=>{ state.pov='char:xuanming-laozu'; runA(); } },
+              {label:'切读者视角 · 审校（第 8 章起读者知情，秘密可见）', act:()=>{ state.pov='reader'; runA(); } } ] },
+    { title:'三 · 过期事实自然退场', desc:'服饰事实只在第 3–5 章有效。调章号看它入包与失效。',
+      steps:[ {label:'章节调到 4', act:()=>{ baseline(); state.chapter=4; runA(); } },
+              {label:'章节调回 12（区间失效剔除）', act:()=>{ state.chapter=12; runA(); } } ] },
+    { title:'四 · 错误输入在 A 里长什么样', desc:'A 没有解析层：拼写错在编码期被类型拦住；运行期传错 ID 只是安静地少一块内容——注意凭证里没有任何报错行。',
+      steps:[ {label:'传入不存在的实体 char:lin-xaun（模拟拼错的 ID）', act:()=>{ baseline(); delete state.mentions['char:lin-xuan']; state.mentions['char:lin-xaun']=true; runA(); } },
+              {label:'恢复默认（对比正常包）', act:()=>{ baseline(); runA(); } } ] }
+  ],
+  b:[
+    { title:'一 · 常规展开（happy path）', desc:'同一任务的配方版。观察：@ 引用如何映射到六层分区；先点「静态依赖预览」看展开前能拿到什么。',
+      steps:[ {label:'载入标准配方并展开', act:()=>{ baseline(); runB(); } },
+              {label:'静态依赖预览（不执行）', act:()=>showDeps() } ] },
+    { title:'二 · 忘写知情过滤的下场（核心戏）', desc:'同一份配方去掉 [知情=pov]。秘密身份全文入包——红牌横幅亮出全知泄漏。这是声明式形态的固有风险类别。',
+      steps:[ {label:'载入「缺知情过滤」配方', act:()=>{ baseline(); state.recipe=PRESETS.leaky; $('#recipe').value=state.recipe; } },
+              {label:'展开运行（看红牌）', act:()=>runB() },
+              {label:'载回标准配方并展开（秘密被视角过滤）', act:()=>{ state.recipe=PRESETS.standard; $('#recipe').value=state.recipe; runB(); } } ] },
+    { title:'三 · 区间过滤靠作者自觉', desc:'A 的区间是查询内置谓词；B 靠 [区间=本章] 这一节过滤器。删掉它试试会怎样（自由操作区直接改配方）。',
+      steps:[ {label:'章节调到 4 并展开（服饰入包）', act:()=>{ baseline(); state.chapter=4; runB(); } },
+              {label:'章节调回 12 再展开（区间失效剔除）', act:()=>{ state.chapter=12; runB(); } } ] },
+    { title:'四 · 失败显性化', desc:'引用写错时：响亮的红牌 + [Error] 行，其余行继续展开。对照 A 走查四的安静空结果。',
+      steps:[ {label:'载入含错字配方并展开', act:()=>{ baseline(); state.recipe=PRESETS.typo; $('#recipe').value=state.recipe; runB(); } },
+              {label:'看静态依赖预览里的失败记录', act:()=>showDeps() } ] }
+  ]
+};
+let walkSel={a:0,b:0}, walkStep={a:-1,b:-1};
+function renderWalk(side){
+  const root=$(side==='a'?'#a-walk':'#b-walk'); const walks=WALKS[side];
+  let html='<div class="walk-tabs">'+walks.map((w,i)=>`<button data-i="${i}" class="${i===walkSel[side]?'on':''}">${esc(w.title)}</button>`).join('')+'</div>';
+  const w=walks[walkSel[side]];
+  html+=`<div class="walk-box"><p class="desc">${esc(w.desc)}</p><ol class="steps">`;
+  w.steps.forEach((s,i)=>{
+    html+=`<li><button class="step-btn ${i<=walkStep[side]?'on':''}" data-step="${i}">${i+1}. ${esc(s.label)}${i===walkStep[side]?'　◀ 当前':''}</button></li>`;
+  });
+  html+='</ol><div class="walk-note">从第 1 步顺序点起；每步都会先重置到已知初始态再动作。</div></div>';
+  root.innerHTML=html;
+  root.querySelectorAll('.walk-tabs button').forEach(b=>b.onclick=()=>{ walkSel[side]=+b.dataset.i; walkStep[side]=-1; renderWalk(side); });
+  root.querySelectorAll('.step-btn').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.step;
+    if(i===0){ baseline();
+      if(side==='b'){ $('#recipe').value=state.recipe; } }
+    walkStep[side]=i; WALKS[side][walkSel[side]].steps[i].act();
+    buildSetupBar(); renderWalk(side);
+  });
+}
+function showDeps(){
+  const {deps,fails}=RecipeResolver.staticDependencies($('#recipe').value);
+  $('#b-deps').innerHTML=`<div class="card" style="margin-top:12px"><h3>静态依赖预览（仅解析文本，不触内核）</h3>
+    <div class="chips">${deps.map(d=>`<span class="chip">${esc(d)}</span>`).join('')||'（空）'}</div>
+    ${fails.length?`<div class="failures">${fails.map(f=>`<div class="fail"><code>${esc(f.source)}</code> ← ${esc(f.detail)}</div>`).join('')}</div>`:''}
+    <div class="note">这串声明可以在保存配方时就进变更影响分析——A 的清单要等编译执行后才存在。</div></div>`;
+}
+
+/* ---- 全局接线 ---- */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); $('#panel-'+b.dataset.tab).classList.add('active');
+});
+$('#ch-minus').onclick=()=>{ state.chapter=Math.max(1,state.chapter-1); renderAll(); };
+$('#ch-plus').onclick =()=>{ state.chapter=Math.min(99,state.chapter+1); renderAll(); };
+$('#pov-sel').onchange=e=>{ state.pov=e.target.value; renderAll(); };
+$('#recipe').addEventListener('input',e=>{ state.recipe=e.target.value; });
+document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{
+  state.recipe=PRESETS[b.dataset.preset]; $('#recipe').value=state.recipe; $('#b-deps').innerHTML='';
+  runB();
+});
+$('#a-run').onclick=runA;
+$('#b-run').onclick=runB;
+$('#b-staticdeps').onclick=showDeps;
+
+function renderAll(){
+  buildSetupBar();
+  runA(); runB();
+  renderWalk('a'); renderWalk('b');
+}
+$('#recipe').value=state.recipe;
+renderAll();
+</script>
+</body>
+</html>
