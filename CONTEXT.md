@@ -1,6 +1,16 @@
+---
+date: 2026-08-23
+description: '墨舟（MoZhou Novel OS）领域词汇表：内核实体、事务连续性、运行时能力、评估与数据飞轮的规范用语'
+tags:
+  - mozhou
+  - glossary
+---
+
 # MoZhou Novel OS
 
 MoZhou Novel OS is a local-first novel operating system and data flywheel designed to make long-form fiction a plannable, generative, editable, traceable, rollbackable, and author-adaptive engineering discipline.
+
+> Related notes: [[kernel-schema-draft]] · [[kernel-schema-decisions]] · [[ADR-0019 Research-Driven Amendments]]
 
 ## Language
 
@@ -11,11 +21,15 @@ The uncompromisable constitutional blueprint of a novel, encapsulating core sati
 _Avoid_: Prompt, author note, background setting
 
 **Outline Graph**:
-A hierarchical directed graph structuring narrative progression across Book, Volume, Arc, Chapter, and Scene/Beat with explicit dependency edges.
+A hierarchical directed graph structuring narrative progression across Book, Volume, Arc, and Chapter with explicit dependency edges. Scenes hang below chapters as their own first-class entity, not as graph nodes.
 _Avoid_: Flat outline, chapter list, story roadmap
 
+**Scene**:
+The atomic synchronization unit shared across planning, writing, chat, and review, hanging below a Chapter and carrying beats, summary, and POV; prose itself lives only in the Chapter Commit.
+_Avoid_: Beat list, chapter fragment, outline leaf
+
 **Temporal Fact**:
-A canonical atomic truth assertion tied to a subject, predicate, and value, bounded by valid chapter intervals (`valid_from` to `valid_until`) and explicit confirmation state (`planned`, `candidate`, `confirmed`, `rejected`).
+A canonical atomic truth assertion tied to a subject, predicate, and value, bounded by valid chapter intervals (`valid_from` to `valid_until`) and explicit confirmation state (`planned`, `candidate`, `confirmed`, `rejected`). Secrets are temporal facts in the reserved `secret` predicate namespace whose disclosure closes the validity interval.
 _Avoid_: Memory item, context note, setting entry
 
 **Candidate Fact**:
