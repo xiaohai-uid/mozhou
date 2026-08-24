@@ -216,6 +216,10 @@ _Avoid_: Skill, tool, agent
 The central registry resolving abstract capabilities to concrete providers (such as native routines, external skills, or remote services) without coupling callers to implementation names.
 _Avoid_: Skill manager, tool list, plugin loader
 
+**Capability Recipe**:
+A machine-validatable frozen methodology unit (typed fields + JSON Schema: triggers, static load conditions, failure matrix, tracking gate, context budget, pinned MIT source) that can be instantiated as one or more runtime skill runs.
+_Avoid_: Free-form prompt template, skill definition
+
 ---
 
 ### Evaluation & Verification
