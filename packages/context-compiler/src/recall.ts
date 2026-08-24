@@ -77,9 +77,11 @@ export interface KeywordScoringConfig {
 
 export interface EmbeddingRecallConfig {
   /**
-   * cosine 相似度入选门（spec §2 默认表：0.80 为 T9 R3 起步值——bge 分布集中
-   * [0.6,1]，生产值待自有语料标定后经配置注入覆盖，算法体内无字面量；
-   * 入 configVersion 参与 recomputationHash）。
+   * cosine 相似度入选门。历史：0.80 为 T9 R3 起步值（bge 分布集中 [0.6,1] 的
+   * 保守猜测）；2026-08-24 经自有语料标定（scripts/embedding-calib/calibrate.mjs，
+   * 报告 docs/research/embedding-threshold-calibration.md）实测 Youden J 最优
+   * t*=0.46——0.80 下 TPR=0（通道全灭），故默认值改判 0.46。
+   * 入 configVersion 参与 recomputationHash。
    */
   readonly thresh: number
 }
@@ -114,7 +116,7 @@ export const DEFAULT_KHOP_RECALL_CONFIG: KhopRecallConfig = {
     aliasScore: 0.85,
     mentionBoost: { step: 0.05, cap: 0.15 },
   },
-  embedding: { thresh: 0.8 },
+  embedding: { thresh: 0.46 },
 }
 
 /** 精确平局收口序（spec §2 merge.priority；未知通道排其后保持入参序）。 */

@@ -53,7 +53,7 @@ keyword:
   aliasScore: 0.85          # 别名命中
   mentionBoost: { step: 0.05, cap: 0.15 }   # 额外提及加分
 embedding:
-  thresh: 0.80              # T9 R3：bge 分布集中 [0.6,1]，起步值按自有语料标定
+  thresh: 0.46              # 2026-08-24 自有语料标定（Youden J 最优；0.80 实测 TPR=0 已废弃，见 docs/research/embedding-threshold-calibration.md）
 merge:
   priority: [manual_pin, keyword, graph_khop, embedding]   # 精确平局收口序
 ```
