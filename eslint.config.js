@@ -1,13 +1,13 @@
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       parserOptions: {
         // 根 scripts/ 的独立运维脚本（不入任何 tsconfig project）仍接受类型化 lint
-        projectService: { allowDefaultProject: ['scripts/*.mjs', 'scripts/embedding-calib/**/*.ts'] },
+        projectService: { allowDefaultProject: ['scripts/*.mjs'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
