@@ -85,10 +85,10 @@ export type { PersistReceiptOptions, PersistedReceiptLocation } from './receipt-
 /** Receipt 重放引擎（T9，#25）：replayInputs 最小重放输入面的运行时兑现——
  *  embedding 索引漂移后仍复现同一 desirability 终序与 recomputationHash，
  *  输入漂移逐条定位 fail loudly（spec §3.1 复算契约）。 */
-export {
-  ReplayHashMismatchError,
-  ReplayInputDriftError,
-  replayReceiptFromInputs,
-  ReplayVersionMismatchError,
-} from './receipt-replay.js'
+export { ReplayHashMismatchError, ReplayInputDriftError, replayReceiptFromInputs, ReplayVersionMismatchError } from './receipt-replay.js'
 export type { ReplayContentResolver, ReplayRuntime, ReplaySurface } from './receipt-replay.js'
+
+/** 编译器全链路集成（T10a，#26）：目录卡四档激活 → 三通道召回 → 两阶段 Reserved
+ *  预算装配 → 服务端 Receipt 一证一文件——compile() 端到端收口在 ContextCompiler。 */
+export { activateCards, compile, EmptyRecallError } from './compile.js'
+export type { CardActivation, CompileCard, CompileInput, CompileResult } from './compile.js'

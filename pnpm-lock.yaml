@@ -32,6 +32,10 @@ importers:
       fastembed:
         specifier: ^2.1.0
         version: 2.1.0
+    devDependencies:
+      '@mozhou/data-plane':
+        specifier: workspace:*
+        version: link:../data-plane
 
   packages/data-plane:
     dependencies:

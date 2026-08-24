@@ -9,6 +9,10 @@
  *   canon 快照 ──khopGraphRecall─────────────────┼─▶ mergeRecallChannels ─▶ RecallResult
  *   可见语料 ──embeddingRecall（T8b 兜底）───────┘      {candidates, excluded}
  *
+ * 检测扫描面（T10a #26 增补）：keywordScanFace 可裁剪 keyword 通道的卡输入面
+ * （detectedOff 档跳过别名检测）；图/embedding 语料恒为全量卡面——实体 id 直引，
+ * 不消费别名表（entity-directory-spec §5）。
+ *
  * 本模块零 IO、零 LLM：输入是已折叠的 NarrativeStateSnapshot 与目录卡扫描面，
  * 输出 #8 装配的直接消费契约。确定性纪律（INV-K4）：一切平局显式收口——
  * 分数降序后 id 升序（ULID ASC）、跨通道精确平局走 merge.priority、
@@ -838,12 +842,20 @@ export interface RecallPipelineInput {
   readonly config?: KhopRecallConfig
   /** 提供即启用 embedding 兜底第三通道；缺省仅 keyword+graph 双通道（三通道互不阻塞）。 */
   readonly embedding?: LocalEmbeddingProvider
+  /**
+   * 检测扫描面裁剪（T10a #26 四档激活接线）：提供时仅集合内 ref 的卡参与 keyword
+   * 别名检测（detectedOff 档跳过检测——别名表不被消费）；图/embedding 语料不受影响
+   * （实体 id 直引，本就不消费别名表——entity-directory-spec §5）。缺省全卡可检。
+   */
+  readonly keywordScanFace?: ReadonlySet<EntityRef>
 }
 
 /** 召回管线一站式入口：keyword 快通道 + k-hop 图通道（+ 可选 embedding 兜底）合并。 */
 export async function recallCandidates(input: RecallPipelineInput): Promise<RecallResult> {
   const config = input.config ?? DEFAULT_KHOP_RECALL_CONFIG
-  const keyword = detectKeywordTriggers(input.cards, input.draftText, config)
+  const scanFace = input.keywordScanFace
+  const detectionFace = scanFace === undefined ? input.cards : input.cards.filter((card) => scanFace.has(card.ref))
+  const keyword = detectKeywordTriggers(detectionFace, input.draftText, config)
   const graph = khopGraphRecall(
     input.snapshot,
     keyword.triggers,
