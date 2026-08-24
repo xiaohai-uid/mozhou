@@ -200,6 +200,14 @@ _Avoid_: Message queue, callback listener
 The deterministic reconstruction and root-cause audit of a historical generation run from logged domain events.
 _Avoid_: Chat history, debug log
 
+**Task Projection**:
+The rebuildable SQLite projection of task lifecycle state (jobs/steps/attempts) with rows aligned to ledger sequence numbers; optimistic concurrency (CAS) applies to the projection, never to the append-only ledger itself.
+_Avoid_: Source-of-truth state table, dual ledger
+
+**Tier Routing**:
+The indirect two-level mapping from task_type to tier name to (provider, model) pairs; model ids are never bound directly to task types so that provider-side renames stay isolated in configuration.
+_Avoid_: Direct model binding, hardcoded per-task models
+
 **Capability**:
 An abstract task-level contract (e.g., `PROSE_DEAI`, `MARKET_SCAN`, `STATE_EXTRACTOR`, `LONGFORM_PLANNING`) decoupled from underlying implementation providers.
 _Avoid_: Skill, tool, agent
