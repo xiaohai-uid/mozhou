@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PROTOTYPE · 商业额度与单位经济</title>
+  <style>
+    :root {
+      --ink: #20282d;
+      --muted: #68757b;
+      --line: #dbe2e1;
+      --paper: #f5f7f6;
+      --panel: #fff;
+      --accent: #246b5a;
+      --accent-soft: #e4f0ec;
+      --warn: #a25f18;
+      --warn-soft: #fff2df;
+      --danger: #a23b3b;
+      --danger-soft: #fbe7e7;
+      --blue: #3f6286;
+      --blue-soft: #e9f0f8;
+      --shadow: 0 10px 26px rgba(31, 43, 46, .07);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); }
+    main { width: min(1260px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 64px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 900px; margin-bottom: 12px; font-size: clamp(30px, 5vw, 52px); line-height: 1.06; letter-spacing: -.045em; }
+    h2 { font-size: 19px; letter-spacing: -.02em; }
+    h3 { font-size: 14px; }
+    p { color: var(--muted); line-height: 1.6; }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .lead { max-width: 850px; font-size: 16px; }
+    .question { margin: 22px 0; padding: 15px 17px; border-left: 4px solid var(--accent); border-radius: 0 10px 10px 0; background: var(--accent-soft); color: #2d5248; }
+    .question strong { display: block; margin-bottom: 4px; color: #183f34; }
+    .prototype-warning { margin: 18px 0 22px; padding: 13px 15px; border: 1px solid #e6c98e; border-radius: 10px; background: var(--warn-soft); color: #704f1d; font-size: 13px; line-height: 1.55; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, .9fr); gap: 18px; align-items: start; }
+    .panel { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow); }
+    .panel + .panel { margin-top: 18px; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .panel-head h2 { margin-bottom: 4px; }
+    .panel-head small { color: var(--muted); }
+    .state-grid, .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+    .state-card, .metric-card { min-width: 0; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfc; }
+    .state-card small, .metric-card small { display: block; min-height: 31px; margin-bottom: 6px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .state-card strong, .metric-card strong { display: block; font-size: 19px; letter-spacing: -.02em; }
+    .subline { margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .section-label { margin: 20px 0 9px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+    label { display: grid; gap: 6px; color: var(--ink); font-size: 13px; font-weight: 700; }
+    label span { color: var(--muted); font-size: 11px; font-weight: 500; }
+    input[type="number"] { width: 100%; padding: 9px 10px; border: 1px solid #cfd9d6; border-radius: 8px; color: var(--ink); background: #fff; font: inherit; }
+    input[type="number"]:focus { outline: 2px solid rgba(36, 107, 90, .2); border-color: var(--accent); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button { padding: 8px 10px; border: 1px solid #cfd9d6; border-radius: 8px; color: var(--ink); background: #fff; cursor: pointer; font: inherit; font-size: 13px; }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { border-color: var(--accent); color: #fff; background: var(--accent); }
+    button.subtle { background: #f3f6f5; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    .formula { margin-top: 14px; padding: 11px 13px; border-radius: 9px; background: #f4f7f6; color: #50605b; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.7; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr.best { background: #f0f8f5; }
+    tbody tr.free-row { background: #fafafa; }
+    .plan-name { font-weight: 800; }
+    .plan-note { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .positive { color: var(--accent); font-weight: 800; }
+    .negative { color: var(--danger); font-weight: 800; }
+    .neutral { color: var(--warn); font-weight: 800; }
+    .pill { display: inline-flex; align-items: center; padding: 4px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .pill.low { color: var(--accent); background: var(--accent-soft); }
+    .pill.medium { color: var(--warn); background: var(--warn-soft); }
+    .pill.high { color: var(--danger); background: var(--danger-soft); }
+    .scenario-tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
+    .tab { border: 0; border-radius: 8px 8px 0 0; color: var(--muted); background: transparent; }
+    .tab.active { color: var(--accent); background: var(--accent-soft); }
+    .scenario-copy { min-height: 82px; margin: 14px 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfc; }
+    .scenario-copy p { margin: 5px 0 0; font-size: 13px; }
+    .step-list { display: grid; gap: 8px; margin: 13px 0; }
+    .step { display: grid; grid-template-columns: 27px 1fr auto; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 12px; }
+    .step.current { border-color: var(--accent); background: #f6fbf9; color: var(--ink); }
+    .step.done { border-color: #cce1d9; background: #f0f8f5; color: #477262; }
+    .step-num { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 50%; background: #edf1ef; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .step.current .step-num { color: #fff; background: var(--accent); }
+    .step.done .step-num { color: #fff; background: var(--accent); }
+    .scenario-state { margin-top: 14px; }
+    .scenario-state.empty { padding: 13px; border-radius: 9px; background: #f6f7f7; color: var(--muted); font-size: 12px; }
+    .mini-table th, .mini-table td { padding: 8px 7px; font-size: 11px; }
+    .mini-table th { font-size: 10px; }
+    .log { display: grid; gap: 8px; max-height: 520px; overflow: auto; }
+    .log-item { padding: 9px 10px; border-left: 3px solid #d5e3de; background: #fbfcfc; font-size: 11px; line-height: 1.5; }
+    .log-item strong { display: block; margin-bottom: 3px; color: var(--ink); }
+    .log-item span { color: var(--muted); }
+    .log-item.warn { border-left-color: #e6c98e; }
+    .log-item.danger { border-left-color: #e2a6a6; }
+    .conclusion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .conclusion-card { padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+    .conclusion-card h3 { margin-bottom: 8px; }
+    .conclusion-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .supported { border-top: 3px solid var(--accent); }
+    .depends { border-top: 3px solid var(--warn); }
+    .cannot { border-top: 3px solid var(--blue); }
+    .observation { margin-top: 14px; padding: 12px 14px; border-radius: 9px; background: var(--blue-soft); color: #3c5871; font-size: 12px; line-height: 1.55; }
+    .muted { color: var(--muted); }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; }
+    @media (max-width: 930px) { .layout { grid-template-columns: 1fr; } }
+    @media (max-width: 680px) { main { width: min(100% - 20px, 1260px); padding-top: 24px; } .parameter-grid, .conclusion-grid { grid-template-columns: 1fr; } .state-grid, .metric-grid { grid-template-columns: repeat(2, 1fr); } .panel { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">PROTOTYPE ONLY · THROWAWAY LOGIC DEMO</div>
+    <h1>商业额度与单位经济验证</h1>
+    <p class="lead">用一组可调假设，观察免费 Beta、有限会员额度和无限会员在一个月内如何共同影响模型成本与毛利。这个页面只验证“结构怎么跑”，不接支付、不调用真实 API，也不替代真实用户数据。</p>
+
+    <div class="question">
+      <strong>要回答的问题</strong>
+      V0 是否可以先提供真实可用的免费 Beta；如果要收费，有限额度能否把模型成本变成可控上限，而不是把“无限 AI”当成默认承诺？
+    </div>
+    <div class="prototype-warning"><strong>模拟不是市场事实。</strong> 默认参数只是演示输入；计算按一个月、混合模型单价、实际被服务的 token 估算，只含可变模型成本，不含支付手续费、税费、退款、客服、固定基础设施、留存、折扣和 BYOK。所有人数、转化率、token 消耗和成本都必须用真实 Beta 数据重新校准。</div>
+
+    <div class="layout">
+      <section>
+        <div class="panel" id="state-panel"></div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2>自由调整参数</h2><small>修改后按回车或移开输入框，整页会重算并追加证据日志。</small></div>
+            <button class="subtle" id="reset-params">恢复默认</button>
+          </div>
+          <div class="parameter-grid">
+            <label>月活用户数<span>一个月内会产生 token 消耗的用户</span><input type="number" min="1" step="100" data-key="users" /></label>
+            <label>免费额度（token/月）<span>Free 用户的服务上限</span><input type="number" min="0" step="50000" data-key="freeQuota" /></label>
+            <label>会员价格（¥/月）<span>有限 3M、5M 与无限方案共用</span><input type="number" min="0" step="1" data-key="memberPrice" /></label>
+            <label>有限会员额度 A（token/月）<span>默认用作 3M 方案</span><input type="number" min="0" step="100000" data-key="memberQuota3" /></label>
+            <label>有限会员额度 B（token/月）<span>默认用作 5M 方案</span><input type="number" min="0" step="100000" data-key="memberQuota5" /></label>
+            <label>平均用户消耗（token/月）<span>非重度 cohort 的需求</span><input type="number" min="0" step="100000" data-key="avgTokens" /></label>
+            <label>重度用户消耗（token/月）<span>重度 cohort 的需求</span><input type="number" min="0" step="100000" data-key="heavyTokens" /></label>
+            <label>模型成本（¥/百万 token）<span>输入输出合计的混合可变成本</span><input type="number" min="0" step="0.1" data-key="modelCost" /></label>
+            <label>免费到付费转化率（%）<span>只做免费 Beta 方案会忽略此项</span><input type="number" min="0" max="100" step="0.5" data-key="conversion" data-scale="100" /></label>
+            <label>重度用户占比（%）<span>剩余用户按平均消耗计算</span><input type="number" min="0" max="100" step="0.5" data-key="heavyShare" data-scale="100" /></label>
+          </div>
+          <div class="formula">收入 = 付费用户数 × 会员价格　｜　模型成本 = 实际服务 token ÷ 1,000,000 × 模型成本　｜　毛利 = 收入 − 模型成本　｜　超额用户 = 需求超过该层额度的用户　｜　亏损用户 = 该用户的模型成本超过直接收入的用户</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div><h2>四种方案对比</h2><small>免费用户仍受免费额度限制；会员方案只把转化用户切到会员额度。</small></div><span class="pill" id="best-plan-pill">当前读数</span></div>
+          <div class="table-wrap"><table id="plan-table"></table></div>
+          <div class="observation" id="break-even-note"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div><h2>Guided walkthrough</h2><small>三个场景都从同一空状态开始；每执行一步都会更新完整状态并写入日志。</small></div><span class="pill" id="scenario-progress">第 0 步</span></div>
+          <div class="scenario-tabs" id="scenario-tabs"></div>
+          <div class="scenario-copy" id="scenario-copy"></div>
+          <div class="step-list" id="step-list"></div>
+          <div class="actions">
+            <button class="primary" id="scenario-next">执行下一步</button>
+            <button class="subtle" id="scenario-reset">重置本场景</button>
+          </div>
+          <div class="scenario-state" id="scenario-state"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div><h2>结论区</h2><small>结论分层，避免把模拟读数包装成市场事实。</small></div></div>
+          <div class="conclusion-grid" id="conclusion-grid"></div>
+        </div>
+      </section>
+
+      <aside>
+        <div class="panel">
+          <div class="panel-head"><div><h2>证据日志</h2><small>每个参数变更、场景操作和重算结果都会留下记录。</small></div><span class="pill" id="event-count">0 条</span></div>
+          <div class="actions" style="margin-bottom:12px"><button class="subtle" id="clear-log">清空日志</button></div>
+          <div class="log" id="event-log"></div>
+        </div>
+        <div class="panel">
+          <h2>使用边界</h2>
+          <p style="font-size:13px;margin-bottom:10px">这不是价格测试、财务预测或市场研究。它只帮助团队在真实 Beta 之前看见额度、消耗、转化和模型成本之间的算术关系。</p>
+          <ul class="muted" style="padding-left:18px;font-size:12px;line-height:1.65;margin:0">
+            <li>无持久化：刷新页面会回到默认参数。</li>
+            <li>无支付、无登录、无真实模型和无真实用户数据。</li>
+            <li>BYOK 未计入平台收入，只作为后续成本泄压方向。</li>
+            <li>重度用户不是一个真实分布，只是压力测试 cohort。</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const DEFAULTS = {
+        users: 1000,
+        freeQuota: 500000,
+        memberPrice: 19,
+        memberQuota3: 3000000,
+        memberQuota5: 5000000,
+        avgTokens: 1200000,
+        heavyTokens: 8000000,
+        modelCost: 2,
+        conversion: 0.08,
+        heavyShare: 0.15
+      };
+
+      const SCENARIOS = {
+        light: {
+          label: '轻度',
+          title: '轻度用户：先看免费 Beta 是否足够',
+          description: '把需求设成平均用户的 35%，并假设用户尚未付费。重点看免费额度是否覆盖体验，以及每个新用户带来的模型成本。',
+          role: 'free',
+          steps: [
+            '生成一个低于免费额度的轻度需求',
+            '对比四种方案的单用户服务量与成本',
+            '记录 Beta 需要验证的真实观测'
+          ]
+        },
+        typical: {
+          label: '典型',
+          title: '典型用户：看会员收入能否覆盖服务成本',
+          description: '使用平均用户消耗，并假设该用户已经转化为会员。重点看 3M 与 5M 的边界差异，而不是提前冻结某个额度。',
+          role: 'paid',
+          steps: [
+            '生成一个典型会员需求',
+            '把有限会员 3M 与 5M 放在同一张证据表',
+            '计算单会员收入、成本和毛利'
+          ]
+        },
+        heavy: {
+          label: '重度',
+          title: '重度用户：压力测试额度与无限风险',
+          description: '使用重度用户消耗，并假设该用户已经转化为会员。重点观察超额、会员亏损和无限方案的成本暴露。',
+          role: 'paid',
+          steps: [
+            '生成一个重度会员需求',
+            '观察 3M、5M 的截断与超额',
+            '打开无限会员对照，记录成本风险'
+          ]
+        }
+      };
+
+      const PLAN_DEFS = [
+        { id: 'unlimited', label: '无限会员', kind: 'member', note: '风险对照：会员消耗不设上限' },
+        { id: 'finite3', label: '有限会员 3M', kind: 'member', quotaKey: 'memberQuota3', note: '高额度但成本上限可见' },
+        { id: 'finite5', label: '有限会员 5M', kind: 'member', quotaKey: 'memberQuota5', note: '更宽松的压力测试' },
+        { id: 'freeBeta', label: '只做免费 Beta', kind: 'free', note: '支付不阻塞首发；收入为 0' }
+      ];
+
+      const state = {
+        params: { ...DEFAULTS },
+        activeScenario: 'light',
+        scenarioStep: 0,
+        scenarioProfile: null,
+        events: []
+      };
+
+      const $ = id => document.getElementById(id);
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const round1 = value => Math.round(value * 10) / 10;
+      const fmtNumber = value => Number(value || 0).toLocaleString('zh-CN', { maximumFractionDigits: 1 });
+      const fmtCount = value => `≈${fmtNumber(Math.round(value))}`;
+      const fmtMoney = value => {
+        const abs = Math.abs(value).toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+        return value < 0 ? `-¥${abs}` : `¥${abs}`;
+      };
+      const fmtPercent = value => `${(value * 100).toFixed(1)}%`;
+      const fmtTokens = value => {
+        if (value >= 1000000) return `${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`;
+        if (value >= 1000) return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}K`;
+        return `${Math.round(value)} token`;
+      };
+      const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+      function logEvent(title, detail, tone = '') {
+        state.events.unshift({ time: now(), title, detail, tone });
+      }
+
+      function userCohorts() {
+        const heavy = state.params.users * state.params.heavyShare;
+        return [
+          { id: 'average', label: '平均用户', users: state.params.users - heavy, demand: state.params.avgTokens },
+          { id: 'heavy', label: '重度用户', users: heavy, demand: state.params.heavyTokens }
+        ];
+      }
+
+      function allowanceFor(plan) {
+        return plan.kind === 'free' ? state.params.freeQuota : (plan.quotaKey ? state.params[plan.quotaKey] : null);
+      }
+
+      function servedTokens(demand, allowance) {
+        return allowance === null ? demand : Math.min(demand, allowance);
+      }
+
+      function riskFor(result) {
+        if (result.revenue === 0) return { level: 'high', label: '高', reason: '零收入，模型成本完全由 Beta 预算承受' };
+        const pressure = result.overageUsers / Math.max(result.totalUsers, 1);
+        const costRatio = result.modelCost / result.revenue;
+        if (result.grossMargin < 0 || costRatio > 1) return { level: 'high', label: '高', reason: '毛利为负或模型成本超过收入' };
+        if (costRatio > .75 || pressure > .4) return { level: 'medium', label: '中', reason: '成本占收入较高，或大量用户撞到额度' };
+        return { level: 'low', label: '低', reason: '在当前假设下有余量，但仍受真实分布影响' };
+      }
+
+      function calculatePlan(plan) {
+        const p = state.params;
+        const cohorts = userCohorts();
+        const freeOnly = plan.kind === 'free';
+        const allowance = allowanceFor(plan);
+        let totalTokens = 0;
+        let demandTokens = 0;
+        let overageUsers = 0;
+        let lossUsers = 0;
+        let lossPaidUsers = 0;
+        let paidUsers = freeOnly ? 0 : p.users * p.conversion;
+        let freeUsers = p.users - paidUsers;
+
+        cohorts.forEach(cohort => {
+          const paidCohortUsers = freeOnly ? 0 : cohort.users * p.conversion;
+          const freeCohortUsers = cohort.users - paidCohortUsers;
+          const freeServed = servedTokens(cohort.demand, p.freeQuota);
+          const paidServed = freeOnly ? 0 : servedTokens(cohort.demand, allowance);
+          const freeCostPerUser = freeServed / 1000000 * p.modelCost;
+          const paidCostPerUser = paidServed / 1000000 * p.modelCost;
+          const freeRevenuePerUser = 0;
+          const paidRevenuePerUser = freeOnly ? 0 : p.memberPrice;
+
+          demandTokens += cohort.users * cohort.demand;
+          totalTokens += freeCohortUsers * freeServed + paidCohortUsers * paidServed;
+          if (freeCohortUsers > 0 && freeServed < cohort.demand) overageUsers += freeCohortUsers;
+          if (!freeOnly && paidCohortUsers > 0 && paidServed < cohort.demand) overageUsers += paidCohortUsers;
+          if (freeCohortUsers > 0 && freeCostPerUser > freeRevenuePerUser) lossUsers += freeCohortUsers;
+          if (paidCohortUsers > 0 && paidCostPerUser > paidRevenuePerUser) {
+            lossUsers += paidCohortUsers;
+            lossPaidUsers += paidCohortUsers;
+          }
+        });
+
+        const revenue = paidUsers * p.memberPrice;
+        const modelCost = totalTokens / 1000000 * p.modelCost;
+        const result = {
+          ...plan,
+          totalUsers: p.users,
+          paidUsers,
+          freeUsers,
+          allowance,
+          demandTokens,
+          servedTokens: totalTokens,
+          droppedTokens: Math.max(0, demandTokens - totalTokens),
+          revenue,
+          modelCost,
+          grossMargin: revenue - modelCost,
+          marginRate: revenue === 0 ? null : (revenue - modelCost) / revenue,
+          overageUsers,
+          lossUsers,
+          lossPaidUsers
+        };
+        result.risk = riskFor(result);
+        return result;
+      }
+
+      function calculateAll() {
+        return PLAN_DEFS.map(calculatePlan);
+      }
+
+      function calculateScenarioPlan(plan, profile) {
+        const allowance = plan.kind === 'free' ? state.params.freeQuota : (plan.quotaKey ? state.params[plan.quotaKey] : null);
+        const served = profile.role === 'free' || plan.kind === 'free' ? servedTokens(profile.demand, state.params.freeQuota) : servedTokens(profile.demand, allowance);
+        const revenue = profile.role === 'paid' && plan.kind !== 'free' ? state.params.memberPrice : 0;
+        const cost = served / 1000000 * state.params.modelCost;
+        return { ...plan, served, revenue, cost, margin: revenue - cost, overage: served < profile.demand, allowance: profile.role === 'free' || plan.kind === 'free' ? state.params.freeQuota : allowance };
+      }
+
+      function scenarioProfile() {
+        const scenario = SCENARIOS[state.activeScenario];
+        if (state.scenarioStep === 0 || !state.scenarioProfile) return null;
+        const demand = state.activeScenario === 'light'
+          ? Math.min(state.params.avgTokens * .35, state.params.freeQuota * .8)
+          : state.activeScenario === 'typical' ? state.params.avgTokens : state.params.heavyTokens;
+        return { scenario: state.activeScenario, role: scenario.role, demand, results: PLAN_DEFS.map(plan => calculateScenarioPlan(plan, { demand, role: scenario.role })) };
+      }
+
+      function renderInputs() {
+        document.querySelectorAll('[data-key]').forEach(input => {
+          const key = input.dataset.key;
+          const scale = Number(input.dataset.scale || 1);
+          input.value = state.params[key] * scale;
+        });
+      }
+
+      function renderState(results) {
+        const p = state.params;
+        const active = SCENARIOS[state.activeScenario];
+        const best = results.reduce((winner, item) => item.grossMargin > winner.grossMargin ? item : winner, results[0]);
+        const paid = p.users * p.conversion;
+        $('state-panel').innerHTML = `
+          <div class="panel-head"><div><h2>当前模拟状态</h2><small>输入改变后，所有方案会从同一批 cohort 重新计算。</small></div><span class="pill ${best.risk.level}">当前最高毛利：${escapeHtml(best.label)}</span></div>
+          <div class="state-grid">
+            <div class="state-card"><small>月活用户 / 付费用户</small><strong>${fmtCount(p.users)} / ${fmtCount(paid)}</strong><div class="subline">转化率 ${fmtPercent(p.conversion)}</div></div>
+            <div class="state-card"><small>平均 / 重度消耗</small><strong>${fmtTokens(p.avgTokens)} / ${fmtTokens(p.heavyTokens)}</strong><div class="subline">重度占比 ${fmtPercent(p.heavyShare)}</div></div>
+            <div class="state-card"><small>免费额度 / 会员价格</small><strong>${fmtTokens(p.freeQuota)} / ¥${fmtNumber(p.memberPrice)}</strong><div class="subline">每月、仅模型可变成本</div></div>
+            <div class="state-card"><small>当前引导场景</small><strong>${escapeHtml(active.label)}</strong><div class="subline">${escapeHtml(active.title)}</div></div>
+          </div>
+          <div class="section-label">一句话读数</div>
+          <p style="margin-bottom:0;font-size:13px">在当前参数下，${escapeHtml(best.label)}的模型毛利读数最高，为 <span class="${best.grossMargin >= 0 ? 'positive' : 'negative'}">${fmtMoney(best.grossMargin)}</span>；这只是算术结果，不是对 3M、5M、价格或转化率的市场定案。</p>
+        `;
+      }
+
+      function renderPlans(results) {
+        const bestMargin = Math.max(...results.map(result => result.grossMargin));
+        $('plan-table').innerHTML = `
+          <thead><tr><th>方案</th><th>额度</th><th>收入</th><th>模型成本</th><th>毛利</th><th>超额用户</th><th>亏损用户<br><span class="muted">总 / 会员</span></th><th>成本风险</th></tr></thead>
+          <tbody>${results.map(result => {
+            const isBest = result.grossMargin === bestMargin;
+            const quota = result.allowance === null ? '∞' : fmtTokens(result.allowance);
+            const marginClass = result.grossMargin >= 0 ? 'positive' : 'negative';
+            return `<tr class="${isBest ? 'best' : ''} ${result.kind === 'free' ? 'free-row' : ''}">
+              <td><div class="plan-name">${escapeHtml(result.label)} ${isBest ? '<span class="pill low">当前最高</span>' : ''}</div><div class="plan-note">${escapeHtml(result.note)}</div></td>
+              <td>${quota}<br><span class="muted">免费层 ${fmtTokens(state.params.freeQuota)}</span></td>
+              <td>${fmtMoney(result.revenue)}<br><span class="muted">付费 ${fmtCount(result.paidUsers)}</span></td>
+              <td>${fmtMoney(result.modelCost)}<br><span class="muted">服务 ${fmtTokens(result.servedTokens)}</span></td>
+              <td class="${marginClass}">${fmtMoney(result.grossMargin)}<br><span class="muted">${result.marginRate === null ? '无收入基线' : `毛利率 ${fmtPercent(result.marginRate)}`}</span></td>
+              <td>${fmtCount(result.overageUsers)}<br><span class="muted">截断 ${fmtTokens(result.droppedTokens)}</span></td>
+              <td>${fmtCount(result.lossUsers)} / ${fmtCount(result.lossPaidUsers)}<br><span class="muted">定义见公式</span></td>
+              <td><span class="pill ${result.risk.level}">${result.risk.label}风险</span><br><span class="muted">${escapeHtml(result.risk.reason)}</span></td>
+            </tr>`;
+          }).join('')}</tbody>
+        `;
+        const breakEven = state.params.modelCost > 0 ? state.params.memberPrice / state.params.modelCost * 1000000 : Infinity;
+        $('best-plan-pill').textContent = `当前最高：${results.find(result => result.grossMargin === bestMargin).label}`;
+        $('break-even-note').innerHTML = `<strong>会员成本边界：</strong>按当前价格与混合模型单价，一个付费会员的模型成本达到 ${fmtTokens(breakEven)} 时就吃完 ¥${fmtNumber(state.params.memberPrice) } 的收入。3M / 5M 只是额度上限，不代表用户一定会用满；是否会用满、是否愿意付费，需要 Beta 真实数据。`;
+      }
+
+      function renderScenario() {
+        const scenario = SCENARIOS[state.activeScenario];
+        const profile = scenarioProfile();
+        $('scenario-tabs').innerHTML = Object.entries(SCENARIOS).map(([id, item]) => `<button class="tab ${id === state.activeScenario ? 'active' : ''}" data-scenario="${id}">${item.label}场景</button>`).join('');
+        $('scenario-copy').innerHTML = `<strong>${escapeHtml(scenario.title)}</strong><p>${escapeHtml(scenario.description)}</p>`;
+        $('scenario-progress').textContent = `第 ${state.scenarioStep} / ${scenario.steps.length} 步`;
+        $('step-list').innerHTML = scenario.steps.map((step, index) => `<div class="step ${index < state.scenarioStep ? 'done' : index === state.scenarioStep ? 'current' : ''}"><span class="step-num">${index < state.scenarioStep ? '✓' : index + 1}</span><span>${escapeHtml(step)}</span><span class="muted">${index < state.scenarioStep ? '已记录' : index === state.scenarioStep ? '待执行' : '未到'}</span></div>`).join('');
+        $('scenario-next').disabled = state.scenarioStep >= scenario.steps.length;
+        if (!profile) {
+          $('scenario-state').innerHTML = '<div class="scenario-state empty">还没有执行本场景。点击“执行下一步”，先把用户需求放入模拟，再看四方案的单用户证据。</div>';
+          return;
+        }
+        const roleLabel = profile.role === 'paid' ? '假设该用户已付费' : '假设该用户仍是免费用户';
+        $('scenario-state').innerHTML = `
+          <div class="metric-grid">
+            <div class="metric-card"><small>场景用户需求</small><strong>${fmtTokens(profile.demand)}</strong><div class="subline">${roleLabel}</div></div>
+            <div class="metric-card"><small>免费层能服务</small><strong>${fmtTokens(Math.min(profile.demand, state.params.freeQuota))}</strong><div class="subline">免费额度 ${fmtTokens(state.params.freeQuota)}</div></div>
+            <div class="metric-card"><small>单用户模型成本</small><strong>${fmtMoney(profile.results[0].cost)}</strong><div class="subline">按实际服务 token</div></div>
+            <div class="metric-card"><small>当前参数证据步</small><strong>${state.scenarioStep} / ${scenario.steps.length}</strong><div class="subline">日志已追加</div></div>
+          </div>
+          <div class="table-wrap" style="margin-top:14px"><table class="mini-table"><thead><tr><th>方案</th><th>服务 token</th><th>单用户收入</th><th>单用户成本</th><th>毛利</th><th>是否超额</th></tr></thead><tbody>
+            ${profile.results.map(result => `<tr><td><strong>${escapeHtml(result.label)}</strong></td><td>${fmtTokens(result.served)}</td><td>${fmtMoney(result.revenue)}</td><td>${fmtMoney(result.cost)}</td><td class="${result.margin >= 0 ? 'positive' : 'negative'}">${fmtMoney(result.margin)}</td><td>${result.overage ? '<span class="pill high">是</span>' : '<span class="pill low">否</span>'}</td></tr>`).join('')}
+          </tbody></table></div>
+        `;
+      }
+
+      function renderConclusions(results) {
+        const finite3 = results.find(result => result.id === 'finite3');
+        const finite5 = results.find(result => result.id === 'finite5');
+        const unlimited = results.find(result => result.id === 'unlimited');
+        const free = results.find(result => result.id === 'freeBeta');
+        const bestFinite = finite3.grossMargin >= finite5.grossMargin ? finite3 : finite5;
+        const pressure = free.overageUsers / Math.max(state.params.users, 1);
+        $('conclusion-grid').innerHTML = `
+          <div class="conclusion-card supported"><h3>原型支持的结构性判断</h3><ul>
+            <li>免费 Beta 可以先发，但在模型成本大于 0 时，免费用户天然是成本暴露；免费额度是成本上限，不是收入。</li>
+            <li>有限会员把会员服务 token 变成硬上限；无限会员的成本随重度用户需求增长，重度占比上升时风险会先放大。</li>
+            <li>BYOK 可以作为后续成本泄压阀，但它改变的是成本归属，不会自动证明用户愿意配置或使用。</li>
+          </ul></div>
+          <div class="conclusion-card depends"><h3>依赖真实数据的判断</h3><ul>
+            <li>3M 还是 5M：当前输入下，${escapeHtml(bestFinite.label)}的模型毛利读数为 ${fmtMoney(bestFinite.grossMargin)}，但这只说明本组假设下的算术结果。</li>
+            <li>真正决定方案的是平均/重度消耗、重度占比、免费到付费转化和模型实际混合成本。</li>
+            <li>需要 Beta 记录：每用户真实 token、触顶率、超额后的行为、付费意愿、退款/流失和 BYOK 采用率。</li>
+          </ul></div>
+          <div class="conclusion-card cannot"><h3>原型无法证明</h3><ul>
+            <li>不能证明 ¥19 是可接受价格，也不能证明任何额度对应真实市场需求或竞品事实。</li>
+            <li>不能证明收入能覆盖支付、税费、客服、基础设施、内容安全和运营成本。</li>
+            <li>不能证明用户会接受“有限额度”，也不能证明无限会员一定会导致亏损；那取决于真实分布和供应商合同。</li>
+          </ul></div>
+          <div class="observation" style="grid-column:1/-1"><strong>当前输入的风险提示：</strong> 免费层有 ${fmtPercent(pressure)} 的用户需求超过免费额度；无限会员当前${unlimited.grossMargin >= 0 ? '仍为正毛利，但对重度 cohort 更敏感' : '已出现负毛利，重度 cohort 是主要压力源'}；3M 与 5M 的差异是待用量数据验证的产品决策，不应在没有真实用户数据时冻结。</div>
+        `;
+      }
+
+      function renderLog() {
+        $('event-count').textContent = `${state.events.length} 条`;
+        $('event-log').innerHTML = state.events.length ? state.events.map(event => `<div class="log-item ${event.tone}"><strong>${escapeHtml(event.time)} · ${escapeHtml(event.title)}</strong><span>${escapeHtml(event.detail)}</span></div>`).join('') : '<div class="muted" style="font-size:12px">暂无日志。修改参数或执行一个场景步骤开始。</div>';
+      }
+
+      function renderAll() {
+        renderInputs();
+        const results = calculateAll();
+        renderState(results);
+        renderPlans(results);
+        renderScenario();
+        renderConclusions(results);
+        renderLog();
+      }
+
+      function logRecalculation(reason) {
+        const results = calculateAll();
+        const best = results.reduce((winner, item) => item.grossMargin > winner.grossMargin ? item : winner, results[0]);
+        logEvent('参数已重算', `${reason}；${best.label}当前毛利 ${fmtMoney(best.grossMargin)}，免费 Beta 毛利 ${fmtMoney(results.find(item => item.id === 'freeBeta').grossMargin)}。`, best.grossMargin < 0 ? 'danger' : '');
+      }
+
+      document.querySelectorAll('[data-key]').forEach(input => {
+        input.addEventListener('change', () => {
+          const key = input.dataset.key;
+          const scale = Number(input.dataset.scale || 1);
+          const raw = Number(input.value);
+          if (!Number.isFinite(raw)) return;
+          const max = key === 'conversion' || key === 'heavyShare' ? 1 : Infinity;
+          state.params[key] = clamp(raw / scale, 0, max);
+          logRecalculation(`${input.parentElement.firstChild.textContent.trim()} → ${input.value}`);
+          renderAll();
+        });
+      });
+
+      $('reset-params').addEventListener('click', () => {
+        state.params = { ...DEFAULTS };
+        state.scenarioStep = 0;
+        state.scenarioProfile = null;
+        logEvent('恢复默认参数', '所有变量回到演示初始值；没有持久化写入。');
+        renderAll();
+      });
+
+      $('clear-log').addEventListener('click', () => {
+        state.events = [];
+        renderLog();
+      });
+
+      $('scenario-tabs').addEventListener('click', event => {
+        const button = event.target.closest('[data-scenario]');
+        if (!button) return;
+        const next = button.dataset.scenario;
+        state.activeScenario = next;
+        state.scenarioStep = 0;
+        state.scenarioProfile = null;
+        logEvent('切换引导场景', `进入${SCENARIOS[next].label}场景；场景进度从第 0 步重新开始。`);
+        renderAll();
+      });
+
+      $('scenario-next').addEventListener('click', () => {
+        const scenario = SCENARIOS[state.activeScenario];
+        if (state.scenarioStep >= scenario.steps.length) return;
+        state.scenarioStep += 1;
+        state.scenarioProfile = scenarioProfile() || true;
+        const profile = scenarioProfile();
+        const resultText = profile ? profile.results.map(result => `${result.label}毛利 ${fmtMoney(result.margin)}`).join('；') : '场景需求已建立';
+        const tone = state.activeScenario === 'heavy' && state.scenarioStep >= 2 ? 'warn' : '';
+        logEvent(`${scenario.label}场景 · 第 ${state.scenarioStep} 步`, `${scenario.steps[state.scenarioStep - 1]}；${resultText}。`, tone);
+        renderAll();
+      });
+
+      $('scenario-reset').addEventListener('click', () => {
+        state.scenarioStep = 0;
+        state.scenarioProfile = null;
+        logEvent('重置引导场景', `${SCENARIOS[state.activeScenario].label}场景回到第 0 步；全局参数不变。`);
+        renderAll();
+      });
+
+      logEvent('原型初始化', '使用默认参数启动；默认值仅用于演示，不代表市场事实。');
+      renderAll();
+    })();
+  </script>
+</body>
+</html>

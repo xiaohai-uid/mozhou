@@ -1,0 +1,78 @@
+# 墨舟 (MoZhou) — 开发环境编排
+# 用法:
+#   docker compose up -d                  # 基础设施（postgres + one-api）
+#   cd app && npm run dev                 # Web 开发模式（推荐，热重载）
+#   docker compose --profile prod up -d --build   # 全栈生产镜像（需 Docker 能访问镜像源）
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mozhou-postgres
+    environment:
+      POSTGRES_USER: mozhou
+      POSTGRES_PASSWORD: mozhou_dev
+      POSTGRES_DB: mozhou
+    ports:
+      - "5433:5432"   # 5432 被本机 WSL Postgres 占用，映射到 5433
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init:/docker-entrypoint-initdb.d:ro   # 首次初始化：启用 pgvector
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mozhou"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  one-api:
+    # Pinned digest verified with MoZhou real PUBLIC_FREE smoke on 2026-08-20.
+    image: justsong/one-api@sha256:a55fb5181854aa0823cc04797ee875dfc5a953c0deb5e7e7ec39a8148e70cbc3
+    container_name: mozhou-one-api
+    environment:
+      TZ: Asia/Shanghai
+      SQL_DSN: ""
+      SESSION_SECRET: mozhou-dev-secret-change-me
+    ports:
+      - "3001:3000"
+    volumes:
+      - oneapi-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    profiles: ["prod"]   # 默认不启动（构建需镜像源；开发用宿主 npm run dev）
+    container_name: mozhou-app
+    environment:
+      DATABASE_URL: postgres://mozhou:mozhou_dev@postgres:5432/mozhou
+      # 生产必需密钥（从宿主环境注入；部署前必须设置，见 docs/deployment.md）
+      AUTH_SECRET: ${AUTH_SECRET:?生产必须设置 AUTH_SECRET}
+      ONEAPI_BASE_URL: ${ONEAPI_BASE_URL:-http://one-api:3000}
+      ONEAPI_TOKEN: ${ONEAPI_TOKEN:?生产必须设置 ONEAPI_TOKEN}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      # /api/v1/health 公开探测端点（含 db ping，503=库不可达）
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      one-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  oneapi-data:

@@ -1,0 +1,1 @@
+ALTER TABLE "novels" ADD COLUMN "rag_enabled" boolean DEFAULT true NOT NULL;

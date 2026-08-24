@@ -1,3 +1,8 @@
-node_modules/
-dist/
+# 墨舟仓库根忽略（app/ 内另有 .gitignore）
+# 设计期产物与部署工作目录：不得入库
+*.log
 *.tsbuildinfo
+.scratch/
+dist/
+figma-upload/
+node_modules/

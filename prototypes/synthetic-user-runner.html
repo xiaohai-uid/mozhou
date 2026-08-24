@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PROTOTYPE · 墨舟合成用户 Runner</title>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #687480;
+      --line: #d9e0e5;
+      --paper: #f6f8f7;
+      --panel: #ffffff;
+      --accent: #a54d38;
+      --accent-soft: #f3e2dc;
+      --calm: #287a62;
+      --warn: #b56a21;
+      --danger: #a33e3e;
+      --shadow: 0 12px 32px rgba(30, 40, 47, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 64px; }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 8px 0 12px; max-width: 780px; font-size: clamp(30px, 5vw, 52px); line-height: 1.06; letter-spacing: -.04em; }
+    h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    h3 { margin: 0; font-size: 14px; }
+    p { color: var(--muted); line-height: 1.65; }
+    .question { max-width: 780px; padding: 16px 18px; margin: 22px 0 26px; background: var(--accent-soft); border-left: 4px solid var(--accent); color: #633126; }
+    .question strong { display: block; color: #49231b; margin-bottom: 4px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, .85fr); gap: 18px; align-items: start; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 22px; }
+    .panel + .panel { margin-top: 18px; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .panel-head small { color: var(--muted); }
+    .state-top { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .state-card { padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfc; }
+    .state-card small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+    .state-card strong { font-size: 19px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #e8f2ee; color: var(--calm); }
+    .pill.warn { background: #fbefdf; color: var(--warn); }
+    .pill.danger { background: #f7e3e3; color: var(--danger); }
+    .pill.accent { background: var(--accent-soft); color: var(--accent); }
+    .trust-line { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; margin: 10px 0 6px; }
+    .meter { height: 9px; border-radius: 999px; background: #e8eceb; overflow: hidden; }
+    .meter span { display: block; height: 100%; background: var(--calm); transition: width .2s ease; }
+    .meter span.warn { background: var(--warn); }
+    .meter span.danger { background: var(--danger); }
+    .intention { padding: 14px 16px; margin-top: 14px; border-radius: 12px; background: #f3f6f5; color: #41504a; }
+    .intention small { color: var(--muted); display: block; margin-bottom: 5px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 18px; }
+    .metric { border-top: 2px solid var(--line); padding-top: 9px; }
+    .metric small { display: block; color: var(--muted); min-height: 30px; font-size: 11px; line-height: 1.35; }
+    .metric strong { font-size: 19px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button { border: 1px solid #cfd8d6; background: #fff; color: var(--ink); border-radius: 9px; padding: 9px 11px; cursor: pointer; font: inherit; font-size: 13px; }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.subtle { background: #f4f6f5; }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .section-label { margin: 20px 0 9px; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .scenarios { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+    .tab { border: 0; border-radius: 8px 8px 0 0; color: var(--muted); background: transparent; }
+    .tab.active { color: var(--accent); background: var(--accent-soft); }
+    .scenario-copy { min-height: 77px; padding: 14px; background: #fbfcfc; border: 1px solid var(--line); border-radius: 10px; margin: 14px 0; }
+    .scenario-copy p { margin: 6px 0 0; font-size: 13px; }
+    .step-list { display: grid; gap: 8px; }
+    .step { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 13px; }
+    .step.current { border-color: var(--accent); background: #fffaf8; color: var(--ink); }
+    .step.done { background: #f1f7f4; border-color: #cfe2d9; color: #47715f; }
+    .step-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #edf0ef; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .step.current .step-num { background: var(--accent); color: #fff; }
+    .step.done .step-num { background: var(--calm); color: #fff; }
+    .log { display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+    .log-item { padding: 10px 11px; border-left: 3px solid #dce4e1; background: #fbfcfc; font-size: 12px; }
+    .log-item strong { display: block; color: var(--ink); margin-bottom: 4px; }
+    .log-item span { color: var(--muted); }
+    .notice { padding: 13px 14px; border-radius: 10px; background: #fff8e8; color: #755b20; font-size: 13px; line-height: 1.55; }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } .state-top { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 520px) { main { width: min(100% - 20px, 1180px); padding-top: 24px; } .panel { padding: 16px; } .state-top, .metrics { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">PROTOTYPE ONLY · THROWAWAY LOGIC DEMO</div>
+    <h1>合成用户 Runner：等待会怎样改变一个人的操作？</h1>
+    <p>这是一个不用安装、双击即可运行的逻辑原型。它不连接真实模型，也不修改墨舟生产代码，只验证一个商业决策问题：等待时间、反馈质量和用户信任下降，能不能自然地转化成可解释的真人式操作。</p>
+
+    <div class="question">
+      <strong>本原型要回答的问题</strong>
+      如果生成期间没有及时反馈，用户是否会从“耐心等待”转向“观察、误点、重试、刷新、回退、取消或放弃”，并且我们能否把这个过程记录成可审计的证据？
+    </div>
+
+    <div class="grid">
+      <section>
+        <div class="panel" id="state-panel"></div>
+        <div class="panel">
+          <div class="panel-head"><div><h2>自由操作</h2><small>所有按钮都可以随便点，试试不按最优路径操作。</small></div><button class="subtle" id="reset-btn">重置</button></div>
+          <div class="section-label">开始和等待</div>
+          <div class="button-row">
+            <button class="primary" data-action="START">开始生成</button>
+            <button data-action="WAIT" data-ms="800">等待 0.8 秒</button>
+            <button data-action="WAIT" data-ms="2200">等待 2.2 秒</button>
+            <button data-action="WAIT" data-ms="5200">等待 5.2 秒</button>
+            <button data-action="PROGRESS">收到进度反馈</button>
+            <button data-action="USEFUL_OUTPUT">收到可用结果</button>
+          </div>
+          <div class="section-label">真人式偏漏</div>
+          <div class="button-row">
+            <button data-action="SCROLL">先滚动看看</button>
+            <button data-action="MISCLICK">误点一次</button>
+            <button data-action="RETRY">重复提交</button>
+            <button data-action="REFRESH">刷新页面</button>
+            <button data-action="BACK">返回上一页</button>
+            <button data-action="SWITCH">切换作品</button>
+            <button data-action="CANCEL">取消生成</button>
+            <button data-action="ABANDON">放弃任务</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div><h2>引导场景</h2><small>每个场景都会先回到同一初始状态。</small></div></div>
+          <div class="scenarios" id="scenario-tabs"></div>
+          <div class="scenario-copy" id="scenario-copy"></div>
+          <div class="step-list" id="step-list"></div>
+        </div>
+      </section>
+
+      <aside>
+        <div class="panel">
+          <div class="panel-head"><div><h2>证据日志</h2><small>每次动作后的状态变化。</small></div><span class="pill accent" id="event-count">0 条</span></div>
+          <div class="log" id="event-log"></div>
+        </div>
+        <div class="panel">
+          <h2>原型边界</h2>
+          <div class="notice" style="margin-top:14px">它只验证状态模型和操作逻辑，不验证真实生成速度、不验证模型质量，也不代表真人研究结果。下一步只有在你和真实用户都觉得状态变化合理后，才值得接入真实浏览器和生产链路。</div>
+          <div class="section-label">建议观察</div>
+          <p style="font-size:13px;margin-bottom:0">当你看到“没有反馈”后，系统是否允许用户自然地改变策略？如果每一步都仍然只是等待，说明模型还是在扮演任务完成器，不像真人。</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    // Portable logic module. It deliberately knows nothing about the DOM.
+    const SyntheticUserMachine = (() => {
+      const PHASE_LABELS = { ready: '准备开始', generating: '生成中', succeeded: '已完成', cancelled: '已取消', abandoned: '已放弃' };
+      const EMOTION_LABELS = { calm: '平静', uncertain: '开始疑惑', impatient: '不耐烦', frustrated: '烦躁', distrustful: '不再信任', relieved: '松了一口气' };
+      const ACTION_LABELS = { START: '开始生成', WAIT: '等待', PROGRESS: '进度反馈', USEFUL_OUTPUT: '可用结果', SCROLL: '滚动', MISCLICK: '误点', RETRY: '重复提交', REFRESH: '刷新', BACK: '返回', SWITCH: '切换作品', CANCEL: '取消', ABANDON: '放弃' };
+
+      function initialState() {
+        return {
+          phase: 'ready', emotion: 'calm', trust: 100, elapsedMs: 0, noFeedbackMs: 0,
+          feedbackState: 'none', lastAction: '还没有动作', lastChange: '等待用户开始', intention: '观察首屏，决定是否开始生成',
+          metrics: { retries: 0, backtracks: 0, refreshes: 0, scrolls: 0, misclicks: 0, cancellations: 0, feedbackCount: 0, firstFeedbackMs: null, firstUsefulMs: null },
+          events: []
+        };
+      }
+
+      const terminal = state => ['succeeded', 'cancelled', 'abandoned'].includes(state.phase);
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const clone = value => JSON.parse(JSON.stringify(value));
+      const formatTime = ms => (ms === null ? '尚未发生' : `${(ms / 1000).toFixed(1)} 秒`);
+
+      function derive(next) {
+        next.trust = clamp(next.trust, 0, 100);
+        if (next.phase === 'succeeded') next.emotion = 'relieved';
+        else if (next.phase === 'abandoned' || next.phase === 'cancelled') next.emotion = 'distrustful';
+        else if (next.phase === 'generating') {
+          if (next.noFeedbackMs >= 8000) next.emotion = next.metrics.retries > 0 ? 'distrustful' : 'frustrated';
+          else if (next.noFeedbackMs >= 3000) next.emotion = 'impatient';
+          else if (next.noFeedbackMs >= 1000) next.emotion = 'uncertain';
+          else next.emotion = 'calm';
+        } else next.emotion = 'calm';
+
+        if (next.phase === 'ready') next.intention = '观察首屏，决定是否开始生成';
+        else if (next.phase === 'succeeded') next.intention = '检查结果是否真的可用';
+        else if (next.phase === 'cancelled') next.intention = '确认任务已停止，决定是否换一种方式';
+        else if (next.phase === 'abandoned') next.intention = '离开任务，信任已经下降';
+        else if (next.noFeedbackMs < 1000) next.intention = '观察是否出现首个反馈';
+        else if (next.noFeedbackMs < 3000) next.intention = '再等一会儿，同时寻找进度提示';
+        else if (next.noFeedbackMs < 8000) next.intention = '检查页面是否卡住，可能会重复点击';
+        else next.intention = '考虑刷新、取消或放弃';
+      }
+
+      function transition(current, action) {
+        const next = clone(current || initialState());
+        const label = ACTION_LABELS[action.type] || action.type;
+        let detail = '';
+        next.lastAction = label;
+
+        if (action.type === 'START') {
+          if (next.phase === 'generating') detail = '已经在生成，真人可能会再次点击开始按钮。';
+          else {
+            next.phase = 'generating'; next.elapsedMs = 0; next.noFeedbackMs = 0; next.feedbackState = 'none'; detail = '用户发起生成，开始等待首个反馈。';
+          }
+        } else if (action.type === 'WAIT') {
+          const ms = Number(action.ms || 0);
+          if (next.phase === 'generating') { next.elapsedMs += ms; next.noFeedbackMs += ms; detail = `用户等待了 ${formatTime(ms)}，但没有获得新反馈。`; }
+          else detail = '当前没有正在生成的任务，等待不会改变结果。';
+        } else if (action.type === 'PROGRESS') {
+          if (next.phase !== 'generating') detail = '当前没有正在生成的任务，这条反馈被忽略。';
+          else { next.feedbackState = 'progress'; next.noFeedbackMs = 0; next.metrics.feedbackCount += 1; if (next.metrics.firstFeedbackMs === null) next.metrics.firstFeedbackMs = next.elapsedMs; next.trust += 8; detail = '用户看到了明确进度，信任暂时恢复。'; }
+        } else if (action.type === 'USEFUL_OUTPUT') {
+          if (next.phase !== 'generating') detail = '当前没有正在生成的任务，结果被忽略。';
+          else { next.phase = 'succeeded'; next.feedbackState = 'useful'; next.noFeedbackMs = 0; if (next.metrics.firstUsefulMs === null) next.metrics.firstUsefulMs = next.elapsedMs; next.trust += 14; detail = '用户拿到了可以继续工作的结果。'; }
+        } else if (action.type === 'SCROLL') {
+          next.metrics.scrolls += 1; detail = next.phase === 'generating' ? '用户先滚动寻找进度、说明或错误提示。' : '用户浏览页面，但没有改变任务状态。';
+        } else if (action.type === 'MISCLICK') {
+          next.metrics.misclicks += 1; next.trust -= 2; detail = '用户误点了一个看起来像操作入口的区域。';
+        } else if (action.type === 'RETRY') {
+          next.metrics.retries += 1; next.trust -= 7; if (next.phase === 'generating') next.noFeedbackMs = 0; detail = next.phase === 'generating' ? '用户重复提交，希望确认刚才的操作是否生效。' : '用户尝试重新提交，但当前没有生成中的任务。';
+        } else if (action.type === 'REFRESH') {
+          next.metrics.refreshes += 1; next.trust -= 8; if (next.phase === 'generating') next.noFeedbackMs = 0; detail = '用户刷新页面，说明他已经不再完全信任当前界面。';
+        } else if (action.type === 'BACK') {
+          next.metrics.backtracks += 1; next.trust -= 10; if (next.phase === 'generating') next.phase = 'ready'; detail = '用户返回上一页，试图脱离当前不确定状态。';
+        } else if (action.type === 'SWITCH') {
+          next.trust -= 8; if (next.phase === 'generating') next.phase = 'ready'; detail = '用户切换作品，说明当前任务已经被暂时搁置。';
+        } else if (action.type === 'CANCEL') {
+          next.metrics.cancellations += 1; next.trust -= 8; next.phase = 'cancelled'; detail = '用户主动取消，等待成本已经超过继续尝试的价值。';
+        } else if (action.type === 'ABANDON') {
+          next.trust -= 20; next.phase = 'abandoned'; detail = '用户放弃任务，系统失去了这次转化机会。';
+        }
+
+        derive(next);
+        next.lastChange = detail;
+        next.events.unshift({ time: next.elapsedMs, action: label, detail, phase: PHASE_LABELS[next.phase], emotion: EMOTION_LABELS[next.emotion] });
+        return next;
+      }
+
+      return { initialState, transition, PHASE_LABELS, EMOTION_LABELS, ACTION_LABELS, formatTime };
+    })();
+
+    const scenarios = [
+      { id: 'happy', title: '正常有反馈', description: '验证：有反馈时，用户是否能保持耐心并完成任务。', steps: [
+        ['开始生成', { type: 'START' }], ['等 0.8 秒', { type: 'WAIT', ms: 800 }], ['看到进度反馈', { type: 'PROGRESS' }], ['再等 1.2 秒', { type: 'WAIT', ms: 1200 }], ['得到可用结果', { type: 'USEFUL_OUTPUT' }]
+      ] },
+      { id: 'silent', title: '没有反馈', description: '验证：长时间空白是否会让用户从等待转向重复、刷新和放弃。', steps: [
+        ['开始生成', { type: 'START' }], ['等 3.2 秒', { type: 'WAIT', ms: 3200 }], ['误点一次', { type: 'MISCLICK' }], ['重复提交', { type: 'RETRY' }], ['再等 5.2 秒', { type: 'WAIT', ms: 5200 }], ['放弃任务', { type: 'ABANDON' }]
+      ] },
+      { id: 'messy', title: '真人偏漏', description: '验证：用户是否会先滚动、返回、刷新和切换，而不是精准执行理想路径。', steps: [
+        ['开始生成', { type: 'START' }], ['先滚动看看', { type: 'SCROLL' }], ['误点一次', { type: 'MISCLICK' }], ['返回上一页', { type: 'BACK' }], ['再次开始', { type: 'START' }], ['等 2.5 秒', { type: 'WAIT', ms: 2500 }], ['刷新页面', { type: 'REFRESH' }], ['取消生成', { type: 'CANCEL' }]
+      ] }
+    ];
+
+    let state = SyntheticUserMachine.initialState();
+    let activeScenario = scenarios[0];
+    let scenarioStep = 0;
+
+    const $ = selector => document.querySelector(selector);
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const moodClass = mood => ['frustrated', 'distrustful'].includes(mood) ? 'danger' : ['uncertain', 'impatient'].includes(mood) ? 'warn' : '';
+    const moodText = mood => SyntheticUserMachine.EMOTION_LABELS[mood];
+
+    function dispatch(action) {
+      state = SyntheticUserMachine.transition(state, action);
+      render();
+    }
+
+    function renderState() {
+      const phase = SyntheticUserMachine.PHASE_LABELS[state.phase];
+      const mood = moodText(state.emotion);
+      const trustClass = state.trust < 35 ? 'danger' : state.trust < 65 ? 'warn' : '';
+      const metrics = state.metrics;
+      $('#state-panel').innerHTML = `
+        <div class="panel-head"><div><h2>当前用户状态</h2><small>每次操作后完整更新，不隐藏“为什么变成这样”。</small></div><span class="pill ${moodClass(state.emotion)}">${escapeHtml(mood)}</span></div>
+        <div class="state-top">
+          <div class="state-card"><small>任务状态</small><strong>${escapeHtml(phase)}</strong><div style="margin-top:8px"><span class="pill ${state.phase === 'succeeded' ? '' : state.phase === 'abandoned' ? 'danger' : state.phase === 'generating' ? 'accent' : ''}">${escapeHtml(state.feedbackState === 'useful' ? '拿到可用结果' : state.feedbackState === 'progress' ? '看到进度反馈' : '没有结果')}</span></div></div>
+          <div class="state-card"><small>本次等待</small><strong>${SyntheticUserMachine.formatTime(state.elapsedMs)}</strong><div style="margin-top:8px;color:var(--muted);font-size:12px">无反馈：${SyntheticUserMachine.formatTime(state.noFeedbackMs)}</div></div>
+          <div class="state-card"><small>用户信任</small><strong>${state.trust}/100</strong><div class="trust-line"><span>继续尝试的意愿</span><span>${terminalStateLabel(state)}</span></div><div class="meter"><span class="${trustClass}" style="width:${state.trust}%"></span></div></div>
+        </div>
+        <div class="intention"><small>用户下一步可能想做什么</small><strong>${escapeHtml(state.intention)}</strong></div>
+        <div class="metrics">
+          <div class="metric"><small>首个反馈</small><strong>${SyntheticUserMachine.formatTime(metrics.firstFeedbackMs)}</strong></div>
+          <div class="metric"><small>首个可用结果</small><strong>${SyntheticUserMachine.formatTime(metrics.firstUsefulMs)}</strong></div>
+          <div class="metric"><small>重复 / 回退</small><strong>${metrics.retries} / ${metrics.backtracks}</strong></div>
+          <div class="metric"><small>误点 / 刷新 / 滚动</small><strong>${metrics.misclicks} / ${metrics.refreshes} / ${metrics.scrolls}</strong></div>
+        </div>
+        <div class="section-label">刚刚发生了什么</div>
+        <p style="margin:0;font-size:13px">${escapeHtml(state.lastChange)}</p>`;
+    }
+
+    function renderLog() {
+      $('#event-count').textContent = `${state.events.length} 条`;
+      $('#event-log').innerHTML = state.events.length ? state.events.slice(0, 18).map(event => `<div class="log-item"><strong>${escapeHtml(event.action)} · ${escapeHtml(event.phase)} · ${escapeHtml(event.emotion)}</strong><span>${escapeHtml(event.detail)} · ${SyntheticUserMachine.formatTime(event.time)}</span></div>`).join('') : '<p style="font-size:13px;margin:0">还没有动作。先点击“开始生成”。</p>';
+    }
+
+    function terminalStateLabel(current) {
+      if (['succeeded', 'cancelled', 'abandoned'].includes(current.phase)) return '已停止';
+      return current.trust < 45 ? '低' : current.trust < 80 ? '摇摆' : '较高';
+    }
+
+    function renderScenarios() {
+      $('#scenario-tabs').innerHTML = scenarios.map(item => `<button class="tab ${item.id === activeScenario.id ? 'active' : ''}" data-scenario="${item.id}">${item.title}</button>`).join('');
+      $('#scenario-copy').innerHTML = `<strong>${activeScenario.title}</strong><p>${activeScenario.description}</p>`;
+      $('#step-list').innerHTML = activeScenario.steps.map((step, index) => {
+        const status = index < scenarioStep ? 'done' : index === scenarioStep ? 'current' : '';
+        return `<div class="step ${status}"><span class="step-num">${index < scenarioStep ? '✓' : index + 1}</span><span>${step[0]}</span>${index === scenarioStep ? `<button class="primary" data-step="${index}">执行</button>` : index < scenarioStep ? '<small>已完成</small>' : '<small>等待中</small>'}</div>`;
+      }).join('');
+    }
+
+    function render() { renderState(); renderLog(); renderScenarios(); }
+
+    document.addEventListener('click', event => {
+      const actionButton = event.target.closest('[data-action]');
+      if (actionButton) dispatch({ type: actionButton.dataset.action, ms: actionButton.dataset.ms });
+      const scenarioButton = event.target.closest('[data-scenario]');
+      if (scenarioButton) { activeScenario = scenarios.find(item => item.id === scenarioButton.dataset.scenario); state = SyntheticUserMachine.initialState(); scenarioStep = 0; render(); }
+      const stepButton = event.target.closest('[data-step]');
+      if (stepButton) { dispatch(activeScenario.steps[Number(stepButton.dataset.step)][1]); scenarioStep += 1; render(); }
+      if (event.target.closest('#reset-btn')) { state = SyntheticUserMachine.initialState(); scenarioStep = 0; render(); }
+    });
+
+    render();
+  </script>
+</body>
+</html>

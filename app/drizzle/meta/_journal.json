@@ -1,0 +1,251 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786258723789,
+      "tag": "0000_tough_joshua_kane",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786265076604,
+      "tag": "0001_warm_triton",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786266257690,
+      "tag": "0002_lying_alex_wilder",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786293067242,
+      "tag": "0003_watery_preak",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786351925959,
+      "tag": "0004_past_white_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786354579186,
+      "tag": "0005_ambiguous_starfox",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786358810580,
+      "tag": "0006_flimsy_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786360776616,
+      "tag": "0007_ambitious_nicolaos",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786371022914,
+      "tag": "0008_thin_kate_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786372524320,
+      "tag": "0009_kind_diamondback",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786377851254,
+      "tag": "0010_quiet_joseph",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786384690259,
+      "tag": "0011_tense_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786385938892,
+      "tag": "0012_skinny_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786534520232,
+      "tag": "0013_volatile_senator_kelly",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786535161796,
+      "tag": "0014_minor_mother_askani",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786536773854,
+      "tag": "0015_clear_doctor_octopus",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786538774902,
+      "tag": "0016_lovely_arachne",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786538850906,
+      "tag": "0017_acoustic_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786542516014,
+      "tag": "0018_natural_scarlet_witch",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786544380918,
+      "tag": "0019_lethal_slapstick",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786546943556,
+      "tag": "0020_shiny_maggott",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786712635348,
+      "tag": "0021_bright_panda",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786796316388,
+      "tag": "0022_skill-runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786796503364,
+      "tag": "0023_skill-runs-run-id",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786799305060,
+      "tag": "0024_runtime-artifacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786799839952,
+      "tag": "0025_artifact-bindings",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786801408171,
+      "tag": "0026_skills-contract",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786898202349,
+      "tag": "0027_greedy_wraith",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786898678497,
+      "tag": "0028_true_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1786899489880,
+      "tag": "0029_glossy_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1786907837217,
+      "tag": "0030_lowly_donald_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1786957712179,
+      "tag": "0031_loose_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786959816997,
+      "tag": "0032_slow_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1786964333655,
+      "tag": "0033_mature_bulldozer",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1786964577147,
+      "tag": "0034_huge_mulholland_black",
+      "breakpoints": true
+    }
+  ]
+}
