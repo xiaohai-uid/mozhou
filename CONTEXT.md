@@ -208,6 +208,14 @@ _Avoid_: Source-of-truth state table, dual ledger
 The indirect two-level mapping from task_type to tier name to (provider, model) pairs; model ids are never bound directly to task types so that provider-side renames stay isolated in configuration.
 _Avoid_: Direct model binding, hardcoded per-task models
 
+**Chapter Production Session**:
+The single in-memory state machine driving one chapter through the ten-step pipeline (Prepare→…→Flywheel Record); each step transition is a ledger task event, one session yields exactly one commit, and recovery replays from the step-boundary checkpoint.
+_Avoid_: Batch job, background worker
+
+**Proposal Port**:
+The unified confirmation API through which both the reconciliation flow and the pipeline's canon proposals await per-item author rulings (confirm/reject/editAccept) before promotion.
+_Avoid_: Ad-hoc dialog state, silent auto-promotion
+
 **Capability**:
 An abstract task-level contract (e.g., `PROSE_DEAI`, `MARKET_SCAN`, `STATE_EXTRACTOR`, `LONGFORM_PLANNING`) decoupled from underlying implementation providers.
 _Avoid_: Skill, tool, agent
