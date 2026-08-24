@@ -96,7 +96,15 @@ export function refreshManifestEntries(
       continue
     }
     const absolute = join(root, rel)
-    files[rel] = { sha256: sha256FileHex(absolute), bytes: statSync(absolute).size }
+    let stat: ReturnType<typeof statSync>
+    try {
+      stat = statSync(absolute)
+    } catch {
+      // 盘上已消失 ⇒ 键移除（T5 删除对账：基线吸收「文件没了」这一现状）
+      delete files[rel]
+      continue
+    }
+    files[rel] = { sha256: sha256FileHex(absolute), bytes: stat.size }
   }
   // 键序与 buildManifest（全树排序扫描）对齐：增量补丁后的基线与全量重建逐字节一致
   const sorted: Record<string, ManifestFileEntry> = {}

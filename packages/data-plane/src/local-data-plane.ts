@@ -31,6 +31,7 @@ import { queryActiveFacts as queryActiveFactsFromRoot } from './narrative-state.
 import type { QueryActiveFactsRequest } from '@mozhou/kernel'
 import { initProjection, populateProjection } from './projection.js'
 import { sha256FileHex } from './sha256.js'
+import { ReconciliationService, type ReconciliationOptions } from './reconciliation.js'
 
 export class ProjectionMissingError extends Error {
   override readonly name = 'ProjectionMissingError'
@@ -161,7 +162,25 @@ export class LocalDataPlane {
     return queryActiveFactsFromRoot(this.root, request)
   }
 
+  /** 对账终态后由 ReconciliationService 调用：从盘上重载基线（S4 吸收后保持 getter 一致）。 */
+  reloadManifest(): void {
+    this._ctx.manifest = readManifest(this.root)
+  }
+
+  /**
+   * T5：外部修改五态对账服务（本平面单例；options 仅首次生效）。
+   * 应用壳在 open 后先 scanExternalModifications('startupScan')，再按需 startWatcher。
+   */
+  reconciliation(options: ReconciliationOptions = {}): ReconciliationService {
+    if (this._reconciliation === null) {
+      this._reconciliation = new ReconciliationService(this, options)
+    }
+    return this._reconciliation
+  }
+  private _reconciliation: ReconciliationService | null = null
+
   close(): void {
+    this._reconciliation?.stopWatcher()
     this._db.close()
   }
 }

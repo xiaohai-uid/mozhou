@@ -9,6 +9,8 @@ export const RUNTIME_DIR = '.mozhou'
 export const MANIFEST_PATH = `${RUNTIME_DIR}/manifest.json`
 export const RUNTIME_DB_PATH = `${RUNTIME_DIR}/runtime.sqlite`
 export const RUNTIME_EVENTS_PATH = `${RUNTIME_DIR}/events.jsonl`
+/** 对账提案存档（T5）：五态状态机的持久化落点。运行时区，非 canon、不参与对账。 */
+export const RUNTIME_RECONCILIATIONS_DIR = `${RUNTIME_DIR}/reconciliations`
 
 export const BOOK_RECORD_PATH = 'book.json'
 
