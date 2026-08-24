@@ -7,7 +7,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         // 根 scripts/ 的独立运维脚本（不入任何 tsconfig project）仍接受类型化 lint
-        projectService: { allowDefaultProject: ['scripts/*.mjs'] },
+        projectService: { allowDefaultProject: ['scripts/*.mjs', 'scripts/embedding-calib/**/*.ts'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
