@@ -55,15 +55,18 @@ describe('RuntimeEngine.execute', () => {
     expect(engine.replaySession().hangingPairKeys).toHaveLength(0);
   });
 
-  it('RecoverableError ⇒ failed_recoverable 并携带 repairHint', async () => {
+  it('RecoverableError 单候选穷尽 ⇒ failed_recoverable 并携带原始 repairHint', async () => {
     const { engine } = makeEngine();
-    engine.registerCapability(CAP);
+    engine.registerCapability({
+      ...CAP,
+      failurePolicy: { timeoutMs: 120_000, fallbackProviderIds: [] }, // 真正单候选
+    });
     engine.registerProviderBinding('deepseek', () =>
       Promise.reject(new RecoverableError('schema 校验失败：title 缺失', { field: 'title' })),
     );
     const result = await engine.execute('CHAPTER_DRAFTING', {});
     expect(result.outcome).toBe('failed_recoverable');
-    expect(result.repairHint).toEqual({ field: 'title' });
+    expect(result.repairHint).toEqual({ field: 'title', triedProviders: ['deepseek'] });
   });
 
   it('普通异常 ⇒ failed_terminal 不带 repairHint', async () => {
@@ -102,5 +105,52 @@ describe('RuntimeEngine.execute', () => {
     );
     expect(err).toBeInstanceOf(NoProviderError);
     expect((err as NoProviderError).message).toContain('settings.yaml');
+  });
+});
+
+describe('T12 timeout+fallback 降级链', () => {
+  const CAP_FB = {
+    ...CAP,
+    failurePolicy: { timeoutMs: 5, fallbackProviderIds: ['glm'] },
+  };
+
+  it('超时触发降级：主 provider 永挂 → glm 成功', async () => {
+    const { engine } = makeEngine();
+    engine.registerCapability(CAP_FB);
+    engine.registerProviderBinding('deepseek', () => new Promise(() => {}));
+    engine.registerProviderBinding('glm', () => Promise.resolve({ ok: true }));
+    const r = await engine.execute('CHAPTER_DRAFTING', {});
+    expect(r.outcome).toBe('succeeded');
+    expect(r.snapshot.providerId).toBe('glm');
+    // 纪律声明：attempt 事件只记「降级切换」，首试由 GenerationStarted+快照覆盖
+    const attempts = engine
+      .replaySession()
+      .events.filter((e) => e.event.type === 'TaskAttemptRegistered');
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]?.event.payload).toMatchObject({ providerId: 'glm' });
+  });
+
+  it('候选全灭 ⇒ failed_recoverable + triedProviders 列表', async () => {
+    const { engine } = makeEngine();
+    engine.registerCapability(CAP_FB);
+    engine.registerProviderBinding('deepseek', () => new Promise(() => {}));
+    engine.registerProviderBinding('glm', () =>
+      Promise.reject(new RecoverableError('glm 也挂了')),
+    );
+    const r = await engine.execute('CHAPTER_DRAFTING', {});
+    expect(r.outcome).toBe('failed_recoverable');
+    expect(r.repairHint).toEqual({ triedProviders: ['deepseek', 'glm'] });
+  });
+
+  it('普通异常直通 failed_terminal：不烧 fallback、无 attempt 事件', async () => {
+    const { engine } = makeEngine();
+    engine.registerCapability(CAP_FB);
+    engine.registerProviderBinding('deepseek', () => Promise.reject(new Error('boom')));
+    const r = await engine.execute('CHAPTER_DRAFTING', {});
+    expect(r.outcome).toBe('failed_terminal');
+    const attempts = engine
+      .replaySession()
+      .events.filter((e) => e.event.type === 'TaskAttemptRegistered');
+    expect(attempts).toHaveLength(0);
   });
 });

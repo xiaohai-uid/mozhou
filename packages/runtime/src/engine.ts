@@ -39,6 +39,31 @@ export class ProviderBindingMissingError extends Error {
   }
 }
 
+/** 超时属可重试类失败（T12）：触发 fallback 链，穷尽后随链交 failed_recoverable。 */
+export class TimeoutError extends RecoverableError {
+  override name = 'TimeoutError';
+}
+
+/** 竞速包装：timeoutMs 内未决即 TimeoutError；定时器用后即清（不留悬挂句柄）。 */
+function withTimeout<T>(p: Promise<T>, timeoutMs: number, providerId: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new TimeoutError(`TIMEOUT: ${providerId} 超过 ${timeoutMs}ms 未返回`)),
+      timeoutMs,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      },
+    );
+  });
+}
+
 export interface ReplayFilter {
   readonly taskRef?: string;
   readonly chapterIndex?: number;
@@ -100,37 +125,69 @@ export class RuntimeEngine {
       taskRef,
       payload: { snapshot },
     });
-    try {
-      const binding = this.#bindings.get(resolution.providerId);
-      if (!binding) throw new ProviderBindingMissingError(resolution.providerId);
-      const value = await binding(payload, snapshot);
-      this.#bus.publish(this.#ctx, {
-        type: 'GenerationFinished',
-        taskRef,
-        payload: { outcome: 'succeeded' satisfies Outcome },
-      });
-      return { outcome: 'succeeded', value, snapshot };
-    } catch (err) {
-      if (err instanceof RecoverableError) {
+
+    // T12：主 provider + fallback 链依序尝试；每次尝试前发 TaskAttemptRegistered
+    //（票面纪律：attempt 事件数=尝试次数）。普通（非超时非可恢复）异常直通 terminal 不烧候选。
+    const candidates = [resolution.providerId, ...resolution.failurePolicy.fallbackProviderIds];
+    const triedProviders: string[] = [];
+    let lastReason = '';
+    let lastRepairHint: unknown;
+    for (const providerId of candidates) {
+      if (triedProviders.length > 0) {
+        this.#bus.publish(this.#ctx, {
+          type: 'TaskAttemptRegistered',
+          taskRef,
+          payload: { providerId, reason: lastReason },
+        });
+      }
+      triedProviders.push(providerId);
+      try {
+        const binding = this.#bindings.get(providerId);
+        if (!binding) throw new ProviderBindingMissingError(providerId);
+        const value = await withTimeout(
+          Promise.resolve().then(() => binding(payload, snapshot)),
+          resolution.failurePolicy.timeoutMs,
+          providerId,
+        );
+        // 快照反映实际服务的 provider（降级成功时 ≠ 主候选）
+        const servedSnapshot: ResolutionSnapshot = { ...snapshot, providerId };
         this.#bus.publish(this.#ctx, {
           type: 'GenerationFinished',
           taskRef,
-          payload: { outcome: 'failed_recoverable' satisfies Outcome, reason: err.message },
+          payload: { outcome: 'succeeded' satisfies Outcome, providerId },
         });
-        return {
-          outcome: 'failed_recoverable',
-          repairHint: err.repairHint,
-          snapshot,
-        };
+        return { outcome: 'succeeded', value, snapshot: servedSnapshot };
+      } catch (err) {
+        lastReason = err instanceof Error ? err.message : String(err);
+        // 普通异常直通 failed_terminal；超时/可恢复才值得烧下一个候选。
+        if (err instanceof RecoverableError) lastRepairHint = err.repairHint;
+        if (!(err instanceof TimeoutError) && !(err instanceof RecoverableError)) {
+          this.#bus.publish(this.#ctx, {
+            type: 'GenerationFinished',
+            taskRef,
+            payload: { outcome: 'failed_terminal' satisfies Outcome, reason: lastReason },
+          });
+          return { outcome: 'failed_terminal', snapshot };
+        }
       }
-      const reason = err instanceof Error ? err.message : String(err);
-      this.#bus.publish(this.#ctx, {
-        type: 'GenerationFinished',
-        taskRef,
-        payload: { outcome: 'failed_terminal' satisfies Outcome, reason },
-      });
-      return { outcome: 'failed_terminal', snapshot };
     }
+
+    // 候选穷尽 ⇒ failed_recoverable + tried 列表（M17：给人工兜底留活路）。
+    this.#bus.publish(this.#ctx, {
+      type: 'GenerationFinished',
+      taskRef,
+      payload: {
+        outcome: 'failed_recoverable' satisfies Outcome,
+        reason: `全部候选失败：${lastReason}`,
+        triedProviders,
+      },
+    });
+    return {
+      outcome: 'failed_recoverable',
+      // 合并末次业务 repairHint 与降级轨迹：二级定向重生两样都需要
+      repairHint: { ...(lastRepairHint as object), triedProviders },
+      snapshot,
+    };
   }
 
   replaySession(filter: ReplayFilter = {}): ExecutionTrace {
