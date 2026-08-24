@@ -11,7 +11,11 @@ import type {
   BookNodeId,
   ChapterCommitId,
   ChapterNodeId,
+  FactId,
+  KnowledgeStateId,
+  RelationshipStateId,
   StyleProfileId,
+  TimelineEventId,
   Ulid,
   VolumeNodeId,
 } from './kernel-schema.js'
@@ -102,4 +106,21 @@ export function newChapterNodeId(): ChapterNodeId {
 
 export function newChapterCommitId(): ChapterCommitId {
   return `cmit_${newUlid()}` as ChapterCommitId
+}
+
+/** T4（实现票 #19）：叙事状态流四族身份。 */
+export function newFactId(): FactId {
+  return `fact_${newUlid()}` as FactId
+}
+
+export function newKnowledgeStateId(): KnowledgeStateId {
+  return `knst_${newUlid()}` as KnowledgeStateId
+}
+
+export function newRelationshipStateId(): RelationshipStateId {
+  return `rels_${newUlid()}` as RelationshipStateId
+}
+
+export function newTimelineEventId(): TimelineEventId {
+  return `tle_${newUlid()}` as TimelineEventId
 }

@@ -35,6 +35,7 @@ import {
   type TrackingKind,
 } from './layout.js'
 import { refreshManifestEntries, writeManifest, type HashManifest } from './manifest.js'
+import { assertCommitAppendsLegal } from './narrative-state.js'
 import { sha256FileHex, sha256Hex } from './sha256.js'
 import { emitFrontmatter, parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
 
@@ -548,6 +549,12 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
     return rows !== undefined && rows.length > 0
   })
   const streamTargets = TRACKING_STREAMS.filter((stream) => touchedKinds.includes(stream.kind))
+
+  // T4 语义门禁：行校验 + 引用完整性 + M2 时间线单调——任何违例在写前
+  // 校验乃至 pending-commit 日志之前抛出，零盘上副作用（宁败不脏）。
+  if (touchedKinds.length > 0) {
+    assertCommitAppendsLegal(ctx.root, request.appends ?? {})
+  }
 
   // S3 写前校验：正文 + 全部将被追加的流
   assertPreWriteHash(ctx, proseRel)

@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { newFactId, newTimelineEventId } from '@mozhou/kernel'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   ChapterPhaseError,
@@ -18,6 +19,8 @@ import { LocalDataPlane } from './local-data-plane.js'
 
 const tmpRoots: string[] = []
 let bookRoot = ''
+/** 当前书身份（T4 起追踪行携带 bookId，构造合法行用）。 */
+let currentBookId = ''
 
 beforeEach(() => {
   bookRoot = join(tmpdir(), `mozhou-t3-${process.pid}-${Math.random().toString(36).slice(2)}`)
@@ -33,7 +36,52 @@ afterAll(() => {
 
 function newBook(): LocalDataPlane {
   createBook({ dir: bookRoot, title: '墨舟测试书' })
-  return LocalDataPlane.open(bookRoot)
+  const plane = LocalDataPlane.open(bookRoot)
+  currentBookId = plane.book.id
+  return plane
+}
+
+const T0 = '2026-08-24T00:00:00.000Z'
+
+/** 合法 TemporalFact 行（T4 语义门禁起，增量必须是冻结 Schema 的完整形状）。 */
+function factRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: newFactId(),
+    bookId: currentBookId,
+    revision: 0,
+    createdAt: T0,
+    updatedAt: T0,
+    subject: 'char:lin-wan',
+    predicate: 'located',
+    value: '墨舟',
+    validFrom: 1,
+    validUntil: null,
+    importance: 'notable',
+    riskClass: 'low',
+    source: { kind: 'chapter', chapterIndex: 1 },
+    status: 'confirmed',
+    compactedIntoVolumeId: null,
+    provenance: { origin: 'ai', protectedUserContent: false },
+    ...overrides,
+  }
+}
+
+/** 合法 TimelineEvent 行（worldTimeOrder 由调用方按单调纪律给值）。 */
+function timelineRow(worldTimeOrder: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: newTimelineEventId(),
+    bookId: currentBookId,
+    revision: 0,
+    createdAt: T0,
+    updatedAt: T0,
+    worldTimeLabel: '开篇',
+    worldTimeOrder,
+    chapterIndex: 1,
+    participants: [],
+    summary: '开篇事件',
+    impactFactIds: [],
+    ...overrides,
+  }
 }
 
 function disk(rel: string): string {
@@ -80,8 +128,8 @@ describe('原子提交三件套', () => {
         chapterIndex: 1,
         summary: '主角登舟',
         appends: {
-          temporalFact: [{ id: 'fact_A', subject: 'char:linwan', predicate: 'located', value: '墨舟' }],
-          timelineEvent: [{ id: 'tle_B', summary: '开篇' }],
+          temporalFact: [factRow()],
+          timelineEvent: [timelineRow(1)],
         },
       })
 
@@ -94,7 +142,7 @@ describe('原子提交三件套', () => {
 
       expect(jsonLines('追踪/事实.jsonl')).toHaveLength(1)
       const factLine = jsonLines('追踪/事实.jsonl')[0] ?? ''
-      expect(JSON.parse(factLine)).toMatchObject({ id: 'fact_A' })
+      expect(JSON.parse(factLine)).toMatchObject({ predicate: 'located' })
       expect(jsonLines('追踪/时间线.jsonl')).toHaveLength(1)
 
       expect(jsonLines(RUNTIME_EVENTS_PATH)).toHaveLength(1)
@@ -127,7 +175,7 @@ describe('原子性：中途失败不产生半提交可见状态（验收①）'
         plane.commitChapter({
           chapterIndex: 1,
           summary: 'x',
-          appends: { temporalFact: [{ id: 'fact_A' }] },
+          appends: { temporalFact: [factRow()] },
           onStage: (reached) => {
             if (reached === stage) {
               throw new Error(`simulated crash at ${stage}`)
@@ -170,7 +218,7 @@ describe('原子性：中途失败不产生半提交可见状态（验收①）'
           plane.commitChapter({
             chapterIndex: 1,
             summary: 'x',
-            appends: { temporalFact: [{ id: 'fact_A' }] },
+            appends: { temporalFact: [factRow()] },
             onStage: (reached) => {
               if (reached === stage) {
                 throw new Error(`simulated crash at ${stage}`)
@@ -206,6 +254,9 @@ describe('原子性：中途失败不产生半提交可见状态（验收①）'
   )
 
   it('撕裂写（流文件被截在载荷中段）也被回滚归零', () => {
+    const firstRow = factRow()
+    const secondRow = factRow()
+    const stagedPayload = `${JSON.stringify(firstRow)}\n${JSON.stringify(secondRow)}\n`
     const plane = newBook()
     try {
       plane.createChapterDraft({ chapterIndex: 1, title: '风起' })
@@ -213,7 +264,7 @@ describe('原子性：中途失败不产生半提交可见状态（验收①）'
         plane.commitChapter({
           chapterIndex: 1,
           summary: 'x',
-          appends: { temporalFact: [{ id: 'fact_A' }, { id: 'fact_B' }] },
+          appends: { temporalFact: [firstRow, secondRow] },
           onStage: (reached) => {
             if (reached === 'event-append') {
               throw new Error('simulated crash mid-stream')
@@ -226,7 +277,9 @@ describe('原子性：中途失败不产生半提交可见状态（验收①）'
     }
 
     // 人为把追加截断在中段，模拟 appendFileSync 中途断电的撕裂写
-    writeFileSync(join(bookRoot, '追踪/事实.jsonl'), '{"id":"fact_A"}\n{"id":"fact_')
+    // （字节级操作：必须与日志载荷逐字节同源，截点落在第二行中段）
+    const tornCut = JSON.stringify(firstRow).length + 1 + Math.floor(JSON.stringify(secondRow).length / 2)
+    writeFileSync(join(bookRoot, '追踪/事实.jsonl'), stagedPayload.slice(0, tornCut))
 
     const recovered = LocalDataPlane.open(bookRoot)
     try {
@@ -245,7 +298,7 @@ describe('原子性：中途失败不产生半提交可见状态（验收①）'
         plane.commitChapter({
           chapterIndex: 1,
           summary: 'x',
-          appends: { temporalFact: [{ id: 'fact_A' }] },
+          appends: { temporalFact: [factRow()] },
           onStage: (reached) => {
             if (reached === 'manifest') {
               editExternally(proseChapterPath(1), (raw) => `${raw}\n外部插入\n`)
@@ -270,7 +323,7 @@ describe('I5：旧 commit 永不改写（验收②）', () => {
         chapterIndex: 1,
         summary: '一提',
         finalProse: '# 风起\n\n第一版定稿。\n',
-        appends: { temporalFact: [{ id: 'fact_A', v: 1 }] },
+        appends: { temporalFact: [factRow({ predicate: 'located', value: '墨舟' })] },
       })
 
       const eventsAfterFirst = disk(RUNTIME_EVENTS_PATH)
@@ -283,7 +336,7 @@ describe('I5：旧 commit 永不改写（验收②）', () => {
         chapterIndex: 1,
         summary: '二提',
         finalProse: '# 风起\n\n改写后的正文。\n',
-        appends: { temporalFact: [{ id: 'fact_A2', v: 2 }] },
+        appends: { temporalFact: [factRow({ status: 'candidate', value: '改写后的世界线' })] },
       })
 
       expect(second.commitId).not.toBe(first.commitId)
@@ -409,8 +462,8 @@ describe('S3 写前校验与相位守卫', () => {
     try {
       plane.createChapterDraft({ chapterIndex: 1, title: '一章' })
       plane.createChapterDraft({ chapterIndex: 2, title: '二章' })
-      plane.commitChapter({ chapterIndex: 1, summary: 'a', appends: { temporalFact: [{ id: 'f1' }] } })
-      plane.commitChapter({ chapterIndex: 2, summary: 'b', appends: { temporalFact: [{ id: 'f2' }] } })
+      plane.commitChapter({ chapterIndex: 1, summary: 'a', appends: { temporalFact: [factRow()] } })
+      plane.commitChapter({ chapterIndex: 2, summary: 'b', appends: { temporalFact: [factRow()] } })
 
       expect(jsonLines('追踪/事实.jsonl')).toHaveLength(2)
       expect(readProseChapter(bookRoot, proseChapterPath(1)).commitId).toBeDefined()

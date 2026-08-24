@@ -5,7 +5,7 @@
  */
 import { existsSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { BookRecord } from '@mozhou/kernel'
+import type { BookRecord, TemporalFact } from '@mozhou/kernel'
 import Database from 'better-sqlite3'
 import {
   commitChapter,
@@ -27,6 +27,8 @@ import {
   RUNTIME_DB_PATH,
 } from './layout.js'
 import { buildManifest, listAllFiles, readManifest, writeManifest, type HashManifest } from './manifest.js'
+import { queryActiveFacts as queryActiveFactsFromRoot } from './narrative-state.js'
+import type { QueryActiveFactsRequest } from '@mozhou/kernel'
 import { initProjection, populateProjection } from './projection.js'
 import { sha256FileHex } from './sha256.js'
 
@@ -148,6 +150,15 @@ export class LocalDataPlane {
   /** T3：应用内重编辑已提交章节 ⇒ 移回 draft，旧 commit 痕迹永不改写（I5）。 */
   reopenChapter(chapterIndex: number): ChapterReopenResult {
     return reopenChapter(this._ctx, chapterIndex)
+  }
+
+  /**
+   * T4：结构化查询芯（#7 冻结形态 `queryActiveFacts(chapter, entityIds, pov)`）——
+   * 第 chapter 章时点上、对 pov 视角可见的活跃事实。秘密门禁零泄漏：
+   * 未授权视角的结果集与「秘密不存在」不可区分。
+   */
+  queryActiveFacts(request: QueryActiveFactsRequest): TemporalFact[] {
+    return queryActiveFactsFromRoot(this.root, request)
   }
 
   close(): void {
