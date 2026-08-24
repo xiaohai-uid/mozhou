@@ -5,7 +5,7 @@
  */
 import { existsSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { BookRecord, TemporalFact } from '@mozhou/kernel'
+import type { BookRecord, KnowledgeState, TemporalFact } from '@mozhou/kernel'
 import Database from 'better-sqlite3'
 import {
   commitChapter,
@@ -27,11 +27,16 @@ import {
   RUNTIME_DB_PATH,
 } from './layout.js'
 import { buildManifest, listAllFiles, readManifest, writeManifest, type HashManifest } from './manifest.js'
-import { queryActiveFacts as queryActiveFactsFromRoot } from './narrative-state.js'
+import { queryActiveFacts as queryActiveFactsFromRoot, queryInvalidatedKnowledgeStates as queryInvalidatedFromRoot } from './narrative-state.js'
 import type { QueryActiveFactsRequest } from '@mozhou/kernel'
 import { initProjection, populateProjection } from './projection.js'
 import { sha256FileHex } from './sha256.js'
 import { ReconciliationService, type ReconciliationOptions } from './reconciliation.js'
+import {
+  propagateStaleMarkers as propagateStaleMarkersIntoCanon,
+  type StalePropagationRequest,
+  type StalePropagationResult,
+} from './stale.js'
 
 export class ProjectionMissingError extends Error {
   override readonly name = 'ProjectionMissingError'
@@ -160,6 +165,23 @@ export class LocalDataPlane {
    */
   queryActiveFacts(request: QueryActiveFactsRequest): TemporalFact[] {
     return queryActiveFactsFromRoot(this.root, request)
+  }
+
+  /**
+   * T6 / I3：知识状态级联失效查询——引用 status=rejected 事实的认知行
+   * （按 id 确定序）。UI 重验清单与影响报告的直接输入。
+   */
+  queryInvalidatedKnowledgeStates(): KnowledgeState[] {
+    return queryInvalidatedFromRoot(this.root)
+  }
+
+  /**
+   * T6 / I2：上游变更 → 下游 stale 传播——命中章的章大纲节点获得
+   * StaleMarker{reason, upstreamRefs, markedAt}，正文零触碰（验收②）。
+   * 这是保护位工件唯一的合法自动写入通道（附加元数据，不改内容）。
+   */
+  propagateStaleMarkers(request: StalePropagationRequest): StalePropagationResult {
+    return propagateStaleMarkersIntoCanon(this._ctx, request)
   }
 
   /** 对账终态后由 ReconciliationService 调用：从盘上重载基线（S4 吸收后保持 getter 一致）。 */

@@ -19,6 +19,8 @@ import {
   liveMaxTimelineOrder,
   assertTimelineBatchOrdered,
   queryActiveFacts as filterVisibleFacts,
+  invalidatedKnowledgeStates,
+  assertNoProtectedSupersession,
   TrackingRowError,
   parseKnowledgeStateRow,
   parseRelationshipStateRow,
@@ -84,8 +86,10 @@ export function readNarrativeSnapshot(root: string): NarrativeStateSnapshot {
 }
 
 /**
- * 提交期语义门禁（T4）：在相位机动第一字节之前拦截非法增量。
+ * 提交期语义门禁（T4；T6 增补保护位半边）：在相位机动第一字节之前拦截非法增量。
  * - 行形状：四族各自冻结 Schema 校验（含 secret.* ⇒ riskClass high 同现律，Q7）；
+ * - 保护位：protectedUserContent 事实行不可被 ai/external 来源同 id 取代
+ *   （T6 / I1，assertNoProtectedSupersession——违例零盘上副作用）；
  * - 引用完整性：认知行 factId 与时间线 impactFactIds 必须解析到「存量活跃 ∪ 本批」
  *   的事实（跨批悬空引用即断链，宁败不脏）；
  * - M2 时间线单调：批内严格递增且全部严格大于存量活跃最大序数。
@@ -96,6 +100,9 @@ export function assertCommitAppendsLegal(
 ): void {
   const snapshot = readNarrativeSnapshot(root)
   const batch = parseBatch(appends)
+
+  // T6 / I1：保护位事实行的自动化取代在动第一字节前拦截
+  assertNoProtectedSupersession(snapshot.facts, batch.temporalFact)
 
   const factUniverse = new Set<FactId>(snapshot.facts.keys())
   for (const fact of batch.temporalFact) {
@@ -122,4 +129,9 @@ export function assertCommitAppendsLegal(
 export function queryActiveFacts(root: string, request: QueryActiveFactsRequest): TemporalFact[] {
   const snapshot = readNarrativeSnapshot(root)
   return filterVisibleFacts(snapshot, request)
+}
+
+/** I3 级联失效查询的 IO 接线：直读真源 → 折叠 → 引用 rejected 事实的认知行。 */
+export function queryInvalidatedKnowledgeStates(root: string): KnowledgeState[] {
+  return invalidatedKnowledgeStates(readNarrativeSnapshot(root))
 }

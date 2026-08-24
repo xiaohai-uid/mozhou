@@ -19,7 +19,8 @@
  */
 import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { newChapterCommitId, newChapterNodeId } from '@mozhou/kernel'
+import { newChapterCommitId, newChapterNodeId, parseDependencyManifest } from '@mozhou/kernel'
+import type { DependencyManifest } from '@mozhou/kernel'
 import type Database from 'better-sqlite3'
 import { CanonStructureError } from './canon-read.js'
 import { openDatabase } from './database.js'
@@ -194,7 +195,7 @@ function renderProseChapter(fields: {
 }
 
 /** 原地替换单个文件：同目录临时文件 + rename（rename 即原子可见点）。 */
-function atomicReplace(root: string, relPath: string, content: string): void {
+export function atomicReplace(root: string, relPath: string, content: string): void {
   const absolute = join(root, relPath)
   const tmp = `${absolute}.mozhou-tmp`
   writeFileSync(tmp, content)
@@ -427,6 +428,12 @@ export interface CommitChapterRequest {
    * 每条记录 JSON.stringify 成一行 append 进对应追踪流。
    */
   readonly appends?: Partial<Record<TrackingKind, readonly unknown[]>>
+  /**
+   * T6：本次提交的依赖钉版（Q14 / US28——编译时读到的 {kind, id, revision} 精确版本）。
+   * 落 ChapterCommitted 事件行；上游重算据此把受影响章节的章大纲节点标 stale。
+   * 同章再次提交时后到者胜：不带清单的新提交即声明本章不再依赖旧上游版本。
+   */
+  readonly dependencyManifest?: DependencyManifest
   /** 测试注入点：每阶段执行前回调，抛错即模拟该阶段中途失败。 */
   readonly onStage?: ((stage: CommitStage) => void) | undefined
 }
@@ -470,7 +477,7 @@ function readVolumeNodeId(root: string): string {
 }
 
 /** S3 写前校验：目标文件盘上 hash 必须 == 基线（缺册 = 外部内容，一律拒绝静默覆盖）。 */
-function assertPreWriteHash(ctx: PlaneContext, relPath: string): void {
+export function assertPreWriteHash(ctx: PlaneContext, relPath: string): void {
   const entry = ctx.manifest.files[relPath]
   const absolute = join(ctx.root, relPath)
   if (!existsSync(absolute)) {
@@ -594,6 +601,11 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
   }
 
   const eventsDisk = readFileSync(join(ctx.root, RUNTIME_EVENTS_PATH), 'utf8')
+  // T6：依赖钉版在进事件行前过冻结形状校验（宁败不脏——坏清单不产生半提交）
+  const manifestFields: Record<string, unknown> =
+    request.dependencyManifest === undefined
+      ? {}
+      : { dependencyManifest: parseDependencyManifest(request.dependencyManifest.entries) }
   const eventLine = `${JSON.stringify({
     type: 'ChapterCommitted',
     seq: jsonlLines(eventsDisk).length,
@@ -605,6 +617,7 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
     summary: request.summary,
     contentSha256: sha256Hex(finalProse),
     appendedCounts,
+    ...manifestFields,
   })}\n`
   appendTargets.push({
     kind: null,

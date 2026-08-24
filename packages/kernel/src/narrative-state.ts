@@ -1,5 +1,5 @@
 /**
- * 叙事状态流语义层（实现票 #19 / T4）。
+ * 叙事状态流语义层（实现票 #19 / T4；T6 增补保护门禁与级联失效查询）。
  *
  * T3 的 commitChapter 只做不解释的字节级追加；本模块补上行的语义半边：
  *   1. 行级校验——TemporalFact / KnowledgeState / RelationshipState / TimelineEvent
@@ -8,7 +8,10 @@
  *      痕迹永不改写，I5 ⇒ 折叠是纯读派生，不回写任何行）；
  *   3. queryActiveFacts 读路径——章区间过滤 + POV/秘密零泄漏门禁 +
  *      knownSinceChapter 生效（Q7/Q10/US24/US25）；
- *   4. 时间线 worldTimeOrder 全书严格单调硬门禁（Q12/M2：乱序插入即拦截）。
+ *   4. 时间线 worldTimeOrder 全书严格单调硬门禁（Q12/M2：乱序插入即拦截）；
+ *   5. T6 增补——assertNoProtectedSupersession（I1：protectedUserContent
+ *      事实行不可被自动化来源同 id 取代）+ invalidatedKnowledgeStates
+ *      （I3：引用事实 rejected 的认知行级联失效可查询）。
  *
  * 零依赖纯函数域：输入是已 JSON.parse 的普通对象，输出品牌化类型或抛错。
  * 文件 IO 归数据面（@mozhou/data-plane），本模块不做任何 IO。
@@ -37,6 +40,7 @@ import type {
   TimelineEventId,
   VolumeNodeId,
 } from './kernel-schema.js'
+import { ProtectedContentViolationError } from './protection.js'
 
 /* ----------------------------------------------------------------------------
  * 错误
@@ -521,4 +525,55 @@ export function queryActiveFacts(
     result.push(fact)
   }
   return result.sort((a, b) => a.validFrom - b.validFrom || (a.id < b.id ? -1 : 1))
+}
+
+/* ----------------------------------------------------------------------------
+ * T6：I1 追踪流保护门禁 + I3 知识状态级联失效查询
+ * -------------------------------------------------------------------------- */
+
+/**
+ * 追踪流保护门禁（T6 / I1）：protectedUserContent = true 的事实行是作者亲笔
+ * 正典断言，自动化通道（origin = ai | external 的增量来源）不得以同 id 行取代。
+ * 作者修订自己的断言（author → author）始终合法。四族之中仅 TemporalFact
+ * 携带 provenance，故本门禁只作用于事实流；其余三族的行语义校验归各自实现票。
+ */
+export function assertNoProtectedSupersession(
+  liveFacts: ReadonlyMap<FactId, TemporalFact>,
+  incoming: readonly TemporalFact[],
+): void {
+  for (const row of incoming) {
+    const live = liveFacts.get(row.id)
+    if (live === undefined || !live.provenance.protectedUserContent) {
+      continue
+    }
+    if (row.provenance.origin !== 'author') {
+      throw new ProtectedContentViolationError(
+        'temporalFact',
+        row.id,
+        `live row is protectedUserContent (origin=${live.provenance.origin}); '${row.provenance.origin}' automation channels may not supersede it (I1)`,
+      )
+    }
+  }
+}
+
+/**
+ * 知识状态级联失效读路径（T6 / I3 / Q11）：KnowledgeState 行无自有生命周期，
+ * 引用事实进入 rejected 的那一刻这些认知行即告失效——本查询把失效面显式
+ * 可视化（UI 重验清单 / 影响报告的直接输入），按 id 确定序返回。
+ * 折叠视图里被取代的旧行天然不出现：失效只看当前活跃事实状态。
+ */
+export function invalidatedKnowledgeStates(state: NarrativeStateSnapshot): KnowledgeState[] {
+  const rejected = new Set<FactId>()
+  for (const fact of state.facts.values()) {
+    if (fact.status === 'rejected') {
+      rejected.add(fact.id)
+    }
+  }
+  const result: KnowledgeState[] = []
+  for (const ks of state.knowledgeStates.values()) {
+    if (rejected.has(ks.factId)) {
+      result.push(ks)
+    }
+  }
+  return result.sort((a, b) => (a.id < b.id ? -1 : 1))
 }
