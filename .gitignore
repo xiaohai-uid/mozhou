@@ -1,4 +1,6 @@
+
 # 墨舟仓库根忽略（app/ 内另有 .gitignore）
+# 标定产物与模型缓存不入库
 # 设计期产物与部署工作目录：不得入库
 *.log
 *.tsbuildinfo
@@ -6,3 +8,5 @@
 dist/
 figma-upload/
 node_modules/
+scripts/embedding-calib/.cache/
+scripts/embedding-calib/fp32-model/
