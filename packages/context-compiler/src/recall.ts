@@ -1,5 +1,5 @@
 /**
- * 关键词 + k-hop 双通道召回算子（实现票 #21 / T8a）。
+ * 关键词 + k-hop + embedding 三通道召回算子（实现票 #21 / T8a、#24 / T8b-2）。
  *
  * 冻结依据：docs/specs/khop-graph-recall-spec.md（#12）· ADR-0022 ·
  * token-budget-assembly-spec §候选契约（#8）· entity-directory-spec §5 检测接线（#13）。
@@ -7,7 +7,7 @@
  * 管线位置：
  *   草稿文本 ──detectKeywordTriggers──▶ 触发集 T ─┐
  *   canon 快照 ──khopGraphRecall─────────────────┼─▶ mergeRecallChannels ─▶ RecallResult
- *   （embedding 通道归 T8b，合并器按通道泛化预留） ┘      {candidates, excluded}
+ *   可见语料 ──embeddingRecall（T8b 兜底）───────┘      {candidates, excluded}
  *
  * 本模块零 IO、零 LLM：输入是已折叠的 NarrativeStateSnapshot 与目录卡扫描面，
  * 输出 #8 装配的直接消费契约。确定性纪律（INV-K4）：一切平局显式收口——
@@ -29,7 +29,13 @@
  *     fact_ref→桥接事实 importance、event→1（TimelineEvent 无 importance 字段，
  *     保持最简）；同一邻居多类边并行取最大权重，数值平局按 rel>fact_ref>event 先到先得；
  *   - 触发实体卡由图通道以 score=1.0、hops=1 发出（触发自身是零距离强关联，
- *     与 keyword 主名命中的精确平局由 merge.priority keyword>graph_khop 收口）。
+ *     与 keyword 主名命中的精确平局由 merge.priority keyword>graph_khop 收口）；
+ *   - embedding 通道（T8b-2）：score = clamp01(内积)——provider 契约已 L2 归一化，
+ *     内积即 cosine；阈值 config.embedding.thresh 仅作入选门（spec §6/T9 R3：
+ *     相对排序优先于绝对值），语料 = POV 可见子图事实 + 目录卡（brief 缺省回退
+ *     name，双空不入语料）——G0 单一门禁点跨通道同构，strict 滤除者零候选
+ *     （INV-K1 不因兜底软化）；子阈值条目从未成为候选，不记 excluded
+ *     （记录范围裁决与 cap 落选同类）。
  */
 import type {
   ActivationEvidence,
@@ -45,6 +51,7 @@ import type {
   TimelineEvent,
 } from '@mozhou/kernel'
 import { detectEntityMentions, isSecretPredicate } from '@mozhou/kernel'
+import type { LocalEmbeddingProvider } from './embedding.js'
 
 /* ----------------------------------------------------------------------------
  * 配置（khop-graph-recall-spec §2 默认表；入 configVersion 参与 recomputationHash）
@@ -64,6 +71,15 @@ export interface KeywordScoringConfig {
   readonly mentionBoost: { readonly step: number; readonly cap: number }
 }
 
+export interface EmbeddingRecallConfig {
+  /**
+   * cosine 相似度入选门（spec §2 默认表：0.80 为 T9 R3 起步值——bge 分布集中
+   * [0.6,1]，生产值待自有语料标定后经配置注入覆盖，算法体内无字面量；
+   * 入 configVersion 参与 recomputationHash）。
+   */
+  readonly thresh: number
+}
+
 export interface KhopRecallConfig {
   /** 永久封顶 2（ADR-0022：条件触发已裁决否决；字段保留进 configVersion）。 */
   readonly maxHop: number
@@ -75,6 +91,7 @@ export interface KhopRecallConfig {
   readonly threshGraph: number
   readonly weights: KhopRecallWeightsConfig
   readonly keyword: KeywordScoringConfig
+  readonly embedding: EmbeddingRecallConfig
 }
 
 export const DEFAULT_KHOP_RECALL_CONFIG: KhopRecallConfig = {
@@ -93,6 +110,7 @@ export const DEFAULT_KHOP_RECALL_CONFIG: KhopRecallConfig = {
     aliasScore: 0.85,
     mentionBoost: { step: 0.05, cap: 0.15 },
   },
+  embedding: { thresh: 0.8 },
 }
 
 /** 精确平局收口序（spec §2 merge.priority；未知通道排其后保持入参序）。 */
@@ -588,6 +606,109 @@ export function khopGraphRecall(
 }
 
 /* ----------------------------------------------------------------------------
+ * embedding 兜底通道（T8b-2）：G0 同构语料 + cosine 入选门（零 IO 之外零 LLM；
+ * 推理委托 provider，本函数只裁语料、打分与收口）
+ * -------------------------------------------------------------------------- */
+
+export interface EmbeddingRecallInput {
+  /** 查询文本（v1 = 草稿/场景原文）。 */
+  readonly queryText: string
+  readonly cards: readonly RecallEntityCard[]
+  readonly snapshot: NarrativeStateSnapshot
+  readonly scope: GraphRecallScope
+  readonly provider: LocalEmbeddingProvider
+}
+
+/** embedding 通道产出条目（阈值已在通道内施加：cosine ≥ config.embedding.thresh）。 */
+export interface EmbeddingRecallEntry {
+  readonly id: string
+  readonly tier: RecallTier
+  readonly relevanceScore: number
+  readonly activation: Extract<ActivationEvidence, { kind: 'embedding' }>
+  readonly content: string
+}
+
+export interface EmbeddingRecallResult {
+  /** 已按分数降序、id 升序收口（INV-K4）。 */
+  readonly entries: readonly EmbeddingRecallEntry[]
+}
+
+function dotProduct(a: readonly number[], b: readonly number[]): number {
+  if (a.length !== b.length) {
+    throw new Error(`embedding 维度不匹配：query=${a.length} passage=${b.length}（provider 契约违约）`)
+  }
+  let dot = 0
+  for (let i = 0; i < a.length; i += 1) {
+    dot += a[i]! * b[i]!
+  }
+  return dot
+}
+
+/**
+ * embedding 兜底召回本体。
+ *
+ * 语料两族（spec §8 tier 表的直达面）：
+ *   - 目录卡：passage = brief（缺省回退 name——空 brief 卡仍有语义身份；
+ *     双空卡无语义面可嵌，不入语料），tier=entity_card（「embedding 直达亦入」）；
+ *   - 事实：经 buildVisibleCanon 复用 G0 单一门禁点（confirmed ∧ 区间活跃 ∧
+ *     secret.* 视角授权）——strict 滤除者不进语料，零软泄漏跨通道成立（INV-K1），
+ *     「门禁滤除造成的漏召由兜底补位」补的是同子图内的语义可达性，不是被滤材料。
+ *
+ * 记录范围裁决：子阈值条目从未成为候选，不记 excluded（与 branchCap/khopCap
+ * 落选同类）；跨通道救援靠「新增条目」生效，无需淘汰记录参与抑制。
+ * 确定性（INV-K4）：同 provider 输出下逐维内积定序固定 ⇒ 同分；平局 id 升序。
+ */
+export async function embeddingRecall(
+  input: EmbeddingRecallInput,
+  config: KhopRecallConfig,
+): Promise<EmbeddingRecallResult> {
+  interface CorpusItem {
+    readonly id: string
+    readonly tier: RecallTier
+    readonly text: string
+    readonly content: string
+  }
+  const corpus: CorpusItem[] = []
+  for (const card of input.cards) {
+    const text = card.brief !== undefined && card.brief.length > 0 ? card.brief : card.name
+    if (text.length === 0) {
+      continue
+    }
+    corpus.push({ id: card.ref, tier: 'entity_card', text, content: card.brief ?? '' })
+  }
+  const canon = buildVisibleCanon(input.snapshot, input.scope)
+  for (const group of canon.factsBySubject.values()) {
+    for (const fact of group) {
+      corpus.push({ id: fact.id, tier: factTier(fact), text: factContent(fact), content: factContent(fact) })
+    }
+  }
+  if (corpus.length === 0 || input.queryText.length === 0) {
+    return { entries: [] }
+  }
+
+  // 顺序推理：同一 ONNX session 不做并发假设，代价可忽略（单查询毫秒级）
+  const queryVector = await input.provider.queryEmbed(input.queryText)
+  const passageVectors = await input.provider.passageEmbed(corpus.map((item) => item.text))
+
+  const entries: EmbeddingRecallEntry[] = []
+  for (const [index, item] of corpus.entries()) {
+    const similarity = clamp01(dotProduct(queryVector, passageVectors[index]!))
+    if (similarity < config.embedding.thresh) {
+      continue // 入选门（spec §6：阈值仅作门；相对排序交装配侧 desirability）
+    }
+    entries.push({
+      id: item.id,
+      tier: item.tier,
+      relevanceScore: similarity,
+      activation: { kind: 'embedding', score: similarity },
+      content: item.content,
+    })
+  }
+  entries.sort(compareDescScoreAscId)
+  return { entries }
+}
+
+/* ----------------------------------------------------------------------------
  * 三通道合并：raw 分 max + 胜出证据 + duplicate ≡ identifier 撞车
  * -------------------------------------------------------------------------- */
 
@@ -697,19 +818,21 @@ export function mergeRecallChannels(channels: readonly ChannelInput[]): RecallRe
 }
 
 /* ----------------------------------------------------------------------------
- * 双通道端到端接线（keyword + graph_khop；embedding 归 T8b 时追加第三路）
+ * 三通道端到端接线（keyword + graph_khop 恒跑；embedding 由 provider 注入启用）
  * -------------------------------------------------------------------------- */
 
-export interface DualChannelRecallInput {
+export interface RecallPipelineInput {
   readonly draftText: string
   readonly cards: readonly RecallEntityCard[]
   readonly snapshot: NarrativeStateSnapshot
   readonly scope: GraphRecallScope
   readonly config?: KhopRecallConfig
+  /** 提供即启用 embedding 兜底第三通道；缺省仅 keyword+graph 双通道（三通道互不阻塞）。 */
+  readonly embedding?: LocalEmbeddingProvider
 }
 
-/** keyword 快通道 + k-hop 图通道的一站式召回合并（本票对外主入口）。 */
-export function recallKeywordAndGraph(input: DualChannelRecallInput): RecallResult {
+/** 召回管线一站式入口：keyword 快通道 + k-hop 图通道（+ 可选 embedding 兜底）合并。 */
+export async function recallCandidates(input: RecallPipelineInput): Promise<RecallResult> {
   const config = input.config ?? DEFAULT_KHOP_RECALL_CONFIG
   const keyword = detectKeywordTriggers(input.cards, input.draftText, config)
   const graph = khopGraphRecall(
@@ -731,8 +854,23 @@ export function recallKeywordAndGraph(input: DualChannelRecallInput): RecallResu
     }
   })
 
-  return mergeRecallChannels([
+  const channels: ChannelInput[] = [
     { channel: 'keyword', entries: keywordEntries },
     { channel: 'graph_khop', entries: graph.entries, exclusions: graph.exclusions },
-  ])
+  ]
+  if (input.embedding !== undefined) {
+    const fallback = await embeddingRecall(
+      {
+        queryText: input.draftText,
+        cards: input.cards,
+        snapshot: input.snapshot,
+        scope: input.scope,
+        provider: input.embedding,
+      },
+      config,
+    )
+    channels.push({ channel: 'embedding', entries: fallback.entries })
+  }
+
+  return mergeRecallChannels(channels)
 }

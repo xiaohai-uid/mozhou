@@ -1,7 +1,7 @@
 /**
- * 关键词 + k-hop 双通道召回测试（实现票 #21 / T8a）。
+ * 关键词 + k-hop + embedding 三通道召回测试（实现票 #21 / T8a、#24 / T8b-2）。
  *
- * 验收对照（issue #21）：
+ * 验收对照（issue #21、#24）：
  *   - INV-K1~K6（khop-graph-recall-spec §10）逐条有对应用例；
  *   - 扩边有效性：keyword 未命中但图邻域相关的实体入候选；
  *   - identifier 撞车去重且胜出通道证据入结果。
@@ -20,12 +20,15 @@ import {
   type VolumeNodeId,
 } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
+import { BUNDLED_MODEL_ID } from './embedding.js'
+import type { LocalEmbeddingProvider } from './embedding.js'
 import {
   DEFAULT_KHOP_RECALL_CONFIG,
   detectKeywordTriggers,
+  embeddingRecall,
   khopGraphRecall,
   mergeRecallChannels,
-  recallKeywordAndGraph,
+  recallCandidates,
   type RecallEntityCard,
 } from './recall.js'
 
@@ -169,7 +172,7 @@ const SCOPE = { chapterIndex: 5, pov: 'protagonist' as PovEntity }
  * -------------------------------------------------------------------------- */
 
 describe('INV-K6 建图与候选资格生命周期门禁', () => {
-  it('planned/candidate/rejected 事实零候选零建边；区间失效事实只留诊断记录', () => {
+  it('planned/candidate/rejected 事实零候选零建边；区间失效事实只留诊断记录', async () => {
     const neighborRefs = [SU, 'char:zhao-qian', 'location:bei-mo', 'faction:xuantian'] as EntityRef[]
     const linOwn = mkFact(LIN, { importance: 'critical' })
     // 四种不合格事实各自指向一个有卡邻居——若建边即泄漏为候选
@@ -184,7 +187,7 @@ describe('INV-K6 建图与候选资格生命周期门禁', () => {
       temporalFact: [linOwn, ...invalidBridges, ...neighborFacts],
     })
 
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫拔剑。',
       cards: [linCard],
       snapshot,
@@ -216,10 +219,10 @@ describe('INV-K1 POV 可见子图单一门禁点', () => {
     mkFact(LIN, { predicate: 'secret.trueIdentity', value: SU, importance: 'critical' })
   const suCritical = () => mkFact(SU, { importance: 'critical' })
 
-  it('未授权视角：秘密桥不存在，邻域实体零候选零痕迹', () => {
+  it('未授权视角：秘密桥不存在，邻域实体零候选零痕迹', async () => {
     const secret = secretBridge()
     const suFact = suCritical()
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫夜行。',
       cards: [linCard],
       snapshot: snap({ temporalFact: [mkFact(LIN), secret, suFact] }),
@@ -236,10 +239,10 @@ describe('INV-K1 POV 可见子图单一门禁点', () => {
     })
   })
 
-  it('授权视角（认知行生效）：秘密桥恢复扩边能力', () => {
+  it('授权视角（认知行生效）：秘密桥恢复扩边能力', async () => {
     const secret = secretBridge()
     const suFact = suCritical()
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫夜行。',
       cards: [linCard],
       snapshot: snap({
@@ -266,12 +269,12 @@ describe('INV-K1 POV 可见子图单一门禁点', () => {
  * -------------------------------------------------------------------------- */
 
 describe('INV-K2/K3 容量纪律', () => {
-  it('khopCap=1 时两张触发卡仍全数入场（卡豁免容量），事实被收口到上限', () => {
+  it('khopCap=1 时两张触发卡仍全数入场（卡豁免容量），事实被收口到上限', async () => {
     const config = { ...DEFAULT_KHOP_RECALL_CONFIG, khopCap: 1 }
     const snapshot = snap({
       temporalFact: [mkFact(LIN), mkFact(SU)],
     })
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫与苏瑶对峙。',
       cards: [linCard, { ref: SU, name: '苏瑶' }],
       snapshot,
@@ -319,20 +322,20 @@ describe('INV-K2/K3 容量纪律', () => {
  * -------------------------------------------------------------------------- */
 
 describe('INV-K4 决定性与平局收口', () => {
-  it('同输入重跑深相等；打乱行构造序不改变输出；同分按 ULID ASC', () => {
-    const build = (reverse: boolean) => {
+  it('同输入重跑深相等；打乱行构造序不改变输出；同分按 ULID ASC', async () => {
+    const build = async (reverse: boolean) => {
       const f1 = mkFact(LIN, { importance: 'notable', id: factAt(700) })
       const f2 = mkFact(LIN, { importance: 'notable', id: factAt(701) })
       const facts = reverse ? [f2, f1] : [f1, f2]
-      return recallKeywordAndGraph({
+      return recallCandidates({
         draftText: '林枫前行。',
         cards: [linCard],
         snapshot: snap({ temporalFact: facts }),
         scope: SCOPE,
       })
     }
-    const forward = build(false)
-    const shuffled = build(true)
+    const forward = await build(false)
+    const shuffled = await build(true)
     expect(shuffled).toEqual(forward)
 
     const tiedOwn = forward.candidates.filter((c) => c.activation?.kind === 'graph_khop' && c.activation.hops === 1)
@@ -345,8 +348,8 @@ describe('INV-K4 决定性与平局收口', () => {
  * -------------------------------------------------------------------------- */
 
 describe('INV-K5 duplicate 判定线', () => {
-  it('正常端到端路径零 duplicate 记录', () => {
-    const result = recallKeywordAndGraph({
+  it('正常端到端路径零 duplicate 记录', async () => {
+    const result = await recallCandidates({
       draftText: '林枫与枫儿是同一人。',
       cards: [linCard],
       snapshot: snap({ temporalFact: [mkFact(LIN)] }),
@@ -374,9 +377,9 @@ describe('INV-K5 duplicate 判定线', () => {
  * -------------------------------------------------------------------------- */
 
 describe('AC② keyword 未命中时图邻域补位', () => {
-  it('强关系敌对边把未提及实体的关键事实拉入候选', () => {
+  it('强关系敌对边把未提及实体的关键事实拉入候选', async () => {
     const suCritical = mkFact(SU, { importance: 'critical' })
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫握紧了剑。', // 苏瑶未被提及
       cards: [linCard, { ref: SU, name: '苏瑶' }],
       snapshot: snap({ temporalFact: [mkFact(LIN), suCritical], relationshipState: [mkRel(LIN, SU, -80)] }),
@@ -392,9 +395,9 @@ describe('AC② keyword 未命中时图邻域补位', () => {
     expect(pulled!.activation).toMatchObject({ kind: 'graph_khop', sourceEntity: LIN, hops: 2 })
   })
 
-  it('弱关系路径低于 threshGraph：淘汰记录带通道归属', () => {
+  it('弱关系路径低于 threshGraph：淘汰记录带通道归属', async () => {
     const weakFact = mkFact(SU, { importance: 'critical', id: factAt(950) })
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫独行。',
       cards: [linCard, { ref: SU, name: '苏瑶' }],
       snapshot: snap({ temporalFact: [mkFact(LIN), weakFact], relationshipState: [mkRel(LIN, SU, 10)] }),
@@ -409,11 +412,11 @@ describe('AC② keyword 未命中时图邻域补位', () => {
     })
   })
 
-  it('event 边永久有效（历史恒真），参与者与地点共现均扩边', () => {
+  it('event 边永久有效（历史恒真），参与者与地点共现均扩边', async () => {
     const loc: EntityRef = 'location:yunlai-inn'
     const suFact = mkFact(SU, { importance: 'critical', id: factAt(960) })
     const locFact = mkFact(loc, { importance: 'critical', id: factAt(961) })
-    const result = recallKeywordAndGraph({
+    const result = await recallCandidates({
       draftText: '林枫想起旧事。',
       cards: [linCard],
       snapshot: snap({
@@ -535,24 +538,24 @@ describe('keyword 别名/正则快通道', () => {
  * -------------------------------------------------------------------------- */
 
 describe('AC③ raw 分 max 合并记胜出证据', () => {
-  const dual = (draftText: string) =>
-    recallKeywordAndGraph({
+  const dual = async (draftText: string) =>
+    recallCandidates({
       draftText,
       cards: [linCard],
       snapshot: snap({ temporalFact: [mkFact(LIN)] }),
       scope: SCOPE,
     })
 
-  it('精确平局走 merge.priority：主名 1.0 平图卡 1.0 ⇒ keyword 证据胜出', () => {
-    const result = dual('林枫出场。')
+  it('精确平局走 merge.priority：主名 1.0 平图卡 1.0 ⇒ keyword 证据胜出', async () => {
+    const result = await dual('林枫出场。')
     const card = result.candidates.filter((c) => c.id === LIN)
     expect(card).toHaveLength(1)
     expect(card[0]!.channel).toBe('keyword')
     expect(card[0]!.activation).toEqual({ kind: 'keyword', keys: ['林枫'] })
   })
 
-  it('别名 0.85 低于图卡 1.0 ⇒ graph_khop 证据胜出且分数取 max', () => {
-    const result = dual('枫儿出场。')
+  it('别名 0.85 低于图卡 1.0 ⇒ graph_khop 证据胜出且分数取 max', async () => {
+    const result = await dual('枫儿出场。')
     const card = result.candidates.filter((c) => c.id === LIN)
     expect(card).toHaveLength(1)
     expect(card[0]!.channel).toBe('graph_khop')
@@ -588,8 +591,8 @@ describe('AC③ raw 分 max 合并记胜出证据', () => {
  * -------------------------------------------------------------------------- */
 
 describe('空触发静默', () => {
-  it('无命中文本 ⇒ 空候选空淘汰', () => {
-    const result = recallKeywordAndGraph({
+  it('无命中文本 ⇒ 空候选空淘汰', async () => {
+    const result = await recallCandidates({
       draftText: '风起了。',
       cards: [linCard],
       snapshot: snap({ temporalFact: [mkFact(LIN)] }),
@@ -597,5 +600,272 @@ describe('空触发静默', () => {
     })
     expect(result.candidates).toEqual([])
     expect(result.excluded).toEqual([])
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * embedding 兜底通道（#24 / T8b-2）：cosine 入选门 · G0 同构语料 · 漏召补位
+ *
+ * stub provider 用 512 维单位基向量做确定性语义面：语料文本 → e_i，
+ * 查询向量按系数混合 ⇒ cosine 精确可算，阈值语义逐位断言。
+ * -------------------------------------------------------------------------- */
+
+/** 第 dim 维为 1 的单位向量（512 维）。 */
+function basisVector(dim: number): number[] {
+  return Array.from({ length: 512 }, (_, i) => (i === dim ? 1 : 0))
+}
+
+/** e_i × weights[i] 的单位化混合向量：对 e_i 的 cosine = weights[i]/‖weights‖₂。 */
+function mixedVector(weights: readonly number[]): number[] {
+  const norm = Math.sqrt(weights.reduce((sum, w) => sum + w * w, 0))
+  return Array.from({ length: 512 }, (_, i) => (i < weights.length ? weights[i]! / norm : 0))
+}
+
+interface StubPassage {
+  readonly text: string
+  readonly vector: readonly number[]
+}
+
+/** 语料查表式 provider：未登记文本回落到与一切查询正交的 e_511（cosine=0）。 */
+function stubEmbeddingProvider(passages: readonly StubPassage[], query: readonly number[]): LocalEmbeddingProvider {
+  const byText = new Map(passages.map((passage) => [passage.text, passage.vector]))
+  return {
+    modelId: BUNDLED_MODEL_ID,
+    dimensions: 512,
+    queryEmbed: () => Promise.resolve([...query]),
+    passageEmbed: (texts) => Promise.resolve(texts.map((text) => [...(byText.get(text) ?? basisVector(511))])),
+  }
+}
+
+const factText = (ref: EntityRef, value: string, predicate = '状态'): string => `${ref} ${predicate}=${value}`
+
+describe('AC② 双漏补位：keyword+k-hop 双漏而向量命中端到端入候选', () => {
+  it('触发集空 ⇒ 图通道静默；语义相关事实经兜底通道入场且证据成形', async () => {
+    const target = mkFact(SU, { id: factAt(1100), value: '当掉怀表为妹妹换药治病' })
+    const config = { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.9 } }
+    const result = await recallCandidates({
+      draftText: '主角为了给家人治病四处筹钱。', // 不含任何主名/别名 ⇒ keyword 与图通道皆空
+      cards: [],
+      snapshot: snap({ temporalFact: [target] }),
+      scope: SCOPE,
+      config,
+      embedding: stubEmbeddingProvider(
+        [{ text: factText(SU, '当掉怀表为妹妹换药治病'), vector: basisVector(0) }],
+        basisVector(0),
+      ),
+    })
+
+    expect(result.candidates).toHaveLength(1)
+    const pulled = result.candidates[0]!
+    expect(pulled.id).toBe(target.id)
+    expect(pulled.channel).toBe('embedding')
+    expect(pulled.tier).toBe('active_fact')
+    expect(pulled.relevanceScore).toBe(1)
+    expect(pulled.activation).toEqual({ kind: 'embedding', score: 1 })
+    expect(pulled.content).toBe(factText(SU, '当掉怀表为妹妹换药治病'))
+  })
+
+  it('图阈值淘汰（弱关系路径）的事实被兜底救回：候选入场且淘汰记录撤销', async () => {
+    const rescued = mkFact(SU, { id: factAt(1110), importance: 'critical' })
+    const config = { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.9 } }
+    const result = await recallCandidates({
+      draftText: '林枫独行。',
+      cards: [linCard],
+      snapshot: snap({
+        temporalFact: [mkFact(LIN), rescued],
+        relationshipState: [mkRel(LIN, SU, 10)], // 路径积 0.27 < threshGraph 0.30 ⇒ 图侧淘汰
+      }),
+      scope: SCOPE,
+      config,
+      embedding: stubEmbeddingProvider(
+        [{ text: factText(SU, '安好'), vector: basisVector(0) }],
+        basisVector(0),
+      ),
+    })
+
+    const pulled = result.candidates.find((candidate) => candidate.id === rescued.id)
+    expect(pulled?.channel).toBe('embedding')
+    expect(result.excluded.find((exclusion) => exclusion.identifier === rescued.id)).toBeUndefined()
+    // LIN 自身材料照常经既有通道入场——救援补位不排挤双通道产出
+    expect(result.candidates.find((candidate) => candidate.id === LIN)).toBeDefined()
+  })
+})
+
+describe('AC③ 相似度阈值以配置注入', () => {
+  // 对 strong ≈ 0.99394、weak ≈ 0.11043——同一 provider 同一查询，只改注入阈值
+  const query = mixedVector([0.9, 0.1])
+  const corpus = [
+    { text: factText(LIN, '强相关内容'), vector: basisVector(0) },
+    { text: factText(SU, '弱相关内容'), vector: basisVector(1) },
+  ]
+
+  it('同语料同查询，改注入阈值翻转入选集；算法体不持字面量门槛', async () => {
+    const run = async (thresh: number) =>
+      recallCandidates({
+        draftText: '任意查询文本。',
+        cards: [],
+        snapshot: snap({
+          temporalFact: [
+            mkFact(LIN, { id: factAt(1120), value: '强相关内容' }),
+            mkFact(SU, { id: factAt(1121), value: '弱相关内容' }),
+          ],
+        }),
+        scope: SCOPE,
+        config: { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh } },
+        embedding: stubEmbeddingProvider(corpus, query),
+      })
+
+    const admitted = await run(0.5)
+    expect(admitted.candidates.map((candidate) => candidate.id)).toEqual([factAt(1120)])
+    expect(admitted.candidates[0]!.relevanceScore).toBeCloseTo(0.9 / Math.sqrt(0.82), 12)
+
+    const denied = await run(0.995)
+    expect(denied.candidates).toEqual([])
+    expect(denied.excluded).toEqual([]) // 子阈值从未成为候选，静默不记淘汰
+  })
+})
+
+describe('INV-K1 G0 单一门禁点跨通道同构（embedding 语料）', () => {
+  const cfg = { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.5 } }
+
+  it('strict POV 门禁：未授权秘密零候选零痕迹；授权视角经兜底直达', async () => {
+    const secret = mkFact(LIN, { id: factAt(1130), predicate: 'secret.trueIdentity', value: SU })
+    const provider = stubEmbeddingProvider(
+      [{ text: factText(LIN, String(SU), 'secret.trueIdentity'), vector: basisVector(0) }],
+      basisVector(0),
+    )
+    const base = {
+      draftText: '林枫的真实身份。',
+      cards: [] as readonly RecallEntityCard[],
+      scope: SCOPE,
+      config: cfg,
+      embedding: provider,
+    }
+
+    const denied = await recallCandidates({
+      ...base,
+      snapshot: snap({ temporalFact: [secret] }),
+    })
+    expect(denied.candidates).toEqual([])
+    expect(denied.excluded).toEqual([])
+
+    const granted = await recallCandidates({
+      ...base,
+      snapshot: snap({
+        temporalFact: [secret],
+        knowledgeState: [mkKnowledge(secret.id, 'protagonist', 3)],
+      }),
+    })
+    expect(granted.candidates.map((candidate) => candidate.id)).toEqual([secret.id])
+    expect(granted.candidates[0]).toMatchObject({ channel: 'embedding', relevanceScore: 1 })
+  })
+
+  it('区间失效与 planned 事实不入语料：完美向量匹配也免疫', async () => {
+    const expired = mkFact(LIN, { id: factAt(1140), validUntil: 2 }) // 区间不含第 5 章
+    const planned = mkFact(LIN, { id: factAt(1141), status: 'planned' })
+    const confirmed = mkFact(LIN, { id: factAt(1142) })
+    const provider = stubEmbeddingProvider(
+      [{ text: factText(LIN, '安好'), vector: basisVector(0) }], // 三条渲染行同文，全部满分匹配
+      basisVector(0),
+    )
+
+    const result = await recallCandidates({
+      draftText: '无关查询。',
+      cards: [],
+      snapshot: snap({ temporalFact: [expired, planned, confirmed] }),
+      scope: SCOPE,
+      config: cfg,
+      embedding: provider,
+    })
+    expect(result.candidates.map((candidate) => candidate.id)).toEqual([confirmed.id])
+  })
+})
+
+describe('embedding 直达卡片与合并收口', () => {
+  const cfg = { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.6 } }
+
+  it('卡直达入 entity_card 档；空 brief 回退 name 作语义面、content 仍为 brief 缺省', async () => {
+    const doctor: RecallEntityCard = { ref: SU, name: '苏瑶', brief: '医馆坐堂的大夫' }
+    const clinic: RecallEntityCard = { ref: 'location:hui-chun-tang', name: '回春堂', brief: '' }
+    // query 对 doctor≈0.7526、clinic≈0.6585 ⇒ 双双过 0.6 门，分数降序定序
+    const result = await recallCandidates({
+      draftText: '坐堂问诊。',
+      cards: [doctor, clinic],
+      snapshot: snap({}),
+      scope: SCOPE,
+      config: cfg,
+      embedding: stubEmbeddingProvider(
+        [
+          { text: '医馆坐堂的大夫', vector: basisVector(0) },
+          { text: '回春堂', vector: basisVector(1) },
+        ],
+        mixedVector([0.8, 0.7]),
+      ),
+    })
+
+    expect(result.candidates.map((candidate) => candidate.tier)).toEqual(['entity_card', 'entity_card'])
+    expect(result.candidates.map((candidate) => candidate.id)).toEqual([SU, 'location:hui-chun-tang'])
+    expect(result.candidates[0]!.content).toBe('医馆坐堂的大夫')
+    expect(result.candidates[1]!.content).toBe('')
+  })
+
+  it('embedding 满分平 keyword 主名 1.0 ⇒ merge.priority 让 keyword 记证据', async () => {
+    const result = await recallCandidates({
+      draftText: '林枫出场。',
+      cards: [linCard],
+      snapshot: snap({ temporalFact: [mkFact(LIN)] }),
+      scope: SCOPE,
+      config: { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.5 } },
+      embedding: stubEmbeddingProvider([{ text: linCard.brief ?? '', vector: basisVector(0) }], basisVector(0)),
+    })
+    const card = result.candidates.filter((candidate) => candidate.id === LIN)
+    expect(card).toHaveLength(1)
+    expect(card[0]!.channel).toBe('keyword')
+    expect(card[0]!.activation).toEqual({ kind: 'keyword', keys: ['林枫'] })
+  })
+
+  it('同输入重跑深相等（INV-K4）；provider 触达前短路空语料/空查询；维度违约显式爆炸', async () => {
+    const config = { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.5 } }
+    const input = {
+      draftText: '查询。',
+      cards: [linCard],
+      snapshot: snap({ temporalFact: [mkFact(LIN)] }),
+      scope: SCOPE,
+      config,
+      embedding: stubEmbeddingProvider([{ text: factText(LIN, '安好'), vector: basisVector(0) }], basisVector(0)),
+    }
+    const first = await recallCandidates(input)
+    const second = await recallCandidates(input)
+    expect(second).toEqual(first)
+    expect(first.candidates.find((candidate) => candidate.activation?.kind === 'embedding')).toBeDefined()
+
+    const explosive: LocalEmbeddingProvider = {
+      modelId: BUNDLED_MODEL_ID,
+      dimensions: 512,
+      queryEmbed: () => Promise.reject(new Error('不应触达引擎')),
+      passageEmbed: () => Promise.reject(new Error('不应触达引擎')),
+    }
+    const emptyCorpus = await embeddingRecall(
+      { queryText: 'x', cards: [], snapshot: snap({}), scope: SCOPE, provider: explosive },
+      config,
+    )
+    expect(emptyCorpus.entries).toEqual([])
+    const blankQuery = await embeddingRecall(
+      { queryText: '', cards: [linCard], snapshot: snap({ temporalFact: [mkFact(LIN)] }), scope: SCOPE, provider: explosive },
+      config,
+    )
+    expect(blankQuery.entries).toEqual([])
+
+    const mismatched: LocalEmbeddingProvider = {
+      ...explosive,
+      queryEmbed: () => Promise.resolve([1, 0]),
+      passageEmbed: (texts) => Promise.resolve(texts.map(() => [1])),
+    }
+    await expect(
+      embeddingRecall(
+        { queryText: 'x', cards: [linCard], snapshot: snap({ temporalFact: [mkFact(LIN)] }), scope: SCOPE, provider: mismatched },
+        config,
+      ),
+    ).rejects.toThrow(/维度不匹配/)
   })
 })

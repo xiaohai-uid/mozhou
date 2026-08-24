@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { foldNarrativeRows, type EntityRef, type FactId } from '@mozhou/kernel'
 import {
   BUNDLED_MODEL_ID,
   createLocalEmbeddingProvider,
@@ -10,6 +11,7 @@ import {
   ModelAssetsError,
 } from './embedding.js'
 import type { LocalEmbeddingProvider } from './embedding.js'
+import { DEFAULT_KHOP_RECALL_CONFIG, recallCandidates } from './recall.js'
 
 /** 测试锚点：包根（本文件位于 src/ 下）。 */
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -101,6 +103,14 @@ describe('内置模型断网冷启动（P0 硬断言）', () => {
     const topIndex = sims.indexOf(Math.max(...sims))
     expect(topIndex).toBe(0)
   })
+
+  it('纯 CPU 单查询延迟冒烟：warm 后单次 <50ms（#24 AC①；T9 基准 18ms 留 2.7× 余量）', async () => {
+    await provider.queryEmbed('预热查询，排除 ONNX session 冷启动')
+    const start = performance.now()
+    await provider.queryEmbed('主角为了给家人治病筹钱做了什么？')
+    const elapsedMs = performance.now() - start
+    expect(elapsedMs).toBeLessThan(50)
+  })
 })
 
 describe('资产哈希登记进构建产物清单', () => {
@@ -147,6 +157,100 @@ describe('ONNXRUNTIME_NODE_INSTALL_CUDA 环境守卫', () => {
       } else {
         process.env.ONNXRUNTIME_NODE_INSTALL_CUDA = previous
       }
+    }
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * 三通道召回真模型端到端（#24 AC②）
+ * -------------------------------------------------------------------------- */
+
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+/** 确定性 26 位 Crockford Base32（kernel validateHead 要求 prefixed-ULID）。 */
+function ulid(seed: number): string {
+  let out = ''
+  let value = seed
+  for (let i = 0; i < 26; i += 1) {
+    out = CROCKFORD[value % 32]! + out
+    value = Math.floor(value / 32)
+  }
+  return out
+}
+
+const BOOK_ID = `book_${ulid(1)}`
+let factSeq = 5000
+
+/** 最小事实行（与 recall.test.ts 夹具同构的精简版；渲染行 = `subject predicate=value`）。 */
+function mkFactRow(subject: EntityRef, value: string) {
+  return {
+    id: `fact_${ulid(factSeq++)}` as FactId,
+    bookId: BOOK_ID,
+    revision: 0,
+    createdAt: '2026-08-23T00:00:00.000Z',
+    updatedAt: '2026-08-23T00:00:00.000Z',
+    subject,
+    predicate: '状态',
+    value,
+    validFrom: 1,
+    validUntil: null,
+    importance: 'notable' as const,
+    riskClass: 'low' as const,
+    source: { kind: 'chapter' as const, chapterIndex: 1 },
+    status: 'confirmed' as const,
+    compactedIntoVolumeId: null,
+    provenance: { origin: 'author' as const, protectedUserContent: false },
+  }
+}
+
+describe('三通道召回真模型端到端（#24 AC②）', () => {
+  it('keyword+k-hop 双漏而向量命中：语义相关事实经兜底入候选，无关者被阈值门拦下', async () => {
+    const provider = await createLocalEmbeddingProvider()
+    const target = mkFactRow('char:lin-xuan', '把怀表当掉换三十两银子给妹妹抓药')
+    const distractor = mkFactRow('char:su-yao', '她在书房里练字临帖')
+    const snapshot = foldNarrativeRows({
+      temporalFact: [target, distractor],
+      knowledgeState: [],
+      relationshipState: [],
+      timelineEvent: [],
+    })
+    const draftText = '主角家里穷得叮当响，为了给家人治病四处筹钱。' // 不含任何主名 ⇒ keyword/graph 双漏
+
+    // 阈值标定式注入：以实测相似度间隔取中点作入选门（生产值待自有语料标定，AC③）
+    const query = await provider.queryEmbed(draftText)
+    const passages = await provider.passageEmbed([
+      `${target.subject} ${target.predicate}=${String(target.value)}`,
+      `${distractor.subject} ${distractor.predicate}=${String(distractor.value)}`,
+    ])
+    const simOf = (index: number): number => {
+      const vector = passages[index]
+      if (vector === undefined) {
+        throw new Error(`provider 少发向量：index=${index}`)
+      }
+      return cosine(query, vector)
+    }
+    const relevantSim = simOf(0)
+    const distractorSim = simOf(1)
+    expect(relevantSim).toBeGreaterThan(distractorSim)
+    const thresh = (relevantSim + distractorSim) / 2
+
+    const result = await recallCandidates({
+      draftText,
+      cards: [],
+      snapshot,
+      scope: { chapterIndex: 5, pov: 'protagonist' },
+      config: { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh } },
+      embedding: provider,
+    })
+
+    expect(result.candidates).toHaveLength(1)
+    const entry = result.candidates[0]!
+    expect(entry).toMatchObject({ id: target.id, channel: 'embedding', tier: 'active_fact' })
+    // 通道内积与测试 cosine 助手求和序不同 ⇒ 1e-9 级浮点发散，按 1e-6 断言
+    expect(entry.relevanceScore).toBeCloseTo(relevantSim, 6)
+    expect(entry.activation?.kind).toBe('embedding')
+    if (entry.activation?.kind === 'embedding') {
+      expect(entry.activation.score).toBeCloseTo(relevantSim, 6)
     }
   })
 })

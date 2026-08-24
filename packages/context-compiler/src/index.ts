@@ -10,17 +10,21 @@ export {
 } from './embedding.js'
 export type { CreateLocalEmbeddingProviderOptions, LocalEmbeddingProvider } from './embedding.js'
 
-/** 关键词 + k-hop 双通道召回（T8a，#21）：别名/正则快通道 + POV 可见子图扩边 + raw 分 max 合并。 */
+/** 关键词 + k-hop + embedding 三通道召回（T8a #21 / T8b-2 #24）：别名/正则快通道 + POV 可见子图扩边 + cosine 兜底 + raw 分 max 合并。 */
 export {
   DEFAULT_KHOP_RECALL_CONFIG,
   detectKeywordTriggers,
+  embeddingRecall,
   khopGraphRecall,
   mergeRecallChannels,
-  recallKeywordAndGraph,
+  recallCandidates,
 } from './recall.js'
 export type {
   ChannelInput,
-  DualChannelRecallInput,
+  EmbeddingRecallConfig,
+  EmbeddingRecallEntry,
+  EmbeddingRecallInput,
+  EmbeddingRecallResult,
   GraphRecallEntry,
   GraphRecallResult,
   GraphRecallScope,
@@ -29,6 +33,7 @@ export type {
   KeywordTrigger,
   KhopRecallConfig,
   KhopRecallWeightsConfig,
+  RecallPipelineInput,
   RecalledCandidate,
   RecallEntityCard,
   RecallExclusion,
