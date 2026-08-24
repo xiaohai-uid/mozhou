@@ -52,6 +52,15 @@ importers:
 
   packages/kernel: {}
 
+  packages/runtime:
+    dependencies:
+      '@mozhou/data-plane':
+        specifier: workspace:*
+        version: link:../data-plane
+      '@mozhou/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
 packages:
 
   '@anush008/tokenizers-darwin-universal@0.0.0':
