@@ -26,6 +26,9 @@ importers:
 
   packages/context-compiler:
     dependencies:
+      '@mozhou/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       fastembed:
         specifier: ^2.1.0
         version: 2.1.0

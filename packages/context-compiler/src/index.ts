@@ -9,3 +9,29 @@ export {
   ModelAssetsError,
 } from './embedding.js'
 export type { CreateLocalEmbeddingProviderOptions, LocalEmbeddingProvider } from './embedding.js'
+
+/** 关键词 + k-hop 双通道召回（T8a，#21）：别名/正则快通道 + POV 可见子图扩边 + raw 分 max 合并。 */
+export {
+  DEFAULT_KHOP_RECALL_CONFIG,
+  detectKeywordTriggers,
+  khopGraphRecall,
+  mergeRecallChannels,
+  recallKeywordAndGraph,
+} from './recall.js'
+export type {
+  ChannelInput,
+  DualChannelRecallInput,
+  GraphRecallEntry,
+  GraphRecallResult,
+  GraphRecallScope,
+  KeywordChannelResult,
+  KeywordScoringConfig,
+  KeywordTrigger,
+  KhopRecallConfig,
+  KhopRecallWeightsConfig,
+  RecalledCandidate,
+  RecallEntityCard,
+  RecallExclusion,
+  RecallResult,
+  RecallTier,
+} from './recall.js'

@@ -9,6 +9,7 @@
     "build": "tsc -p ."
   },
   "dependencies": {
+    "@mozhou/kernel": "workspace:*",
     "fastembed": "^2.1.0"
   }
 }
