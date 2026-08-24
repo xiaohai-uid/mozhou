@@ -114,7 +114,7 @@ function baseInput(overrides: Partial<AssembleInput>): AssembleInput {
     task: { type: 'chapter_writing', chapterIndex: 42 },
     modelProfile: { id: 'test-model', contextWindow: WINDOW },
     tokenizer: charTok,
-    recall: { candidates: [], excluded: [] },
+    recall: { candidates: [], excluded: [], parseFailures: [], },
     structural: STRUCTURAL_100,
     receiptIdentity: IDENTITY,
     ...overrides,
@@ -138,7 +138,7 @@ describe('Phase 0 三层预扣', () => {
   it('输出预留/结构层/保底配额逐项核算，条目渲染含分隔符开销', () => {
     const { packet, receipt } = assembleBudgetedContext(
       baseInput({
-        recall: { candidates: [cand('world_rule', 0.9, 30)], excluded: [] },
+        recall: { candidates: [cand('world_rule', 0.9, 30)], excluded: [], parseFailures: [], },
         storyText: [],
       }),
     )
@@ -192,6 +192,7 @@ describe('AC① 设定洪泛场景正文配额守恒', () => {
     return {
       candidates: Array.from({ length: 12 }, (_, index) => cand('entity_card', 0.99 - index * 0.01, 199)),
       excluded: [],
+      parseFailures: [],
     }
   }
 
@@ -241,6 +242,7 @@ describe('AC① 设定洪泛场景正文配额守恒', () => {
             cand('world_rule', 0.6, 49, { id: 'fact_d' }),
           ],
           excluded: [],
+          parseFailures: [],
         },
       }),
     )
@@ -253,7 +255,7 @@ describe('AC① 设定洪泛场景正文配额守恒', () => {
   it('连配额免除预算都装不下 ⇒ budget_exhausted（双原因码互斥）', () => {
     // 单张 3001 token 原子卡：> remNoQuota 2908 ⇒ 只能是 budget_exhausted
     const { receipt } = assembleBudgetedContext(
-      baseInput({ recall: { candidates: [cand('entity_card', 1, 3000)], excluded: [] } }),
+      baseInput({ recall: { candidates: [cand('entity_card', 1, 3000)], excluded: [], parseFailures: [], } }),
     )
     const stopper = receipt.entries.find((entry) => entry.stage === 'reserve' && !entry.included)
     expect(stopper?.exclusionReason).toBe('budget_exhausted')
@@ -277,6 +279,7 @@ describe('AC② 同输入两次装配完全一致', () => {
         { identifier: 'fact_ghost', reason: 'pov_filtered', channel: 'graph_khop' },
         { identifier: 'concept:mist', reason: 'relevance_below_threshold' },
       ],
+      parseFailures: [],
     },
     storyText: ['第一章正文切片。', '第二章正文切片。'],
   })
@@ -335,6 +338,7 @@ describe('AC③ 每个淘汰条目携带合法 ExclusionReason', () => {
             { identifier: 'concept:fog', reason: 'relevance_below_threshold' },
             { identifier: 'fact_twice', reason: 'duplicate', channel: 'keyword' },
           ],
+          parseFailures: [],
         },
         storyText: ['S'.repeat(5000)],
       }),
@@ -373,6 +377,7 @@ describe('desirability 全序与终态化', () => {
             cand('entity_card', 0.95, 20, { id: 'card_m2' }),
           ],
           excluded: [],
+          parseFailures: [],
         },
       }),
     )
@@ -389,6 +394,7 @@ describe('desirability 全序与终态化', () => {
             cand('entity_card', 0.8, 10, { id: 'fact_a' }),
           ],
           excluded: [],
+          parseFailures: [],
         },
       }),
     )
@@ -402,6 +408,7 @@ describe('desirability 全序与终态化', () => {
         recall: {
           candidates: [cand('world_rule', 0.9, 600, { id: 'rule_big' }), cand('world_rule', 0.8, 100, { id: 'rule_small' })],
           excluded: [],
+          parseFailures: [],
         },
       }),
     )
@@ -416,7 +423,7 @@ describe('desirability 全序与终态化', () => {
     const huge = 'x'.repeat(3000)
     const { packet, receipt } = assembleBudgetedContext(
       baseInput({
-        recall: { candidates: [cand('entity_card', 1, 0, { id: 'card_huge', atomicOverride: true, content: huge })], excluded: [] },
+        recall: { candidates: [cand('entity_card', 1, 0, { id: 'card_huge', atomicOverride: true, content: huge })], excluded: [], parseFailures: [], },
       }),
     )
     expect(packet.settings).toHaveLength(0)
@@ -440,6 +447,7 @@ describe('desirability 全序与终态化', () => {
             }),
           ],
           excluded: [],
+          parseFailures: [],
         },
       }),
     )
@@ -474,6 +482,7 @@ describe('放置收敛：跨界合并漂移由收敛循环兜底', () => {
             cand('world_rule', 0.7, 0, { id: 'rule_c', content: 'B' + 'c'.repeat(299) }),
           ],
           excluded: [],
+          parseFailures: [],
         },
         storyText: ['S'.repeat(3000)],
       }),
@@ -501,6 +510,7 @@ describe('放置收敛：跨界合并漂移由收敛循环兜底', () => {
             cand('entity_card', 0.7, 0, { id: 'card_c', content: 'B' + 'c'.repeat(498) }),
           ],
           excluded: [],
+          parseFailures: [],
         },
         storyText: ['S'.repeat(1477)],
       }),
@@ -531,6 +541,7 @@ describe('receipt 确定性条目序', () => {
             cand('entity_card', 0.7, 0, { id: 'card_c', content: 'B' + 'c'.repeat(498) }),
           ],
           excluded: [{ identifier: 'fact_ghost', reason: 'pov_filtered' }],
+          parseFailures: [],
         },
         storyText: ['S'.repeat(1477)],
       }),
@@ -673,5 +684,47 @@ describe('真召回直通装配（上游 = 双通道召回输出）', () => {
         expect(activation.hops).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * T9 #25：解析失败逐条入 Receipt + replayInputs 归档激活证据
+ * -------------------------------------------------------------------------- */
+
+describe('T9 解析失败逐条与重放面增补', () => {
+  it('recall.parseFailures 原样透传：每个失败引用一条独立记录，不聚合不计数', () => {
+    const parseFailures = [
+      { source: 'char:su[aliases[0]]', detail: 'invalid regex: unmatched bracket' },
+      { source: 'faction:yun[aliases[2]]', detail: 'invalid regex: dangling quantifier' },
+    ]
+    const { receipt } = assembleBudgetedContext(
+      baseInput({
+        recall: { candidates: [], excluded: [], parseFailures },
+      }),
+    )
+    expect(receipt.parseFailures).toEqual(parseFailures)
+    expect(receipt.parseFailures).toHaveLength(2)
+    for (const failure of receipt.parseFailures) {
+      expect(failure.source).toBeTruthy()
+      expect(failure.detail).toBeTruthy()
+    }
+  })
+
+  it('replayInputs.candidates 归档激活证据（converge 淘汰者的证据唯一载体）', () => {
+    const { receipt } = assembleBudgetedContext(
+      baseInput({
+        recall: {
+          candidates: [
+            cand('entity_card', 1, 30, { id: 'card_x', channel: 'keyword', activation: { kind: 'keyword', keys: ['林枫'] } }),
+            cand('world_rule', 0.9, 30, { id: 'rule_y', channel: 'embedding', activation: { kind: 'embedding', score: 0.9 } }),
+          ],
+          excluded: [],
+          parseFailures: [],
+        },
+      }),
+    )
+    const archived = new Map(receipt.replayInputs.candidates.map((candidate) => [candidate.id, candidate]))
+    expect(archived.get('card_x')?.activation).toEqual({ kind: 'keyword', keys: ['林枫'] })
+    expect(archived.get('rule_y')?.activation).toEqual({ kind: 'embedding', score: 0.9 })
   })
 })

@@ -402,7 +402,10 @@ export interface ParseFailure {
   readonly detail: string; // 失败原因
 }
 
-/** 重放候选（Q16）：竞争池条目的重放描述——只存标量与摘要，内容本体不内嵌（真源唯一）。 */
+/** 重放候选（Q16）：竞争池条目的重放描述——只存标量与摘要，内容本体不内嵌（真源唯一）。
+ *  T9 受控增补（#25）：归档 `activation`——recomputationHash 覆盖 entries（含激活证据），
+ *  重放要逐字节复现哈希就必须能为每个候选重建 activation；落选者（converge 淘汰）的
+ *  激活证据在 receipt entries 中无第二载体，只能随重放面归档。 */
 export interface ReplayCandidate {
   readonly id: string; // ULID 或 EntityRef
   readonly tier: string; // ADR-0004 修剪层级词表
@@ -410,6 +413,8 @@ export interface ReplayCandidate {
   readonly relevanceScore: number;
   readonly pinned?: boolean | undefined;
   readonly atomicOverride?: boolean | undefined;
+  /** 激活证据（T9 #25 增补）：与 RecalledCandidate.activation 同构，逐字节重放的必要输入。 */
+  readonly activation?: ActivationEvidence | undefined;
   readonly contentDigest: string; // SHA-256；codex 自由 md 无 revision，摘要兜底变异检测
 }
 

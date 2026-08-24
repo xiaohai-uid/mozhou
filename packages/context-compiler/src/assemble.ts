@@ -1,5 +1,6 @@
 /**
- * 两阶段 Reserved 预算装配（实现票 #23 / T7）。
+ * 两阶段 Reserved 预算装配（实现票 #23 / T7；T9 #25 增补：parseFailures 逐条透传、
+ * replayInputs 归档激活证据）。
  *
  * 冻结依据：docs/specs/token-budget-assembly-spec.md（#8）· ADR-0020 ·
  * kernel-schema §8（ReceiptEntry / ExclusionReason / storyTextQuota / ReplayInputs）·
@@ -202,7 +203,9 @@ const ENTRY_DELIMITER = '\n'
 
 const renderPiece = (content: string): string => content + ENTRY_DELIMITER
 
-function canonicalJson(value: unknown): string {
+/** 哈希纪律的规范化序列化（INV-R3）：键字典序、紧凑分隔符、剔除 undefined。
+ *  导出供重放面（T9 #25）复用同一公式——inputsDigest 锚定与文件排版互不影响。 */
+export function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value) ?? 'null'
   }
@@ -215,7 +218,7 @@ function canonicalJson(value: unknown): string {
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`
 }
 
-function sha256Hex(content: string): string {
+export function sha256Hex(content: string): string {
   return createHash('sha256').update(content, 'utf8').digest('hex')
 }
 
@@ -603,6 +606,9 @@ export function assembleBudgetedContext(input: AssembleInput): AssemblyResult {
         relevanceScore: meta.relevanceScore,
         ...(meta.pinned ? { pinned: true } : {}),
         ...(meta.atomicOverride ? { atomicOverride: true } : {}),
+        // T9 #25：激活证据随重放面归档——recomputationHash 覆盖 entries（含 activation），
+        // converge 淘汰者的证据在 receipt entries 中无第二载体，缺此位则哈希不可复现。
+        ...(meta.activation === undefined ? {} : { activation: meta.activation }),
         contentDigest: sha256Hex(meta.sourceContent),
       }),
     ),
@@ -638,7 +644,9 @@ export function assembleBudgetedContext(input: AssembleInput): AssemblyResult {
     taskType: input.task.type,
     ...(input.task.chapterIndex === undefined ? {} : { chapterIndex: input.task.chapterIndex }),
     entries,
-    parseFailures: [], // v1：装配内部零解析失败；召回侧 parseFailures 归 T8a 通道诊断面
+    // 解析失败逐条（T9 #25）：召回通道前置解析失败的原样透传——每个失败引用
+    // 一条独立 {source, detail} 记录，不聚合不计数；成功装配内部的语义不变（spec §5）。
+    parseFailures: input.recall.parseFailures,
     storyTextQuota: { reservedTokens: storyQuotaFloor, actualTokens: storyActualTokens },
     totalTokens: usedTokens,
     assembledBy: 'server', // N10/I4：类型层面把客户端装配表达为非法状态
@@ -650,7 +658,8 @@ export function assembleBudgetedContext(input: AssembleInput): AssemblyResult {
   return { packet, receipt }
 }
 
-/** 有效配置的自描述版本号：解析后配置的规范摘要（覆盖项参与 ⇒ 版本随配置漂移可见）。 */
-function configVersionOf(cfg: BudgetAssemblyConfig): string {
+/** 有效配置的自描述版本号：解析后配置的规范摘要（覆盖项参与 ⇒ 版本随配置漂移可见）。
+ *  导出供重放面（T9 #25）做 configVersion 一致性校验。 */
+export function configVersionOf(cfg: BudgetAssemblyConfig): string {
   return `budget-assembly/${sha256Hex(canonicalJson(cfg)).slice(0, 32)}`
 }

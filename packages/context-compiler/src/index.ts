@@ -44,6 +44,8 @@ export type {
 /** 两阶段 Reserved 预算装配（T7，#23）：三层预扣 → 序贯预订前缀语义 → 放置收敛 → Receipt 发射（ADR-0020）。 */
 export {
   assembleBudgetedContext,
+  canonicalJson,
+  configVersionOf,
   DEFAULT_BUDGET_ASSEMBLY_CONFIG,
   CompileConfigError,
   ConvergenceError,
@@ -63,3 +65,30 @@ export type {
   ReceiptIdentity,
   StructuralSection,
 } from './assemble.js'
+
+/** Receipt 一证一文件（T9，#25）：稳定键序美化序列化 + .mozhou/receipts/ 不可变凭证 +
+ *  ContextCompiled 指针事件（INV-R1 崩溃一致序 / INV-R2 不可变 / 悬空指针校验，ADR-0021）。 */
+export {
+  assertNoDanglingReceiptPointers,
+  DanglingReceiptPointerError,
+  listReceiptIds,
+  loadReceipt,
+  persistReceipt,
+  ReceiptAlreadyExistsError,
+  ReceiptNotFoundError,
+  RECEIPTS_DIRNAME,
+  RUNTIME_EVENTS_RELPATH,
+  serializeReceiptFile,
+} from './receipt-file.js'
+export type { PersistReceiptOptions, PersistedReceiptLocation } from './receipt-file.js'
+
+/** Receipt 重放引擎（T9，#25）：replayInputs 最小重放输入面的运行时兑现——
+ *  embedding 索引漂移后仍复现同一 desirability 终序与 recomputationHash，
+ *  输入漂移逐条定位 fail loudly（spec §3.1 复算契约）。 */
+export {
+  ReplayHashMismatchError,
+  ReplayInputDriftError,
+  replayReceiptFromInputs,
+  ReplayVersionMismatchError,
+} from './receipt-replay.js'
+export type { ReplayContentResolver, ReplayRuntime, ReplaySurface } from './receipt-replay.js'

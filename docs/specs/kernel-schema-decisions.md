@@ -113,6 +113,7 @@ tags:
 |------|------|------|
 | `entries[].activation?` | 判别联合 `ActivationEvidence`（keyword.keys / graph_khop{sourceEntity,hops,score} / embedding.score / manual_pin） | **Q15**：NAI Context Viewer Key 列的类型化对应物——「为何成为候选」是可解释性契约的另一半；拒绝词法压缩串（house style 是品牌类型+判别联合）；structural 恒 undefined，双通道合并记胜出通道证据 |
 | `replayInputs` | `ReplayInputs`（版本组 + 竞争池候选终序清单含 score/contentDigest + 结构层/storyText digest） | **Q16**：可复算 = 归档最小重放输入面——relevanceScore 是召回时点产物非实体属性，只存摘要则索引漂移后终序永久不可恢复；内容本体不内嵌（真源唯一）；复算边界 = 预算装配四阶段，recall_filter 透传不在契约内 |
+| `replayInputs.candidates[].activation?` | 判别联合 `ActivationEvidence`（同 Q15 形状） | **T9 增补（#25）**：recomputationHash 覆盖 entries（含激活证据），converge 淘汰者的证据在 receipt entries 中无第二载体——缺此位则「任意时刻重放必得同哈希」（spec §3.1）在结构上不可满足 |
 | `inputsDigest` | `string`（必填） | 恒 = `sha256(canonicalJson(replayInputs))`（INV-R6）；实现未启动无存量数据，不留兼容灰区 |
 | 物理存储 | `.mozhou/receipts/rcpt_<ULID>.json` 一证一文件 + events 指针事件 | ADR-0021：守目录树 v2 冻结（追踪流行级对账语义不适用于凭证）；崩溃一致序先证后指针；详见 [context-receipt-physical-format-spec](./context-receipt-physical-format-spec.md) |
 

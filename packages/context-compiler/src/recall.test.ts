@@ -372,8 +372,41 @@ describe('INV-K5 duplicate 判定线', () => {
   })
 })
 
+describe('T9 #25 解析失败逐条透传', () => {
+  it('mergeRecallChannels 按通道序原样拼接 parseFailures，逐条独立不聚合', () => {
+    const failuresA = [{ source: 'char:su[aliases[0]]', detail: 'invalid regex: unmatched bracket' }]
+    const failuresB = [
+      { source: 'faction:yun[aliases[2]]', detail: 'invalid regex: dangling quantifier' },
+    ]
+    const entry = { id: 'char:x', tier: 'entity_card' as const, relevanceScore: 1, content: 'x' }
+    const result = mergeRecallChannels([
+      { channel: 'keyword', entries: [entry], parseFailures: failuresA },
+      { channel: 'graph_khop', entries: [], parseFailures: failuresB },
+    ])
+    expect(result.parseFailures).toEqual([...failuresA, ...failuresB])
+  })
+
+  it('recallCandidates 端到端：keyword 非法 regex 别名的 parseFailures 进入 RecallResult', async () => {
+    const brokenCard = { ref: SU, name: '苏瑶', aliases: [{ text: '([', kind: 'regex' as const }] }
+    const result = await recallCandidates({
+      draftText: '苏瑶来了。',
+      cards: [brokenCard],
+      snapshot: snap({}),
+      scope: SCOPE,
+    })
+    expect(result.parseFailures).toHaveLength(1)
+    expect(result.parseFailures[0]!.source).toContain('aliases[')
+    // 主名回落照常成为候选（解析失败不炸通道）
+    expect(result.candidates.some((candidate) => candidate.id === SU)).toBe(true)
+  })
+})
+
 /* ----------------------------------------------------------------------------
  * AC②扩边有效性 + 阈值口径 + event 边永久性
+ * -------------------------------------------------------------------------- */
+
+/* ----------------------------------------------------------------------------
+ * AC② keyword 未命中时图邻域补位
  * -------------------------------------------------------------------------- */
 
 describe('AC② keyword 未命中时图邻域补位', () => {

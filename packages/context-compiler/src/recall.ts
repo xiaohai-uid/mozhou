@@ -148,6 +148,9 @@ export interface RecallExclusion {
 export interface RecallResult {
   readonly candidates: readonly RecalledCandidate[]
   readonly excluded: readonly RecallExclusion[]
+  /** 解析失败逐条记录（T9 #25）：各通道前置解析失败的原样合并（通道序），逐条独立——
+   *  每个失败引用一条 {source, detail}，不聚合计数；装配端原样落 Receipt.parseFailures。 */
+  readonly parseFailures: readonly ParseFailure[]
 }
 
 /* ----------------------------------------------------------------------------
@@ -725,6 +728,8 @@ export interface ChannelInput {
   }[]
   /** 通道侧前置淘汰记录（图通道的区间/POV/阈值透传；阈值先于合并施加）。 */
   readonly exclusions?: readonly RecallExclusion[]
+  /** 通道侧解析失败逐条记录（T9 #25）：keyword 非法 regex 别名等，透传进 RecallResult。 */
+  readonly parseFailures?: readonly ParseFailure[]
 }
 
 /**
@@ -814,7 +819,11 @@ export function mergeRecallChannels(channels: readonly ChannelInput[]): RecallRe
       (a.reason < b.reason ? -1 : a.reason > b.reason ? 1 : 0),
   )
 
-  return { candidates, excluded }
+  // 解析失败逐条透传（T9 #25）：按通道入参序原样拼接，不排序不去重——
+  // 每个失败引用保持独立记录项，source/detail 语义归产生通道所有。
+  const parseFailures = channels.flatMap((channel) => channel.parseFailures ?? [])
+
+  return { candidates, excluded, parseFailures }
 }
 
 /* ----------------------------------------------------------------------------
@@ -855,7 +864,7 @@ export async function recallCandidates(input: RecallPipelineInput): Promise<Reca
   })
 
   const channels: ChannelInput[] = [
-    { channel: 'keyword', entries: keywordEntries },
+    { channel: 'keyword', entries: keywordEntries, parseFailures: keyword.parseFailures },
     { channel: 'graph_khop', entries: graph.entries, exclusions: graph.exclusions },
   ]
   if (input.embedding !== undefined) {
