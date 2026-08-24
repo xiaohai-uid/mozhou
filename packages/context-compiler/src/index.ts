@@ -40,3 +40,26 @@ export type {
   RecallResult,
   RecallTier,
 } from './recall.js'
+
+/** 两阶段 Reserved 预算装配（T7，#23）：三层预扣 → 序贯预订前缀语义 → 放置收敛 → Receipt 发射（ADR-0020）。 */
+export {
+  assembleBudgetedContext,
+  DEFAULT_BUDGET_ASSEMBLY_CONFIG,
+  CompileConfigError,
+  ConvergenceError,
+  TokenizerUnavailable,
+} from './assemble.js'
+export type {
+  AssemblyModelProfile,
+  AssemblyResult,
+  AssemblyTierName,
+  AssembleInput,
+  AssembleTask,
+  BudgetAssemblyConfig,
+  ContextPacket,
+  ExactTokenizer,
+  PacketSettingEntry,
+  PacketStructuralPiece,
+  ReceiptIdentity,
+  StructuralSection,
+} from './assemble.js'
