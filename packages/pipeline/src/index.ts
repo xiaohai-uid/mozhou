@@ -193,3 +193,15 @@ export type {
   UsageFact,
   UsageRecord,
 } from './record-step.js';
+
+/**
+ * S9 重提交管线（T19 · #43）：commit 后章节 requestResubmit——相位移回 draft
+ * （I5：旧 commit 物理痕迹永不改写），新 taskRef 新会话全量重走十步；重提交
+ * 期间读取真相 = phase=committed 的最新 commitId（事件行锚）。
+ */
+export {
+  ResubmitNotCommittedError,
+  latestCommittedTruth,
+  requestResubmit,
+} from './resubmit.js';
+export type { CommittedTruthAnchor, ResubmitOutcome } from './resubmit.js';
