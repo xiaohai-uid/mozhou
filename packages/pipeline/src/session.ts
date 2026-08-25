@@ -79,6 +79,37 @@ export class StepTransitionError extends Error {
   }
 }
 
+/**
+ * 回环未被显式驱动（T19 · #43；S7 回环停止策略）：requestRework 只在门禁
+ * hard_conflict 悬置时合法——无冲突可回炉、或门禁已通过，都不是「作者承认
+ * 错误改文」的显式动作。循环无自动迭代，缺这一票就停。
+ */
+export class ReworkNotDrivenError extends Error {
+  override readonly name = 'ReworkNotDrivenError';
+  constructor(chapterIndex: number, verdict: string | null) {
+    super(
+      `chapter ${chapterIndex} rework not driven: the loop advances only by explicit author action ` +
+        `(S7) — current gate verdict is '${verdict ?? '<none>'}', 'hard_conflict' required`,
+    );
+  }
+}
+
+/**
+ * 硬冲突未决、前进出口关闭（T19 · #43；S7 停止策略）：门禁 hard_conflict
+ * 悬置期间禁止步进 canon_proposal——带冲突的 delta 进不了确认面。唯一出路是
+ * 作者显式动作：requestRework 承认错误改文回炉，别无自动通道。
+ */
+export class HardConflictUnresolvedError extends Error {
+  override readonly name = 'HardConflictUnresolvedError';
+  constructor(chapterIndex: number, taskRef: string) {
+    super(
+      `chapter ${chapterIndex} session ${taskRef}: continuity gate ended with hard_conflict — ` +
+        'the forward exit to canon_proposal is closed until the author explicitly drives a rework ' +
+        '(requestRework: acknowledge the mistake, edit the prose, full re-extract)',
+    );
+  }
+}
+
 /** 步卫失败：动作与当前步不符（含步锚事件发射位）。 */
 export class StepGuardError extends Error {
   override readonly name = 'StepGuardError';
@@ -188,6 +219,10 @@ export class ChapterProductionSession {
     if (to !== expected) {
       throw new StepTransitionError(this.#currentStep, to, expected);
     }
+    // S7 停止策略：硬冲突悬置时前进出口关闭（delta 不进确认面），只许显式回炉
+    if (to === 'canon_proposal' && this.project().lastGateVerdict === 'hard_conflict') {
+      throw new HardConflictUnresolvedError(this.#chapterIndex, this.#taskRef);
+    }
     this.#publish({
       type: 'TaskStepTransitioned',
       taskRef: this.#taskRef,
@@ -195,6 +230,34 @@ export class ChapterProductionSession {
       payload: { from: this.#currentStep, to, ...(result ?? {}) },
     });
     this.#currentStep = to;
+  }
+
+  /**
+   * 回炉边（T19 · #43；S7 回环停止策略 / S8 Gate 后行的显式驱动面）：门禁
+   * hard_conflict 悬置时，作者「承认错误」改文 ⇒ 光标移回 user_edit，随后沿
+   * 线性序重走 Final Extract 全量重提取（一致性优先于增量成本）。纪律：
+   *   - 这是唯一的逆向步转换——且必须由作者显式调用本方法驱动（无自动迭代、
+   *     无次数上限：有显式驱动即无失控）；advance() 的线性后继守卫不变；
+   *   - 判据读当下投影（lastGateVerdict='hard_conflict'），不是内存光标——
+   *     崩溃恢复后同样可判；verdict=pass 或未走到门禁即拒（ReworkNotDrivenError）；
+   *   - 回炉事件照常落账：TaskStepTransitioned{from:'continuity_gate',to:'user_edit'}
+   *     携带 reason 字段，投影折叠自然回到 user_edit（无第三处真源）。
+   */
+  requestRework(): void {
+    if (this.#currentStep !== 'continuity_gate') {
+      throw new StepGuardError('continuity_gate', this.#currentStep, 'requestRework');
+    }
+    const verdict = this.project().lastGateVerdict;
+    if (verdict !== 'hard_conflict') {
+      throw new ReworkNotDrivenError(this.#chapterIndex, verdict);
+    }
+    this.#publish({
+      type: 'TaskStepTransitioned',
+      taskRef: this.#taskRef,
+      chapterIndex: this.#chapterIndex,
+      payload: { from: 'continuity_gate', to: 'user_edit', reason: 'hard_conflict_rework' },
+    });
+    this.#currentStep = 'user_edit';
   }
 
   /**

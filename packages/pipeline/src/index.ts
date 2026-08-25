@@ -16,6 +16,8 @@ export type { SessionProjection } from './projection.js';
 export {
   ChapterProductionSession,
   GlobalSingleFlightError,
+  HardConflictUnresolvedError,
+  ReworkNotDrivenError,
   SessionAlreadyActiveError,
   SessionNotResumableError,
   StepGuardError,

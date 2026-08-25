@@ -33,6 +33,12 @@ export interface SessionProjection {
   readonly commitId: string | null;
   /** 本窗口内最近一张 CHAPTER_DRAFTING 凭证（receiptId 续跑凭据）。 */
   readonly lastReceiptId: ContextReceiptId | null;
+  /**
+   * 本窗口内最近一次进 continuity_gate 步的 Result 字段 verdict（T19 · #43）：
+   * 'pass' | 'hard_conflict' | null（尚未走到）。回环显式驱动的判据——只有
+   * hard_conflict 悬置中的门禁才允许 requestRework（S7：每次循环由作者驱动）。
+   */
+  readonly lastGateVerdict: 'pass' | 'hard_conflict' | null;
   /** 成对约束悬挂 head 键（head#taskRef；投影合并侧呈现，规格 §3）。 */
   readonly openHeads: readonly string[];
 }
@@ -58,6 +64,7 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
   let committed = false;
   let commitId: string | null = null;
   let lastReceiptId: ContextReceiptId | null = null;
+  let lastGateVerdict: 'pass' | 'hard_conflict' | null = null;
   const openHeads: string[] = [];
 
   for (const row of rows) {
@@ -76,6 +83,7 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
           committed = false;
           commitId = null;
           lastReceiptId = null;
+          lastGateVerdict = null;
           openHeads.length = 0;
           const step = event.payload?.['step'];
           currentStep = typeof step === 'string' && isPipelineStep(step) ? step : 'prepare';
@@ -84,6 +92,11 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
             const to = event.payload?.['to'];
             if (typeof to === 'string' && isPipelineStep(to)) {
               currentStep = to;
+            }
+            // 门禁 Result 字段留痕：verdict 是回环显式驱动的机械判据（S7/S8 Gate 后行）
+            if (to === 'continuity_gate') {
+              const verdict = event.payload?.['verdict'];
+              lastGateVerdict = verdict === 'pass' || verdict === 'hard_conflict' ? verdict : lastGateVerdict;
             }
           } else if (type === 'TaskFinished') {
             finished = true;
@@ -146,6 +159,7 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
     committed,
     commitId,
     lastReceiptId,
+    lastGateVerdict,
     openHeads: [...openHeads],
   };
 }
