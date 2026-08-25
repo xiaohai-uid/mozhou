@@ -104,12 +104,21 @@ describe('内置模型断网冷启动（P0 硬断言）', () => {
     expect(topIndex).toBe(0)
   })
 
-  it('纯 CPU 单查询延迟冒烟：warm 后单次 <50ms（#24 AC①；T9 基准 18ms 留 2.7× 余量）', async () => {
+  it('纯 CPU 单查询延迟冒烟：warm 后 5 次采样中位 <100ms（#24 AC①；T9 基准 18ms；#45 负载感知化）', async () => {
+    // 这是负载感知的 CPU 冒烟而非精度断言（#45）：全量 vitest 并行下 CPU 饱和
+    // 会整体抬高墙钟时间——原「单次 <50ms」对调度敏感，实测满载冲到 63.93ms、
+    // 探针诊断尾部达 133ms 而隔离跑恒绿，属假红。取 5 次采样中位数滤除瞬时
+    // 毛刺，阈值放宽至 100ms（实测满载中位 ~34ms，仍有 ~3× 余量）；病态回归
+    // 照样落网：热路径混入同步 IO 或模型改走网络加载时，中位数将达数百 ms。
     await provider.queryEmbed('预热查询，排除 ONNX session 冷启动')
-    const start = performance.now()
-    await provider.queryEmbed('主角为了给家人治病筹钱做了什么？')
-    const elapsedMs = performance.now() - start
-    expect(elapsedMs).toBeLessThan(50)
+    const samples: number[] = []
+    for (let i = 0; i < 5; i += 1) {
+      const start = performance.now()
+      await provider.queryEmbed('主角为了给家人治病筹钱做了什么？')
+      samples.push(performance.now() - start)
+    }
+    const medianMs = [...samples].sort((a, b) => a - b)[2]!
+    expect(medianMs).toBeLessThan(100)
   })
 })
 
