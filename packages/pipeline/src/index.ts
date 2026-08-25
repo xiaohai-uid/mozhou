@@ -171,3 +171,22 @@ export {
   listPendingProposalRefs,
 } from './proposal-port.js';
 export type { PortAction, ProposalMutationOutcome, ProposalPortDeps, ProposalPortRef } from './proposal-port.js';
+
+/**
+ * Flywheel Record 步（T19 · #43）：任务收尾事件 + usage/cost 投影；记账失败
+ * 不阻断正文（state_degraded）；派生记账允许异步回灌至 usage 投影表。
+ */
+export {
+  USAGE_PROJECTION_PATH,
+  appendUsageRows,
+  backfillDerivedUsage,
+  readUsageProjection,
+  runFlywheelRecord,
+} from './record-step.js';
+export type {
+  FlywheelRecordOutcome,
+  FlywheelRecordStatus,
+  RunFlywheelRecordRequest,
+  UsageFact,
+  UsageRecord,
+} from './record-step.js';
