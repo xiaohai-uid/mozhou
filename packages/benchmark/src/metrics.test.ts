@@ -16,21 +16,21 @@ describe('六指标 L1 机械判定器（T20 #44）', () => {
       const batch = emptyCandidateCounts();
       batch.temporalFact = 4;
       batch.timelineEvent = 1;
-      const gate = { verdict: 'pass', hardConflicts: [], advisory: [], checked: { batch, liveFacts: 2 } };
+      const gate = { verdict: 'pass' as const, hardConflicts: [], advisory: [], checked: { batch, liveFacts: 2 } };
       expect(judgeCanonAccuracy(gate)).toBe(1);
     });
     it('反例：5 项核检 1 硬冲突 ⇒ 精确 0.8', () => {
       const batch = emptyCandidateCounts();
       batch.temporalFact = 5;
       const conflict = { factId: 'tf_1', assertion: '主角已用剑', suggestion: '改回空手' };
-      const gate = { verdict: 'hard_conflict', hardConflicts: [conflict], advisory: [], checked: { batch, liveFacts: 0 } };
+      const gate = { verdict: 'hard_conflict' as const, hardConflicts: [conflict], advisory: [], checked: { batch, liveFacts: 0 } };
       expect(judgeCanonAccuracy(gate)).toBe(0.8);
     });
   });
 
   describe('KNOWLEDGE_LEAK_RATE——未知情者引用秘密的比率', () => {
     const canon = [
-      { id: 'knst_1', factId: 'fact_map', holder: 'char:elder', knownSinceChapter: 2 },
+      { id: 'knst_1', factId: 'fact_map', holder: 'char:elder' as const, knownSinceChapter: 2 },
     ];
     it('正例：唯一引用已被正典覆盖 ⇒ 0 泄漏', () => {
       const rate = judgeKnowledgeLeakRate({
@@ -58,8 +58,8 @@ describe('六指标 L1 机械判定器（T20 #44）', () => {
 
   describe('PROMISE_RECALL——到期承诺进编译上下文的召回率', () => {
     const promises = [
-      { promiseId: 'p1', type: 'foreshadowing', description: '信', introducedChapter: 3, targetChapter: 3, status: 'due' },
-      { promiseId: 'p2', type: 'quest', description: '寻剑', introducedChapter: 4, targetChapter: 5, status: 'due' },
+      { promiseId: 'p1', type: 'foreshadowing', description: '信', introducedChapter: 3, targetChapter: 3, status: 'due' as const },
+      { promiseId: 'p2', type: 'quest', description: '寻剑', introducedChapter: 4, targetChapter: 5, status: 'due' as const },
     ];
     it('正例：两条到期承诺都在 receipt 编译条目中 ⇒ 1', () => {
       const receipt = { entries: [
