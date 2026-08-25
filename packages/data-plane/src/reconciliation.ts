@@ -528,7 +528,8 @@ export function buildDefaultExtractor(): Extractor {
  * ------------------------------------------------------------------------- */
 
 /** 作者门条目命名：整文件类恒 `whole`；追踪流 `change:<seq>` / `add:<seqOnDisk>` / `remove:<seq>`。 */
-function itemIdsOf(summary: ChangeSummary): Set<string> {
+/** 提案项词表（T18 · #42 ProposalPort 复用面）：对账提案的可决策条目 id 全集。 */
+export function itemIdsOf(summary: ChangeSummary): Set<string> {
   const ids = new Set<string>(['whole'])
   if (summary.kind === 'trackingStream') {
     for (const change of summary.changes) ids.add(`change:${change.seq}`)

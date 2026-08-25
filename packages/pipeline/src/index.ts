@@ -158,3 +158,16 @@ export type {
   ProposalItemState,
   RoutingCounts,
 } from './proposal-step.js';
+
+/**
+ * ProposalPort 统一确认面（T18 · #42 架构核心）：confirm / reject / editAccept
+ * 逐条粒度，一个 Port 两个调用方——管线 Canon 提案与 T5 五态对账共用同一协议；
+ * 未决提案跨重启待决（决策缓冲持久化 + listPendingProposalRefs 恢复入口）。
+ */
+export {
+  ProposalPort,
+  ProposalPortError,
+  confirmedAppendsForCommit,
+  listPendingProposalRefs,
+} from './proposal-port.js';
+export type { PortAction, ProposalMutationOutcome, ProposalPortDeps, ProposalPortRef } from './proposal-port.js';

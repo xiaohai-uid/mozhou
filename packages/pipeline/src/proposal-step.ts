@@ -51,7 +51,10 @@ export interface CanonProposalRecord {
   readonly taskRef: string;
   readonly chapterIndex: number;
   readonly createdAt: string;
-  readonly state: 'open';
+  /** open = 待决/待提交；consumed = 已进 Commit（或全拒收口）——恢复扫描据此区分悬挂与已闭合。 */
+  readonly state: 'open' | 'consumed';
+  /** 提案收口面（markProposalConsumed 时回填）。 */
+  readonly consumedAt?: string;
   readonly items: readonly CanonProposalItem[];
 }
 
@@ -295,4 +298,19 @@ export function createCanonProposal(request: CreateCanonProposalRequest): CanonP
   request.bus.publish({ root: request.bookRoot }, event);
 
   return { proposalId: record.proposalId, items, routed };
+}
+
+/**
+ * 提案收口：Commit 消费确认集后由编排方调用——记录翻 consumed，恢复扫描不再
+ * 视其为悬挂待决。幂等：已 consumed 的提案原样返回。
+ */
+export function markProposalConsumed(root: string, proposalId: string): CanonProposalRecord {
+  const record = loadCanonProposal(root, proposalId);
+  if (record === null) {
+    throw new ProposalRoutingError('no such canon proposal: ' + proposalId);
+  }
+  if (record.state === 'consumed') return record;
+  const closed: CanonProposalRecord = { ...record, state: 'consumed', consumedAt: new Date().toISOString() };
+  persistProposal(root, closed);
+  return closed;
 }
