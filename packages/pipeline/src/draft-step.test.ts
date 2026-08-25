@@ -95,6 +95,8 @@ const RECIPE: CapabilityRecipe = {
 /** 假流夹具：逐 delta 产出；可选在全部 delta 之后抛错模拟断流。 */
 function fakeStream(chunks: readonly string[], terminalError?: Error) {
   return async function* () {
+    // 显式微任务边界：真实流每个 delta 都跨异步边界到达
+    await Promise.resolve();
     for (const chunk of chunks) {
       yield chunk;
     }
@@ -165,6 +167,7 @@ describe('流式写入正文文件 phase=draft', () => {
     const engine = makeEngine(root);
     let seenPayload: unknown;
     engine.registerProviderBinding('deepseek', async (payload) => {
+      await Promise.resolve();
       seenPayload = payload;
       return '成稿';
     });
@@ -308,6 +311,7 @@ describe('M17 三级降级可见性接线', () => {
     registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream([], new ProviderTransportError({ status: 401 })));
     let glmCalled = false;
     engine.registerProviderBinding('glm', async () => {
+      await Promise.resolve();
       glmCalled = true;
       return '不应被调用';
     });

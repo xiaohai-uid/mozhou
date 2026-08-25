@@ -192,7 +192,8 @@ function refreshBaseline(bookRoot: string, relPath: string): void {
  * 组合根把它注册到 engine.registerProviderBinding(解析到的 providerId, …)。
  */
 export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBinding {
-  return async (_payload, _snapshot) => {
+  // 绑定只消费盘面真源与流缝，不读 payload/snapshot——零参闭包即满足 ProviderBinding 形状
+  return async () => {
     const prose = loadProseSnapshot(opts, opts.mode);
     let body = prose.baseBody;
     // chars 恒等盘上持久化字节数（含规范化尾换行），与正文文件逐字节对账
@@ -279,7 +280,7 @@ function extractRawSample(error: unknown): RawProviderError | null {
     typeof candidate['code'] === 'string' ||
     typeof candidate['code'] === 'number' ||
     typeof candidate['errorType'] === 'string';
-  return hasSample ? (candidate as RawProviderError) : null;
+  return hasSample ? candidate : null; // Record<string, unknown> 对全可选字段结构兼容
 }
 
 /* ---------------------------------------------------------------------------

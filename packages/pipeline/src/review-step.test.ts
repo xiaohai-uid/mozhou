@@ -80,6 +80,8 @@ function draftEngine(root: string, chunks: readonly string[]): RuntimeEngine {
     failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
   });
   async function* stream() {
+    // 显式微任务边界：真实流每个 delta 都跨异步边界到达
+    await Promise.resolve();
     for (const chunk of chunks) yield chunk;
   }
   engine.registerProviderBinding(
