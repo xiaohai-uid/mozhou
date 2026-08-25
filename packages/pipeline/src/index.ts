@@ -136,3 +136,25 @@ export type {
   GateVerdict,
   HardConflict,
 } from './gate-step.js';
+
+/**
+ * Canon Proposal 步（T18 · #42）：通过 Gate 的候选 delta → riskClass 三档分流提案
+ * 记录（low 自动落 canon；medium 队列挂起等待程序化确认；high 显式确认方可进
+ * Commit）。记录持久化 .mozhou/proposals/——未确认提案跨重启待决的盘面凭据。
+ */
+export {
+  ProposalRoutingError,
+  createCanonProposal,
+  listCanonProposals,
+  loadCanonProposal,
+  routeItemRisk,
+  saveCanonProposal,
+} from './proposal-step.js';
+export type {
+  CanonProposalItem,
+  CanonProposalOutcome,
+  CanonProposalRecord,
+  CreateCanonProposalRequest,
+  ProposalItemState,
+  RoutingCounts,
+} from './proposal-step.js';
