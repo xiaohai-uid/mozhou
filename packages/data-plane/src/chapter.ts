@@ -169,8 +169,12 @@ export function readProseChapter(root: string, relPath: string): ProseChapterSca
   }
 }
 
-/** 组装正文章文件全文（字段顺序冻结，同状态逐字节一致）。 */
-function renderProseChapter(fields: {
+/**
+ * 组装正文章文件全文（字段顺序冻结，同状态逐字节一致）。
+ * T17 导出：管线 Draft/Edit 步写草稿正文复用同一冻结字段序（章一体两面的
+ * frontmatter 形态只有一份真源，禁止调用侧散写第二份渲染器）。
+ */
+export function renderProseChapter(fields: {
   mozhouId: string
   revision: number
   chapterIndex: number
