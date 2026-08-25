@@ -32,6 +32,28 @@ export type {
   SceneView,
 } from './prepare.js';
 
+/**
+ * Draft 步（T17 · #41）：正文流写 phase=draft、断流 partial 半稿保留、
+ * M17 三级降级可见性接线（静默/attempt 事件/failed_recoverable 上报）。
+ */
+export {
+  DRAFT_STATE_DIR,
+  ProviderTransportError,
+  draftStateRelPath,
+  makeDraftProviderBinding,
+  readDraftState,
+  runDraftStep,
+} from './draft-step.js';
+export type {
+  DraftBindingOptions,
+  DraftMode,
+  DraftStateFile,
+  DraftStatus,
+  DraftStepOutcome,
+  DraftStepRequest,
+  DraftStreamSource,
+} from './draft-step.js';
+
 /** Compile 步衔接：复用 compile() 缝；stale 警告继续+Receipt 留痕；receiptId 续跑。 */
 export {
   STALE_WARNING_SECTION,
