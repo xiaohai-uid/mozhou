@@ -54,6 +54,13 @@ export type {
   DraftStreamSource,
 } from './draft-step.js';
 
+/**
+ * Review 步消费入口（T17 · #41）：draft 产物 → 机械核检输入记录；
+ * 硬门禁本体归 T18，本票只保证可被核检入口消费。
+ */
+export { loadDraftForReview } from './review-step.js';
+export type { MechanicalReviewInput } from './review-step.js';
+
 /** Compile 步衔接：复用 compile() 缝；stale 警告继续+Receipt 留痕；receiptId 续跑。 */
 export {
   STALE_WARNING_SECTION,
