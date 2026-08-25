@@ -33,6 +33,16 @@ export type {
 } from './prepare.js';
 
 /**
+ * 多候选择优（T17 · #41；ADR-0013）：候选呈现 CandidateCreated + 择优决策
+ * accepted/rejected 双路同账落一行方为有效飞轮信号。
+ */
+export {
+  presentCandidates,
+  recordCandidateDecision,
+} from './multi-candidate.js';
+export type { CandidateDecisionRequest, CandidateOption, PresentedCandidate } from './multi-candidate.js';
+
+/**
  * Draft 步（T17 · #41）：正文流写 phase=draft、断流 partial 半稿保留、
  * M17 三级降级可见性接线（静默/attempt 事件/failed_recoverable 上报）。
  */
