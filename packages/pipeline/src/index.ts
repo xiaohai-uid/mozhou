@@ -97,3 +97,23 @@ export {
   runCompileStep,
 } from './compile-step.js';
 export type { CompileStepOutcome, CompileStepRequest } from './compile-step.js';
+
+/**
+ * Final Extract 步（T18 · #42）：终稿全文 → 五族候选 delta（运行期驻留不落正典，
+ * 丢失可接受重跑即恢复）；提取失败 = failed_recoverable 可重试；提取缝显式注入。
+ */
+export {
+  CANDIDATE_FAMILIES,
+  CandidateBatchShapeError,
+  emptyCandidateCounts,
+  runFinalExtract,
+} from './extract-step.js';
+export type {
+  CandidateDeltaBatch,
+  CandidateFamily,
+  DeltaExtractor,
+  DeltaExtractionInput,
+  FinalExtractOutcome,
+  FinalExtractStatus,
+  RunFinalExtractRequest,
+} from './extract-step.js';
