@@ -6,7 +6,7 @@
  * 断言）/ Record 后 FlywheelRecorded 与 Commit 同事务序 + usage 异步可回灌。
  * 零时钟零外部服务：手工行 id + 注入时钟/凭证；恢复判定读盘两次独立运行逐字段相等。
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,7 +19,6 @@ import {
   LocalDataPlane,
   RUNTIME_EVENTS_PATH,
   createBook,
-  createChapterDraft,
   openDatabase,
   proseChapterPath,
   readManifest,

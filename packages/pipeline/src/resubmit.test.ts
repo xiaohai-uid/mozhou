@@ -17,7 +17,6 @@ import {
   RUNTIME_EVENTS_PATH,
   TRACKING_STREAMS,
   createBook,
-  createChapterDraft,
   proseChapterPath,
   readProseChapter,
 } from '@mozhou/data-plane';
