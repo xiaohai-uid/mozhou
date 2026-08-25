@@ -59,7 +59,7 @@ export class PublishBus {
 
   publish(ctx: LedgerCtx, event: DomainEvent): void {
     if (!(DOMAIN_EVENT_TYPES as readonly string[]).includes(event.type)) {
-      throw new Error(`未知事件类型 ${String(event.type)}——词表由 runtime/types.ts 统一持有`);
+      throw new Error(`未知事件类型 ${String(event.type)}——词表由 kernel 类型库统一持有（@mozhou/kernel domain-events.ts，T16 上收）`);
     }
     const pair = EVENT_PAIRS.find(
       ([h, t]) => h === event.type || t === event.type,

@@ -349,7 +349,15 @@ export interface StyleProfile extends KernelEntityHead {
  *    Q15/Q16 为工单 #9 收敛定案的受控增补：activation / replayInputs）
  * -------------------------------------------------------------------------- */
 
-export type CompileTaskType = 'chapter_writing' | 'scene_beat' | 'review' | 'fact_extraction';
+/** T16 受控增补（#40，chapter-pipeline-spec §4 第 2 条）：#8 tier 表增
+ *  CHAPTER_DRAFTING 档行——十步管线第 2 步 Compile 的任务类型（S3）。
+ *  命名沿 runtime 能力词表大写约定；配额行见 context-compiler assemble.ts。 */
+export type CompileTaskType =
+  | 'chapter_writing'
+  | 'scene_beat'
+  | 'review'
+  | 'fact_extraction'
+  | 'CHAPTER_DRAFTING';
 
 /** 装配来源（工单要求预留字段①）：该条目经哪条召回通道进入候选。 */
 export type AssemblyChannel =
@@ -531,4 +539,50 @@ export interface EntityCardFrontmatter {
   readonly brief?: string;
   /** 作者组织用标签，永不入包（spec D4）。 */
   readonly tags?: readonly string[];
+}
+
+/* ----------------------------------------------------------------------------
+ * 11. 任务族结果与冲突类型（T16 受控增补 · #40；chapter-pipeline-spec §4 第 3 条，
+ *     沿 #31 ResolutionSnapshot 同族入册——事件词表本体见 domain-events.ts）
+ * -------------------------------------------------------------------------- */
+
+/** 四态结局词表唯一（#31 T3 / Q4）：正交原因维度归 failurePolicy 与事件字段。 */
+export type Outcome =
+  | 'succeeded'
+  | 'failed_recoverable'
+  | 'failed_terminal'
+  | 'state_degraded';
+
+/** Provider 标识（开放字符串；词表归配置层）。 */
+export type ProviderId = string;
+
+/** 解析快照（#31 Q7=A）：每次 execute 写入 GenerationStarted payload —— M14 双向钉死的事件侧落点。 */
+export interface ResolutionSnapshot {
+  readonly taskType: string;
+  readonly capability: string;
+  readonly providerId: ProviderId;
+  readonly providerVersion: string;
+  readonly tier?: string;
+  readonly provider?: string;
+  readonly model?: string;
+}
+
+/** 任务结果（#31 §1 四方法契约的返回面）：outcome 承载四态之一；
+ *  failed_recoverable 时 repairHint 供二级定向重生（M17，Q8=A）。 */
+export interface TaskResult {
+  readonly outcome: Outcome;
+  /** succeeded 时承载产物。 */
+  readonly value?: unknown;
+  /** failed_recoverable 时供二级定向重生（M17 分层协作）。 */
+  readonly repairHint?: unknown;
+  readonly snapshot: ResolutionSnapshot;
+}
+
+/** 连续性硬冲突（S5：Gate 失败输出 = Result 字段 hardConflicts[]）。
+ *  纯机械核检的确定性产出——factId 锚定被违反的事实断言，assertion 是
+ *  机读违例陈述，suggestion 是给作者的改文建议；回炉改文由作者显式驱动（S7）。 */
+export interface HardConflict {
+  readonly factId: FactId;
+  readonly assertion: string;
+  readonly suggestion: string;
 }

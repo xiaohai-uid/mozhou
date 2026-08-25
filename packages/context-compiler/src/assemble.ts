@@ -133,6 +133,9 @@ export const DEFAULT_BUDGET_ASSEMBLY_CONFIG: BudgetAssemblyConfig = {
     scene_beat: 0.3,
     review: 0.15,
     fact_extraction: 0.1,
+    // T16 受控增补行（#40，chapter-pipeline-spec §4 第 2 条 / S3）：十步管线
+    // 第 2 步 Compile 的任务档；正文保底配额与 chapter_writing 同族（0.4）。
+    CHAPTER_DRAFTING: 0.4,
   },
   tiers: {
     entity_card: { rank: 1, defaultTrim: 'atomic' },
