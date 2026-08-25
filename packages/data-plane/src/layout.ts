@@ -11,6 +11,9 @@ export const RUNTIME_DB_PATH = `${RUNTIME_DIR}/runtime.sqlite`
 export const RUNTIME_EVENTS_PATH = `${RUNTIME_DIR}/events.jsonl`
 /** 对账提案存档（T5）：五态状态机的持久化落点。运行时区，非 canon、不参与对账。 */
 export const RUNTIME_RECONCILIATIONS_DIR = `${RUNTIME_DIR}/reconciliations`
+/** 管线提案仓（T18 · #42）：Canon Proposal 记录与 ProposalPort 逐条决策账的持久化落点。
+ *  运行时区，非 canon、不参与对账；未确认提案跨重启待决的盘面凭据（S8 Proposal 后行）。 */
+export const RUNTIME_PROPOSALS_DIR = `${RUNTIME_DIR}/proposals`
 
 export const BOOK_RECORD_PATH = 'book.json'
 
