@@ -19,7 +19,7 @@ import type { DomainEvent } from '@mozhou/kernel';
 import { PublishBus } from '@mozhou/runtime';
 import type { LedgerCtx } from '@mozhou/runtime';
 import { readPipelineLedger } from './ledger.js';
-import { projectSession } from './projection.js';
+import { findOpenSessionWindow, projectSession } from './projection.js';
 import type { SessionProjection } from './projection.js';
 import { nextStepOf } from './steps.js';
 import type { PipelineStep } from './steps.js';
@@ -49,6 +49,25 @@ export class SessionNotResumableError extends Error {
   override readonly name = 'SessionNotResumableError';
   constructor(readonly chapterIndex: number, detail: string) {
     super(`chapter ${chapterIndex} has no resumable session: ${detail}`);
+  }
+}
+
+/**
+ * 全局单飞违例（T19 · #43；S11 跨章并发 V1）：同时最多一个活动 session——
+ * 别章窗口还开着时开新卷即拒。先 resume 或走完收卷再开新章。
+ */
+export class GlobalSingleFlightError extends Error {
+  override readonly name = 'GlobalSingleFlightError';
+  constructor(
+    readonly requestedChapterIndex: number,
+    readonly activeChapterIndex: number,
+    readonly activeTaskRef: string,
+  ) {
+    super(
+      `chapter ${requestedChapterIndex} cannot start: chapter ${activeChapterIndex} already has the global active ` +
+        `production session (${activeTaskRef}) — V1 is globally single-flight (one active session at a time), ` +
+        'resume or finish it first',
+    );
   }
 }
 
@@ -99,11 +118,18 @@ export class ChapterProductionSession {
     return this.#currentStep;
   }
 
-  /** 开卷：TaskStarted(step=prepare)。同章活动会话存在即拒（重提交=新 session 的前置是旧卷已闭合）。 */
+  /** 开卷：TaskStarted(step=prepare)。同章活动会话存在即拒（重提交=新 session 的前置是旧卷已闭合）；
+   *  别章活动会话存在同样即拒——V1 全局单飞，同时最多一个活动 session（S11）。守卫在
+   *  TaskStarted 落账之前，拒绝零副作用。 */
   static start(deps: ChapterProductionSessionDeps): ChapterProductionSession {
-    const projection = projectSession(readPipelineLedger(deps.root), deps.chapterIndex);
+    const rows = readPipelineLedger(deps.root);
+    const projection = projectSession(rows, deps.chapterIndex);
     if (projection.sessionOpen && projection.taskRef !== null) {
       throw new SessionAlreadyActiveError(deps.chapterIndex, projection.taskRef);
+    }
+    const active = findOpenSessionWindow(rows);
+    if (active !== null && active.chapterIndex !== deps.chapterIndex) {
+      throw new GlobalSingleFlightError(deps.chapterIndex, active.chapterIndex, active.taskRef);
     }
     const taskRef = deps.newTaskRef ? deps.newTaskRef() : `tsk_${newUlid()}`;
     const session = new ChapterProductionSession(deps, taskRef, 'prepare');

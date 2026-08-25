@@ -149,3 +149,35 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
     openHeads: [...openHeads],
   };
 }
+
+/**
+ * 全局活动会话扫描（T19 · #43；S11 跨章并发 V1 全局单飞）：折叠全部章的窗口，
+ * 返回最新一个仍开放（已开卷、未收卷、未提交）的窗口——同一时刻至多一个；
+ * 无开放窗口返回 null。纯函数、无 IO、幂等。
+ */
+export function findOpenSessionWindow(
+  rows: readonly PipelineLedgerRow[],
+): { readonly chapterIndex: number; readonly taskRef: string } | null {
+  let active: { chapterIndex: number; taskRef: string } | null = null;
+  let finished = false;
+  let committed = false;
+
+  for (const row of rows) {
+    if (row.kind !== 'task') continue;
+    const event = row.event;
+    const chapterIndex = event.chapterIndex;
+    if (chapterIndex === undefined) continue;
+    if (event.type === 'TaskStarted') {
+      // 新开卷即当前窗口（旧窗口被取代——健康账本上旧窗口必已闭合）
+      active = { chapterIndex, taskRef: event.taskRef };
+      finished = false;
+      committed = false;
+    } else if (active !== null && event.taskRef === active.taskRef && chapterIndex === active.chapterIndex) {
+      if (event.type === 'TaskFinished') finished = true;
+      else if (event.type === 'CanonCommitted') committed = true;
+    }
+  }
+
+  if (active === null || finished || committed) return null;
+  return active;
+}

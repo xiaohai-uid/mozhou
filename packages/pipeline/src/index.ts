@@ -9,12 +9,13 @@ export { readPipelineLedger } from './ledger.js';
 export type { PipelineLedgerRow } from './ledger.js';
 
 /** 会话步投影（当前步随时可重建；完成态=CanonCommitted 存在性）。 */
-export { projectSession } from './projection.js';
+export { findOpenSessionWindow, projectSession } from './projection.js';
 export type { SessionProjection } from './projection.js';
 
 /** ChapterProductionSession 内存态状态机。 */
 export {
   ChapterProductionSession,
+  GlobalSingleFlightError,
   SessionAlreadyActiveError,
   SessionNotResumableError,
   StepGuardError,
