@@ -3,3 +3,7 @@ export * from './eventBus.js';
 export * from './tasks.js';
 export * from './registry.js';
 export * from './engine.js';
+export * from './adapter/openai-compat.js';
+export * from './adapter/anthropic-events.js';
+export * from './adapter/errors.js';
+export * from './structuredOutput.js';
