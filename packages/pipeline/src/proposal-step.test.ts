@@ -11,7 +11,6 @@ import { newUlid } from '@mozhou/kernel';
 import { PublishBus, readLedger } from '@mozhou/runtime';
 import { LocalDataPlane, RUNTIME_PROPOSALS_DIR, createBook } from '@mozhou/data-plane';
 import { createCanonProposal, loadCanonProposal, listCanonProposals } from './proposal-step.js';
-import type { CandidateDeltaBatch } from './extract-step.js';
 
 let roots: string[] = [];
 afterEach(() => {

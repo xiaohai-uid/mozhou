@@ -20,7 +20,7 @@
  * 投影悬挂标记 = CanonProposalCreated#taskRef 成对头悬挂）。确认协议本体归
  * ProposalPort（proposal-port.ts），本模块只负责提案的创建与存取。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { newUlid } from '@mozhou/kernel';
 import type { DomainEvent, FactId, FactRiskClass } from '@mozhou/kernel';
