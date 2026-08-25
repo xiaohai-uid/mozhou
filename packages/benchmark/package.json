@@ -1,0 +1,20 @@
+{
+  "name": "@mozhou/benchmark",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

@@ -5,6 +5,7 @@
     { "path": "packages/data-plane" },
     { "path": "packages/context-compiler" },
     { "path": "packages/runtime" },
-    { "path": "packages/pipeline" }
+    { "path": "packages/pipeline" },
+    { "path": "packages/benchmark" }
   ]
 }
