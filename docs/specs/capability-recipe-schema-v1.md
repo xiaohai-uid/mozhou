@@ -25,8 +25,8 @@ recipe:
   id: string-kebab-case                 # F1 ★★★ 全局唯一
   recipeVersion: 1.0.0                  # F2 ★★★ 每配方独立 semver（R7 双轨之下游）
   source:                               # F3+R9=A MIT 出处字段化（机器可查）
-    repo: worldwonderer/oh-story-claudecode   # 或 "original"（自研配方）
-    commit: 9d0bd5f5aead707ddcf7d5f141b237e2ac464c  # 全 SHA 落库，短 SHA 仅展示
+    repo: worldwonderer/oh-story-claudecode   # 或 "original"（自研配方）；注：该仓 owner 已改名 zenstory-ai，旧路径由 GitHub 自动重定向
+    commit: 9d0bd5f5aead707ddcdcf7d5f141b237e2ac464c  # 全 SHA 落库，短 SHA 仅展示
     license: MIT | original
     refinedAt: 2026-08-24              # 炼化转写时间
     refineNote: string                 # 转写说明（改了什么/为何）
