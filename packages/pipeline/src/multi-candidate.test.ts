@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PublishBus, readLedger } from '@mozhou/runtime';
-import { LocalDataPlane, createBook } from '@mozhou/data-plane';
+import { createBook } from '@mozhou/data-plane';
 import { EditActionLevelError, presentCandidates, recordCandidateDecision } from './index.js';
 
 let roots: string[] = [];
