@@ -117,3 +117,22 @@ export type {
   FinalExtractStatus,
   RunFinalExtractRequest,
 } from './extract-step.js';
+
+/**
+ * Continuity Gate 步（T18 · #42）：纯机械核检编排整合——M2 时间线单调 + 四族行校验
+ * + POV 秘密零泄漏 + dependency 引用完整性；失败输出 Result 字段 hardConflicts[]
+ * {factId, assertion, suggestion}；LLM 审查只许旁路建议（advisoryReviewer 独立可选
+ * 调用，结论不入判定不入账——S5 死事件裁定）。
+ */
+export {
+  runContinuityGate,
+} from './gate-step.js';
+export type {
+  AdvisoryReviewer,
+  AdvisorySuggestion,
+  ContinuityGateOutcome,
+  ContinuityGateRequest,
+  GateCheckedCounts,
+  GateVerdict,
+  HardConflict,
+} from './gate-step.js';

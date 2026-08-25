@@ -151,8 +151,13 @@ export class ChapterProductionSession {
     return this.project().committed;
   }
 
-  /** 步进到严格后继步；发射 TaskStepTransitioned{from,to}。 */
-  advance(to: PipelineStep): void {
+  /**
+   * 步进到严格后继步；发射 TaskStepTransitioned{from,to}。result 是本步的
+   * Result 字段（T18 · #42：Gate 冲突清单 hardConflicts[] 随步进事件进账，
+   * chapter-pipeline-spec §1 表第 7 行「冲突清单进 Result 字段」），键原样
+   * 并入事件 payload；缺省不携带。
+   */
+  advance(to: PipelineStep, result?: Readonly<Record<string, unknown>>): void {
     const expected = nextStepOf(this.#currentStep);
     if (to !== expected) {
       throw new StepTransitionError(this.#currentStep, to, expected);
@@ -161,7 +166,7 @@ export class ChapterProductionSession {
       type: 'TaskStepTransitioned',
       taskRef: this.#taskRef,
       chapterIndex: this.#chapterIndex,
-      payload: { from: this.#currentStep, to },
+      payload: { from: this.#currentStep, to, ...(result ?? {}) },
     });
     this.#currentStep = to;
   }
