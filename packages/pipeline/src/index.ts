@@ -55,6 +55,24 @@ export type {
 } from './draft-step.js';
 
 /**
+ * User Edit 步（T17 · #41）：结构化编辑操作块捕获（非字符 diff）、保护位校验、
+ * M16 五级动作位 V1 只做光标+选区两级；编辑即时落正文文件。
+ */
+export {
+  EDIT_ACTION_LEVELS_V1,
+  EditActionLevelError,
+  EditBlockShapeError,
+  applyEditBlocks,
+  recordUserEdit,
+} from './user-edit-step.js';
+export type {
+  EditActionLevel,
+  EditOperationBlock,
+  RecordUserEditRequest,
+  UserEditOutcome,
+} from './user-edit-step.js';
+
+/**
  * Review 步消费入口（T17 · #41）：draft 产物 → 机械核检输入记录；
  * 硬门禁本体归 T18，本票只保证可被核检入口消费。
  */
