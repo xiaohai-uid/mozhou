@@ -29,6 +29,9 @@ importers:
       '@mozhou/context-compiler':
         specifier: workspace:*
         version: link:../context-compiler
+      '@mozhou/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@mozhou/pipeline':
         specifier: workspace:*
         version: link:../pipeline

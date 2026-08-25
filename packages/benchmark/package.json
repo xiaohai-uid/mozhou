@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
     "@mozhou/pipeline": "workspace:*",
     "@mozhou/runtime": "workspace:*"
   },
