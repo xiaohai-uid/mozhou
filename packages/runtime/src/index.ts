@@ -7,3 +7,4 @@ export * from './adapter/openai-compat.js';
 export * from './adapter/anthropic-events.js';
 export * from './adapter/errors.js';
 export * from './structuredOutput.js';
+export * from './tierConfig.js';
