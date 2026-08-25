@@ -52,6 +52,21 @@ importers:
 
   packages/kernel: {}
 
+  packages/pipeline:
+    dependencies:
+      '@mozhou/context-compiler':
+        specifier: workspace:*
+        version: link:../context-compiler
+      '@mozhou/data-plane':
+        specifier: workspace:*
+        version: link:../data-plane
+      '@mozhou/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@mozhou/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
   packages/runtime:
     dependencies:
       '@mozhou/data-plane':

@@ -32,16 +32,36 @@ function readStoredLines(ctx: LedgerCtx): StoredLine[] {
   if (!existsSync(p)) return [];
   const text = readFileSync(p, 'utf8');
   if (text.length === 0) return [];
-  return text
+  const stored: StoredLine[] = [];
+  text
     .split('\n')
     .filter((line) => line.trim().length > 0)
-    .map((line, i) => {
-      const parsed = JSON.parse(line) as { seq?: unknown; event?: DomainEvent };
-      if (typeof parsed.seq !== 'number' || !parsed.event) {
-        throw new Error(`账本第 ${i + 1} 行缺少 seq/event 字段`);
+    .forEach((line) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        return; // 撕裂行：审计容忍，不阻断回读
       }
-      return { seq: parsed.seq, event: parsed.event };
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        !Array.isArray(parsed) &&
+        typeof (parsed as Record<string, unknown>).seq === 'number' &&
+        typeof (parsed as Record<string, unknown>).event === 'object' &&
+        (parsed as Record<string, unknown>).event !== null
+      ) {
+        // T16（#40）：账本同时承载平铺领域行（ChapterCommitted/ContextCompiled 等，
+        // T3/T9 先于 runtime 存在的写入方）与任务事件行两种格式（单一账本 T2）。
+        // 回读只取任务事件行，其余格式跳过——投影/配对语义不受平铺行干扰。
+        const row = parsed as { seq?: unknown; event?: DomainEvent };
+        if (typeof row.seq !== 'number' || !row.event) {
+          return;
+        }
+        stored.push({ seq: row.seq, event: row.event });
+      }
     });
+  return stored;
 }
 
 /** 全量读账本（replaySession/投影重建共用入口）。 */
