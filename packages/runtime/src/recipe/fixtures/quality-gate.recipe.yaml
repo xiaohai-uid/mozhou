@@ -1,0 +1,76 @@
+# Capability Recipe · quality_gate —— T15 回填试跑实例（#39 验收第 5 条）
+# 规格真源：docs/specs/capability-recipe-schema-v1.md（F1-F17 裁剪集字段全覆盖）。
+# 出处 pin：oh-story v0.7.6（tag 别名 v0.7.6-4），全 SHA 落库、短 SHA 仅展示。
+schemaVersion: 1
+recipe:
+  id: quality-gate                                    # F1 kebab-case 全局唯一
+  recipeVersion: 1.0.0                                # F2 双轨下游：每配方独立 semver
+  source:                                             # F3+R9 MIT 出处字段化（机器可查）
+    repo: zenstory-ai/oh-story-claudecode             # 规格示例串 worldwonderer/… 为改名前 owner，GitHub 重定向核实现名
+    commit: 9d0bd5f5aead707ddcdcf7d5f141b237e2ac464c  # v0.7.6-4 pin；规格文档转录串缺一字符，以 GitHub API 核实的全 SHA 为准
+    license: MIT
+    refinedAt: 2026-08-24                             # 炼化转写时间
+    refineNote: 按 capability-recipe-schema-v1 冻结转写上游质量门技能——参考文件条件化加载与 tracking_commit 追踪门同构落位。
+  brief:
+    capability: 成稿质量门——对已产出章节做机检与判定，输出通过/返工结论
+    runtimeSemantics: postWrite 钩子触发；blocking 预检失败按 failFast 拒收，advisory 只报告不改写；rubric 缺失属 failFast，词表缺失可 skip 继续
+    triggers: [成稿检查, 质量门, 交稿前体检, 章节验收]
+  taskType: quality_gate                              # F5 对齐 #31 CapabilityType 词表（ADR-0006 五内置技能之一）
+  entry:                                              # F6 入口指令面
+    routerDoc: skills/quality-gate/router.md
+    phases: [collect, judge, verdict]
+    stopPoints: [verdict-blocking-fail, evidence-insufficient]
+  references:                                         # F7+R3=A 静态四型触发表（四型各一条）
+    - path: docs/quality/rubric.md                    # always 型：空串哨兵=无条件必读
+      loadCondition: { type: always, value: "" }
+      failure: { policy: failFast, repairAction: 补齐 rubric 文档后重跑本配方 }
+    - path: docs/quality/ai-pattern-markers.md        # phase 型：judge 阶段停靠点加载
+      loadCondition: { type: phase, value: judge }
+      failure: { policy: repair, repairAction: 从上游 pin 同步词表文件后重试 }
+    - path: docs/quality/degeneration-baseline.md     # fallback 型：兜底索引查询式
+      loadCondition: { type: fallback, value: ai-pattern-markers 未命中时 }
+      failure: { policy: rebuildFromRevision }
+    - path: 设定/题材定位.md                           # input 型：按输入键 genre 命中（非 ASCII 相对路径合法）
+      loadCondition: { type: input, value: genre }
+      failure: { policy: skip }
+  artifacts:
+    - path: 正文/第N章.md                              # F8 字数预算 + R4=A 条目化降级
+      granularity: chapter
+      createdPhase: collect
+      readTiming: post_write
+      sizeBudget: { target: 6000, max: 12288 }        # 上游实证热上下文 ≤12288B
+      failure: { policy: rebuildFromRevision }
+    - path: 正文/.quality-report.md
+      granularity: chapter
+      createdPhase: verdict
+      readTiming: post_write
+      sizeBudget: { target: 2048, max: 4096 }
+      failure: { policy: skip }
+  prechecks:                                          # F11 确定性预检：只报告不改写
+    - script: scripts/check-ai-patterns.mjs
+      severityPolicy: blocking
+      retryPolicy: { maxBlockingRetries: 2 }
+    - script: scripts/check-degeneration.mjs
+      severityPolicy: advisory
+      retryPolicy: { maxBlockingRetries: 0 }
+  trackingGate:                                       # F12+R5=A 七件套整槽
+    authorityState: 正文/.quality-state.yaml
+    casField: expected_state_revision                 # 与 ChapterCommit 乐观并发字段同款
+    transactionModes: [append-only-jsonl, cas-swap]
+    derivedViews:
+      - name: quality-history
+        path: 正文/.quality-history.jsonl
+    budgets:
+      hotContextBytes: 4096
+      perChapterReads: [上一章质量报告]
+    failureTaxonomy: validationFailed
+    hookPoint: postWrite
+  contextBudget:                                      # F16+R6=A 容量预算入 Schema
+    hotContextBytes: 12288
+    fixedSections: [rubric, ai-pattern-markers]
+    perChapterReads: [上一章正文尾部, 上一章质量报告]
+versioning:                                           # R7=A 双轨规则 + 显式退役声明
+  schemaVersionRule: incompatible-change-requires-major-reject
+  retiredPaths:
+    - skills/quality-gate/checklist.md                # RETIRED 先例：被 router.md 取代的旧清单
+compatibilityPolicy: none                             # R8=A 零兼容承诺
