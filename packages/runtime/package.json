@@ -11,6 +11,7 @@
   "dependencies": {
     "ajv": "^8.17.1",
     "@mozhou/data-plane": "workspace:*",
-    "@mozhou/kernel": "workspace:*"
+    "@mozhou/kernel": "workspace:*",
+    "yaml": "^2.6.1"
   }
 }
