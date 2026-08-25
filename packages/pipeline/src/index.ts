@@ -205,3 +205,15 @@ export {
   requestResubmit,
 } from './resubmit.js';
 export type { CommittedTruthAnchor, ResubmitOutcome } from './resubmit.js';
+
+/**
+ * S10 watcher × S3（T19 · #43）：步边界检查点响应 EXTERNAL_MODIFIED（步内不打断）；
+ * 对账软门禁=警告不硬阻塞，适用整条管线。
+ */
+export {
+  CheckpointSuspendedError,
+  guardedPipelineStep,
+  pipelineReconciliationGate,
+  stepBoundaryCheckpoint,
+} from './watcher-checkpoint.js';
+export type { ReconciliationWarning } from './watcher-checkpoint.js';
