@@ -80,6 +80,7 @@ export {
 } from './user-edit-step.js';
 export type {
   EditActionLevel,
+  EditDeltaStats,
   EditOperationBlock,
   RecordUserEditRequest,
   UserEditOutcome,

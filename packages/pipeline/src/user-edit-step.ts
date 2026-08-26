@@ -13,7 +13,11 @@
  *   - 编辑即时落正文文件（S8 Review/Edit 中行：编辑缓冲即时落盘），phase 保持
  *     draft；revision +1（离散编辑是可审计的版本步进，区别于 Draft 流式落盘
  *     的连续持久）；frontmatter 其余字段（含 protected 位）原样保留；
- *   - 写后刷新 hash 基线（同 draft-step 的编排方契约：长持句柄在步边界重开）。
+ *   - 写后刷新 hash 基线（同 draft-step 的编排方契约：长持句柄在步边界重开）；
+ *   - T21 编辑 delta（#54 · t52:B2）：payload 增 deltaStats 五字段（口径钉死恒有）；
+ *     delete/replace 块由步内盖 removedText——应用前从行数组截取、全文无截断上限
+ *     （与无上限的 replacementText 保持 diff 对称性），仅及发布侧克隆块；
+ *     validateBlock 镜像守卫拒调用方传入该键（宁败不猜，杜绝伪造删除侧文本）。
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,7 +36,7 @@ import {
 } from '@mozhou/data-plane';
 import type { FrontmatterFieldValue } from '@mozhou/data-plane';
 
-/** M16 五级动作位的 V1 实现集：只做光标+选区两级（面板/向导/广场归后续 Phase）。 */
+/** M16 五级动作位的 V1 实现集：只做光标+选区两级（面板/向导归后续 Phase）。 */
 export const EDIT_ACTION_LEVELS_V1 = ['cursor', 'selection'] as const;
 
 export type EditActionLevel = (typeof EDIT_ACTION_LEVELS_V1)[number];
@@ -68,10 +72,32 @@ export interface EditOperationBlock {
   readonly paragraphEnd: number;
   /** insert/replace 必带；delete 不得携带。 */
   readonly replacementText?: string;
+  /**
+   * 删除侧原文（T21 · t52:B2）：**步内产出、仅及发布侧克隆块**——recordUserEdit
+   * 在应用前从行数组截取后盖章，全文无截断上限（与无上限的 replacementText 保持
+   * diff 对称性）；validateBlock 镜像守卫拒调用方传入。
+   */
+  readonly removedText?: string;
+}
+
+/** 编辑 delta 统计（T21 · t52:B2 五字段口径钉死）：随 UserEditRecorded.payload 恒有。 */
+export interface EditDeltaStats {
+  readonly opsInsert: number;
+  readonly opsDelete: number;
+  readonly opsReplace: number;
+  /** Σ replacementText.length over insert+replace 块。 */
+  readonly insertedChars: number;
+  /** Σ 被 remove 行以 '\n' join 后的长度 over delete+replace 块。 */
+  readonly removedChars: number;
 }
 
 function validateBlock(block: EditOperationBlock, index: number): void {
   const label = `block #${index} (${block.op})`;
+  // T21 镜像守卫：删除侧文本由本步发布侧产出，调用方一律不得携带（镜像 delete
+  // 不得携带 replacementText 的既有守卫；宁败不猜，杜绝伪造删除侧文本）
+  if (block.removedText !== undefined) {
+    throw new EditBlockShapeError(`${label}: removedText 由本步发布侧产出，调用方不得携带`);
+  }
   if (!Number.isSafeInteger(block.paragraphStart) || block.paragraphStart < 1) {
     throw new EditBlockShapeError(`${label}: paragraphStart 必须为 >=1 的整数`);
   }
@@ -117,10 +143,11 @@ function toAddressableLines(body: string): string[] {
 }
 
 /**
- * 把操作块依序应用到一个行数组（原地修改）。纯内存计算，IO 归调用方。
- * 区间越界即抛 EditBlockShapeError（宁败不猜，零部分应用）。
+ * 把操作块依序应用到一个行数组（原地修改），返回该块移除的原文（'\n' join；
+ * insert 无移除得 undefined）——T21 发布侧 removedText 盖章的数据源。纯内存
+ * 计算，IO 归调用方。区间越界即抛 EditBlockShapeError（宁败不猜，零部分应用）。
  */
-function applyBlockToLines(lines: string[], block: EditOperationBlock, index: number): void {
+function applyBlockToLines(lines: string[], block: EditOperationBlock, index: number): string | undefined {
   const lastLine = lines.length;
   switch (block.op) {
     case 'insert': {
@@ -128,37 +155,68 @@ function applyBlockToLines(lines: string[], block: EditOperationBlock, index: nu
         throw new EditBlockShapeError(`block #${index}: 插入点 ${block.paragraphStart} 越界（当前 ${lastLine} 行）`);
       }
       lines.splice(block.paragraphStart - 1, 0, ...replacementLines(block.replacementText ?? ''));
-      return;
+      return undefined;
     }
     case 'delete': {
       if (block.paragraphEnd > lastLine) {
         throw new EditBlockShapeError(`block #${index}: 区间 [${block.paragraphStart},${block.paragraphEnd}] 越界（当前 ${lastLine} 行）`);
       }
+      // 应用前从行数组截取（t52:B2 定案值）：被删行以 '\n' join 全文保留
+      const removed = lines.slice(block.paragraphStart - 1, block.paragraphEnd).join('\n');
       lines.splice(block.paragraphStart - 1, block.paragraphEnd - block.paragraphStart + 1);
-      return;
+      return removed;
     }
     case 'replace': {
       if (block.paragraphEnd > lastLine) {
         throw new EditBlockShapeError(`block #${index}: 区间 [${block.paragraphStart},${block.paragraphEnd}] 越界（当前 ${lastLine} 行）`);
       }
+      const removed = lines.slice(block.paragraphStart - 1, block.paragraphEnd).join('\n');
       lines.splice(block.paragraphStart - 1, block.paragraphEnd - block.paragraphStart + 1, ...replacementLines(block.replacementText ?? ''));
-      return;
+      return removed;
     }
   }
 }
 
-/** 纯函数：对草稿正文应用一组结构化操作块（校验+应用一体；坏块整批拒绝）。 */
-export function applyEditBlocks(body: string, blocks: readonly EditOperationBlock[]): string {
+/**
+ * 步内单遍应用：校验 → 依序应用到正文行数组 → 捕获各块移除的原文
+ * （发布侧克隆块 removedText 盖章与 deltaStats 口径的同源数据）。
+ */
+function applyBlocksValidated(body: string, blocks: readonly EditOperationBlock[]): {
+  readonly nextBody: string;
+  readonly removedTexts: readonly (string | undefined)[];
+} {
   if (blocks.length === 0) {
     throw new EditBlockShapeError('blocks 不得为空——编辑动作必须至少携带一个操作块');
   }
   blocks.forEach(validateBlock);
   const lines = toAddressableLines(body);
-  blocks.forEach((block, index) => applyBlockToLines(lines, block, index));
-  return lines.length > 0 ? lines.join('\n') + '\n' : '';
+  const removedTexts = blocks.map((block, index) => applyBlockToLines(lines, block, index));
+  return { nextBody: lines.length > 0 ? lines.join('\n') + '\n' : '', removedTexts };
 }
 
-/* ---------------------------------------------------------------------------
+/** 纯函数：对草稿正文应用一组结构化操作块（校验+应用一体；坏块整批拒绝）。 */
+export function applyEditBlocks(body: string, blocks: readonly EditOperationBlock[]): string {
+  return applyBlocksValidated(body, blocks).nextBody;
+}
+
+/** 五字段口径（t52:B2 精度修正钉死）：ops* 即块数；两字符量从克隆块汇总。 */
+function computeDeltaStats(blocks: readonly EditOperationBlock[]): EditDeltaStats {
+  let opsInsert = 0;
+  let opsDelete = 0;
+  let opsReplace = 0;
+  let insertedChars = 0;
+  let removedChars = 0;
+  for (const block of blocks) {
+    if (block.op === 'insert') opsInsert += 1;
+    else if (block.op === 'delete') opsDelete += 1;
+    else opsReplace += 1;
+    if (block.replacementText !== undefined) insertedChars += block.replacementText.length;
+    if (block.removedText !== undefined) removedChars += block.removedText.length;
+  }
+  return { opsInsert, opsDelete, opsReplace, insertedChars, removedChars };
+}
+
+/* -------------------------------------------------------------------------
  * 步执行：校验 → 应用 → 落盘 → UserEditRecorded
  * ------------------------------------------------------------------------- */
 
@@ -208,7 +266,15 @@ export function recordUserEdit(request: RecordUserEditRequest): UserEditOutcome 
     throw new ProtectedContentViolationError('prose', scan.mozhouId, 'assistant-channel edit on protectedUserContent artifact is forbidden (I1)');
   }
 
-  const nextBody = applyEditBlocks(scan.body, request.blocks);
+  // 单遍校验+应用：removedTexts 与 blocks 同序（delete/replace 为移除原文全文）
+  const { nextBody, removedTexts } = applyBlocksValidated(scan.body, request.blocks);
+
+  // T21（t52:B2）：发布侧克隆块盖 removedText——请求侧原数组零触碰，payload.blocks
+  // 不再与 request.blocks 同一性（无消费者依赖此同一性，t52 复核在案）
+  const publishedBlocks: readonly EditOperationBlock[] = request.blocks.map((block, index) => {
+    const removed = removedTexts[index];
+    return removed === undefined ? { ...block } : { ...block, removedText: removed };
+  });
 
   // frontmatter 字段原样保留（含 protected 位），只步进 revision——保护位声明
   // 不因编辑而丢失；phase 恒为 draft（相位翻转唯一入口是 commitChapter）
@@ -231,8 +297,9 @@ export function recordUserEdit(request: RecordUserEditRequest): UserEditOutcome 
       action: 'edit_blocks',
       level: request.level,
       source: request.source,
-      blocks: request.blocks,
+      blocks: publishedBlocks,
       revision: scan.revision + 1,
+      deltaStats: computeDeltaStats(publishedBlocks),
     },
   };
   request.bus.publish({ root: request.bookRoot }, event);
