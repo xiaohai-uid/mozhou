@@ -29,6 +29,7 @@ import {
   bookDirectoryPaths,
 } from './layout.js'
 import { buildManifest, writeManifest } from './manifest.js'
+import { emitStyleProfilesYaml, seedStyleProfileRows } from './style-profiles.js'
 import { populateProjection, initProjection } from './projection.js'
 import { readCanonState } from './canon-read.js'
 import { emitFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
@@ -139,7 +140,7 @@ export function createBook(options: CreateBookOptions): CreateBookResult {
   )
   writeFileSync(
     join(root, STYLE_PROFILE_PATH),
-    `${emitFrontmatter(planningFrontmatter(newStyleProfileId(), 'styleProfile'))}# 文风画像\n\n> StyleProfile × scenarioType（action / dialogue / romance_emotion / exposition_worldbuilding）；EMA 平滑结果算完即落盘，初始为空表。\n`,
+    `${emitFrontmatter(planningFrontmatter(newStyleProfileId(), 'styleProfile'))}# 文风画像\n\n> StyleProfile × scenarioType（action / dialogue / romance_emotion / exposition_worldbuilding）；EMA 平滑结果算完即落盘，初始为空表。\n\n${emitStyleProfilesYaml(seedStyleProfileRows())}`,
   )
   writeFileSync(
     join(root, MARKET_BRIEF_PATH),
