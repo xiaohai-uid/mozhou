@@ -117,4 +117,30 @@ export {
   estimateStyleSectionsTokens,
   renderStyleSections,
 } from './style-sections.js';
-export type { StyleSection } from './style-sections.js';
+
+/** 语义层骨架（T28 · #69）：advisory-only 报告载荷 + 分析器 + 一报一文件存储。 */
+export {
+  INPUT_TOKEN_CAP,
+  OUTPUT_TOKEN_CAP,
+  analyzeSemantic,
+} from './semantic/analyze.js';
+export type { AnalyzeDeps, AnalyzeInput, AnalyzeOutcome } from './semantic/analyze.js';
+export {
+  SEMANTIC_DIR_RELPATH,
+  countSemanticReports,
+  readSemanticReports,
+  writeSemanticReport,
+} from './semantic/report-store.js';
+export type {
+  AffectedRef,
+  SemanticAnalysisReport,
+  SemanticFinding,
+  SemanticInputStats,
+  SemanticVerdict,
+} from './semantic/types.js';
+
+/** 语义批次编排与派生投影（T29 · #70；D12/D14/E3/E5）。 */
+export { runSemanticBatch } from './semantic/batch.js';
+export type { RunSemanticBatchRequest, SemanticBatchItem, SemanticBatchOutcome } from './semantic/batch.js';
+export { selectSemanticAnalysisRows } from './semantic/projection.js';
+export type { SemanticAnalysisRow } from './semantic/projection.js';

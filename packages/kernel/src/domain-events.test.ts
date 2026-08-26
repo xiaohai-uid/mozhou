@@ -64,10 +64,15 @@ describe('T21 受控增补（#54 · t51:B5）+ T27（#68 · t66 R4）', () => {
     }
   });
 
-  it('词表 17 词条（15 + Traversal 对）；成对约束四对在册', () => {
-    expect(DOMAIN_EVENT_TYPES).toHaveLength(17);
+  it('词表 18 词条（15 + Traversal 对 + SemanticAnalyzed）；成对约束四对在册', () => {
+    expect(DOMAIN_EVENT_TYPES).toHaveLength(18);
     expect(EVENT_PAIRS).toHaveLength(4);
     expect(EVENT_PAIRS).toContainEqual(['TraversalStarted', 'TraversalFinished']);
+    // SemanticAnalyzed 不成对：不出现在任何一端（t66 D14/E3）
+    for (const [head, tail] of EVENT_PAIRS) {
+      expect(head).not.toBe('SemanticAnalyzed');
+      expect(tail).not.toBe('SemanticAnalyzed');
+    }
     // 配对两端都必须是词表内事件（表与词表不脱钩）
     for (const [head, tail] of EVENT_PAIRS) {
       expect(DOMAIN_EVENT_TYPES.includes(head)).toBe(true);

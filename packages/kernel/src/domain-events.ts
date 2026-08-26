@@ -37,6 +37,7 @@ export const DOMAIN_EVENT_TYPES = [
   'StyleProfileUpdated',
   'TraversalStarted',
   'TraversalFinished',
+  'SemanticAnalyzed',
 ] as const;
 
 export type DomainEventType = (typeof DOMAIN_EVENT_TYPES)[number];
