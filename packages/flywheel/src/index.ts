@@ -92,3 +92,20 @@ export type {
   TabooPromotion,
   UpdateStyleProfilesOptions,
 } from './style-learner.js';
+
+/** 归一化写口：StyleProfileStore 唯一写者 + taboo 候选侧账（t51:B1 受控豁免三件套）。 */
+export {
+  TABOO_STATE_RELPATH,
+  loadTabooCandidateState,
+  saveTabooCandidateState,
+  writeStyleProfiles,
+} from './style-store.js';
+export type {
+  StyleWriteAudit,
+  WriteStyleProfilesOutcome,
+  WriteStyleProfilesRequest,
+} from './style-store.js';
+
+/** 触发点编排：Flywheel Record 步 afterRecord 钩子注入入口（t48-b §6-C）。 */
+export { runStyleLearnerForWindow } from './style-runner.js';
+export type { RunStyleLearnerOutcome, RunStyleLearnerRequest } from './style-runner.js';

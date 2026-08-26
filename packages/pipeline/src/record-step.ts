@@ -79,6 +79,14 @@ export interface RunFlywheelRecordRequest {
    * 测试注入抛错夹具模拟记账故障，注入收集夹具断言行内容。
    */
   readonly projectionSink?: (rows: readonly UsageRecord[]) => void;
+  /**
+   * 步后钩子（T23 · #56；t48-b §6-C 触发点）：FlywheelRecorded 落账后调用——
+   * 数据飞轮学习者（StyleLearner 等）经此订阅「窗口已闭合」，自行 readPipelineLedger
+   * 提取本窗口编辑并更新派生画像。依赖方向：pipeline 不 import flywheel，回调由编排方
+   * 注入（projectionSink 同款语义缝）。钩子抛错不阻断正文与收尾事件（S12 同款降级：
+   * 记账/派生面失败不得吞掉已落账的 FlywheelRecorded）。
+   */
+  readonly afterRecord?: () => void;
   /** 测试确定性注入：缺省按序铸 usg_ ULID / 缺省不带时间戳。 */
   readonly newEntryId?: (index: number) => string;
   readonly nowIso?: string;
@@ -136,6 +144,15 @@ export function runFlywheelRecord(request: RunFlywheelRecordRequest): FlywheelRe
     },
   };
   request.bus.publish({ root: request.bookRoot }, event);
+
+  if (request.afterRecord !== undefined) {
+    try {
+      request.afterRecord();
+    } catch {
+      // S12 语义：派生面失败不阻断正文与已落账事件；errorDetail 已表达投影面降级，
+      // 此处钩子失败不重写状态（钩子自有审计通道，如 StyleProfileUpdated 成败在账）。
+    }
+  }
 
   return { status, rows, recordedCount: status === 'succeeded' ? rows.length : 0, errorDetail };
 }
