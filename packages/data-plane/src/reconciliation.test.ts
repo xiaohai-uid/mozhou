@@ -569,3 +569,58 @@ describe('五态对账：作者门与落投影（Q8-Q12 + S4）', () => {
     }
   })
 })
+
+describe('T25：公共落定出口 onSettled（D18-D20）', () => {
+  it('applied 终态触发 onSettled，且发生在 ReconciliationResolved 事件之后', () => {
+    const plane = newBook()
+    try {
+      const calls: string[] = []
+      const rec = plane.reconciliation({
+        onSettled: (p) => calls.push(p.resolution + ':' + p.proposalId),
+      })
+      const { proseRel } = seedCommittedChapter(plane)
+      editExternally(proseRel, (text) => `${text}\n外部补写。\n`)
+      const proposal = rec.scanExternalModifications('startupScan').proposed[0]
+      expect(proposal).toBeDefined()
+
+      rec.decideItems(proposal!.proposalId, ['whole'])
+
+      // 回调收到 applied 终态与 proposalId（嗅探幂等键）
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toBe('applied:' + proposal!.proposalId)
+      // 事件已落账后才有回调（先文件后事件再回调的公共出口序）
+      const lastEvent = JSON.parse(jsonLines(RUNTIME_EVENTS_PATH).at(-1) ?? '{}') as { type?: string }
+      expect(lastEvent.type).toBe('ReconciliationResolved')
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('dismiss 终态同样触发（拒绝≠回滚，落定即通知）', () => {
+    const plane = newBook()
+    try {
+      const settled: string[] = []
+      const rec = plane.reconciliation({ onSettled: (p) => settled.push(p.resolution) })
+      const { proseRel } = seedCommittedChapter(plane)
+      editExternally(proseRel, (text) => `${text}x\n`)
+      const proposal = rec.scanExternalModifications('startupScan').proposed[0]
+      rec.dismiss(proposal!.proposalId)
+      expect(settled).toEqual(['dismissed'])
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('未注入 onSettled 的默认服务零回调（兼容旧调用方）', () => {
+    const plane = newBook()
+    try {
+      const rec = plane.reconciliation()
+      const { proseRel } = seedCommittedChapter(plane)
+      editExternally(proseRel, (text) => `${text}y\n`)
+      const proposal = rec.scanExternalModifications('startupScan').proposed[0]
+      expect(() => rec.decideItems(proposal!.proposalId, ['whole'])).not.toThrow()
+    } finally {
+      plane.close()
+    }
+  })
+})

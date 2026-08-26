@@ -560,9 +560,31 @@ function rejectedLedgerOf(
  * ReconciliationService：五态状态机 + watcher
  * ------------------------------------------------------------------------- */
 
+/**
+ * 落定事件（T25 · #66；D18/D19/D20）：canon 对账提案达终态后的通知负载。
+ * proposalId 即嗅探幂等键（reconciliation.ts:149-153 抑制账本同源）。
+ */
+export interface ReconciliationSettledPayload {
+  readonly proposalId: string
+  readonly relPath: string
+  readonly resolution: ResolutionKind
+  readonly acceptedItemCount: number
+}
+
 export interface ReconciliationOptions {
   /** 替换缺省确定性提取器（LLM 语义提取注入点 / 测试故障注入口）。 */
   readonly extract?: Extractor | undefined
+  /**
+   * 数据面公共落定出口回调（T25 · #66；D19/D20）：对账任意终态
+   * （applied/partially_applied/dismissed）落定后、ReconciliationResolved 事件
+   * 之后调用。这是 Phase5 嗅探的唯一挂接点——不挂 watcher 轮询内部
+   * （mtime 预筛是检测层非业务信号）、不新增 ReconciliationSettled 词条
+   * （确定性面零新事件，t65 D19 终裁）。调用顺序由公共出口编排：
+   * 落定 → reloadManifest（syncBaselineForPath 已做）→ 回调。
+   */
+  readonly onSettled?: ((payload: ReconciliationSettledPayload) => void) | undefined
+  /** 全书扫描预算（T25 · #66；D21 终裁值）：单批扫描章数上限，超限分批。 */
+  readonly scanBatchLimit?: number | undefined
 }
 
 export interface WatcherOptions {
@@ -580,12 +602,16 @@ interface MtimeFingerprint {
 
 export class ReconciliationService {
   private readonly extract: Extractor
+  private readonly onSettled: ((payload: ReconciliationSettledPayload) => void) | undefined
+  private readonly scanBatchLimit: number | undefined
   private watcherTimer: ReturnType<typeof setTimeout> | null = null
   private watcherStopped = true
   private lastMtimeSnapshot: ReadonlyMap<string, MtimeFingerprint> | null = null
 
   constructor(private readonly host: ReconciliationHost, options: ReconciliationOptions = {}) {
     this.extract = options.extract ?? buildDefaultExtractor()
+    this.onSettled = options.onSettled
+    this.scanBatchLimit = options.scanBatchLimit
   }
 
   /* ---------------- 检出面 ---------------- */
@@ -904,7 +930,7 @@ export class ReconciliationService {
     )
   }
 
-  /** 终态落库三连：提案持久化 + 基线吸收盘上现状（S4：无论取舍）+ 审计事件。 */
+  /** 终态落库三连：提案持久化 + 基线吸收盘上现状（S4：无论取舍）+ 审计事件 + 落定回调。 */
   private finalize(
     _original: ReconciliationProposal,
     terminal: ReconciliationProposal,
@@ -919,6 +945,17 @@ export class ReconciliationService {
       resolution,
       acceptedItemCount: acceptedCount,
     })
+    // 公共落定出口（T25 · #66；D19/D20）：事件后、调用方注入的嗅探回调。
+    // 调用方（Phase5 编排）自行装配 propagateStaleMarkers 与后续扫描——本服务
+    // 不直接依赖 stale 面（数据面关注点分离），回调即唯一接线。
+    if (this.onSettled !== undefined) {
+      this.onSettled({
+        proposalId: terminal.proposalId,
+        relPath: terminal.relPath,
+        resolution,
+        acceptedItemCount: acceptedCount,
+      })
+    }
     return terminal
   }
 
