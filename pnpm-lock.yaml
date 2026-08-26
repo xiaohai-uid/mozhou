@@ -71,19 +71,22 @@ importers:
 
   packages/flywheel:
     dependencies:
+      '@mozhou/benchmark':
+        specifier: workspace:*
+        version: link:../benchmark
       '@mozhou/data-plane':
         specifier: workspace:*
         version: link:../data-plane
-      '@mozhou/pipeline':
-        specifier: workspace:*
-        version: link:../pipeline
-    devDependencies:
       '@mozhou/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@mozhou/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
       '@mozhou/runtime':
         specifier: workspace:*
         version: link:../runtime
+    devDependencies:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)

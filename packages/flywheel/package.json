@@ -10,12 +10,14 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@mozhou/benchmark": "workspace:*",
     "@mozhou/data-plane": "workspace:*",
-    "@mozhou/pipeline": "workspace:*"
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
   },
   "devDependencies": {
-    "@mozhou/kernel": "workspace:*",
-    "@mozhou/runtime": "workspace:*",
     "vitest": "^2.1.8"
   }
 }
+
