@@ -11,9 +11,11 @@
  *      costMicros/outputTokens 经济性（S5）+ at 时间锚（R4 切窗原料）；
  *   3. 矩阵行存档（readMatrixRowArchive）：S3/S4（见 thresholds 层合成）。
  *
- * **taskRef 同窗 join（C2）**：T21 P1 桥接后 GenerationStarted.payload.parentTaskRef
- * 即会话窗口任务引用——usage/edit/decision 行的 taskRef 与之相等才可归因。桥接缺位
- * （任何 GenerationStarted 无 parentTaskRef）⇒ 该代次不可归因，上层只产 watch。
+ * **taskRef 同窗 join（C2）**：T21 P1 桥接把会话窗口引用盖进执行事件 payload 层——
+ * TaskAttemptRegistered / GenerationFinished 携带 parentTaskRef（engine.ts
+ * parentPatch；DomainEvent 顶层禁新增字段，t52:B5）。代次事件以 event.taskRef=
+ * genTaskRef 为共同键 join：GenerationStarted 给 route/recipe，attempt/finish 给
+ * 窗口归属。桥接缺位 ⇒ 该代次不可归因，上层只产 watch。
  *
  * 窗口→cell 取**首个**匹配代次（账本行序权威；一窗多代的 V1 口径=首代定归属）。
  * 纯函数零时钟零外部服务；Date.parse 仅解析显式注入的 ISO 字符串，不取当下。
@@ -96,12 +98,23 @@ function parseAtMs(iso: string | undefined): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** 提取事件 payload 层 parentTaskRef（T21 P1 桥接：只进 payload，domain 顶层禁新增字段）。 */
+function collectParent(
+  parentByGen: Map<string, string>,
+  taskRef: string,
+  payload: Record<string, unknown> | undefined,
+): void {
+  const parent = payload?.['parentTaskRef'];
+  if (typeof parent === 'string' && !parentByGen.has(taskRef)) {
+    parentByGen.set(taskRef, parent);
+  }
+}
+
 interface StartedRow {
   readonly position: number;
   readonly genTaskRef: string;
   readonly taskType: string;
   readonly providerId: string;
-  readonly parentTaskRef: string | null;
   readonly recipeVersion: string | null;
 }
 
@@ -111,6 +124,7 @@ interface StartedRow {
  */
 export function projectInputs(input: ProjectionInput): ProjectionOutput {
   const startedRows: StartedRow[] = [];
+  const parentByGen = new Map<string, string>();
   const attemptsByGen = new Map<string, number>();
   const failedGens = new Set<string>();
   const closedWindows = new Map<string, { chapterIndex: number | null; degraded: boolean }>();
@@ -130,14 +144,14 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
         const snapshot = rec(payload?.['snapshot']);
         const taskType = snapshot?.['taskType'];
         const providerId = snapshot?.['providerId'];
+        // started 行自身通常携带 parentTaskRef（手工桥接/外部生产者只在此事件上带）
+        collectParent(parentByGen, event.taskRef, payload);
         if (typeof taskType === 'string' && typeof providerId === 'string') {
-          const parentRaw = payload?.['parentTaskRef'];
           startedRows.push({
             position,
             genTaskRef: event.taskRef,
             taskType,
             providerId,
-            parentTaskRef: typeof parentRaw === 'string' && parentRaw.length > 0 ? parentRaw : null,
             recipeVersion: payload === undefined ? null : readRecipeVersionFromPayload(payload),
           });
         }
@@ -145,12 +159,14 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
       }
       case 'TaskAttemptRegistered':
         attemptsByGen.set(event.taskRef, (attemptsByGen.get(event.taskRef) ?? 0) + 1);
+        collectParent(parentByGen, event.taskRef, payload);
         break;
       case 'GenerationFinished': {
         const outcome = payload?.['outcome'];
         if (outcome === 'failed_terminal' || outcome === 'failed_recoverable') {
           failedGens.add(event.taskRef);
         }
+        collectParent(parentByGen, event.taskRef, payload);
         break;
       }
       case 'FlywheelRecorded': {
@@ -207,12 +223,14 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
     }
   }
 
-  // 窗口→cell：首个 parentTaskRef 匹配的 GenerationStarted 定归属（行序权威）
+  // 窗口→cell：首个归属本窗口的 GenerationStarted 定归属（行序权威；
+  // 归属=attempt/finish payload.parentTaskRef 指回该窗口）
   const primaryGenByWindow = new Map<string, StartedRow>();
   for (const started of startedRows) {
-    if (started.parentTaskRef === null) continue;
-    if (!primaryGenByWindow.has(started.parentTaskRef)) {
-      primaryGenByWindow.set(started.parentTaskRef, started);
+    const parentTaskRef = parentByGen.get(started.genTaskRef);
+    if (parentTaskRef === undefined) continue;
+    if (!primaryGenByWindow.has(parentTaskRef)) {
+      primaryGenByWindow.set(parentTaskRef, started);
     }
   }
 
@@ -246,13 +264,16 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
     });
   }
 
-  const generations: GenerationFact[] = startedRows.map((started) => ({
-    genTaskRef: started.genTaskRef,
-    windowTaskRef: started.parentTaskRef,
-    cellId: started.parentTaskRef !== null ? cellOfWindow.get(started.parentTaskRef) ?? null : null,
-    attempts: attemptsByGen.get(started.genTaskRef) ?? 0,
-    failed: failedGens.has(started.genTaskRef),
-  }));
+  const generations: GenerationFact[] = startedRows.map((started) => {
+    const windowTaskRef = parentByGen.get(started.genTaskRef);
+    return {
+      genTaskRef: started.genTaskRef,
+      windowTaskRef: windowTaskRef ?? null,
+      cellId: windowTaskRef !== undefined ? cellOfWindow.get(windowTaskRef) ?? null : null,
+      attempts: attemptsByGen.get(started.genTaskRef) ?? 0,
+      failed: failedGens.has(started.genTaskRef),
+    };
+  });
 
   // 决策行回填 cellId/atMs（窗口级归属传导）
   const filledDecisions = decisions.map((decision) => ({
@@ -261,12 +282,12 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
     atMs: atMsByWindow.get(decision.taskRef) ?? null,
   }));
 
-  const bridgePresent = startedRows.some((started) => started.parentTaskRef !== null);
+  const bridgePresent = parentByGen.size > 0;
   const seenRoutes = new Set<string>();
   const unattributedRoutes: UnattributedRoute[] = [];
   for (const started of startedRows) {
-    const attributed =
-      started.parentTaskRef !== null && modelByWindow.has(started.parentTaskRef);
+    const windowTaskRef = parentByGen.get(started.genTaskRef);
+    const attributed = windowTaskRef !== undefined && modelByWindow.has(windowTaskRef);
     if (attributed) continue;
     const routeKey = `${started.taskType}|${started.providerId}`;
     if (seenRoutes.has(routeKey)) continue;

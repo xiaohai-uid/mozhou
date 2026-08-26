@@ -23,7 +23,7 @@ import {
 } from './thresholds.js';
 import type { ArchivedMatrixRow } from './storage.js';
 import { emptySignals } from './types.js';
-import type { CellSignals, RoutingSuggestion } from './types.js';
+import type { CellSignals } from './types.js';
 import type { DecisionFact, SignalSlice } from './project.js';
 
 // ---------------------------------------------------------------------------
