@@ -11,7 +11,8 @@
  *   - usage/cost 类派生记账允许异步回灌（§J.4 边界内）：成本核算等派生面事后经
  *     backfillDerivedUsage 追加进同一投影表——只碰运行时区，Ledger 零字节触碰；
  *     回灌行必须携带 derivedFrom（来源同步行 entryId），宁败不猜；
- *   - 零时钟零外部服务：entryId/时间戳显式注入，缺省铸新 ULID。
+ *   - 零时钟零外部服务：entryId/时间戳显式注入，缺省铸新 ULID。（t52:B3 判例交叉引用：
+ *     测量值可缺省注入时钟——runtime engine 的 nowMs→durationMs 即此域；时刻戳必显式。）
  */
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

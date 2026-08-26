@@ -571,6 +571,9 @@ export interface ResolutionSnapshot {
  *  failed_recoverable 时 repairHint 供二级定向重生（M17，Q8=A）。 */
 export interface TaskResult {
   readonly outcome: Outcome;
+  /** 本次执行的账本任务引用（T21 · #54 t52:Q-E 只读回执）：引擎铸发，调用方据此外
+   *  账本按 taskRef 精确折叠自己的事件轨迹——替代「最近一条」邻接启发式。 */
+  readonly taskRef: string;
   /** succeeded 时承载产物。 */
   readonly value?: unknown;
   /** failed_recoverable 时供二级定向重生（M17 分层协作）。 */

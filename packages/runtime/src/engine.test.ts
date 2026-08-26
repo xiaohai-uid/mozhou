@@ -1,5 +1,6 @@
 /**
  * T11 验收测试：execute 四态路径 + 解析快照 + fail-fast（规格 §1/§4，Q4/Q6/Q7）。
+ * T21 增补（#54）：meta 桥接三槽（P1）/ nowMs 注入统一盖 durationMs（P3）/ taskRef 回执（Q-E）。
  */
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -152,5 +153,109 @@ describe('T12 timeout+fallback 降级链', () => {
       .replaySession()
       .events.filter((e) => e.event.type === 'TaskAttemptRegistered');
     expect(attempts).toHaveLength(0);
+  });
+});
+
+describe('T21 事件供给面增补（#54 · t52 B1/B3/Q-E）', () => {
+  /** 注入时钟夹具：按序吐 ticks，耗尽后驻留末值（零时钟纪律：不碰 Date.now）。 */
+  function timedEngine(ticks: readonly number[]) {
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-engine-t21-'));
+    mkdirSync(join(root, '.mozhou'), { recursive: true });
+    let i = 0;
+    const engine = new RuntimeEngine({
+      bus: new PublishBus(),
+      ctx: { root },
+      newTaskRef: () => 'gen_t21',
+      nowMs: () => ticks[Math.min(i++, ticks.length - 1)] ?? 0,
+    });
+    return { root, engine };
+  }
+
+  const eventsOf = (engine: RuntimeEngine) =>
+    engine.replaySession().events.map((row) => row.event);
+
+  it('P1 meta 桥接：chapterIndex 上顶层槽、parentTaskRef 进 payload、eventPayload 并入 Started', async () => {
+    const { engine } = timedEngine([1000, 1375]);
+    engine.registerCapability(CAP);
+    engine.registerProviderBinding('deepseek', () => Promise.resolve('ok'));
+    const result = await engine.execute('CHAPTER_DRAFTING', { beat: '开场' }, {
+      parentTaskRef: 'tsk_session_ch7',
+      chapterIndex: 7,
+      eventPayload: { recipeSnapshot: { recipe: { recipeVersion: '2.5.0' } } },
+    });
+
+    expect(result.taskRef).toBe('gen_t21'); // Q-E：只读回执
+    const events = eventsOf(engine);
+    const started = events.find((e) => e.type === 'GenerationStarted')!;
+    expect(started.taskRef).toBe(result.taskRef);
+    expect(started.chapterIndex).toBe(7);
+    // snapshot 与 M14 形状 eventPayload 同槽共存；recipeSnapshot 三级嵌套原样入账
+    expect(started.payload).toMatchObject({
+      snapshot: { providerId: 'deepseek' },
+      recipeSnapshot: { recipe: { recipeVersion: '2.5.0' } },
+    });
+
+    const finished = events.find((e) => e.type === 'GenerationFinished')!;
+    expect(finished.chapterIndex).toBe(7);
+    expect(finished.payload).toMatchObject({
+      outcome: 'succeeded',
+      providerId: 'deepseek',
+      parentTaskRef: 'tsk_session_ch7',
+      durationMs: 375, // 注入时钟差值：1375-1000
+    });
+  });
+
+  it('P1：fallback attempt 与穷尽出口同样携 chapterIndex+parentTaskRef+durationMs', async () => {
+    const { engine } = timedEngine([100, 400]);
+    engine.registerCapability({
+      ...CAP,
+      failurePolicy: { timeoutMs: 120_000, fallbackProviderIds: ['glm'] },
+    });
+    engine.registerProviderBinding('deepseek', () =>
+      Promise.reject(new RecoverableError('主渠道挂了')),
+    );
+    engine.registerProviderBinding('glm', () =>
+      Promise.reject(new RecoverableError('glm 也挂了')),
+    );
+    const r = await engine.execute('CHAPTER_DRAFTING', {}, {
+      parentTaskRef: 'tsk_session_fb',
+      chapterIndex: 3,
+    });
+    expect(r.outcome).toBe('failed_recoverable');
+
+    const events = eventsOf(engine);
+    const attempt = events.find((e) => e.type === 'TaskAttemptRegistered')!;
+    expect(attempt.chapterIndex).toBe(3);
+    expect(attempt.payload).toMatchObject({ providerId: 'glm', parentTaskRef: 'tsk_session_fb' });
+    const finished = events.find((e) => e.type === 'GenerationFinished')!;
+    expect(finished.chapterIndex).toBe(3);
+    expect(finished.payload).toMatchObject({
+      outcome: 'failed_recoverable',
+      durationMs: 300, // 入口 100 → 穷尽出口 400
+      parentTaskRef: 'tsk_session_fb',
+    });
+  });
+
+  it('P3：terminal 出口统一盖 durationMs；taskRef 回执与事件同源', async () => {
+    const { engine } = timedEngine([1000, 1250]);
+    engine.registerCapability(CAP);
+    engine.registerProviderBinding('deepseek', () => Promise.reject(new Error('boom')));
+    const r = await engine.execute('CHAPTER_DRAFTING', {});
+    expect(r.outcome).toBe('failed_terminal');
+    expect(r.taskRef).toBe('gen_t21');
+    const finished = eventsOf(engine).find((e) => e.type === 'GenerationFinished')!;
+    expect(finished.payload).toMatchObject({ outcome: 'failed_terminal', reason: 'boom', durationMs: 250 });
+  });
+
+  it('缺省行为零回归：无 meta ⇒ 事件无 chapterIndex 键、payload 无桥接键', async () => {
+    const { engine } = timedEngine([]);
+    engine.registerCapability(CAP);
+    engine.registerProviderBinding('deepseek', () => Promise.resolve('ok'));
+    await engine.execute('CHAPTER_DRAFTING', {});
+    for (const event of eventsOf(engine)) {
+      expect('chapterIndex' in event).toBe(false);
+      expect(event.payload?.['recipeSnapshot']).toBeUndefined();
+      expect(event.payload?.['parentTaskRef']).toBeUndefined();
+    }
   });
 });

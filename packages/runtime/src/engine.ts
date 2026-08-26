@@ -3,6 +3,9 @@
  * execute 骨架——解析快照 → GenerationStarted → provider 调用位（T13 接入）→
  * GenerationFinished → TaskResult 四态。解析逻辑本票只到 Registry.resolve，
  * tier 层由 T14 填充 setGlobalOverride。
+ *
+ * T21 受控增补（#54 · t52）：第三可选参 meta 桥接会话窗口与执行事件（B1）、
+ * nowMs 注入测量时钟统一盖 durationMs（B3）、TaskResult 回执 taskRef（Q-E）。
  */
 import { newUlid } from '@mozhou/kernel';
 import type {
@@ -81,6 +84,29 @@ export interface RuntimeEngineDeps {
   readonly registry?: CapabilityRegistry;
   /** 零时钟纪律：taskRef 生成器可注入固定值（默认 newUlid）。 */
   readonly newTaskRef?: () => string;
+  /**
+   * 零时钟判例边界（T21 · t52:B3 注释级锚定）：**测量值可缺省注入时钟、时刻戳必显式**。
+   * 本 dep 只产测量值——execute 入口取样一次，与各 GenerationFinished 出口取样做差
+   * 得 durationMs；缺省 Date.now。时刻戳类字段（at/nowIso/createdAtUtc）不在此取：
+   * 必须调用方显式注入、缺省不落（record-step.ts 头注交叉引用同一判例）。
+   */
+  readonly nowMs?: () => number;
+}
+
+/**
+ * execute 第三可选参（T21 · t52:B1 执行桥接）：把会话窗口上下文桥进执行事件。
+ *   - parentTaskRef：会话窗口任务引用。**只准进 payload 层**——DomainEvent 禁止新增
+ *     顶层字段（t52:B5 硬约束：pipeline 读面逐字段白名单重建 ledger.ts，未知顶层键
+ *     会被静默丢弃，顶层新字段即「写侧入了账、读侧永远看不见」的哑字段）；
+ *   - chapterIndex：上 DomainEvent 既有顶层可选槽；
+ *   - eventPayload：M14 形状载荷增补（toGenerationStartedPayload 产出），并入
+ *     GenerationStarted.payload（snapshot 之后）。
+ * 三槽全可选；缺省行为与既有双参调用完全一致（零回归）。
+ */
+export interface ExecutionMeta {
+  readonly parentTaskRef?: string;
+  readonly chapterIndex?: number;
+  readonly eventPayload?: Readonly<Record<string, unknown>>;
 }
 
 export class RuntimeEngine {
@@ -89,12 +115,14 @@ export class RuntimeEngine {
   readonly #registry: CapabilityRegistry;
   readonly #bindings = new Map<string, ProviderBinding>();
   readonly #newTaskRef: () => string;
+  readonly #nowMs: () => number;
 
   constructor(deps: RuntimeEngineDeps) {
     this.#bus = deps.bus;
     this.#ctx = deps.ctx;
     this.#registry = deps.registry ?? new CapabilityRegistry();
     this.#newTaskRef = deps.newTaskRef ?? (() => newUlid());
+    this.#nowMs = deps.nowMs ?? (() => Date.now());
   }
 
   get registry(): CapabilityRegistry {
@@ -110,8 +138,14 @@ export class RuntimeEngine {
     this.#registry.registerCapability(cap);
   }
 
-  async execute(taskType: string, payload: unknown): Promise<TaskResult> {
+  async execute(taskType: string, payload: unknown, meta?: ExecutionMeta): Promise<TaskResult> {
     const taskRef = this.#newTaskRef();
+    // P3（t52:B3）：入口取样一次，三个 GenerationFinished 出口统一盖 durationMs
+    //（含 fallback 链全程——引擎层测量天然覆盖多 attempt 区间）。
+    const startedAtMs = this.#nowMs();
+    // 桥接槽条件展开（exactOptionalPropertyTypes 纪律）：缺省零键。
+    const chapterSlot = meta?.chapterIndex === undefined ? {} : { chapterIndex: meta.chapterIndex };
+    const parentPatch = meta?.parentTaskRef === undefined ? {} : { parentTaskRef: meta.parentTaskRef };
     // Q6=A 调用期解析：解析不到即抛 NO_PROVIDER_*，不产生任何账本事件。
     const resolution: Resolution = this.#registry.resolve(taskType);
     const snapshot: ResolutionSnapshot = {
@@ -123,7 +157,12 @@ export class RuntimeEngine {
     this.#bus.publish(this.#ctx, {
       type: 'GenerationStarted',
       taskRef,
-      payload: { snapshot },
+      ...chapterSlot,
+      payload: {
+        snapshot,
+        // B1：eventPayload（M14 形状 toGenerationStartedPayload 产出）并入 snapshot 之后
+        ...(meta?.eventPayload === undefined ? {} : meta.eventPayload),
+      },
     });
 
     // T12：主 provider + fallback 链依序尝试；每次尝试前发 TaskAttemptRegistered
@@ -137,7 +176,8 @@ export class RuntimeEngine {
         this.#bus.publish(this.#ctx, {
           type: 'TaskAttemptRegistered',
           taskRef,
-          payload: { providerId, reason: lastReason },
+          ...chapterSlot,
+          payload: { providerId, reason: lastReason, ...parentPatch },
         });
       }
       triedProviders.push(providerId);
@@ -154,9 +194,15 @@ export class RuntimeEngine {
         this.#bus.publish(this.#ctx, {
           type: 'GenerationFinished',
           taskRef,
-          payload: { outcome: 'succeeded' satisfies Outcome, providerId },
+          ...chapterSlot,
+          payload: {
+            outcome: 'succeeded' satisfies Outcome,
+            providerId,
+            durationMs: this.#nowMs() - startedAtMs,
+            ...parentPatch,
+          },
         });
-        return { outcome: 'succeeded', value, snapshot: servedSnapshot };
+        return { outcome: 'succeeded', value, snapshot: servedSnapshot, taskRef };
       } catch (err) {
         lastReason = err instanceof Error ? err.message : String(err);
         // 普通异常直通 failed_terminal；超时/可恢复才值得烧下一个候选。
@@ -165,9 +211,15 @@ export class RuntimeEngine {
           this.#bus.publish(this.#ctx, {
             type: 'GenerationFinished',
             taskRef,
-            payload: { outcome: 'failed_terminal' satisfies Outcome, reason: lastReason },
+            ...chapterSlot,
+            payload: {
+              outcome: 'failed_terminal' satisfies Outcome,
+              reason: lastReason,
+              durationMs: this.#nowMs() - startedAtMs,
+              ...parentPatch,
+            },
           });
-          return { outcome: 'failed_terminal', snapshot };
+          return { outcome: 'failed_terminal', snapshot, taskRef };
         }
       }
     }
@@ -176,10 +228,13 @@ export class RuntimeEngine {
     this.#bus.publish(this.#ctx, {
       type: 'GenerationFinished',
       taskRef,
+      ...chapterSlot,
       payload: {
         outcome: 'failed_recoverable' satisfies Outcome,
         reason: `全部候选失败：${lastReason}`,
         triedProviders,
+        durationMs: this.#nowMs() - startedAtMs,
+        ...parentPatch,
       },
     });
     return {
@@ -187,6 +242,7 @@ export class RuntimeEngine {
       // 合并末次业务 repairHint 与降级轨迹：二级定向重生两样都需要
       repairHint: { ...(lastRepairHint as object), triedProviders },
       snapshot,
+      taskRef,
     };
   }
 
