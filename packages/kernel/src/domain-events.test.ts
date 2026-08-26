@@ -53,3 +53,16 @@ describe('领域事件词表（T16 受控增补）', () => {
     }
   });
 });
+
+describe('T21 受控增补（#54 · t51:B5）', () => {
+  it('StyleProfileUpdated 入列：词表 15 词条、非成对收尾事件', () => {
+    expect(DOMAIN_EVENT_TYPES.includes('StyleProfileUpdated')).toBe(true);
+    expect(DOMAIN_EVENT_TYPES).toHaveLength(15);
+    // 非成对事件：EVENT_PAIRS 零改动，StyleProfileUpdated 不出现在任何一端
+    expect(EVENT_PAIRS).toHaveLength(3);
+    for (const [head, tail] of EVENT_PAIRS) {
+      expect(head).not.toBe('StyleProfileUpdated');
+      expect(tail).not.toBe('StyleProfileUpdated');
+    }
+  });
+});
