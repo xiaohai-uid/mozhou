@@ -23,6 +23,7 @@ import type {
   FactId,
   KnowledgeHolder,
   PovEntity,
+  TemporalFact,
 } from '@mozhou/kernel'
 import {
   createBook,
@@ -518,7 +519,7 @@ async function runScenario(root: string): Promise<Omit<LifecycleBenchReport, 'du
   }
 
   // ── 幕间行为观测：结构化查询芯（POV / 秘密零泄漏在返回值上判定）──
-  const probeFacts = (chapter: number, pov: PovEntity, subject: EntityRef) =>
+  const probeFacts = (chapter: number, pov: PovEntity, subject: EntityRef): TemporalFact[] =>
     plane.queryActiveFacts({ chapter, pov, entityIds: [subject] })
 
   const behaviorProbes = (): string[] => [
