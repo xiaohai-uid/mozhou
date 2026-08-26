@@ -41,7 +41,7 @@ describe('m₀ 冷启动', () => {
     expect(profile.degradedWindows).toBe(0);
     expect(profile.driftLog).toHaveLength(0);
     for (const dim of PREFERENCE_DIMS) {
-      const state = profile.dims[dim]!;
+      const state = profile.dims[dim];
       expect(posteriorMean(dim, state)).toBe(M0[dim]);
       expect(state.kappaEff).toBe(KAPPA0);
       expect(driftSigma(state)).toBe(0);
@@ -61,11 +61,11 @@ describe('m₀ 冷启动', () => {
 
 describe('κ₀ 加权更新数值断言', () => {
   it('两条 x=−40 决策：mean=(8·0−80)/10=−8（精确闭式锚）', () => {
-    let profile = fold(coldStartProfile(), [
+    const profile = fold(coldStartProfile(), [
       syntheticObservation({ cand_len_diff: -40 }),
       syntheticObservation({ cand_len_diff: -40 }),
     ]);
-    const state = profile.dims['cand_len_diff']!;
+    const state = profile.dims['cand_len_diff'];
     expect(posteriorMean('cand_len_diff', state)).toBeCloseTo(-8, 10);
     expect(state.W).toBeCloseTo(2, 10);
     expect(profile.obsCount).toBe(2);
@@ -77,19 +77,19 @@ describe('κ₀ 加权更新数值断言', () => {
       syntheticObservation({ level_ratio: 0 }, 0.3),
     ]);
     // mean = (8·0.5 + 1·1 + 0.3·0)/(8+1.3)
-    expect(posteriorMean('level_ratio', profile.dims['level_ratio']!))
+    expect(posteriorMean('level_ratio', profile.dims['level_ratio']))
       .toBeCloseTo((KAPPA0 * 0.5 + 1) / (KAPPA0 + 1.3), 12);
   });
 
   it('主均值不是 EMA：20 条常值流（无漂移干扰）后验贴闭式解，远离 α-EMA 轨迹', () => {
     const closed = fold(coldStartProfile(), Array.from({ length: 20 }, () =>
       syntheticObservation({ sent_len_mean: 10 })));
-    expect(posteriorMean('sent_len_mean', closed.dims['sent_len_mean']!))
+    expect(posteriorMean('sent_len_mean', closed.dims['sent_len_mean']))
       .toBeCloseTo((8 * 42 + 20 * 10) / 28, 10);
 
     let ema = M0['sent_len_mean'];
     for (let i = 0; i < 20; i += 1) ema += 0.15 * (10 - ema);
-    const actual = posteriorMean('sent_len_mean', closed.dims['sent_len_mean']!);
+    const actual = posteriorMean('sent_len_mean', closed.dims['sent_len_mean']);
     expect(Math.abs(actual - ema)).toBeGreaterThan(5); // EMA 已贴到 ~11.9，后验仍在 ~19.1
   });
 });
@@ -99,7 +99,7 @@ describe('<5 条跳过判定', () => {
     const profile = fold(coldStartProfile(), Array.from({ length: MIN_SAMPLES_FOR_JUDGMENT - 1 }, () =>
       syntheticObservation({ ttr_win500: 0.99 })));
     expect(profile.obsCount).toBe(4);
-    expect(profile.dims['ttr_win500']!.kappaEff).toBe(KAPPA0);
+    expect(profile.dims['ttr_win500'].kappaEff).toBe(KAPPA0);
     expect(profile.driftLog).toHaveLength(0);
   });
 });
@@ -120,7 +120,7 @@ describe('漂移衰减', () => {
     const dim: PreferenceDim = 'sent_len_mean';
     const { profile, triggerObs } = stepwise([...Array<number>(5).fill(42), ...Array<number>(60).fill(100)], dim);
     expect(triggerObs).toBe(37); // 公式算术锚：前 10 条偏移全部脱靶（σ 随混合膨胀）
-    const state = profile.dims[dim]!;
+    const state = profile.dims[dim];
     expect(state.kappaEff).toBe(KAPPA0 / 8); // 触发点 37/47/57 → 三次减半
     expect(profile.driftLog).toHaveLength(3);
     const event = profile.driftLog[0]!;
@@ -143,7 +143,7 @@ describe('漂移衰减', () => {
     const stream = [...Array<number>(5).fill(2), ...Array<number>(9).fill(50), 2, ...Array<number>(30).fill(50)];
     const { profile, triggerObs } = stepwise(stream, dim);
     expect(triggerObs).toBe(41); // 公式算术锚（9 连击被回正行清零后重新累计）
-    expect(profile.dims[dim]!.kappaEff).toBe(KAPPA0 / 2);
+    expect(profile.dims[dim].kappaEff).toBe(KAPPA0 / 2);
     expect(profile.driftLog).toHaveLength(1); // 有界后续流内不重复锤打
   });
 
@@ -151,7 +151,7 @@ describe('漂移衰减', () => {
     const dim: PreferenceDim = 'sent_len_mean';
     const { profile } = stepwise([...Array<number>(5).fill(42), ...Array<number>(DRIFT_STREAK_MIN - 1 + 20).fill(100)].slice(0, 5 + 9), dim);
     // 前 9 条偏移全脱靶（σ 膨胀期），构造恰好 9 条命中需要越过 σ 膨胀期——此处直接验证短流无触发
-    expect(profile.dims[dim]!.kappaEff).toBe(KAPPA0);
+    expect(profile.dims[dim].kappaEff).toBe(KAPPA0);
     expect(profile.driftLog).toHaveLength(0);
   });
 });
@@ -166,14 +166,14 @@ describe('窗口锚与去重与游标', () => {
     ]);
     expect(profile.degradedWindows).toBe(1);
     expect(profile.obsCount).toBe(1);
-    expect(posteriorMean('cand_len_diff', profile.dims['cand_len_diff']!)).toBe((KAPPA0 * 0 + 1) / (KAPPA0 + 1));
+    expect(posteriorMean('cand_len_diff', profile.dims['cand_len_diff'])).toBe((KAPPA0 * 0 + 1) / (KAPPA0 + 1));
   });
 
   it('obsId 重复先到先得：同批重复观测只计一次', () => {
     const obs = syntheticObservation({ cand_len_diff: -40 });
     const profile = fold(coldStartProfile(), [obs, obs]);
     expect(profile.obsCount).toBe(1);
-    expect(profile.dims['cand_len_diff']!.W).toBe(1);
+    expect(profile.dims['cand_len_diff'].W).toBe(1);
   });
 
   it('cursor 只向前推进到本批最大 position；空批不动', () => {

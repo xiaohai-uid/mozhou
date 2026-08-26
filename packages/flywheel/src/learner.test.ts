@@ -10,7 +10,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { DomainEvent } from '@mozhou/kernel';
 import { PublishBus } from '@mozhou/runtime';
 import { LocalDataPlane, createBook } from '@mozhou/data-plane';
 import {
@@ -49,11 +48,6 @@ function hermeticBook(title: string): string {
   createBook({ dir, title: `T22${title}之书` });
   LocalDataPlane.open(dir).createChapterDraft({ chapterIndex: 5, title: '第五章' });
   return dir;
-}
-
-interface Deps {
-  readonly bus: PublishBus;
-  readonly bookRoot: string;
 }
 
 function deps(root: string, bus: PublishBus) {
@@ -179,8 +173,8 @@ describe('快照延迟物化（t51:A2）', () => {
     expect(outcome.mode).toBe('rebuild');
     expect(hasMaterializedProfile(root)).toBe(false);
     expect(existsSync(join(root, PREFERENCE_DIR))).toBe(false);
-    expect(posteriorMean('sent_len_mean', outcome.profile.dims['sent_len_mean']!)).toBe(M0['sent_len_mean']);
-    expect(posteriorMean('cand_len_diff', outcome.profile.dims['cand_len_diff']!)).toBe(M0['cand_len_diff']);
+    expect(posteriorMean('sent_len_mean', outcome.profile.dims['sent_len_mean'])).toBe(M0['sent_len_mean']);
+    expect(posteriorMean('cand_len_diff', outcome.profile.dims['cand_len_diff'])).toBe(M0['cand_len_diff']);
   });
 
   it('首批观测后物化：两份产物落盘且 obsCount>0', () => {
@@ -214,16 +208,16 @@ describe('读面与数值（真实 producer 事件）', () => {
     );
     const lens = candidateRows.map((row) => Number(row.event.payload?.['chars']));
     expect(lens.sort((a, b) => a - b)).toHaveLength(5);
-    const outcomeDiff = outcome.profile.dims['cand_len_diff']!;
+    const outcomeDiff = outcome.profile.dims['cand_len_diff'];
     expect(outcomeDiff.W).toBeCloseTo(2, 10); // 只有两个决策喂 f6
 
     // f7 语境位：cursor(w1)+selection 两决策+编辑三态全带 level 位
     // f1 手算锚：句均 3(seed1)+2.5(seed2)+16(replace) 各带 w=.3 → mean=(8·42+0.3·21.5)/8.9
-    expect(posteriorMean('sent_len_mean', outcome.profile.dims['sent_len_mean']!))
+    expect(posteriorMean('sent_len_mean', outcome.profile.dims['sent_len_mean']))
       .toBeCloseTo((KAPPA0 * 42 + 0.3 * 21.5) / (KAPPA0 + 0.9), 10);
 
     // assistant 文本不得产生任何观测：f1 的 W 若混入 assistant insert 会偏离 0.9
-    expect(outcome.profile.dims['sent_len_mean']!.W).toBeCloseTo(0.9, 10);
+    expect(outcome.profile.dims['sent_len_mean'].W).toBeCloseTo(0.9, 10);
   });
 
   it('<5 条跳过判定：四样本内漂移连击不启动、κ_eff 不动', () => {
