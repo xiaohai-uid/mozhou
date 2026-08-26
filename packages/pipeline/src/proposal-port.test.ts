@@ -259,3 +259,54 @@ import { loadCanonProposal } from './proposal-step.js';
 function loadPipelineFor(root: string, proposalId: string) {
   return loadCanonProposal(root, proposalId);
 }
+
+describe('ProposalPort · style 后端（t51:B2）', () => {
+  it('confirm 显式生效；reject/editAccept 响亮拒绝；永挂待决视图', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-port-style-'));
+    roots.push(root);
+    createBook({ dir: root, title: 'PortStyle' });
+    const accepted: string[] = [];
+    const port = new ProposalPort({
+      root,
+      styleBackend: {
+        listPending: () => [
+          { id: 'sug_1', scenarioType: 'action', proposal: { sensoryDensity: 0.6 } },
+          { id: 'sug_2', scenarioType: 'dialogue', proposal: { actionPacing: 0.4 } },
+        ],
+        accept: (item) => accepted.push(item.id),
+      },
+    });
+
+    // 永挂待决：pendingItemsOf 返回全部挂起建议
+    const pending = port.pendingItemsOf({ port: 'style', proposalId: 'style:any' });
+    expect(pending).toEqual(['sug_1', 'sug_2']);
+    // 未决策前 accept 回调未被调用（无隐式采纳）
+    expect(accepted).toEqual([]);
+
+    // 逐条 confirm 才生效
+    const outcome = port.confirm({ port: 'style', proposalId: 'style:any' }, 'sug_1');
+    expect(outcome.action).toBe('confirmed');
+    expect(outcome.finalized).toBe(false);
+    expect(accepted).toEqual(['sug_1']);
+
+    // reject/editAccept 不是 style 后端的合法动作（无静默批量/无编辑面）
+    expect(() => port.reject({ port: 'style', proposalId: 'style:any' }, 'sug_2'))
+      .toThrow(ProposalPortError);
+    expect(() => port.editAccept({ port: 'style', proposalId: 'style:any' }, 'sug_2', { x: 1 }))
+      .toThrow(ProposalPortError);
+    // 未知建议响亮拒绝
+    expect(() => port.confirm({ port: 'style', proposalId: 'style:any' }, 'sug_nope'))
+      .toThrow(ProposalPortError);
+  });
+
+  it('缺省无 styleBackend：访问 style 引用响亮报错（防守缺省）', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-port-style-nb-'));
+    roots.push(root);
+    createBook({ dir: root, title: 'PortStyleNoBackend' });
+    const port = new ProposalPort({ root });
+    expect(() => port.pendingItemsOf({ port: 'style', proposalId: 'style:x' }))
+      .toThrow(ProposalPortError);
+    expect(() => port.confirm({ port: 'style', proposalId: 'style:x' }, 'sug_1'))
+      .toThrow(ProposalPortError);
+  });
+});

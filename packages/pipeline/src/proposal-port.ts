@@ -36,10 +36,13 @@ import type { CandidateFamily } from './extract-step.js';
 import { listCanonProposals, loadCanonProposal, saveCanonProposal } from './proposal-step.js';
 import type { CanonProposalItem, CanonProposalRecord } from './proposal-step.js';
 
-/** 统一提案引用：port 判别两个调用方后端。 */
+/** 统一提案引用：port 判别三个调用方后端。
+ *  style = StyleLearner LLM 旁路建议确认面（t51:B2）：派生建议不落提案仓，
+ *  内存持留、永挂待决、无超时自动生效、confirm 显式生效（见下 README）。 */
 export type ProposalPortRef =
   | { readonly port: 'pipeline'; readonly proposalId: string }
-  | { readonly port: 'reconciliation'; readonly proposalId: string };
+  | { readonly port: 'reconciliation'; readonly proposalId: string }
+  | { readonly port: 'style'; readonly proposalId: string };
 
 export type PortAction = 'confirmed' | 'rejected' | 'edit_accepted';
 
@@ -154,19 +157,39 @@ function persistDecisionLedger(root: string, ledger: ReconciliationDecisionLedge
  * Port 本体
  * ------------------------------------------------------------------------- */
 
+/** style 建议条目：LLM 旁路分类结果（如 sensoryDensity/actionPacing 标定），
+ *  confirm 前的可选载荷。 */
+export interface StyleSuggestionItem {
+  readonly id: string;
+  readonly scenarioType: string;
+  readonly proposal: Readonly<Record<string, unknown>>;
+}
+
+/** style 后端确认时回调：把采纳的建议写进 StyleProfile（writeStyleProfiles 唯一写口）。 */
+export interface StylePortBackend {
+  /** 当前挂起建议（永挂待决视图；调用方每次从学习器旁路产出后刷新）。 */
+  readonly listPending: () => readonly StyleSuggestionItem[];
+  /** confirm 生效回调：调用方（flywheel）按建议写盘并返回该素材（比如新 revision）。 */
+  readonly accept: (item: StyleSuggestionItem) => void;
+}
+
 export interface ProposalPortDeps {
   readonly root: string;
   /** reconciliation 引用的后端服务（LocalDataPlane.reconciliation() 单例即可）。 */
   readonly reconciliation?: ReconciliationService | undefined;
+  /** style 旁路建议后端（t51:B2）；缺省 = style port 不可用（响亮报错）。 */
+  readonly styleBackend?: StylePortBackend | undefined;
 }
 
 export class ProposalPort {
   readonly #root: string;
   readonly #reconciliation: ReconciliationService | undefined;
+  readonly #styleBackend: StylePortBackend | undefined;
 
   constructor(deps: ProposalPortDeps) {
     this.#root = deps.root;
     this.#reconciliation = deps.reconciliation;
+    this.#styleBackend = deps.styleBackend;
   }
 
   /* ---------------- 协议三动词 ---------------- */
@@ -198,12 +221,16 @@ export class ProposalPort {
 
   /* ---------------- 查询/恢复面 ---------------- */
 
-  /** 未决条目 id（重启后续接的入口视图）。 */
+  /** 未决条目 id（重启后续接的入口视图；style = 当前挂起建议全集——永挂待决）。 */
   pendingItemsOf(ref: ProposalPortRef): readonly string[] {
     if (ref.port === 'pipeline') {
       const record = loadCanonProposal(this.#root, ref.proposalId);
       if (record === null || record.state === 'consumed') return [];
       return record.items.filter((item) => item.state === 'pending').map((item) => item.itemId);
+    }
+    if (ref.port === 'style') {
+      const backend = this.#requireStyle();
+      return backend.listPending().map((item) => item.id);
     }
     const service = this.#requireReconciliation();
     const proposal = requireOpenReconciliation(service, ref.proposalId);
@@ -211,7 +238,7 @@ export class ProposalPort {
     return [...itemIdsOf(proposal.summary)].filter((itemId) => ledger.decisions[itemId] === undefined);
   }
 
-  /** 全书未决提案引用扫描（恢复入口）：管线 open 记录 + 对账 awaiting_author 提案。 */
+  /** 全书未决提案引用扫描（恢复入口）：管线 open 记录 + 对账 awaiting_author + style 挂起建议。 */
   listPendingRefs(): ProposalPortRef[] {
     const refs: ProposalPortRef[] = [];
     for (const record of listCanonProposals(this.#root)) {
@@ -224,6 +251,11 @@ export class ProposalPort {
         if (proposal.state === 'awaiting_author' && proposal.summary !== null) {
           refs.push({ port: 'reconciliation', proposalId: proposal.proposalId });
         }
+      }
+    }
+    if (this.#styleBackend !== undefined) {
+      for (const item of this.#styleBackend.listPending()) {
+        refs.push({ port: 'style', proposalId: 'style:' + item.id });
       }
     }
     return refs;
@@ -276,6 +308,9 @@ export class ProposalPort {
   ): ProposalMutationOutcome {
     if (ref.port === 'pipeline') {
       return this.#decidePipeline(ref, itemId, action, patch);
+    }
+    if (ref.port === 'style') {
+      return this.#decideStyle(ref, itemId, action);
     }
     return this.#decideReconciliation(ref, itemId, action);
   }
@@ -356,6 +391,43 @@ export class ProposalPort {
       );
     }
     return this.#reconciliation;
+  }
+
+  #requireStyle(): StylePortBackend {
+    if (this.#styleBackend === undefined) {
+      return portError(
+        'this ProposalPort was opened without a style backend (t51:B2) — supply deps.styleBackend',
+      );
+    }
+    return this.#styleBackend;
+  }
+
+  /**
+   * style 后端决策（t51:B2 语义精确映射）：
+   *   - 永挂待决：挂起建议只经 listPending 暴露，无任何持久化/清理定时器；
+   *   - 无超时自动生效：本方法之外没有任何路径会采纳建议——finish 超时逻辑不存在；
+   *   - 无静默批量接受：每条建议必须单条 confirm；reject 只是放弃该条不回写。
+   * reject/editAccept 对 style 后端均显式拒绝（该面只有 confirm 这一个生效动作）。
+   */
+  #decideStyle(
+    ref: Extract<ProposalPortRef, { port: 'style' }>,
+    itemId: string,
+    action: PortAction,
+  ): ProposalMutationOutcome {
+    if (action !== 'confirmed') {
+      return portError(
+        'style proposals accept only confirm (t51:B2: no silent batch accept, no edit surface) — ' +
+          'got ' + action + ' for ' + itemId,
+      );
+    }
+    const backend = this.#requireStyle();
+    const item = backend.listPending().find((candidate) => candidate.id === itemId);
+    if (item === undefined) {
+      return portError('unknown style suggestion ' + itemId + ' (listPending() is the only registry)');
+    }
+    backend.accept(item);
+    const stillPending = backend.listPending().filter((candidate) => candidate.id !== itemId).length;
+    return outcomeOf(ref, itemId, action, stillPending);
   }
 }
 

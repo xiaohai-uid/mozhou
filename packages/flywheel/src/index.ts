@@ -109,3 +109,12 @@ export type {
 /** 触发点编排：Flywheel Record 步 afterRecord 钩子注入入口（t48-b §6-C）。 */
 export { runStyleLearnerForWindow } from './style-runner.js';
 export type { RunStyleLearnerOutcome, RunStyleLearnerRequest } from './style-runner.js';
+
+/** 注入缝：StyleProfile → compile() structuralSections（t51:B4 四场景型全注入 ≤800 token）。 */
+export {
+  STYLE_SECTIONS_TOKEN_BUDGET,
+  assertStyleSectionsWithinBudget,
+  estimateStyleSectionsTokens,
+  renderStyleSections,
+} from './style-sections.js';
+export type { StyleSection } from './style-sections.js';
