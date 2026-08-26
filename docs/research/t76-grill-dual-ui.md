@@ -54,6 +54,22 @@ V1 完成判据 = 四票全绿 + 五步旅程端到端台架 + 契约快照在�
 - TUI 专案：三面板交互面表达力不足、悖离图形偏好
 - WebSocket 实时推送：本地动作后重读即最新，推送是过度设计（V2 backlog）
 
+## 修订记录（2026-08-27 实证驱动）
+
+### R1 D1 底座修正：浏览器直引 → 同进程中间件 API
+
+- **触发**：T31 首次真实构建（vite build）实证——data-plane 直接 import node:fs/
+  node:crypto（sha256.js），浏览器端打包 externalize 即炸。t74 §3-a『直引 workspace 包』
+  的研究推断（凭 flywheel import pipeline 前例）未覆盖 Browser 环境差异，被实证推翻。
+- **修正**：apps/web 采用【同进程中间件 API】——Node 侧 server/api.ts（Vite
+  middleware 形态）直调后端读面函数、JSON 直出；dev = Vite middleware 挂载，
+  prod = 薄 server.mjs serve dist + 挂载同一 API。前端 fetch 消费。
+- **保留 t76 精神**：仍无独立 BFF 服务进程（同一 dev server / 同一 serve 进程），
+  无契约翻译层（JSON 直出后端类型）、单机本地。修订 t76 D1 表述为『同进程中间件
+  API（非独立 HTTP BFF）』。
+- **影响**：T31 范围 +apps/web/server（API 中间件 + 薄 serve）；三面板 T32-T34
+  改为 fetch 消费 JSON（契约形状与后端包类型同源）。
+
 ## 4. 验收基线
 
 1. T31-T34 四票各自四绿；app 构建产物可静态打开
