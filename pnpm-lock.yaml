@@ -71,13 +71,13 @@ importers:
 
   packages/flywheel:
     dependencies:
+      '@mozhou/data-plane':
+        specifier: workspace:*
+        version: link:../data-plane
       '@mozhou/pipeline':
         specifier: workspace:*
         version: link:../pipeline
     devDependencies:
-      '@mozhou/data-plane':
-        specifier: workspace:*
-        version: link:../data-plane
       '@mozhou/kernel':
         specifier: workspace:*
         version: link:../kernel

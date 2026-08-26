@@ -68,3 +68,27 @@ export {
 /** 编排面四导出：extractObservations / reduce / runPreferenceLearning / rebuildPreference。 */
 export { rebuildPreference, runPreferenceLearning } from './learner.js';
 export type { PreferenceLearningOutcome, PreferenceRebuildOutcome } from './learner.js';
+
+/** 学习核：四场景型 StyleProfile vN 演化（T23 · #56；t51:B6 / t48-b §3-§4）。
+ *  纯函数零 IO——持久化归 StyleProfileStore 单口，触发点归 Flywheel Record 步。 */
+export {
+  STYLE_ALPHA,
+  STYLE_ALPHA_BOOST,
+  STYLE_DELTA_MAX,
+  STYLE_NMIN,
+  TABOO_CAPACITY,
+  TABOO_PROMOTION_MIN_CHAPTERS,
+  TABOO_PROMOTION_MIN_HITS,
+  emptyTabooCandidateState,
+  updateStyleProfiles,
+} from './style-learner.js';
+export type {
+  ScenarioBatchOutcome,
+  StyleEditObservation,
+  StyleUpdateReport,
+  StyleUpdateResult,
+  TabooCandidateEntry,
+  TabooCandidateState,
+  TabooPromotion,
+  UpdateStyleProfilesOptions,
+} from './style-learner.js';
