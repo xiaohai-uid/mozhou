@@ -69,6 +69,25 @@ importers:
         specifier: ^7.6.12
         version: 7.6.13
 
+  packages/flywheel:
+    dependencies:
+      '@mozhou/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
+    devDependencies:
+      '@mozhou/data-plane':
+        specifier: workspace:*
+        version: link:../data-plane
+      '@mozhou/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@mozhou/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   packages/kernel: {}
 
   packages/pipeline:
