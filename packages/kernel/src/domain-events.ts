@@ -35,6 +35,8 @@ export const DOMAIN_EVENT_TYPES = [
   'CanonCommitted',
   'FlywheelRecorded',
   'StyleProfileUpdated',
+  'TraversalStarted',
+  'TraversalFinished',
 ] as const;
 
 export type DomainEventType = (typeof DOMAIN_EVENT_TYPES)[number];
@@ -52,4 +54,5 @@ export const EVENT_PAIRS: ReadonlyArray<readonly [DomainEventType, DomainEventTy
   ['GenerationStarted', 'GenerationFinished'],
   ['CanonProposalCreated', 'CanonCommitted'],
   ['TaskStarted', 'TaskFinished'],
+  ['TraversalStarted', 'TraversalFinished'],
 ];

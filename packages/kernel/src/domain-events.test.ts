@@ -54,15 +54,24 @@ describe('领域事件词表（T16 受控增补）', () => {
   });
 });
 
-describe('T21 受控增补（#54 · t51:B5）', () => {
-  it('StyleProfileUpdated 入列：词表 15 词条、非成对收尾事件', () => {
+describe('T21 受控增补（#54 · t51:B5）+ T27（#68 · t66 R4）', () => {
+  it('StyleProfileUpdated 入列：非成对收尾事件', () => {
     expect(DOMAIN_EVENT_TYPES.includes('StyleProfileUpdated')).toBe(true);
-    expect(DOMAIN_EVENT_TYPES).toHaveLength(15);
-    // 非成对事件：EVENT_PAIRS 零改动，StyleProfileUpdated 不出现在任何一端
-    expect(EVENT_PAIRS).toHaveLength(3);
+    // 非成对事件：StyleProfileUpdated 不出现在任何一端
     for (const [head, tail] of EVENT_PAIRS) {
       expect(head).not.toBe('StyleProfileUpdated');
       expect(tail).not.toBe('StyleProfileUpdated');
+    }
+  });
+
+  it('词表 17 词条（15 + Traversal 对）；成对约束四对在册', () => {
+    expect(DOMAIN_EVENT_TYPES).toHaveLength(17);
+    expect(EVENT_PAIRS).toHaveLength(4);
+    expect(EVENT_PAIRS).toContainEqual(['TraversalStarted', 'TraversalFinished']);
+    // 配对两端都必须是词表内事件（表与词表不脱钩）
+    for (const [head, tail] of EVENT_PAIRS) {
+      expect(DOMAIN_EVENT_TYPES.includes(head)).toBe(true);
+      expect(DOMAIN_EVENT_TYPES.includes(tail)).toBe(true);
     }
   });
 });
