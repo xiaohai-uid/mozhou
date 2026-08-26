@@ -25,18 +25,24 @@
  * 流缝契约：stream 工厂每次调用供一个全新 AsyncIterable<string>（delta 序列；
  * fallback 重试无法复活已消费的生成器）。传输层错误用 ProviderTransportError
  * 携带三家原始错误样本交归一化表。真实 HTTP adapter 归后续票，本票只冻结缝形状。
+ *
+ * T21 受控增补（#54 · t52）：execute 第三参 meta 桥接会话窗口——parentTaskRef/
+ * chapterIndex/eventPayload（M14 形状 recipeSnapshot）；业务 payload 删平铺
+ * recipeId/recipeVersion 两键（唯一消费方走嵌套路径 version-matrix.ts，t52:B1）；
+ * 失败原因折叠改按本次 taskRef 精确匹配（Q-E，替代「最近一条」邻接启发式）。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ContextPacket } from '@mozhou/context-compiler';
 import type {
   CapabilityRecipe,
+  CapabilityRecipeDocument,
   NormalizedProviderId,
   ProviderBinding,
   RawProviderError,
   RuntimeEngine,
 } from '@mozhou/runtime';
-import { RecoverableError, normalizeProviderError } from '@mozhou/runtime';
+import { RecoverableError, normalizeProviderError, toGenerationStartedPayload } from '@mozhou/runtime';
 import {
   ChapterPhaseError,
   atomicReplace,
@@ -235,14 +241,16 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
 }
 
 /**
- * 账本折叠：最近一条 GenerationFinished 的 reason（引擎把失败原因只写进事件
- * payload，TaskResult 不携带）。S11 全局单飞 V1 下 await 返回后最近一条即本次。
+ * 账本折叠：本次执行（taskRef 精确匹配）的 GenerationFinished reason（引擎把失败
+ * 原因只写进事件 payload）。T21 · t52:Q-E：TaskResult 增只读 taskRef 后按本次
+ * taskRef 精确折叠，替代旧「最近一条」邻接启发式——S11 单飞解除后最近≠本次
+ * （T19 重提交全量重走场景即反例）。
  */
-function lastGenerationFinishedReason(root: string): string | undefined {
+function generationFinishedReason(root: string, taskRef: string): string | undefined {
   const rows = readPipelineLedger(root);
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     const row = rows[i];
-    if (row !== undefined && row.kind === 'task' && row.event.type === 'GenerationFinished') {
+    if (row !== undefined && row.kind === 'task' && row.event.type === 'GenerationFinished' && row.event.taskRef === taskRef) {
       const reason = row.event.payload?.['reason'];
       return typeof reason === 'string' ? reason : undefined;
     }
@@ -296,6 +304,19 @@ export interface DraftStepRequest {
   /** recipe 实例：taskType 驱动引擎解析（tier→provider），预算字段随 payload 下发。 */
   readonly recipe: CapabilityRecipe;
   readonly mode?: DraftMode;
+  /**
+   * 会话窗口任务引用（T21 · t52:B1；编排方从 ChapterProductionSession.taskRef 取，
+   * recordUserEdit/runFlywheelRecord 的 taskRef 同源）：经 meta.parentTaskRef 进执行
+   * 事件 payload 层（DomainEvent 禁增顶层字段，t52:B5）。缺省不桥接。
+   */
+  readonly taskRef?: string;
+  /**
+   * 配方原档（T21 · P1a，t52:B1 定案值；loadRecipeById/loadRecipeFile 所得）：可得时
+   * 经 meta.eventPayload = toGenerationStartedPayload(doc) 把 M14 形状解析快照挂进
+   * GenerationStarted.payload.recipeSnapshot（三级嵌套，version-matrix 消费面）；
+   * 缺省行不含 recipeSnapshot（读侧 ?? null 容缺是既定行为 version-matrix.ts）。
+   */
+  readonly recipeDoc?: CapabilityRecipeDocument;
 }
 
 export interface DraftStepOutcome {
@@ -321,13 +342,22 @@ export interface DraftStepOutcome {
  */
 export async function runDraftStep(request: DraftStepRequest): Promise<DraftStepOutcome> {
   const mode: DraftMode = request.mode ?? 'generate';
-  const result = await request.engine.execute(request.recipe.taskType, {
-    prompt: request.packet.text,
-    recipeId: request.recipe.id,
-    recipeVersion: request.recipe.recipeVersion,
-    hotContextBytes: request.recipe.contextBudget.hotContextBytes,
-    mode,
-  });
+  // T21（t52:B1）桥接：会话窗口 taskRef→parentTaskRef（payload 层）、chapterIndex→顶层槽；
+  // recipeDoc 可得时铸 M14 形状 eventPayload。业务 payload 不再携带平铺 recipeId/
+  // recipeVersion 两键——唯一消费方 version-matrix.ts 只走 recipeSnapshot 嵌套路径。
+  const result = await request.engine.execute(
+    request.recipe.taskType,
+    {
+      prompt: request.packet.text,
+      hotContextBytes: request.recipe.contextBudget.hotContextBytes,
+      mode,
+    },
+    {
+      ...(request.taskRef === undefined ? {} : { parentTaskRef: request.taskRef }),
+      chapterIndex: request.chapterIndex,
+      ...(request.recipeDoc === undefined ? {} : { eventPayload: toGenerationStartedPayload(request.recipeDoc) }),
+    },
+  );
 
   const proseRelPath = proseChapterPath(request.chapterIndex);
   const onDisk = readProseChapter(request.bookRoot, proseRelPath);
@@ -346,7 +376,7 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
     const partialReason = state?.reason;
     const hintMessage = typeof hint['providerMessage'] === 'string' ? hint['providerMessage'] : undefined;
     const failureReason: string | undefined =
-      partialReason ?? hintMessage ?? lastGenerationFinishedReason(request.bookRoot);
+      partialReason ?? hintMessage ?? generationFinishedReason(request.bookRoot, result.taskRef);
     return {
       outcome: result.outcome,
       proseRelPath,

@@ -9,7 +9,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PublishBus, RuntimeEngine, readLedger } from '@mozhou/runtime';
-import type { CapabilityRecipe } from '@mozhou/runtime';
+import type { CapabilityRecipe, CapabilityRecipeDocument } from '@mozhou/runtime';
+import { readPipelineLedger } from './ledger.js';
 import type { ContextPacket } from '@mozhou/context-compiler';
 import {
   LocalDataPlane,
@@ -175,11 +176,13 @@ describe('流式写入正文文件 phase=draft', () => {
     await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
     expect(seenPayload).toMatchObject({
       prompt: '装配完成的生成输入',
-      recipeId: 'chapter-drafting',
-      recipeVersion: '0.1.0',
       hotContextBytes: 8192,
       mode: 'generate',
     });
+    // t52:B1：业务 payload 删平铺 recipeId/recipeVersion 两键——唯一消费方
+    // version-matrix.ts 只走 recipeSnapshot 嵌套路径，平铺身份=冗余投影
+    expect(seenPayload).not.toHaveProperty('recipeId');
+    expect(seenPayload).not.toHaveProperty('recipeVersion');
   });
 });
 
@@ -336,5 +339,69 @@ describe('M17 三级降级可见性接线', () => {
     const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
     expect(outcome.outcome).toBe('failed_terminal');
     expect(outcome.reason).toContain('phase=draft');
+  });
+});
+
+describe('T21 事件供给面增补（#54 · t52 B1/Q-E）', () => {
+  /** 配方原档夹具：RECIPE 本就是全字段 CapabilityRecipe，直接升档成文档。 */
+  const RECIPE_DOC: CapabilityRecipeDocument = {
+    schemaVersion: 1,
+    compatibilityPolicy: 'none',
+    versioning: { schemaVersionRule: 'incompatible-change-requires-major-reject', retiredPaths: [] },
+    recipe: RECIPE,
+  };
+
+  it('P1 桥接端到端：taskRef+recipeDoc ⇒ chapterIndex/parentTaskRef/recipeSnapshot 全链路入账', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['桥接成稿。']));
+
+    const outcome = await runDraftStep({
+      engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE,
+      taskRef: 'tsk_session_t21',
+      recipeDoc: RECIPE_DOC,
+    });
+    expect(outcome.outcome).toBe('succeeded');
+
+    // 读侧走 pipeline 白名单重建面：payload 层新字段全链路可达（engine→账本→读回）
+    const events = readPipelineLedger(root).flatMap((row) => (row.kind === 'task' ? [row.event] : []));
+    const started = events.find((event) => event.type === 'GenerationStarted')!;
+    expect(started.chapterIndex).toBe(7); // 顶层既有槽
+    expect(started.payload?.['recipeSnapshot']).toEqual(RECIPE_DOC); // M14 形状整档入账
+    const snapshot = started.payload?.['recipeSnapshot'] as { recipe: { recipeVersion: string } };
+    expect(snapshot.recipe.recipeVersion).toBe('0.1.0'); // 三级嵌套收窄（version-matrix 同款路径）
+
+    const finished = events.find((event) => event.type === 'GenerationFinished')!;
+    expect(finished.chapterIndex).toBe(7);
+    expect(finished.payload).toMatchObject({ parentTaskRef: 'tsk_session_t21' });
+  });
+
+  it('缺省零回归：不传 taskRef/recipeDoc ⇒ 无 parentTaskRef 键、无 recipeSnapshot 键', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['素跑成稿。']));
+    await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+    for (const event of readLedger({ root }).map((row) => row.event)) {
+      // chapterIndex 恒桥接（步内已知章序，t52:B1 定案值）；parentTaskRef/recipeSnapshot
+      // 仅在调用方显式给出 taskRef/recipeDoc 时才入账
+      expect(event.chapterIndex).toBe(7);
+      expect(event.payload?.['parentTaskRef']).toBeUndefined();
+      expect(event.payload?.['recipeSnapshot']).toBeUndefined();
+    }
+  });
+
+  it('Q-E 精确折叠：失败原因取自本次执行的 GenerationFinished，而非邻接最近行', async () => {
+    const { root } = hermeticBook();
+    // 预置一条异窗口旧失败行（S11 单飞解除后的交错场景缩影）：旧启发式「最近一条」
+    // 在本行之后还有别的写入时即错位，精确折叠按本次 taskRef 收敛。
+    const seedBus = new PublishBus();
+    seedBus.publish({ root }, { type: 'GenerationStarted', taskRef: 'gen_stale_window', payload: {} });
+    seedBus.publish({ root }, { type: 'GenerationFinished', taskRef: 'gen_stale_window', payload: { outcome: 'failed_terminal', reason: 'STALE-REASON-FROM-OLD-WINDOW' } });
+
+    const engine = makeEngine(root); // 不注册绑定 ⇒ ProviderBindingMissingError 直通 terminal
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+    expect(outcome.outcome).toBe('failed_terminal');
+    expect(outcome.reason).toContain('PROVIDER_BINDING_MISSING');
+    expect(outcome.reason).not.toContain('STALE-REASON-FROM-OLD-WINDOW');
   });
 });
