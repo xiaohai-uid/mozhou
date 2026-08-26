@@ -29,6 +29,7 @@ import {
 } from '@mozhou/kernel'
 import type { DependencyManifest, DependencyManifestEntry, StaleMarker } from '@mozhou/kernel'
 import { assertPreWriteHash, atomicReplace, type PlaneContext } from './chapter.js'
+import { assertWithinBudget, staleMarkerEquivalent } from './stale-cache.js'
 import { RUNTIME_EVENTS_PATH, chapterOutlinePath } from './layout.js'
 import { refreshManifestEntries, writeManifest } from './manifest.js'
 import { emitFrontmatter, parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
@@ -184,6 +185,8 @@ export interface StalePropagationResult {
   readonly markedChapters: readonly number[]
   /** 有钉版但未被命中的章节（按章序）；无钉版章节不在传播视野内。 */
   readonly untouchedChapters: readonly number[]
+  /** D03 幂等短路命中的章节：既有标记与计算值逐字段全等、跳过写（revision 不动）。 */
+  readonly skippedByIdempotency: readonly number[]
 }
 
 /**
@@ -194,9 +197,11 @@ export interface StalePropagationResult {
 export function propagateStaleMarkers(ctx: PlaneContext, request: StalePropagationRequest): StalePropagationResult {
   const changes = request.upstreamChanges.map((entry, index) => parseDependencyManifestEntry(entry, index))
   const pins = readChapterDependencyPins(ctx.root)
+  assertWithinBudget(ctx.root, pins)
 
   const markedChapters: number[] = []
   const untouchedChapters: number[] = []
+  const skippedByIdempotency: number[] = []
   const touchedRelPaths: string[] = []
 
   for (const pin of [...pins.values()].sort((a, b) => a.chapterIndex - b.chapterIndex)) {
@@ -214,6 +219,15 @@ export function propagateStaleMarkers(ctx: PlaneContext, request: StalePropagati
     const relPath = chapterOutlinePath(pin.chapterIndex)
     // S3 写前校验：盘上内容 ≠ 基线即拒（外部编辑中的大纲先走对账，不被静默叠加）
     assertPreWriteHash(ctx, relPath)
+
+    // D03 幂等短路：既有标记与计算值逐字段全等 ⇒ 跳过写（revision 不动、原子替换不触发）。
+    const raw = readFileSync(join(ctx.root, relPath), 'utf8')
+    const existing = readOutlineStaleMarker(parseFrontmatter(raw).data)
+    if (existing !== null && staleMarkerEquivalent(existing, marker)) {
+      skippedByIdempotency.push(pin.chapterIndex)
+      continue
+    }
+
     const { nodeId, newRevision } = applyMarkerToOutlineNode(ctx.root, relPath, marker)
     ctx.db.prepare('UPDATE outline_nodes SET revision = ? WHERE id = ?').run(newRevision, nodeId)
     touchedRelPaths.push(relPath)
@@ -226,5 +240,5 @@ export function propagateStaleMarkers(ctx: PlaneContext, request: StalePropagati
     writeManifest(ctx.root, ctx.manifest)
   }
 
-  return { reason: request.reason, markedChapters, untouchedChapters }
+  return { reason: request.reason, markedChapters, untouchedChapters, skippedByIdempotency }
 }
