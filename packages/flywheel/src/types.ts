@@ -56,15 +56,18 @@ export const MIN_SAMPLES_FOR_JUDGMENT = 5;
 export type EditActionLevelV1 = 'cursor' | 'selection';
 
 /**
- * 观测种类：candidate_decision 强信号 / edit_blocks 按操作拆分三态 /
+ * 观测种类词表：candidate_decision 强信号 / edit_blocks 按操作拆分三态 /
  * FlywheelRecorded 任务窗口闭合锚（w=0，只供 degradedWindows 计数）。
  */
-export type ObservationKind =
-  | 'candidate_decision'
-  | 'edit_insert'
-  | 'edit_replace'
-  | 'edit_delete'
-  | 'window_anchor';
+export const OBSERVATION_KINDS = [
+  'candidate_decision',
+  'edit_insert',
+  'edit_replace',
+  'edit_delete',
+  'window_anchor',
+] as const;
+
+export type ObservationKind = (typeof OBSERVATION_KINDS)[number];
 
 /**
  * 单条偏好观测（observations.jsonl 持久化行形状）。

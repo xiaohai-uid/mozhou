@@ -4,7 +4,7 @@
  * κ₀=8、连击 ≥10 全为冻结常量，步数随之冻结）。零时钟零外部服务。
  */
 import { describe, expect, it } from 'vitest';
-import { coldStartProfile, driftSigma, posteriorMean, reduceProfile } from './inference.js';
+import { coldStartProfile, driftSigma, posteriorMean, reduce } from './inference.js';
 import type { PreferenceProfileState } from './inference.js';
 import { DRIFT_STREAK_MIN, KAPPA0, M0, MIN_SAMPLES_FOR_JUDGMENT, PREFERENCE_DIMS } from './types.js';
 import type { PreferenceDim, PreferenceObservation } from './types.js';
@@ -29,7 +29,7 @@ function syntheticObservation(
 }
 
 function fold(profile: PreferenceProfileState, batch: readonly PreferenceObservation[]): PreferenceProfileState {
-  return reduceProfile(profile, batch);
+  return reduce(profile, batch);
 }
 
 describe('m₀ 冷启动', () => {

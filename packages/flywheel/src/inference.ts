@@ -91,7 +91,7 @@ export function driftSigma(state: DimState): number {
  * 乱序输入防御性排序）；obsId 先到先得去重。cursor 只推进到本批最大 position，
  * 真实账本末位由调用方覆盖（尾部无观测行也要消费掉）。
  */
-export function reduceProfile(
+export function reduce(
   prev: PreferenceProfileState,
   observations: readonly PreferenceObservation[],
 ): PreferenceProfileState {
