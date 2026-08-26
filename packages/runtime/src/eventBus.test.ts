@@ -69,3 +69,23 @@ describe('readLedger / 单口委托', () => {
     expect(ledger.map((l) => l.event.type)).toEqual(['TaskStarted']);
   });
 });
+
+describe('T21 词表增补（#54 · t51:B5）', () => {
+  it('StyleProfileUpdated 非成对事件：词表门放行、无配对约束、顶层 taskRef/chapterIndex 回读原样', () => {
+    const { root } = hermeticRoot();
+    const bus = new PublishBus();
+    bus.publish({ root }, {
+      type: 'StyleProfileUpdated',
+      taskRef: 'tsk_style_1',
+      chapterIndex: 9,
+      payload: { regime: 'steady' },
+    });
+    // 非成对收尾事件：无 head/tail 配对（EVENT_PAIRS 不动），发布即落账无悬挂
+    expect(bus.openHeadKeys()).toEqual([]);
+    const events = readLedger({ root }).map((l) => l.event);
+    expect(events.map((e) => e.type)).toEqual(['StyleProfileUpdated']);
+    expect(events[0]!.taskRef).toBe('tsk_style_1'); // 顶层既有槽位（t52:B5：禁塞 payload、禁增顶层字段）
+    expect(events[0]!.chapterIndex).toBe(9);
+    expect(events[0]!.payload).toEqual({ regime: 'steady' });
+  });
+});

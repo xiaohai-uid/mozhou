@@ -1,6 +1,10 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { toGenerationStartedPayload } from '@mozhou/runtime';
+import { PublishBus, RuntimeEngine, toGenerationStartedPayload } from '@mozhou/runtime';
 import type { CapabilityRecipeDocument } from '@mozhou/runtime';
+import { readPipelineLedger } from '@mozhou/pipeline';
 import type { BenchmarkRunReport } from './run.js';
 import { BENCHMARK_VERSION } from './types.js';
 import type { MetricId, MetricReading } from './types.js';
@@ -68,5 +72,57 @@ describe('M14 Recipe↔Benchmark 版本矩阵钩子（T15 产出 × T20 消费�
   it('确定性：同输入两次序列化逐字节一致', () => {
     const input = { report: stubReport(), generationStarted: toGenerationStartedPayload(docWithVersion('9.9.9')) };
     expect(JSON.stringify(matrixRowFor(input))).toBe(JSON.stringify(matrixRowFor(input)));
+  });
+});
+
+describe('T21 全链路（#54 · t52:B1）：execute meta 桥接 → 账本白名单重建 → 矩阵行', () => {
+  it('GenerationStarted 账本行的 recipeSnapshot 经嵌套路径进版本矩阵（engine→账本→消费端到端）', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-t21-e2e-'));
+    try {
+      mkdirSync(join(root, '.mozhou'), { recursive: true });
+      const engine = new RuntimeEngine({
+        bus: new PublishBus(),
+        ctx: { root },
+        newTaskRef: () => 'gen_t21_e2e',
+        nowMs: () => 0, // 零时钟：注入常数时钟，durationMs 恒 0（不碰 Date.now）
+      });
+      engine.registerCapability({
+        taskType: 'CHAPTER_DRAFTING',
+        providerId: 'deepseek',
+        providerVersion: '1.0.0',
+        failurePolicy: { timeoutMs: 120_000, fallbackProviderIds: [] },
+      });
+      engine.registerProviderBinding('deepseek', () => Promise.resolve('ok'));
+
+      const doc = docWithVersion('3.1.4');
+      const result = await engine.execute('CHAPTER_DRAFTING', {}, {
+        parentTaskRef: 'tsk_session_t21',
+        chapterIndex: 7,
+        eventPayload: toGenerationStartedPayload(doc),
+      });
+      expect(result.taskRef).toBe('gen_t21_e2e'); // Q-E 回执与事件同源
+
+      // 读侧 = pipeline 白名单重建面（learner/evaluator 未来同一读法）：
+      // payload 层字段全链路可达，顶层只认 type/taskRef/chapterIndex/payload 四槽
+      const rows = readPipelineLedger(root);
+      const startedPayload = rows
+        .flatMap((row) => (row.kind === 'task' && row.event.type === 'GenerationStarted' ? [row.event.payload] : []))
+        .at(0);
+      expect(startedPayload).toBeDefined();
+      const input = {
+        report: stubReport(),
+        ...(startedPayload === undefined ? {} : { generationStarted: startedPayload }),
+      };
+      expect(matrixRowFor(input).recipeVersion).toBe('3.1.4'); // 三级嵌套路径
+
+      // P3 同趟佐证：账本行 GenerationFinished 已盖 durationMs（注入常数时钟差值）
+      const finished = rows
+        .flatMap((row) => (row.kind === 'task' && row.event.type === 'GenerationFinished' ? [row.event] : []))
+        .at(0)!;
+      expect(finished.payload?.['durationMs']).toBe(0);
+      expect(finished.payload?.['parentTaskRef']).toBe('tsk_session_t21');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
