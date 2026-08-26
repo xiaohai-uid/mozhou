@@ -67,7 +67,7 @@ function bridgedEngine(root: string, bus: PublishBus): RuntimeEngine {
     providerVersion: '1.0.0',
     failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
   });
-  engine.registerProviderBinding('prov_a', () => '正文');
+  engine.registerProviderBinding('prov_a', () => Promise.resolve('正文'));
   return engine;
 }
 
