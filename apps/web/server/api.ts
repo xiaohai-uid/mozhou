@@ -8,7 +8,7 @@
  * 形态：Connect-style (req, res, next)。全部读面函数在此直调（零契约翻译层）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createBook, readCanonState } from '@mozhou/data-plane'
+import { createBook, readCanonState, scanEntityCards } from '@mozhou/data-plane'
 import { readPipelineLedger } from '@mozhou/pipeline'
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
@@ -37,9 +37,10 @@ function urlPath(req: IncomingMessage): string {
 /**
  * 中间件：仅处理 /api/* 前缀；非 API 请求交给 next()（Vite 静态或 prod serve）。
  * 端点：
- *   POST /api/book        {title, dir} → createBook
- *   POST /api/book.state  {root}      → readCanonState（Story Brain 基底）
- *   POST /api/ledger      {root}      → readPipelineLedger（Traversal/账本可见）
+ *   POST /api/book                 {title, dir} → createBook
+ *   POST /api/book.state           {root}       → readCanonState（Story Brain 基底）
+ *   POST /api/story-brain.entities {root}       → scanEntityCards（Story Brain 实体网格）
+ *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  */
 export function apiMiddleware(): Middleware {
   return (req, res, next) => {
@@ -60,6 +61,13 @@ export function apiMiddleware(): Middleware {
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
           json(res, 200, { ok: true, state: readCanonState(root) })
+          return
+        }
+        if (req.method === 'POST' && path === '/api/story-brain.entities') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+          json(res, 200, { ok: true, cards: scanEntityCards(root) })
           return
         }
         if (req.method === 'POST' && path === '/api/ledger') {
