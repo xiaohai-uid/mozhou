@@ -49,20 +49,39 @@ jobs:
       - name: Create claimable Vercel preview
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           tar -czf "$RUNNER_TEMP/apps-web-dist.tgz" -C apps/web/dist .
-          curl -fsS -X POST 'https://codex-deploy-skills.vercel.sh/api/deploy' \
+          set +e
+          HTTP_STATUS=$(curl -sS -o "$RUNNER_TEMP/vercel-preview.json" -w '%{http_code}' -X POST 'https://codex-deploy-skills.vercel.sh/api/deploy' \
             -F "file=@$RUNNER_TEMP/apps-web-dist.tgz" \
-            -F 'framework=null' \
-            -o "$RUNNER_TEMP/vercel-preview.json"
-          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/vercel-preview.json","utf8")); if(!p.previewUrl||!p.claimUrl) process.exit(1); console.log("claimable preview created");'
+            -F 'framework=null')
+          CURL_EXIT=$?
+          set -e
+          printf '{"curlExit":%s,"httpStatus":"%s"}\n' "$CURL_EXIT" "$HTTP_STATUS" > "$RUNNER_TEMP/vercel-preview-meta.json"
+          echo "Vercel claim endpoint HTTP status: $HTTP_STATUS (curl exit $CURL_EXIT)"
       - name: Upload Vercel preview response
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vercel-preview-response
-          path: ${{ runner.temp }}/vercel-preview.json
+          path: |
+            ${{ runner.temp }}/vercel-preview.json
+            ${{ runner.temp }}/vercel-preview-meta.json
           if-no-files-found: error
           retention-days: 1
+      - name: Validate Vercel preview response
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = process.env.RUNNER_TEMP + '/vercel-preview.json';
+          const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (!p.previewUrl || !p.claimUrl) {
+            console.error('Vercel claim deployment failed:', p.error ?? p.message ?? 'missing previewUrl/claimUrl');
+            process.exit(1);
+          }
+          console.log('claimable preview created');
+          NODE
 
   gate:
     name: typecheck / lint / unit+http / build
