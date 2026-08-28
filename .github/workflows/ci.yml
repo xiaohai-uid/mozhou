@@ -20,6 +20,38 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
+  remote-preview-probe:
+    name: remote preview probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe Vercel preview
+        shell: bash
+        env:
+          PREVIEW_URL: https://mozhou-full-next-e2e-aq248vxgd-dayiwang188-5199s-projects.vercel.app
+        run: |
+          set -u
+          for i in $(seq 1 12); do
+            ROOT_STATUS=$(curl -L -sS -o /tmp/root.html -w '%{http_code}' "$PREVIEW_URL/" || true)
+            HEALTH_STATUS=$(curl -L -sS -o /tmp/health.txt -w '%{http_code}' "$PREVIEW_URL/api/v1/health" || true)
+            echo "attempt=$i root=$ROOT_STATUS health=$HEALTH_STATUS"
+            if [ "$ROOT_STATUS" = "200" ] || [ "$HEALTH_STATUS" = "200" ]; then
+              echo "--- health response ---"
+              head -c 1200 /tmp/health.txt || true
+              echo
+              echo "--- root markers ---"
+              grep -o -E '<title>[^<]+|墨舟|MoZhou' /tmp/root.html | head -20 || true
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "--- final root response ---"
+          head -c 1200 /tmp/root.html || true
+          echo
+          echo "--- final health response ---"
+          head -c 1200 /tmp/health.txt || true
+          echo
+          exit 1
+
   workspace:
     name: pnpm workspace / apps-web
     runs-on: ubuntu-latest
