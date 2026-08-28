@@ -63,7 +63,7 @@ jobs:
         run: |
           curl -fL --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
           chmod +x /tmp/cloudflared
-          nohup /tmp/cloudflared tunnel --url http://127.0.0.1:4173 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
+          nohup /tmp/cloudflared tunnel --url http://127.0.0.1:4173 --http-host-header 127.0.0.1:4173 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
           PUBLIC_URL=""
           for i in $(seq 1 30); do
             PUBLIC_URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -1 || true)
