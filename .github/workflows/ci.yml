@@ -39,6 +39,13 @@ jobs:
       - run: pnpm test
       - run: pnpm --filter @mozhou/web test
       - run: pnpm --filter @mozhou/web build
+      - name: Upload apps/web preview bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: apps-web-dist
+          path: apps/web/dist
+          if-no-files-found: error
+          retention-days: 1
 
   gate:
     name: typecheck / lint / unit+http / build
