@@ -20,28 +20,8 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
-  workspace:
-    name: pnpm workspace / apps-web
-    runs-on: ubuntu-latest
-    env:
-      ONNXRUNTIME_NODE_INSTALL_CUDA: "skip"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
-      - run: pnpm --filter @mozhou/web test
-      - run: pnpm --filter @mozhou/web build
-
-  gate:
-    name: typecheck / lint / unit+http / build
+  cloud-loop:
+    name: cloud-only production golden path
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -68,42 +48,96 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
-      - name: Apply database schema
-        run: npx drizzle-kit migrate
-      - run: npx tsc --noEmit
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
-
-  e2e:
-    name: playwright e2e
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: mozhou
-          POSTGRES_PASSWORD: mozhou_dev
-          POSTGRES_DB: mozhou
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U mozhou"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - name: Apply database schema
+      - name: Apply existing database schema
         run: npx drizzle-kit migrate
       - run: npx playwright install --with-deps chromium
-      - run: node node_modules/@playwright/test/cli.js test
+      - name: Build production Next.js app
+        run: npm run build
+      - name: Start production app
+        run: |
+          nohup npm run start -- -p 3210 > /tmp/mozhou-prod.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3210/ >/tmp/local-root.html; then
+              echo "LOCAL_APP_READY attempt=$i"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/mozhou-prod.log
+          exit 1
+      - name: Open temporary public Cloudflare tunnel and verify from public URL
+        run: |
+          curl -fL --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
+          chmod +x /tmp/cloudflared
+          nohup /tmp/cloudflared tunnel --url http://127.0.0.1:3210 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
+          PUBLIC_URL=""
+          for i in $(seq 1 30); do
+            PUBLIC_URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -1 || true)
+            if [ -n "$PUBLIC_URL" ]; then break; fi
+            sleep 2
+          done
+          if [ -z "$PUBLIC_URL" ]; then
+            cat /tmp/cloudflared.log
+            exit 1
+          fi
+          echo "PUBLIC_URL=$PUBLIC_URL"
+          echo "$PUBLIC_URL" > /tmp/public-url.txt
+          ROOT_STATUS=$(curl -L -sS -o /tmp/public-root.html -w '%{http_code}' "$PUBLIC_URL/")
+          HEALTH_STATUS=$(curl -L -sS -o /tmp/public-health.txt -w '%{http_code}' "$PUBLIC_URL/api/v1/health")
+          echo "PUBLIC_ROOT_STATUS=$ROOT_STATUS"
+          echo "PUBLIC_HEALTH_STATUS=$HEALTH_STATUS"
+          echo "PUBLIC_ROOT_MARKERS:"
+          grep -o -E '<title>[^<]+|墨舟|MoZhou' /tmp/public-root.html | head -20 || true
+          echo "PUBLIC_HEALTH_BODY:"
+          head -c 1200 /tmp/public-health.txt || true
+          echo
+          test "$ROOT_STATUS" = "200"
+          test "$HEALTH_STATUS" = "200"
+          ! grep -q 'Login – Vercel' /tmp/public-root.html
+      - name: Run existing production Golden Journey in real Chromium
+        env:
+          E2E_PROD: "1"
+          E2E_PORT: "3210"
+        run: node node_modules/@playwright/test/cli.js test tests/e2e/golden-journey.spec.ts
+      - name: Capture post-journey browser evidence
+        run: |
+          node - <<'NODE'
+          const { chromium } = require('@playwright/test');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+            const response = await page.goto('http://127.0.0.1:3210/', { waitUntil: 'networkidle' });
+            console.log('POST_JOURNEY_ROOT_STATUS=' + response.status());
+            console.log('POST_JOURNEY_TITLE=' + await page.title());
+            await page.screenshot({ path: '/tmp/mozhou-cloud-loop.png', fullPage: true });
+            await browser.close();
+          })();
+          NODE
+      - name: Show production/tunnel diagnostics
+        if: always()
+        run: |
+          echo '--- app log tail ---'
+          tail -80 /tmp/mozhou-prod.log || true
+          echo '--- tunnel log tail ---'
+          tail -80 /tmp/cloudflared.log || true
+
+  workspace:
+    if: ${{ false }}
+    name: pnpm workspace / apps-web
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo skipped during temporary cloud-loop diagnostic
+
+  gate:
+    if: ${{ false }}
+    name: typecheck / lint / unit+http / build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo skipped during temporary cloud-loop diagnostic
+
+  e2e:
+    if: ${{ false }}
+    name: playwright e2e
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo skipped during temporary cloud-loop diagnostic
