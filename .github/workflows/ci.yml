@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 env:
@@ -20,6 +20,26 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
+  workspace:
+    name: pnpm workspace / apps-web
+    runs-on: ubuntu-latest
+    env:
+      ONNXRUNTIME_NODE_INSTALL_CUDA: "skip"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm --filter @mozhou/web test
+      - run: pnpm --filter @mozhou/web build
+
   gate:
     name: typecheck / lint / unit+http / build
     runs-on: ubuntu-latest
