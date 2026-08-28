@@ -55,7 +55,7 @@ jobs:
         run: npm run build
       - name: Start production app
         run: |
-          nohup npm run start -- -p 3210 > /tmp/mozhou-prod.log 2>&1 &
+          nohup env NODE_ENV=test npm run start -- -p 3210 > /tmp/mozhou-prod.log 2>&1 &
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3210/ >/tmp/local-root.html; then
               echo "LOCAL_APP_READY attempt=$i"
