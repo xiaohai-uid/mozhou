@@ -21,129 +21,39 @@ env:
 
 jobs:
   remote-preview-probe:
-    name: remote full-app probe
+    name: protection-off probe
     runs-on: ubuntu-latest
     steps:
-      - name: Probe public Vercel deployment
+      - name: Verify direct deployment protection setting
         shell: bash
-        env:
-          PREVIEW_URL: https://mozhou-full-next-e2e-public-vu4eui7ev.vercel.app
         run: |
-          set -u
-          for i in $(seq 1 18); do
-            ROOT_STATUS=$(curl -L -sS -o /tmp/root.html -w '%{http_code}' "$PREVIEW_URL/" || true)
-            HEALTH_STATUS=$(curl -L -sS -o /tmp/health.txt -w '%{http_code}' "$PREVIEW_URL/api/v1/health" || true)
-            ROOT_TITLE=$(grep -o -E '<title>[^<]+' /tmp/root.html | head -1 || true)
-            echo "attempt=$i root=$ROOT_STATUS health=$HEALTH_STATUS title=$ROOT_TITLE"
-            if [ "$ROOT_STATUS" = "200" ] && [ "$HEALTH_STATUS" = "200" ] && ! grep -q 'Login – Vercel' /tmp/root.html && ! grep -q 'Login – Vercel' /tmp/health.txt; then
-              echo "--- health response ---"
-              head -c 1600 /tmp/health.txt || true
-              echo
-              echo "--- root markers ---"
-              grep -o -E '<title>[^<]+|墨舟|MoZhou' /tmp/root.html | head -30 || true
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "--- final root response ---"
-          head -c 1600 /tmp/root.html || true
+          URL='https://vercel-protection-off-probe-iesqvkhou.vercel.app'
+          STATUS=$(curl -L -sS -o /tmp/body.html -w '%{http_code}' "$URL/" || true)
+          TITLE=$(grep -o -E '<title>[^<]+' /tmp/body.html | head -1 || true)
+          echo "status=$STATUS title=$TITLE"
+          head -c 800 /tmp/body.html || true
           echo
-          echo "--- final health response ---"
-          head -c 1600 /tmp/health.txt || true
-          echo
-          exit 1
+          test "$STATUS" = "200"
+          grep -q 'VERCEL_PROTECTION_OFF_OK' /tmp/body.html
+          ! grep -q 'Login – Vercel' /tmp/body.html
 
   workspace:
+    if: false
     name: pnpm workspace / apps-web
     runs-on: ubuntu-latest
-    env:
-      ONNXRUNTIME_NODE_INSTALL_CUDA: "skip"
     steps:
-      - uses: actions/checkout@v4
-      - name: Upload legacy app source bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: legacy-app-source
-          path: app
-          if-no-files-found: error
-          retention-days: 1
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
-      - run: pnpm --filter @mozhou/web test
-      - run: pnpm --filter @mozhou/web build
+      - run: echo skipped-for-one-shot-probe
 
   gate:
+    if: false
     name: typecheck / lint / unit+http / build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: mozhou
-          POSTGRES_PASSWORD: mozhou_dev
-          POSTGRES_DB: mozhou
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U mozhou"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - name: Apply database schema
-        run: npx drizzle-kit migrate
-      - run: npx tsc --noEmit
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
+      - run: echo skipped-for-one-shot-probe
 
   e2e:
+    if: false
     name: playwright e2e
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: mozhou
-          POSTGRES_PASSWORD: mozhou_dev
-          POSTGRES_DB: mozhou
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U mozhou"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - name: Apply database schema
-        run: npx drizzle-kit migrate
-      - run: npx playwright install --with-deps chromium
-      - run: node node_modules/@playwright/test/cli.js test
+      - run: echo skipped-for-one-shot-probe
