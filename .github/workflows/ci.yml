@@ -108,23 +108,23 @@ jobs:
             if (match === null) throw new Error('cannot parse created book root: ' + createdText)
             const root = match[1]
 
-            const ref = 'character:linzhou'
+            const ref = 'char:linzhou'
             const rel = dataPlane.entityCardFileRel(ref)
             const absolute = join(root, rel)
             mkdirSync(dirname(absolute), { recursive: true })
             writeFileSync(
               absolute,
-              '---\nref: character:linzhou\nname: 林舟\nbrief: 云端验收主角\n---\n# 林舟\n',
+              '---\nref: char:linzhou\nname: 林舟\nbrief: 云端验收主角\n---\n# 林舟\n',
               'utf8',
             )
 
             await page.getByRole('button', { name: '刷新实体' }).click()
-            const card = page.locator('[data-entity-ref="character:linzhou"]')
+            const card = page.locator('[data-entity-ref="char:linzhou"]')
             await expect(card).toContainText('林舟')
             await expect(card).toContainText('云端验收主角')
-            await expect(page.getByTestId('story-brain-entities')).toContainText('character')
+            await expect(page.getByTestId('story-brain-entities')).toContainText('char')
             await page.screenshot({ path: '/tmp/round2-story-brain.png', fullPage: true })
-            console.log('ROUND2_BROWSER_PASS ref=character:linzhou name=林舟')
+            console.log('ROUND2_BROWSER_PASS ref=char:linzhou name=林舟')
             await browser.close()
           })().catch((error) => {
             console.error(error)
