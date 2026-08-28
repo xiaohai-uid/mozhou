@@ -82,8 +82,17 @@ jobs:
           fi
           echo "PUBLIC_URL=$PUBLIC_URL"
           echo "$PUBLIC_URL" > /tmp/public-url.txt
-          ROOT_STATUS=$(curl -L -sS -o /tmp/public-root.html -w '%{http_code}' "$PUBLIC_URL/")
-          HEALTH_STATUS=$(curl -L -sS -o /tmp/public-health.txt -w '%{http_code}' "$PUBLIC_URL/api/v1/health")
+          ROOT_STATUS="000"
+          HEALTH_STATUS="000"
+          for i in $(seq 1 18); do
+            ROOT_STATUS=$(curl -L -sS --max-time 15 -o /tmp/public-root.html -w '%{http_code}' "$PUBLIC_URL/" || true)
+            HEALTH_STATUS=$(curl -L -sS --max-time 15 -o /tmp/public-health.txt -w '%{http_code}' "$PUBLIC_URL/api/v1/health" || true)
+            echo "PUBLIC_PROBE attempt=$i root=$ROOT_STATUS health=$HEALTH_STATUS"
+            if [ "$ROOT_STATUS" = "200" ] && [ "$HEALTH_STATUS" = "200" ]; then
+              break
+            fi
+            sleep 5
+          done
           echo "PUBLIC_ROOT_STATUS=$ROOT_STATUS"
           echo "PUBLIC_HEALTH_STATUS=$HEALTH_STATUS"
           echo "PUBLIC_ROOT_MARKERS:"
