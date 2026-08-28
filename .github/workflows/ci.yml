@@ -27,19 +27,6 @@ jobs:
       ONNXRUNTIME_NODE_INSTALL_CUDA: "skip"
     steps:
       - uses: actions/checkout@v4
-      - name: Upload private Replit source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: replit-source-snapshot
-          path: |
-            .
-            !.git/**
-            !**/.env
-            !**/.env.*
-            !**/node_modules/**
-            !**/.next/**
-          if-no-files-found: error
-          retention-days: 1
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
