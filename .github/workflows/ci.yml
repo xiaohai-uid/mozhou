@@ -46,6 +46,23 @@ jobs:
           path: apps/web/dist
           if-no-files-found: error
           retention-days: 1
+      - name: Create claimable Vercel preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/apps-web-dist.tgz" -C apps/web/dist .
+          curl -fsS -X POST 'https://codex-deploy-skills.vercel.sh/api/deploy' \
+            -F "file=@$RUNNER_TEMP/apps-web-dist.tgz" \
+            -F 'framework=null' \
+            -o "$RUNNER_TEMP/vercel-preview.json"
+          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/vercel-preview.json","utf8")); if(!p.previewUrl||!p.claimUrl) process.exit(1); console.log("claimable preview created");'
+      - name: Upload Vercel preview response
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel-preview-response
+          path: ${{ runner.temp }}/vercel-preview.json
+          if-no-files-found: error
+          retention-days: 1
 
   gate:
     name: typecheck / lint / unit+http / build
