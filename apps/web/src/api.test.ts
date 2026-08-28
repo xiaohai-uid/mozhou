@@ -62,13 +62,13 @@ describe('apps/web api 中间件 · T31/T32', () => {
     roots.push(dir)
     const created = await post(base, '/api/book', { title: '实体书', dir })
     const root = created.data.root as string
-    const ref = 'character:linzhou' as EntityRef
+    const ref = 'char:linzhou' as EntityRef
     const rel = entityCardFileRel(ref)
     const absolute = join(root, rel)
     mkdirSync(dirname(absolute), { recursive: true })
     writeFileSync(
       absolute,
-      '---\nref: character:linzhou\nname: 林舟\nbrief: 主角\n---\n# 林舟\n',
+      '---\nref: char:linzhou\nname: 林舟\nbrief: 主角\n---\n# 林舟\n',
       'utf8',
     )
 
@@ -77,8 +77,8 @@ describe('apps/web api 中间件 · T31/T32', () => {
     expect(data.ok).toBe(true)
     expect(data.cards).toEqual([
       expect.objectContaining({
-        ref: 'character:linzhou',
-        cardType: 'character',
+        ref: 'char:linzhou',
+        cardType: 'char',
         name: '林舟',
         brief: '主角',
         aiContext: 'detected',
