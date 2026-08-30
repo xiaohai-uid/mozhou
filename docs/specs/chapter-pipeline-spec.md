@@ -23,7 +23,7 @@ tags:
 | 1 | Prepare | chapterIndex | 章查询结果集（内存态） | 幂等查询，无失败面 | TaskStarted(step=prepare) |
 | 2 | Compile | Prepare 结果集 | ContextPacket + Receipt | EmptyRecallError / ConvergenceError（穿透不降级） | ContextCompiled（已有） |
 | 3 | Draft | Packet + recipe 实例 | 正文流 → `<书>/正文/**/第N章.md`（phase=draft） | provider 错误归一化；M17 三级降级 | GenerationStarted/Finished |
-| 4 | Review | draft | 机械核检报告（旁路建议另列） | 无硬失败 | —— |
+| 4 | Review | exact draft + ContextReceipt + QualityPolicy | QualityReviewReport | provider unavailable=explicit refusal; blocking fail=review_rework eligible | QualityReviewCompleted |
 | 5 | User Edit | draft | 编辑 delta（结构化操作块） | 保护位校验 | UserEditRecorded |
 | 6 | Final Extract | 终稿全文 | 五族候选 delta（运行期驻留） | 提取失败=failed_recoverable 重试 | CandidateDeltaExtracted |
 | 7 | Continuity Gate | delta+终稿 | 通过 或 HARD_CONFLICT[] | 冲突清单进 Result 字段 | TaskStepTransitioned(gate) |

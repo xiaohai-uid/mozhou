@@ -2,13 +2,23 @@
 
 AI 小说写作平台 —— 自有品牌 · 模型自由 · 数据自有
 
+## 产品线划分（2026-08-30 起，ADR-0025）
+
+- **`apps/web + packages/*` 是 Novel OS 2.0 主线**：pnpm monorepo（`@mozhou/kernel` / `data-plane` / `context-compiler` / `pipeline` / `runtime` / `flywheel` / `benchmark` 等），新的 Story Kernel 与 quality-engine 能力只在这里落地。
+- **`app/` 是遗留应用面（legacy）**：V1.x Next.js 单体，**只接收迁移/安全/可靠性修复**，不再新增核心能力；迁移完成前其用户数据导出/读取能力保持可用。
+
 ## 快速开始（开发环境）
 
 ```bash
-# 1. 启动基础设施（Postgres+pgvector、one-api 网关）
+# Novel OS 2.0 主线（packages/* + apps/web）
+pnpm install
+pnpm build
+pnpm test
+
+# 1. 启动基础设施（Postgres+pgvector、one-api 网关）— legacy 应用依赖
 docker compose up -d
 
-# 2. 启动 Web 应用（开发模式）
+# 2. 启动遗留 Web 应用（开发模式）
 cd app
 npm install
 npm run dev
@@ -36,19 +46,21 @@ npm run gate:release
 ## 结构
 
 ```
-app/                 Next.js 应用（App Router + TS + Tailwind + shadcn/ui）
+packages/            Novel OS 核心包（kernel/data-plane/context-compiler/pipeline/runtime/flywheel/benchmark/…）
+apps/web             Novel OS 2.0 UI（Vite + React，主线）
+app/                 遗留 Next.js 应用（legacy，只收迁移/安全/可靠性修复）
+docs/adr/            架构决策记录
+docs/specs/          规格文档（chapter-pipeline-spec 等）
 docker-compose.yml   Postgres(pgvector) + one-api 编排
-.scratch/            本地工单 tracker（mozhou-mvp 12 票）
+.scratch/            本地工单 tracker
 prototype/           原型（pipeline-engine.prototype.html）
 CONTEXT.md           设计决策记录（grill-with-docs）
 ```
 
 ## 技术栈
 
-- **Web**: Next.js (App Router) + TypeScript + Tailwind + shadcn/ui
-- **数据**: PostgreSQL 16 + pgvector + Drizzle ORM
-- **LLM 网关**: one-api（额度/渠道/failover）
-- **部署**: Docker Compose 单机
+- **Novel OS 主线**: TypeScript 5.5 + Node 22 + pnpm workspace + Vitest；UI 为 Vite + React（apps/web）
+- **遗留 app/**: Next.js (App Router) + TypeScript + Tailwind + shadcn/ui；PostgreSQL 16 + pgvector + Drizzle ORM；one-api 网关
 
 ## 设计来源
 

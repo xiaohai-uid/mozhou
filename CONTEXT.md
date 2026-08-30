@@ -267,3 +267,16 @@ _Avoid_: Security level, data flag
 **Market Brief**:
 A structured, continuously updated profile of genre trends, hook placements, chapter length distributions, pacing patterns, and anti-patterns extracted from public market leaderboards and benchmarks.
 _Avoid_: Market report, scan markdown, crawler output
+
+## 2026-08-30 文学质量门集成边界冻结（ADR-0025）
+
+实施计划 `docs/superpowers/plans/2026-08-30-longform-quality-gates-integration.md` 开工前置裁决，详见 [[0025-literary-quality-review-boundary]]。要点：
+
+1. Continuity Gate 保持确定性与正典权威；文学 LLM 判定不得进入 Canon 真伪判定。
+2. 文学质量审查 = 独立 pre-Canon 质量边界（`@mozhou/quality-engine`），报告锚定 `chapterIndex + draftRevision + draftContentHash + receiptId + ruleSetDigest + reviewerBinding`，正文变化即 stale（fail closed）。
+3. 管线步 id `review` 保留，契约扩展为「产出版本绑定 QualityReviewReport」；blocking 失败走显式 `review_rework` 回炉边，每 session 自动回炉上限 2 次，第 3 次交作者。
+4. **QualityReviewReport 是值**（随报告 JSON 落 `.mozhou/quality-reviews/`，非 Canon）；飞轮侧信号由事件投影派生，不双写报告本体。
+5. `apps/web + packages/*` 为 Novel OS 主线；`app/` 冻结为遗留面（只收迁移/安全/可靠性修复）。项目级质量策略不入 TemporalFact。
+
+新增术语：**QualityReviewReport**（版本绑定的文学审查报告值）、**QualityPolicy**（平台默认+项目覆盖的规则集，`maxAutomaticReworks` 恒为 2）、**FailurePattern**（作者结构化纠错投影出的项目级失败记忆，质量先验而非 Canon 事实）、**ReaderExperienceDelta**（压力/期待/实得/兑付/解法模式的章级诊断，Kernel 外）。
+_Avoid_: 让文学判定进入 Gate 裁决、把质量规则写进 TemporalFact、自动回炉超 2 次

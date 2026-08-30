@@ -1,3 +1,5 @@
+> **LEGACY（2026-08-30 起，ADR-0025）**：本目录是墨舟 V1.x 遗留应用面。Novel OS 主线在 `apps/web + packages/*`；本目录只接收迁移/安全/可靠性修复，不再新增 Story Kernel 或 quality-engine 能力。迁移期间用户数据导出/读取能力保持可用。
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
