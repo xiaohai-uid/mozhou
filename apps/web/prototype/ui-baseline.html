@@ -1,0 +1,573 @@
+<!doctype html>
+<!--
+  PROTOTYPE v2 · 丢弃式原型 · 2026-08-30（判定后移入 throwaway 分支，不入 main）
+  v1（三个只摆 6 个面的变体）被用户否决："感觉都不太行……我这个有多少技能，准确来说是有多少功能"。
+
+  问题（重述）：完整功能面 —— 13 个一级功能（创作5/工作流1/资源6/账户1）+ 技能面
+  （内置执行器 6 · 广场 3 · oh-story 13 · 自定义技能 · 蒸馏风格）+ Novel OS 新面板
+  （质量门/Story Brain/装配看板/变更矩阵）—— 在深色工作台骨架里如何组织？
+
+  三个宏观 IA 变体，?variant= 切换（←/→ 方向键亦可）：
+    A — 全功能单壳：17+ 功能全部常驻左栏分组，工作台只是其中一项
+    B — 专注工作台 + 功能抽屉：工作台独占全屏（legacy 原味），☰ 抽屉承载全部功能
+    C — 指挥台 + 命令面板：仪表盘为家，⌘K 命令面板承载全部功能与技能的直达
+
+  全部数据为静态 mock；只读原型。设计 token 逐值取自 app/app/globals.css「夜墨编辑工作室」。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>墨舟 · UI 基线原型 v2（PROTOTYPE）</title>
+<style>
+  :root {
+    --background: #0b0a0f;
+    --foreground: #f4f1fa;
+    --accent: #8b78ff;
+    --accent-strong: #9d8eff;
+    --accent-soft: rgba(139, 120, 255, 0.12);
+    --surface: #15131a;
+    --surface-2: #282330;
+    --surface-3: #1d1923;
+    --surface-raised: #211c29;
+    --surface-sunken: #100e14;
+    --hairline: rgba(244, 241, 250, 0.1);
+    --hairline-strong: rgba(244, 241, 250, 0.16);
+    --text-muted: #aba4b8;
+    --text-faint: #7c7487;
+    --danger: #f28b9b;
+    --success: #80d6b0;
+    --warning: #e4b875;
+    --shadow-ink: rgba(0, 0, 0, 0.36);
+    --font-sans: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--background); color: var(--foreground);
+    font-family: var(--font-sans); font-size: 14px; line-height: 1.55;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  input, select, textarea { font: inherit; }
+
+  /* ── 材质 ─────────────────────────────────────────────── */
+  .panel { background: var(--surface); border: 1px solid var(--hairline); border-radius: 0.75rem; }
+  .panel-soft { background: var(--surface-3); border: 1px solid var(--hairline); border-radius: 0.75rem; }
+  .control { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 0.5rem; padding: 7px 12px; }
+  .primary-action { background: var(--accent); color: #fff; border-radius: 0.5rem; padding: 8px 16px; font-weight: 600; }
+  .primary-action:hover { background: var(--accent-strong); }
+  .muted { color: var(--text-muted); }
+  .faint { color: var(--text-faint); }
+  .mono { font-family: var(--font-mono); font-size: 12px; }
+  .capsule { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 13px; border: 1px solid var(--surface-2); color: var(--text-faint); user-select: none; }
+  .capsule.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--hairline-strong); color: var(--text-muted); }
+  .badge { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; }
+
+  /* ── 骨架 ─────────────────────────────────────────────── */
+  .shell { display: flex; flex-direction: column; height: 100vh; }
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: var(--surface-sunken); border-bottom: 1px solid var(--hairline); flex: 0 0 auto; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: 0.5px; }
+  .brand-glyph { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 14px; font-weight: 800; }
+  .body { display: flex; flex: 1 1 auto; min-height: 0; }
+  .rail { width: 248px; flex: 0 0 auto; background: var(--surface-sunken); border-right: 1px solid var(--hairline); display: flex; flex-direction: column; }
+  .center { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .rightbar { width: 320px; flex: 0 0 auto; background: var(--surface-sunken); border-left: 1px solid var(--hairline); overflow-y: auto; }
+
+  .nav-label { font-size: 11px; letter-spacing: 1.6px; color: var(--text-faint); padding: 12px 14px 4px; font-weight: 650; }
+  .nav-item { display: flex; align-items: center; gap: 9px; width: calc(100% - 12px); margin: 0 6px; text-align: left; padding: 6px 10px; border-radius: 0.5rem; color: var(--text-muted); font-size: 13px; }
+  .nav-item:hover { background: var(--surface-3); color: var(--foreground); }
+  .nav-item.on { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  .nav-ico { width: 17px; text-align: center; opacity: 0.9; font-size: 13px; }
+  .nav-item .badge { margin-left: auto; }
+
+  .scroll { overflow-y: auto; min-height: 0; }
+  .scroll::-webkit-scrollbar { width: 9px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 9px; }
+
+  /* 对话 */
+  .bubble { max-width: 78%; padding: 10px 14px; border-radius: 0.75rem; font-size: 13.5px; }
+  .bubble.ai { background: var(--surface-3); border: 1px solid var(--hairline); border-bottom-left-radius: 2px; }
+  .bubble.me { background: var(--accent-soft); border: 1px solid transparent; margin-left: auto; border-bottom-right-radius: 2px; }
+  .composer { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--hairline); background: var(--surface-sunken); }
+  .composer textarea { flex: 1; resize: none; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 0.5rem; color: var(--foreground); padding: 9px 12px; height: 44px; }
+
+  /* 实体/事实/大纲 */
+  .egrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+  .ecard { padding: 11px 12px; cursor: pointer; transition: border-color .12s; }
+  .ecard:hover { border-color: var(--hairline-strong); }
+  .ecard.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+  .ecard .nm { font-weight: 650; } .ecard .br { font-size: 12px; margin-top: 2px; }
+
+  /* 阶段轨 */
+  .stage { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 12.5px; color: var(--text-faint); }
+  .stage .idx { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; border: 1px solid var(--hairline-strong); flex: 0 0 auto; }
+  .stage.done { color: var(--text-muted); } .stage.done .idx { background: var(--surface-2); color: var(--success); border-color: transparent; }
+  .stage.cur { color: var(--accent); font-weight: 650; } .stage.cur .idx { background: var(--accent-soft); border-color: var(--accent); }
+
+  /* 矩阵 */
+  table.matrix { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  .matrix th, .matrix td { border: 1px solid var(--hairline); padding: 7px 10px; text-align: center; }
+  .matrix th { background: var(--surface-3); color: var(--text-muted); font-weight: 600; }
+  .matrix td.rowh { text-align: left; background: var(--surface-3); white-space: nowrap; }
+  .cell-hit { background: rgba(242, 139, 155, 0.16); color: var(--danger); font-weight: 650; }
+  .cell-ok { background: rgba(128, 214, 176, 0.10); color: var(--success); }
+  .cell-no { color: var(--text-faint); }
+
+  /* 质量门 */
+  .verdict { display: inline-flex; align-items: center; gap: 7px; padding: 3px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
+  .verdict.fail { background: rgba(242, 139, 155, 0.14); color: var(--danger); }
+  .qfail { border-left: 3px solid var(--danger); padding: 8px 12px; background: var(--surface-3); border-radius: 0 0.5rem 0.5rem 0; }
+  .qadv { border-left: 3px solid var(--warning); padding: 8px 12px; background: var(--surface-3); border-radius: 0 0.5rem 0.5rem 0; }
+  .unavail { display: flex; gap: 8px; background: rgba(228, 184, 117, 0.08); border: 1px dashed rgba(228, 184, 117, 0.4); border-radius: 0.5rem; padding: 8px 12px; font-size: 12.5px; color: var(--warning); }
+
+  /* 装配看板 */
+  .rentry { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: 0.5rem; background: var(--surface-3); font-size: 12.5px; }
+  .qbar { height: 5px; border-radius: 5px; background: var(--surface-2); overflow: hidden; display: flex; }
+  .qbar i { display: block; height: 100%; }
+
+  /* 抽屉（变体 B） */
+  .drawer { position: fixed; top: 0; bottom: 0; left: 0; width: 352px; z-index: 40; background: #14121a; border-right: 1px solid var(--hairline-strong); box-shadow: 14px 0 40px var(--shadow-ink); display: flex; flex-direction: column; transform: translateX(-105%); transition: transform .18s ease; }
+  .drawer.open { transform: none; }
+  .scrim { position: fixed; inset: 0; z-index: 30; background: rgba(4, 3, 8, 0.55); display: none; }
+  .scrim.open { display: block; }
+
+  /* 指挥台卡片（变体 C） */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(285px, 1fr)); gap: 12px; }
+  .hubcard { padding: 14px 16px; cursor: pointer; transition: border-color .12s, transform .12s; }
+  .hubcard:hover { border-color: var(--hairline-strong); transform: translateY(-1px); }
+  .hubcard .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 15px; margin-bottom: 8px; }
+
+  /* 命令面板（变体 C） */
+  .palette-wrap { position: fixed; inset: 0; z-index: 50; background: rgba(4, 3, 8, 0.6); display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+  .palette-wrap.open { display: flex; }
+  .palette { width: 620px; max-height: 62vh; background: #17141d; border: 1px solid var(--hairline-strong); border-radius: 0.9rem; box-shadow: 0 24px 70px var(--shadow-ink); display: flex; flex-direction: column; overflow: hidden; }
+  .palette input { background: transparent; border: none; outline: none; color: var(--foreground); padding: 14px 18px; font-size: 15px; border-bottom: 1px solid var(--hairline); }
+  .pal-group { font-size: 11px; letter-spacing: 1.6px; color: var(--text-faint); padding: 10px 18px 3px; font-weight: 650; }
+  .pal-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 18px; font-size: 13.5px; color: var(--text-muted); }
+  .pal-item:hover, .pal-item.sel { background: var(--accent-soft); color: var(--foreground); }
+  .pal-item .k { margin-left: auto; font-size: 11px; color: var(--text-faint); border: 1px solid var(--hairline); border-radius: 4px; padding: 0 5px; }
+
+  h3.sec { font-size: 12px; letter-spacing: 1.5px; color: var(--text-faint); font-weight: 650; margin: 0 0 8px; }
+
+  /* 浮动切换条 */
+  #switcher { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; z-index: 99; background: #1c1a22; border: 1px solid var(--hairline-strong); border-radius: 999px; padding: 6px 10px; box-shadow: 0 10px 28px var(--shadow-ink); }
+  #switcher button.arr { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: var(--text-muted); }
+  #switcher button.arr:hover { background: var(--surface-2); color: #fff; }
+  #switcher .lbl { min-width: 210px; text-align: center; font-size: 13px; font-weight: 650; letter-spacing: 0.3px; }
+  #switcher .lbl small { display: block; font-weight: 400; color: var(--text-faint); font-size: 11px; }
+  #watermark { position: fixed; top: 10px; right: -34px; transform: rotate(35deg); z-index: 99; background: var(--warning); color: #1a1a1a; font-size: 10.5px; font-weight: 800; letter-spacing: 1px; padding: 3px 40px; opacity: 0.9; }
+</style>
+</head>
+<body>
+<div id="watermark">PROTOTYPE · v2</div>
+<div id="app"></div>
+<div id="switcher">
+  <button class="arr" onclick="cycle(-1)" title="上一个变体（←）">‹</button>
+  <div class="lbl" id="sw-lbl"></div>
+  <button class="arr" onclick="cycle(1)" title="下一个变体（→）">›</button>
+</div>
+
+<script>
+/* ══════════════ 完整功能面（来自 legacy app-shell-nav / skills API 实测） ══════════════ */
+const NAV = [
+  { g: '创作', items: [
+    ['工作台', '⌂'], ['写作对话', '✎'], ['我的作品', '📖'], ['风格蒸馏', '🪶'], ['小说拆解', '✂'],
+  ]},
+  { g: '检视 · Novel OS', items: [
+    ['Story Brain', '⿲'], ['装配看板', '🧾'], ['变更矩阵', '⟳'], ['质量门', '⚑'],
+  ]},
+  { g: '工作流', items: [ ['任务中心', '☑', 2] ]},
+  { g: '资源', items: [
+    ['书源搜索', '🔍'], ['书源书架', '🔖'], ['技能广场', '✦'], ['网文扫榜', '🏆'], ['联网搜索', '🌐'], ['云同步', '☁'],
+  ]},
+  { g: '账户', items: [ ['会员中心', '👤'] ]},
+];
+
+const SKILLS = {
+  builtin: ['故事基座（常驻）', '质量门（常驻）', '章节规划', '读者题材', '叙事风格', '自定义提示'],
+  plaza: ['去 AI 味', '人物小传', '信息差设计'],
+  ohstory: 13, mine: 4,
+};
+const CAPSULES = ['续写', '对白打磨', '悬念调度', '场景氛围', '一致性自查'];
+
+const BOOK = { title: '夜航西楼', chapter: '第 3 章 · 雾中来客', words: '4,821 / 6,000' };
+const TASKS = [
+  { n: '拆解《长夜余烬》· 结构与黄金章', s: '运行中 · Stage 4/6', tone: 'var(--accent)' },
+  { n: '番茄扫榜 · 都市异能', s: '已完成 12:04 · 简报可绑定', tone: 'var(--success)' },
+  { n: '风格蒸馏「冷峻快节奏」', s: '排队中', tone: 'var(--text-faint)' },
+];
+
+const ENTITIES = [
+  { kind: 'char', ref: 'e1', name: '沈铎', brief: '守钟人后代，能听见钟里低语' },
+  { kind: 'char', ref: 'e2', name: '白棠', brief: '档案员，追查 1947 失踪案' },
+  { kind: 'location', ref: 'e3', name: '旧钟楼', brief: '十二响后多出一响' },
+  { kind: 'clue', ref: 'e4', name: '第十三响', brief: '只在雾夜出现' },
+  { kind: 'clue', ref: 'e5', name: '值夜簿', brief: '缺失的 7 月页' },
+  { kind: 'faction', ref: 'e6', name: '守钟会', brief: '维持钟约的地下家族' },
+];
+const FACTS = [
+  { who: 'e1', text: '沈铎自幼失聪，却“听”得见钟响', truth: 'canon' },
+  { who: 'e1', text: '沈铎不确定第十三响是幻听还是真实', truth: 'suspect' },
+  { who: 'e2', text: '白棠相信值夜簿被人为撕页', truth: 'belief' },
+  { who: 'e3', text: '钟楼 1947 年易主，买主无档', truth: 'canon' },
+  { who: 'e4', text: '第十三响出现后必有一人失踪', truth: 'canon' },
+];
+const OUTLINE = [['第 1 章 · 值夜簿', 'committed'], ['第 2 章 · 第十三响', 'committed'], ['第 3 章 · 雾中来客', 'drafting']];
+const STAGES = [['prepare','done'],['compile','done'],['draft','cur'],['review','todo'],['extract','todo'],['continuity','todo'],['proposal','todo'],['commit','todo']];
+const BUBBLES = [
+  { who: 'ai', text: '墨舟先问：第 3 章开在雾夜的钟楼还是白棠的档案馆？读者想看“第十三响之后发生了什么”——先给声音还是先给人？' },
+  { who: 'me', text: '先给声音。守钟人视角写第十三响起，白棠章中段闯入。' },
+  { who: 'ai', text: '好。起笔段已生成（草稿 d3，装配 3,120 / 4,096）：雾从江面漫上来时，沈铎正在给钟上弦……' },
+];
+const MATRIX = {
+  chapters: ['第1章','第2章','第3章','第4章','第5章'],
+  rows: [
+    { n: '改写 · 值夜簿缺页', stale: '2 stale', cells: ['ok','hit','hit','hit','no'] },
+    { n: '改写 · 守钟会钟约', stale: '1 stale', cells: ['ok','no','hit','hit','no'] },
+    { n: '追加 · 白棠到访钟楼', stale: '—', cells: ['no','no','hit','no','no'] },
+  ],
+};
+const QUALITY = {
+  verdict: 'blocking_fail', rework: '回炉 1 / 2', anchor: 'ch3 · rev d3 · hash 9f2c… · digest a1…',
+  blocking: [
+    { r: 'REV-001 v3', m: '“低语”在未建立听觉前提下被写成“听见”' },
+    { r: 'PARA-001 v2', m: '重复使用“雾像湿布”比喻（第 2 章已用）' },
+  ],
+  adv: ['期待未兑付：钟摆停摆尚未回应', '白棠档案员身份无行为支撑', '场景转换缺时间锚'],
+};
+
+/* ══════════════ 渲染小件 ══════════════ */
+const truthTag = t => t === 'canon' ? '<span class="tag" style="color:var(--success)">canon</span>'
+  : t === 'suspect' ? '<span class="tag" style="color:var(--warning)">suspect</span>'
+  : '<span class="tag" style="color:var(--accent)">belief</span>';
+let picked = null;
+function pickEntity(ref) { picked = picked === ref ? null : ref; rerender(); }
+
+function entityGrid() {
+  const kinds = [...new Set(ENTITIES.map(e => e.kind))];
+  return kinds.map(k => `
+    <div style="margin-bottom:13px">
+      <div class="faint" style="font-size:11.5px;letter-spacing:1px;margin-bottom:6px">${k}</div>
+      <div class="egrid">${ENTITIES.filter(e => e.kind === k).map(e => `
+        <div class="panel ecard ${picked === e.ref ? 'on' : ''}" onclick="pickEntity('${e.ref}')">
+          <div class="nm">${e.name}</div><div class="br muted">${e.brief}</div>
+        </div>`).join('')}</div>
+    </div>`).join('');
+}
+function factsList() {
+  const rows = picked ? FACTS.filter(f => f.who === picked) : FACTS;
+  const nm = r => (ENTITIES.find(e => e.ref === r) || {}).name || r;
+  return rows.map(f => `
+    <div class="panel-soft" style="padding:8px 11px;margin-bottom:7px;display:flex;gap:9px;align-items:baseline">
+      <span class="faint" style="font-size:12px;white-space:nowrap">${nm(f.who)}</span>
+      <span style="flex:1;font-size:13px">${f.text}</span>${truthTag(f.truth)}
+    </div>`).join('');
+}
+function outlineList() {
+  return `<div class="panel" style="padding:11px 13px;margin-bottom:10px">
+    <div style="font-weight:650;margin-bottom:7px">卷一 · 雾季</div>
+    ${OUTLINE.map(([t, s]) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 2px;border-top:1px solid var(--hairline)">
+        <span class="muted">${t}</span>
+        <span class="tag" style="${s === 'drafting' ? 'color:var(--accent);border-color:var(--accent)' : 'color:var(--success)'}">${s}</span>
+      </div>`).join('')}
+  </div>`;
+}
+function stageRail() { return STAGES.map(([t, s]) => `
+  <div class="stage ${s}"><span class="idx">${s === 'done' ? '✓' : s === 'cur' ? '●' : ''}</span>${t}</div>`).join(''); }
+function capsuleRow() { return `<div style="display:flex;flex-wrap:wrap;gap:6px">
+  ${CAPSULES.map((s, i) => `<span class="capsule ${i !== 4 ? 'on' : ''}" onclick="this.classList.toggle('on')">${s}</span>`).join('')}</div>`; }
+function conversation() {
+  return `
+    <div class="scroll" style="flex:1;padding:16px 18px">
+      <div class="panel-soft" style="padding:12px 14px;margin-bottom:14px">
+        <div style="color:var(--accent);font-weight:650;margin-bottom:3px">墨舟先问</div>
+        <div class="muted" style="font-size:13px">AI 先问、你先答，再动笔。回答进入下一轮装配。</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">${BUBBLES.map(b => `<div class="bubble ${b.who}">${b.text}</div>`).join('')}</div>
+    </div>
+    <div class="composer"><textarea placeholder="回答，或直接指挥下一笔…"></textarea><button class="primary-action">发送</button></div>`;
+}
+function qualityPanel() {
+  return `<div class="panel" style="padding:13px 15px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+      <span class="verdict fail">✕ ${QUALITY.verdict}</span><span class="tag">${QUALITY.rework}</span></div>
+    <div class="mono faint" style="margin-bottom:10px">${QUALITY.anchor}</div>
+    ${QUALITY.blocking.map(b => `<div class="qfail" style="margin-bottom:8px">
+      <div style="font-weight:650;font-size:13px"><span class="mono" style="color:var(--danger)">${b.r}</span> · ${b.m}</div></div>`).join('')}
+    <h3 class="sec" style="margin:10px 0 7px">ADVISORIES</h3>
+    ${QUALITY.adv.map(a => `<div class="qadv" style="margin-bottom:6px;font-size:12.5px">${a}</div>`).join('')}
+    <div class="unavail" style="margin-top:10px">⚠ 语义审查提供方未接入（Gate 3）：显式 REFUSED，不静默放行</div>
+  </div>`;
+}
+function receiptPanel() {
+  return `
+    <div class="panel" style="padding:13px 15px;margin-bottom:10px">
+      <h3 class="sec">装配看板 · RECEIPTS</h3>
+      <div class="panel-soft" style="padding:9px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;border-color:var(--accent)">
+        <div><span class="mono" style="color:var(--accent)">rcpt-021</span> <span class="muted" style="font-size:12.5px">· 第 3 章草稿装配（d3）</span></div>
+        <div style="display:flex;gap:8px;align-items:center"><span class="mono faint">3,120 / 4,096</span><span class="tag" style="color:var(--accent);border-color:var(--accent)">可续跑</span></div>
+      </div>
+      <div class="panel-soft" style="padding:9px 12px;display:flex;justify-content:space-between;align-items:center">
+        <div><span class="mono faint">rcpt-019</span> <span class="muted" style="font-size:12.5px">· 第 2 章定稿装配</span></div>
+        <span class="tag">已消费</span>
+      </div>
+    </div>
+    <div class="panel" style="padding:13px 15px">
+      <h3 class="sec">rcpt-021 · 逐条装配分解</h3>
+      ${[['角色卡 · 沈铎',812,'reserved'],['角色卡 · 白棠',604,'reserved'],['大纲节 · 3.2',240,'reserved'],['前文切片 · 第2章尾',966,'story'],['文风规范 · 夜航腔',498,'fixed']].map(([k,t,q]) => `
+        <div class="rentry" style="margin-bottom:6px"><span>${k}</span><span class="mono faint">${t} tok · ${q}</span></div>`).join('')}
+      <div class="faint" style="margin:10px 0 4px;font-size:12px">reserved 1656 / story 1440 / fixed 498 · cap 4096</div>
+      <div class="qbar"><i style="width:40%;background:var(--accent)"></i><i style="width:35%;background:var(--success)"></i><i style="width:13%;background:var(--warning)"></i></div>
+      <div class="mono faint" style="margin-top:9px">replay: canon@09:12 · outline@rev7 · receipt-019</div>
+      <button class="primary-action" style="margin-top:11px">从此凭据续跑</button>
+    </div>`;
+}
+function matrixPanel() {
+  const c = { hit: 'cell-hit', ok: 'cell-ok', no: 'cell-no' };
+  const v = { hit: '需重写', ok: '已消解', no: '—' };
+  return `<div class="panel" style="padding:13px 15px">
+    <h3 class="sec">CHANGE MATRIX · 行 = 遍历 / 列 = 受影响章</h3>
+    <table class="matrix">
+      <tr><th style="text-align:left">Traversal</th>${MATRIX.chapters.map(x => `<th>${x}</th>`).join('')}<th>重跑</th></tr>
+      ${MATRIX.rows.map(r => `<tr><td class="rowh">${r.n}<div class="faint mono" style="font-size:10.5px">${r.stale}</div></td>
+        ${r.cells.map(x => `<td class="${c[x]}">${v[x]}</td>`).join('')}
+        <td><button class="control" style="padding:4px 10px;font-size:12px">重跑</button></td></tr>`).join('')}
+    </table>
+    <div class="muted" style="font-size:12.5px;margin-top:9px">红 = 上游改动未消解 · 绿 = 重跑后消解 · 幂等 + 预算约束</div>
+  </div>`;
+}
+
+const INSPECT = {
+  brain: () => `<div class="scroll" style="flex:1;padding:16px 18px">${entityGrid()}
+    <h3 class="sec" style="margin-top:4px">${picked ? '关联事实（点击实体过滤）' : '事实列表 · 点击实体可过滤'}</h3>${factsList()}</div>`,
+  receipt: () => `<div class="scroll" style="flex:1;padding:16px 18px;max-width:720px">${receiptPanel()}</div>`,
+  matrix: () => `<div class="scroll" style="flex:1;padding:16px 18px;max-width:880px">${matrixPanel()}</div>`,
+  quality: () => `<div class="scroll" style="flex:1;padding:16px 18px;max-width:700px">${qualityPanel()}</div>`,
+};
+
+/* 全功能分组导航（A 左栏 / B 抽屉共用；clickableOnly 时仅检视组可点） */
+function fullNav(activeItem, onNav) {
+  return NAV.map(gr => `
+    <div class="nav-label">${gr.g}</div>
+    ${gr.items.map(([t, i, n]) => `
+      <button class="nav-item ${activeItem === t ? 'on' : ''}" onclick="${onNav ? onNav.replace('%S', t) : `void 0`}">
+        <span class="nav-ico">${i}</span>${t}${n ? `<span class="badge">${n}</span>` : ''}
+      </button>`).join('')}`).join('');
+}
+
+/* ══════════════ 变体 A：全功能单壳（17+ 功能常驻左栏，工作台只是其一） ══════════════ */
+let aView = '工作台';
+function renderA() {
+  const inspectMap = { 'Story Brain': 'brain', '装配看板': 'receipt', '变更矩阵': 'matrix', '质量门': 'quality' };
+  const center = aView === '工作台' ? conversation()
+    : aView === '写作对话' ? conversation()
+    : inspectMap[aView] ? INSPECT[inspectMap[aView]]()
+    : `<div class="scroll" style="flex:1;padding:22px"><div class="panel-soft" style="padding:26px;text-align:center">
+        <div style="font-size:26px;margin-bottom:8px">${(NAV.flatMap(g => g.items).find(i => i[0] === aView) || [])[1] || '▣'}</div>
+        <div style="font-weight:650">${aView}</div>
+        <div class="muted" style="font-size:13px;margin-top:4px">legacy 功能页 · 沿用原页面形态迁入本壳（本原型只演示导航位）</div>
+      </div></div>`;
+  return `
+    <div class="shell">
+      <div class="topbar">
+        <div class="brand"><span class="brand-glyph">墨</span>墨舟</div>
+        <div class="muted" style="font-size:13px">${BOOK.title} · ${BOOK.chapter}</div>
+        <div style="flex:1"></div>
+        <span class="control" style="padding:5px 12px;font-size:12.5px;color:var(--text-faint)">⌘K 全局搜索</span>
+        <span class="tag">A · 全功能单壳</span>
+      </div>
+      <div class="body">
+        <div class="rail scroll">
+          ${fullNav(aView, `aView='%S';rerender()`)}
+          <div style="flex:1"></div>
+          <div class="faint" style="padding:10px 14px;font-size:11.5px">user@mozhou.local · 会员中心</div>
+        </div>
+        <div class="center" style="display:flex;flex-direction:column">
+          ${center}
+          ${aView === '工作台' ? '' : ''}
+        </div>
+        ${aView === '工作台' || aView === '写作对话' ? `
+        <div class="rightbar" style="padding:14px">
+          <h3 class="sec">本次链路 · 阶段轨（管线十步）</h3>
+          <div class="panel" style="padding:10px 13px;margin-bottom:12px">${stageRail()}</div>
+          <h3 class="sec">技能胶囊（多选 · 内置 ${SKILLS.builtin.length} · 广场 ${SKILLS.plaza.length} · 我的 ${SKILLS.mine}）</h3>
+          ${capsuleRow()}
+          <div class="panel-soft" style="padding:10px 12px;margin-top:12px">
+            <div class="faint" style="font-size:11.5px;letter-spacing:1px;margin-bottom:5px">CONTEXT ASSEMBLER</div>
+            <div class="mono faint">tokens 3,120 / 4,096 · reserved 40%</div>
+          </div>
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+/* ══════════════ 变体 B：专注工作台 + 功能抽屉（legacy 双壳原味） ══════════════ */
+let bDrawer = true, bTab = 'quality';
+function renderB() {
+  const tabs = [['quality','质量门'],['brain','实体'],['receipt','装配'],['matrix','矩阵']];
+  return `
+    <div class="scrim ${bDrawer ? 'open' : ''}" onclick="bDrawer=false;rerender()"></div>
+    <div class="drawer ${bDrawer ? 'open' : ''}">
+      <div style="padding:14px 14px 10px;display:flex;gap:9px;align-items:center;border-bottom:1px solid var(--hairline)">
+        <div class="brand"><span class="brand-glyph">墨</span>墨舟</div>
+        <div style="flex:1"></div>
+        <button class="control" style="padding:5px 10px;font-size:12.5px" onclick="bDrawer=false;rerender()">✕ 收起</button>
+      </div>
+      <div style="padding:10px 12px 6px"><input class="control" style="width:100%" placeholder="搜索功能、技能、动作…"></div>
+      <div class="scroll" style="flex:1;padding-bottom:12px">
+        ${fullNav(null, `bDrawer=false;aViewJump('%S')`)}
+      </div>
+      <div class="faint" style="padding:10px 14px;border-top:1px solid var(--hairline);font-size:11.5px">
+        内置技能执行器 ${SKILLS.builtin.length} · 广场 ${SKILLS.plaza.length} · oh-story ${SKILLS.ohstory} · 我的 ${SKILLS.mine}
+      </div>
+    </div>
+    <div class="shell">
+      <div class="topbar">
+        <button class="control" style="padding:6px 12px;font-size:13px" onclick="bDrawer=true;rerender()">☰ 全部功能</button>
+        <div class="brand"><span class="brand-glyph">墨</span>墨舟</div>
+        <div class="muted" style="font-size:13px">${BOOK.title} · ${BOOK.chapter}</div>
+        <div style="flex:1"></div>
+        <span class="tag">B · 专注工作台</span>
+      </div>
+      <div class="body">
+        <div class="rail" style="width:212px">
+          <div class="nav-label">当前作品</div>
+          <div class="panel" style="margin:4px 8px 10px;padding:10px 12px;background:var(--surface)">
+            <div style="font-weight:700">${BOOK.title}</div>
+            <div class="muted" style="font-size:12px">${BOOK.chapter}</div>
+            <div class="faint mono" style="margin-top:4px">${BOOK.words}</div>
+          </div>
+          <div style="padding:0 6px">
+            ${[['✍','写作对话',1],['▤','章节与大纲',0],['⚇','人物关系',0],['◈','世界规则',0]].map(([i, t, on]) => `
+              <button class="nav-item ${on ? 'on' : ''}"><span class="nav-ico">${i}</span>${t}</button>`).join('')}
+          </div>
+          <div style="flex:1"></div>
+          <div class="faint" style="padding:10px 12px;font-size:11.5px">工作台独占全屏；其余功能走 ☰ 抽屉</div>
+        </div>
+        <div class="center">${conversation()}</div>
+        <div class="rightbar" style="width:392px;display:flex;flex-direction:column">
+          <div style="padding:12px 14px 0"><div class="panel" style="padding:9px 13px">${stageRail()}</div></div>
+          <div style="display:flex;gap:4px;padding:10px 12px 0">
+            ${tabs.map(([k, t]) => `<button class="nav-item ${bTab === k ? 'on' : ''}" style="flex:1;justify-content:center;margin:0;padding:6px 4px" onclick="bTab='${k}';rerender()">${t}</button>`).join('')}
+          </div>
+          <div class="scroll" style="flex:1;padding:12px 14px">${INSPECT[bTab]()}</div>
+        </div>
+      </div>
+    </div>`;
+}
+function aViewJump(name) { /* B 变体点抽屉：功能页以占位提示（原型不实作页面） */
+  document.getElementById('app').innerHTML = renderB();
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:60;background:var(--surface-2);border:1px solid var(--hairline-strong);border-radius:8px;padding:9px 16px;font-size:13px;box-shadow:0 10px 28px var(--shadow-ink)';
+  t.textContent = `「${name}」→ 独立功能页打开（原型占位）`;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 1600);
+}
+
+/* ══════════════ 变体 C：指挥台 + 命令面板（仪表盘为家，⌘K 直达一切） ══════════════ */
+let cPalette = true;
+const PALETTE = [
+  { g: '功能', items: ['工作台','写作对话','我的作品','风格蒸馏','小说拆解','Story Brain','装配看板','变更矩阵','质量门','任务中心','书源搜索','书源书架','技能广场','网文扫榜','联网搜索','云同步','会员中心'] },
+  { g: '技能', items: ['续写','对白打磨','悬念调度','场景氛围','一致性自查','去 AI 味','人物小传','信息差设计'] },
+  { g: '动作', items: ['新建书（Wizard 五步）','导入正文','刷新扫榜简报','从凭据续跑 rcpt-021'] },
+];
+function renderC() {
+  const hubcard = (ic, t, sub, extra) => `
+    <div class="panel hubcard"><div class="ic">${ic}</div>
+      <div style="font-weight:650">${t}</div>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">${sub}</div>
+      ${extra || ''}</div>`;
+  return `
+    <div class="palette-wrap ${cPalette ? 'open' : ''}" onclick="if(event.target===this){cPalette=false;rerender()}">
+      <div class="palette">
+        <input placeholder="搜索功能、技能、动作…（↑↓ 选择，↵ 打开）" autofocus>
+        <div class="scroll" style="padding-bottom:10px">
+          ${PALETTE.map(gr => `<div class="pal-group">${gr.g}</div>` +
+            gr.items.map((it, i) => `<button class="pal-item ${gr.g === '功能' && i === 0 ? 'sel' : ''}">
+              <span>${it}</span><span class="k">${gr.g === '功能' ? '跳转' : gr.g === '技能' ? '运行' : '执行'}</span></button>`).join('')).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="shell">
+      <div class="topbar">
+        <div class="brand"><span class="brand-glyph">墨</span>墨舟</div>
+        <button class="control" style="flex:0 1 380px;text-align:left;padding:7px 13px;font-size:13px;color:var(--text-faint)" onclick="cPalette=true;rerender()">⌘K 搜索功能 / 技能 / 动作…</button>
+        <div style="flex:1"></div>
+        <button class="control" style="padding:6px 12px;font-size:12.5px">☑ 任务 <span class="badge">2</span></button>
+        <span class="tag">C · 指挥台</span>
+      </div>
+      <div class="scroll" style="flex:1;padding:18px 22px">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px">
+          <div style="font-size:19px;font-weight:750">创作指挥台</div>
+          <div class="muted" style="font-size:13px">${BOOK.title} · 一切功能从这里直达</div>
+        </div>
+        <div class="cards" style="margin-bottom:16px">
+          <div class="panel hubcard" style="grid-column:span 2;border-color:var(--accent)">
+            <div style="display:flex;gap:16px;align-items:center">
+              <div style="flex:1">
+                <div class="faint" style="font-size:11.5px;letter-spacing:1px">继续写作</div>
+                <div style="font-weight:700;font-size:16px;margin-top:2px">${BOOK.chapter}</div>
+                <div class="muted" style="font-size:12.5px;margin-top:2px">草稿 d3 · 质量门 blocking_fail · 回炉 1/2</div>
+                <div class="qbar" style="margin-top:9px;max-width:280px"><i style="width:80%;background:var(--accent)"></i></div>
+              </div>
+              <button class="primary-action">续写 →</button>
+            </div>
+          </div>
+          ${hubcard('⚑', '质量门', '第 3 章 · 2 blocking · 3 advisories')}
+          ${hubcard('☑', '任务中心', '拆解运行中 · 扫榜完成 · 蒸馏排队')}
+        </div>
+        <h3 class="sec">创作工具</h3>
+        <div class="cards" style="margin-bottom:16px">
+          ${hubcard('✎','写作对话','独立对话 · 技能胶囊可载入')}
+          ${hubcard('🪶','风格蒸馏','已有 2 个风格档 · 「夜航腔」使用中')}
+          ${hubcard('✂','小说拆解','长篇 Stage 0-6 / 短篇核与反转')}
+          ${hubcard('✦','技能广场',`内置 ${SKILLS.builtin.length} 执行器 · 广场 ${SKILLS.plaza.length} · oh-story ${SKILLS.ohstory}`)}
+        </div>
+        <h3 class="sec">资源</h3>
+        <div class="cards">
+          ${hubcard('🏆','网文扫榜','番茄榜源 · 简报可绑定作品')}
+          ${hubcard('🔍','书源搜索','检索 → 加入书架')}
+          ${hubcard('🔖','书源书架','12 本在架')}
+          ${hubcard('🌐','联网搜索','资料检索入上下文')}
+          ${hubcard('☁','云同步','全部作品 · 自动')}
+          ${hubcard('👤','会员中心','额度与计费')}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════ 切换器 ══════════════ */
+const VARIANTS = {
+  A: { name: 'A — 全功能单壳', desc: '17+ 功能常驻左栏分组，工作台只是其中一项', render: renderA },
+  B: { name: 'B — 专注工作台 + 抽屉', desc: '工作台独占全屏（legacy 双壳原味），☰ 抽屉承载全部', render: renderB },
+  C: { name: 'C — 指挥台 + 命令面板', desc: '仪表盘为家，⌘K 直达全部功能与技能', render: renderC },
+};
+const ORDER = ['A', 'B', 'C'];
+function currentVariant() {
+  const v = new URLSearchParams(location.search).get('variant');
+  return VARIANTS[v] ? v : 'A';
+}
+function rerender() {
+  const v = currentVariant();
+  document.getElementById('app').innerHTML = VARIANTS[v].render();
+  document.getElementById('sw-lbl').innerHTML = `${VARIANTS[v].name}<small>${VARIANTS[v].desc}</small>`;
+}
+function cycle(dir) {
+  const next = ORDER[(ORDER.indexOf(currentVariant()) + dir + ORDER.length) % ORDER.length];
+  const u = new URL(location); u.searchParams.set('variant', next);
+  history.replaceState(null, '', u); rerender();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && currentVariant() === 'C' && cPalette) { cPalette = false; rerender(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { cPalette = true; if (currentVariant() !== 'C') { const u = new URL(location); u.searchParams.set('variant', 'C'); history.replaceState(null, '', u); } rerender(); return; }
+  if (e.target.matches('input,textarea,[contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1);
+  if (e.key === 'ArrowRight') cycle(1);
+});
+rerender();
+</script>
+</body>
+</html>

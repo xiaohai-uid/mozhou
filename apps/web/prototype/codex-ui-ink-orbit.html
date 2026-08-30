@@ -1,0 +1,2038 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>墨舟 Novel OS · Ink Orbit</title>
+<!--
+设计决策说明
+
+本方案采用“专注工作台 + 指挥能力”的混合 IA。工作台始终是视觉与操作中心，左侧五组功能航道完整承载 17 项一级功能；顶部八步管线把写作对话、Context Compiler、草稿生成、文学质量门、Continuity Gate、Proposal Port 与正典提交串成一条可读的生产路径；右侧检视塔让质量门、Story Brain、装配看板和变更矩阵在不离开写作语境的情况下切换。技能双层胶囊轨贴近输入动作，完整技能抽屉承担发现与管理；Wizard 作为首次建书的五步覆盖层，不混入日常导航。
+
+设计语言命名为“夜墨精密仪器”。品牌基色逐值照录，以近黑分级表面承担约 78% 视觉重量，夜墨紫约 9%，语义色与文本约 13%。原生 WebGL 仅在最底层生成低频墨流、微粒与阶段牵引光核，不覆盖正文；reduced-motion 下只绘制单帧。排印以中文系统黑体呈现高密度操作信息，以宋体呈现作品名、章节与正文，形成“仪器外壳 × 文学纸面”的张力。材质避免泛滥玻璃拟态，主要依赖亮度阶、内侧高光、发丝线、固定颗粒与局部镜面反射。动效只使用 transform、opacity 和 filter，以指数减速完成面板换场，状态迁移由短促墨迹聚焦表达。
+-->
+<style>
+:root{
+  --background:#0b0a0f;
+  --foreground:#f4f1fa;
+  --accent:#8b78ff;
+  --accent-strong:#9d8eff;
+  --accent-soft:rgba(139,120,255,.12);
+  --surface:#15131a;
+  --surface-2:#282330;
+  --surface-3:#1d1923;
+  --surface-raised:#211c29;
+  --surface-sunken:#100e14;
+  --hairline:rgba(244,241,250,.1);
+  --hairline-strong:rgba(244,241,250,.16);
+  --text-muted:#aba4b8;
+  --text-faint:#7c7487;
+  --danger:#f28b9b;
+  --success:#80d6b0;
+  --warning:#e4b875;
+  --radius-sm:.5rem;
+  --radius-md:.75rem;
+  --radius-lg:1rem;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","微软雅黑",sans-serif;
+  --serif:"Songti SC","STSong","SimSun",serif;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+html,body{
+  width:100%;
+  height:100%;
+  margin:0;
+  min-width:1180px;
+  overflow:hidden;
+  background:var(--background);
+  color:var(--foreground);
+  font-family:var(--sans);
+  font-size:13px;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,textarea{font:inherit;color:inherit}
+button{border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent-strong);
+  outline-offset:2px;
+}
+canvas{
+  position:fixed;
+  inset:0;
+  z-index:0;
+  width:100%;
+  height:100%;
+  opacity:.74;
+}
+body:after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:8;
+  pointer-events:none;
+  opacity:.045;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+}
+.app{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:228px minmax(610px,1fr) 356px;
+  grid-template-rows:62px 54px minmax(0,1fr);
+  gap:1px;
+  height:100dvh;
+  background:var(--hairline);
+}
+.topbar{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  padding:0 18px;
+  background:rgba(11,10,15,.95);
+  box-shadow:inset 0 -1px rgba(255,255,255,.025);
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  width:192px;
+}
+.seal{
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  background:var(--foreground);
+  color:var(--background);
+  font:17px var(--serif);
+  box-shadow:0 0 0 4px rgba(244,241,250,.04);
+}
+.brand b{
+  font:500 17px var(--serif);
+  letter-spacing:.08em;
+}
+.brand small{
+  display:block;
+  margin-top:2px;
+  color:var(--text-faint);
+  font:9px var(--mono);
+  letter-spacing:.16em;
+}
+.book-switch{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:230px;
+  padding:8px 12px;
+  border-radius:var(--radius-md);
+  background:var(--surface);
+  text-align:left;
+  box-shadow:inset 0 0 0 1px var(--hairline);
+}
+.cover{
+  width:22px;
+  height:28px;
+  border-radius:4px;
+  background:linear-gradient(145deg,var(--accent),#352e56);
+  box-shadow:inset 0 1px rgba(255,255,255,.25);
+}
+.book-switch span{font:14px var(--serif)}
+.book-switch em{
+  display:block;
+  margin-top:2px;
+  color:var(--text-faint);
+  font:10px var(--sans);
+  font-style:normal;
+}
+.top-actions{
+  display:flex;
+  gap:7px;
+  margin-left:auto;
+}
+.iconbtn,.quiet-btn{
+  display:grid;
+  place-items:center;
+  min-width:38px;
+  height:38px;
+  border-radius:var(--radius-md);
+  background:var(--surface);
+  box-shadow:inset 0 0 0 1px var(--hairline);
+  transition:
+    transform .28s var(--ease),
+    background-color .28s var(--ease);
+}
+.quiet-btn{
+  display:flex;
+  width:auto;
+  padding:0 13px;
+  gap:7px;
+  color:var(--text-muted);
+}
+.iconbtn:hover,.quiet-btn:hover{
+  background:var(--surface-raised);
+  transform:translateY(-1px);
+}
+.status-dot{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 12px var(--success);
+}
+.proto{
+  position:fixed;
+  z-index:9;
+  top:17px;
+  right:-31px;
+  width:132px;
+  transform:rotate(45deg);
+  background:var(--accent);
+  color:var(--background);
+  text-align:center;
+  font:700 9px/20px var(--mono);
+  letter-spacing:.16em;
+  box-shadow:0 5px 22px rgba(0,0,0,.35);
+}
+.pipeline{
+  grid-column:2/-1;
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  gap:5px;
+  padding:7px 15px;
+  background:rgba(16,14,20,.95);
+}
+.step{
+  position:relative;
+  padding:7px 8px 7px 22px;
+  border-radius:8px;
+  background:transparent;
+  color:var(--text-faint);
+  text-align:left;
+  transition:
+    color .4s var(--ease),
+    background-color .4s var(--ease),
+    transform .4s var(--ease);
+}
+.step:before{
+  content:"";
+  position:absolute;
+  top:13px;
+  left:8px;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:currentColor;
+}
+.step b{
+  display:block;
+  font:9px var(--mono);
+  letter-spacing:.08em;
+}
+.step span{font-size:10px}
+.step.done{color:var(--success)}
+.step.active{
+  color:var(--foreground);
+  background:var(--accent-soft);
+  box-shadow:inset 0 0 0 1px rgba(139,120,255,.2);
+}
+.step.active:before{
+  background:var(--accent-strong);
+  box-shadow:0 0 14px var(--accent);
+}
+.sidebar{
+  grid-row:2/4;
+  overflow:auto;
+  padding:14px 10px;
+  background:rgba(16,14,20,.97);
+  scrollbar-width:none;
+}
+.sidebar-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:5px 8px 15px;
+  color:var(--text-faint);
+  font:10px var(--mono);
+  letter-spacing:.12em;
+}
+.nav-group{margin-bottom:14px}
+.nav-label{
+  padding:6px 9px;
+  color:var(--text-faint);
+  font-size:9px;
+  letter-spacing:.16em;
+}
+.nav-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  height:34px;
+  padding:0 9px;
+  border-radius:9px;
+  background:transparent;
+  color:var(--text-muted);
+  text-align:left;
+  transition:
+    background-color .28s var(--ease),
+    color .28s var(--ease),
+    transform .28s var(--ease);
+}
+.nav-item:hover{
+  background:rgba(244,241,250,.045);
+  color:var(--foreground);
+  transform:translateX(2px);
+}
+.nav-item.active{
+  background:var(--accent-soft);
+  color:var(--foreground);
+  box-shadow:inset 0 0 0 1px rgba(139,120,255,.15);
+}
+.nav-item i{
+  width:18px;
+  color:var(--text-faint);
+  font:10px var(--mono);
+  font-style:normal;
+}
+.nav-item.active i{color:var(--accent-strong)}
+.count{
+  display:grid;
+  place-items:center;
+  min-width:18px;
+  height:18px;
+  margin-left:auto;
+  border-radius:9px;
+  background:var(--danger);
+  color:#1a0c10;
+  font:700 9px var(--mono);
+}
+.center{
+  display:grid;
+  grid-template-rows:52px minmax(0,1fr) auto;
+  min-width:0;
+  overflow:hidden;
+  background:rgba(11,10,15,.89);
+}
+.chapterbar{
+  display:flex;
+  align-items:center;
+  padding:0 24px;
+  background:rgba(21,19,26,.84);
+  box-shadow:inset 0 -1px var(--hairline);
+}
+.chapterbar h1{
+  margin:0;
+  font:500 17px var(--serif);
+}
+.chapterbar .meta{
+  margin-left:11px;
+  color:var(--text-faint);
+  font:10px var(--mono);
+}
+.chapterbar .save{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-left:auto;
+  color:var(--success);
+  font-size:10px;
+}
+.conversation{
+  overflow:auto;
+  padding:28px max(28px,7%);
+  scrollbar-color:var(--surface-2) transparent;
+}
+.date-rule{
+  margin-bottom:28px;
+  color:var(--text-faint);
+  text-align:center;
+  font:9px var(--mono);
+  letter-spacing:.12em;
+}
+.msg{
+  display:flex;
+  gap:12px;
+  margin:0 0 21px;
+  animation:rise .7s var(--ease) both;
+}
+.msg.user{justify-content:flex-end}
+.avatar{
+  display:grid;
+  place-items:center;
+  flex:0 0 30px;
+  height:30px;
+  border-radius:10px;
+  background:var(--surface-2);
+  font-family:var(--serif);
+}
+.msg.ai .avatar{
+  background:var(--foreground);
+  color:var(--background);
+}
+.bubble{
+  max-width:76%;
+  padding:14px 16px;
+  border-radius:4px 14px 14px 14px;
+  background:var(--surface-3);
+  color:#ded9e8;
+  line-height:1.72;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.055),
+    0 14px 35px rgba(0,0,0,.12);
+}
+.user .bubble{
+  border-radius:14px 4px 14px 14px;
+  background:var(--accent-soft);
+  box-shadow:inset 0 0 0 1px rgba(139,120,255,.16);
+}
+.bubble strong{
+  color:var(--foreground);
+  font:500 15px var(--serif);
+}
+.bubble .hint{
+  display:block;
+  margin-top:8px;
+  color:var(--text-faint);
+  font-size:10px;
+}
+.choice-row{
+  display:flex;
+  gap:7px;
+  margin-top:12px;
+}
+.choice{
+  padding:7px 10px;
+  border-radius:8px;
+  background:rgba(244,241,250,.05);
+  color:var(--text-muted);
+  box-shadow:inset 0 0 0 1px var(--hairline);
+}
+.draft-slice{
+  margin:0 0 22px 42px;
+  padding:18px 20px;
+  border-radius:var(--radius-lg);
+  background:linear-gradient(110deg,rgba(244,241,250,.055),rgba(244,241,250,.025));
+  box-shadow:inset 0 1px rgba(255,255,255,.07);
+}
+.draft-slice .kicker{
+  color:var(--accent-strong);
+  font:9px var(--mono);
+  letter-spacing:.14em;
+}
+.draft-slice p{
+  margin:10px 0 0;
+  color:#e8e2ef;
+  font:15px/2 var(--serif);
+}
+.composer-wrap{
+  padding:10px 20px 17px;
+  background:linear-gradient(180deg,rgba(11,10,15,0),var(--background) 18%);
+}
+.rails{
+  display:grid;
+  gap:6px;
+  margin:0 6px 8px;
+}
+.rail{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  overflow:hidden;
+}
+.rail-label{
+  flex:0 0 40px;
+  color:var(--text-faint);
+  font:9px var(--mono);
+  letter-spacing:.1em;
+}
+.pill{
+  padding:6px 9px;
+  border-radius:999px;
+  background:var(--surface);
+  color:var(--text-muted);
+  white-space:nowrap;
+  font-size:10px;
+  box-shadow:inset 0 0 0 1px var(--hairline);
+  transition:
+    background-color .26s var(--ease),
+    color .26s var(--ease),
+    transform .26s var(--ease);
+}
+.pill:hover{transform:translateY(-1px)}
+.pill.on{
+  background:var(--accent-soft);
+  color:var(--foreground);
+  box-shadow:inset 0 0 0 1px rgba(139,120,255,.35);
+}
+.pill.radio.on:before{
+  content:"";
+  display:inline-block;
+  width:5px;
+  height:5px;
+  margin-right:5px;
+  border-radius:50%;
+  background:var(--accent-strong);
+  box-shadow:0 0 8px var(--accent);
+}
+.composer-shell{
+  padding:5px;
+  border-radius:19px;
+  background:rgba(244,241,250,.035);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 20px 55px rgba(0,0,0,.3);
+}
+.composer{
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:end;
+  padding:11px 12px;
+  border-radius:15px;
+  background:var(--surface);
+  box-shadow:inset 0 1px rgba(255,255,255,.055);
+}
+textarea{
+  height:42px;
+  padding:4px 6px;
+  resize:none;
+  border:0;
+  background:transparent;
+  color:var(--foreground);
+  line-height:1.55;
+}
+textarea::placeholder{color:var(--text-faint)}
+.send{
+  display:grid;
+  place-items:center;
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  background:var(--foreground);
+  color:var(--background);
+  transition:
+    transform .28s var(--ease),
+    box-shadow .28s var(--ease);
+}
+.send:hover{
+  transform:translateY(-2px);
+  box-shadow:0 10px 30px rgba(244,241,250,.16);
+}
+.composer-foot{
+  grid-column:1/-1;
+  display:flex;
+  justify-content:space-between;
+  padding:7px 6px 0;
+  color:var(--text-faint);
+  font:9px var(--mono);
+}
+.inspector{
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  min-width:0;
+  background:rgba(16,14,20,.97);
+}
+.tabs{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:4px;
+  padding:8px;
+  box-shadow:inset 0 -1px var(--hairline);
+}
+.tab{
+  height:36px;
+  border-radius:9px;
+  background:transparent;
+  color:var(--text-faint);
+  font-size:10px;
+}
+.tab.active{
+  background:var(--surface-2);
+  color:var(--foreground);
+  box-shadow:inset 0 1px rgba(255,255,255,.06);
+}
+.panel{
+  display:none;
+  overflow:auto;
+  padding:16px;
+  scrollbar-color:var(--surface-2) transparent;
+}
+.panel.active{
+  display:block;
+  animation:panelin .55s var(--ease);
+}
+.panel-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  margin-bottom:14px;
+}
+.panel-head h2{
+  margin:0;
+  font:500 20px var(--serif);
+}
+.panel-head p{
+  margin:4px 0 0;
+  color:var(--text-faint);
+  font-size:10px;
+}
+.tag{
+  padding:5px 7px;
+  border-radius:999px;
+  background:var(--accent-soft);
+  color:var(--accent-strong);
+  font:9px var(--mono);
+}
+.card-shell{
+  margin-bottom:10px;
+  padding:4px;
+  border-radius:15px;
+  background:rgba(244,241,250,.025);
+  box-shadow:inset 0 0 0 1px var(--hairline);
+}
+.card{
+  padding:12px;
+  border-radius:11px;
+  background:var(--surface);
+  box-shadow:inset 0 1px rgba(255,255,255,.05);
+}
+.card-title{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:9px;
+}
+.card-title b{font-size:11px}
+.muted{color:var(--text-faint)}
+.mono{
+  font-family:var(--mono);
+  font-size:9px;
+}
+.verdict{
+  padding:5px 8px;
+  border-radius:999px;
+  font:700 9px var(--mono);
+}
+.blocking{
+  background:rgba(242,139,155,.12);
+  color:var(--danger);
+}
+.pass{
+  background:rgba(128,214,176,.12);
+  color:var(--success);
+}
+.banner{
+  margin-bottom:10px;
+  padding:10px;
+  border-radius:9px;
+  background:rgba(228,184,117,.09);
+  color:var(--warning);
+  font-size:10px;
+  box-shadow:inset 0 0 0 1px rgba(228,184,117,.15);
+}
+.finding{
+  padding:9px 0;
+  box-shadow:inset 0 -1px var(--hairline);
+}
+.finding:last-child{box-shadow:none}
+.finding b{
+  color:var(--danger);
+  font:10px var(--mono);
+}
+.finding p{
+  margin:5px 0 0;
+  color:var(--text-muted);
+  font-size:10px;
+  line-height:1.6;
+}
+.entity-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.entity{
+  padding:9px;
+  border-radius:9px;
+  background:var(--surface-3);
+}
+.entity small{
+  display:block;
+  margin-bottom:4px;
+  color:var(--text-faint);
+}
+.tree{
+  color:var(--text-muted);
+  font-size:10px;
+  line-height:2;
+}
+.tree .active-node{color:var(--foreground)}
+.fact{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:7px;
+  padding:7px 0;
+  font-size:10px;
+  box-shadow:inset 0 -1px var(--hairline);
+}
+.cog{
+  width:7px;
+  height:7px;
+  margin-top:4px;
+  border-radius:50%;
+}
+.canon{background:var(--success)}
+.suspect{background:var(--warning)}
+.belief{background:var(--accent)}
+.budget{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:3px;
+  margin:8px 0;
+}
+.budget span{
+  height:7px;
+  border-radius:2px;
+  background:var(--surface-2);
+}
+.budget .reserved{background:var(--accent)}
+.budget .story{background:var(--success)}
+.budget .fixed{background:var(--warning)}
+.receipt-row{
+  display:grid;
+  grid-template-columns:1fr auto auto;
+  gap:7px;
+  padding:8px 0;
+  font-size:10px;
+  box-shadow:inset 0 -1px var(--hairline);
+}
+.receipt-row code{
+  color:var(--accent-strong);
+  font:9px var(--mono);
+}
+.replay{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+}
+.replay div{
+  padding:7px;
+  border-radius:7px;
+  background:var(--surface-3);
+}
+.action{
+  width:100%;
+  height:36px;
+  margin-top:10px;
+  border-radius:9px;
+  background:var(--foreground);
+  color:var(--background);
+  font-weight:600;
+}
+.action.secondary{
+  background:var(--surface-2);
+  color:var(--foreground);
+}
+.matrix{
+  width:100%;
+  border-spacing:3px;
+  border-collapse:separate;
+  font:9px var(--mono);
+}
+.matrix th{
+  padding:5px;
+  color:var(--text-faint);
+  font-weight:400;
+}
+.matrix td{
+  height:31px;
+  border-radius:6px;
+  background:var(--surface-3);
+  color:var(--text-faint);
+  text-align:center;
+}
+.matrix td.red{
+  background:rgba(242,139,155,.16);
+  color:var(--danger);
+}
+.matrix td.green{
+  background:rgba(128,214,176,.13);
+  color:var(--success);
+}
+.matrix td.rowname{
+  max-width:86px;
+  padding-left:7px;
+  color:var(--text-muted);
+  text-align:left;
+  font-family:var(--sans);
+}
+.drawer,.wizard{
+  position:fixed;
+  z-index:6;
+  inset:0;
+  display:none;
+}
+.drawer.open,.wizard.open{display:block}
+.scrim{
+  position:absolute;
+  inset:0;
+  background:rgba(5,4,8,.76);
+  backdrop-filter:blur(10px);
+  animation:fade .35s var(--ease);
+}
+.drawer-sheet{
+  position:absolute;
+  top:18px;
+  right:18px;
+  bottom:18px;
+  width:min(760px,70vw);
+  padding:6px;
+  border-radius:22px;
+  background:var(--surface-sunken);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline-strong),
+    -30px 0 80px rgba(0,0,0,.35);
+  animation:slide .58s var(--ease);
+}
+.drawer-core{
+  height:100%;
+  overflow:auto;
+  padding:25px;
+  border-radius:17px;
+  background:var(--surface);
+}
+.drawer-top{
+  display:flex;
+  align-items:center;
+}
+.drawer-top h2{
+  margin:0;
+  font:500 27px var(--serif);
+}
+.drawer-top p{
+  margin:5px 0 0;
+  color:var(--text-faint);
+}
+.close{margin-left:auto}
+.skill-section{margin-top:24px}
+.skill-section h3{
+  color:var(--text-faint);
+  font-size:10px;
+  font-weight:500;
+  letter-spacing:.14em;
+}
+.skill-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+.skill-card{
+  min-height:92px;
+  padding:12px;
+  border-radius:12px;
+  background:var(--surface-3);
+  box-shadow:inset 0 1px rgba(255,255,255,.05);
+}
+.skill-card b{
+  display:block;
+  margin-bottom:6px;
+}
+.skill-card p{
+  margin:0;
+  color:var(--text-faint);
+  font-size:10px;
+  line-height:1.5;
+}
+.skill-card .kind{
+  margin-top:9px;
+  color:var(--accent-strong);
+  font:8px var(--mono);
+}
+.wizard-stage{
+  position:absolute;
+  inset:22px;
+  padding:6px;
+  border-radius:25px;
+  background:var(--surface-sunken);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline-strong),
+    0 40px 100px rgba(0,0,0,.55);
+  animation:wiz .68s var(--ease);
+}
+.wizard-core{
+  display:grid;
+  grid-template-columns:260px 1fr;
+  height:100%;
+  overflow:hidden;
+  border-radius:19px;
+  background:var(--surface);
+}
+.wiz-nav{
+  padding:34px;
+  background:var(--surface-sunken);
+}
+.wiz-nav .seal{margin-bottom:35px}
+.wiz-nav h2{
+  margin:0 0 8px;
+  font:400 28px/1.25 var(--serif);
+}
+.wiz-nav>p{
+  color:var(--text-faint);
+  line-height:1.7;
+}
+.wiz-steps{margin-top:36px}
+.wiz-step{
+  display:flex;
+  gap:12px;
+  margin:17px 0;
+  color:var(--text-faint);
+}
+.wiz-step i{
+  display:grid;
+  place-items:center;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:var(--surface-2);
+  font:9px var(--mono);
+  font-style:normal;
+}
+.wiz-step.active{color:var(--foreground)}
+.wiz-step.active i{
+  background:var(--accent);
+  color:var(--background);
+  box-shadow:0 0 20px rgba(139,120,255,.35);
+}
+.wiz-content{
+  position:relative;
+  padding:7vh 8vw;
+}
+.wiz-content h1{
+  max-width:650px;
+  margin:0;
+  font:400 clamp(32px,4vw,58px)/1.12 var(--serif);
+  text-wrap:balance;
+}
+.wiz-content .lead{
+  max-width:580px;
+  color:var(--text-muted);
+  font-size:14px;
+  line-height:1.8;
+}
+.field{
+  max-width:560px;
+  margin-top:32px;
+}
+.field label{
+  display:block;
+  margin-bottom:8px;
+  color:var(--text-faint);
+  font-size:10px;
+}
+.field input{
+  width:100%;
+  height:52px;
+  padding:0 15px;
+  border:0;
+  border-radius:12px;
+  background:var(--surface-3);
+  box-shadow:inset 0 0 0 1px var(--hairline);
+}
+.field input:focus{box-shadow:inset 0 0 0 1px var(--accent)}
+.wiz-actions{
+  position:absolute;
+  right:48px;
+  bottom:40px;
+  display:flex;
+  gap:8px;
+}
+.primary{
+  height:44px;
+  padding:0 18px;
+  border-radius:999px;
+  background:var(--foreground);
+  color:var(--background);
+  font-weight:600;
+}
+.primary span{
+  display:inline-grid;
+  place-items:center;
+  width:26px;
+  height:26px;
+  margin-left:10px;
+  border-radius:50%;
+  background:rgba(11,10,15,.1);
+}
+.variantbar{
+  position:fixed;
+  z-index:7;
+  bottom:12px;
+  left:50%;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:5px;
+  border-radius:999px;
+  background:rgba(21,19,26,.94);
+  box-shadow:
+    inset 0 0 0 1px var(--hairline),
+    0 15px 45px rgba(0,0,0,.4);
+  backdrop-filter:blur(12px);
+  transform:translateX(-50%);
+}
+.variantbar button{
+  width:29px;
+  height:29px;
+  border-radius:50%;
+  background:var(--surface-2);
+}
+.variantbar span{
+  padding:0 8px;
+  color:var(--text-faint);
+  font:9px var(--mono);
+}
+@keyframes rise{
+  from{opacity:0;transform:translateY(12px);filter:blur(3px)}
+  to{opacity:1;transform:none;filter:none}
+}
+@keyframes panelin{
+  from{opacity:0;transform:translateX(8px);filter:blur(3px)}
+  to{opacity:1;transform:none;filter:none}
+}
+@keyframes fade{
+  from{opacity:0}
+  to{opacity:1}
+}
+@keyframes slide{
+  from{opacity:0;transform:translateX(32px)}
+  to{opacity:1;transform:none}
+}
+@keyframes wiz{
+  from{opacity:0;transform:scale(.975) translateY(10px)}
+  to{opacity:1;transform:none}
+}
+@media(max-width:1280px){
+  .app{grid-template-columns:208px minmax(590px,1fr) 330px}
+  .bubble{max-width:84%}
+  .pipeline{padding-left:8px;padding-right:8px}
+  .step{padding-left:18px}
+  .step:before{left:6px}
+  .step span{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{
+    animation-duration:.001ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+    scroll-behavior:auto!important;
+  }
+  canvas{opacity:.55}
+}
+</style>
+</head>
+<body>
+<canvas id="ink" aria-hidden="true"></canvas>
+<div class="proto">PROTOTYPE</div>
+
+<main class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="seal">墨</div>
+      <div>
+        <b>墨舟</b>
+        <small>NOVEL OS 2.0</small>
+      </div>
+    </div>
+
+    <button class="book-switch" id="wizardOpen">
+      <span class="cover"></span>
+      <span>
+        《雾港失真》
+        <em>第 18 章 · 活跃草稿</em>
+      </span>
+    </button>
+
+    <button class="quiet-btn" id="skillOpen">⌘&nbsp; 技能注册表</button>
+
+    <div class="top-actions">
+      <button class="quiet-btn">
+        <i class="status-dot"></i>
+        本地已同步
+      </button>
+      <button class="iconbtn" aria-label="搜索">⌕</button>
+      <button class="iconbtn" aria-label="命令面板">⌘</button>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span>CAPABILITY INDEX</span>
+      <span>17</span>
+    </div>
+    <nav id="nav" aria-label="完整功能导航"></nav>
+  </aside>
+
+  <section class="pipeline" id="pipeline" aria-label="章节生产管线"></section>
+
+  <section class="center">
+    <div class="chapterbar">
+      <h1>第十八章 · 潮汐钟的第十三响</h1>
+      <span class="meta">1,842 字 / 目标 2,600</span>
+      <span class="save">
+        <i class="status-dot"></i>
+        草稿已保存
+      </span>
+    </div>
+
+    <div class="conversation">
+      <div class="date-rule">CHAPTER PRODUCTION SESSION · #CP-018-04</div>
+
+      <div class="msg ai">
+        <div class="avatar">舟</div>
+        <div class="bubble">
+          <strong>这一章，你更想让读者害怕“钟声”，还是害怕钟声之后的沉默？</strong>
+          <br>
+          我检测到上一章留下的承诺是“第十三响后会有人被遗忘”。先确定情绪落点，我再装配本章上下文。
+          <div class="choice-row">
+            <button class="choice">害怕钟声</button>
+            <button class="choice">害怕沉默</button>
+            <button class="choice">两者递进</button>
+          </div>
+          <span class="hint">墨舟先问 · 关联承诺 promise:tide-clock-13</span>
+        </div>
+      </div>
+
+      <div class="msg user">
+        <div class="bubble">
+          两者递进。前十二响让林岚以为危险来自钟，第十三响之后，所有人突然不再记得顾沉。
+        </div>
+        <div class="avatar">我</div>
+      </div>
+
+      <div class="msg ai">
+        <div class="avatar">舟</div>
+        <div class="bubble">
+          明白。我会保留林岚的 POV 限制，让她先从称谓错位察觉异常。Context Receipt 已装配 6,438 tok，连续性检查命中 3 条关键事实。
+        </div>
+      </div>
+
+      <article class="draft-slice">
+        <div class="kicker">DRAFT STREAM · 片段 03</div>
+        <p>
+          第十三声没有落下来。<br>
+          它像一滴悬在港口上空的墨，迟迟不肯洇开。林岚转过身，想问顾沉是否也听见了那阵静默，却发现码头上的每一张脸都在看她。
+        </p>
+      </article>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="rails">
+        <div class="rail">
+          <span class="rail-label">技能</span>
+          <button class="pill on">续写</button>
+          <button class="pill on">悬念调度</button>
+          <button class="pill">对白打磨</button>
+          <button class="pill">场景氛围</button>
+          <button class="pill">一致性自查</button>
+          <button class="pill">＋ 自定义提示</button>
+        </div>
+
+        <div class="rail">
+          <span class="rail-label">风格</span>
+          <button class="pill radio">无</button>
+          <button class="pill radio on">冷峻悬疑 · v3</button>
+          <button class="pill radio">克制留白</button>
+          <button class="pill radio">高密度对白</button>
+        </div>
+      </div>
+
+      <div class="composer-shell">
+        <div class="composer">
+          <textarea aria-label="写作指令" placeholder="回答墨舟，或描述下一段需要发生什么…"></textarea>
+          <button class="send" aria-label="发送">↑</button>
+          <div class="composer-foot">
+            <span>已注入 2 项技能 · 1 项风格 · 质量门常驻</span>
+            <span>⌘ Enter 发送</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="inspector">
+    <div class="tabs">
+      <button class="tab active" data-panel="quality">质量门</button>
+      <button class="tab" data-panel="brain">Story Brain</button>
+      <button class="tab" data-panel="receipt">装配看板</button>
+      <button class="tab" data-panel="matrix">变更矩阵</button>
+    </div>
+
+    <section class="panel active" id="quality">
+      <div class="panel-head">
+        <div>
+          <h2>质量门</h2>
+          <p>QualityReviewReport · rev.07</p>
+        </div>
+        <span class="verdict blocking">blocking_fail</span>
+      </div>
+
+      <div class="banner">语义审查提供方未接入（Gate 3） · unavailable</div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>锚定版本</b>
+            <span class="mono muted">2 / 2 回炉</span>
+          </div>
+          <div class="mono muted">
+            draft 91e4…c82 · receipt rcpt_018_04<br>
+            ruleset 7ad2…119 · reviewer local:v2
+          </div>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>Blocking 失败 · 2</b>
+          </div>
+
+          <div class="finding">
+            <b>LIT-PAYOFF-004 · v2.1</b>
+            <p>“第十三响”的结果在 286 字内被直接解释，悬念兑现早于情绪峰值。</p>
+          </div>
+
+          <div class="finding">
+            <b>POV-LEAK-011 · v1.6</b>
+            <p>证据摘录：“顾沉知道他们已经忘了他。”林岚 POV 不应访问该认知。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>Advisories · 3</b>
+            <span class="verdict pass">Continuity pass</span>
+          </div>
+          <p class="muted">
+            场景压力曲线在 62% 处变平；建议延后解释性对白。意象“潮锈”本章重复 4 次。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="brain">
+      <div class="panel-head">
+        <div>
+          <h2>Story Brain</h2>
+          <p>实体卡 · 大纲树 · 事实列表</p>
+        </div>
+        <span class="tag">12 entities</span>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>实体卡</b>
+            <span class="muted">点击筛选事实</span>
+          </div>
+          <div class="entity-grid">
+            <div class="entity"><small>人物</small>林岚</div>
+            <div class="entity"><small>人物</small>顾沉</div>
+            <div class="entity"><small>地点</small>灰潮港</div>
+            <div class="entity"><small>概念</small>潮汐钟</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title"><b>章大纲树</b></div>
+          <div class="tree">
+            ▾ 卷二 · 失真的海岸<br>
+            　├ 第十七章 · 无名船票<br>
+            <span class="active-node">　└ 第十八章 · 潮汐钟的第十三响</span><br>
+            　　├ Scene 01 · 钟楼下<br>
+            　　└ Scene 02 · 被抹去的称谓
+          </div>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>关联事实</b>
+            <span class="mono muted">5 rows</span>
+          </div>
+          <div class="fact">
+            <i class="cog canon"></i>
+            <span><b>canon</b> 顾沉左耳听不见低频钟声</span>
+          </div>
+          <div class="fact">
+            <i class="cog suspect"></i>
+            <span><b>suspect</b> 第十三响会抹去见证者记忆</span>
+          </div>
+          <div class="fact">
+            <i class="cog belief"></i>
+            <span><b>belief</b> 林岚相信钟楼由港务局控制</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="receipt">
+      <div class="panel-head">
+        <div>
+          <h2>装配看板</h2>
+          <p>Context Receipt · 可确定性重算</p>
+        </div>
+        <span class="tag">6,438 tok</span>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>额度分配</b>
+            <span class="mono muted">cap 8,192</span>
+          </div>
+          <div class="budget">
+            <span class="reserved"></span>
+            <span class="story"></span>
+            <span class="fixed"></span>
+            <span></span>
+          </div>
+          <div class="mono muted">
+            reserved 2,304 · story 3,288 · fixed 846 · slack 1,754
+          </div>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>逐条装配分解</b>
+            <span class="muted">按 desirability</span>
+          </div>
+          <div class="receipt-row">
+            <span>Author Intent / reader promise</span>
+            <code>fixed</code>
+            <b>412</b>
+          </div>
+          <div class="receipt-row">
+            <span>char:lin-lan · detected</span>
+            <code>reserved</code>
+            <b>688</b>
+          </div>
+          <div class="receipt-row">
+            <span>promise:tide-clock-13</span>
+            <code>reserved</code>
+            <b>521</b>
+          </div>
+          <div class="receipt-row">
+            <span>第十七章末段</span>
+            <code>story</code>
+            <b>1,204</b>
+          </div>
+          <div class="receipt-row">
+            <span>Scene 02 beats</span>
+            <code>story</code>
+            <b>734</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>Replay Inputs</b>
+            <span class="verdict pass">hash match</span>
+          </div>
+          <div class="replay mono">
+            <div>tokenizer<br>qwen2.5-v4</div>
+            <div>compiler<br>ctx-2.8.1</div>
+            <div>candidates<br>17 ordered</div>
+            <div>digest<br>c820…a91f</div>
+          </div>
+          <button class="action secondary">续跑 compile step</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="matrix">
+      <div class="panel-head">
+        <div>
+          <h2>变更矩阵</h2>
+          <p>Traversal × 受影响章</p>
+        </div>
+        <span class="verdict blocking">stale 4</span>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th>上游变更</th>
+                <th>17</th>
+                <th>18</th>
+                <th>19</th>
+                <th>20</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="rowname">顾沉听觉限制</td>
+                <td class="green">已消解</td>
+                <td class="red">需重写</td>
+                <td>—</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td class="rowname">潮汐钟规则</td>
+                <td>—</td>
+                <td class="red">需重写</td>
+                <td class="red">需重写</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td class="rowname">港务局权限</td>
+                <td class="green">已消解</td>
+                <td>—</td>
+                <td class="red">需重写</td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-shell">
+        <div class="card">
+          <div class="card-title">
+            <b>Traversal #tv_084</b>
+            <span class="mono muted">3 hops · 14ms</span>
+          </div>
+          <p class="muted">
+            concept:tide-clock → fact:memory-erasure → chapter:018,019
+          </p>
+          <button class="action secondary">重跑此遍历</button>
+        </div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<div class="drawer" id="skills">
+  <div class="scrim" data-close="skills"></div>
+  <div class="drawer-sheet">
+    <div class="drawer-core">
+      <div class="drawer-top">
+        <div>
+          <h2>能力注册表</h2>
+          <p>执行器、广场技能与个人配方都从这里进入写作请求。</p>
+        </div>
+        <button class="iconbtn close" data-close="skills" aria-label="关闭">×</button>
+      </div>
+      <div id="skillSections"></div>
+    </div>
+  </div>
+</div>
+
+<div class="wizard" id="wizard">
+  <div class="scrim" data-close="wizard"></div>
+  <div class="wizard-stage">
+    <div class="wizard-core">
+      <aside class="wiz-nav">
+        <div class="seal">墨</div>
+        <h2>把第一条航线<br>交给墨舟</h2>
+        <p>五步建立作品骨架。完成后进入常驻工作台，任何一步都可重放。</p>
+        <div class="wiz-steps" id="wizSteps"></div>
+      </aside>
+
+      <section class="wiz-content">
+        <button
+          class="iconbtn close"
+          style="position:absolute;right:24px;top:24px"
+          data-close="wizard"
+          aria-label="关闭"
+        >×</button>
+
+        <div class="mono muted" id="wizEyebrow">STEP 01 / 05</div>
+        <h1 id="wizTitle">先给这本书一个<br>可以启航的名字</h1>
+        <p class="lead" id="wizLead">
+          不用现在就把一切想清楚。书名和题材只用于建立作品容器，之后仍可修改。
+        </p>
+
+        <div class="field">
+          <label id="wizLabel">作品名</label>
+          <input id="wizInput" value="雾港失真">
+        </div>
+
+        <div class="wiz-actions">
+          <button class="quiet-btn" id="wizBack">上一步</button>
+          <button class="primary" id="wizNext">继续<span>→</span></button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="variantbar">
+  <button id="prev" aria-label="上一变体">‹</button>
+  <span>INK ORBIT · 01 / 01</span>
+  <button id="next" aria-label="下一变体">›</button>
+</div>
+
+<script>
+const navGroups = {
+  "创作": [
+    "工作台",
+    "写作对话",
+    "我的作品",
+    "风格蒸馏",
+    "小说拆解"
+  ],
+  "检视 · Novel OS": [
+    "Story Brain",
+    "装配看板",
+    "变更矩阵",
+    "质量门"
+  ],
+  "工作流": [
+    "任务中心"
+  ],
+  "资源": [
+    "书源搜索 / 书源书架",
+    "技能广场",
+    "网文扫榜",
+    "联网搜索",
+    "云同步"
+  ],
+  "账户": [
+    "会员中心"
+  ]
+};
+
+const navIcons = [
+  "01","02","03","04","05",
+  "SB","CR","CM","QG",
+  "10","11","12","13","14","15","16"
+];
+
+let navIndex = 0;
+
+document.querySelector("#nav").innerHTML = Object.entries(navGroups)
+  .map(([group, items]) => `
+    <div class="nav-group">
+      <div class="nav-label">${group}</div>
+      ${items.map(item => `
+        <button class="nav-item ${item === "工作台" ? "active" : ""}">
+          <i>${navIcons[navIndex++]}</i>
+          <span>${item}</span>
+          ${item === "任务中心" ? '<b class="count">3</b>' : ""}
+        </button>
+      `).join("")}
+    </div>
+  `).join("");
+
+document.querySelectorAll(".nav-item").forEach(item => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach(node => {
+      node.classList.remove("active");
+    });
+    item.classList.add("active");
+  });
+});
+
+const stages = [
+  ["prepare","准备"],
+  ["compile","装配"],
+  ["draft","草稿"],
+  ["review","审查"],
+  ["extract","提取"],
+  ["continuity","连续性"],
+  ["proposal","提案"],
+  ["commit","提交"]
+];
+
+document.querySelector("#pipeline").innerHTML = stages
+  .map((stage, index) => `
+    <button
+      class="step ${index < 3 ? "done" : index === 3 ? "active" : ""}"
+      data-stage="${index}"
+    >
+      <b>${stage[0]}</b>
+      <span>${stage[1]}</span>
+    </button>
+  `).join("");
+
+let inkFocus = .43;
+
+document.querySelectorAll(".step").forEach(button => {
+  button.addEventListener("click", () => {
+    const activeStage = Number(button.dataset.stage);
+
+    document.querySelectorAll(".step").forEach((step, index) => {
+      step.className = "step " + (
+        index < activeStage
+          ? "done"
+          : index === activeStage
+            ? "active"
+            : ""
+      );
+    });
+
+    inkFocus = activeStage / 7;
+  });
+});
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab,.panel").forEach(node => {
+      node.classList.remove("active");
+    });
+
+    tab.classList.add("active");
+    document.querySelector("#" + tab.dataset.panel).classList.add("active");
+  });
+});
+
+document.querySelectorAll(".pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    if (pill.classList.contains("radio")) {
+      pill.parentNode.querySelectorAll(".radio").forEach(node => {
+        node.classList.remove("on");
+      });
+      pill.classList.add("on");
+      return;
+    }
+
+    pill.classList.toggle("on");
+  });
+});
+
+const skillData = {
+  "内置执行器 · 6": [
+    ["故事基座","常驻 · 正典与大纲上下文"],
+    ["质量门","常驻 · blocking 与 advisory"],
+    ["章节规划","开关 · Scene 与章节节拍"],
+    ["读者题材","开关 · 题材承诺检查"],
+    ["叙事风格","开关 · 风格档注入"],
+    ["自定义提示","编辑 · 私有指令"]
+  ],
+  "广场技能 · 3": [
+    ["去 AI 味","降低模板句式与机械转折"],
+    ["人物小传","从正典生成角色履历"],
+    ["信息差设计","规划角色、读者、叙述者知情差"]
+  ],
+  "oh-story · 13": [
+    ["黄金三章","开篇承诺与钩子"],
+    ["长篇拆解","Stage 0–6"],
+    ["短篇故事核","情绪核与反转"],
+    ["章节续写","承接当前场景"],
+    ["对白打磨","角色声纹检查"],
+    ["悬念调度","承诺生命周期"],
+    ["场景氛围","感官与意象"],
+    ["一致性自查","事实与知识状态"],
+    ["爽点诊断","压力与实得"],
+    ["节奏扫描","段落张力曲线"],
+    ["伏笔台账","承诺到期追踪"],
+    ["人物弧光","关系与信念变化"],
+    ["大纲推演","冲突路径比较"]
+  ],
+  "我的技能 · 4": [
+    ["冷雾句法","私有 · v3"],
+    ["港城地理校验","私有 · v1"],
+    ["克制留白","私有 · v4"],
+    ["章末钩子 A/B","私有 · v2"]
+  ]
+};
+
+document.querySelector("#skillSections").innerHTML = Object.entries(skillData)
+  .map(([group, skills]) => `
+    <section class="skill-section">
+      <h3>${group}</h3>
+      <div class="skill-grid">
+        ${skills.map(([name, description]) => `
+          <div class="skill-card">
+            <b>${name}</b>
+            <p>${description}</p>
+            <div class="kind">CAPABILITY RECIPE</div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
+
+const skillsDrawer = document.querySelector("#skills");
+const wizard = document.querySelector("#wizard");
+
+document.querySelector("#skillOpen").addEventListener("click", () => {
+  skillsDrawer.classList.add("open");
+});
+
+document.querySelector("#wizardOpen").addEventListener("click", () => {
+  wizard.classList.add("open");
+});
+
+document.querySelectorAll("[data-close]").forEach(element => {
+  element.addEventListener("click", () => {
+    document.querySelector("#" + element.dataset.close).classList.remove("open");
+  });
+});
+
+const wizardData = [
+  [
+    "建书",
+    "先给这本书一个<br>可以启航的名字",
+    "不用现在就把一切想清楚。书名和题材只用于建立作品容器，之后仍可修改。",
+    "作品名",
+    "雾港失真"
+  ],
+  [
+    "世界观",
+    "写下这个世界<br>绝不能违背的规则",
+    "从一条硬规则开始。它会进入 Author Intent，成为后续生成不可越过的边界。",
+    "世界规则",
+    "被潮汐钟遗忘的人，会从所有书面记录中消失"
+  ],
+  [
+    "大纲",
+    "确定第一卷<br>必须兑现的承诺",
+    "只描述读者最终会看到什么，不需要提前写出每一章。",
+    "卷级承诺",
+    "林岚必须找回一个全城都不记得的人"
+  ],
+  [
+    "首章",
+    "选择第一章<br>最晚从哪里切入",
+    "墨舟会先提问，再创建首个 Chapter Production Session。",
+    "开场画面",
+    "一张没有乘客姓名的末班船票"
+  ],
+  [
+    "连写",
+    "骨架已经完成<br>开始第一段航行",
+    "进入常驻工作台。管线、质量门和正典提案会在写作过程中持续陪伴。",
+    "首章目标",
+    "让读者在 800 字内意识到记忆正在被篡改"
+  ]
+];
+
+let wizardIndex = 0;
+
+function renderWizard() {
+  document.querySelector("#wizSteps").innerHTML = wizardData
+    .map((item, index) => `
+      <div class="wiz-step ${index === wizardIndex ? "active" : ""}">
+        <i>${String(index + 1).padStart(2, "0")}</i>
+        <span>${item[0]}</span>
+      </div>
+    `).join("");
+
+  document.querySelector("#wizEyebrow").textContent =
+    `STEP ${String(wizardIndex + 1).padStart(2, "0")} / 05`;
+
+  document.querySelector("#wizTitle").innerHTML =
+    wizardData[wizardIndex][1];
+
+  document.querySelector("#wizLead").textContent =
+    wizardData[wizardIndex][2];
+
+  document.querySelector("#wizLabel").textContent =
+    wizardData[wizardIndex][3];
+
+  document.querySelector("#wizInput").value =
+    wizardData[wizardIndex][4];
+
+  document.querySelector("#wizBack").style.opacity =
+    wizardIndex ? "1" : ".35";
+
+  document.querySelector("#wizNext").innerHTML =
+    wizardIndex === 4
+      ? "进入工作台<span>→</span>"
+      : "继续<span>→</span>";
+}
+
+renderWizard();
+
+document.querySelector("#wizNext").addEventListener("click", () => {
+  if (wizardIndex < 4) {
+    wizardIndex += 1;
+    renderWizard();
+  } else {
+    wizard.classList.remove("open");
+  }
+});
+
+document.querySelector("#wizBack").addEventListener("click", () => {
+  if (wizardIndex > 0) {
+    wizardIndex -= 1;
+    renderWizard();
+  }
+});
+
+const canvas = document.querySelector("#ink");
+const gl = canvas.getContext("webgl", {
+  antialias:false,
+  alpha:false,
+  powerPreference:"low-power"
+});
+
+function initWebGL() {
+  if (!gl) {
+    canvas.style.background =
+      "radial-gradient(circle at 58% 35%,rgba(139,120,255,.10),transparent 38%),#0b0a0f";
+    return;
+  }
+
+  const vertexSource = `
+    attribute vec2 position;
+
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }
+  `;
+
+  const fragmentSource = `
+    precision highp float;
+
+    uniform vec2 resolution;
+    uniform float time;
+    uniform float focus;
+
+    float hash(vec2 point) {
+      return fract(
+        sin(dot(point, vec2(127.1, 311.7))) * 43758.5453
+      );
+    }
+
+    float noise(vec2 point) {
+      vec2 cell = floor(point);
+      vec2 local = fract(point);
+
+      local = local * local * (3.0 - 2.0 * local);
+
+      return mix(
+        mix(
+          hash(cell),
+          hash(cell + vec2(1.0, 0.0)),
+          local.x
+        ),
+        mix(
+          hash(cell + vec2(0.0, 1.0)),
+          hash(cell + vec2(1.0, 1.0)),
+          local.x
+        ),
+        local.y
+      );
+    }
+
+    void main() {
+      vec2 uv = (
+        gl_FragCoord.xy - 0.5 * resolution
+      ) / resolution.y;
+
+      float field = 0.0;
+      vec2 flow = uv * 1.8;
+
+      for (int layer = 0; layer < 5; layer++) {
+        field += noise(flow + time * 0.012) *
+          (0.28 / float(layer + 1));
+
+        flow = mat2(
+          1.6, -1.1,
+          1.1,  1.6
+        ) * flow;
+      }
+
+      vec2 focusPoint = uv - vec2(
+        mix(-0.34, 0.36, focus),
+        0.08
+      );
+
+      float halo = exp(
+        -dot(focusPoint, focusPoint) * 4.2
+      );
+
+      float filament = pow(
+        max(0.0, field - 0.38),
+        2.0
+      ) * 2.5;
+
+      vec3 background = vec3(
+        0.043,
+        0.039,
+        0.059
+      );
+
+      vec3 violet = vec3(
+        0.545,
+        0.471,
+        1.0
+      );
+
+      vec3 color =
+        background +
+        violet * (
+          filament * 0.24 +
+          halo * 0.075
+        ) +
+        vec3(0.12, 0.11, 0.15) *
+        field * 0.12;
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  function compileShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    return shader;
+  }
+
+  const program = gl.createProgram();
+
+  gl.attachShader(
+    program,
+    compileShader(gl.VERTEX_SHADER, vertexSource)
+  );
+
+  gl.attachShader(
+    program,
+    compileShader(gl.FRAGMENT_SHADER, fragmentSource)
+  );
+
+  gl.linkProgram(program);
+  gl.useProgram(program);
+
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([
+      -1,-1,
+       3,-1,
+      -1, 3
+    ]),
+    gl.STATIC_DRAW
+  );
+
+  const position = gl.getAttribLocation(program, "position");
+
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(
+    position,
+    2,
+    gl.FLOAT,
+    false,
+    0,
+    0
+  );
+
+  const resolution = gl.getUniformLocation(program, "resolution");
+  const time = gl.getUniformLocation(program, "time");
+  const focus = gl.getUniformLocation(program, "focus");
+
+  const reducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
+
+  function draw(milliseconds = 0) {
+    const density = Math.min(window.devicePixelRatio || 1, 1.5);
+    const targetWidth = Math.round(window.innerWidth * density);
+    const targetHeight = Math.round(window.innerHeight * density);
+
+    if (
+      canvas.width !== targetWidth ||
+      canvas.height !== targetHeight
+    ) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      gl.viewport(0, 0, targetWidth, targetHeight);
+    }
+
+    gl.uniform2f(
+      resolution,
+      canvas.width,
+      canvas.height
+    );
+
+    gl.uniform1f(
+      time,
+      milliseconds / 1000
+    );
+
+    gl.uniform1f(
+      focus,
+      inkFocus
+    );
+
+    gl.drawArrays(
+      gl.TRIANGLES,
+      0,
+      3
+    );
+
+    if (!reducedMotion) {
+      window.requestAnimationFrame(draw);
+    }
+  }
+
+  draw();
+}
+
+initWebGL();
+
+document.addEventListener("keydown", event => {
+  const focusedTag = document.activeElement.tagName;
+
+  if (
+    focusedTag === "INPUT" ||
+    focusedTag === "TEXTAREA"
+  ) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    skillsDrawer.classList.remove("open");
+    wizard.classList.remove("open");
+  }
+
+  if (
+    event.key === "ArrowLeft" ||
+    event.key === "ArrowRight"
+  ) {
+    document.querySelector(".variantbar span").animate(
+      [
+        {opacity:.35, transform:"translateY(2px)"},
+        {opacity:1, transform:"translateY(0)"}
+      ],
+      {
+        duration:280,
+        easing:"cubic-bezier(.16,1,.3,1)"
+      }
+    );
+  }
+});
+
+document.querySelector("#prev").addEventListener("click", () => {
+  document.querySelector(".variantbar span").animate(
+    [{opacity:.35},{opacity:1}],
+    {duration:280,easing:"cubic-bezier(.16,1,.3,1)"}
+  );
+});
+
+document.querySelector("#next").addEventListener("click", () => {
+  document.querySelector(".variantbar span").animate(
+    [{opacity:.35},{opacity:1}],
+    {duration:280,easing:"cubic-bezier(.16,1,.3,1)"}
+  );
+});
+</script>
+</body>
+</html>
