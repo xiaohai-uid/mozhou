@@ -260,6 +260,7 @@ describe('Continuity Gate 步', () => {
     session.advance('compile');
     session.advance('draft');
     session.advance('review');
+    session.recordQualityReview({ reportId: 'rpt_gate_pass', verdict: 'pass' });
     session.advance('user_edit');
     session.advance('final_extract');
 
@@ -281,5 +282,69 @@ describe('Continuity Gate 步', () => {
     expect(transition?.payload?.['verdict']).toBe('pass');
     expect(transition?.payload?.['hardConflicts']).toEqual([]);
     expect(session.currentStep).toBe('continuity_gate');
+  });
+});
+
+/* -------------------------------------------------------------------------
+ * ADR-0026（认知层级）：suspects/believes 不得授权确定性秘密陈述
+ * ------------------------------------------------------------------------- */
+
+describe('ADR-0026 认知层级与秘密授权', () => {
+  it('suspects 认知行不授权秘密事实 → hard_conflict', () => {
+    const { root } = newBook();
+    const secret = factRow({ predicate: 'secret.bloodline', riskClass: 'high', value: '青云血脉' });
+    const outcome = runContinuityGate({
+      bookRoot: root,
+      chapterIndex: 2,
+      delta: {
+        temporalFact: [secret],
+        knowledgeState: [ksRow({ factId: secret.id as string, holder: 'protagonist', level: 'suspects' })],
+      },
+    });
+    expect(outcome.verdict).toBe('hard_conflict');
+    expect(outcome.hardConflicts[0]?.assertion).toContain('no authorizing knowledge row');
+  });
+
+  it('believes 认知行同样不授权秘密事实', () => {
+    const { root } = newBook();
+    const secret = factRow({ predicate: 'secret.bloodline', riskClass: 'high', value: '青云血脉' });
+    const outcome = runContinuityGate({
+      bookRoot: root,
+      chapterIndex: 2,
+      delta: {
+        temporalFact: [secret],
+        knowledgeState: [ksRow({ factId: secret.id as string, holder: 'protagonist', level: 'believes' })],
+      },
+    });
+    expect(outcome.verdict).toBe('hard_conflict');
+  });
+
+  it('knows 认知行照常授权秘密（对照）', () => {
+    const { root } = newBook();
+    const secret = factRow({ predicate: 'secret.bloodline', riskClass: 'high', value: '青云血脉' });
+    const outcome = runContinuityGate({
+      bookRoot: root,
+      chapterIndex: 2,
+      delta: {
+        temporalFact: [secret],
+        knowledgeState: [ksRow({ factId: secret.id as string, holder: 'protagonist', level: 'knows' })],
+      },
+    });
+    expect(outcome.hardConflicts.filter((c) => c.assertion.includes('no authorizing knowledge row'))).toHaveLength(0);
+  });
+
+  it('存量行（无 level）读路径迁移为 knows，照常授权（迁移规则）', () => {
+    const { root } = newBook();
+    const secret = factRow({ predicate: 'secret.bloodline', riskClass: 'high', value: '青云血脉' });
+    const { level: _omitted, ...legacy } = ksRow({ factId: secret.id as string, holder: 'protagonist', level: 'knows' });
+    const outcome = runContinuityGate({
+      bookRoot: root,
+      chapterIndex: 2,
+      delta: {
+        temporalFact: [secret],
+        knowledgeState: [legacy],
+      },
+    });
+    expect(outcome.hardConflicts.filter((c) => c.assertion.includes('no authorizing knowledge row'))).toHaveLength(0);
   });
 });

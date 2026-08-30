@@ -67,6 +67,7 @@ function harnessToConflictedGate(prefix: string): Harness {
   session.advance('compile');
   session.advance('draft');
   session.advance('review');
+  session.recordQualityReview({ reportId: 'rpt_rw_pass', verdict: 'pass' });
   session.advance('user_edit');
 
   let calls = 0;

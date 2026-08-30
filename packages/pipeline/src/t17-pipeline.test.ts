@@ -121,6 +121,9 @@ describe('T17 三步挂进十步状态机', () => {
     const reviewInput = loadDraftForReview(dir, 2);
     expect(reviewInput.body).toBe(outcome.text);
 
+    // Review 步落账（ADR-0025）：审查事件随会话窗口进账，pass 才放行前进口
+    session.recordQualityReview({ reportId: 'rpt_t17_pass', verdict: 'pass' });
+
     // User Edit 步：结构化操作块即时落盘并落账（挂会话 taskRef）
     session.advance('user_edit');
     const editOutcome = recordUserEdit({
@@ -161,6 +164,7 @@ describe('T17 三步挂进十步状态机', () => {
     expect(types).toContain('TaskStarted');
     expect(types).toContain('GenerationStarted');
     expect(types).toContain('GenerationFinished');
+    expect(types).toContain('QualityReviewCompleted');
     expect(types).toContain('UserEditRecorded');
     expect(types).toContain('CandidateCreated');
   });

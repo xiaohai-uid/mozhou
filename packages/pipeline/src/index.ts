@@ -17,6 +17,9 @@ export {
   ChapterProductionSession,
   GlobalSingleFlightError,
   HardConflictUnresolvedError,
+  QualityReviewNotPassError,
+  QualityReworkLimitExceededError,
+  QualityReworkNotDrivenError,
   ReworkNotDrivenError,
   SessionAlreadyActiveError,
   SessionNotResumableError,
@@ -26,12 +29,20 @@ export {
 export type { ChapterProductionSessionDeps } from './session.js';
 
 /** Prepare 步：纯函数查询组合，不落盘。 */
-export { prepareChapterInputs } from './prepare.js';
+export {
+  prepareChapterInputs,
+  QUALITY_SECTION,
+  qualityStructuralSections,
+  READER_EXPERIENCE_PATH,
+  MEMORY_ANCHORS_PATH,
+  FAILURE_MEMORY_PATH,
+} from './prepare.js';
 export type {
   ActivePromiseView,
   AuthorIntentView,
   ChapterOutlineView,
   ChapterPrepareInputs,
+  QualityPreparationSlice,
   SceneView,
 } from './prepare.js';
 
@@ -76,22 +87,29 @@ export {
   EditActionLevelError,
   EditBlockShapeError,
   applyEditBlocks,
+  recordAuthorCorrection,
   recordUserEdit,
 } from './user-edit-step.js';
 export type {
   EditActionLevel,
   EditDeltaStats,
   EditOperationBlock,
+  RecordAuthorCorrectionRequest,
   RecordUserEditRequest,
   UserEditOutcome,
 } from './user-edit-step.js';
 
 /**
- * Review 步消费入口（T17 · #41）：draft 产物 → 机械核检输入记录；
- * 硬门禁本体归 T18，本票只保证可被核检入口消费。
+ * Review 步（T17 · #41；ADR-0025 升级）：draft 产物 → 机械核检输入记录 +
+ * 版本绑定 QualityReviewReport（报告落 .mozhou/quality-reviews/，非 Canon）。
+ * 事件落账与回炉决策由编排者经 ChapterProductionSession 显式驱动。
  */
-export { loadDraftForReview } from './review-step.js';
-export type { MechanicalReviewInput } from './review-step.js';
+export { loadDraftForReview, runReviewStep } from './review-step.js';
+export type {
+  MechanicalReviewInput,
+  ReviewStepOutcome,
+  RunReviewStepRequest,
+} from './review-step.js';
 
 /** Compile 步衔接：复用 compile() 缝；stale 警告继续+Receipt 留痕；receiptId 续跑。 */
 export {

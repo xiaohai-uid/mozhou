@@ -108,6 +108,7 @@ function walkToCommit(
   session.advance('compile');
   session.advance('draft');
   session.advance('review');
+  session.recordQualityReview({ reportId: 'rpt_rs_pass', verdict: 'pass' });
   session.advance('user_edit');
   recordUserEdit({
     bus,

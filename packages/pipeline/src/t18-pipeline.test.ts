@@ -125,6 +125,7 @@ describe('T18 三步挂进十步状态机（Extract/Gate/Proposal × ProposalPor
     // Review 步消费入口核对（draft 产物即核检输入）
     session.advance('review');
     expect(loadDraftForReview(dir, 2).body).toBeTruthy();
+    session.recordQualityReview({ reportId: 'rpt_t18_pass', verdict: 'pass' });
 
     // 终稿落定（User Edit 步承载作者润色通道；正文文件即时持久）
     session.advance('user_edit');
@@ -218,6 +219,7 @@ describe('T18 三步挂进十步状态机（Extract/Gate/Proposal × ProposalPor
       'TaskStepTransitioned', // → compile
       'TaskStepTransitioned', // → draft
       'TaskStepTransitioned', // → review
+      'QualityReviewCompleted', // ADR-0025：审查 pass 落账，放行前进口
       'TaskStepTransitioned', // → user_edit
       'UserEditRecorded',
       'TaskStepTransitioned', // → final_extract
@@ -269,6 +271,7 @@ describe('T18 三步挂进十步状态机（Extract/Gate/Proposal × ProposalPor
       newTaskRef: () => 'tsk_t18_conflict',
     });
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract'] as const) {
+      if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_t18_conflict', verdict: 'pass' });
       session.advance(step);
     }
 

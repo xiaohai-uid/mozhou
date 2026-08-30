@@ -13,8 +13,10 @@ describe('领域事件词表（T16 受控增补）', () => {
     // 运行时再以开放字符串集合断言一次，防词表被改回。
     const vocabulary: readonly string[] = DOMAIN_EVENT_TYPES;
     expect(vocabulary.includes('AutomatedReviewCompleted')).toBe(false);
-    // 词表本体也不得出现任何 review 审查完结语义的变体拼写
-    const variants = vocabulary.filter((type) => /review/i.test(type));
+    // 词表本体也不得出现「AutomatedReview」审查完结语义的变体拼写。
+    // ADR-0025（2026-08-30）起 QualityReviewCompleted 合法入列——它裁决的是
+    // 文学质量（pre-Canon 边界），不是被删除的自动化正典审查语义。
+    const variants = vocabulary.filter((type) => /automated.?review/i.test(type));
     expect(variants).toEqual([]);
   });
 
@@ -64,8 +66,8 @@ describe('T21 受控增补（#54 · t51:B5）+ T27（#68 · t66 R4）', () => {
     }
   });
 
-  it('词表 18 词条（15 + Traversal 对 + SemanticAnalyzed）；成对约束四对在册', () => {
-    expect(DOMAIN_EVENT_TYPES).toHaveLength(18);
+  it('词表 20 词条（15 + Traversal 对 + SemanticAnalyzed + QualityReview/AuthorCorrection）；成对约束四对在册', () => {
+    expect(DOMAIN_EVENT_TYPES).toHaveLength(20);
     expect(EVENT_PAIRS).toHaveLength(4);
     expect(EVENT_PAIRS).toContainEqual(['TraversalStarted', 'TraversalFinished']);
     // SemanticAnalyzed 不成对：不出现在任何一端（t66 D14/E3）

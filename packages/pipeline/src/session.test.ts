@@ -43,7 +43,10 @@ const makeDeps = (root: string, refIndex = 0) => ({
 /** 走完十步：advance ×9 + 提案头/正典提交/收卷三个步锚。 */
 function walkAllTen(session: ChapterProductionSession): void {
   const order = ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const;
-  for (const step of order) session.advance(step);
+  for (const step of order) {
+    if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_t16_pass', verdict: 'pass' });
+    session.advance(step);
+  }
   session.recordProposal({ proposalId: 'prop_x' });
   session.advance('commit');
   session.markCommitted('cmit_t16_x');
@@ -124,7 +127,8 @@ describe('投影恢复当前步（会话态=投影，无第三处真源）', () 
     expect(resumed!.taskRef).toBe(TASK_REFS[0]);
     expect(resumed!.currentStep).toBe('review');
 
-    // 恢复后的会话继续按后继序步进
+    // 恢复后的会话继续按后继序步进（ADR-0025：前进前先落 pass 审查）
+    resumed!.recordQualityReview({ reportId: 'rpt_t16_resume', verdict: 'pass' });
     resumed!.advance('user_edit');
     expect(ChapterProductionSession.resume(makeDeps(root))!.currentStep).toBe('user_edit');
   });
@@ -147,6 +151,7 @@ describe('一 session ↔ 一 commit 与重提交', () => {
     const root = hermeticRoot();
     const session = ChapterProductionSession.start(makeDeps(root));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
+      if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_t16_pass', verdict: 'pass' });
       session.advance(step);
     }
     session.recordProposal();
@@ -164,6 +169,7 @@ describe('一 session ↔ 一 commit 与重提交', () => {
     const root = hermeticRoot();
     const first = ChapterProductionSession.start(makeDeps(root, 0));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
+      if (step === 'user_edit') first.recordQualityReview({ reportId: 'rpt_t16_first', verdict: 'pass' });
       first.advance(step);
     }
     first.recordProposal();

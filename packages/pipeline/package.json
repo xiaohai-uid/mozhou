@@ -12,6 +12,7 @@
     "@mozhou/context-compiler": "workspace:*",
     "@mozhou/data-plane": "workspace:*",
     "@mozhou/kernel": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
     "@mozhou/runtime": "workspace:*"
   }
 }

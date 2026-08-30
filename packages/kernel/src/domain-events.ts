@@ -16,6 +16,17 @@
  *     DomainEvent 既有顶层槽位（禁止塞 payload、也禁止新增顶层字段，t52:B5）。
  *
  * 成对约束：head 必须被 tail 闭合，悬挂在投影合并时标记（DSH hook-protocol 先例）。
+ *
+ * 词表增补（ADR-0025 · 质量门集成，2026-08-30）：任务族 `QualityReviewCompleted`
+ * —— 文学质量审查步（十步第 4 步 Review）的步锚事件；payload 携带 verdict
+ * （pass / blocking_fail / refused）与版本绑定锚（reportId / draftRevision /
+ * draftContentHash / receiptId / ruleSetDigest）。非成对事件：报告本体落
+ * `.mozhou/quality-reviews/`（运行期审计证据，非 Canon）。
+ *
+ * 词表增补（同上）：任务族 `AuthorCorrectionRecorded`——作者结构化纠错
+ * （Task 5 失败记忆）：payload 携带 reasons（CorrectionReason 词表）与
+ * noteDigest（纠错附注的 SHA-256 摘要；**原文不入账**——隐私红线 P0/P1）。
+ * 非成对事件；飞轮 s7 重复纠错率的事件源。
  */
 
 /** 事件词表：任务族 + 领域族（唯一真源；各模块禁止散写）。 */
@@ -30,6 +41,8 @@ export const DOMAIN_EVENT_TYPES = [
   'GenerationFinished',
   'CandidateCreated',
   'UserEditRecorded',
+  'QualityReviewCompleted',
+  'AuthorCorrectionRecorded',
   'CandidateDeltaExtracted',
   'CanonProposalCreated',
   'CanonCommitted',

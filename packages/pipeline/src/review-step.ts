@@ -1,12 +1,34 @@
 /**
- * Review 步消费入口（T17 · #41；chapter-pipeline-spec §1 表第 4 行 / S5）。
+ * Review 步消费入口（T17 · #41；chapter-pipeline-spec §1 表第 4 行 / S5；
+ * ADR-0025 升级：契约从「装载 draft 供核检」扩展为「产出版本绑定的
+ * QualityReviewReport」——step id `review` 保留）。
  *
- * 本票边界：只保证 draft 产物可被机械核检入口**消费**——把盘上 phase=draft
- * 的正文章读成一份确定性输入记录（身份/相位/正文/字数），供硬门禁本体
- * （M2 时间线单调 + 四族行校验 + POV 秘密零泄漏 + dependency 引用完整性）
- * 在其实现票（T18）挂接。Gate 判定逻辑一概不在本模块——S5 拍板 Gate 纯机械，
- * LLM 审查只许做旁路建议，两者都不是本票交付物。
+ * 边界纪律：
+ * - 本模块只做装载、哈希、装配与报告落盘；裁决全部在 quality-engine 与
+ *   Gate（机械）——编排者拿到 outcome 后经 session.recordQualityReview 落账，
+ *   blocking_fail 走 session.requestQualityRework 显式回炉（上限 2 次）；
+ * - 报告哈希覆盖**精确待审正文**（readProseChapter 原文的 SHA-256，UTF-8）——
+ *   不哈希截断包或摘要（ADR-0025 决策 3：正文变化即 stale，fail closed）；
+ * - 报告持久化于 `.mozhou/quality-reviews/chapter_<N>/report_<ULID>.json`，
+ *   属运行期审计证据，不进 Canon、不参与真伪折叠。
  */
+import { mkdir, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+import { newUlid } from '@mozhou/kernel';
+import {
+  defaultPlatformRules,
+  hashProse,
+  mergeQualityPolicies,
+  qualityRuleSetDigest,
+  runQualityReview,
+} from '@mozhou/quality-engine';
+import type {
+  FailurePattern,
+  QualityPolicy,
+  QualityReviewReport,
+  ReviewerBinding,
+  SemanticQualityEvaluator,
+} from '@mozhou/quality-engine';
 import type { ChapterPhase } from '@mozhou/data-plane';
 import { ChapterPhaseError, proseChapterPath, readProseChapter } from '@mozhou/data-plane';
 
@@ -21,6 +43,34 @@ export interface MechanicalReviewInput {
   /** 草稿全文（frontmatter 之后的正文区）。 */
   readonly body: string;
   readonly charCount: number;
+}
+
+export interface RunReviewStepRequest {
+  readonly bookRoot: string;
+  readonly chapterIndex: number;
+  /** 本窗 Compile 的 ContextReceipt id（报告锚定六元组之一）。 */
+  readonly receiptId: string;
+  readonly reviewer: ReviewerBinding;
+  /** 已合并（平台+项目）的质量策略；缺省 = 平台默认规则集。 */
+  readonly policy?: QualityPolicy;
+  readonly failurePatterns?: readonly FailurePattern[];
+  readonly semanticEvaluator?: SemanticQualityEvaluator;
+  /** 调用方标记的动作拍点段落（PARA-001 豁免），透传 quality-engine。 */
+  readonly actionBeatParagraphs?: ReadonlySet<number>;
+}
+
+export interface ReviewStepOutcome {
+  readonly input: MechanicalReviewInput;
+  readonly report: QualityReviewReport;
+  /** 报告落盘相对路径（.mozhou/quality-reviews/…）。 */
+  readonly reportRelPath: string;
+}
+
+function defaultPolicyFor(bookRoot: string): QualityPolicy {
+  return mergeQualityPolicies(
+    { schemaVersion: 1, projectId: 'platform', rules: defaultPlatformRules(), maxAutomaticReworks: 2 },
+    { schemaVersion: 1, projectId: basename(bookRoot), rules: [], maxAutomaticReworks: 2 },
+  );
 }
 
 /**
@@ -46,4 +96,63 @@ export function loadDraftForReview(bookRoot: string, chapterIndex: number): Mech
     body: scan.body,
     charCount: scan.body.length,
   };
+}
+
+/**
+ * Review 步执行（ADR-0025）：装载精确 draft → SHA-256 → runQualityReview →
+ * 报告落 `.mozhou/quality-reviews/`。本函数无会话副作用——事件落账与回炉
+ * 决策由编排者经 session 显式驱动。
+ */
+export async function runReviewStep(request: RunReviewStepRequest): Promise<ReviewStepOutcome> {
+  const input = loadDraftForReview(request.bookRoot, request.chapterIndex);
+  const policy = request.policy ?? defaultPolicyFor(request.bookRoot);
+  const proseContentHash = hashProse(input.body);
+  // exactOptionalPropertyTypes：可选缝（semanticEvaluator/actionBeatParagraphs）
+  // 只在提供时进入请求对象，不允许显式 undefined。
+  const reviewRequest: {
+    readonly prose: string;
+    readonly policy: QualityPolicy;
+    readonly anchor: {
+      readonly chapterIndex: number;
+      readonly draftRevision: number;
+      readonly draftContentHash: string;
+      readonly receiptId: string;
+      readonly ruleSetDigest: string;
+    };
+    readonly reviewer: ReviewerBinding;
+    readonly failurePatterns: readonly FailurePattern[];
+    semanticEvaluator?: SemanticQualityEvaluator;
+    actionBeatParagraphs?: ReadonlySet<number>;
+  } = {
+    prose: input.body,
+    policy,
+    anchor: {
+      chapterIndex: input.chapterIndex,
+      draftRevision: input.revision,
+      draftContentHash: proseContentHash,
+      receiptId: request.receiptId,
+      ruleSetDigest: qualityRuleSetDigest(policy),
+    },
+    reviewer: request.reviewer,
+    failurePatterns: request.failurePatterns ?? [],
+  };
+  if (request.semanticEvaluator !== undefined) {
+    reviewRequest.semanticEvaluator = request.semanticEvaluator;
+  }
+  if (request.actionBeatParagraphs !== undefined) {
+    reviewRequest.actionBeatParagraphs = request.actionBeatParagraphs;
+  }
+  const report = await runQualityReview(reviewRequest);
+
+  const reportRelPath = join(
+    '.mozhou',
+    'quality-reviews',
+    `chapter_${input.chapterIndex}`,
+    `report_${newUlid()}.json`,
+  );
+  const absolute = join(request.bookRoot, reportRelPath);
+  await mkdir(dirname(absolute), { recursive: true });
+  await writeFile(absolute, JSON.stringify(report, null, 2) + '\n', 'utf8');
+
+  return { input, report, reportRelPath };
 }

@@ -134,6 +134,17 @@ export interface CellSignals {
     readonly failedGenerations: number;
     readonly degradedWindows: number;
   };
+  /**
+   * S7 重复纠错率（ADR-0025 · 计划 Task 5）：作者结构化纠错在该 cell 上的
+   * 复发信号。correctedChapters = 有纠错记录的不同章数；repeatedCorrections =
+   * 同一 reason 在更晚章节的再次出现（FailurePattern 活跃期内的复发）；
+   * repeatCorrectionRate = repeated ÷ corrected（分母 0 ⇒ null，宁缺不猜）。
+   */
+  readonly s7: {
+    readonly correctedChapters: number;
+    readonly repeatedCorrections: number;
+    readonly repeatCorrectionRate: number | null;
+  };
 }
 
 /** 空 signals 零值（投影累加起点）。 */
@@ -145,5 +156,6 @@ export function emptySignals(): CellSignals {
     s4: { userEditRatioReduction: null },
     s5: { costMicros: 0, outputTokens: 0, microsPerOutputToken: null },
     s6: { windows: 0, attempts: 0, failedGenerations: 0, degradedWindows: 0 },
+    s7: { correctedChapters: 0, repeatedCorrections: 0, repeatCorrectionRate: null },
   };
 }

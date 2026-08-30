@@ -315,3 +315,80 @@ describe('projectInputs · 六信号口径', () => {
     expect(cells[0].s2.editRatio).toBe(0); // 对照 C3：闭合无编辑是 0，不是 null
   });
 });
+
+/* -------------------------------------------------------------------------
+ * S7 重复纠错率（ADR-0025 · Task 5）：聚合语义
+ * ------------------------------------------------------------------------- */
+
+const CELL_A = 'cell-a';
+
+function emptyWindow(taskRef: string, cellId: string | null, chapterIndex: number | null) {
+  return { taskRef, chapterIndex, cellId, edited: false, degraded: false, costMicros: 0, outputTokens: 0, atMs: null };
+}
+
+function correction(taskRef: string, cellId: string | null, chapterIndex: number | null, reasons: readonly string[], position = 0) {
+  return { position, taskRef, chapterIndex, cellId, reasons };
+}
+
+describe('S7 重复纠错率（ADR-0025 · Task 5）', () => {
+  it('有窗口零纠错 → s7 全零、rate=null（宁缺不猜）', () => {
+    const result = aggregateSignals({
+      windows: [emptyWindow('w1', CELL_A, 1)],
+      generations: [],
+      decisions: [],
+    });
+    expect(result.get(CELL_A)?.s7).toEqual({
+      correctedChapters: 0,
+      repeatedCorrections: 0,
+      repeatCorrectionRate: null,
+    });
+  });
+
+  it('同 reason 在更晚章节复发 → rate>0', () => {
+    const result = aggregateSignals({
+      windows: [emptyWindow('w1', CELL_A, 1), emptyWindow('w2', CELL_A, 3)],
+      generations: [],
+      decisions: [],
+      corrections: [
+        correction('w1', CELL_A, 1, ['style_drift'], 0),
+        correction('w2', CELL_A, 3, ['style_drift'], 1),
+      ],
+    });
+    expect(result.get(CELL_A)?.s7).toEqual({
+      correctedChapters: 2,
+      repeatedCorrections: 1,
+      repeatCorrectionRate: 0.5,
+    });
+  });
+
+  it('同章重复同 reason 不计复发；不同 reason 各自独立', () => {
+    const result = aggregateSignals({
+      windows: [emptyWindow('w1', CELL_A, 1), emptyWindow('w2', CELL_A, 2)],
+      generations: [],
+      decisions: [],
+      corrections: [
+        correction('w1', CELL_A, 1, ['style_drift'], 0),
+        correction('w1', CELL_A, 1, ['style_drift'], 1),
+        correction('w2', CELL_A, 2, ['other'], 2),
+      ],
+    });
+    expect(result.get(CELL_A)?.s7).toEqual({
+      correctedChapters: 2,
+      repeatedCorrections: 0,
+      repeatCorrectionRate: 0,
+    });
+  });
+
+  it('不可归因（cellId=null）与无章号纠错不入 S7', () => {
+    const result = aggregateSignals({
+      windows: [],
+      generations: [],
+      decisions: [],
+      corrections: [
+        correction('w1', null, 1, ['style_drift'], 0),
+        correction('w2', CELL_A, null, ['style_drift'], 1),
+      ],
+    });
+    expect(result.size).toBe(0);
+  });
+});

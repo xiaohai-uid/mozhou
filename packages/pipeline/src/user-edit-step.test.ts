@@ -20,9 +20,11 @@ import {
   EditActionLevelError,
   EditBlockShapeError,
   applyEditBlocks,
+  readPipelineLedger,
   recordUserEdit,
 } from './index.js';
 import type { EditOperationBlock } from './index.js';
+import { hashProse, parseFailurePatterns } from '@mozhou/quality-engine';
 
 let roots: string[] = [];
 afterEach(() => {
@@ -284,5 +286,68 @@ describe('T21 编辑 delta 增补（#54 · t52:B2）', () => {
     const published = last.payload?.['blocks'] as { removedText?: string }[];
     expect(published[0]?.removedText).toBe('');
     expect(last.payload?.['deltaStats']).toMatchObject({ opsDelete: 1, removedChars: 0 });
+  });
+});
+
+/* -------------------------------------------------------------------------
+ * ADR-0025（质量门集成 · Task 5）：结构化纠错——事件 + 书侧失败记忆
+ * ------------------------------------------------------------------------- */
+
+describe('结构化纠错：AuthorCorrectionRecorded + 失败记忆折叠', () => {
+  it('带 reasons 的编辑落纠错事件（附注只带摘要）并写书侧 jsonl', () => {
+    const root = hermeticBook();
+    const deps = makeDeps(root);
+    recordUserEdit({ ...deps, blocks: [
+      { op: 'insert', paragraphStart: 2, paragraphEnd: 2, replacementText: '原始第一行' },
+    ] });
+
+    recordUserEdit({
+      ...deps,
+      blocks: [{ op: 'replace', paragraphStart: 2, paragraphEnd: 2, replacementText: '改写后的一行' }],
+      correctionReasons: ['outline_expansion'],
+      correctionNote: '又把大纲当正文写了',
+    });
+
+    // 事件在账：reasons 原样、noteDigest 为摘要、附注原文不入账
+    const correction = readPipelineLedger(root)
+      .filter((row) => row.kind === 'task')
+      .map((row) => (row.kind === 'task' ? row.event : null))
+      .find((event) => event?.type === 'AuthorCorrectionRecorded');
+    expect(correction).toBeDefined();
+    expect(correction?.payload?.['reasons']).toEqual(['outline_expansion']);
+    expect(correction?.payload?.['noteDigest']).toBe(hashProse('又把大纲当正文写了'));
+    expect(JSON.stringify(correction)).not.toContain('又把大纲当正文写了');
+
+    // 书侧失败记忆：模式折叠正确（质量先验，非 Canon 文件）
+    const jsonl = readFileSync(join(root, '质量', 'failure-memory.jsonl'), 'utf8');
+    expect(parseFailurePatterns(jsonl)).toEqual([
+      {
+        code: 'outline_expansion',
+        firstSeenChapter: 5,
+        lastSeenChapter: 5,
+        occurrences: 1,
+        active: true,
+        authorNote: '又把大纲当正文写了',
+      },
+    ]);
+  });
+
+  it('不带 reasons 的编辑零纠错副作用（diff 语义不变）', () => {
+    const root = hermeticBook();
+    const deps = makeDeps(root);
+    recordUserEdit({ ...deps, blocks: [
+      { op: 'insert', paragraphStart: 2, paragraphEnd: 2, replacementText: '原始第一行' },
+    ] });
+
+    recordUserEdit({ ...deps, blocks: [
+      { op: 'replace', paragraphStart: 2, paragraphEnd: 2, replacementText: '普通润色' },
+    ] });
+
+    const events = readPipelineLedger(root)
+      .filter((row) => row.kind === 'task')
+      .map((row) => (row.kind === 'task' ? row.event : null))
+      .filter((event) => event?.type === 'AuthorCorrectionRecorded');
+    expect(events).toHaveLength(0);
+    expect(() => readFileSync(join(root, '质量', 'failure-memory.jsonl'), 'utf8')).toThrowError();
   });
 });

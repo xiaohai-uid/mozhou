@@ -246,10 +246,23 @@ export interface TemporalFact extends KernelEntityHead {
 /** 知情者：读者 / 主角 / 具名角色。 */
 export type KnowledgeHolder = 'reader' | 'protagonist' | `char:${string}`;
 
+/**
+ * 认知层级（ADR-0026 · 质量门集成 Task 7）：
+ * - knows：确认知情——该事实对持有者是权威知识，可授权 definitive 秘密陈述；
+ * - suspects：怀疑——上下文只许呈现「CHARACTER SUSPECTS: …; do not narrate or
+ *   act as confirmed knowledge」，不得授权确定性秘密陈述；
+ * - believes：信念——呈现所信命题；有 distortion 时呈现畸变而非真相。
+ * 迁移规则：ADR-0026 之前的存量行（无 level 字段）在读路径一次性折算为
+ * knows（parseKnowledgeStateRow 缺省补齐）；新构造必须显式声明 level。
+ */
+export type EpistemicLevel = 'knows' | 'suspects' | 'believes';
+
 export interface KnowledgeState extends KernelEntityHead {
   readonly id: KnowledgeStateId;
   readonly factId: FactId;
   readonly holder: KnowledgeHolder;
+  /** 认知层级（ADR-0026）：knows=确认知情 / suspects=怀疑 / believes=信念。 */
+  readonly level: EpistemicLevel;
   /** 得知章索引（必填锚点） */
   readonly knownSinceChapter: number;
   /** 场景级精化（可选；多视角章节钉到具体场景，喂给 ADR-0011 POV 切片） */

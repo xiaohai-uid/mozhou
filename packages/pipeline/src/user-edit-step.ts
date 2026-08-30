@@ -19,11 +19,13 @@
  *     （与无上限的 replacementText 保持 diff 对称性），仅及发布侧克隆块；
  *     validateBlock 镜像守卫拒调用方传入该键（宁败不猜，杜绝伪造删除侧文本）。
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ProtectedContentViolationError } from '@mozhou/kernel';
 import type { DomainEvent } from '@mozhou/kernel';
 import type { PublishBus } from '@mozhou/runtime';
+import { hashProse, parseFailurePatterns, serializeFailurePatterns, updateFailurePatterns } from '@mozhou/quality-engine';
+import type { CorrectionReason } from '@mozhou/quality-engine';
 import {
   atomicReplace,
   emitFrontmatter,
@@ -233,6 +235,15 @@ export interface RecordUserEditRequest {
    */
   readonly source: 'author' | 'assistant';
   readonly blocks: readonly EditOperationBlock[];
+  /**
+   * ADR-0025（质量门集成 · 计划 Task 5）：结构化纠错元数据——作者承认本次
+   * 编辑属于哪类文学失误。可选项：不提供 = 纯编辑（不产生纠错事件/记忆，
+   * 字符 diff 语义零变化）；提供非空数组 = 记录 AuthorCorrectionRecorded
+   * 并折叠进书侧失败记忆（质量/quality 记忆文件，质量先验非 Canon）。
+   */
+  readonly correctionReasons?: readonly CorrectionReason[];
+  /** 纠错附注原文：只落书侧记忆文件（P1）；事件/遥测仅携带 SHA-256 摘要。 */
+  readonly correctionNote?: string;
 }
 
 export interface UserEditOutcome {
@@ -304,10 +315,72 @@ export function recordUserEdit(request: RecordUserEditRequest): UserEditOutcome 
   };
   request.bus.publish({ root: request.bookRoot }, event);
 
+  // ADR-0025（Task 5）：结构化纠错——仅当作者给出非空 reasons 时发声。
+  // 事件携带摘要不携带附注原文（P0/P1 隐私分层）；失败记忆折叠进书侧
+  // jsonl（append-only 行容读），是质量先验、不是 Canon 事实。
+  const reasons = request.correctionReasons ?? [];
+  if (reasons.length > 0) {
+    recordAuthorCorrection({
+      bus: request.bus,
+      bookRoot: request.bookRoot,
+      taskRef: request.taskRef,
+      chapterIndex: request.chapterIndex,
+      reasons,
+      ...(request.correctionNote !== undefined ? { note: request.correctionNote } : {}),
+    });
+  }
+
   return {
     proseRelPath: relPath,
     body: nextBody,
     revisionBefore: scan.revision,
     revisionAfter: scan.revision + 1,
   };
+}
+
+/* -------------------------------------------------------------------------
+ * 结构化纠错独立入口（ADR-0025 · Task 9 web 面）：纯纠错记录，零正文副作用
+ * ------------------------------------------------------------------------- */
+
+export interface RecordAuthorCorrectionRequest {
+  readonly bus: PublishBus;
+  readonly bookRoot: string;
+  /** 归属会话窗口 taskRef（无活动会话时调用方自铸一次性引用）。 */
+  readonly taskRef: string;
+  readonly chapterIndex: number;
+  readonly reasons: readonly CorrectionReason[];
+  readonly note?: string;
+}
+
+/**
+ * 纯纠错记录：AuthorCorrectionRecorded 落账 + 失败记忆折叠。不触碰正文文件、
+ * 不步进 revision——纠错是元数据动作，编辑走 recordUserEdit。web 端
+ * /api/chapter.corrections 与 recordUserEdit 共用本函数（单一事实源）。
+ */
+export function recordAuthorCorrection(request: RecordAuthorCorrectionRequest): void {
+  if (request.reasons.length === 0) return;
+  const correctionEvent: DomainEvent = {
+    type: 'AuthorCorrectionRecorded',
+    taskRef: request.taskRef,
+    chapterIndex: request.chapterIndex,
+    payload: {
+      reasons: [...request.reasons],
+      ...(request.note !== undefined ? { noteDigest: hashProse(request.note) } : {}),
+    },
+  };
+  request.bus.publish({ root: request.bookRoot }, correctionEvent);
+
+  const memoryDir = join(request.bookRoot, '质量');
+  const memoryPath = join(memoryDir, 'failure-memory.jsonl');
+  const existing = existsSync(memoryPath)
+    ? parseFailurePatterns(readFileSync(memoryPath, 'utf8'))
+    : [];
+  const updated = updateFailurePatterns(
+    existing,
+    request.chapterIndex,
+    request.reasons,
+    request.note,
+  );
+  mkdirSync(memoryDir, { recursive: true });
+  writeFileSync(memoryPath, serializeFailurePatterns(updated), 'utf8');
 }

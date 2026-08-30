@@ -39,6 +39,15 @@ export interface SessionProjection {
    * hard_conflict 悬置中的门禁才允许 requestRework（S7：每次循环由作者驱动）。
    */
   readonly lastGateVerdict: 'pass' | 'hard_conflict' | null;
+  /**
+   * 本窗口内最近一次 QualityReviewCompleted 的 verdict（ADR-0025）：
+   * 'pass' | 'blocking_fail' | 'refused' | null（尚未审查）。review→user_edit
+   * 前进出口的判据——只有 pass 放行；blocking_fail 走 requestQualityRework
+   * 显式回炉；refused 停给作者（无静默放行）。崩溃恢复沿账本折叠重建。
+   */
+  readonly lastQualityVerdict: 'pass' | 'blocking_fail' | 'refused' | null;
+  /** 本窗口内已发生的质量回炉次数（TaskStepTransitioned reason=quality_rework 计数）。 */
+  readonly qualityReworkCount: number;
   /** 成对约束悬挂 head 键（head#taskRef；投影合并侧呈现，规格 §3）。 */
   readonly openHeads: readonly string[];
 }
@@ -65,6 +74,8 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
   let commitId: string | null = null;
   let lastReceiptId: ContextReceiptId | null = null;
   let lastGateVerdict: 'pass' | 'hard_conflict' | null = null;
+  let lastQualityVerdict: 'pass' | 'blocking_fail' | 'refused' | null = null;
+  let qualityReworkCount = 0;
   const openHeads: string[] = [];
 
   for (const row of rows) {
@@ -84,6 +95,8 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
           commitId = null;
           lastReceiptId = null;
           lastGateVerdict = null;
+          lastQualityVerdict = null;
+          qualityReworkCount = 0;
           openHeads.length = 0;
           const step = event.payload?.['step'];
           currentStep = typeof step === 'string' && isPipelineStep(step) ? step : 'prepare';
@@ -98,6 +111,20 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
               const verdict = event.payload?.['verdict'];
               lastGateVerdict = verdict === 'pass' || verdict === 'hard_conflict' ? verdict : lastGateVerdict;
             }
+            // 质量回炉计数（ADR-0025）：reason=quality_rework 的 review→draft 逆向边
+            if (
+              to === 'draft' &&
+              event.payload?.['reason'] === 'quality_rework' &&
+              event.payload?.['from'] === 'review'
+            ) {
+              qualityReworkCount += 1;
+            }
+          } else if (type === 'QualityReviewCompleted') {
+            const verdict = event.payload?.['verdict'];
+            lastQualityVerdict =
+              verdict === 'pass' || verdict === 'blocking_fail' || verdict === 'refused'
+                ? verdict
+                : lastQualityVerdict;
           } else if (type === 'TaskFinished') {
             finished = true;
           } else if (type === 'CanonCommitted') {
@@ -160,6 +187,8 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
     commitId,
     lastReceiptId,
     lastGateVerdict,
+    lastQualityVerdict,
+    qualityReworkCount,
     openHeads: [...openHeads],
   };
 }

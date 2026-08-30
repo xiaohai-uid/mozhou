@@ -110,6 +110,51 @@ export class HardConflictUnresolvedError extends Error {
   }
 }
 
+/**
+ * 文学审查未通过、前进出口关闭（ADR-0025 决策 3/4）：review→user_edit 只对
+ * verdict='pass' 放行——blocking_fail 走 requestQualityRework 显式回炉；
+ * refused 停给作者处置（提供方不可用/未知不升格为 pass，fail closed）。
+ */
+export class QualityReviewNotPassError extends Error {
+  override readonly name = 'QualityReviewNotPassError';
+  constructor(chapterIndex: number, taskRef: string, verdict: string | null) {
+    super(
+      `chapter ${chapterIndex} session ${taskRef}: literary review verdict is '${verdict ?? '<none>'}' ` +
+        "— forward exit to user_edit requires 'pass' (ADR-0025); blocking_fail must drive an explicit " +
+        'requestQualityRework, refused stops for the author',
+    );
+  }
+}
+
+/**
+ * 文学审查回炉未被显式驱动（ADR-0025 决策 4）：requestQualityRework 只在
+ * review 步且最新质量 verdict='blocking_fail' 时合法——verdict=pass/refused
+ * 或尚未审查都不是「承认文学错误改文」的显式动作。
+ */
+export class QualityReworkNotDrivenError extends Error {
+  override readonly name = 'QualityReworkNotDrivenError';
+  constructor(chapterIndex: number, verdict: string | null) {
+    super(
+      `chapter ${chapterIndex} quality rework not driven: the loop advances only by explicit action ` +
+        `(ADR-0025) — current literary review verdict is '${verdict ?? '<none>'}', 'blocking_fail' required`,
+    );
+  }
+}
+
+/**
+ * 质量回炉次数超限（ADR-0025 决策 5）：每个 ChapterProductionSession 自动
+ * 回炉上限 2 次；第 3 次请求即抛——停止并交作者处置，不允许无限 agent loop。
+ */
+export class QualityReworkLimitExceededError extends Error {
+  override readonly name = 'QualityReworkLimitExceededError';
+  constructor(chapterIndex: number, taskRef: string, attempted: number) {
+    super(
+      `chapter ${chapterIndex} session ${taskRef}: quality rework attempt ${attempted} exceeds the ` +
+        'automatic cap of 2 per session (ADR-0025) — stopping for author action',
+    );
+  }
+}
+
 /** 步卫失败：动作与当前步不符（含步锚事件发射位）。 */
 export class StepGuardError extends Error {
   override readonly name = 'StepGuardError';
@@ -219,6 +264,15 @@ export class ChapterProductionSession {
     if (to !== expected) {
       throw new StepTransitionError(this.#currentStep, to, expected);
     }
+    // ADR-0025：文学审查未 pass 时 review→user_edit 前进出口关闭（结构性，
+    // 判据读当下投影——崩溃恢复后同样可判）。blocking_fail 只能显式回炉，
+    // refused 停给作者；'pass' 放行。
+    if (to === 'user_edit' && this.#currentStep === 'review') {
+      const verdict = this.project().lastQualityVerdict;
+      if (verdict !== 'pass') {
+        throw new QualityReviewNotPassError(this.#chapterIndex, this.#taskRef, verdict);
+      }
+    }
     // S7 停止策略：硬冲突悬置时前进出口关闭（delta 不进确认面），只许显式回炉
     if (to === 'canon_proposal' && this.project().lastGateVerdict === 'hard_conflict') {
       throw new HardConflictUnresolvedError(this.#chapterIndex, this.#taskRef);
@@ -258,6 +312,63 @@ export class ChapterProductionSession {
       payload: { from: 'continuity_gate', to: 'user_edit', reason: 'hard_conflict_rework' },
     });
     this.#currentStep = 'user_edit';
+  }
+
+  /**
+   * 第 4 步步锚：QualityReviewCompleted（ADR-0025）——文学质量审查结果落账。
+   * verdict 必须在场且 ∈ {pass, blocking_fail, refused}（宁败不猜）；报告本体
+   * 由 review 步落 `.mozhou/quality-reviews/`（非 Canon），事件只携带身份与裁决。
+   */
+  recordQualityReview(payload: {
+    readonly reportId: string;
+    readonly verdict: 'pass' | 'blocking_fail' | 'refused';
+    readonly reportPath?: string;
+    readonly draftRevision?: number;
+    readonly draftContentHash?: string;
+    readonly receiptId?: string;
+    readonly ruleSetDigest?: string;
+  }): void {
+    if (this.#currentStep !== 'review') {
+      throw new StepGuardError('review', this.#currentStep, 'recordQualityReview');
+    }
+    this.#publish({
+      type: 'QualityReviewCompleted',
+      taskRef: this.#taskRef,
+      chapterIndex: this.#chapterIndex,
+      payload,
+    });
+  }
+
+  /**
+   * 质量回炉边（ADR-0025 决策 4/5）：blocking_fail 悬置时，编排者显式调用
+   * ⇒ 光标移回 draft 重写正文，重写后沿线性序重走 review。纪律：
+   *   - 只在 review 步且最新质量 verdict='blocking_fail' 时合法（判据读当下
+   *     投影——崩溃恢复后同样可判）；refused/pass 或未审查即拒；
+   *   - 每 session 自动回炉上限 2 次：第 3 次请求抛 QualityReworkLimitExceededError，
+   *     停止并交作者处置（无自动循环——本方法只做一次逆向转换，重写与重审
+   *     由编排者逐步驱动）；
+   *   - 回炉事件照常落账：TaskStepTransitioned{from:'review',to:'draft',
+   *     reason:'quality_rework',reworkAttempt:n}，投影折叠自然回到 draft。
+   */
+  requestQualityRework(): void {
+    if (this.#currentStep !== 'review') {
+      throw new StepGuardError('review', this.#currentStep, 'requestQualityRework');
+    }
+    const verdict = this.project().lastQualityVerdict;
+    if (verdict !== 'blocking_fail') {
+      throw new QualityReworkNotDrivenError(this.#chapterIndex, verdict);
+    }
+    const attempt = this.project().qualityReworkCount + 1;
+    if (attempt > 2) {
+      throw new QualityReworkLimitExceededError(this.#chapterIndex, this.#taskRef, attempt);
+    }
+    this.#publish({
+      type: 'TaskStepTransitioned',
+      taskRef: this.#taskRef,
+      chapterIndex: this.#chapterIndex,
+      payload: { from: 'review', to: 'draft', reason: 'quality_rework', reworkAttempt: attempt },
+    });
+    this.#currentStep = 'draft';
   }
 
   /**

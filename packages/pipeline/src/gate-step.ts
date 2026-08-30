@@ -258,7 +258,11 @@ function collectVisibleFactIds(state: NarrativeStateSnapshot, chapter: number): 
     }
   }
   for (const ks of state.knowledgeStates.values()) {
-    if (ks.holder === 'reader' && ks.knownSinceChapter <= chapter) visible.add(ks.factId);
+    // ADR-0026：reader 披露行也须 level=knows——suspects/believes 不得授权
+    // 确定性秘密陈述（宁败不猜）
+    if (ks.holder === 'reader' && ks.knownSinceChapter <= chapter && ks.level === 'knows') {
+      visible.add(ks.factId);
+    }
   }
   return visible;
 }

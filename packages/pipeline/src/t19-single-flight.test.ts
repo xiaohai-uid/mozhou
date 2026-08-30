@@ -83,6 +83,7 @@ describe('S11 跨章并发 V1 全局单飞', () => {
     // ch2 走完全十步并收卷（最小步进：无 LLM 缝参与，正文保持占位）
     const session = ChapterProductionSession.start(deps(root, bus, 2, 'sf_done'));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
+      if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_sf_pass', verdict: 'pass' });
       session.advance(step);
     }
     session.recordProposal({ routed: { low: 0, medium: 0, high: 0 } });

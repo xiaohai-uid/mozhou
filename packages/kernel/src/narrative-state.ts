@@ -28,6 +28,7 @@ import type {
   FactSource,
   FactStatus,
   FactValue,
+  EpistemicLevel,
   KnowledgeHolder,
   KnowledgeState,
   KnowledgeStateId,
@@ -296,15 +297,31 @@ export function parseKnowledgeStateRow(row: unknown): KnowledgeState {
   // exactOptionalPropertyTypes：可选键缺席 = 键不存在，不得显式写 undefined
   const sceneId = row['knownSinceSceneId']
   const distortion = row['distortion']
+  const level = row['level']
+  // ADR-0026 迁移规则：存量行（level 缺席）读路径一次性折算 knows；
+  // 在场值必须 ∈ 词表（宁败不猜），不静默改写非法值。
+  const parsedLevel =
+    level === undefined || level === null
+      ? MIGRATED_DEFAULT_LEVEL
+      : level === 'knows' || level === 'suspects' || level === 'believes'
+        ? level
+        : fail(kind, 'level', `must be knows|suspects|believes, got ${describe(level)}`)
   return {
     ...head,
     factId: requirePrefixedUlid(kind, row, 'factId', 'fact') as FactId,
     holder: requireKnowledgeHolder(kind, row),
+    level: parsedLevel,
     knownSinceChapter: requireSafeInteger(kind, row, 'knownSinceChapter', 1),
     ...(sceneId === undefined ? {} : { knownSinceSceneId: requirePrefixedUlid(kind, row, 'knownSinceSceneId', 'scene') }),
     ...(distortion === undefined ? {} : { distortion: requireString(kind, row, 'distortion') }),
   } as unknown as KnowledgeState
 }
+
+/**
+ * ADR-0026 迁移缺省：仅用于 pre-epistemic 存量行（无 level 字段）——历史行
+ * 语义即「确认知情」。新构造必须显式声明 level；schema 升版后此缺省将移除。
+ */
+export const MIGRATED_DEFAULT_LEVEL: EpistemicLevel = 'knows'
 
 /* ----------------------------------------------------------------------------
  * RelationshipState
@@ -509,7 +526,9 @@ export function queryActiveFacts(
 
   const authorizedSecrets = new Set<FactId>()
   for (const ks of state.knowledgeStates.values()) {
-    if (ks.holder === request.pov && ks.knownSinceChapter <= request.chapter) {
+    // ADR-0026：仅 level=knows 授权确定性秘密知识；suspects/believes 不授权
+    //（分别经 queryKnowledgePerspective 以「怀疑/信念」语义呈现）
+    if (ks.holder === request.pov && ks.knownSinceChapter <= request.chapter && ks.level === 'knows') {
       authorizedSecrets.add(ks.factId)
     }
   }
@@ -525,6 +544,58 @@ export function queryActiveFacts(
     result.push(fact)
   }
   return result.sort((a, b) => a.validFrom - b.validFrom || (a.id < b.id ? -1 : 1))
+}
+
+/**
+ * 认知视角查询（ADR-0026 · Task 7）：某视角在某章的 suspects/believes 知识面。
+ * queryActiveFacts 只给 knows 授权的权威事实；本查询补出「怀疑/信念」两条
+ * 非权威通道，供上下文装配器以限定语义呈现：
+ *   - suspects → 「CHARACTER SUSPECTS: <proposition>; do not narrate or act as
+ *     confirmed knowledge.」
+ *   - believes → 呈现所信命题；有 distortion 时呈现畸变而非真相比照。
+ * 返回的是事实 id + 层级 + 建议呈现文本的机械投影；是否入上下文由装配预算裁决。
+ */
+export interface KnowledgePerspectiveEntry {
+  readonly factId: FactId
+  readonly level: 'suspects' | 'believes'
+  readonly holder: KnowledgeHolder
+  /** 建议呈现文本（suspects 带限定后缀；believes 有畸变时呈现畸变）。 */
+  readonly presentation: string
+}
+
+export function queryKnowledgePerspective(
+  state: Pick<NarrativeStateSnapshot, 'facts' | 'knowledgeStates'>,
+  request: QueryActiveFactsRequest,
+): KnowledgePerspectiveEntry[] {
+  assertQueryRequest(request)
+  const out: KnowledgePerspectiveEntry[] = []
+  for (const ks of state.knowledgeStates.values()) {
+    if (ks.holder !== request.pov) continue
+    if (ks.knownSinceChapter > request.chapter) continue
+    if (ks.level !== 'suspects' && ks.level !== 'believes') continue
+    const fact = state.facts.get(ks.factId)
+    const proposition =
+      fact !== undefined && fact.validFrom <= request.chapter
+        ? fact.predicate + ':' + String(fact.value ?? '')
+        : ks.factId
+    if (ks.level === 'suspects') {
+      out.push({
+        factId: ks.factId,
+        level: 'suspects',
+        holder: ks.holder,
+        presentation: `CHARACTER SUSPECTS: ${proposition}; do not narrate or act as confirmed knowledge.`,
+      })
+    } else {
+      const believed = ks.distortion !== undefined ? ks.distortion : proposition
+      out.push({
+        factId: ks.factId,
+        level: 'believes',
+        holder: ks.holder,
+        presentation: `CHARACTER BELIEVES: ${believed}（如与正典冲突，以信念为准呈现，不陈真相）.`,
+      })
+    }
+  }
+  return out
 }
 
 /* ----------------------------------------------------------------------------

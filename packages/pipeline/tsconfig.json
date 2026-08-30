@@ -9,6 +9,7 @@
     { "path": "../kernel" },
     { "path": "../data-plane" },
     { "path": "../context-compiler" },
-    { "path": "../runtime" }
+    { "path": "../runtime" },
+    { "path": "../quality-engine" }
   ]
 }

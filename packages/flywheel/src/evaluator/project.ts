@@ -49,6 +49,15 @@ export interface DecisionFact {
   readonly atMs: number | null;
 }
 
+/** 作者结构化纠错事实（ADR-0025 · Task 5）：cell 归属沿窗口传导（决策同法）。 */
+export interface CorrectionFact {
+  readonly position: number;
+  readonly taskRef: string;
+  readonly chapterIndex: number | null;
+  readonly cellId: string | null;
+  readonly reasons: readonly string[];
+}
+
 export interface GenerationFact {
   readonly genTaskRef: string;
   readonly windowTaskRef: string | null;
@@ -72,6 +81,7 @@ export interface ProjectionOutput {
   readonly windows: readonly WindowFact[];
   readonly generations: readonly GenerationFact[];
   readonly decisions: readonly DecisionFact[];
+  readonly corrections: readonly CorrectionFact[];
   /** cellId → CellKey 注册表（建议物铸面用，避免字符串反解）。 */
   readonly cellKeys: ReadonlyMap<string, CellKey>;
   /** 任一 GenerationStarted 携带 parentTaskRef ⇒ true（C2 桥接机械判据）。 */
@@ -130,6 +140,7 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
   const closedWindows = new Map<string, { chapterIndex: number | null; degraded: boolean }>();
   const editedWindows = new Set<string>();
   const decisions: DecisionFact[] = [];
+  const corrections: CorrectionFact[] = [];
 
   let position = 0;
   for (const row of input.ledger) {
@@ -194,6 +205,16 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
         } else if (action === 'edit_blocks' && payload?.['source'] === 'author') {
           editedWindows.add(event.taskRef);
         }
+        break;
+      }
+      case 'AuthorCorrectionRecorded': {
+        corrections.push({
+          position,
+          taskRef: event.taskRef,
+          chapterIndex: typeof event.chapterIndex === 'number' ? event.chapterIndex : null,
+          cellId: null, // 二次扫描回填
+          reasons: stringArray(payload?.['reasons']),
+        });
         break;
       }
       default:
@@ -282,6 +303,13 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
     atMs: atMsByWindow.get(decision.taskRef) ?? null,
   }));
 
+  const filledCorrections = corrections
+    .map((correction) => ({
+      ...correction,
+      cellId: cellOfWindow.get(correction.taskRef) ?? null,
+    }))
+    .sort((a, b) => a.position - b.position);
+
   const bridgePresent = parentByGen.size > 0;
   const seenRoutes = new Set<string>();
   const unattributedRoutes: UnattributedRoute[] = [];
@@ -295,7 +323,7 @@ export function projectInputs(input: ProjectionInput): ProjectionOutput {
     unattributedRoutes.push({ taskType: started.taskType, providerId: started.providerId });
   }
 
-  return { windows, generations, decisions: filledDecisions, cellKeys, bridgePresent, unattributedRoutes };
+  return { windows, generations, decisions: filledDecisions, corrections: filledCorrections, cellKeys, bridgePresent, unattributedRoutes };
 }
 
 /* ---------------------------------------------------------------------------
@@ -307,6 +335,8 @@ export interface SignalSlice {
   readonly windows: readonly WindowFact[];
   readonly generations: readonly GenerationFact[];
   readonly decisions: readonly DecisionFact[];
+  /** 缺省空数组：旧调用方零适配（s7 恒零值）。 */
+  readonly corrections?: readonly CorrectionFact[];
 }
 
 /**
@@ -321,12 +351,13 @@ export function aggregateSignals(slice: SignalSlice): Map<string, CellSignals> {
     rejected: number;
     decisions: number;
     chapters: Set<number>;
+    corrections: ReadonlyArray<{ chapterIndex: number; reasons: readonly string[] }>;
   }>();
 
   const touch = (cellId: string) => {
     let entry = byCell.get(cellId);
     if (entry === undefined) {
-      entry = { signals: emptySignals(), accepted: 0, rejected: 0, decisions: 0, chapters: new Set() };
+      entry = { signals: emptySignals(), accepted: 0, rejected: 0, decisions: 0, chapters: new Set(), corrections: [] };
       byCell.set(cellId, entry);
     }
     return entry;
@@ -382,6 +413,15 @@ export function aggregateSignals(slice: SignalSlice): Map<string, CellSignals> {
     if (decision.chapterIndex !== null) entry.chapters.add(decision.chapterIndex);
   }
 
+  // S7（ADR-0025 · Task 5）：复发=同 reason 在严格更晚章节再次出现。
+  // FailurePattern 活跃期的机械代理：地平线内已有更早出现即视为活跃期。
+  const corrections = slice.corrections ?? [];
+  for (const correction of corrections) {
+    if (correction.cellId === null || correction.chapterIndex === null) continue;
+    const entry = touch(correction.cellId);
+    entry.corrections = [...entry.corrections, { chapterIndex: correction.chapterIndex, reasons: correction.reasons }];
+  }
+
   const result = new Map<string, CellSignals>();
   for (const [cellId, entry] of byCell) {
     const totalOptions = entry.accepted + entry.rejected;
@@ -404,9 +444,35 @@ export function aggregateSignals(slice: SignalSlice): Map<string, CellSignals> {
         microsPerOutputToken: entry.signals.s5.outputTokens === 0 ? null : entry.signals.s5.costMicros / entry.signals.s5.outputTokens,
       },
       s6: entry.signals.s6,
+      s7: computeS7(entry.corrections),
     });
   }
   return result;
+}
+
+/** 纠错记录 → S7：correctedChapters 去重章数；repeated = 严格更晚章节同 reason 复发数。 */
+function computeS7(
+  corrections: ReadonlyArray<{ chapterIndex: number; reasons: readonly string[] }>,
+): CellSignals['s7'] {
+  const chapters = new Set<number>();
+  const firstSeenByReason = new Map<string, number>();
+  let repeated = 0;
+  const ordered = [...corrections].sort((a, b) => a.chapterIndex - b.chapterIndex);
+  for (const { chapterIndex, reasons } of ordered) {
+    chapters.add(chapterIndex);
+    for (const reason of reasons) {
+      const first = firstSeenByReason.get(reason);
+      if (first === undefined) firstSeenByReason.set(reason, chapterIndex);
+      else if (chapterIndex > first) repeated += 1;
+      else firstSeenByReason.set(reason, Math.min(first, chapterIndex));
+    }
+  }
+  const correctedChapters = chapters.size;
+  return {
+    correctedChapters,
+    repeatedCorrections: repeated,
+    repeatCorrectionRate: correctedChapters === 0 ? null : repeated / correctedChapters,
+  };
 }
 
 /** 章（chapterIndex）去重计数——R2 的「≥5 章」口径。 */

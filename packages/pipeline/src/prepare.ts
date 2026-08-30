@@ -24,6 +24,14 @@ import {
 import { parseFrontmatter, readOutlineStaleMarker } from '@mozhou/data-plane';
 import type { FrontmatterFieldValue } from '@mozhou/data-plane';
 import type { StaleMarker } from '@mozhou/kernel';
+import {
+  parseFailurePatterns,
+  parseMemoryAnchors,
+  parseReaderExperienceDeltas,
+  selectRecentDeltas,
+  selectRelevantAnchors,
+} from '@mozhou/quality-engine';
+import type { FailurePattern, MemoryAnchor, ReaderExperienceDelta } from '@mozhou/quality-engine';
 
 const PROMISE_STATUSES: readonly PromiseStatus[] = [
   'introduced',
@@ -76,6 +84,19 @@ export interface ChapterPrepareInputs {
   readonly activePromises: readonly ActivePromiseView[];
   /** 目标章大纲节点的 stale 标记；null = 未标记。警告继续，留痕在 Receipt。 */
   readonly staleMarker: StaleMarker | null;
+  /**
+   * ADR-0025（计划 Task 6）：有界质量切片——ReaderExperienceDelta 近窗 ≤5、
+   * 活跃 FailurePattern、相关 MemoryAnchor ≤8。Kernel 外诊断数据（非 Canon）；
+   * 书侧文件缺席 = 空切片（合法规划态）。供给既有结构段通道
+   * （qualityStructuralSections），在既有预算内竞争，不开新无限频道。
+   */
+  readonly qualitySlice: QualityPreparationSlice;
+}
+
+export interface QualityPreparationSlice {
+  readonly readerExperience: readonly ReaderExperienceDelta[];
+  readonly activeFailurePatterns: readonly FailurePattern[];
+  readonly memoryAnchors: readonly MemoryAnchor[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -201,6 +222,61 @@ function readActivePromises(root: string, chapterIndex: number): ActivePromiseVi
  * Prepare 主入口：五族查询聚合成内存结果集。零写入；同盘面重复调用
  * 结果逐字段相等（纯度验收的机械含义）。
  */
+/** 书侧质量诊断文件（质量/ 目录；Kernel 外、非 Canon）。 */
+export const READER_EXPERIENCE_PATH = ['质量', 'reader-experience.jsonl'] as const;
+export const MEMORY_ANCHORS_PATH = ['质量', 'memory-anchors.jsonl'] as const;
+export const FAILURE_MEMORY_PATH = ['质量', 'failure-memory.jsonl'] as const;
+
+function readJsonl(root: string, relParts: readonly string[]): string | null {
+  const absolute = join(root, ...relParts);
+  return existsSync(absolute) ? readFileSync(absolute, 'utf8') : null;
+}
+
+/** 有界质量切片：近窗诊断 ≤5 + 活跃失败模式 + 相关锚 ≤8（选择纯函数在 quality-engine）。 */
+function readQualitySlice(root: string, chapterIndex: number): QualityPreparationSlice {
+  const deltasRaw = readJsonl(root, READER_EXPERIENCE_PATH);
+  const anchorsRaw = readJsonl(root, MEMORY_ANCHORS_PATH);
+  const patternsRaw = readJsonl(root, FAILURE_MEMORY_PATH);
+  const deltas = deltasRaw === null ? [] : parseReaderExperienceDeltas(deltasRaw);
+  const anchors = anchorsRaw === null ? [] : parseMemoryAnchors(anchorsRaw);
+  const patterns = patternsRaw === null ? [] : parseFailurePatterns(patternsRaw);
+  return {
+    readerExperience: selectRecentDeltas(deltas, { chapterIndex }),
+    activeFailurePatterns: patterns.filter((pattern) => pattern.active),
+    memoryAnchors: selectRelevantAnchors(anchors),
+  };
+}
+
+/** 质量切片的结构段标识（Receipt entries 按 identifier 对齐）。 */
+export const QUALITY_SECTION = 'quality_memory';
+
+/** 质量切片 → 既有结构段（Receipt 按段记账；空切片不出段，零噪声）。 */
+export function qualityStructuralSections(
+  slice: QualityPreparationSlice,
+): { readonly section: 'quality_memory'; readonly content: string }[] {
+  const lines: string[] = [];
+  for (const delta of slice.readerExperience) {
+    lines.push(
+      `delta ch${delta.chapterIndex}: pressure=${delta.pressureDelta} expectation=${delta.expectationDelta} ` +
+        `gain=${delta.tangibleGain} payoff=${delta.payoff} pattern=${delta.solutionPattern}`,
+    );
+  }
+  for (const pattern of slice.activeFailurePatterns) {
+    lines.push(
+      `failure ${pattern.code}: seen ${pattern.occurrences}x (ch${pattern.firstSeenChapter}-ch${pattern.lastSeenChapter})` +
+        (pattern.authorNote === undefined ? '' : ` note=${pattern.authorNote}`),
+    );
+  }
+  for (const anchor of slice.memoryAnchors) {
+    lines.push(
+      `anchor ${anchor.anchorId} [${anchor.type}] ${anchor.status} planted=ch${anchor.plantedChapter}` +
+        `${anchor.lastEchoChapter === null ? '' : ` lastEcho=ch${anchor.lastEchoChapter}`}: ${anchor.description}`,
+    );
+  }
+  if (lines.length === 0) return [];
+  return [{ section: QUALITY_SECTION, content: lines.join('\n') }];
+}
+
 export function prepareChapterInputs(root: string, chapterIndex: number): ChapterPrepareInputs {
   if (!Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
     throw new Error(`chapterIndex must be a positive integer, got ${chapterIndex}`);
@@ -256,5 +332,6 @@ export function prepareChapterInputs(root: string, chapterIndex: number): Chapte
     authorIntent: readAuthorIntent(root),
     activePromises: readActivePromises(root, chapterIndex),
     staleMarker,
+    qualitySlice: readQualitySlice(root, chapterIndex),
   };
 }
