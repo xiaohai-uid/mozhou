@@ -80,7 +80,7 @@ function factRow(options: RowBuilderOptions = {}): Record<string, unknown> {
 
 function knstRow(
   factId: string,
-  options: { id?: string; holder?: string; knownSinceChapter?: number; level?: string } = {},
+  options: { id?: string; holder?: string; knownSinceChapter?: number; level?: string; distortion?: string } = {},
 ): Record<string, unknown> {
   return {
     id: options.id ?? newKnowledgeStateId(),
@@ -92,6 +92,7 @@ function knstRow(
     holder: options.holder ?? 'protagonist',
     knownSinceChapter: options.knownSinceChapter ?? 1,
     ...(options.level === undefined ? {} : { level: options.level }),
+    ...(options.distortion === undefined ? {} : { distortion: options.distortion }),
   }
 }
 
@@ -557,36 +558,74 @@ describe('ADR-0026 认知层级', () => {
       const authoritative = queryActiveFacts(snapshot, { chapter: 12, pov: 'char:zhao' })
       expect(authoritative.map((f) => f.id)).not.toContain(secretFactId)
 
-      // 认知视角：suspects 呈现带限定后缀
+      // 认知视角：suspects 呈现带限定后缀；秘密值不得出现（ADR-0026 修订：防真相泄漏）
       const perspective = queryKnowledgePerspective(snapshot, { chapter: 12, pov: 'char:zhao' })
       expect(perspective).toHaveLength(1)
       expect(perspective[0]!.level).toBe('suspects')
       expect(perspective[0]!.presentation).toContain('CHARACTER SUSPECTS:')
       expect(perspective[0]!.presentation).toContain('do not narrate or act as confirmed knowledge')
+      expect(perspective[0]!.presentation).not.toContain('真正血脉')
     } finally {
       plane.close()
     }
   })
 
-  it('believes 行有畸变时呈现畸变而非真相', () => {
+  it('believes 行有畸变时呈现畸变而非真相（秘密事实的正典值不得出现）', () => {
     const plane = newBook()
     try {
       const factId = `fact_${fixedUlid(13)}`
+      const ksId = newKnowledgeStateId()
       plane.createChapterDraft({ chapterIndex: 13, title: '十三章' })
       plane.commitChapter({
         chapterIndex: 13,
         summary: 'belief seed',
         appends: {
-          temporalFact: [factRow({ id: factId, predicate: 'origin', value: '真相版本', validFrom: 13 })],
-          knowledgeState: [knstRow(factId, { holder: 'protagonist', knownSinceChapter: 13, level: 'believes' })],
+          temporalFact: [factRow({ id: factId, predicate: 'secret.origin', riskClass: 'high', value: '真正血脉', validFrom: 13 })],
+          knowledgeState: [knstRow(factId, { id: ksId, holder: 'protagonist', knownSinceChapter: 13, level: 'believes' })],
         },
       })
-      // 直接为该行补 distortion：经合法提交通道再写一行带 distortion 的 belief
       const snapshot = readNarrativeSnapshot(bookRoot)
       const perspective = queryKnowledgePerspective(snapshot, { chapter: 13, pov: 'protagonist' })
       expect(perspective).toHaveLength(1)
       expect(perspective[0]!.level).toBe('believes')
-      expect(perspective[0]!.presentation).toContain('CHARACTER BELIEVES:')
+      // 无畸变：秘密事实呈现占位，正典值不得出现
+      expect(perspective[0]!.presentation).not.toContain('真正血脉')
+      expect(perspective[0]!.presentation).toContain('拒绝呈现正典命题')
+
+      // 作者补写 distortion（信念中的假版本）→ 呈现畸变，仍不含正典值
+      plane.createChapterDraft({ chapterIndex: 14, title: '十四章' })
+      plane.commitChapter({
+        chapterIndex: 14,
+        summary: 'distortion seed',
+        appends: {
+          knowledgeState: [knstRow(factId, { id: ksId, holder: 'protagonist', knownSinceChapter: 13, level: 'believes', distortion: '自己只是普通渔家女' })],
+        },
+      })
+      const after = queryKnowledgePerspective(readNarrativeSnapshot(bookRoot), { chapter: 14, pov: 'protagonist' })
+      expect(after).toHaveLength(1)
+      expect(after[0]!.presentation).toContain('CHARACTER BELIEVES: 自己只是普通渔家女')
+      expect(after[0]!.presentation).not.toContain('真正血脉')
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('believes 无畸变 + 非秘密事实 → 照常呈现命题（边界对照）', () => {
+    const plane = newBook()
+    try {
+      const factId = `fact_${fixedUlid(15)}`
+      plane.createChapterDraft({ chapterIndex: 15, title: '十五章' })
+      plane.commitChapter({
+        chapterIndex: 15,
+        summary: 'non-secret belief',
+        appends: {
+          temporalFact: [factRow({ id: factId, predicate: 'origin', value: '青云宗', validFrom: 15 })],
+          knowledgeState: [knstRow(factId, { holder: 'protagonist', knownSinceChapter: 15, level: 'believes' })],
+        },
+      })
+      const perspective = queryKnowledgePerspective(readNarrativeSnapshot(bookRoot), { chapter: 15, pov: 'protagonist' })
+      expect(perspective).toHaveLength(1)
+      expect(perspective[0]!.presentation).toContain('origin:青云宗')
     } finally {
       plane.close()
     }

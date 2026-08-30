@@ -547,12 +547,14 @@ export function queryActiveFacts(
 }
 
 /**
- * 认知视角查询（ADR-0026 · Task 7）：某视角在某章的 suspects/believes 知识面。
- * queryActiveFacts 只给 knows 授权的权威事实；本查询补出「怀疑/信念」两条
- * 非权威通道，供上下文装配器以限定语义呈现：
- *   - suspects → 「CHARACTER SUSPECTS: <proposition>; do not narrate or act as
+ * 认知视角查询（ADR-0026 · Task 7；2026-08-30 审查修订）：某视角在某章的
+ * suspects/believes 知识面。queryActiveFacts 只给 knows 授权的权威事实；本查询
+ * 补出「怀疑/信念」两条非权威通道，供上下文装配器以限定语义呈现：
+ *   - suspects → 「CHARACTER SUSPECTS: <内容>; do not narrate or act as
  *     confirmed knowledge.」
- *   - believes → 呈现所信命题；有 distortion 时呈现畸变而非真相比照。
+ *   - believes → 畸变优先；无畸变时非秘密事实呈现命题、秘密事实呈现占位。
+ * 防真相泄漏修订：secret.* 事实的正典值**永不**进入本通道（suspects/believes
+ * 一体适用）——只给谓词级提示 + fact 引用；内容须由作者以 distortion 显式提供。
  * 返回的是事实 id + 层级 + 建议呈现文本的机械投影；是否入上下文由装配预算裁决。
  */
 export interface KnowledgePerspectiveEntry {
@@ -574,24 +576,38 @@ export function queryKnowledgePerspective(
     if (ks.knownSinceChapter > request.chapter) continue
     if (ks.level !== 'suspects' && ks.level !== 'believes') continue
     const fact = state.facts.get(ks.factId)
-    const proposition =
-      fact !== undefined && fact.validFrom <= request.chapter
-        ? fact.predicate + ':' + String(fact.value ?? '')
-        : ks.factId
+    const factLive = fact !== undefined && fact.validFrom <= request.chapter
+    const isSecret = factLive && isSecretPredicate(fact.predicate)
     if (ks.level === 'suspects') {
+      // ADR-0026 修订（2026-08-30 审查）：秘密事实的值永不出现在 suspects 通道
+      // ——只给谓词级提示 + 引用（戏剧张力用，非内容）。非秘密事实照常呈现命题。
+      const content =
+        isSecret || !factLive
+          ? `存在未确证的隐秘事实（${factLive ? fact.predicate : 'unknown'}, ref ${ks.factId}）`
+          : fact.predicate + ':' + String(fact.value ?? '')
       out.push({
         factId: ks.factId,
         level: 'suspects',
         holder: ks.holder,
-        presentation: `CHARACTER SUSPECTS: ${proposition}; do not narrate or act as confirmed knowledge.`,
+        presentation: `CHARACTER SUSPECTS: ${content}; do not narrate or act as confirmed knowledge.`,
       })
     } else {
-      const believed = ks.distortion !== undefined ? ks.distortion : proposition
+      // ADR-0026 修订（2026-08-30 审查）：believes 呈现次序 = 畸变 > 秘密占位 > 命题。
+      // 秘密事实无畸变时拒绝呈现正典命题——真相不可经该通道泄露（宁缺不猜）；
+      // 作者补写 distortion（信念中的假版本）后方可呈现内容。
+      let content: string
+      if (ks.distortion !== undefined) {
+        content = ks.distortion
+      } else if (isSecret || !factLive) {
+        content = `（fact ${ks.factId} — 信念内容未定，拒绝呈现正典命题；补写 distortion 后可呈现）`
+      } else {
+        content = fact.predicate + ':' + String(fact.value ?? '')
+      }
       out.push({
         factId: ks.factId,
         level: 'believes',
         holder: ks.holder,
-        presentation: `CHARACTER BELIEVES: ${believed}（如与正典冲突，以信念为准呈现，不陈真相）.`,
+        presentation: `CHARACTER BELIEVES: ${content}（如与正典冲突，以信念为准呈现）.`,
       })
     }
   }
