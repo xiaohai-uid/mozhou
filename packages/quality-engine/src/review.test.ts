@@ -56,6 +56,7 @@ function evaluatorReturning(
           ruleId: r.id,
           ruleVersion: r.version,
           verdict: map[r.id]!.verdict,
+          severity: r.severity,
           evidence:
             map[r.id]!.verdict === 'fail' && (map[r.id]!.evidenceCount ?? 0) > 0
               ? [{ ruleId: r.id, note: 'evidence note' }]

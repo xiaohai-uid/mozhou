@@ -43,6 +43,11 @@ export interface QualityRuleEvaluation {
   readonly ruleId: string;
   readonly ruleVersion: string;
   readonly verdict: QualityRuleVerdict;
+  /**
+   * 规则严重度快照（契约修订 2026-08-30 审查轮：由 runQualityReview 按策略
+   * 附着）——消费方据 verdict+severity 分类 blocking/advisory，不自行查表。
+   */
+  readonly severity: QualitySeverity;
   readonly evidence: readonly QualityEvidence[];
 }
 

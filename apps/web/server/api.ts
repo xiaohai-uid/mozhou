@@ -128,6 +128,7 @@ export function apiMiddleware(): Middleware {
             receiptId,
           })
           const projection = session.project()
+          const failed = outcome.report.evaluations.filter((e) => e.verdict === 'fail')
           json(res, 200, {
             ok: true,
             verdict: outcome.report.verdict,
@@ -137,7 +138,11 @@ export function apiMiddleware(): Middleware {
             draftContentHash: outcome.report.anchor.draftContentHash,
             reworkCount: projection.qualityReworkCount,
             current: true,
-            blocking: outcome.report.evaluations.filter((e) => e.verdict === 'fail'),
+            // 审查轮修订：按评估自带的 severity 分类——advisory fail 不再混入 blocking
+            blockingFailures: failed.filter((e) => e.severity === 'blocking'),
+            advisories: failed.filter((e) => e.severity === 'advisory'),
+            // Gate 3 边界标记：web 直连面未挂语义审查者（结构接线完成 / semantic review unavailable）
+            semanticReviewer: 'unavailable',
           })
           return
         }
@@ -204,6 +209,7 @@ export function apiMiddleware(): Middleware {
             ? isQualityReviewCurrent(report, { draftRevision: scan.revision, draftContentHash: hashProse(scan.body) })
             : false
           const projection = projectSession(readPipelineLedger(root), chapterIndex)
+          const failed = report.evaluations.filter((e) => e.verdict === 'fail')
           json(res, 200, {
             ok: true,
             hasReport: true,
@@ -213,7 +219,9 @@ export function apiMiddleware(): Middleware {
             draftContentHash: report.anchor.draftContentHash,
             current: draftCurrent,
             reworkCount: projection.qualityReworkCount,
-            blocking: report.evaluations.filter((e) => e.verdict === 'fail'),
+            blockingFailures: failed.filter((e) => e.severity === 'blocking'),
+            advisories: failed.filter((e) => e.severity === 'advisory'),
+            semanticReviewer: 'unavailable',
           })
           return
         }

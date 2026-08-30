@@ -14,12 +14,17 @@ export interface QualitySummary {
   readonly draftContentHash?: string
   readonly current?: boolean
   readonly reworkCount?: number
-  readonly blocking?: readonly {
-    readonly ruleId: string
-    readonly ruleVersion: string
-    readonly verdict: string
-    readonly evidence: readonly { readonly ruleId: string; readonly note: string; readonly excerpt?: string }[]
-  }[]
+  readonly semanticReviewer?: 'unavailable' | 'attached'
+  readonly blockingFailures?: readonly EvaluationView[]
+  readonly advisories?: readonly EvaluationView[]
+}
+
+interface EvaluationView {
+  readonly ruleId: string
+  readonly ruleVersion: string
+  readonly verdict: string
+  readonly severity: 'blocking' | 'advisory'
+  readonly evidence: readonly { readonly ruleId: string; readonly note: string; readonly excerpt?: string }[]
 }
 
 export interface ReviewResponse extends QualitySummary {
@@ -138,11 +143,11 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
       {verdict === 'pass' && <p style={{ color: '#27ae60' }}>审查通过，可进入作者编辑。</p>}
       {verdict === 'refused' && <p style={{ color: '#7f8c8d' }}>语义审查提供方不可用——已显式拒绝，交作者处置。</p>}
 
-      {(summary?.blocking?.length ?? 0) > 0 && (
+      {(summary?.blockingFailures?.length ?? 0) > 0 && (
         <div>
           <h4>Blocking failures</h4>
           <ul>
-            {summary?.blocking?.map((evaluation) => (
+            {summary?.blockingFailures?.map((evaluation) => (
               <li key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
                 <strong>{evaluation.ruleId}</strong>（v{evaluation.ruleVersion}）
                 <ul>
@@ -157,6 +162,21 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
             ))}
           </ul>
         </div>
+      )}
+      {(summary?.advisories?.length ?? 0) > 0 && (
+        <div>
+          <h4>Advisories（建议，不阻断）</h4>
+          <ul>
+            {summary?.advisories?.map((evaluation) => (
+              <li key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
+                {evaluation.ruleId}（v{evaluation.ruleVersion}）：{evaluation.evidence[0]?.note}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {summary?.semanticReviewer === 'unavailable' && (
+        <p style={{ color: '#7f8c8d' }}>语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。</p>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>

@@ -44,6 +44,7 @@ async function evaluateSemanticRules(
     ruleId: rule.id,
     ruleVersion: rule.version,
     verdict: 'unknown',
+    severity: rule.severity,
     evidence: [{ ruleId: rule.id, note }],
   });
 
@@ -109,9 +110,16 @@ export async function runQualityReview(input: QualityReviewInput): Promise<Quali
   const severityOf = (ruleId: string): 'blocking' | 'advisory' =>
     input.policy.rules.find((r) => r.id === ruleId)?.severity ?? 'blocking';
 
+  // 契约修订（2026-08-30 审查轮）：每条评估携带 severity 快照——
+  // 消费方（web/飞轮）据 verdict+severity 分类，不自行查策略表。
+  const withSeverity = evaluations.map((evaluation) => ({
+    ...evaluation,
+    severity: severityOf(evaluation.ruleId),
+  }));
+
   let verdict: QualityReviewReport['verdict'] = 'pass';
-  for (const evaluation of evaluations) {
-    if (evaluation.verdict === 'fail' && severityOf(evaluation.ruleId) === 'blocking') {
+  for (const evaluation of withSeverity) {
+    if (evaluation.verdict === 'fail' && evaluation.severity === 'blocking') {
       verdict = 'blocking_fail';
       break;
     }
@@ -130,7 +138,7 @@ export async function runQualityReview(input: QualityReviewInput): Promise<Quali
     reportId: randomUUID(),
     anchor: input.anchor,
     reviewer: input.reviewer,
-    evaluations,
+    evaluations: withSeverity,
     verdict,
   };
 }

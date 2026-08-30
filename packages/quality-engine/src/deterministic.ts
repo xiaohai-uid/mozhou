@@ -137,6 +137,7 @@ function paraEvaluation(
     ruleId: definition.id,
     ruleVersion: definition.version,
     verdict: evidence.length > 0 ? 'fail' : 'pass',
+    severity: definition.severity,
     evidence,
   };
 }
@@ -152,6 +153,7 @@ function revEvaluation(
     ruleId: definition.id,
     ruleVersion: definition.version,
     verdict: current ? 'pass' : 'fail',
+    severity: definition.severity,
     evidence: current
       ? []
       : [

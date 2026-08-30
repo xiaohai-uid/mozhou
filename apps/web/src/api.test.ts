@@ -168,6 +168,10 @@ describe('ADR-0025 质量审查 API 契约', () => {
 
     const firstReview = await post(base, '/api/chapter.review', { root, chapterIndex: 1, policy: DETERMINISTIC_POLICY })
     expect(firstReview.data.verdict).toBe('blocking_fail')
+    // 审查轮修订：PARA-001 为 blocking → 进 blockingFailures；advisories 空
+    expect((firstReview.data.blockingFailures as unknown[]).length).toBe(1)
+    expect(firstReview.data.advisories).toEqual([])
+    expect(firstReview.data.semanticReviewer).toBe('unavailable')
 
     // 第一次与第二次回炉成功（回炉后回 draft，需再 review 才能再回炉）
     for (let round = 0; round < 2; round += 1) {
