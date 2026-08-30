@@ -6,6 +6,7 @@
     { "path": "packages/context-compiler" },
     { "path": "packages/runtime" },
     { "path": "packages/pipeline" },
+    { "path": "packages/quality-engine" },
     { "path": "packages/benchmark" },
     { "path": "packages/flywheel" }
   ]
