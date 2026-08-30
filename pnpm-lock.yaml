@@ -35,6 +35,9 @@ importers:
       '@mozhou/pipeline':
         specifier: workspace:*
         version: link:../../packages/pipeline
+      '@mozhou/quality-engine':
+        specifier: workspace:*
+        version: link:../../packages/quality-engine
       '@mozhou/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -75,6 +78,9 @@ importers:
       '@mozhou/pipeline':
         specifier: workspace:*
         version: link:../pipeline
+      '@mozhou/quality-engine':
+        specifier: workspace:*
+        version: link:../quality-engine
       '@mozhou/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -144,9 +150,18 @@ importers:
       '@mozhou/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@mozhou/quality-engine':
+        specifier: workspace:*
+        version: link:../quality-engine
       '@mozhou/runtime':
         specifier: workspace:*
         version: link:../runtime
+
+  packages/quality-engine:
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
 
   packages/runtime:
     dependencies:
