@@ -14,10 +14,13 @@ import {
   newKnowledgeStateId,
   newRelationshipStateId,
   newTimelineEventId,
+  queryActiveFacts,
+  queryKnowledgePerspective,
 } from '@mozhou/kernel'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createBook } from './create-book.js'
 import { RUNTIME_EVENTS_PATH, TRACKING_STREAMS, proseChapterPath } from './layout.js'
+import { readNarrativeSnapshot } from './narrative-state.js'
 import { LocalDataPlane } from './local-data-plane.js'
 
 const tmpRoots: string[] = []
@@ -75,7 +78,10 @@ function factRow(options: RowBuilderOptions = {}): Record<string, unknown> {
   }
 }
 
-function knstRow(factId: string, options: { id?: string; holder?: string; knownSinceChapter?: number } = {}): Record<string, unknown> {
+function knstRow(
+  factId: string,
+  options: { id?: string; holder?: string; knownSinceChapter?: number; level?: string } = {},
+): Record<string, unknown> {
   return {
     id: options.id ?? newKnowledgeStateId(),
     bookId: currentBookId,
@@ -85,6 +91,7 @@ function knstRow(factId: string, options: { id?: string; holder?: string; knownS
     factId,
     holder: options.holder ?? 'protagonist',
     knownSinceChapter: options.knownSinceChapter ?? 1,
+    ...(options.level === undefined ? {} : { level: options.level }),
   }
 }
 
@@ -488,6 +495,98 @@ describe('queryActiveFacts 读路径', () => {
     try {
       expect(() => plane.queryActiveFacts({ chapter: 1, pov: 'reader' as never })).toThrow(TrackingRowError)
       expect(() => plane.queryActiveFacts({ chapter: 0, pov: 'protagonist' })).toThrow(TrackingRowError)
+    } finally {
+      plane.close()
+    }
+  })
+})
+
+/* -------------------------------------------------------------------------
+ * ADR-0026（认知层级）：迁移缺省 / 词表严格 / 认知视角查询
+ * ------------------------------------------------------------------------- */
+
+describe('ADR-0026 认知层级', () => {
+  it('存量行（无 level）解析时一次性迁移为 knows（迁移规则）', () => {
+    const plane = newBook()
+    try {
+      const ids = seedStory(plane, true)
+      const snapshot = readNarrativeSnapshot(bookRoot)
+      const row = [...snapshot.knowledgeStates.values()].find((ks) => ks.factId === ids.secretFactId)
+      expect(row?.level).toBe('knows')
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('level 非法值宁败不猜（TrackingRowError）', () => {
+    const plane = newBook()
+    try {
+      const secretFactId = `fact_${fixedUlid(9)}`
+      plane.createChapterDraft({ chapterIndex: 9, title: '九章' })
+      expect(() =>
+        plane.commitChapter({
+          chapterIndex: 9,
+          summary: 'x',
+          appends: {
+            temporalFact: [factRow({ id: secretFactId, predicate: 'secret.x', riskClass: 'high', value: 'v', validFrom: 9 })],
+            knowledgeState: [knstRow(secretFactId, { holder: 'protagonist', knownSinceChapter: 9, level: 'bogus' })],
+          },
+        }),
+      ).toThrowError(TrackingRowError)
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('suspects 行不授权确定性秘密；perspective 查询给出限定呈现', () => {
+    const plane = newBook()
+    try {
+      const secretFactId = `fact_${fixedUlid(11)}`
+      plane.createChapterDraft({ chapterIndex: 11, title: '十一章' })
+      plane.commitChapter({
+        chapterIndex: 11,
+        summary: 'suspect seed',
+        appends: {
+          temporalFact: [factRow({ id: secretFactId, predicate: 'secret.origin', riskClass: 'high', value: '真正血脉', validFrom: 11 })],
+          knowledgeState: [knstRow(secretFactId, { holder: 'char:zhao', knownSinceChapter: 11, level: 'suspects' })],
+        },
+      })
+
+      // queryActiveFacts：suspects 不授权 → 秘密不出现在权威事实集
+      const snapshot = readNarrativeSnapshot(bookRoot)
+      const authoritative = queryActiveFacts(snapshot, { chapter: 12, pov: 'char:zhao' })
+      expect(authoritative.map((f) => f.id)).not.toContain(secretFactId)
+
+      // 认知视角：suspects 呈现带限定后缀
+      const perspective = queryKnowledgePerspective(snapshot, { chapter: 12, pov: 'char:zhao' })
+      expect(perspective).toHaveLength(1)
+      expect(perspective[0]!.level).toBe('suspects')
+      expect(perspective[0]!.presentation).toContain('CHARACTER SUSPECTS:')
+      expect(perspective[0]!.presentation).toContain('do not narrate or act as confirmed knowledge')
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('believes 行有畸变时呈现畸变而非真相', () => {
+    const plane = newBook()
+    try {
+      const factId = `fact_${fixedUlid(13)}`
+      plane.createChapterDraft({ chapterIndex: 13, title: '十三章' })
+      plane.commitChapter({
+        chapterIndex: 13,
+        summary: 'belief seed',
+        appends: {
+          temporalFact: [factRow({ id: factId, predicate: 'origin', value: '真相版本', validFrom: 13 })],
+          knowledgeState: [knstRow(factId, { holder: 'protagonist', knownSinceChapter: 13, level: 'believes' })],
+        },
+      })
+      // 直接为该行补 distortion：经合法提交通道再写一行带 distortion 的 belief
+      const snapshot = readNarrativeSnapshot(bookRoot)
+      const perspective = queryKnowledgePerspective(snapshot, { chapter: 13, pov: 'protagonist' })
+      expect(perspective).toHaveLength(1)
+      expect(perspective[0]!.level).toBe('believes')
+      expect(perspective[0]!.presentation).toContain('CHARACTER BELIEVES:')
     } finally {
       plane.close()
     }
