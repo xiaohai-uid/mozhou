@@ -1,9 +1,10 @@
 /**
- * 文学质量审查面板（ADR-0025 · 计划 Task 9）。
+ * 文学质量审查面板（ADR-0025 · 计划 Task 9；T40 换肤为 Ink Orbit 材质）。
  * 作者主权：pass 不触发任何自动动作；回炉只经「Apply rework」显式按钮；
  * 纠错经「Record my correction」显式提交。无自动循环。
  */
 import { useCallback, useEffect, useState } from 'react'
+import { post } from '../lib/post'
 
 export interface QualitySummary {
   readonly ok: boolean
@@ -31,6 +32,9 @@ export interface ReviewResponse extends QualitySummary {
   readonly reportPath?: string
 }
 
+/** 与 packages/quality-engine/src/types.ts CORRECTION_REASONS 同源；
+ * 不可直引包根——policy/review 模块携 node:crypto，进浏览器包必炸。
+ * 词表漂移由 api.test.ts 的 400 未知原因契约测试兜底。 */
 const CORRECTION_REASONS = [
   'outline_expansion',
   'character_toolization',
@@ -50,19 +54,10 @@ const VERDICT_LABEL: Record<string, string> = {
   refused: 'REFUSED',
 }
 
-async function post<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = (await res.json()) as { ok?: boolean; error?: string; code?: string } & T
-  if (!res.ok || data.ok === false) {
-    const error = new Error(data.error ?? '请求失败 (HTTP ' + res.status + ')')
-    error.name = data.code ?? 'RequestError'
-    throw error
-  }
-  return data
+const VERDICT_CLASS: Record<string, string> = {
+  pass: 'verdict pass',
+  blocking_fail: 'verdict blocking',
+  refused: 'verdict refused',
 }
 
 export function QualityPanel({ root, chapterIndex }: { root: string; chapterIndex: number }) {
@@ -125,85 +120,129 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const hashShort = summary?.draftContentHash === undefined ? '' : summary.draftContentHash.slice(0, 12)
 
   return (
-    <section aria-label="literary-quality-panel" style={{ border: '1px solid #444', padding: 12, marginTop: 12 }}>
-      <h3>文学质量审查</h3>
-      {error !== null && <p role="alert" style={{ color: '#c0392b' }}>{error}</p>}
-      <p>
-        Literary Review:{' '}
-        <strong>{verdict === undefined ? (summary?.hasReport === false ? '（尚无报告）' : '—') : VERDICT_LABEL[verdict]}</strong>
-        {summary?.current === false && <em>（报告已 stale——正文在审查后变化）</em>}
-      </p>
-      {summary?.draftRevision !== undefined && (
-        <p>Exact draft: revision {summary.draftRevision} · hash {hashShort}…</p>
-      )}
-      {summary?.hasReport !== false && (
-        <p>Rework attempt {Math.min(reworkCount, 2)}/2</p>
-      )}
-
-      {verdict === 'pass' && <p style={{ color: '#27ae60' }}>审查通过，可进入作者编辑。</p>}
-      {verdict === 'refused' && <p style={{ color: '#7f8c8d' }}>语义审查提供方不可用——已显式拒绝，交作者处置。</p>}
-
-      {(summary?.blockingFailures?.length ?? 0) > 0 && (
-        <div>
-          <h4>Blocking failures</h4>
-          <ul>
-            {summary?.blockingFailures?.map((evaluation) => (
-              <li key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
-                <strong>{evaluation.ruleId}</strong>（v{evaluation.ruleVersion}）
-                <ul>
-                  {evaluation.evidence.map((evidence, index) => (
-                    <li key={index}>
-                      {evidence.note}
-                      {evidence.excerpt !== undefined && <q>{evidence.excerpt}</q>}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
+    <section aria-label="literary-quality-panel" className="card-shell">
+      <div className="card">
+        <div className="card-title">
+          <b>文学质量审查</b>
+          {verdict !== undefined && (
+            <span className={VERDICT_CLASS[verdict] ?? 'verdict'}>{VERDICT_LABEL[verdict] ?? verdict}</span>
+          )}
         </div>
-      )}
-      {(summary?.advisories?.length ?? 0) > 0 && (
-        <div>
-          <h4>Advisories（建议，不阻断）</h4>
-          <ul>
-            {summary?.advisories?.map((evaluation) => (
-              <li key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
-                {evaluation.ruleId}（v{evaluation.ruleVersion}）：{evaluation.evidence[0]?.note}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {summary?.semanticReviewer === 'unavailable' && (
-        <p style={{ color: '#7f8c8d' }}>语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。</p>
-      )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => { void runReview() }}>Run literary review</button>
-        {verdict === 'blocking_fail' && (
-          <button onClick={() => { void applyRework() }} disabled={reworkCount >= 2}>
-            Apply rework{reworkCount >= 2 ? '（已达上限）' : ''}
-          </button>
+        {error !== null && (
+          <p role="alert" className="wb-error" style={{ marginBottom: 10 }}>
+            {error}
+          </p>
         )}
-      </div>
 
-      <div style={{ marginTop: 10, borderTop: '1px solid #333', paddingTop: 8 }}>
-        <h4>Record my correction</h4>
-        <select value={selectedReason} onChange={(event) => setSelectedReason(event.target.value)}>
-          {CORRECTION_REASONS.map((reason) => (
-            <option key={reason} value={reason}>{reason}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="纠错附注（原文只留本机）"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          style={{ marginLeft: 8 }}
-        />
-        <button style={{ marginLeft: 8 }} onClick={() => { void recordCorrection() }}>保存纠错</button>
-        {correctionSaved && <span style={{ marginLeft: 8, color: '#27ae60' }}>已记录（事件+失败记忆）</span>}
+        {verdict === undefined && (
+          <p className="muted" style={{ margin: 0, fontSize: 11 }}>
+            {summary?.hasReport === false ? '（尚无报告）' : '—'}
+          </p>
+        )}
+        {summary?.current === false && (
+          <p className="mono muted" style={{ margin: '6px 0 0' }}>
+            报告已 stale——正文在审查后变化
+          </p>
+        )}
+        {summary?.draftRevision !== undefined && (
+          <p className="mono muted" style={{ margin: '6px 0 0' }}>
+            Exact draft: revision {summary.draftRevision} · hash {hashShort}…
+          </p>
+        )}
+        {summary?.hasReport !== false && (
+          <p className="mono muted" style={{ margin: '6px 0 0' }}>
+            Rework attempt {Math.min(reworkCount, 2)}/2
+          </p>
+        )}
+
+        {verdict === 'pass' && (
+          <p style={{ margin: '8px 0 0', color: 'var(--success)', fontSize: 11 }}>
+            审查通过，可进入作者编辑。
+          </p>
+        )}
+        {verdict === 'refused' && (
+          <p style={{ margin: '8px 0 0', color: 'var(--text-faint)', fontSize: 11 }}>
+            语义审查提供方不可用——已显式拒绝，交作者处置。
+          </p>
+        )}
+
+        {(summary?.blockingFailures?.length ?? 0) > 0 && (
+          <div>
+            <h4 className="mono muted" style={{ margin: '12px 0 4px' }}>BLOCKING FAILURES</h4>
+            {summary?.blockingFailures?.map((evaluation) => (
+              <div className="finding" key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
+                <b>
+                  {evaluation.ruleId}（v{evaluation.ruleVersion}）
+                </b>
+                {evaluation.evidence.map((evidence, index) => (
+                  <p key={index}>
+                    {evidence.note}
+                    {evidence.excerpt !== undefined && <q> {evidence.excerpt}</q>}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        {(summary?.advisories?.length ?? 0) > 0 && (
+          <div>
+            <h4 className="mono muted" style={{ margin: '12px 0 4px' }}>ADVISORIES（建议，不阻断）</h4>
+            {summary?.advisories?.map((evaluation) => (
+              <div className="finding" key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
+                <p style={{ margin: 0 }}>
+                  {evaluation.ruleId}（v{evaluation.ruleVersion}）：{evaluation.evidence[0]?.note}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+        {summary?.semanticReviewer === 'unavailable' && (
+          <p className="banner" style={{ marginTop: 10, marginBottom: 0 }}>
+            语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。
+          </p>
+        )}
+
+        <div className="actions">
+          <button className="btn-primary" onClick={() => { void runReview() }}>
+            Run literary review
+          </button>
+          {verdict === 'blocking_fail' && (
+            <button className="btn" onClick={() => { void applyRework() }} disabled={reworkCount >= 2}>
+              Apply rework{reworkCount >= 2 ? '（已达上限）' : ''}
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--hairline)', paddingTop: 10 }}>
+          <h4 className="mono muted" style={{ margin: '0 0 8px' }}>RECORD MY CORRECTION</h4>
+          <div className="actions" style={{ marginTop: 0, alignItems: 'center' }}>
+            <select
+              className="control"
+              value={selectedReason}
+              onChange={(event) => setSelectedReason(event.target.value)}
+              aria-label="纠错原因"
+            >
+              {CORRECTION_REASONS.map((reason) => (
+                <option key={reason} value={reason}>{reason}</option>
+              ))}
+            </select>
+            <input
+              className="control"
+              type="text"
+              placeholder="纠错附注（原文只留本机）"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              style={{ flex: 1, minWidth: 140 }}
+            />
+            <button className="btn" onClick={() => { void recordCorrection() }}>保存纠错</button>
+          </div>
+          {correctionSaved && (
+            <p className="mono" style={{ margin: '8px 0 0', color: 'var(--success)' }}>
+              已记录（事件+失败记忆）
+            </p>
+          )}
+        </div>
       </div>
     </section>
   )

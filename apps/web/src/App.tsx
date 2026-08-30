@@ -1,155 +1,108 @@
-import { useState } from 'react'
-import type { EntityCardScan } from '@mozhou/data-plane'
+/**
+ * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027）：
+ * 顶栏 + 八步管线条 + 左侧五组功能航道 + 中栏（工作台填充/显式占位）
+ * + 右侧检视塔 + WebGL 背景墨流。书名与视图状态经 localStorage 记忆。
+ */
+import { useEffect, useState } from 'react'
+import { CapabilityChannels } from './shell/CapabilityChannels'
+import { InkBackground } from './shell/InkBackground'
+import { InspectorEmpty, InspectorPlaceholder, InspectorTower } from './shell/InspectorTower'
+import type { InspectorTabId } from './shell/InspectorTower'
+import { PipelineStrip, PIPELINE_STAGES } from './shell/PipelineStrip'
+import { PlaceholderView } from './shell/PlaceholderView'
+import { TopBar } from './shell/TopBar'
+import { loadWorkbenchState, saveWorkbenchState } from './shell/workbenchStorage'
+import type { BookInfo } from './shell/workbenchStorage'
+import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
+import { WorkbenchView } from './workbench/WorkbenchView'
 
-interface BookCreated { ok: true; root: string; bookId: string }
-interface LedgerRow { kind: string; event?: { type?: string; taskRef?: string }; type?: string }
+/** 管线点击牵引的墨迹聚焦：activeStage 均匀映射到 [0,1]（原型同款）。 */
+function stageToFocus(stageIndex: number): number {
+  return stageIndex / (PIPELINE_STAGES.length - 1)
+}
+
+/** 检视组导航 → 检视塔 tab 的牵引映射。 */
+const INSPECTOR_VIEW_TO_TAB: Partial<Record<ViewId, InspectorTabId>> = {
+  'quality-gate': 'quality',
+  'story-brain': 'story-brain',
+  'context-receipt': 'context-receipt',
+  'change-matrix': 'change-matrix',
+}
+
+/** 壳级默认阶段：审查（与原型关键屏一致的初始高亮；真实会话绑定随后续票接入）。 */
+const DEFAULT_STAGE = PIPELINE_STAGES.findIndex((stage) => stage.id === 'review')
 
 export function App(): JSX.Element {
-  const [title, setTitle] = useState('未命名之书')
-  const [book, setBook] = useState<{ root: string; bookId: string } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [events, setEvents] = useState<readonly string[]>([])
-  const [entityCards, setEntityCards] = useState<readonly EntityCardScan[]>([])
-  const [entitiesLoaded, setEntitiesLoaded] = useState(false)
-  const [entitiesBusy, setEntitiesBusy] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [initial] = useState(loadWorkbenchState)
+  const [book, setBook] = useState<BookInfo | null>(initial.book)
+  const [view, setView] = useState<ViewId>(initial.view)
+  const [stage, setStage] = useState(DEFAULT_STAGE)
+  const [inspectorTab, setInspectorTab] = useState<InspectorTabId>('quality')
 
-  async function post<T>(path: string, body: Record<string, unknown>): Promise<T> {
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const data = (await res.json()) as { ok?: boolean; error?: string } & T
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.error ?? '请求失败 (HTTP ' + res.status + ')')
-    }
-    return data
+  useEffect(() => {
+    saveWorkbenchState({ book, view })
+  }, [book, view])
+
+  const handleSelectView = (next: ViewId): void => {
+    setView(next)
+    const tab = INSPECTOR_VIEW_TO_TAB[next]
+    if (tab !== undefined) setInspectorTab(tab)
   }
 
-  const handleCreateBook = async () => {
-    setError(null)
-    setBusy(true)
-    try {
-      const data = await post<BookCreated>('/api/book', { title })
-      setBook({ root: data.root, bookId: data.bookId })
-      setEntityCards([])
-      setEntitiesLoaded(false)
-    } catch (cause) {
-      setError((cause as Error).message)
-    } finally {
-      setBusy(false)
-    }
+  const handleBookCreated = (created: BookInfo): void => {
+    setBook(created)
+    setView('workbench')
   }
 
-  const handleRefreshEntities = async () => {
-    setError(null)
-    if (book === null) return
-    setEntitiesBusy(true)
-    try {
-      const data = await post<{ cards: readonly EntityCardScan[] }>('/api/story-brain.entities', { root: book.root })
-      setEntityCards(data.cards)
-      setEntitiesLoaded(true)
-    } catch (cause) {
-      setError((cause as Error).message)
-    } finally {
-      setEntitiesBusy(false)
-    }
-  }
-
-  const handleRefreshLedger = async () => {
-    setError(null)
-    if (book === null) return
-    try {
-      const data = await post<{ events: readonly LedgerRow[] }>('/api/ledger', { root: book.root })
-      setEvents(
-        data.events.map((row) =>
-          row.kind === 'task' ? (row.event?.type ?? 'task') : (row.type ?? row.kind),
-        ),
-      )
-    } catch (cause) {
-      setError((cause as Error).message)
-    }
-  }
-
-  const entityGroups = new Map<EntityCardScan['cardType'], EntityCardScan[]>()
-  for (const card of entityCards) {
-    const group = entityGroups.get(card.cardType)
-    if (group === undefined) {
-      entityGroups.set(card.cardType, [card])
-    } else {
-      group.push(card)
-    }
+  const panels = {
+    quality:
+      book === null ? (
+        <InspectorEmpty note="建书后可用——先在工作台建书，再回到本面板运行文学质量审查。" />
+      ) : (
+        <QualityPanel root={book.root} chapterIndex={1} />
+      ),
+    'story-brain': (
+      <InspectorPlaceholder
+        title="Story Brain 三区面板"
+        ticket="T41"
+        note="实体卡 / 章大纲树 / 事实列表三区只读面板随实现票 T41 迁入本塔；实体网格切片暂置于工作台中栏。"
+      />
+    ),
+    'context-receipt': (
+      <InspectorPlaceholder
+        title="装配看板"
+        ticket="T42"
+        note="Context Receipt 列表与逐条装配分解（额度条 / Replay Inputs / 续跑）随实现票 T42 落地。"
+      />
+    ),
+    'change-matrix': (
+      <InspectorPlaceholder
+        title="变更矩阵"
+        ticket="T43"
+        note="行=遍历 / 列=受影响章的影响矩阵与幂等重跑随实现票 T43 落地。"
+      />
+    ),
   }
 
   return (
-    <main style={{ maxWidth: 640, margin: '40px auto', fontFamily: 'system-ui', padding: 16 }}>
-      <h1 style={{ fontSize: 28 }}>墨舟 · 新手引导台</h1>
-      {error !== null && <p style={{ color: '#b3261e', background: '#fdecea', padding: 8 }}>错误：{error}</p>}
-      <section style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
-        <h2>第 1 步：建书</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={busy}
-            style={{ flex: 1, padding: 8 }}
+    <>
+      <InkBackground focus={stageToFocus(stage)} />
+      <div className="app app-grain">
+        <TopBar book={book} onHome={() => setView('workbench')} />
+        <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
+        <PipelineStrip activeStage={stage} onSelect={setStage} />
+        {view === 'workbench' ? (
+          <WorkbenchView
+            key={book?.root ?? 'no-book'}
+            book={book}
+            onBookCreated={handleBookCreated}
           />
-          <button onClick={() => void handleCreateBook()} disabled={busy} style={{ padding: '8px 16px' }}>
-            {busy ? '创建中…' : '创建'}
-          </button>
-        </div>
-        {book !== null && (
-          <p data-testid="created-book" style={{ color: '#1a7f37' }}>
-            已建：根 {book.root} · 书 {book.bookId}
-          </p>
+        ) : (
+          <PlaceholderView view={view} />
         )}
-      </section>
-      {book !== null && <QualityPanel root={book.root} chapterIndex={1} />}
-      <section
-        data-testid="story-brain-entities"
-        style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}
-      >
-        <h2>Story Brain · 实体网格</h2>
-        <button
-          onClick={() => void handleRefreshEntities()}
-          disabled={book === null || entitiesBusy}
-          style={{ padding: '8px 16px' }}
-        >
-          {entitiesBusy ? '读取中…' : '刷新实体'}
-        </button>
-        {entitiesLoaded && entityCards.length === 0 && <p>暂无实体卡</p>}
-        {Array.from(entityGroups.entries()).map(([cardType, cards]) => (
-          <div key={cardType} style={{ marginTop: 16 }}>
-            <h3 style={{ marginBottom: 8 }}>{cardType}</h3>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-              {cards.map((card) => (
-                <article
-                  key={card.ref}
-                  data-entity-ref={card.ref}
-                  style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}
-                >
-                  <strong>{card.name}</strong>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{card.ref}</div>
-                  {card.brief !== null && <p style={{ marginBottom: 0 }}>{card.brief}</p>}
-                </article>
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-      <section style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
-        <h2>账本可见（Phase 5 遍历/风格学习事件会出现在这里）</h2>
-        <button onClick={() => void handleRefreshLedger()} disabled={book === null} style={{ padding: '8px 16px' }}>
-          刷新账本
-        </button>
-        <ul style={{ maxHeight: 240, overflow: 'auto', marginTop: 8 }}>
-          {events.map((type, i) => (
-            <li key={i}>{type}</li>
-          ))}
-        </ul>
-      </section>
-    </main>
+        <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} />
+      </div>
+    </>
   )
 }

@@ -1,6 +1,8 @@
+// @vitest-environment node
 /**
  * T31 apps/web 同进程 API 中间件测试（Phase 6；t76 R1 修订形态）。
  * 黑盒：真实 HTTP 起服 → POST /api/* 断言 JSON 直出。
+ * （vitest 默认环境为 jsdom——组件测试引入后的约定；真实 HTTP 套件固定 node。）
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
