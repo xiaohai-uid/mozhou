@@ -7,13 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@mozhou/data-plane": "workspace:*",
-    "@mozhou/pipeline": "workspace:*",
-    "@mozhou/runtime": "workspace:*",
     "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
+    "@mozhou/runtime": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

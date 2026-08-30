@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { QualityPanel } from './quality/QualityPanel'
 
 interface BookCreated { ok: true; root: string; bookId: string }
 interface LedgerRow { kind: string; event?: { type?: string; taskRef?: string }; type?: string }
@@ -70,6 +71,7 @@ export function App(): JSX.Element {
         </div>
         {book !== null && <p style={{ color: '#1a7f37' }}>已建：根 {book.root} · 书 {book.bookId}</p>}
       </section>
+      {book !== null && <QualityPanel root={book.root} chapterIndex={1} />}
       <section style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
         <h2>账本可见（Phase 5 遍历/风格学习事件会出现在这里）</h2>
         <button onClick={() => void handleRefreshLedger()} disabled={book === null} style={{ padding: '8px 16px' }}>
