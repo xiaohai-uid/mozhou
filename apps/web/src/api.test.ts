@@ -4,12 +4,13 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, createChapterDraft, readManifest, openDatabase, readProseChapter, proseChapterPath } from '@mozhou/data-plane'
+import { LocalDataPlane, createChapterDraft, entityCardFileRel, readManifest, openDatabase, readProseChapter, proseChapterPath } from '@mozhou/data-plane'
+import type { EntityRef } from '@mozhou/kernel'
 import { ChapterProductionSession, recordUserEdit } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 
@@ -47,7 +48,7 @@ async function post(base: string, path: string, body: Record<string, unknown>): 
   return { status: res.status, data }
 }
 
-describe('apps/web api 中间件 · T31', () => {
+describe('apps/web api 中间件 · T31/T32', () => {
   it('POST /api/book 建书：返回 root 与 bookId', async () => {
     const base = await listen()
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-api-'))
@@ -57,6 +58,36 @@ describe('apps/web api 中间件 · T31', () => {
     expect(data.ok).toBe(true)
     expect(typeof data.root).toBe('string')
     expect(typeof data.bookId).toBe('string')
+  })
+
+  it('POST /api/story-brain.entities：直出 scanEntityCards 的实体卡契约（PR #82 移植）', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-api-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { title: '实体书', dir })
+    const root = created.data.root as string
+    const ref = 'char:linzhou' as EntityRef
+    const rel = entityCardFileRel(ref)
+    const absolute = join(root, rel)
+    mkdirSync(dirname(absolute), { recursive: true })
+    writeFileSync(
+      absolute,
+      '---\nref: char:linzhou\nname: 林舟\nbrief: 主角\n---\n# 林舟\n',
+      'utf8',
+    )
+
+    const { status, data } = await post(base, '/api/story-brain.entities', { root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.cards).toEqual([
+      expect.objectContaining({
+        ref: 'char:linzhou',
+        cardType: 'char',
+        name: '林舟',
+        brief: '主角',
+        aiContext: 'detected',
+      }),
+    ])
   })
 
   it('POST /api/ledger：新建书的账本为空数组（无事件）', async () => {

@@ -19,7 +19,7 @@ import {
   recordAuthorCorrection,
   runReviewStep,
 } from '@mozhou/pipeline'
-import { createBook, proseChapterPath, readCanonState, readProseChapter } from '@mozhou/data-plane'
+import { createBook, proseChapterPath, readCanonState, readProseChapter, scanEntityCards } from '@mozhou/data-plane'
 import { readPipelineLedger } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 
@@ -49,9 +49,10 @@ function urlPath(req: IncomingMessage): string {
 /**
  * 中间件：仅处理 /api/* 前缀；非 API 请求交给 next()（Vite 静态或 prod serve）。
  * 端点：
- *   POST /api/book        {title, dir} → createBook
- *   POST /api/book.state  {root}      → readCanonState（Story Brain 基底）
- *   POST /api/ledger      {root}      → readPipelineLedger（Traversal/账本可见）
+ *   POST /api/book                 {title, dir} → createBook
+ *   POST /api/book.state           {root}       → readCanonState（Story Brain 基底）
+ *   POST /api/story-brain.entities {root}       → scanEntityCards（Story Brain 实体网格，PR #82）
+ *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  *   POST /api/chapter.review      {root, chapterIndex} → runReviewStep + 审查落账
  *   POST /api/chapter.rework      {root, chapterIndex} → 显式质量回炉（上限 2）
  *   POST /api/chapter.corrections {root, chapterIndex, reasons[], note?} → 纠错记录
@@ -76,6 +77,13 @@ export function apiMiddleware(): Middleware {
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
           json(res, 200, { ok: true, state: readCanonState(root) })
+          return
+        }
+        if (req.method === 'POST' && path === '/api/story-brain.entities') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+          json(res, 200, { ok: true, cards: scanEntityCards(root) })
           return
         }
         if (req.method === 'POST' && path === '/api/ledger') {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { EntityCardScan } from '@mozhou/data-plane'
 import { QualityPanel } from './quality/QualityPanel'
 
 interface BookCreated { ok: true; root: string; bookId: string }
@@ -9,6 +10,9 @@ export function App(): JSX.Element {
   const [book, setBook] = useState<{ root: string; bookId: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [events, setEvents] = useState<readonly string[]>([])
+  const [entityCards, setEntityCards] = useState<readonly EntityCardScan[]>([])
+  const [entitiesLoaded, setEntitiesLoaded] = useState(false)
+  const [entitiesBusy, setEntitiesBusy] = useState(false)
   const [busy, setBusy] = useState(false)
 
   async function post<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -30,10 +34,27 @@ export function App(): JSX.Element {
     try {
       const data = await post<BookCreated>('/api/book', { title })
       setBook({ root: data.root, bookId: data.bookId })
+      setEntityCards([])
+      setEntitiesLoaded(false)
     } catch (cause) {
       setError((cause as Error).message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleRefreshEntities = async () => {
+    setError(null)
+    if (book === null) return
+    setEntitiesBusy(true)
+    try {
+      const data = await post<{ cards: readonly EntityCardScan[] }>('/api/story-brain.entities', { root: book.root })
+      setEntityCards(data.cards)
+      setEntitiesLoaded(true)
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setEntitiesBusy(false)
     }
   }
 
@@ -49,6 +70,16 @@ export function App(): JSX.Element {
       )
     } catch (cause) {
       setError((cause as Error).message)
+    }
+  }
+
+  const entityGroups = new Map<EntityCardScan['cardType'], EntityCardScan[]>()
+  for (const card of entityCards) {
+    const group = entityGroups.get(card.cardType)
+    if (group === undefined) {
+      entityGroups.set(card.cardType, [card])
+    } else {
+      group.push(card)
     }
   }
 
@@ -69,9 +100,45 @@ export function App(): JSX.Element {
             {busy ? '创建中…' : '创建'}
           </button>
         </div>
-        {book !== null && <p style={{ color: '#1a7f37' }}>已建：根 {book.root} · 书 {book.bookId}</p>}
+        {book !== null && (
+          <p data-testid="created-book" style={{ color: '#1a7f37' }}>
+            已建：根 {book.root} · 书 {book.bookId}
+          </p>
+        )}
       </section>
       {book !== null && <QualityPanel root={book.root} chapterIndex={1} />}
+      <section
+        data-testid="story-brain-entities"
+        style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}
+      >
+        <h2>Story Brain · 实体网格</h2>
+        <button
+          onClick={() => void handleRefreshEntities()}
+          disabled={book === null || entitiesBusy}
+          style={{ padding: '8px 16px' }}
+        >
+          {entitiesBusy ? '读取中…' : '刷新实体'}
+        </button>
+        {entitiesLoaded && entityCards.length === 0 && <p>暂无实体卡</p>}
+        {Array.from(entityGroups.entries()).map(([cardType, cards]) => (
+          <div key={cardType} style={{ marginTop: 16 }}>
+            <h3 style={{ marginBottom: 8 }}>{cardType}</h3>
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+              {cards.map((card) => (
+                <article
+                  key={card.ref}
+                  data-entity-ref={card.ref}
+                  style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}
+                >
+                  <strong>{card.name}</strong>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{card.ref}</div>
+                  {card.brief !== null && <p style={{ marginBottom: 0 }}>{card.brief}</p>}
+                </article>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
       <section style={{ marginTop: 24, border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
         <h2>账本可见（Phase 5 遍历/风格学习事件会出现在这里）</h2>
         <button onClick={() => void handleRefreshLedger()} disabled={book === null} style={{ padding: '8px 16px' }}>
