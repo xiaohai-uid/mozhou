@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { okJson } from './test/http'
+import { emptyCanonState } from './test/fixtures'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -19,9 +20,26 @@ const STORED_BOOK = {
   title: '雾港失真',
 }
 
+/** 壳级按路径 stub：建书 + Story Brain 三读面 + 质量门缺省；未知 /api 路径显式抛错（防未来回归静默通过）。 */
+function stubAppFetch(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation(async (path: string) => {
+      if (path === '/api/book') return okJson({ ok: true, root: 'C:\\tmp\\app-book', bookId: 'bk_app' })
+      if (path === '/api/book.state') return okJson({ ok: true, state: emptyCanonState() })
+      if (path === '/api/story-brain.entities') return okJson({ ok: true, cards: [] })
+      if (path === '/api/story-brain.facts') {
+        return okJson({ ok: true, chapter: 1, currentChapterIndex: null, chapters: [], canon: [], perspective: [], invalidated: [] })
+      }
+      if (path === '/api/chapter.quality') return okJson({ ok: true, hasReport: false })
+      throw new Error('unexpected fetch path in shell test: ' + path)
+    }),
+  )
+}
+
 describe('App 壳集成（T40）', () => {
   it('五屏齐备：顶栏 / 管线条 / 航道 / 中栏 / 检视塔', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ ok: true, hasReport: false })))
+    stubAppFetch()
     render(<App />)
     expect(document.querySelector('.topbar')).not.toBeNull()
     expect(screen.getByLabelText('章节生产管线')).not.toBeNull()
@@ -36,7 +54,7 @@ describe('App 壳集成（T40）', () => {
       'mozhou.workbench.v1',
       JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
     )
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ ok: true, hasReport: false })))
+    stubAppFetch()
     render(<App />)
     expect(document.querySelector('.topbar .book-switch')?.textContent).toContain('雾港失真')
     expect(document.querySelector('.chapterbar h1')?.textContent).toBe('《雾港失真》')
@@ -44,16 +62,14 @@ describe('App 壳集成（T40）', () => {
   })
 
   it('未建书时质量门 tab 呈显式空态；建书后挂载 QualityPanel', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(async (path: string) =>
-        path === '/api/book'
-          ? okJson({ ok: true, root: 'C:\\tmp\\new-book', bookId: 'bk_new' })
-          : okJson({ ok: true, hasReport: false }),
-      ),
-    )
+    stubAppFetch()
     render(<App />)
-    expect(screen.getByTestId('inspector-empty').textContent).toContain('建书后可用')
+    // 建书前 quality 与 story-brain 两个 tab 均为显式空态（T41 起两处）；
+    // 此处断言质量门空态的专属文案在列
+    const empties = screen.getAllByTestId('inspector-empty')
+    expect(empties.map((el) => el.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining('文学质量审查')]),
+    )
 
     const titleInput = screen.getByLabelText('作品名')
     await userEvent.clear(titleInput)
@@ -66,7 +82,7 @@ describe('App 壳集成（T40）', () => {
   })
 
   it('检视组导航点击切到中栏显式占位（未实现页不假装可用）', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ ok: true, hasReport: false })))
+    stubAppFetch()
     render(<App />)
     const receiptNav = document.querySelector('[data-view="context-receipt"]')
     if (receiptNav === null) throw new Error('missing context-receipt nav')
@@ -79,7 +95,7 @@ describe('App 壳集成（T40）', () => {
   })
 
   it('管线条点击切换激活阶段（牵引背景墨迹聚焦）', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ ok: true, hasReport: false })))
+    stubAppFetch()
     render(<App />)
     const commit = document.querySelector('[data-stage="commit"]')
     if (commit === null) throw new Error('missing commit step')
@@ -89,14 +105,7 @@ describe('App 壳集成（T40）', () => {
   })
 
   it('书名与视图经 localStorage 持久化（建书后写入）', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(async (path: string) =>
-        path === '/api/book'
-          ? okJson({ ok: true, root: 'C:\\tmp\\persist', bookId: 'bk_p' })
-          : okJson({ ok: true, hasReport: false }),
-      ),
-    )
+    stubAppFetch()
     render(<App />)
     const titleInput = screen.getByLabelText('作品名')
     await userEvent.clear(titleInput)

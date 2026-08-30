@@ -7,6 +7,9 @@
  * - 抽屉与 Wizard 材质随 T42 落地，此处不迁移
  * - 新增 .btn/.btn-primary/.actions/.control 面板控件材质（源自原型
  *   quiet-btn/send/field 的同一材质语言）与 .verdict.refused 衍生档
+ * - T41 增补：.tree/.active-node/.fact/.cog/.canon/.suspect/.belief 自原型
+ *   Story Brain 区迁移；button.entity 与 .entity[aria-pressed='true'] 为
+ *   实体卡按钮化（点击筛选事实）衍生档
  * - transition 属性表照录原型（含 background-color 微渐变）：ADR-0027
  *   「动效只动 transform/opacity/filter」约束的是程序化动效与 WebGL；
  *   hover 微渐变属用户裁决采纳的原型材质本身
@@ -660,7 +663,7 @@
     line-height: 1.6;
   }
 
-  /* ---- 实体网格（Story Brain 切片，三区面板随 T41 迁入检视塔） ---- */
+  /* ---- 实体网格（Story Brain 三区面板，T41 迁入检视塔） ---- */
   .entity-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -673,10 +676,66 @@
     background: var(--surface-3);
   }
 
+  /* T41：实体卡从 article 切片升级为可点击 button（点击筛选事实），
+     继承原型 .entity 材质；aria-pressed 选中态用 accent 描边 */
+  button.entity {
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+
+  .entity[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 1px var(--accent-strong);
+  }
+
   .entity small {
     display: block;
     margin-bottom: 4px;
     color: var(--text-faint);
+  }
+
+  /* ---- Story Brain 大纲树 / 事实行 / 认知点（T41，自原型语义类迁移：
+     .tree/.active-node/.fact/.cog/.canon/.suspect/.belief 原样迁移） ---- */
+  .tree {
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 2;
+  }
+
+  .tree-row {
+    white-space: nowrap;
+  }
+
+  .tree .active-node {
+    color: var(--foreground);
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 7px;
+    padding: 7px 0;
+    font-size: 10px;
+    box-shadow: inset 0 -1px var(--hairline);
+  }
+
+  .cog {
+    width: 7px;
+    height: 7px;
+    margin-top: 4px;
+    border-radius: 50%;
+  }
+
+  .canon {
+    background: var(--success);
+  }
+
+  .suspect {
+    background: var(--warning);
+  }
+
+  .belief {
+    background: var(--accent);
   }
 
   /* ---- 面板控件材质 ---- */

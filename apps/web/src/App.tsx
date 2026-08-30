@@ -15,6 +15,7 @@ import { loadWorkbenchState, saveWorkbenchState } from './shell/workbenchStorage
 import type { BookInfo } from './shell/workbenchStorage'
 import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
+import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WorkbenchView } from './workbench/WorkbenchView'
 
 /** 管线点击牵引的墨迹聚焦：activeStage 均匀映射到 [0,1]（原型同款）。 */
@@ -62,13 +63,12 @@ export function App(): JSX.Element {
       ) : (
         <QualityPanel root={book.root} chapterIndex={1} />
       ),
-    'story-brain': (
-      <InspectorPlaceholder
-        title="Story Brain 三区面板"
-        ticket="T41"
-        note="实体卡 / 章大纲树 / 事实列表三区只读面板随实现票 T41 迁入本塔；实体网格切片暂置于工作台中栏。"
-      />
-    ),
+    'story-brain':
+      book === null ? (
+        <InspectorEmpty note="建书后可用——先在工作台建书，Story Brain 三区只读面板随后挂载。" />
+      ) : (
+        <StoryBrainPanel root={book.root} />
+      ),
     'context-receipt': (
       <InspectorPlaceholder
         title="装配看板"

@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
 import { LocalDataPlane, createChapterDraft, entityCardFileRel, readManifest, openDatabase, readProseChapter, proseChapterPath } from '@mozhou/data-plane'
+import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
 import { ChapterProductionSession, recordUserEdit } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
@@ -261,5 +262,210 @@ describe('ADR-0025 质量审查 API 契约', () => {
     const { status, data } = await post(base, '/api/chapter.review', { root: dir, chapterIndex: 1 })
     expect(status).toBe(409)
     expect(data.ok).toBe(false)
+  })
+})
+
+/* -------------------------------------------------------------------------
+ * T41（#86）Story Brain 四读面 API 契约：
+ * readCanonState（/api/book.state）+ queryActiveFacts / ADR-0026
+ * suspects-believes 安全通道 / queryInvalidatedKnowledgeStates
+ * （/api/story-brain.facts）。scanEntityCards 已在上方 PR #82 契约覆盖。
+ * ------------------------------------------------------------------------- */
+
+const T41_T0 = '2026-08-24T00:00:00.000Z'
+
+function t41FactRow(
+  bookId: string,
+  options: { subject: string; predicate: string; value: string; riskClass?: string; status?: string },
+): Record<string, unknown> {
+  return {
+    id: newFactId(),
+    bookId,
+    revision: 0,
+    createdAt: T41_T0,
+    updatedAt: T41_T0,
+    subject: options.subject,
+    predicate: options.predicate,
+    value: options.value,
+    validFrom: 1,
+    validUntil: null,
+    importance: 'notable',
+    riskClass: options.riskClass ?? 'low',
+    source: { kind: 'chapter', chapterIndex: 1 },
+    status: options.status ?? 'confirmed',
+    compactedIntoVolumeId: null,
+    provenance: { origin: 'ai', protectedUserContent: false },
+  }
+}
+
+function t41KnstRow(
+  bookId: string,
+  factId: string,
+  options: { holder?: string; level?: string; distortion?: string } = {},
+): Record<string, unknown> {
+  return {
+    id: newKnowledgeStateId(),
+    bookId,
+    revision: 0,
+    createdAt: T41_T0,
+    updatedAt: T41_T0,
+    factId,
+    holder: options.holder ?? 'protagonist',
+    knownSinceChapter: 1,
+    ...(options.level === undefined ? {} : { level: options.level }),
+    ...(options.distortion === undefined ? {} : { distortion: options.distortion }),
+  }
+}
+
+/** 建书 + 一章已提交 + 认知三级种子：
+ *  A located=灰潮港（主角 knows）；B 秘密真名（主角 knows 授权）；C 秘密行踪
+ *  （主角 suspects——值不得出通道）；A 的信念行（char:lin-wan believes+畸变）；
+ *  D 已否决事实 + knows 认知行（⇒ invalidated）。 */
+async function seedT41Book(title: string): Promise<{ base: string; root: string }> {
+  const base = await listen()
+  bases.push(base)
+  const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t41-'))
+  roots.push(dir)
+  await post(base, '/api/book', { title, dir })
+  const plane = LocalDataPlane.open(dir)
+  try {
+    plane.createChapterDraft({ chapterIndex: 1, title: '风起' })
+    const factA = t41FactRow(plane.book.id, { subject: 'char:lin-wan', predicate: 'located', value: '灰潮港' })
+    const factB = t41FactRow(plane.book.id, { subject: 'char:gu-chen', predicate: 'secret.true_name', value: '绝密真名值X', riskClass: 'high' })
+    const factC = t41FactRow(plane.book.id, { subject: 'char:gu-chen', predicate: 'secret.whereabouts', value: '绝密行踪值Y', riskClass: 'high' })
+    const factD = t41FactRow(plane.book.id, { subject: 'char:lin-wan', predicate: 'scar_origin', value: '旧疤来历Z', status: 'rejected' })
+    plane.commitChapter({
+      chapterIndex: 1,
+      summary: '开篇',
+      appends: {
+        temporalFact: [factA, factB, factC, factD],
+        knowledgeState: [
+          t41KnstRow(plane.book.id, factA['id'] as string),
+          t41KnstRow(plane.book.id, factB['id'] as string, { level: 'knows' }),
+          t41KnstRow(plane.book.id, factC['id'] as string, { level: 'suspects' }),
+          t41KnstRow(plane.book.id, factA['id'] as string, {
+            holder: 'char:lin-wan',
+            level: 'believes',
+            distortion: '港务局控制钟楼',
+          }),
+          t41KnstRow(plane.book.id, factD['id'] as string, { level: 'knows' }),
+        ],
+      },
+    })
+  } finally {
+    plane.close()
+  }
+  return { base, root: dir }
+}
+
+describe('T41 Story Brain 四读面 API 契约', () => {
+  it('POST /api/book.state：readCanonState 直出（大纲两节点 + 五族追踪流）', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t41-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { title: '基底书', dir })
+    const root = created.data.root as string
+    const { status, data } = await post(base, '/api/book.state', { root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const state = data.state as {
+      book: { title: string }
+      outlineNodes: { nodeType: string }[]
+      trackingLines: Record<string, unknown[]>
+      entityCards: unknown[]
+    }
+    expect(state.book.title).toBe('基底书')
+    expect(state.outlineNodes.map((node) => node.nodeType)).toEqual(['book', 'volume'])
+    expect(Object.keys(state.trackingLines)).toHaveLength(5)
+    expect(state.entityCards).toEqual([])
+  })
+
+  it('POST /api/story-brain.facts：canon=knows 授权可见；suspects/believes 安全通道；invalidated 直出', async () => {
+    const { base, root } = await seedT41Book('认知书')
+    const { status, data } = await post(base, '/api/story-brain.facts', { root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.chapter).toBe(1)
+    expect(data.currentChapterIndex).toBe(1)
+    expect(data.chapters).toEqual([{ chapterIndex: 1, phase: 'committed' }])
+
+    const canon = data.canon as { id: string; subject: string; predicate: string; value: string }[]
+    // D 已 rejected 出局；C 秘密无 knows 授权 ⇒ 对主角不可见（与不存在不可区分）
+    expect(canon.map((fact) => fact.predicate).sort()).toEqual(['located', 'secret.true_name'])
+    // knows 授权的秘密事实：正典值对主角可见（ADR-0026 通道语义）
+    expect(canon.find((fact) => fact.predicate === 'secret.true_name')?.value).toBe('绝密真名值X')
+
+    const perspective = data.perspective as {
+      factId: string
+      level: string
+      holder: string
+      presentation: string
+      subject: string | null
+    }[]
+    expect(perspective).toHaveLength(2)
+    const suspect = perspective.find((entry) => entry.level === 'suspects')
+    if (suspect === undefined) throw new Error('missing suspects entry')
+    expect(suspect.holder).toBe('protagonist')
+    expect(suspect.subject).toBe('char:gu-chen')
+    expect(suspect.presentation).toContain('CHARACTER SUSPECTS:')
+    expect(suspect.presentation).toContain('secret.whereabouts')
+    const belief = perspective.find((entry) => entry.level === 'believes')
+    if (belief === undefined) throw new Error('missing believes entry')
+    expect(belief.holder).toBe('char:lin-wan')
+    expect(belief.subject).toBe('char:lin-wan')
+    expect(belief.presentation).toContain('CHARACTER BELIEVES:')
+    expect(belief.presentation).toContain('港务局控制钟楼')
+
+    // 防真相泄漏修订：C 的正典值永不进 suspects/believes 通道（逐字段审计）
+    expect(JSON.stringify(data.perspective)).not.toContain('绝密行踪值Y')
+
+    const invalidated = data.invalidated as { factId: string; level: string; subject: string | null }[]
+    expect(invalidated).toHaveLength(1)
+    expect(invalidated[0]?.level).toBe('knows')
+    expect(invalidated[0]?.subject).toBe('char:lin-wan')
+  })
+
+  it('entityIds 限定断言主体（queryActiveFacts 过滤面）', async () => {
+    const { base, root } = await seedT41Book('过滤书')
+    const { data } = await post(base, '/api/story-brain.facts', { root, entityIds: ['char:gu-chen'] })
+    const canon = data.canon as { predicate: string }[]
+    expect(canon.map((fact) => fact.predicate)).toEqual(['secret.true_name'])
+  })
+
+  it('章节锚点取最新草稿章（draft 优先于 committed）', async () => {
+    const { base, root } = await seedT41Book('锚书')
+    const plane = LocalDataPlane.open(root)
+    try {
+      plane.createChapterDraft({ chapterIndex: 2, title: '潮生' })
+    } finally {
+      plane.close()
+    }
+    const { data } = await post(base, '/api/story-brain.facts', { root })
+    expect(data.chapter).toBe(2)
+    expect(data.currentChapterIndex).toBe(2)
+    expect(data.chapters).toEqual([
+      { chapterIndex: 1, phase: 'committed' },
+      { chapterIndex: 2, phase: 'draft' },
+    ])
+  })
+
+  it('无正文章之书：锚点回落 1、currentChapterIndex=null、canon 空', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t41-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '空书', dir })
+    const { data } = await post(base, '/api/story-brain.facts', { root: dir })
+    expect(data.chapter).toBe(1)
+    expect(data.currentChapterIndex).toBeNull()
+    expect(data.chapters).toEqual([])
+    expect(data.canon).toEqual([])
+  })
+
+  it('缺 root 的 facts 请求返回 400 显式错误', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/story-brain.facts', {})
+    expect(status).toBe(400)
+    expect(data.ok).toBe(false)
+    expect(typeof data.error).toBe('string')
   })
 })

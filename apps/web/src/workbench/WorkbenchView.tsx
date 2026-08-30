@@ -1,10 +1,10 @@
 /**
  * 中栏工作台（实现票 T40）：Ink Orbit 对话区骨架（真实对话流随 T44
- * 接入，输入区以 disabled 显式占位）+ 存量功能填充——建书卡 /
- * Story Brain 实体网格切片 / 账本可见，全部换肤为 Ink Orbit 材质。
+ * 接入，输入区以 disabled 显式占位）+ 存量功能填充——建书卡 / 账本可见，
+ * 全部换肤为 Ink Orbit 材质。Story Brain 实体网格切片已随 T41 迁入
+ * 右侧检视塔（apps/web/src/story-brain/StoryBrainPanel.tsx）。
  */
 import { useState } from 'react'
-import type { EntityCardScan } from '@mozhou/data-plane'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
 
@@ -30,10 +30,6 @@ export function WorkbenchView({
   const [title, setTitle] = useState('未命名之书')
   const [createError, setCreateError] = useState<string | null>(null)
   const [createBusy, setCreateBusy] = useState(false)
-  const [entityCards, setEntityCards] = useState<readonly EntityCardScan[]>([])
-  const [entitiesLoaded, setEntitiesLoaded] = useState(false)
-  const [entitiesBusy, setEntitiesBusy] = useState(false)
-  const [entityError, setEntityError] = useState<string | null>(null)
   const [events, setEvents] = useState<readonly string[]>([])
   const [ledgerError, setLedgerError] = useState<string | null>(null)
 
@@ -50,23 +46,6 @@ export function WorkbenchView({
     }
   }
 
-  const handleRefreshEntities = async (): Promise<void> => {
-    if (book === null) return
-    setEntityError(null)
-    setEntitiesBusy(true)
-    try {
-      const data = await post<{ cards: readonly EntityCardScan[] }>('/api/story-brain.entities', {
-        root: book.root,
-      })
-      setEntityCards(data.cards)
-      setEntitiesLoaded(true)
-    } catch (cause) {
-      setEntityError((cause as Error).message)
-    } finally {
-      setEntitiesBusy(false)
-    }
-  }
-
   const handleRefreshLedger = async (): Promise<void> => {
     if (book === null) return
     setLedgerError(null)
@@ -79,16 +58,6 @@ export function WorkbenchView({
       )
     } catch (cause) {
       setLedgerError((cause as Error).message)
-    }
-  }
-
-  const entityGroups = new Map<EntityCardScan['cardType'], EntityCardScan[]>()
-  for (const card of entityCards) {
-    const group = entityGroups.get(card.cardType)
-    if (group === undefined) {
-      entityGroups.set(card.cardType, [card])
-    } else {
-      group.push(card)
     }
   }
 
@@ -111,7 +80,7 @@ export function WorkbenchView({
           <div className="bubble">
             写作对话流（墨舟先问 · 气泡流 · 草稿流片段）将在中栏对话票 T44 接入，当前为骨架。
             <span className="hint">
-              中栏暂以存量功能填充：建书卡 / Story Brain 实体网格 / 账本可见。
+              中栏暂以存量功能填充：建书卡 / 账本可见。Story Brain 三区面板已迁入右侧检视塔（T41）。
             </span>
           </div>
         </div>
@@ -153,44 +122,6 @@ export function WorkbenchView({
               )}
             </div>
           </div>
-        </section>
-
-        <section className="wb-section" data-testid="story-brain-entities">
-          <h2>Story Brain · 实体网格</h2>
-          <div className="actions">
-            <button
-              className="btn"
-              onClick={() => void handleRefreshEntities()}
-              disabled={book === null || entitiesBusy}
-            >
-              {entitiesBusy ? '读取中…' : '刷新实体'}
-            </button>
-            <span className="mono muted" style={{ alignSelf: 'center' }}>
-              三区面板随 T41 迁入检视塔
-            </span>
-          </div>
-          {entityError !== null && (
-            <p className="wb-error" role="alert">
-              错误：{entityError}
-            </p>
-          )}
-          {entitiesLoaded && entityCards.length === 0 && <p className="muted">暂无实体卡</p>}
-          {Array.from(entityGroups.entries()).map(([cardType, cards]) => (
-            <div key={cardType} style={{ marginTop: 14 }}>
-              <div className="mono muted" style={{ marginBottom: 6 }}>
-                {cardType}
-              </div>
-              <div className="entity-grid">
-                {cards.map((card) => (
-                  <article key={card.ref} className="entity" data-entity-ref={card.ref}>
-                    <strong>{card.name}</strong>
-                    <small>{card.ref}</small>
-                    {card.brief !== null && <p style={{ margin: 0 }}>{card.brief}</p>}
-                  </article>
-                ))}
-              </div>
-            </div>
-          ))}
         </section>
 
         <section className="wb-section" data-testid="ledger">

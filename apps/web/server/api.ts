@@ -19,11 +19,51 @@ import {
   recordAuthorCorrection,
   runReviewStep,
 } from '@mozhou/pipeline'
-import { createBook, proseChapterPath, readCanonState, readProseChapter, scanEntityCards } from '@mozhou/data-plane'
+import {
+  createBook,
+  proseChapterPath,
+  queryInvalidatedKnowledgeStates,
+  readCanonState,
+  readNarrativeSnapshot,
+  readProseChapter,
+  scanEntityCards,
+} from '@mozhou/data-plane'
+import type { ChapterPhase } from '@mozhou/data-plane'
+import {
+  queryActiveFacts as queryVisibleFactsInSnapshot,
+  queryKnowledgePerspective,
+} from '@mozhou/kernel'
+import type {
+  EntityRef,
+  KnowledgePerspectiveEntry,
+  KnowledgeState,
+  TemporalFact,
+} from '@mozhou/kernel'
 import { readPipelineLedger } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
+
+/**
+ * T41（#86）Story Brain 事实区响应（认知三级通道，ADR-0026）：
+ * - canon：queryActiveFacts @（当前章，POV 主角）——knows 授权的秘密含在内；
+ * - perspective：suspects/believes 安全通道（kernel queryKnowledgePerspective
+ *   逐持有者投影）——秘密正典值零泄漏，只出限定语义文本；
+ * - invalidated：queryInvalidatedKnowledgeStates——引用 rejected 事实的认知行；
+ * - subject 为实体点击过滤的联接元数据（不承载通道内容）。
+ */
+export interface StoryBrainFactsResponse {
+  readonly ok: true
+  /** 事实查询锚点章（最新草稿章；无草稿取最新章；无章 = 1）。 */
+  readonly chapter: number
+  /** 当前章（最新草稿优先）；无正文章为 null（大纲树不高亮）。 */
+  readonly currentChapterIndex: number | null
+  /** 正文章扫描（章一体两面 readProseChapter，探测序）。 */
+  readonly chapters: readonly { chapterIndex: number; phase: ChapterPhase }[]
+  readonly canon: readonly TemporalFact[]
+  readonly perspective: readonly (KnowledgePerspectiveEntry & { subject: EntityRef | null })[]
+  readonly invalidated: readonly (KnowledgeState & { subject: EntityRef | null })[]
+}
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
@@ -52,6 +92,8 @@ function urlPath(req: IncomingMessage): string {
  *   POST /api/book                 {title, dir} → createBook
  *   POST /api/book.state           {root}       → readCanonState（Story Brain 基底）
  *   POST /api/story-brain.entities {root}       → scanEntityCards（Story Brain 实体网格，PR #82）
+ *   POST /api/story-brain.facts    {root, entityIds?} → 认知三级通道（T41：canon /
+ *                                      suspects-believes 安全投影 / invalidated + 章节锚点）
  *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  *   POST /api/chapter.review      {root, chapterIndex} → runReviewStep + 审查落账
  *   POST /api/chapter.rework      {root, chapterIndex} → 显式质量回炉（上限 2）
@@ -84,6 +126,68 @@ export function apiMiddleware(): Middleware {
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
           json(res, 200, { ok: true, cards: scanEntityCards(root) })
+          return
+        }
+        if (req.method === 'POST' && path === '/api/story-brain.facts') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+          const rawEntityIds = Array.isArray(body['entityIds']) ? body['entityIds'] : []
+          const entityIds = rawEntityIds.filter((r): r is EntityRef => typeof r === 'string' && r.length > 0)
+
+          // 章节锚点：正文章逐章探测（章一体两面），首个缺失即止——章序连续
+          // 由 createChapterDraft 纪律保证；缺章即停止，不猜测后续。
+          const chapters: { chapterIndex: number; phase: ChapterPhase }[] = []
+          for (let index = 1; ; index += 1) {
+            try {
+              const scan = readProseChapter(root, proseChapterPath(index))
+              chapters.push({ chapterIndex: scan.chapterIndex, phase: scan.phase })
+            } catch (error) {
+              if ((error as { code?: string }).code === 'ENOENT') break
+              throw error
+            }
+          }
+          const latestDraft = [...chapters].reverse().find((chapter) => chapter.phase === 'draft')
+          const latest = chapters[chapters.length - 1]
+          const currentChapterIndex = latestDraft?.chapterIndex ?? latest?.chapterIndex ?? null
+          const chapter = currentChapterIndex ?? 1
+
+          // 一次折叠，四读面同源：canon（kernel 纯函数 = data-plane
+          // queryActiveFacts 同语义）+ 逐持有者 suspects/believes 通道。
+          const snapshot = readNarrativeSnapshot(root)
+          const canon = queryVisibleFactsInSnapshot(snapshot, {
+            chapter,
+            pov: 'protagonist',
+            ...(entityIds.length > 0 ? { entityIds } : {}),
+          })
+
+          // reader 非可查询视角（零泄漏门禁拒绝全知视角）；knows 不进本通道
+          const holders = new Set<Exclude<KnowledgeState['holder'], 'reader'>>()
+          for (const ks of snapshot.knowledgeStates.values()) {
+            if (ks.holder === 'reader' || ks.level === 'knows' || ks.knownSinceChapter > chapter) continue
+            holders.add(ks.holder)
+          }
+          const perspective = [...holders].sort().flatMap((holder) =>
+            queryKnowledgePerspective(snapshot, { chapter, pov: holder }).map((entry) => ({
+              ...entry,
+              subject: snapshot.facts.get(entry.factId)?.subject ?? null,
+            })),
+          )
+          const invalidated = queryInvalidatedKnowledgeStates(root).map((ks) => ({
+            ...ks,
+            subject: snapshot.facts.get(ks.factId)?.subject ?? null,
+          }))
+
+          const payload: StoryBrainFactsResponse = {
+            ok: true,
+            chapter,
+            currentChapterIndex,
+            chapters,
+            canon,
+            perspective,
+            invalidated,
+          }
+          json(res, 200, payload)
           return
         }
         if (req.method === 'POST' && path === '/api/ledger') {

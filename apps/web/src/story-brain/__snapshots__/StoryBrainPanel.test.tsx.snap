@@ -1,0 +1,305 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StoryBrainPanel（T41） > 三区只读渲染：实体分栏 / 大纲树含章行与当前章高亮 / 认知三级事实行（契约快照） 1`] = `
+<section
+  aria-label="story-brain-panel"
+>
+  <div
+    class="panel-head"
+  >
+    <div>
+      <h2>
+        Story Brain
+      </h2>
+      <p>
+        实体卡 · 大纲树 · 事实列表
+      </p>
+    </div>
+    <span
+      class="tag"
+    >
+      3
+       entities
+    </span>
+  </div>
+  <div
+    class="actions"
+    style="margin-top: 0px;"
+  >
+    <button
+      class="btn"
+    >
+      刷新
+    </button>
+    <span
+      class="mono muted"
+      style="align-self: center;"
+    >
+      canon 按主角 POV · 认知通道 ADR-0026
+    </span>
+  </div>
+  <div
+    class="card-shell"
+    data-testid="sb-entities"
+  >
+    <div
+      class="card"
+    >
+      <div
+        class="card-title"
+      >
+        <b>
+          实体卡
+        </b>
+        <span
+          class="muted"
+        >
+          点击筛选事实
+        </span>
+      </div>
+      <div
+        style="margin-top: 10px;"
+      >
+        <div
+          class="mono muted"
+          style="margin-bottom: 6px;"
+        >
+          人物
+        </div>
+        <div
+          class="entity-grid"
+        >
+          <button
+            aria-pressed="false"
+            class="entity"
+            data-entity-ref="char:gu-chen"
+            type="button"
+          >
+            <small>
+              人物
+            </small>
+            顾沉
+          </button>
+          <button
+            aria-pressed="false"
+            class="entity"
+            data-entity-ref="char:lin-wan"
+            type="button"
+          >
+            <small>
+              人物
+            </small>
+            林岚
+          </button>
+        </div>
+      </div>
+      <div
+        style="margin-top: 10px;"
+      >
+        <div
+          class="mono muted"
+          style="margin-bottom: 6px;"
+        >
+          地点
+        </div>
+        <div
+          class="entity-grid"
+        >
+          <button
+            aria-pressed="false"
+            class="entity"
+            data-entity-ref="location:harbor"
+            type="button"
+          >
+            <small>
+              地点
+            </small>
+            灰潮港
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="card-shell"
+  >
+    <div
+      class="card"
+    >
+      <div
+        class="card-title"
+      >
+        <b>
+          章大纲树
+        </b>
+        <span
+          class="mono muted"
+        >
+          fact anchor ch
+          2
+        </span>
+      </div>
+      <div
+        class="tree"
+        data-testid="sb-outline"
+      >
+        <div
+          class="tree-row"
+          style="padding-left: 0px;"
+        >
+          ▾ 总纲 · 
+          雾港失真
+        </div>
+        <div
+          class="tree-row"
+          style="padding-left: 14px;"
+        >
+          ▾ 
+          卷一 · 失真的海岸
+        </div>
+        <div
+          class="tree-row"
+          style="padding-left: 28px;"
+        >
+          ├
+           第 
+          1
+           章 · 
+          草稿
+        </div>
+        <div
+          class="tree-row active-node"
+          style="padding-left: 28px;"
+        >
+          └
+           第 
+          2
+           章 · 
+          草稿
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="card-shell"
+  >
+    <div
+      class="card"
+    >
+      <div
+        class="card-title"
+      >
+        <b>
+          关联事实
+        </b>
+        <span
+          class="mono muted"
+          data-testid="sb-fact-count"
+        >
+          5
+           rows
+        </span>
+      </div>
+      <div
+        data-testid="sb-facts"
+        style="margin-top: 6px;"
+      >
+        <div
+          class="fact"
+          data-fact-level="canon"
+        >
+          <i
+            class="cog canon"
+          />
+          <span>
+            <b>
+              canon
+            </b>
+             
+            char:lin-wan
+             · 
+            located
+            : 
+            灰潮港
+          </span>
+        </div>
+        <div
+          class="fact"
+          data-fact-level="canon"
+        >
+          <i
+            class="cog canon"
+          />
+          <span>
+            <b>
+              canon
+            </b>
+             
+            char:gu-chen
+             · 
+            secret.true_name
+            : 
+            绝密真名值X
+          </span>
+        </div>
+        <div
+          class="fact"
+          data-fact-level="suspect"
+        >
+          <i
+            class="cog suspect"
+          />
+          <span>
+            <b>
+              suspect
+            </b>
+             
+            CHARACTER SUSPECTS: 存在未确证的隐秘事实（secret.whereabouts, ref fact_c）; do not narrate or act as confirmed knowledge.
+          </span>
+        </div>
+        <div
+          class="fact"
+          data-fact-level="belief"
+        >
+          <i
+            class="cog belief"
+          />
+          <span>
+            <b>
+              belief
+            </b>
+             
+            CHARACTER BELIEVES: 港务局控制钟楼（如与正典冲突，以信念为准呈现）.
+          </span>
+        </div>
+        <h4
+          class="mono muted"
+          style="margin: 10px 0px 2px;"
+        >
+          失效认知 · 引用已否决事实
+        </h4>
+        <div
+          class="fact"
+          data-fact-level="invalid"
+        >
+          <i
+            class="cog"
+            style="background: var(--text-faint);"
+          />
+          <span>
+            <b>
+              invalid
+            </b>
+             
+            protagonist
+             · 
+            knows
+             · 
+            fact_01JB0000000000000000000D
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+`;

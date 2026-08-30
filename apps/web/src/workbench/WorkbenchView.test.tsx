@@ -1,6 +1,7 @@
 /**
- * 工作台中栏组件测试（实现票 T40）：存量功能（建书 / 实体网格 / 账本）
- * 在新壳内可用 + 对话区骨架显式占位（不假装可用）。
+ * 工作台中栏组件测试（实现票 T40）：存量功能（建书 / 账本）在新壳内可用
+ * + 对话区骨架显式占位（不假装可用）。实体网格切片已随 T41 迁入检视塔，
+ * 其契约测试移至 story-brain/StoryBrainPanel.test.tsx。
  */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -59,31 +60,6 @@ describe('WorkbenchView', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain('目录已存在')
     })
-  })
-
-  it('实体网格：按类型分栏渲染实体卡（data-entity-ref 契约保留）', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            cards: [
-              { ref: 'char:linzhou', cardType: 'char', name: '林舟', brief: '主角', aiContext: 'detected' },
-              { ref: 'loc:harbor', cardType: 'loc', name: '雾港', brief: null, aiContext: 'detected' },
-            ],
-          }),
-          { status: 200 },
-        ),
-      ),
-    )
-    render(<WorkbenchView book={BOOK} onBookCreated={() => {}} />)
-    await userEvent.click(screen.getByRole('button', { name: '刷新实体' }))
-    await waitFor(() => {
-      expect(document.querySelector('[data-entity-ref="char:linzhou"]')).not.toBeNull()
-    })
-    expect(document.querySelector('[data-entity-ref="loc:harbor"]')?.textContent).toContain('雾港')
-    expect(screen.getByTestId('story-brain-entities').textContent).toContain('三区面板随 T41 迁入检视塔')
   })
 
   it('账本刷新：事件类型直出（task 事件取 event.type）', async () => {
