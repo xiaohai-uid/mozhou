@@ -53,3 +53,24 @@ export interface MetricReading {
   readonly value: number;
   readonly passed: boolean;
 }
+
+
+/* ----------------------------------------------------------------------------
+ * ADR-0025（质量门集成 · 计划 Task 8）：长篇文学质量回归信号
+ * -------------------------------------------------------------------------- */
+
+/**
+ * 文学质量五信号（全部 [0,1] 标量；L1 机械判定器口径——同输入同值）。
+ * - staleReviewPassRate：旧 PASS 交付尝试中被正确拦截的比率（1=全部拦截，回归=0）；
+ * - blockingRuleCoverage：启用 blocking 规则中获得评估覆盖的比率；
+ * - repeatCorrectionRate：同 reason 在更晚章节复发的比率（回归=高）；
+ * - tangibleGainRecall：有期待加压的章节中产出可感实得的比率；
+ * - solutionPatternRepeatRate：解法模式复用比率（回归=高）。
+ */
+export interface LiteraryQualitySignals {
+  readonly staleReviewPassRate: number;
+  readonly blockingRuleCoverage: number;
+  readonly repeatCorrectionRate: number;
+  readonly tangibleGainRecall: number;
+  readonly solutionPatternRepeatRate: number;
+}

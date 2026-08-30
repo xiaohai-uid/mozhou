@@ -13,6 +13,7 @@
     "@mozhou/context-compiler": "workspace:*",
     "@mozhou/kernel": "workspace:*",
     "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
     "@mozhou/runtime": "workspace:*"
   },
   "devDependencies": {

@@ -9,6 +9,7 @@
     { "path": "../kernel" },
     { "path": "../context-compiler" },
     { "path": "../pipeline" },
-    { "path": "../runtime" }
+    { "path": "../runtime" },
+    { "path": "../quality-engine" }
   ]
 }

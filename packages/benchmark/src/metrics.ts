@@ -8,6 +8,7 @@
  */
 import type { ContextReceipt, DependencyManifestEntry, KnowledgeHolder } from '@mozhou/kernel';
 import type { ActivePromiseView, CandidateDeltaBatch, ContinuityGateOutcome } from '@mozhou/pipeline';
+import type { LiteraryQualitySignals } from './types.js';
 
 /** 正典知情视图（KnowledgeState 结构子集——真实行可直接赋值）。 */
 export type CanonKnowledgeView = readonly {
@@ -171,4 +172,99 @@ export interface UserEditReductionInput {
 export function judgeUserEditRatioReduction(input: UserEditReductionInput): number {
   if (input.baselineEditCount === 0) return input.currentEditCount === 0 ? 1 : 0;
   return (input.baselineEditCount - input.currentEditCount) / input.baselineEditCount;
+}
+
+
+/* ----------------------------------------------------------------------------
+ * ADR-0025（质量门集成 · 计划 Task 8）：五信号 L1 机械判定器
+ * -------------------------------------------------------------------------- */
+
+/** 旧 PASS 交付尝试记录：attempt 用了 stale PASS 且实际被放行 = 回归。 */
+export interface StaleReviewAttempt {
+  readonly usedStalePass: boolean;
+  readonly delivered: boolean;
+}
+
+/** staleReviewPassRate = 拦截数 ÷ stale 尝试数；无 stale 尝试 → 1（无可回归面）。 */
+export function judgeStaleReviewPassRate(attempts: readonly StaleReviewAttempt[]): number {
+  const stale = attempts.filter((a) => a.usedStalePass);
+  if (stale.length === 0) return 1;
+  const blocked = stale.filter((a) => !a.delivered).length;
+  return blocked / stale.length;
+}
+
+/** blocking 覆盖率 = 报告中有评估记录的启用 blocking 规则 ÷ 启用 blocking 规则总数。 */
+export function judgeBlockingRuleCoverage(
+  enabledBlockingRuleIds: readonly string[],
+  reportEvaluations: Readonly<Record<string, string>>,
+): number {
+  if (enabledBlockingRuleIds.length === 0) return 1;
+  const covered = enabledBlockingRuleIds.filter((id) => reportEvaluations[id] !== undefined);
+  return covered.length / enabledBlockingRuleIds.length;
+}
+
+/** 结构化纠错记录（chapterIndex 升序无要求；同 reason 严格更晚章节复发 = repeat）。 */
+export interface CorrectionOccurrence {
+  readonly chapterIndex: number;
+  readonly reasons: readonly string[];
+}
+
+/** repeatCorrectionRate = 复发纠错章数 ÷ 有纠错章数（0 分母 → 0）。 */
+export function judgeRepeatCorrectionRate(corrections: readonly CorrectionOccurrence[]): number {
+  const chapters = new Set<number>();
+  const firstSeen = new Map<string, number>();
+  let repeated = 0;
+  for (const { chapterIndex, reasons } of [...corrections].sort((a, b) => a.chapterIndex - b.chapterIndex)) {
+    chapters.add(chapterIndex);
+    for (const reason of reasons) {
+      const first = firstSeen.get(reason);
+      if (first === undefined) firstSeen.set(reason, chapterIndex);
+      else if (chapterIndex > first) repeated += 1;
+    }
+  }
+  if (chapters.size === 0) return 0;
+  return repeated / chapters.size;
+}
+
+/** 章级读者体验行（ReaderExperienceDelta 结构子集）。 */
+export interface ReaderExperienceRow {
+  readonly chapterIndex: number;
+  readonly expectationDelta: number;
+  readonly tangibleGain: string;
+  readonly solutionPattern: string;
+}
+
+/** tangibleGainRecall = 有期待加压（expectationDelta>0）章中产出可感实得的比率。 */
+export function judgeTangibleGainRecall(deltas: readonly ReaderExperienceRow[]): number {
+  const promising = deltas.filter((d) => d.expectationDelta > 0);
+  if (promising.length === 0) return 1;
+  const realized = promising.filter((d) => d.tangibleGain !== 'none');
+  return realized.length / promising.length;
+}
+
+/** solutionPatternRepeatRate = 近窗内出现 ≥2 次的模式占比（0 模式 → 0）。 */
+export function judgeSolutionPatternRepeatRate(deltas: readonly ReaderExperienceRow[]): number {
+  const counts = new Map<string, number>();
+  for (const d of deltas) counts.set(d.solutionPattern, (counts.get(d.solutionPattern) ?? 0) + 1);
+  if (counts.size === 0) return 0;
+  let repeated = 0;
+  for (const count of counts.values()) if (count >= 2) repeated += 1;
+  return repeated / counts.size;
+}
+
+/** 五信号聚合（同输入同值）。 */
+export function judgeLiteraryQualitySignals(input: {
+  readonly staleAttempts: readonly StaleReviewAttempt[];
+  readonly enabledBlockingRuleIds: readonly string[];
+  readonly reportEvaluations: Readonly<Record<string, string>>;
+  readonly corrections: readonly CorrectionOccurrence[];
+  readonly readerExperience: readonly ReaderExperienceRow[];
+}): LiteraryQualitySignals {
+  return {
+    staleReviewPassRate: judgeStaleReviewPassRate(input.staleAttempts),
+    blockingRuleCoverage: judgeBlockingRuleCoverage(input.enabledBlockingRuleIds, input.reportEvaluations),
+    repeatCorrectionRate: judgeRepeatCorrectionRate(input.corrections),
+    tangibleGainRecall: judgeTangibleGainRecall(input.readerExperience),
+    solutionPatternRepeatRate: judgeSolutionPatternRepeatRate(input.readerExperience),
+  };
 }

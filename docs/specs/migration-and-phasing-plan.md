@@ -72,3 +72,12 @@ Directly addressing the failure modes identified in historical project iteration
 1. **Real Provider Smoke**: Mock tests passing in CI is only a prerequisite; no phase is closed without live provider payload verification (complete prompt inspection, SSE roundtrip, token latency accounting).
 2. **Reload & Recovery Invariance**: Page refresh, app reload, and error retries must preserve 100% of uncommitted edits and canon states.
 3. **Three Consecutive Clean Runs**: The core golden journey (create novel → clarify intent → draft chapter → review & edit → commit canon → reload) must pass 3 consecutive runs with 0 regression.
+
+## Appendix: Literary Quality Regression Benchmarks (2026-08-30, ADR-0025)
+
+长篇文学质量回归基准随 `packages/benchmark/fixtures/quality-regression-cases.json` 落地（Task 8）：
+
+- **五信号**（`LiteraryQualitySignals`，L1 机械判定器口径）：staleReviewPassRate / blockingRuleCoverage / repeatCorrectionRate / tangibleGainRecall / solutionPatternRepeatRate。
+- **用例覆盖**：stale-review（旧 PASS 交付拦截）、outline-expansion（NARR-001）、tool-character（CHAR-001）、payoff-zeroing（PAY-004）、false-belief（suspects 不授权，ADR-0026）、repeat-correction（s7 同口径）。
+- **边界**：semantic 用例的 expectedVerdict 是参考语义审查者的记录值——基准验证聚合与管线接线，不验证 LLM 本体；mechanical 用例走真实管线机制（isQualityReviewCurrent / 纠错折叠）。
+- **回归判据**：staleReviewPassRate 下降、repeatCorrectionRate / solutionPatternRepeatRate 上升即视为回归，进入 Phase 6 UI 的质量面板读数。
