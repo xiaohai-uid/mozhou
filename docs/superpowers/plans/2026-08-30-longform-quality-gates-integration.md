@@ -1,6 +1,6 @@
 # Long-Form Literary Quality Gates Integration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 在不削弱 MoZhou 已有 Story Kernel / Context Compiler / Continuity Gate / ChapterCommit 确定性边界的前提下，把《长生者皆为薪柴》真实长篇生产中验证出的“文学质量审查、规则覆盖、失败记忆、期待兑现、记忆锚、版本绑定”能力产品化，并统一到 `apps/web + packages/*` 的 Novel OS 主线。
 
@@ -87,7 +87,7 @@ docs/adr/00xx-literary-quality-review-boundary.md
 - Consumes: current ten-step pipeline contract and `docs/spikes/2026-08-29-longform-production-quality-cross-audit.md`.
 - Produces: one authoritative decision: Novel OS core development targets `apps/web + packages/*`; `app/` is legacy application surface and receives only migration/security/reliability fixes.
 
-- [ ] **Step 1: Write the ADR before code changes**
+- [x] **Step 1: Write the ADR before code changes**
 
 ADR decisions must state all of the following verbatim in substance:
 
@@ -101,7 +101,7 @@ ADR decisions must state all of the following verbatim in substance:
 7. Project literary policy is not Canon and must not be stored as TemporalFact.
 ```
 
-- [ ] **Step 2: Update `chapter-pipeline-spec.md` review row**
+- [x] **Step 2: Update `chapter-pipeline-spec.md` review row**
 
 Change step 4 semantics to:
 
@@ -111,11 +111,11 @@ Review | exact draft + ContextReceipt + QualityPolicy | QualityReviewReport | pr
 
 Do not change step 7 `Continuity Gate` semantics.
 
-- [ ] **Step 3: Document legacy-app boundary**
+- [x] **Step 3: Document legacy-app boundary**
 
 `README.md` must identify `apps/web` as Novel OS 2.0 UI and `app/` as legacy web app pending migration. Do not delete `app/` in this task.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/adr/0025-literary-quality-review-boundary.md docs/specs/chapter-pipeline-spec.md CONTEXT.md README.md app/LEGACY.md
@@ -200,7 +200,7 @@ export interface QualityReviewReport {
 }
 ```
 
-- [ ] **Step 1: Write policy merge failing test**
+- [x] **Step 1: Write policy merge failing test**
 
 ```ts
 it('project rule overrides platform rule only by the same id', () => {
@@ -213,7 +213,7 @@ it('project rule overrides platform rule only by the same id', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 ```bash
 pnpm --filter @mozhou/quality-engine test -- policy.test.ts
@@ -221,7 +221,7 @@ pnpm --filter @mozhou/quality-engine test -- policy.test.ts
 
 Expected: FAIL because `mergeQualityPolicies` does not exist.
 
-- [ ] **Step 3: Implement deterministic policy merge and digest**
+- [x] **Step 3: Implement deterministic policy merge and digest**
 
 Export:
 
@@ -232,7 +232,7 @@ export function qualityRuleSetDigest(policy: QualityPolicy): string;
 
 Digest must be SHA-256 of canonical JSON of enabled rules sorted by `id`, including `id/version/kind/severity/description/evidenceRequired`.
 
-- [ ] **Step 4: Write staleness failing test**
+- [x] **Step 4: Write staleness failing test**
 
 ```ts
 it('invalidates a pass when draft hash changes', () => {
@@ -241,7 +241,7 @@ it('invalidates a pass when draft hash changes', () => {
 });
 ```
 
-- [ ] **Step 5: Implement exact-version validation**
+- [x] **Step 5: Implement exact-version validation**
 
 ```ts
 export function isQualityReviewCurrent(
@@ -253,7 +253,7 @@ export function isQualityReviewCurrent(
 }
 ```
 
-- [ ] **Step 6: Run package tests**
+- [x] **Step 6: Run package tests**
 
 ```bash
 pnpm --filter @mozhou/quality-engine test
@@ -261,7 +261,7 @@ pnpm --filter @mozhou/quality-engine test
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/quality-engine pnpm-lock.yaml
@@ -302,7 +302,7 @@ export async function runQualityReview(input: {
 }): Promise<QualityReviewReport>;
 ```
 
-- [ ] **Step 1: Add deterministic paragraph waterfall rule**
+- [x] **Step 1: Add deterministic paragraph waterfall rule**
 
 Define platform rule id `PARA-001`: three consecutive one-sentence narrative paragraphs are a blocking failure unless all three are dialogue or explicit action beats tagged by the caller. V1 implementation may conservatively detect plain prose paragraphs and return evidence spans; it must never rewrite prose itself.
 
@@ -315,11 +315,11 @@ expect(result.find((x) => x.ruleId === 'PARA-001')?.verdict).toBe('fail');
 expect(result.find((x) => x.ruleId === 'PARA-001')?.evidence.length).toBeGreaterThan(0);
 ```
 
-- [ ] **Step 2: Add version/hash coverage rule**
+- [x] **Step 2: Add version/hash coverage rule**
 
 Define `REV-001`: review anchor must match current draft revision/hash before report can be used as a pass. This rule is mechanical and blocking.
 
-- [ ] **Step 3: Add semantic rule contract, not hard-coded genre prompts**
+- [x] **Step 3: Add semantic rule contract, not hard-coded genre prompts**
 
 The semantic evaluator must receive rule definitions by id. Initial reusable ids:
 
@@ -337,17 +337,17 @@ MEM-002 forced_anchor_creation
 
 Do not hard-code `bloodworm`, `cultivation`, `陈缺`, or any specific novel terms in package code.
 
-- [ ] **Step 4: Make blocking aggregation explicit**
+- [x] **Step 4: Make blocking aggregation explicit**
 
 `runQualityReview` returns `blocking_fail` iff at least one enabled blocking rule returns `fail`. `unknown` from a semantic provider outage must not become `pass`; if any required blocking semantic rule is `unknown`, overall verdict is `refused`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 pnpm --filter @mozhou/quality-engine test
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/quality-engine/src
@@ -388,7 +388,7 @@ export interface ReviewStepOutcome {
 export async function runReviewStep(request: RunReviewStepRequest): Promise<ReviewStepOutcome>;
 ```
 
-- [ ] **Step 1: Write failing exact-hash review test**
+- [x] **Step 1: Write failing exact-hash review test**
 
 Create a draft, run review, mutate the draft body through the existing draft edit path, then assert:
 
@@ -396,11 +396,11 @@ Create a draft, run review, mutate the draft body through the existing draft edi
 expect(isQualityReviewCurrent(oldReport, newDraftIdentity)).toBe(false);
 ```
 
-- [ ] **Step 2: Compute draft hash from exact body consumed by review**
+- [x] **Step 2: Compute draft hash from exact body consumed by review**
 
 Use SHA-256 over the exact UTF-8 body returned by `readProseChapter`. Do not hash a truncated context packet or a summary.
 
-- [ ] **Step 3: Persist review report outside Canon**
+- [x] **Step 3: Persist review report outside Canon**
 
 Use path:
 
@@ -410,7 +410,7 @@ Use path:
 
 Report is runtime audit evidence; it is not Canon truth.
 
-- [ ] **Step 4: Add explicit `requestQualityRework()` session edge**
+- [x] **Step 4: Add explicit `requestQualityRework()` session edge**
 
 Rules:
 
@@ -428,11 +428,11 @@ export class QualityReworkLimitExceededError extends Error {}
 
 No automatic loop exists inside `session.ts`; an orchestrator may call at most twice based on the explicit report.
 
-- [ ] **Step 5: Prevent forward progress on blocking fail or refused review**
+- [x] **Step 5: Prevent forward progress on blocking fail or refused review**
 
 `advance('user_edit')` must reject if the last review verdict is not `pass`.
 
-- [ ] **Step 6: Add session tests**
+- [x] **Step 6: Add session tests**
 
 Required cases:
 
@@ -446,13 +446,13 @@ refused -> user_edit denied and no silent pass
 crash/resume restores last review verdict and rework count from ledger
 ```
 
-- [ ] **Step 7: Run pipeline tests**
+- [x] **Step 7: Run pipeline tests**
 
 ```bash
 pnpm --filter @mozhou/pipeline test
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/pipeline packages/runtime packages/kernel
@@ -497,7 +497,7 @@ export interface FailurePattern {
 }
 ```
 
-- [ ] **Step 1: Extend user edit recording request**
+- [x] **Step 1: Extend user edit recording request**
 
 Add optional structured correction metadata without changing character-diff semantics:
 
@@ -506,11 +506,11 @@ readonly correctionReasons?: readonly CorrectionReason[];
 readonly correctionNote?: string;
 ```
 
-- [ ] **Step 2: Emit `AuthorCorrectionRecorded` only when reasons are supplied**
+- [x] **Step 2: Emit `AuthorCorrectionRecorded` only when reasons are supplied**
 
 Event payload contains chapterIndex, reasons, and a digest of the note; do not put raw private prose into telemetry/flywheel rows.
 
-- [ ] **Step 3: Project project-local failure memory**
+- [x] **Step 3: Project project-local failure memory**
 
 Persist book-local:
 
@@ -520,11 +520,11 @@ Persist book-local:
 
 Repeated same code increments `occurrences` and updates `lastSeenChapter` append-only through event-derived projection semantics.
 
-- [ ] **Step 4: Feed active failure patterns into future semantic review**
+- [x] **Step 4: Feed active failure patterns into future semantic review**
 
 `runQualityReview` receives active patterns and reviewer instructions must explicitly test recurrence. This does not make past author judgment a Canon fact; it is a quality prior.
 
-- [ ] **Step 5: Add flywheel metric**
+- [x] **Step 5: Add flywheel metric**
 
 Add:
 
@@ -538,7 +538,7 @@ s7: {
 
 A correction is repeated when the same reason occurs in a later chapter while its FailurePattern is active.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 ```bash
 pnpm --filter @mozhou/quality-engine test
@@ -581,11 +581,11 @@ export interface MemoryAnchor {
 }
 ```
 
-- [ ] **Step 1: Keep NarrativePromise as Canon-adjacent promise truth, but store reader-experience diagnostics outside Kernel**
+- [x] **Step 1: Keep NarrativePromise as Canon-adjacent promise truth, but store reader-experience diagnostics outside Kernel**
 
 Do not add `ReaderExperienceDelta` or `MemoryAnchor` to TemporalFact.
 
-- [ ] **Step 2: Add review rules**
+- [x] **Step 2: Add review rules**
 
 Required semantic rules:
 
@@ -597,15 +597,15 @@ MEM-003: anchor echoed with no added meaning
 MEM-004: chapter manufactures a new anchor solely to satisfy quota
 ```
 
-- [ ] **Step 3: Compile only the recent bounded slice**
+- [x] **Step 3: Compile only the recent bounded slice**
 
 For chapter N, include at most recent 5 `ReaderExperienceDelta` rows, active/near-due NarrativePromises, active FailurePatterns, and at most 8 relevant MemoryAnchors. These items compete in the normal context budget; no new unlimited prompt channel.
 
-- [ ] **Step 4: Test budget preservation**
+- [x] **Step 4: Test budget preservation**
 
 Existing `ContextReceipt` must still account for every included/excluded item. No quality item may bypass `storyTextQuota` or exact tokenizer accounting.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/quality-engine packages/pipeline packages/context-compiler
@@ -649,9 +649,9 @@ Migration rule:
 existing KnowledgeState rows with no `level` in pre-migration data are migrated once to level='knows'; runtime parser after migration remains strict and does not silently default forever.
 ```
 
-- [ ] **Step 1: Write migration tests**
+- [x] **Step 1: Write migration tests**
 
-- [ ] **Step 2: Define POV semantics**
+- [x] **Step 2: Define POV semantics**
 
 `queryActiveFacts` may expose a fact as authoritative character knowledge only for `level='knows'`.
 
@@ -663,11 +663,11 @@ CHARACTER SUSPECTS: <fact proposition>; do not narrate or act as confirmed knowl
 
 For `believes`, expose the believed proposition; when `distortion` exists, expose the distortion, not the true fact.
 
-- [ ] **Step 3: Update leakage gate**
+- [x] **Step 3: Update leakage gate**
 
 A secret referenced as confirmed knowledge in extracted prose requires `level='knows'`; `suspects` must not authorize a definitive secret statement.
 
-- [ ] **Step 4: Run kernel/pipeline tests and commit**
+- [x] **Step 4: Run kernel/pipeline tests and commit**
 
 ```bash
 pnpm --filter @mozhou/kernel test
@@ -701,37 +701,37 @@ export interface LiteraryQualitySignals {
 }
 ```
 
-- [ ] **Step 1: Add exact stale-review benchmark**
+- [x] **Step 1: Add exact stale-review benchmark**
 
 Case: review draft revision 3/hash A -> edit to revision 4/hash B -> attempt delivery using old pass. Expected hard failure; `staleReviewPassRate` counts this as regression.
 
-- [ ] **Step 2: Add outline-expansion case**
+- [x] **Step 2: Add outline-expansion case**
 
 Provide an outline with 6 beats and a draft that converts each beat into one report-like paragraph with no scene causality. Expected `NARR-001=fail`.
 
-- [ ] **Step 3: Add tool-character case**
+- [x] **Step 3: Add tool-character case**
 
 Supporting character exists only to deliver protagonist-required information and has no independent goal/action. Expected `CHAR-001=fail`.
 
-- [ ] **Step 4: Add payoff-zeroing case**
+- [x] **Step 4: Add payoff-zeroing case**
 
 Three chapters accumulate pressure; chapter 4 grants a power/resource then removes all practical agency in the same scene without compensating advantage. Expected `PAY-004=fail`.
 
-- [ ] **Step 5: Add false-belief/knowledge case**
+- [x] **Step 5: Add false-belief/knowledge case**
 
 Character has `suspects` only, prose states secret as certainty. Expected Continuity/Knowledge Gate failure after Task 7.
 
-- [ ] **Step 6: Add repeat-correction case**
+- [x] **Step 6: Add repeat-correction case**
 
 Same correction reason appears in later chapter while active. Expected `repeatCorrectionRate > 0`.
 
-- [ ] **Step 7: Run benchmark tests**
+- [x] **Step 7: Run benchmark tests**
 
 ```bash
 pnpm --filter @mozhou/benchmark test
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/benchmark docs/specs/migration-and-phasing-plan.md
@@ -762,7 +762,7 @@ POST /api/chapter.quality     { root, chapterIndex }
 
 Responses expose report ids, verdicts, evidence, draft revision/hash, rework count, and stale/current status. Raw model chain-of-thought is never returned or persisted.
 
-- [ ] **Step 1: Add API contract tests**
+- [x] **Step 1: Add API contract tests**
 
 Required behaviors:
 
@@ -775,7 +775,7 @@ attempt 3 returns explicit 409/422 style error with code QualityReworkLimitExcee
 correction reasons persist without raw manuscript telemetry upload
 ```
 
-- [ ] **Step 2: Add UI quality panel**
+- [x] **Step 2: Add UI quality panel**
 
 Display:
 
@@ -789,11 +789,11 @@ Rework attempt 0/2, 1/2, 2/2
 “Record my correction” reason selector
 ```
 
-- [ ] **Step 3: Preserve author agency**
+- [x] **Step 3: Preserve author agency**
 
 No auto-commit after quality pass. No quality failure can mutate Canon. No rework can start without the explicit orchestrator/user action defined in Task 4.
 
-- [ ] **Step 4: Run UI verification**
+- [x] **Step 4: Run UI verification**
 
 ```bash
 pnpm --filter @mozhou/web test
@@ -801,7 +801,7 @@ pnpm --filter @mozhou/web typecheck
 pnpm --filter @mozhou/web build
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web
@@ -819,14 +819,14 @@ git commit -m "feat: surface literary quality review in web"
 **Interfaces:**
 - Produces one verification report with exact commit SHA, commands, pass/fail counts, known limitations, and confirmation that `app/` legacy data remains readable.
 
-- [ ] **Step 1: Run repository typecheck/build/tests**
+- [x] **Step 1: Run repository typecheck/build/tests**
 
 ```bash
 pnpm test
 pnpm build
 ```
 
-- [ ] **Step 2: Run the golden chapter journey three consecutive times**
+- [x] **Step 2: Run the golden chapter journey three consecutive times**
 
 Each run:
 
@@ -848,23 +848,23 @@ verify committed prose + deltas + quality report anchor
 
 All three must pass without manual state repair.
 
-- [ ] **Step 3: Run stale-pass negative journey**
+- [x] **Step 3: Run stale-pass negative journey**
 
 Review PASS -> mutate draft -> attempt forward delivery. Expected: blocked because report hash/revision is stale.
 
-- [ ] **Step 4: Run two-rework-limit negative journey**
+- [x] **Step 4: Run two-rework-limit negative journey**
 
 Produce blocking fail three times. Expected: only first two reworks are allowed; third stops for author.
 
-- [ ] **Step 5: Verify legacy boundary**
+- [x] **Step 5: Verify legacy boundary**
 
 Existing `app/` build/tests remain unchanged unless a documented migration shim is necessary. No deletion of old database migrations or user manuscript data.
 
-- [ ] **Step 6: Write verification report**
+- [x] **Step 6: Write verification report**
 
 The report must include exact commands and outputs summarized by status; do not write “tests passed” without command evidence.
 
-- [ ] **Step 7: Final commit**
+- [x] **Step 7: Final commit**
 
 ```bash
 git add docs/spikes/2026-08-30-quality-gates-verification-report.md
