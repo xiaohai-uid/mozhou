@@ -1027,3 +1027,20 @@ describe('小说拆解 API 契约', () => {
     expect(res.emotionalBeats.length).toBeGreaterThanOrEqual(1)
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 网文扫榜 API 契约：/api/rank-scan（T52）。
+ * ------------------------------------------------------------------------- */
+describe('网文扫榜 API 契约', () => {
+  it('POST /api/rank-scan：返回多平台榜单数据与热门题材风向词', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/rank-scan', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const boards = data.boards as { id: string; name: string; items: unknown[] }[]
+    expect(boards.length).toBeGreaterThanOrEqual(2)
+    expect(boards[0]?.items.length).toBeGreaterThanOrEqual(1)
+    const keywords = data.trendingKeywords as { name: string; heat: number }[]
+    expect(keywords.length).toBeGreaterThanOrEqual(2)
+  })
+})

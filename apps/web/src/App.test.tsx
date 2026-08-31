@@ -84,6 +84,13 @@ function stubAppFetch(): void {
           },
         })
       }
+      if (path === '/api/rank-scan') {
+        return okJson({
+          ok: true,
+          boards: [],
+          trendingKeywords: [],
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -155,9 +162,9 @@ describe('App 壳集成（T40）', () => {
     const receiptPanel = document.querySelector('[data-panel="context-receipt"]')
     if (receiptPanel === null) throw new Error('missing context-receipt panel')
     expect(receiptPanel.querySelector('[data-testid="inspector-empty"]')?.textContent).toContain('装配看板')
-    const rankNav = document.querySelector('[data-view="rank-scan"]')
-    if (rankNav === null) throw new Error('missing rank-scan nav')
-    await userEvent.click(rankNav)
+    const cloudNav = document.querySelector('[data-view="cloud-sync"]')
+    if (cloudNav === null) throw new Error('missing cloud-sync nav')
+    await userEvent.click(cloudNav)
     expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
   })
 
@@ -366,5 +373,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('novel-breakdown-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('novel-breakdown-view').textContent).toContain('小说拆解')
+  })
+
+  it('网文扫榜导航：点击 nav 挂载网文扫榜视图（多平台热榜透视）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const rankNav = document.querySelector('[data-view="rank-scan"]')
+    if (rankNav === null) throw new Error('missing rank-scan nav')
+    await userEvent.click(rankNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('rank-scan-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('rank-scan-view').textContent).toContain('网文扫榜')
   })
 })

@@ -336,6 +336,34 @@ export interface NovelBreakdownResponse {
 }
 
 /**
+ * T52（网文扫榜）多平台榜单透视与题材风向分析读面。
+ */
+export interface RankingItem {
+  readonly rank: number
+  readonly title: string
+  readonly author: string
+  readonly category: string
+  readonly hotScore: string
+  readonly tags: readonly string[]
+  readonly goldenFinger: string
+  readonly oneLineHook: string
+}
+
+export interface RankBoard {
+  readonly id: string
+  readonly name: string
+  readonly platform: 'fanqie' | 'qidian' | 'jjwxc'
+  readonly updatedAt: string
+  readonly items: readonly RankingItem[]
+}
+
+export interface RankScanResponse {
+  readonly ok: true
+  readonly boards: readonly RankBoard[]
+  readonly trendingKeywords: readonly { readonly name: string; readonly heat: number }[]
+}
+
+/**
  * T46（技能广场）V1 能力注册表读面。
  * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
  * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
@@ -1138,6 +1166,93 @@ export function apiMiddleware(): Middleware {
             ok: true,
             result,
           } satisfies NovelBreakdownResponse)
+          return
+        }
+        /* ---- T52（网文扫榜）：多平台热榜透视与题材风向分析。 ---- */
+        if (req.method === 'POST' && path === '/api/rank-scan') {
+          const boards: RankBoard[] = [
+            {
+              id: 'fanqie_hot',
+              name: '番茄小说 · 巅峰热读榜',
+              platform: 'fanqie',
+              updatedAt: '2026-08-31',
+              items: [
+                {
+                  rank: 1,
+                  title: '惹金枝',
+                  author: '青青子衿',
+                  category: '古言脑洞',
+                  hotScore: '98.5万在读',
+                  tags: ['双洁', '真假千金', '强强反杀'],
+                  goldenFinger: '前世记忆预知 + 医毒双绝',
+                  oneLineHook: '重回替嫁当夜，她直接掀翻了喜堂。',
+                },
+                {
+                  rank: 2,
+                  title: '长生：从斩妖司杂役开始加点',
+                  author: '十步一剑',
+                  category: '玄幻脑洞',
+                  hotScore: '92.1万在读',
+                  tags: ['杀伐果断', '系统加点', '苟道流'],
+                  goldenFinger: '斩妖爆属性点，寿命无限转换修为',
+                  oneLineHook: '只要苟得住，仙尊佛陀皆化作我面板上的属性。',
+                },
+                {
+                  rank: 3,
+                  title: '诡异纪元：我能看到隐藏规则',
+                  author: '夜幕低垂',
+                  category: '悬疑灵异',
+                  hotScore: '86.4万在读',
+                  tags: ['规则怪谈', '克苏鲁', '智商在线'],
+                  goldenFinger: '规则视界：红色必死，绿色生路',
+                  oneLineHook: '第一条规则：千万不要相信日落后的门铃声。',
+                },
+              ],
+            },
+            {
+              id: 'qidian_yuepiao',
+              name: '起点中文网 · 畅销风云榜',
+              platform: 'qidian',
+              updatedAt: '2026-08-31',
+              items: [
+                {
+                  rank: 1,
+                  title: '道诡异仙',
+                  author: '狐尾的笔',
+                  category: '东方玄幻',
+                  hotScore: '月票榜 Top 1',
+                  tags: ['克苏鲁修仙', '心素', '民俗恐怖'],
+                  goldenFinger: '迷惘真假双世界穿梭',
+                  oneLineHook: '我分不清，我是真疯了还是这个世界疯了。',
+                },
+                {
+                  rank: 2,
+                  title: '宿命之环',
+                  author: '爱潜水的乌贼',
+                  category: '西方奇幻',
+                  hotScore: '月票榜 Top 2',
+                  tags: ['诡秘序列', '猎人途径', '神话宿命'],
+                  goldenFinger: '愚者信标与宿命之环恩赐',
+                  oneLineHook: '科尔杜村的灾难循环，因一个外乡人被撕开裂隙。',
+                },
+              ],
+            },
+          ]
+
+          const trendingKeywords = [
+            { name: '长生苟道', heat: 98 },
+            { name: '规则怪谈', heat: 95 },
+            { name: '家族修仙', heat: 88 },
+            { name: '替嫁反杀', heat: 84 },
+            { name: '系统加点', heat: 82 },
+            { name: '克苏鲁民俗', heat: 79 },
+          ]
+
+          json(res, 200, {
+            ok: true,
+            boards,
+            trendingKeywords,
+          } satisfies RankScanResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {
