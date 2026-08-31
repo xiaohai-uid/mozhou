@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DialogueStream（T44） > 墨舟先问渲染 + choice 快捷回答填入 composer；双胶囊轨技能多选；契约快照 1`] = `
+<div
+  class="rails"
+  data-testid="rails"
+>
+  <div
+    class="rail"
+  >
+    <span
+      class="rail-label"
+    >
+      技能
+    </span>
+    <button
+      aria-pressed="true"
+      class="pill on"
+      type="button"
+    >
+      续写
+    </button>
+    <button
+      aria-pressed="false"
+      class="pill"
+      type="button"
+    >
+      悬念调度
+    </button>
+  </div>
+  <div
+    class="rail"
+  >
+    <span
+      class="rail-label"
+    >
+      风格
+    </span>
+    <button
+      class="pill radio on"
+      disabled=""
+      type="button"
+    >
+      未接入（V1 空态）
+    </button>
+    <span
+      class="rail-hint"
+    >
+      风格胶囊数据源未到，显式空态
+    </span>
+  </div>
+</div>
+`;
