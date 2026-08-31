@@ -49,6 +49,13 @@ function stubAppFetch(): void {
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
       }
+      if (path === '/api/library') return okJson({ ok: true, books: [], skipped: 0 })
+      if (path === '/api/library.open') {
+        return okJson({ ok: false, error: 'unexpected library.open path in shell test: ' + path })
+      }
+      if (path === '/api/library.import') {
+        return okJson({ ok: false, error: 'unexpected library.import path in shell test: ' + path })
+      }
       if (path === '/api/chapter.quality') return okJson({ ok: true, hasReport: false })
       throw new Error('unexpected fetch path in shell test: ' + path)
     }),
@@ -207,5 +214,22 @@ describe('App 首次建书 Wizard（T42）', () => {
     await waitFor(() => {
       expect(screen.getByTestId('wizard-overlay')).not.toBeNull()
     })
+  })
+
+  it('书源书架导航：点击 nav 挂载书架视图（本地书库读面）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const shelfNav = document.querySelector('[data-view="book-shelf"]')
+    if (shelfNav === null) throw new Error('missing book-shelf nav')
+    await userEvent.click(shelfNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('bookshelf-view')).toBeInTheDocument()
+    })
+    // 书库根 = 当前书父目录（C:\tmp\stored-book → C:\tmp）
+    expect(screen.getByLabelText('bookshelf-view').textContent).toContain('C:\\tmp')
   })
 })

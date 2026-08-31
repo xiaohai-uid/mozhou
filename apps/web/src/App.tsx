@@ -17,6 +17,7 @@ import type { BookInfo } from './shell/workbenchStorage'
 import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
 import { ReceiptPanel } from './context-receipt/ReceiptPanel'
+import { BookshelfView } from './shelf/BookshelfView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
@@ -25,6 +26,12 @@ import { WorkbenchView } from './workbench/WorkbenchView'
 /** 管线点击牵引的墨迹聚焦：activeStage 均匀映射到 [0,1]（原型同款）。 */
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
+}
+
+/** 书根 → 书库父目录（浏览器无 node:path，取最后分隔符前段；无分隔符回落根自身）。 */
+function parentDirOf(root: string): string {
+  const index = Math.max(root.lastIndexOf('/'), root.lastIndexOf('\\'))
+  return index > 0 ? root.slice(0, index) : root
 }
 
 /** 检视组导航 → 检视塔 tab 的牵引映射。 */
@@ -73,6 +80,15 @@ export function App(): JSX.Element {
     setBook(created)
     setView('workbench')
   }
+
+  /** 书架切书：开书/导入后切换到该书（localStorage 记忆随 book/view effect 落）。 */
+  const handleBookSwitch = (switched: BookInfo): void => {
+    setBook(switched)
+    setView('workbench')
+  }
+
+  /** 书库父目录：当前书根的父目录（无书 = null，书架显式引导）。 */
+  const parentDir = book === null ? null : parentDirOf(book.root)
 
   const handleWizardComplete = (outcome: WizardOutcome): void => {
     try {
@@ -133,6 +149,12 @@ export function App(): JSX.Element {
             key={book?.root ?? 'no-book'}
             book={book}
             onBookCreated={handleBookCreated}
+          />
+        ) : view === 'book-shelf' ? (
+          <BookshelfView
+            parentDir={parentDir}
+            currentRoot={book?.root ?? null}
+            onSwitchBook={handleBookSwitch}
           />
         ) : (
           <PlaceholderView view={view} />

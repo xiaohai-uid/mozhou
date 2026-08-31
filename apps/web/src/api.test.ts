@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
+import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
@@ -787,5 +787,80 @@ describe('T44 中栏对话流 API 契约', () => {
     expect(status).toBe(400)
     expect(data.ok).toBe(false)
     expect(typeof data.error).toBe('string')
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * 书架（本地书库）API 契约：/api/library（scanLibrary 读面）+
+ * /api/library.open（校验书根切书）+ /api/library.import（书源导入建书）。
+ * 纯本地数据面（零外部抓取/认证）。seed：同父目录建多书。
+ * ------------------------------------------------------------------------- */
+
+describe('书架（本地书库）API 契约', () => {
+  it('POST /api/library：父目录扫描多书（含章计数）；空目录空书库', async () => {
+    const base = await listen()
+    const parent = mkdtempSync(join(tmpdir(), 'mozhou-web-lib-'))
+    roots.push(parent)
+    const bookA = createBook({ dir: join(parent, '甲书'), title: '甲书' })
+    createBook({ dir: join(parent, '乙书'), title: '乙书' })
+    const plane = LocalDataPlane.open(bookA.root)
+    try {
+      plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    } finally {
+      plane.close()
+    }
+
+    const { status, data } = await post(base, '/api/library', { parentDir: parent })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.skipped).toBe(0)
+    const books = data.books as { root: string; bookId: string; title: string; chapterCount: number }[]
+    expect(books).toHaveLength(2)
+    // 码点序（跨平台确定）：乙(U+4E59) < 甲(U+7532) → 乙书在前
+    expect(books[0]?.title).toBe('乙书')
+    expect(books[0]?.chapterCount).toBe(0)
+    expect(books[1]?.title).toBe('甲书')
+    expect(books[1]?.chapterCount).toBe(1)
+  })
+
+  it('POST /api/library.open：有效书根返回 BookInfo；坏根 404 显式错误', async () => {
+    const base = await listen()
+    const parent = mkdtempSync(join(tmpdir(), 'mozhou-web-lib-'))
+    roots.push(parent)
+    const book = createBook({ dir: join(parent, '可开之书'), title: '可开之书' })
+    const ok = await post(base, '/api/library.open', { root: book.root })
+    expect(ok.status).toBe(200)
+    expect(ok.data.ok).toBe(true)
+    expect(ok.data.bookId).toBe(book.book.id)
+    expect(ok.data.title).toBe('可开之书')
+
+    const bad = await post(base, '/api/library.open', { root: join(parent, '不存在') })
+    expect(bad.status).toBe(404)
+    expect(bad.data.ok).toBe(false)
+    expect(typeof bad.data.error).toBe('string')
+  })
+
+  it('POST /api/library.import：书源导入建书落地；重名冲突 409；缺参 400', async () => {
+    const base = await listen()
+    const parent = mkdtempSync(join(tmpdir(), 'mozhou-web-lib-'))
+    roots.push(parent)
+    const ok = await post(base, '/api/library.import', { parentDir: parent, title: '导入之书' })
+    expect(ok.status).toBe(200)
+    expect(ok.data.ok).toBe(true)
+    expect(typeof ok.data.root).toBe('string')
+    expect(typeof ok.data.bookId).toBe('string')
+    expect(ok.data.title).toBe('导入之书')
+    // 落地即真：书库扫描可见
+    const scan = await post(base, '/api/library', { parentDir: parent })
+    const books = scan.data.books as { title: string }[]
+    expect(books.map((b) => b.title)).toContain('导入之书')
+    // 重名导入（目录已存在）→ 409
+    const dup = await post(base, '/api/library.import', { parentDir: parent, title: '导入之书' })
+    expect(dup.status).toBe(409)
+    expect(dup.data.ok).toBe(false)
+    // 缺 title → 400
+    const missing = await post(base, '/api/library.import', { parentDir: parent })
+    expect(missing.status).toBe(400)
+    expect(missing.data.ok).toBe(false)
   })
 })

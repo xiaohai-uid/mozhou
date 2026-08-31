@@ -14,6 +14,7 @@ import {
   TRACKING_STREAMS,
   VOLUME_ONE_OUTLINE_PATH,
   ZONGGANG_PATH,
+  proseChapterPath,
   type EntityRefPrefix,
   type TrackingKind,
 } from './layout.js'
@@ -434,4 +435,64 @@ export function readCanonState(root: string): CanonState {
   }
 
   return { book, outlineNodes, planningArtifacts, trackingLines, entityCards: scanEntityCards(root) }
+}
+
+/* ----------------------------------------------------------------------------
+ * 书库扫描（书架读面）：父目录下含 book.json 的子目录 = 一本书。
+ * 纯只读、逐书容错（坏 book.json 的书跳过并计数，不整体失败）。
+ * ------------------------------------------------------------------------- */
+
+export interface LibraryBook {
+  readonly root: string
+  readonly book: BookRecord
+  /** 正文章数（扫描 正文/ 下按序探测章文件；缺目录 = 0）。 */
+  readonly chapterCount: number
+}
+
+export interface LibraryScan {
+  readonly books: readonly LibraryBook[]
+  /** 目录下存在但 book.json 不可读（坏/缺）的子目录数——显式呈现，不静默。 */
+  readonly skipped: number
+}
+
+/** 扫描父目录下所有含 book.json 的子目录为书库（按书名排序）。 */
+export function scanLibrary(parentDir: string): LibraryScan {
+  if (!existsSync(parentDir)) {
+    return { books: [], skipped: 0 }
+  }
+  const books: LibraryBook[] = []
+  let skipped = 0
+  for (const name of readdirSync(parentDir).sort()) {
+    const root = join(parentDir, name)
+    let stat: ReturnType<typeof statSync>
+    try {
+      stat = statSync(root)
+    } catch {
+      continue
+    }
+    if (!stat.isDirectory()) continue
+    if (!existsSync(join(root, BOOK_RECORD_PATH))) continue
+    try {
+      const book = readBookRecord(root)
+      books.push({ root, book, chapterCount: countChapters(root) })
+    } catch {
+      skipped += 1
+    }
+  }
+  return {
+    books: books.sort((a, b) =>
+      a.book.title < b.book.title ? -1 : a.book.title > b.book.title ? 1 : 0,
+    ),
+    skipped,
+  }
+}
+
+/** 正文章数：逐章探测 proseChapterPath（章序连续，缺章即止）。 */
+function countChapters(root: string): number {
+  let count = 0
+  for (let index = 1; ; index += 1) {
+    if (!existsSync(join(root, proseChapterPath(index)))) break
+    count += 1
+  }
+  return count
 }

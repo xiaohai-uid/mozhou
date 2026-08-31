@@ -29,11 +29,13 @@ import {
   listImpactRecords,
   proseChapterPath,
   queryInvalidatedKnowledgeStates,
+  readBookRecord,
   readCanonState,
   readNarrativeSnapshot,
   readProseChapter,
   runTraversal,
   scanEntityCards,
+  scanLibrary,
   sha256Hex,
 } from '@mozhou/data-plane'
 import type { ChapterPhase } from '@mozhou/data-plane'
@@ -185,6 +187,26 @@ export interface DraftStreamUnavailable {
   readonly error: string
 }
 
+/**
+ * 书架（本地书库）读面/切换面：
+ * - /api/library        {parentDir} → scanLibrary（含 book.json 的子目录 = 书）
+ * - /api/library.open   {root}      → 校验书根并返回 BookInfo（App 切书）
+ * - /api/library.import {parentDir, title} → createBook（书源搜索导入落地）
+ * 纯本地数据面，零外部抓取、零认证。
+ */
+export interface LibraryResponse {
+  readonly ok: true
+  readonly books: readonly { root: string; bookId: string; title: string; chapterCount: number }[]
+  readonly skipped: number
+}
+
+export interface LibraryOpenResponse {
+  readonly ok: true
+  readonly root: string
+  readonly bookId: string
+  readonly title: string
+}
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -204,6 +226,12 @@ function bodyOf(req: IncomingMessage): Promise<Record<string, unknown>> {
 function urlPath(req: IncomingMessage): string {
   const url = req.url ?? '/'
   return url.split('?')[0] ?? '/'
+}
+
+/** 书源导入的书名 → 安全目录名（去路径分隔/保留中文；空串回落「未命名之书」）。 */
+function sanitizeDirName(title: string): string {
+  const cleaned = title.replace(/[\\/:*?"<>|]/g, ' ').trim()
+  return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
 /* ---- T44（#89）中栏对话流辅助 ---- */
@@ -318,6 +346,9 @@ function ndjson(res: ServerResponse, payload: unknown): void {
  *   POST /api/capabilities         {}           → 技能多选胶囊列表（T44 读面）
  *   POST /api/draft.question       {}           → 墨舟先问（T44，V1 mock）
  *   POST /api/draft.stream         {root, prompt} → 流式草稿端点（T44：NDJSON；provider 未配 unavailable）
+ *   POST /api/library              {parentDir} → 书架扫描（本地书库读面）
+ *   POST /api/library.open         {root}      → 校验书根并返回 BookInfo（切书）
+ *   POST /api/library.import       {parentDir, title} → 书源导入建书（本地落地）
  *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  *   POST /api/chapter.review      {root, chapterIndex} → runReviewStep + 审查落账
  *   POST /api/chapter.rework      {root, chapterIndex} → 显式质量回炉（上限 2）
@@ -570,6 +601,58 @@ export function apiMiddleware(): Middleware {
           } catch (error) {
             ndjson(res, { ok: true, event: 'error', error: (error as Error).message })
             res.end()
+          }
+          return
+        }
+        /* ---- 书架（本地书库）：scanLibrary 读面 + 开书校验 + 书源导入落地。
+         *      纯本地数据面（零外部抓取/认证）；book.json 子目录即书。 ---- */
+        if (req.method === 'POST' && path === '/api/library') {
+          const body = await bodyOf(req)
+          const parentDir = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
+          if (parentDir === null) { json(res, 400, { ok: false, error: 'parentDir required' }); return }
+          const scan = scanLibrary(parentDir)
+          json(res, 200, {
+            ok: true,
+            books: scan.books.map((entry) => ({
+              root: entry.root,
+              bookId: entry.book.id,
+              title: entry.book.title,
+              chapterCount: entry.chapterCount,
+            })),
+            skipped: scan.skipped,
+          } satisfies LibraryResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/library.open') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+          try {
+            const book = readBookRecord(root)
+            json(res, 200, { ok: true, root, bookId: book.id, title: book.title } satisfies LibraryOpenResponse)
+          } catch (error) {
+            json(res, 404, { ok: false, error: 'not a valid book root: ' + (error as Error).message })
+          }
+          return
+        }
+        if (req.method === 'POST' && path === '/api/library.import') {
+          const body = await bodyOf(req)
+          const parentDir = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
+          const title = typeof body['title'] === 'string' ? body['title'].trim() : ''
+          if (parentDir === null || title.length === 0) {
+            json(res, 400, { ok: false, error: 'parentDir and non-empty title required' })
+            return
+          }
+          try {
+            const result = createBook({ dir: join(parentDir, sanitizeDirName(title)), title })
+            json(res, 200, {
+              ok: true,
+              root: result.root,
+              bookId: result.book.id,
+              title: result.book.title,
+            } satisfies LibraryOpenResponse)
+          } catch (error) {
+            json(res, 409, { ok: false, error: (error as Error).message })
           }
           return
         }
