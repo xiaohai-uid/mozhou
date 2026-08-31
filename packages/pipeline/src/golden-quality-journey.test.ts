@@ -23,7 +23,6 @@ import {
   QualityReworkLimitExceededError,
   makeDraftProviderBinding,
   createCanonProposal,
-  listPendingProposalRefs,
   readPipelineLedger,
   recordUserEdit,
   runContinuityGate,

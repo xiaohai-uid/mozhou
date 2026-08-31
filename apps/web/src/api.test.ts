@@ -710,7 +710,10 @@ describe('T44 中栏对话流 API 契约', () => {
     expect(data.providerAvailable).toBe(false)
     const capabilities = data.capabilities as { id: string; label: string }[]
     expect(capabilities.map((cap) => cap.label)).toContain('续写')
-    expect(capabilities.length).toBeGreaterThanOrEqual(5)
+    expect(capabilities.map((cap) => cap.id)).toEqual(
+      expect.arrayContaining(['sepia-write', 'sepia-review', 'sepia-refactor', 'sepia-recreate']),
+    )
+    expect(capabilities.length).toBeGreaterThanOrEqual(8)
   })
 
   it('POST /api/capabilities：配置 MOZHOU_API_KEY 时 providerAvailable=true', async () => {
@@ -1019,10 +1022,22 @@ describe('风格蒸馏 API 契约', () => {
     const { status, data } = await post(base, '/api/style.distill', { text: sample })
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
-    const metrics = data.sampleMetrics as { charCount: number; dialogueRatio: number; actionPacing: number }
+    const metrics = data.sampleMetrics as {
+      charCount: number
+      dialogueRatio: number
+      actionPacing: number
+      sepiaNarrativeScore: {
+        pass1NarrativeArchitecture: number
+        pass2DiscourseFlow: number
+        pass3SurfacePurity: number
+      }
+    }
     expect(metrics.charCount).toBeGreaterThan(20)
     expect(metrics.dialogueRatio).toBeGreaterThan(0)
     expect(metrics.actionPacing).toBeGreaterThan(0)
+    expect(metrics.sepiaNarrativeScore.pass1NarrativeArchitecture).toBeGreaterThan(0)
+    expect(metrics.sepiaNarrativeScore.pass2DiscourseFlow).toBeGreaterThan(0)
+    expect(metrics.sepiaNarrativeScore.pass3SurfacePurity).toBeGreaterThan(0)
   })
 })
 

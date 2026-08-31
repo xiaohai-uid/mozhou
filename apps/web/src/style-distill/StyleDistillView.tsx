@@ -169,6 +169,48 @@ export function StyleDistillView({
                     </b>
                   </div>
                 </div>
+
+                {/* sepia StoryScope 叙事架构评定 */}
+                {data.sampleMetrics.sepiaNarrativeScore && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
+                    <div className="card-title">
+                      <b>sepia 叙事架构评定 (StoryScope)</b>
+                      <span className="cap-badge native">De-AI 指标</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+                      <div>
+                        <div className="mono muted">Pass 1 叙事架构</div>
+                        <b style={{ fontSize: 14, color: 'var(--accent-strong)' }}>
+                          {data.sampleMetrics.sepiaNarrativeScore.pass1NarrativeArchitecture} 分
+                        </b>
+                      </div>
+                      <div>
+                        <div className="mono muted">Pass 2 语篇流动</div>
+                        <b style={{ fontSize: 14, color: 'var(--success)' }}>
+                          {data.sampleMetrics.sepiaNarrativeScore.pass2DiscourseFlow} 分
+                        </b>
+                      </div>
+                      <div>
+                        <div className="mono muted">Pass 3 表层纯净</div>
+                        <b style={{ fontSize: 14, color: 'var(--warning)' }}>
+                          {data.sampleMetrics.sepiaNarrativeScore.pass3SurfacePurity} 分
+                        </b>
+                      </div>
+                    </div>
+                    {data.sampleMetrics.sepiaNarrativeScore.aiTellsSummary.length > 0 && (
+                      <div className="finding" style={{ marginTop: 8 }}>
+                        <b>⚠️ AI 架构特征提示：</b>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+                          {data.sampleMetrics.sepiaNarrativeScore.aiTellsSummary.map((tell, i) => (
+                            <span key={i} className="mono muted" style={{ fontSize: 10 }}>
+                              • {tell}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </section>

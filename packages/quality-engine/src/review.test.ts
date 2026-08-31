@@ -49,19 +49,21 @@ function evaluatorReturning(
   map: Readonly<Record<string, { verdict: QualityRuleEvaluation['verdict']; evidenceCount?: number }>>,
 ): SemanticQualityEvaluator {
   return {
-    evaluate: async ({ rules }) =>
-      rules
-        .filter((r) => map[r.id])
-        .map((r) => ({
-          ruleId: r.id,
-          ruleVersion: r.version,
-          verdict: map[r.id]!.verdict,
-          severity: r.severity,
-          evidence:
-            map[r.id]!.verdict === 'fail' && (map[r.id]!.evidenceCount ?? 0) > 0
-              ? [{ ruleId: r.id, note: 'evidence note' }]
-              : [],
-        })),
+    evaluate: ({ rules }) =>
+      Promise.resolve(
+        rules
+          .filter((r) => map[r.id])
+          .map((r) => ({
+            ruleId: r.id,
+            ruleVersion: r.version,
+            verdict: map[r.id]!.verdict,
+            severity: r.severity,
+            evidence:
+              map[r.id]!.verdict === 'fail' && (map[r.id]!.evidenceCount ?? 0) > 0
+                ? [{ ruleId: r.id, note: 'evidence note' }]
+                : [],
+          })),
+      ),
   };
 }
 
@@ -120,9 +122,7 @@ describe('runQualityReview 裁决', () => {
   it('提供方抛异常 → refused 且附原因', async () => {
     const prose = '陈缺推门进来，把伞收了靠在墙边，水顺着伞骨在地上积成一小滩。';
     const broken: SemanticQualityEvaluator = {
-      evaluate: async () => {
-        throw new Error('provider outage');
-      },
+      evaluate: () => Promise.reject(new Error('provider outage')),
     };
     const report = await runQualityReview({
       prose,

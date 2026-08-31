@@ -95,7 +95,7 @@ export function parseMemoryAnchors(jsonl: string): MemoryAnchor[] {
       type: type as AnchorType,
       description,
       plantedChapter,
-      lastEchoChapter: lastEchoChapter as number | null,
+      lastEchoChapter,
       status: status as AnchorStatus,
     });
   }

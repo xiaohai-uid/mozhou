@@ -27,7 +27,7 @@ describe('scanLibrary · 书架读面', () => {
   it('父目录下多书：按书名排序，章计数正确', () => {
     const parent = hermeticParent()
     const bookA = createBook({ dir: join(parent, '甲书'), title: '甲书' })
-    const bookB = createBook({ dir: join(parent, '乙书'), title: '乙书' })
+    createBook({ dir: join(parent, '乙书'), title: '乙书' })
     // 甲书建一章草稿 → chapterCount=1；乙书无章 → 0
     const plane = LocalDataPlane.open(bookA.root)
     try {

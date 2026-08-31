@@ -110,7 +110,7 @@ const FACTS: StoryBrainFactsResponse = {
 function stubStoryBrainFetch(facts: StoryBrainFactsResponse = FACTS): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockImplementation(async (path: string) => {
+    vi.fn().mockImplementation((path: string) => {
       if (path === '/api/book.state') return okJson({ ok: true, state: STATE })
       if (path === '/api/story-brain.entities') return okJson({ ok: true, cards: CARDS })
       if (path === '/api/story-brain.facts') return okJson(facts)
@@ -197,7 +197,7 @@ describe('StoryBrainPanel（T41）', () => {
   it('读取失败显式报错（role=alert），不静默', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (path: string) => {
+      vi.fn().mockImplementation((path: string) => {
         if (path === '/api/story-brain.facts') {
           return new Response(JSON.stringify({ ok: false, error: 'canon 结构违例' }), { status: 500 })
         }
@@ -213,7 +213,7 @@ describe('StoryBrainPanel（T41）', () => {
   it('空书三空态：暂无实体卡 / 大纲树仅总纲卷行 / 无关联事实', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (path: string) => {
+      vi.fn().mockImplementation((path: string) => {
         if (path === '/api/book.state') return okJson({ ok: true, state: emptyCanonState() })
         if (path === '/api/story-brain.entities') return okJson({ ok: true, cards: [] })
         if (path === '/api/story-brain.facts') {

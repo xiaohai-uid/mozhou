@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeQualityPolicies, qualityRuleSetDigest } from './policy.js';
+import { defaultPlatformRules, mergeQualityPolicies, qualityRuleSetDigest } from './policy.js';
 import type { QualityPolicy, QualityRuleDefinition } from './types.js';
 
 function rule(
@@ -78,5 +78,17 @@ describe('qualityRuleSetDigest', () => {
   it('is a sha-256 hex digest', () => {
     const digest = qualityRuleSetDigest(policy('book-a', [rule('R1', 'blocking')]));
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('defaultPlatformRules contains sepia narrative architecture rules (SEPIA-001~005)', () => {
+    const rules = defaultPlatformRules();
+    const sepiaRuleIds = rules.filter((r) => r.id.startsWith('SEPIA-')).map((r) => r.id);
+    expect(sepiaRuleIds).toEqual([
+      'SEPIA-001',
+      'SEPIA-002',
+      'SEPIA-003',
+      'SEPIA-004',
+      'SEPIA-005',
+    ]);
   });
 });

@@ -41,6 +41,13 @@ const MOCK_STYLE: StyleDistillResponse = {
     shortSentenceRatio: 0.6,
     sensoryDensity: 0.5,
     actionPacing: 0.7,
+    sepiaNarrativeScore: {
+      pass1NarrativeArchitecture: 95,
+      pass2DiscourseFlow: 90,
+      pass3SurfacePurity: 88,
+      aiTellsCount: 1,
+      aiTellsSummary: ['Pass 3 表层套话：检测到 1 处典型 AI 机械句式'],
+    },
   },
 }
 
@@ -54,6 +61,7 @@ describe('StyleDistillView（风格蒸馏）', () => {
 
     expect(screen.getByTestId('style-metrics-result')).toBeInTheDocument()
     expect(screen.getByTestId('style-metrics-result').textContent).toContain('120 字')
+    expect(screen.getByTestId('style-metrics-result').textContent).toContain('sepia 叙事架构评定')
     expect(screen.getByTestId('style-profiles-list').textContent).toContain('action')
 
     const view = container.querySelector('[aria-label="style-distill-view"]')

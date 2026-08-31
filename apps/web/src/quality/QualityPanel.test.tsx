@@ -116,7 +116,7 @@ describe('QualityPanel（Ink Orbit 换肤后语义保全）', () => {
   })
 
   it('纠错：原因下拉 + 附注 + 显式保存（附注原文只留本机）', async () => {
-    const fetchMock = vi.fn().mockImplementation(async () =>
+    const fetchMock = vi.fn().mockImplementation(() =>
       okJson({ ok: true, recorded: 1, noteDigest: 'd' }),
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -128,7 +128,10 @@ describe('QualityPanel（Ink Orbit 换肤后语义保全）', () => {
       expect(screen.getByText('已记录（事件+失败记忆）')).toBeInTheDocument()
     })
     const correctionsCall = fetchMock.mock.calls.find(([path]) => path === '/api/chapter.corrections')
-    expect(JSON.parse(correctionsCall?.[1]?.body as string)).toEqual({
+    const [correctionPath, correctionInit] = (correctionsCall ?? []) as [string, RequestInit]
+    expect(correctionPath).toBe('/api/chapter.corrections')
+    const body = correctionInit.body as string
+    expect(JSON.parse(body)).toEqual({
       root: 'C:/tmp/b',
       chapterIndex: 1,
       reasons: ['style_drift'],

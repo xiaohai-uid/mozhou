@@ -337,6 +337,7 @@ describe('ADR-0026 认知层级与秘密授权', () => {
     const { root } = newBook();
     const secret = factRow({ predicate: 'secret.bloodline', riskClass: 'high', value: '青云血脉' });
     const { level: _omitted, ...legacy } = ksRow({ factId: secret.id as string, holder: 'protagonist', level: 'knows' });
+    void _omitted; // 迁移路径：构造不含 level 的存量行
     const outcome = runContinuityGate({
       bookRoot: root,
       chapterIndex: 2,

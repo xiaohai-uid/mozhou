@@ -40,6 +40,11 @@ export const SEMANTIC_RULE_IDS = [
   'PAT-002', // same_high_level_solution_pattern_repeated_across_recent_chapters
   'MEM-003', // anchor_echoed_with_no_added_meaning
   'MEM-004', // chapter_manufactures_a_new_anchor_solely_to_satisfy_quota
+  'SEPIA-001', // theme_telling (Pass 1 Narrative Architecture: 主题旁白直接说教)
+  'SEPIA-002', // single_track_causality (Pass 1: 单一整洁因果链与顿悟结案)
+  'SEPIA-003', // bodily_sensation_monotony (Pass 1: 纯生理情绪反应堆砌)
+  'SEPIA-004', // discourse_flow_sag (Pass 2 Discourse Flow: 段末设问与中段塌陷)
+  'SEPIA-005', // surface_cliches (Pass 3 Surface Style: 机械AI套话连接词)
 ] as const;
 
 export type SemanticRuleId = (typeof SEMANTIC_RULE_IDS)[number];

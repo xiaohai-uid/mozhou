@@ -177,6 +177,84 @@ exports[`StyleDistillView（风格蒸馏） > 样本输入与指标渲染；契�
               </b>
             </div>
           </div>
+          <div
+            style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline);"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                sepia 叙事架构评定 (StoryScope)
+              </b>
+              <span
+                class="cap-badge native"
+              >
+                De-AI 指标
+              </span>
+            </div>
+            <div
+              style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;"
+            >
+              <div>
+                <div
+                  class="mono muted"
+                >
+                  Pass 1 叙事架构
+                </div>
+                <b
+                  style="font-size: 14px; color: var(--accent-strong);"
+                >
+                  95
+                   分
+                </b>
+              </div>
+              <div>
+                <div
+                  class="mono muted"
+                >
+                  Pass 2 语篇流动
+                </div>
+                <b
+                  style="font-size: 14px; color: var(--success);"
+                >
+                  90
+                   分
+                </b>
+              </div>
+              <div>
+                <div
+                  class="mono muted"
+                >
+                  Pass 3 表层纯净
+                </div>
+                <b
+                  style="font-size: 14px; color: var(--warning);"
+                >
+                  88
+                   分
+                </b>
+              </div>
+            </div>
+            <div
+              class="finding"
+              style="margin-top: 8px;"
+            >
+              <b>
+                ⚠️ AI 架构特征提示：
+              </b>
+              <div
+                style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;"
+              >
+                <span
+                  class="mono muted"
+                  style="font-size: 10px;"
+                >
+                  • 
+                  Pass 3 表层套话：检测到 1 处典型 AI 机械句式
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

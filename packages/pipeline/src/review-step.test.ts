@@ -174,7 +174,10 @@ describe('ADR-0025 runReviewStep：版本绑定审查报告', () => {
     const dir = join(root, '.mozhou', 'quality-reviews', 'chapter_3');
     const files = readdirSync(dir);
     expect(files.length).toBe(1);
-    const persisted = JSON.parse(readFileSync(join(dir, files[0]!), 'utf8'));
+    const persisted = JSON.parse(readFileSync(join(dir, files[0]!), 'utf8')) as {
+      reportId: string;
+      verdict: string;
+    };
     expect(persisted.reportId).toBe(outcome.report.reportId);
     expect(persisted.verdict).toBe('pass');
     expect(outcome.reportRelPath).toContain('chapter_3');

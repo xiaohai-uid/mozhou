@@ -1,7 +1,7 @@
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', '.scratch/**', 'figma-upload/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {

@@ -108,15 +108,16 @@ describe('ADR-0025 长篇质量回归基准', () => {
 
     for (const testCase of semanticCases) {
       const evaluator = {
-        evaluate: async () => [
-          {
-            ruleId: testCase.ruleId!,
-            ruleVersion: '1.0.0',
-            verdict: testCase.expectedVerdict as 'fail',
-            severity: 'advisory' as const,
-            evidence: [{ ruleId: testCase.ruleId!, note: '参考审查者记录裁决', excerpt: testCase.prose!.slice(0, 20) }],
-          },
-        ],
+        evaluate: () =>
+          Promise.resolve([
+            {
+              ruleId: testCase.ruleId!,
+              ruleVersion: '1.0.0',
+              verdict: testCase.expectedVerdict as 'fail',
+              severity: 'advisory' as const,
+              evidence: [{ ruleId: testCase.ruleId!, note: '参考审查者记录裁决', excerpt: testCase.prose!.slice(0, 20) }],
+            },
+          ]),
       };
       const report: QualityReviewReport = await runQualityReview({
         prose: testCase.prose!,

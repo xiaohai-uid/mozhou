@@ -70,7 +70,21 @@ function stubAppFetch(): void {
         return okJson({
           ok: true,
           currentProfiles: null,
-          sampleMetrics: { charCount: 0, dialogueRatio: 0, avgSentenceLength: 0, shortSentenceRatio: 0, sensoryDensity: 0, actionPacing: 0 },
+          sampleMetrics: {
+            charCount: 0,
+            dialogueRatio: 0,
+            avgSentenceLength: 0,
+            shortSentenceRatio: 0,
+            sensoryDensity: 0,
+            actionPacing: 0,
+            sepiaNarrativeScore: {
+              pass1NarrativeArchitecture: 100,
+              pass2DiscourseFlow: 100,
+              pass3SurfacePurity: 100,
+              aiTellsCount: 0,
+              aiTellsSummary: [],
+            },
+          },
         })
       }
       if (path === '/api/novel-breakdown') {

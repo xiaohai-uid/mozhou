@@ -285,6 +285,14 @@ export interface StyleMetrics {
   readonly shortSentenceRatio: number
   readonly sensoryDensity: number
   readonly actionPacing: number
+  /** sepia (StoryScope) 叙事架构与 De-AI 评定 */
+  readonly sepiaNarrativeScore: {
+    readonly pass1NarrativeArchitecture: number // [0, 100]
+    readonly pass2DiscourseFlow: number // [0, 100]
+    readonly pass3SurfacePurity: number // [0, 100]
+    readonly aiTellsCount: number
+    readonly aiTellsSummary: readonly string[]
+  }
 }
 
 export interface StyleDistillResponse {
@@ -641,11 +649,25 @@ function sanitizeDirName(title: string): string {
   return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
-/** 风格样本蒸馏指标提取（T50 纯确定性算法）。 */
+/** 风格样本蒸馏指标提取（T50 纯确定性算法 + sepia StoryScope 叙事架构与 De-AI 评定）。 */
 function computeStyleMetrics(text: string): StyleMetrics {
   const clean = text.trim()
   if (clean.length === 0) {
-    return { charCount: 0, dialogueRatio: 0, avgSentenceLength: 0, shortSentenceRatio: 0, sensoryDensity: 0, actionPacing: 0 }
+    return {
+      charCount: 0,
+      dialogueRatio: 0,
+      avgSentenceLength: 0,
+      shortSentenceRatio: 0,
+      sensoryDensity: 0,
+      actionPacing: 0,
+      sepiaNarrativeScore: {
+        pass1NarrativeArchitecture: 100,
+        pass2DiscourseFlow: 100,
+        pass3SurfacePurity: 100,
+        aiTellsCount: 0,
+        aiTellsSummary: [],
+      },
+    }
   }
   const dialogueMatches = clean.match(/["“「][^"”」]+["”」]/g) ?? []
   const dialogueChars = dialogueMatches.reduce((acc, m) => acc + m.length - 2, 0)
@@ -665,6 +687,25 @@ function computeStyleMetrics(text: string): StyleMetrics {
   const actionHits = (clean.match(actionKeywords) ?? []).length
   const actionPacing = Math.min(1, Math.round((actionHits / Math.max(1, clean.length / 50)) * 10) / 100)
 
+  // sepia AI Tells 规则检测
+  const aiTells: string[] = []
+  const clicheMatches = clean.match(/不仅.*而且|值得注意|显而易见|总而言之|随着.*的推移|深吸了一口气|心跳.*加速/g)
+  if (clicheMatches && clicheMatches.length > 0) {
+    aiTells.push(`Pass 3 表层套话：检测到 ${clicheMatches.length} 处典型 AI 机械句式`)
+  }
+  const questionMatches = clean.split('\n').filter((p) => /[？\?]\s*$/.test(p.trim()))
+  if (questionMatches.length >= 2) {
+    aiTells.push(`Pass 2 语篇流动：段末模板化设问偏高 (${questionMatches.length} 处)`)
+  }
+  const moralMatches = clean.match(/明白了一个道理|这一刻.*终于懂了|生命的意义|这或许就是/g)
+  if (moralMatches && moralMatches.length > 0) {
+    aiTells.push(`Pass 1 叙事架构：存在旁白主题直接说教 / 顿悟倾向`)
+  }
+
+  const pass1 = Math.max(60, 100 - (moralMatches ? moralMatches.length * 15 : 0))
+  const pass2 = Math.max(60, 100 - (questionMatches.length >= 2 ? 20 : 0))
+  const pass3 = Math.max(50, 100 - (clicheMatches ? clicheMatches.length * 12 : 0))
+
   return {
     charCount: clean.length,
     dialogueRatio,
@@ -672,14 +713,25 @@ function computeStyleMetrics(text: string): StyleMetrics {
     shortSentenceRatio: shortRatio,
     sensoryDensity: Math.max(0.1, Math.min(0.95, sensoryDensity)),
     actionPacing: Math.max(0.1, Math.min(0.95, actionPacing)),
+    sepiaNarrativeScore: {
+      pass1NarrativeArchitecture: pass1,
+      pass2DiscourseFlow: pass2,
+      pass3SurfacePurity: pass3,
+      aiTellsCount: aiTells.length,
+      aiTellsSummary: aiTells,
+    },
   }
 }
 
-/* ---- T44（#89）中栏对话流辅助 ---- */
+/* ---- T44（#89）中栏对话流辅助与 sepia 4 大核心操作入口 ---- */
 
-/** V1 静态技能词表（原型 codex-ui-ink-orbit.html 胶囊清单；CapabilityRegistry 接线前为读面）。 */
+/** 技能词表（融入 sepia 4 大 De-AI 操作：write/review/refactor/recreate）。 */
 const DIALOGUE_CAPABILITIES: readonly CapabilityListItem[] = [
   { id: 'continuation', label: '续写' },
+  { id: 'sepia-write', label: 'sepia 架构创作' },
+  { id: 'sepia-review', label: 'sepia 叙事诊断' },
+  { id: 'sepia-refactor', label: 'sepia 就地去味' },
+  { id: 'sepia-recreate', label: 'sepia 意图重写' },
   { id: 'suspense', label: '悬念调度' },
   { id: 'dialogue-polish', label: '对白打磨' },
   { id: 'atmosphere', label: '场景氛围' },
