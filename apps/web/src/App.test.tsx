@@ -66,6 +66,13 @@ function stubAppFetch(): void {
           traversals: [],
         })
       }
+      if (path === '/api/style' || path === '/api/style.distill') {
+        return okJson({
+          ok: true,
+          currentProfiles: null,
+          sampleMetrics: { charCount: 0, dialogueRatio: 0, avgSentenceLength: 0, shortSentenceRatio: 0, sensoryDensity: 0, actionPacing: 0 },
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -316,5 +323,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('book-source-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('book-source-view').textContent).toContain('书源搜索')
+  })
+
+  it('风格蒸馏导航：点击 nav 挂载风格蒸馏视图（文风画像与范本分析）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const styleNav = document.querySelector('[data-view="style-distill"]')
+    if (styleNav === null) throw new Error('missing style-distill nav')
+    await userEvent.click(styleNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('style-distill-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('style-distill-view').textContent).toContain('风格蒸馏')
   })
 })

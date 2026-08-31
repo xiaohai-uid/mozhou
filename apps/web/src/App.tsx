@@ -20,6 +20,7 @@ import { ReceiptPanel } from './context-receipt/ReceiptPanel'
 import { BookshelfView } from './shelf/BookshelfView'
 import { BookSourceView } from './book-source/BookSourceView'
 import { CapabilitySquareView } from './capability-square/CapabilitySquareView'
+import { StyleDistillView } from './style-distill/StyleDistillView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
@@ -177,6 +178,10 @@ export function App(): JSX.Element {
           <TasksView
             root={book?.root ?? null}
             onGoToWorkbench={() => setView('workbench')}
+          />
+        ) : view === 'style-distill' ? (
+          <StyleDistillView
+            root={book?.root ?? null}
           />
         ) : (
           <PlaceholderView view={view} />

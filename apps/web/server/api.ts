@@ -33,6 +33,7 @@ import {
   readCanonState,
   readNarrativeSnapshot,
   readProseChapter,
+  readStyleProfiles,
   runTraversal,
   scanEntityCards,
   scanLibrary,
@@ -272,6 +273,33 @@ export interface TasksResponse {
 }
 
 /**
+ * T50（风格蒸馏）文风画像与样本分析读面。
+ * 纯本地计算与数据面（直读 readStyleProfiles + 确定性句法分面提取）：
+ * - 四场景文风画像（动作/对话/情感/设定）
+ * - 风格样本蒸馏指标（对白占比、句长分布、感官描写密度、动作节奏）
+ */
+export interface StyleMetrics {
+  readonly charCount: number
+  readonly dialogueRatio: number
+  readonly avgSentenceLength: number
+  readonly shortSentenceRatio: number
+  readonly sensoryDensity: number
+  readonly actionPacing: number
+}
+
+export interface StyleDistillResponse {
+  readonly ok: true
+  readonly currentProfiles: Record<string, {
+    readonly scenarioType: string
+    readonly revision: number
+    readonly dialogueRatio: number
+    readonly sensoryDensity: number
+    readonly actionPacing: number
+  }> | null
+  readonly sampleMetrics?: StyleMetrics | undefined
+}
+
+/**
  * T46（技能广场）V1 能力注册表读面。
  * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
  * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
@@ -478,6 +506,40 @@ function urlPath(req: IncomingMessage): string {
 function sanitizeDirName(title: string): string {
   const cleaned = title.replace(/[\\/:*?"<>|]/g, ' ').trim()
   return cleaned.length > 0 ? cleaned : '未命名之书'
+}
+
+/** 风格样本蒸馏指标提取（T50 纯确定性算法）。 */
+function computeStyleMetrics(text: string): StyleMetrics {
+  const clean = text.trim()
+  if (clean.length === 0) {
+    return { charCount: 0, dialogueRatio: 0, avgSentenceLength: 0, shortSentenceRatio: 0, sensoryDensity: 0, actionPacing: 0 }
+  }
+  const dialogueMatches = clean.match(/["“「][^"”」]+["”」]/g) ?? []
+  const dialogueChars = dialogueMatches.reduce((acc, m) => acc + m.length - 2, 0)
+  const dialogueRatio = Math.min(1, Math.round((dialogueChars / clean.length) * 100) / 100)
+
+  const sentences = clean.split(/[。！？；\n]+/).map((s) => s.trim()).filter((s) => s.length > 0)
+  const totalSentences = Math.max(1, sentences.length)
+  const avgLen = Math.round(clean.length / totalSentences)
+  const shortCount = sentences.filter((s) => s.length <= 15).length
+  const shortRatio = Math.round((shortCount / totalSentences) * 100) / 100
+
+  const sensoryKeywords = /看|望|见|听|闻|嗅|凉|冷|热|暗|光|影|红|白|黑|声|响|震|颤/g
+  const sensoryHits = (clean.match(sensoryKeywords) ?? []).length
+  const sensoryDensity = Math.min(1, Math.round((sensoryHits / Math.max(1, clean.length / 50)) * 10) / 100)
+
+  const actionKeywords = /拔|冲|刺|斩|跃|退|闪|击|落|飞|抓|握|挥|踢|撞|踏/g
+  const actionHits = (clean.match(actionKeywords) ?? []).length
+  const actionPacing = Math.min(1, Math.round((actionHits / Math.max(1, clean.length / 50)) * 10) / 100)
+
+  return {
+    charCount: clean.length,
+    dialogueRatio,
+    avgSentenceLength: avgLen,
+    shortSentenceRatio: shortRatio,
+    sensoryDensity: Math.max(0.1, Math.min(0.95, sensoryDensity)),
+    actionPacing: Math.max(0.1, Math.min(0.95, actionPacing)),
+  }
 }
 
 /* ---- T44（#89）中栏对话流辅助 ---- */
@@ -911,6 +973,44 @@ export function apiMiddleware(): Middleware {
             events,
             traversals: [...traversals].reverse(),
           } satisfies TasksResponse)
+          return
+        }
+        /* ---- T50（风格蒸馏）：读取文风画像与样本分面蒸馏。 ---- */
+        if (req.method === 'POST' && path === '/api/style') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+
+          try {
+            const profiles = readStyleProfiles(root)
+            json(res, 200, {
+              ok: true,
+              currentProfiles: profiles,
+            } satisfies StyleDistillResponse)
+          } catch {
+            json(res, 200, {
+              ok: true,
+              currentProfiles: null,
+            } satisfies StyleDistillResponse)
+          }
+          return
+        }
+        if (req.method === 'POST' && path === '/api/style.distill') {
+          const body = await bodyOf(req)
+          const text = typeof body['text'] === 'string' ? body['text'] : ''
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+
+          let currentProfiles: StyleDistillResponse['currentProfiles'] = null
+          if (root !== null) {
+            try { currentProfiles = readStyleProfiles(root) } catch { /* ignore */ }
+          }
+
+          const sampleMetrics = computeStyleMetrics(text)
+          json(res, 200, {
+            ok: true,
+            currentProfiles,
+            sampleMetrics,
+          } satisfies StyleDistillResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {

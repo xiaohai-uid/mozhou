@@ -980,3 +980,32 @@ describe('任务中心（流水审计与 Traversal 历史）API 契约', () => {
     expect(typeof data.error).toBe('string')
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 风格蒸馏 API 契约：/api/style 与 /api/style.distill（T50）。
+ * ------------------------------------------------------------------------- */
+describe('风格蒸馏 API 契约', () => {
+  it('POST /api/style：读取当前书文风画像', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-style-api-'))
+    roots.push(dir)
+    const book = createBook({ dir: join(dir, '风格测试书'), title: '风格测试书' })
+
+    const { status, data } = await post(base, '/api/style', { root: book.root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.currentProfiles).not.toBeNull()
+  })
+
+  it('POST /api/style.distill：样本分析输出字数、对白比例、感官与动作密度', async () => {
+    const base = await listen()
+    const sample = '“拔剑！”少年厉喝一声，身形如电，长剑破空斩落。寒风呼啸，暗夜里火星迸溅。'
+    const { status, data } = await post(base, '/api/style.distill', { text: sample })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const metrics = data.sampleMetrics as { charCount: number; dialogueRatio: number; actionPacing: number }
+    expect(metrics.charCount).toBeGreaterThan(20)
+    expect(metrics.dialogueRatio).toBeGreaterThan(0)
+    expect(metrics.actionPacing).toBeGreaterThan(0)
+  })
+})

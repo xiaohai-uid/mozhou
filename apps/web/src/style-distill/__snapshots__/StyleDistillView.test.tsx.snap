@@ -1,0 +1,281 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StyleDistillView（风格蒸馏） > 样本输入与指标渲染；契约快照 1`] = `
+<section
+  aria-label="style-distill-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      风格蒸馏
+    </h1>
+    <span
+      class="meta"
+    >
+      文风画像与范本分面蒸馏
+    </span>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="style-sample-input"
+    >
+      <h2>
+        范本文风蒸馏
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              输入参考范本（正文或段落）
+            </b>
+            <span
+              class="mono muted"
+            >
+              句法节奏 · 对白占比 · 感官密度
+            </span>
+          </div>
+          <textarea
+            aria-label="文风范本输入"
+            class="control"
+            placeholder="粘贴一段您希望作品参考的文字样本（几百字即可）…"
+            rows="4"
+            style="width: 100%; resize: vertical;"
+          />
+          <div
+            class="actions"
+            style="margin-top: 10px; justify-content: space-between;"
+          >
+            <div
+              style="display: flex; gap: 6px; align-items: center;"
+            >
+              <span
+                class="mono muted"
+              >
+                填入样例：
+              </span>
+              <button
+                class="btn"
+                style="font-size: 9px; padding: 3px 6px;"
+              >
+                冷冽武侠·短句动作
+              </button>
+              <button
+                class="btn"
+                style="font-size: 9px; padding: 3px 6px;"
+              >
+                细腻仙侠·感官氛围
+              </button>
+              <button
+                class="btn"
+                style="font-size: 9px; padding: 3px 6px;"
+              >
+                悬疑密闭·对白交锋
+              </button>
+            </div>
+            <button
+              class="btn-primary"
+              disabled=""
+            >
+              提取文风指标
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="style-metrics-result"
+    >
+      <h2>
+        范本蒸馏指标
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;"
+          >
+            <div>
+              <div
+                class="mono muted"
+              >
+                字数 / 均句长
+              </div>
+              <b
+                style="font-size: 15px;"
+              >
+                120
+                 字 / 
+                15
+                 字符
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                对白占比
+              </div>
+              <b
+                style="font-size: 15px; color: var(--accent-strong);"
+              >
+                40
+                %
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                短句比例
+              </div>
+              <b
+                style="font-size: 15px;"
+              >
+                60
+                %
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                感官描写密度
+              </div>
+              <b
+                style="font-size: 15px; color: var(--success);"
+              >
+                50
+                %
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                动作张力节奏
+              </div>
+              <b
+                style="font-size: 15px; color: var(--warning);"
+              >
+                70
+                %
+              </b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="style-profiles-list"
+    >
+      <h2>
+        当前作品四场景文风画像
+      </h2>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                action
+              </b>
+              <span
+                class="tag"
+              >
+                r
+                1
+              </span>
+            </div>
+            <div
+              class="mono muted"
+              style="display: flex; flex-direction: column; gap: 4px;"
+            >
+              <div>
+                对白占比: 
+                15
+                %
+              </div>
+              <div>
+                感官密度: 
+                45
+                %
+              </div>
+              <div>
+                动作节奏: 
+                80
+                %
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                dialogue
+              </b>
+              <span
+                class="tag"
+              >
+                r
+                1
+              </span>
+            </div>
+            <div
+              class="mono muted"
+              style="display: flex; flex-direction: column; gap: 4px;"
+            >
+              <div>
+                对白占比: 
+                75
+                %
+              </div>
+              <div>
+                感官密度: 
+                20
+                %
+              </div>
+              <div>
+                动作节奏: 
+                30
+                %
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;
