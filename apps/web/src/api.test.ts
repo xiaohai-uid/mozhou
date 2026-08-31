@@ -713,6 +713,21 @@ describe('T44 中栏对话流 API 契约', () => {
     expect(capabilities.length).toBeGreaterThanOrEqual(5)
   })
 
+  it('POST /api/capabilities：配置 MOZHOU_API_KEY 时 providerAvailable=true', async () => {
+    const before = process.env['MOZHOU_API_KEY']
+    try {
+      process.env['MOZHOU_API_KEY'] = 'sk-real-test-key'
+      const base = await listen()
+      const { status, data } = await post(base, '/api/capabilities', {})
+      expect(status).toBe(200)
+      expect(data.ok).toBe(true)
+      expect(data.providerAvailable).toBe(true)
+    } finally {
+      if (before === undefined) delete process.env['MOZHOU_API_KEY']
+      else process.env['MOZHOU_API_KEY'] = before
+    }
+  })
+
   it('POST /api/draft.question：mock 先问直出（问题 + choices）', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/draft.question', {})

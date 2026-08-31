@@ -686,16 +686,21 @@ const DIALOGUE_CAPABILITIES: readonly CapabilityListItem[] = [
   { id: 'consistency', label: '一致性自查' },
 ]
 
-/** 判定 CHAPTER_DRAFTING 是否可解析（provider 未配 = registry 无该 taskType 的 resolve）。 */
+/** 判定 CHAPTER_DRAFTING 是否可解析（支持环境变量真实配置或 mock 模式）。 */
 function hasDraftProvider(): boolean {
   const configured = process.env['MOZHOU_DRAFT_PROVIDER']
-  if (configured !== 'mock') return false
+  const hasRealKey =
+    Boolean(process.env['MOZHOU_API_KEY']) ||
+    Boolean(process.env['DEEPSEEK_API_KEY']) ||
+    Boolean(process.env['OPENAI_API_KEY'])
+  if (configured !== 'mock' && !hasRealKey) return false
+
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root: '/' } })
   engine.registerCapability({
     taskType: 'CHAPTER_DRAFTING',
-    providerId: 'mock',
-    providerVersion: '0.0.0',
-    failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
+    providerId: hasRealKey ? 'real-llm' : 'mock',
+    providerVersion: '0.1.0',
+    failurePolicy: { timeoutMs: 30_000, fallbackProviderIds: [] },
   })
   try {
     engine.registry.resolve('CHAPTER_DRAFTING')
