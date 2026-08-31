@@ -1088,3 +1088,29 @@ describe('云同步与备份 API 契约', () => {
     expect(data.bookTitle).toBe('快照测试书')
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 会员中心 API 契约：/api/membership 与 /api/membership.activate（T55）。
+ * ------------------------------------------------------------------------- */
+describe('会员中心 API 契约', () => {
+  it('POST /api/membership：返回许可证状态与版本方案列表', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/membership', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const license = data.license as { planName: string; status: string }
+    expect(license.planName).toContain('Pro')
+    expect(license.status).toBe('active')
+    const plans = data.plans as { id: string; name: string }[]
+    expect(plans.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('POST /api/membership.activate：激活新许可证密钥', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/membership.activate', { key: 'MOZHOU-KEY-999' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const license = data.license as { licenseKey: string }
+    expect(license.licenseKey).toBe('MOZHOU-KEY-999')
+  })
+})

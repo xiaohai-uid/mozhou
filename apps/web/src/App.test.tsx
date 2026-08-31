@@ -109,6 +109,13 @@ function stubAppFetch(): void {
           storageUsage: { localCanonFiles: 0, databaseBytes: 0 },
         })
       }
+      if (path === '/api/membership' || path === '/api/membership.activate') {
+        return okJson({
+          ok: true,
+          license: { planId: 'pro', planName: 'Pro', licenseKey: 'KEY', activatedAt: '', expiresAt: '', status: 'active' },
+          plans: [],
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -170,7 +177,7 @@ describe('App 壳集成（T40）', () => {
     expect(document.querySelector('.chapterbar h1')?.textContent).toBe('《新书》')
   })
 
-  it('检视组导航点击切到中栏显式占位（未实现页不假装可用）', async () => {
+  it('检视组导航点击切到中栏显式占位与检视塔联动', async () => {
     stubAppFetch()
     render(<App />)
     const receiptNav = document.querySelector('[data-view="context-receipt"]')
@@ -180,9 +187,9 @@ describe('App 壳集成（T40）', () => {
     const receiptPanel = document.querySelector('[data-panel="context-receipt"]')
     if (receiptPanel === null) throw new Error('missing context-receipt panel')
     expect(receiptPanel.querySelector('[data-testid="inspector-empty"]')?.textContent).toContain('装配看板')
-    const memberNav = document.querySelector('[data-view="membership"]')
-    if (memberNav === null) throw new Error('missing membership nav')
-    await userEvent.click(memberNav)
+    const dialogueNav = document.querySelector('[data-view="dialogue"]')
+    if (dialogueNav === null) throw new Error('missing dialogue nav')
+    await userEvent.click(dialogueNav)
     expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
   })
 
@@ -439,5 +446,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('cloud-sync-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('cloud-sync-view').textContent).toContain('云同步与备份')
+  })
+
+  it('会员中心导航：点击 nav 挂载会员中心视图（许可证与权益方案）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const memberNav = document.querySelector('[data-view="membership"]')
+    if (memberNav === null) throw new Error('missing membership nav')
+    await userEvent.click(memberNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('membership-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('membership-view').textContent).toContain('会员与授权中心')
   })
 })

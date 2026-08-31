@@ -1,0 +1,218 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MembershipView（会员中心） > 许可证与方案矩阵渲染；契约快照 1`] = `
+<section
+  aria-label="membership-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      会员与授权中心
+    </h1>
+    <span
+      class="meta"
+    >
+      许可证管理 · 商业化权益方案
+    </span>
+    <div
+      class="save"
+    >
+      <span
+        class="cap-badge native"
+      >
+        ● 终身买断已激活
+      </span>
+    </div>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="membership-license-card"
+    >
+      <h2>
+        当前许可证状态
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <div
+              style="display: flex; align-items: center; gap: 8px;"
+            >
+              <b
+                style="font-size: 14px;"
+              >
+                墨舟 Pro 终身专业版
+              </b>
+              <span
+                class="cap-badge native"
+              >
+                状态: 永久生效
+              </span>
+            </div>
+            <span
+              class="mono muted"
+            >
+              有效期: 
+              永久有效
+            </span>
+          </div>
+          <div
+            class="actions"
+            style="margin-top: 6px; gap: 12px;"
+          >
+            <span
+              class="mono muted"
+            >
+              授权密钥：
+              MOZHOU-PRO-LIFETIME-TEST
+            </span>
+            <span
+              class="mono muted"
+            >
+              激活日期：
+              2026-08-30
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="membership-plans-section"
+    >
+      <h2>
+        版本方案与权益矩阵
+      </h2>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px; box-shadow: inset 0 0 0 1.5px var(--accent-strong);"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                墨舟 Pro 终身专业版
+              </b>
+              <span
+                class="cap-badge native"
+              >
+                ¥299
+              </span>
+            </div>
+            <p
+              class="mono"
+              style="margin: 0px 0px 8px; color: var(--accent-strong); font-size: 10px;"
+            >
+              当前已激活
+            </p>
+            <div
+              style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;"
+            >
+              <div
+                class="mono muted"
+                style="display: flex; align-items: center; gap: 6px;"
+              >
+                <span
+                  style="color: var(--success);"
+                >
+                  ✓
+                </span>
+                <span>
+                  无限作品库
+                </span>
+              </div>
+              <div
+                class="mono muted"
+                style="display: flex; align-items: center; gap: 6px;"
+              >
+                <span
+                  style="color: var(--success);"
+                >
+                  ✓
+                </span>
+                <span>
+                  Story Brain
+                </span>
+              </div>
+              <div
+                class="mono muted"
+                style="display: flex; align-items: center; gap: 6px;"
+              >
+                <span
+                  style="color: var(--success);"
+                >
+                  ✓
+                </span>
+                <span>
+                  质量门审查
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="membership-activate-section"
+    >
+      <h2>
+        激活许可证
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              输入许可证密钥（License Key）
+            </b>
+            <span
+              class="mono muted"
+            >
+              离线校验 · 即时解锁
+            </span>
+          </div>
+          <div
+            class="actions"
+          >
+            <input
+              aria-label="许可证密钥输入"
+              class="control"
+              placeholder="例如：MOZHOU-PRO-LIFETIME-XXXX-YYYY"
+              style="flex: 1 1 0%; min-width: 220px;"
+              value=""
+            />
+            <button
+              class="btn-primary"
+              disabled=""
+            >
+              激活授权
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

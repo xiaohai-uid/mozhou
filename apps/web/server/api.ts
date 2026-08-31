@@ -408,6 +408,31 @@ export interface BackupExportResponse {
 }
 
 /**
+ * T55（会员中心）许可证与商业化方案读面。
+ */
+export interface LicensePlan {
+  readonly id: string
+  readonly name: string
+  readonly price: string
+  readonly tag?: string
+  readonly features: readonly string[]
+  readonly current: boolean
+}
+
+export interface MembershipResponse {
+  readonly ok: true
+  readonly license: {
+    readonly planId: string
+    readonly planName: string
+    readonly licenseKey: string
+    readonly activatedAt: string
+    readonly expiresAt: string
+    readonly status: 'active' | 'expired' | 'trial'
+  }
+  readonly plans: readonly LicensePlan[]
+}
+
+/**
  * T46（技能广场）V1 能力注册表读面。
  * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
  * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
@@ -1406,6 +1431,77 @@ export function apiMiddleware(): Middleware {
             fileCount: 12,
             manifestDigest: 'sha256_mock_snapshot_digest',
           } satisfies BackupExportResponse)
+          return
+        }
+        /* ---- T55（会员中心）：许可证状态与商业化权益读面。 ---- */
+        if (req.method === 'POST' && path === '/api/membership') {
+          const plans: LicensePlan[] = [
+            {
+              id: 'free_community',
+              name: '社区开源版',
+              price: '免费',
+              features: ['单书本地正典创作', '基础大纲与章节管理', '本地 SQLite 数据库存储', '社区技能广场查看'],
+              current: false,
+            },
+            {
+              id: 'pro_lifetime',
+              name: '墨舟 Pro 终身专业版',
+              price: '¥299 (终身买断)',
+              tag: '推荐方案 · 当前已激活',
+              features: [
+                '无限作品库与多书无缝切换',
+                'Story Brain 认知三级穿透面板',
+                'Context Receipt 确定性装配看板',
+                'Change Matrix 变更影响矩阵与幂等重跑',
+                '全套文学质量审查与防过拟合回炉',
+                '全场景 StyleProfile 文风蒸馏与飞轮演化',
+                '本地离线快照与全量便携迁移',
+              ],
+              current: true,
+            },
+            {
+              id: 'studio_team',
+              name: '工作室多端团队版',
+              price: '¥899 / 年',
+              features: ['包含 Pro 版全部权益', '多设备局域网实时同步协同', '专属小说拆解高级提示词库', '优先技术支持通道'],
+              current: false,
+            },
+          ]
+
+          json(res, 200, {
+            ok: true,
+            license: {
+              planId: 'pro_lifetime',
+              planName: '墨舟 Pro 终身专业版',
+              licenseKey: 'MOZHOU-PRO-LIFETIME-PERMANENT-2026',
+              activatedAt: '2026-08-30',
+              expiresAt: '永久有效',
+              status: 'active',
+            },
+            plans,
+          } satisfies MembershipResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/membership.activate') {
+          const body = await bodyOf(req)
+          const key = typeof body['key'] === 'string' ? body['key'].trim() : ''
+          if (key.length === 0) {
+            json(res, 400, { ok: false, error: '请输入有效的许可证密钥' })
+            return
+          }
+
+          json(res, 200, {
+            ok: true,
+            license: {
+              planId: 'pro_lifetime',
+              planName: '墨舟 Pro 终身专业版',
+              licenseKey: key,
+              activatedAt: new Date().toISOString().slice(0, 10),
+              expiresAt: '永久有效',
+              status: 'active',
+            },
+            plans: [],
+          } satisfies MembershipResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {
