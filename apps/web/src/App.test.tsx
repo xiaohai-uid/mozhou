@@ -91,6 +91,14 @@ function stubAppFetch(): void {
           trendingKeywords: [],
         })
       }
+      if (path === '/api/web-search') {
+        return okJson({
+          ok: true,
+          query: '',
+          results: [],
+          hotQueries: [],
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -389,5 +397,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('rank-scan-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('rank-scan-view').textContent).toContain('网文扫榜')
+  })
+
+  it('联网搜索导航：点击 nav 挂载联网搜索视图（设定资料检索）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const searchNav = document.querySelector('[data-view="web-search"]')
+    if (searchNav === null) throw new Error('missing web-search nav')
+    await userEvent.click(searchNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('web-search-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('web-search-view').textContent).toContain('联网搜索')
   })
 })

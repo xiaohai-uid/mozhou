@@ -23,6 +23,7 @@ import { CapabilitySquareView } from './capability-square/CapabilitySquareView'
 import { StyleDistillView } from './style-distill/StyleDistillView'
 import { NovelBreakdownView } from './novel-breakdown/NovelBreakdownView'
 import { RankScanView } from './rank-scan/RankScanView'
+import { WebSearchView } from './web-search/WebSearchView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
@@ -191,6 +192,8 @@ export function App(): JSX.Element {
           />
         ) : view === 'rank-scan' ? (
           <RankScanView />
+        ) : view === 'web-search' ? (
+          <WebSearchView />
         ) : (
           <PlaceholderView view={view} />
         )}

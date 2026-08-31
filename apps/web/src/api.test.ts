@@ -1044,3 +1044,20 @@ describe('网文扫榜 API 契约', () => {
     expect(keywords.length).toBeGreaterThanOrEqual(2)
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 联网搜索 API 契约：/api/web-search（T53）。
+ * ------------------------------------------------------------------------- */
+describe('联网搜索 API 契约', () => {
+  it('POST /api/web-search：返回资料库检索结果与热门检索词', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/web-search', { query: '唐代' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const results = data.results as { id: string; title: string; category: string }[]
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    expect(results[0]?.title).toContain('唐代')
+    const hotQueries = data.hotQueries as string[]
+    expect(hotQueries.length).toBeGreaterThanOrEqual(3)
+  })
+})
