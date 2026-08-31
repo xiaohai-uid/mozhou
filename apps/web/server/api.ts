@@ -208,6 +208,47 @@ export interface LibraryOpenResponse {
 }
 
 /**
+ * T47（我的作品）作品概览与章节目录读面。
+ * 纯本地数据面（直读 readCanonState + readProseChapter 逐章扫描）：
+ * - 作品元信息（ID、标题、题材、创建时间、根路径）
+ * - 创作统计（总章数、提交章数、草稿章数、正文总字数、实体卡数）
+ * - 章节列表（章序号、标题、相位、字数、修订号）
+ * - 大纲节点列表（总纲、分卷纲等节点）
+ */
+export interface WorksChapterSummary {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly phase: ChapterPhase
+  readonly wordCount: number
+  readonly revision: number
+}
+
+export interface WorksOverviewResponse {
+  readonly ok: true
+  readonly book: {
+    readonly id: string
+    readonly title: string
+    readonly root: string
+    readonly genres: readonly string[]
+    readonly createdAt: string
+  }
+  readonly stats: {
+    readonly totalChapters: number
+    readonly committedChapters: number
+    readonly draftChapters: number
+    readonly totalWords: number
+    readonly entityCount: number
+  }
+  readonly chapters: readonly WorksChapterSummary[]
+  readonly outlineNodes: readonly {
+    readonly id: string
+    readonly nodeType: string
+    readonly title: string
+    readonly status: string
+  }[]
+}
+
+/**
  * T46（技能广场）V1 能力注册表读面。
  * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
  * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
@@ -731,6 +772,71 @@ export function apiMiddleware(): Middleware {
             providerAvailable: hasDraftProvider(),
             groups: CAPABILITY_SQUARE_GROUPS,
           } satisfies CapabilitySquareResponse)
+          return
+        }
+        /* ---- T47（我的作品）：作品详情、章节目录、正文字数与大纲节点汇总读面。 ---- */
+        if (req.method === 'POST' && path === '/api/works') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+
+          const canon = readCanonState(root)
+          const chapters: WorksChapterSummary[] = []
+          let totalWords = 0
+          let committedCount = 0
+          let draftCount = 0
+
+          for (let index = 1; ; index += 1) {
+            try {
+              const scan = readProseChapter(root, proseChapterPath(index))
+              const words = scan.body.replace(/\s+/g, '').length
+              totalWords += words
+              if (scan.phase === 'committed') committedCount += 1
+              if (scan.phase === 'draft') draftCount += 1
+
+              // 尝试从大纲节点中寻找章标题（nodeType === 'chapter'）
+              const outlineNode = canon.outlineNodes.find(
+                (node) => node.nodeType === 'chapter' && node.orderIndex === index,
+              )
+              const chapterTitle = outlineNode?.title ?? `第 ${index} 章`
+
+              chapters.push({
+                chapterIndex: scan.chapterIndex,
+                title: chapterTitle,
+                phase: scan.phase,
+                wordCount: words,
+                revision: scan.revision,
+              })
+            } catch (error) {
+              if ((error as { code?: string }).code === 'ENOENT') break
+              throw error
+            }
+          }
+
+          json(res, 200, {
+            ok: true,
+            book: {
+              id: canon.book.id,
+              title: canon.book.title,
+              root,
+              genres: [],
+              createdAt: canon.book.createdAt,
+            },
+            stats: {
+              totalChapters: chapters.length,
+              committedChapters: committedCount,
+              draftChapters: draftCount,
+              totalWords,
+              entityCount: canon.entityCards.length,
+            },
+            chapters,
+            outlineNodes: canon.outlineNodes.map((n) => ({
+              id: n.id,
+              nodeType: n.nodeType,
+              title: n.title,
+              status: n.status,
+            })),
+          } satisfies WorksOverviewResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {

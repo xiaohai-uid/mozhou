@@ -914,3 +914,41 @@ describe('技能广场（能力注册表）API 契约', () => {
     }
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 我的作品（作品概览与章节目录）API 契约：/api/works（T47）。
+ * ------------------------------------------------------------------------- */
+describe('我的作品（作品概览与章节目录）API 契约', () => {
+  it('POST /api/works：返回作品元数据、统计指标、章节列表与大纲骨架', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-works-api-'))
+    roots.push(dir)
+    const book = createBook({ dir: join(dir, '作品测试书'), title: '作品测试书' })
+    const plane = LocalDataPlane.open(book.root)
+    try {
+      plane.createChapterDraft({ chapterIndex: 1, title: '第一章 启程' })
+    } finally {
+      plane.close()
+    }
+
+    const { status, data } = await post(base, '/api/works', { root: book.root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect((data.book as { title: string }).title).toBe('作品测试书')
+    const stats = data.stats as { totalChapters: number; totalWords: number; draftChapters: number }
+    expect(stats.totalChapters).toBe(1)
+    expect(stats.draftChapters).toBe(1)
+    const chapters = data.chapters as { chapterIndex: number; title: string; phase: string }[]
+    expect(chapters).toHaveLength(1)
+    expect(chapters[0]?.chapterIndex).toBe(1)
+    expect(chapters[0]?.phase).toBe('draft')
+  })
+
+  it('POST /api/works：缺 root 返回 400 显式错误', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/works', {})
+    expect(status).toBe(400)
+    expect(data.ok).toBe(false)
+    expect(typeof data.error).toBe('string')
+  })
+})

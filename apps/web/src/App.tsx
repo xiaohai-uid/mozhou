@@ -19,6 +19,7 @@ import { QualityPanel } from './quality/QualityPanel'
 import { ReceiptPanel } from './context-receipt/ReceiptPanel'
 import { BookshelfView } from './shelf/BookshelfView'
 import { CapabilitySquareView } from './capability-square/CapabilitySquareView'
+import { WorksView } from './works/WorksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
@@ -159,6 +160,11 @@ export function App(): JSX.Element {
           />
         ) : view === 'capability-square' ? (
           <CapabilitySquareView />
+        ) : view === 'works' ? (
+          <WorksView
+            root={book?.root ?? null}
+            onGoToWorkbench={() => setView('workbench')}
+          />
         ) : (
           <PlaceholderView view={view} />
         )}

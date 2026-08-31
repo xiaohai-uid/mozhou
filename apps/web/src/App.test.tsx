@@ -48,6 +48,15 @@ function stubAppFetch(): void {
       if (path === '/api/capability-square') {
         return okJson({ ok: true, providerAvailable: false, groups: [] })
       }
+      if (path === '/api/works') {
+        return okJson({
+          ok: true,
+          book: { id: 'bk_app', title: '雾港失真', root: 'C:\\tmp\\stored-book', genres: [], createdAt: '2026-08-31' },
+          stats: { totalChapters: 0, committedChapters: 0, draftChapters: 0, totalWords: 0, entityCount: 0 },
+          chapters: [],
+          outlineNodes: [],
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -250,5 +259,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('capability-square-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('capability-square-view').textContent).toContain('技能广场')
+  })
+
+  it('我的作品导航：点击 nav 挂载我的作品视图（作品概览与章节全景）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const worksNav = document.querySelector('[data-view="works"]')
+    if (worksNav === null) throw new Error('missing works nav')
+    await userEvent.click(worksNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('works-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('works-view').textContent).toContain('我的作品')
   })
 })
