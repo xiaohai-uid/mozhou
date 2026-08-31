@@ -57,6 +57,15 @@ function stubAppFetch(): void {
           outlineNodes: [],
         })
       }
+      if (path === '/api/tasks') {
+        return okJson({
+          ok: true,
+          totalEvents: 0,
+          totalTraversals: 0,
+          events: [],
+          traversals: [],
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -275,5 +284,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('works-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('works-view').textContent).toContain('我的作品')
+  })
+
+  it('任务中心导航：点击 nav 挂载任务中心视图（流水审计看板）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const tasksNav = document.querySelector('[data-view="tasks"]')
+    if (tasksNav === null) throw new Error('missing tasks nav')
+    await userEvent.click(tasksNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('tasks-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('tasks-view').textContent).toContain('任务中心')
   })
 })

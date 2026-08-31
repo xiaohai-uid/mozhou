@@ -39,7 +39,7 @@ import {
   sha256Hex,
 } from '@mozhou/data-plane'
 import type { ChapterPhase } from '@mozhou/data-plane'
-import type { ChangeMatrix } from '@mozhou/data-plane'
+import type { ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import {
   queryActiveFacts as queryVisibleFactsInSnapshot,
@@ -246,6 +246,29 @@ export interface WorksOverviewResponse {
     readonly title: string
     readonly status: string
   }[]
+}
+
+/**
+ * T48（任务中心）任务与流水审计读面。
+ * 纯本地数据面（聚合 readPipelineLedger 与 listImpactRecords）：
+ * - 任务事件总数、Traversal 影响分析总数
+ * - 最近事件流水（含类型、摘要、类别分类、时间戳）
+ * - 最近 Traversal 记录（影响章数、触发源、上游变更）
+ */
+export interface TaskEventSummary {
+  readonly position: number
+  readonly type: string
+  readonly timestamp?: string | undefined
+  readonly summary: string
+  readonly category: 'pipeline' | 'traversal' | 'review' | 'system'
+}
+
+export interface TasksResponse {
+  readonly ok: true
+  readonly totalEvents: number
+  readonly totalTraversals: number
+  readonly events: readonly TaskEventSummary[]
+  readonly traversals: readonly ImpactRecord[]
 }
 
 /**
@@ -837,6 +860,57 @@ export function apiMiddleware(): Middleware {
               status: n.status,
             })),
           } satisfies WorksOverviewResponse)
+          return
+        }
+        /* ---- T48（任务中心）：账本事件流水与 Traversal 影响审计读面。 ---- */
+        if (req.method === 'POST' && path === '/api/tasks') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+
+          const ledger = readPipelineLedger(root)
+          const traversals = listImpactRecords(root)
+
+          const events: TaskEventSummary[] = ledger.map((row) => {
+            if (row.kind === 'task') {
+              const ev = row.event
+              const evType = ev.type
+              let cat: TaskEventSummary['category'] = 'system'
+              if (evType.startsWith('Chapter') || evType.startsWith('Canon')) cat = 'pipeline'
+              else if (evType.startsWith('Traversal')) cat = 'traversal'
+              else if (evType.startsWith('Quality')) cat = 'review'
+
+              return {
+                position: row.position,
+                type: evType,
+                timestamp: (ev as { timestamp?: string }).timestamp,
+                summary: `${evType} (taskRef: ${(ev as { taskRef?: string }).taskRef ?? '—'})`,
+                category: cat,
+              }
+            } else {
+              const r = row.row
+              const rowType = typeof r['type'] === 'string' ? r['type'] : 'DomainEvent'
+              let cat: TaskEventSummary['category'] = 'pipeline'
+              if (rowType.includes('Traversal')) cat = 'traversal'
+              else if (rowType.includes('Quality')) cat = 'review'
+
+              return {
+                position: row.position,
+                type: rowType,
+                timestamp: typeof r['at'] === 'string' ? r['at'] : undefined,
+                summary: `${rowType} (seq: ${String(r['seq'] ?? '—')})`,
+                category: cat,
+              }
+            }
+          }).reverse() // 倒序呈现最新事件
+
+          json(res, 200, {
+            ok: true,
+            totalEvents: ledger.length,
+            totalTraversals: traversals.length,
+            events,
+            traversals: [...traversals].reverse(),
+          } satisfies TasksResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {

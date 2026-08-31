@@ -952,3 +952,31 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     expect(typeof data.error).toBe('string')
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 任务中心（流水审计与 Traversal 历史）API 契约：/api/tasks（T48）。
+ * ------------------------------------------------------------------------- */
+describe('任务中心（流水审计与 Traversal 历史）API 契约', () => {
+  it('POST /api/tasks：返回账本事件流水与 Traversal 记录', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-tasks-api-'))
+    roots.push(dir)
+    const book = createBook({ dir: join(dir, '任务测试书'), title: '任务测试书' })
+
+    const { status, data } = await post(base, '/api/tasks', { root: book.root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(typeof data.totalEvents).toBe('number')
+    expect(typeof data.totalTraversals).toBe('number')
+    expect(Array.isArray(data.events)).toBe(true)
+    expect(Array.isArray(data.traversals)).toBe(true)
+  })
+
+  it('POST /api/tasks：缺 root 返回 400 显式错误', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/tasks', {})
+    expect(status).toBe(400)
+    expect(data.ok).toBe(false)
+    expect(typeof data.error).toBe('string')
+  })
+})
