@@ -10,7 +10,11 @@
  * 导入失败（重名、空标题）显式报错（role=alert）。
  */
 import { useState } from 'react'
-import type { BookSourceSearchResponse, LibraryOpenResponse } from '../../server/api'
+import type {
+  BookSourceSearchResponse,
+  CrawlerExtractResponse,
+  LibraryOpenResponse,
+} from '../../server/api'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
 
@@ -35,6 +39,7 @@ export function BookSourceView({
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<BookSourceSearchResponse['books']>([])
+  const [crawledExcerpt, setCrawledExcerpt] = useState<{ title: string; content: string; channel: string } | null>(null)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastImported, setLastImported] = useState<string | null>(null)
@@ -44,6 +49,43 @@ export function BookSourceView({
     if (clean.length === 0 || searching) return
     setSearching(true)
     setError(null)
+    setCrawledExcerpt(null)
+
+    // 若输入的是 http/https URL，优先走 crawl4ai 网页深度正文提取
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      try {
+        const crawlRes = await post<CrawlerExtractResponse>('/api/crawler.extract', { url: clean })
+        if (crawlRes.ok) {
+          setCrawledExcerpt({
+            title: crawlRes.title,
+            content: crawlRes.content.slice(0, 300) + (crawlRes.content.length > 300 ? '...' : ''),
+            channel: crawlRes.channel === 'crawl4ai' ? 'crawl4ai 无头渲染' : 'HTTP 提取',
+          })
+          setSearchResults([
+            {
+              platform: 'fanqie',
+              platformName: crawlRes.channel === 'crawl4ai' ? 'crawl4ai 抓取' : '网页抓取',
+              bookId: 'crawled_url',
+              title: crawlRes.title,
+              author: '网络抓取来源',
+              category: '外部网页正文',
+              status: '已解析',
+              intro: crawlRes.content.slice(0, 150),
+              url: clean,
+            },
+          ])
+          return
+        } else {
+          setError(`网页抓取失败: ${crawlRes.error ?? '未知错误'}`)
+        }
+      } catch (cause) {
+        setError((cause as Error).message)
+      } finally {
+        setSearching(false)
+      }
+      return
+    }
+
     try {
       const res = await post<BookSourceSearchResponse>('/api/book-source.search', { query: clean })
       setSearchResults(res.books)
@@ -119,6 +161,18 @@ export function BookSourceView({
             <button className="btn-primary" onClick={onGoToWorkbench} style={{ fontSize: 10, padding: '3px 8px' }}>
               前往工作台写作 →
             </button>
+          </div>
+        )}
+
+        {crawledExcerpt !== null && (
+          <div className="banner" data-testid="book-source-crawled-preview" style={{ background: 'rgba(128, 214, 176, 0.08)', color: 'var(--success)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <b>网页抓取解析成功（{crawledExcerpt.channel}）：《{crawledExcerpt.title}》</b>
+              <span className="mono muted">已自动提取纯净正文</span>
+            </div>
+            <p className="mono muted" style={{ margin: '6px 0 0', fontSize: 10, lineHeight: 1.5 }}>
+              {crawledExcerpt.content}
+            </p>
           </div>
         )}
 

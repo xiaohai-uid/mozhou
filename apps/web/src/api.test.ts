@@ -1075,6 +1075,19 @@ describe('端侧多源书源检索 API 契约', () => {
     expect(Array.isArray(nonNull.data.books)).toBe(true)
     expect(typeof nonNull.data.degraded).toBe('boolean')
   })
+
+  it('POST /api/crawler.extract：缺 URL 返回 400；私网/非安全地址被安全策略拦截', async () => {
+    const base = await listen()
+    const missing = await post(base, '/api/crawler.extract', {})
+    expect(missing.status).toBe(400)
+    expect(missing.data.ok).toBe(false)
+
+    // 私网地址拦截测试
+    const ssrf = await post(base, '/api/crawler.extract', { url: 'http://127.0.0.1:8080/admin' })
+    expect(ssrf.status).toBe(200)
+    expect(ssrf.data.ok).toBe(false)
+    expect(ssrf.data.error).toContain('SECURITY_REJECT')
+  })
 })
 
 /* ----------------------------------------------------------------------------

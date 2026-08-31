@@ -58,6 +58,7 @@ import type { CapabilityRecipe } from '@mozhou/runtime'
 import type { ContextPacket } from '@mozhou/context-compiler'
 import { searchMultipleSources, type MultiSourceSearchOutcome } from './crawlers/multisource.js'
 import { fetchQidianHotBoard } from './crawlers/rankings.js'
+import { smartExtractContent, isCrawl4aiAlive } from './crawlers/crawl4ai.js'
 import type { CrawledBook } from './crawlers/qidian.js'
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
@@ -386,6 +387,17 @@ export interface BookSourceSearchResponse {
   readonly books: readonly CrawledBook[]
   readonly degraded: boolean
   readonly notes: readonly string[]
+}
+
+/**
+ * crawl4ai / HTTP 双轨网页深度提取响应。
+ */
+export interface CrawlerExtractResponse {
+  readonly ok: boolean
+  readonly title: string
+  readonly content: string
+  readonly channel: 'crawl4ai' | 'http_fallback'
+  readonly error?: string | undefined
 }
 
 /**
@@ -1466,6 +1478,24 @@ export function apiMiddleware(): Middleware {
             degraded: outcome.degraded,
             notes: outcome.notes,
           } satisfies BookSourceSearchResponse)
+          return
+        }
+        /* ---- crawl4ai / HTTP 双轨网页正文与章节深度抓取提取端点。 ---- */
+        if (req.method === 'POST' && path === '/api/crawler.extract') {
+          const body = await bodyOf(req)
+          const url = typeof body['url'] === 'string' ? body['url'].trim() : ''
+          if (!url) {
+            json(res, 400, { ok: false, error: 'url required' })
+            return
+          }
+          const extractResult = await smartExtractContent(url)
+          json(res, 200, {
+            ok: extractResult.ok,
+            title: extractResult.title,
+            content: extractResult.content,
+            channel: extractResult.channel,
+            error: extractResult.error,
+          } satisfies CrawlerExtractResponse)
           return
         }
         /* ---- T53（联网搜索）：网文设定与历史民俗资料库检索。 ---- */
