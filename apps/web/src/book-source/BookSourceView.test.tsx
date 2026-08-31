@@ -62,7 +62,7 @@ describe('BookSourceView（书源搜索与导入）', () => {
 
     const input = screen.getByLabelText('书源检索输入')
     await userEvent.type(input, '凡人问仙')
-    const importBtn = screen.getByRole('button', { name: '导入本地书库' })
+    const importBtn = screen.getByRole('button', { name: '直接建书入库' })
     await userEvent.click(importBtn)
 
     await waitFor(() => {
@@ -145,12 +145,76 @@ describe('BookSourceView（书源搜索与导入）', () => {
 
     const input = screen.getByLabelText('书源检索输入')
     await userEvent.type(input, '冲突之书')
-    const importBtn = screen.getByRole('button', { name: '导入本地书库' })
+    const importBtn = screen.getByRole('button', { name: '直接建书入库' })
     await userEvent.click(importBtn)
 
     await waitFor(() => {
       expect(screen.getByTestId('book-source-error')).toBeInTheDocument()
       expect(screen.getByTestId('book-source-error').textContent).toContain('书籍已存在，导入冲突')
+    })
+  })
+
+  it('全网多源检索卡片列表展示与一键导入', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((path: string) => {
+        if (path === '/api/book-source.search') {
+          return okJson({
+            ok: true,
+            query: '宿命之环',
+            total: 1,
+            degraded: false,
+            notes: [],
+            books: [
+              {
+                platform: 'qidian',
+                platformName: '起点中文网',
+                bookId: '1036370336',
+                title: '宿命之环',
+                author: '爱潜水的乌贼',
+                category: '玄幻',
+                status: '连载中',
+                intro: '诡秘之主第二部',
+                url: 'https://m.qidian.com/book/1036370336/',
+              },
+            ],
+          })
+        }
+        if (path === '/api/library.import') {
+          return okJson({ ok: true, root: 'C:/tmp/lib/宿命之环', bookId: 'bk_suming', title: '宿命之环' })
+        }
+        return okJson({ ok: false })
+      }),
+    )
+
+    const onSwitchBook = vi.fn()
+    render(
+      <BookSourceView
+        parentDir={PARENT_DIR}
+        onSwitchBook={onSwitchBook}
+        onGoToWorkbench={() => {}}
+      />,
+    )
+
+    const input = screen.getByLabelText('书源检索输入')
+    await userEvent.type(input, '宿命之环')
+    const searchBtn = screen.getByRole('button', { name: '全网多源检索' })
+    await userEvent.click(searchBtn)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('book-source-results')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('book-source-results').textContent).toContain('爱潜水的乌贼')
+
+    const importFromCardBtn = screen.getByRole('button', { name: '一键导入本地书库' })
+    await userEvent.click(importFromCardBtn)
+
+    await waitFor(() => {
+      expect(onSwitchBook).toHaveBeenCalledWith({
+        root: 'C:/tmp/lib/宿命之环',
+        bookId: 'bk_suming',
+        title: '宿命之环',
+      })
     })
   })
 })

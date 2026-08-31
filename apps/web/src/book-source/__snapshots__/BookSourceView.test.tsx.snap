@@ -52,22 +52,28 @@ exports[`BookSourceView（书源搜索与导入） > 搜索与推荐样例渲染
             <input
               aria-label="书源检索输入"
               class="control"
-              placeholder="输入要导入的书名或网络书源名称…"
+              placeholder="输入书名（如 宿命之环、凡人修仙）检索起点/七猫..."
               style="flex: 1 1 0%; min-width: 200px;"
               value=""
             />
             <button
+              class="btn"
+              disabled=""
+            >
+              全网多源检索
+            </button>
+            <button
               class="btn-primary"
               disabled=""
             >
-              导入本地书库
+              直接建书入库
             </button>
           </div>
           <p
             class="mono muted"
             style="margin: 10px 0px 0px;"
           >
-            导入将在书库根下建立标准小说目录容器（包含 book.json、总纲、第一卷纲及元数据）。
+            端侧并发检索起点与七猫公开源，检索结果可一键在本地书库落盘正典容器。
           </p>
         </div>
       </div>

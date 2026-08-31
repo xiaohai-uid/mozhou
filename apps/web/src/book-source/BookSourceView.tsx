@@ -10,7 +10,7 @@
  * 导入失败（重名、空标题）显式报错（role=alert）。
  */
 import { useState } from 'react'
-import type { LibraryOpenResponse } from '../../server/api'
+import type { BookSourceSearchResponse, LibraryOpenResponse } from '../../server/api'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
 
@@ -33,9 +33,26 @@ export function BookSourceView({
   onGoToWorkbench: () => void
 }): JSX.Element {
   const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<BookSourceSearchResponse['books']>([])
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastImported, setLastImported] = useState<string | null>(null)
+
+  const handleSearch = async (): Promise<void> => {
+    const clean = query.trim()
+    if (clean.length === 0 || searching) return
+    setSearching(true)
+    setError(null)
+    try {
+      const res = await post<BookSourceSearchResponse>('/api/book-source.search', { query: clean })
+      setSearchResults(res.books)
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setSearching(false)
+    }
+  }
 
   const handleImport = async (targetTitle: string): Promise<void> => {
     const title = targetTitle.trim()
@@ -119,25 +136,81 @@ export function BookSourceView({
                   className="control"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  disabled={importing}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSearch()
+                  }}
+                  disabled={importing || searching}
                   aria-label="书源检索输入"
-                  placeholder="输入要导入的书名或网络书源名称…"
+                  placeholder="输入书名（如 宿命之环、凡人修仙）检索起点/七猫..."
                   style={{ flex: 1, minWidth: 200 }}
                 />
+                <button
+                  className="btn"
+                  onClick={() => { void handleSearch() }}
+                  disabled={searching || query.trim().length === 0}
+                >
+                  {searching ? '全网检索中…' : '全网多源检索'}
+                </button>
                 <button
                   className="btn-primary"
                   onClick={() => { void handleImport(query) }}
                   disabled={importing || query.trim().length === 0}
                 >
-                  {importing ? '导入中…' : '导入本地书库'}
+                  {importing ? '导入中…' : '直接建书入库'}
                 </button>
               </div>
               <p className="mono muted" style={{ margin: '10px 0 0' }}>
-                导入将在书库根下建立标准小说目录容器（包含 book.json、总纲、第一卷纲及元数据）。
+                端侧并发检索起点与七猫公开源，检索结果可一键在本地书库落盘正典容器。
               </p>
             </div>
           </div>
         </section>
+
+        {/* 实时多源搜索结果 */}
+        {searchResults.length > 0 && (
+          <section className="wb-section" data-testid="book-source-results">
+            <h2>全网多源检索结果 ({searchResults.length})</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {searchResults.map((b) => (
+                <div className="card-shell" key={`${b.platform}_${b.bookId}`} style={{ marginBottom: 0 }}>
+                  <div className="card">
+                    <div className="card-title">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <b style={{ fontSize: 13 }}>{b.title}</b>
+                        <span className="tag">{b.platformName}</span>
+                        <span className="mono muted">作者：{b.author}</span>
+                      </div>
+                      <span className="cap-badge native">{b.status ?? '连载中'}</span>
+                    </div>
+                    {b.category && (
+                      <span className="mono muted" style={{ fontSize: 10 }}>
+                        题材分类：{b.category}
+                      </span>
+                    )}
+                    {b.intro && (
+                      <p className="muted" style={{ margin: '4px 0 0', fontSize: 11, lineHeight: 1.6 }}>
+                        {b.intro}
+                      </p>
+                    )}
+                    <div className="actions" style={{ marginTop: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="mono muted" style={{ fontSize: 9 }}>
+                        来源页：{b.url}
+                      </span>
+                      <button
+                        className="btn-primary"
+                        disabled={importing}
+                        onClick={() => { void handleImport(b.title) }}
+                        style={{ fontSize: 10, padding: '3px 8px' }}
+                      >
+                        一键导入本地书库
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 推荐导入样例 */}
         <section className="wb-section" data-testid="book-source-samples">

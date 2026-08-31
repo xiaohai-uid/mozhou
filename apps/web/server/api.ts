@@ -56,6 +56,9 @@ import { readPipelineLedger } from '@mozhou/pipeline'
 import { NoProviderError, PublishBus, RuntimeEngine } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
 import type { ContextPacket } from '@mozhou/context-compiler'
+import { searchMultipleSources, type MultiSourceSearchOutcome } from './crawlers/multisource.js'
+import { fetchQidianHotBoard } from './crawlers/rankings.js'
+import type { CrawledBook } from './crawlers/qidian.js'
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
 
@@ -369,6 +372,20 @@ export interface RankScanResponse {
   readonly ok: true
   readonly boards: readonly RankBoard[]
   readonly trendingKeywords: readonly { readonly name: string; readonly heat: number }[]
+  readonly degraded?: boolean | undefined
+  readonly note?: string | undefined
+}
+
+/**
+ * 端侧多源书源检索响应（起点/七猫/番茄）。
+ */
+export interface BookSourceSearchResponse {
+  readonly ok: true
+  readonly query: string
+  readonly total: number
+  readonly books: readonly CrawledBook[]
+  readonly degraded: boolean
+  readonly notes: readonly string[]
 }
 
 /**
@@ -1325,14 +1342,58 @@ export function apiMiddleware(): Middleware {
           } satisfies NovelBreakdownResponse)
           return
         }
-        /* ---- T52（网文扫榜）：多平台热榜透视与题材风向分析。 ---- */
+        /* ---- T52（网文扫榜）：多平台热榜透视与题材风向分析（支持端侧实时爬取与降级）。 ---- */
         if (req.method === 'POST' && path === '/api/rank-scan') {
+          const body = await bodyOf(req)
+          const shouldRefresh = Boolean(body['refresh'])
+
+          let qidianItems: RankingItem[] = [
+            {
+              rank: 1,
+              title: '道诡异仙',
+              author: '狐尾的笔',
+              category: '东方玄幻',
+              hotScore: '月票榜 Top 1',
+              tags: ['克苏鲁修仙', '心素', '民俗恐怖'],
+              goldenFinger: '迷惘真假双世界穿梭',
+              oneLineHook: '我分不清，我是真疯了还是这个世界疯了。',
+            },
+            {
+              rank: 2,
+              title: '宿命之环',
+              author: '爱潜水的乌贼',
+              category: '西方奇幻',
+              hotScore: '月票榜 Top 2',
+              tags: ['诡秘序列', '猎人途径', '神话宿命'],
+              goldenFinger: '愚者信标与宿命之环恩赐',
+              oneLineHook: '科尔杜村的灾难循环，因一个外乡人被撕开裂隙。',
+            },
+          ]
+
+          let degraded = false
+          let note: string | undefined = undefined
+
+          if (shouldRefresh) {
+            try {
+              const crawled = await fetchQidianHotBoard()
+              if (crawled.ok && crawled.items.length > 0) {
+                qidianItems = crawled.items
+              } else {
+                degraded = true
+                note = crawled.note
+              }
+            } catch (err) {
+              degraded = true
+              note = (err as Error).message
+            }
+          }
+
           const boards: RankBoard[] = [
             {
               id: 'fanqie_hot',
               name: '番茄小说 · 巅峰热读榜',
               platform: 'fanqie',
-              updatedAt: '2026-08-31',
+              updatedAt: new Date().toISOString().slice(0, 10),
               items: [
                 {
                   rank: 1,
@@ -1370,29 +1431,8 @@ export function apiMiddleware(): Middleware {
               id: 'qidian_yuepiao',
               name: '起点中文网 · 畅销风云榜',
               platform: 'qidian',
-              updatedAt: '2026-08-31',
-              items: [
-                {
-                  rank: 1,
-                  title: '道诡异仙',
-                  author: '狐尾的笔',
-                  category: '东方玄幻',
-                  hotScore: '月票榜 Top 1',
-                  tags: ['克苏鲁修仙', '心素', '民俗恐怖'],
-                  goldenFinger: '迷惘真假双世界穿梭',
-                  oneLineHook: '我分不清，我是真疯了还是这个世界疯了。',
-                },
-                {
-                  rank: 2,
-                  title: '宿命之环',
-                  author: '爱潜水的乌贼',
-                  category: '西方奇幻',
-                  hotScore: '月票榜 Top 2',
-                  tags: ['诡秘序列', '猎人途径', '神话宿命'],
-                  goldenFinger: '愚者信标与宿命之环恩赐',
-                  oneLineHook: '科尔杜村的灾难循环，因一个外乡人被撕开裂隙。',
-                },
-              ],
+              updatedAt: new Date().toISOString().slice(0, 10),
+              items: qidianItems,
             },
           ]
 
@@ -1409,7 +1449,23 @@ export function apiMiddleware(): Middleware {
             ok: true,
             boards,
             trendingKeywords,
+            ...(degraded ? { degraded: true, note } : {}),
           } satisfies RankScanResponse)
+          return
+        }
+        /* ---- 端侧多源实时书源检索（起点/七猫/番茄聚合）。 ---- */
+        if (req.method === 'POST' && path === '/api/book-source.search') {
+          const body = await bodyOf(req)
+          const query = typeof body['query'] === 'string' ? body['query'].trim() : ''
+          const outcome = await searchMultipleSources(query)
+          json(res, 200, {
+            ok: true,
+            query: outcome.query,
+            total: outcome.total,
+            books: outcome.books,
+            degraded: outcome.degraded,
+            notes: outcome.notes,
+          } satisfies BookSourceSearchResponse)
           return
         }
         /* ---- T53（联网搜索）：网文设定与历史民俗资料库检索。 ---- */

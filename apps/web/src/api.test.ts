@@ -1059,6 +1059,25 @@ describe('小说拆解 API 契约', () => {
 })
 
 /* ----------------------------------------------------------------------------
+ * 端侧多源书源检索 API 契约：/api/book-source.search
+ * ------------------------------------------------------------------------- */
+describe('端侧多源书源检索 API 契约', () => {
+  it('POST /api/book-source.search：检索空关键词返回空列表；非空时聚合结构完整', async () => {
+    const base = await listen()
+    const empty = await post(base, '/api/book-source.search', { query: '' })
+    expect(empty.status).toBe(200)
+    expect(empty.data.ok).toBe(true)
+    expect(empty.data.total).toBe(0)
+
+    const nonNull = await post(base, '/api/book-source.search', { query: '凡人' })
+    expect(nonNull.status).toBe(200)
+    expect(nonNull.data.ok).toBe(true)
+    expect(Array.isArray(nonNull.data.books)).toBe(true)
+    expect(typeof nonNull.data.degraded).toBe('boolean')
+  })
+})
+
+/* ----------------------------------------------------------------------------
  * 网文扫榜 API 契约：/api/rank-scan（T52）。
  * ------------------------------------------------------------------------- */
 describe('网文扫榜 API 契约', () => {
