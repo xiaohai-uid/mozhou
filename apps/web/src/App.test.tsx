@@ -29,7 +29,7 @@ const STORED_BOOK = {
 function stubAppFetch(): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockImplementation(async (path: string) => {
+    vi.fn().mockImplementation((path: string) => {
       if (path === '/api/book') return okJson({ ok: true, root: 'C:\\tmp\\app-book', bookId: 'bk_app' })
       if (path === '/api/book.state') return okJson({ ok: true, state: emptyCanonState() })
       if (path === '/api/story-brain.entities') return okJson({ ok: true, cards: [] })
@@ -43,6 +43,11 @@ function stubAppFetch(): void {
       if (path === '/api/change-matrix') return okJson({ ok: true, matrix: { columns: [], rows: [] } })
       if (path === '/api/change-matrix.rerun') {
         return okJson({ ok: false, error: 'unexpected rerun path in shell test: ' + path })
+      }
+      if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
+      if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
+      if (path === '/api/draft.stream') {
+        return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
       }
       if (path === '/api/chapter.quality') return okJson({ ok: true, hasReport: false })
       throw new Error('unexpected fetch path in shell test: ' + path)
@@ -62,7 +67,7 @@ describe('App 壳集成（T40）', () => {
     expect(screen.getByLabelText('章节生产管线').querySelectorAll('.step')).toHaveLength(8)
   })
 
-  it('刷新恢复：localStorage 中的书与视图状态还原（US12）', async () => {
+  it('刷新恢复：localStorage 中的书与视图状态还原（US12）', () => {
     window.localStorage.setItem(
       'mozhou.workbench.v1',
       JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
@@ -99,14 +104,14 @@ describe('App 壳集成（T40）', () => {
     render(<App />)
     const receiptNav = document.querySelector('[data-view="context-receipt"]')
     if (receiptNav === null) throw new Error('missing context-receipt nav')
-    await userEvent.click(receiptNav as HTMLElement)
+    await userEvent.click(receiptNav)
     // T42 起装配看板为真实 tab：未建书呈显式空态（InspectorEmpty），不假装可用
     const receiptPanel = document.querySelector('[data-panel="context-receipt"]')
     if (receiptPanel === null) throw new Error('missing context-receipt panel')
     expect(receiptPanel.querySelector('[data-testid="inspector-empty"]')?.textContent).toContain('装配看板')
     const rankNav = document.querySelector('[data-view="rank-scan"]')
     if (rankNav === null) throw new Error('missing rank-scan nav')
-    await userEvent.click(rankNav as HTMLElement)
+    await userEvent.click(rankNav)
     expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
   })
 
@@ -115,7 +120,7 @@ describe('App 壳集成（T40）', () => {
     render(<App />)
     const commit = document.querySelector('[data-stage="commit"]')
     if (commit === null) throw new Error('missing commit step')
-    await userEvent.click(commit as HTMLElement)
+    await userEvent.click(commit)
     expect(commit.className).toContain('active')
     expect(document.querySelector('[data-stage="prepare"]')?.className).toContain('done')
   })
@@ -198,7 +203,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     expect(screen.queryByTestId('wizard-overlay')).toBeNull()
     const bookSwitch = document.querySelector('.book-switch')
     if (bookSwitch === null) throw new Error('missing book-switch')
-    await userEvent.click(bookSwitch as HTMLElement)
+    await userEvent.click(bookSwitch)
     await waitFor(() => {
       expect(screen.getByTestId('wizard-overlay')).not.toBeNull()
     })

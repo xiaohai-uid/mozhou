@@ -1,13 +1,13 @@
 /**
- * 工作台中栏组件测试（实现票 T40）：存量功能（建书 / 账本）在新壳内可用
- * + 对话区骨架显式占位（不假装可用）。实体网格切片已随 T41 迁入检视塔，
- * 其契约测试移至 story-brain/StoryBrainPanel.test.tsx。
+ * 工作台中栏组件测试（实现票 T44）：对话流、建书 / 账本存量功能。
+ * 实体网格切片已随 T41 迁入检视塔；对话流契约测试在 DialogueStream.test.tsx。
  */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WorkbenchView } from './WorkbenchView'
 import type { BookInfo } from '../shell/workbenchStorage'
+import { okJson } from '../test/http'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -16,19 +16,17 @@ afterEach(() => {
 const BOOK: BookInfo = { root: 'C:\\tmp\\book-a', bookId: 'bk_1', title: '测试之书' }
 
 describe('WorkbenchView', () => {
-  it('对话区骨架：composer disabled 显式占位并点名 T44，不假装可用', () => {
+  it('空书对话流显示建书提示；composer 不在未建书状态伪装可用', () => {
     render(<WorkbenchView book={null} onBookCreated={() => {}} />)
-    expect(screen.getByTestId('dialogue-skeleton').textContent).toContain('T44')
-    expect(screen.getByLabelText('写作对话输入（T44 接入前占位）')).toBeDisabled()
-    expect(screen.getByLabelText('发送（T44 接入前占位）')).toBeDisabled()
+    expect(screen.getByTestId('dialogue-no-book').textContent).toContain('先建书')
+    expect(screen.getByTestId('create-book')).toBeInTheDocument()
   })
 
   it('建书成功回调 BookInfo（含书名，供 localStorage 记忆）', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true, root: 'C:\\tmp\\book-a', bookId: 'bk_1' }), {
-        status: 200,
-      }),
-    )
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/book') return okJson({ ok: true, root: 'C:\\tmp\\book-a', bookId: 'bk_1' })
+      return okJson({ ok: false, error: 'unexpected path: ' + path })
+    })
     vi.stubGlobal('fetch', fetchMock)
     const onBookCreated = vi.fn()
     render(<WorkbenchView book={null} onBookCreated={onBookCreated} />)
@@ -43,7 +41,8 @@ describe('WorkbenchView', () => {
         title: '雾港失真',
       })
     })
-    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual({
+    const init = fetchMock.mock.calls[0]?.[1] as { body?: string } | undefined
+    expect(JSON.parse(init?.body ?? '{}')).toEqual({
       title: '雾港失真',
     })
   })
@@ -65,18 +64,20 @@ describe('WorkbenchView', () => {
   it('账本刷新：事件类型直出（task 事件取 event.type）', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
+      vi.fn().mockImplementation((path: string) => {
+        if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
+        if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
+        if (path === '/api/ledger') {
+          return okJson({
             ok: true,
             events: [
               { kind: 'task', event: { type: 'TraverseCompleted' } },
               { kind: 'style_learned', type: 'style_learned' },
             ],
-          }),
-          { status: 200 },
-        ),
-      ),
+          })
+        }
+        return okJson({ ok: false, error: 'unexpected path: ' + path })
+      }),
     )
     render(<WorkbenchView book={BOOK} onBookCreated={() => {}} />)
     await userEvent.click(screen.getByRole('button', { name: '刷新账本' }))

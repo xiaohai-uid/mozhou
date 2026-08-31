@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, createBook, createChapterDraft, entityCardFileRel, openPinsWindow, readManifest, openDatabase, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
+import { LocalDataPlane, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
@@ -128,8 +128,6 @@ describe('apps/web api 中间件 · T31/T32', () => {
  * HTTP 层只消费 /api/chapter.* 端点——黑盒不变。
  * ------------------------------------------------------------------------- */
 
-import { runReviewStep } from '@mozhou/pipeline'
-
 /** 确定性规则策略：web 直连面无语义提供方，缺省全平台策略必 refused。 */
 const DETERMINISTIC_POLICY = {
   schemaVersion: 1,
@@ -155,7 +153,7 @@ async function makeBookAtReview(title: string): Promise<string> {
   return dir
 }
 
-async function writeWaterfallBody(root: string): Promise<void> {
+function writeWaterfallBody(root: string): void {
   // 既有编辑路径铺入段落瀑布正文（PARA-001 必 fail）
   recordUserEdit({
     bus: new PublishBus(),
@@ -199,7 +197,7 @@ describe('ADR-0025 质量审查 API 契约', () => {
   it('blocking_fail 阻断前进：rework 两次可用，第三次 422 QualityReworkLimitExceeded', async () => {
     const root = await makeBookAtReview('回炉之书')
     const base = bases[bases.length - 1]!
-    await writeWaterfallBody(root)
+    writeWaterfallBody(root)
 
     const firstReview = await post(base, '/api/chapter.review', { root, chapterIndex: 1, policy: DETERMINISTIC_POLICY })
     expect(firstReview.data.verdict).toBe('blocking_fail')
@@ -692,5 +690,102 @@ describe('T43 变更矩阵读面 API 契约', () => {
     const matrix = data.matrix as { columns: number[]; rows: unknown[] }
     expect(matrix.columns).toEqual([])
     expect(matrix.rows).toEqual([])
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * T44（#89）中栏写作对话流 API 契约：
+ * /api/capabilities（技能读面 + providerAvailable）、/api/draft.question（V1 mock 先问）、
+ * /api/draft.stream（NDJSON 流式草稿；provider 未配 ⇒ 显式 PROVIDER_UNAVAILABLE，
+ * Gate 3 纪律；mock provider 经 MOZHOU_DRAFT_PROVIDER=mock 显式开启）。
+ * ------------------------------------------------------------------------- */
+
+describe('T44 中栏对话流 API 契约', () => {
+  it('POST /api/capabilities：技能词表 + providerAvailable=false（未配置负路径）', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/capabilities', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.providerAvailable).toBe(false)
+    const capabilities = data.capabilities as { id: string; label: string }[]
+    expect(capabilities.map((cap) => cap.label)).toContain('续写')
+    expect(capabilities.length).toBeGreaterThanOrEqual(5)
+  })
+
+  it('POST /api/draft.question：mock 先问直出（问题 + choices）', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/draft.question', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(typeof data.question).toBe('string')
+    expect((data.question as string).length).toBeGreaterThan(0)
+    expect(Array.isArray(data.choices)).toBe(true)
+    expect((data.choices as string[]).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('POST /api/draft.stream：provider 未配 ⇒ 200 JSON PROVIDER_UNAVAILABLE（非流式）', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t44-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { title: '对话书', dir })
+    const root = created.data.root as string
+    const res = await fetch(base + '/api/draft.stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root, chapterIndex: 1, prompt: '开场' }),
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toContain('application/json')
+    expect(res.headers.get('Content-Type')).not.toContain('ndjson')
+    const data = (await res.json()) as { ok: boolean; code: string; error: string }
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('PROVIDER_UNAVAILABLE')
+    expect(data.error).toContain('provider')
+  })
+
+  it('POST /api/draft.stream：mock provider 正路径 ⇒ NDJSON start/delta/done 全帧 + 落盘即真', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t44-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '流式书', dir })
+    const plane = LocalDataPlane.open(dir)
+    try {
+      plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    } finally {
+      plane.close()
+    }
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    try {
+      const res = await fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: dir, chapterIndex: 1, prompt: '夜雨敲窗，灯焰摇了三摇。他推门而入。', skills: ['continuation'] }),
+      })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Content-Type')).toContain('ndjson')
+      const text = await res.text()
+      const frames = text.split('\n').filter((line) => line.trim().length > 0).map((line) => JSON.parse(line) as { ok: boolean; event: string; text?: string; outcome?: string; partial?: boolean })
+      expect(frames[0]?.event).toBe('start')
+      expect(frames.at(-1)?.event).toBe('done')
+      expect(frames.at(-1)?.outcome).toBe('succeeded')
+      expect(frames.at(-1)?.partial).toBe(false)
+      const deltas = frames.filter((frame) => frame.event === 'delta').map((frame) => frame.text ?? '').join('')
+      expect(deltas).toContain('夜雨敲窗')
+      expect(deltas).toContain('他推门而入')
+      // 落盘即真：正文 draft 文件含流式产物
+      const scan = readProseChapter(dir, proseChapterPath(1))
+      expect(scan.phase).toBe('draft')
+      expect(scan.body).toContain('夜雨敲窗')
+    } finally {
+      delete process.env['MOZHOU_DRAFT_PROVIDER']
+    }
+  })
+
+  it('POST /api/draft.stream：缺 root/chapterIndex 返回 400 显式错误', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/draft.stream', { prompt: 'x' })
+    expect(status).toBe(400)
+    expect(data.ok).toBe(false)
+    expect(typeof data.error).toBe('string')
   })
 })

@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { post } from '../lib/post'
+import { DialogueStream } from './DialogueStream'
 import type { BookInfo } from '../shell/workbenchStorage'
 
 interface BookCreated {
@@ -73,17 +74,7 @@ export function WorkbenchView({
       </div>
 
       <div className="conversation">
-        <div className="date-rule">CHAPTER PRODUCTION SESSION · 对话流随 T44 接入</div>
-
-        <div className="msg ai" data-testid="dialogue-skeleton">
-          <div className="avatar">舟</div>
-          <div className="bubble">
-            写作对话流（墨舟先问 · 气泡流 · 草稿流片段）将在中栏对话票 T44 接入，当前为骨架。
-            <span className="hint">
-              中栏暂以存量功能填充：建书卡 / 账本可见。Story Brain 三区面板已迁入右侧检视塔（T41）。
-            </span>
-          </div>
-        </div>
+        <DialogueStream book={book} />
 
         <section className="wb-section" data-testid="create-book">
           <h2>建书</h2>
@@ -147,25 +138,6 @@ export function WorkbenchView({
             ))}
           </ul>
         </section>
-      </div>
-
-      <div className="composer-wrap">
-        <div className="composer-shell">
-          <div className="composer">
-            <textarea
-              placeholder="对话流将在 T44 接入——此处为骨架占位，不假装可用"
-              disabled
-              aria-label="写作对话输入（T44 接入前占位）"
-            />
-            <button className="send" disabled aria-label="发送（T44 接入前占位）">
-              ↑
-            </button>
-            <div className="composer-foot">
-              <span>COMPOSER · SKELETON</span>
-              <span>对话流 · T44</span>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   )

@@ -16,9 +16,11 @@ import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-comp
 import {
   ChapterProductionSession,
   loadReceiptForResume,
+  makeDraftProviderBinding,
   projectSession,
   QualityReworkLimitExceededError,
   recordAuthorCorrection,
+  runDraftStep,
   runReviewStep,
 } from '@mozhou/pipeline'
 import {
@@ -48,7 +50,9 @@ import type {
   TemporalFact,
 } from '@mozhou/kernel'
 import { readPipelineLedger } from '@mozhou/pipeline'
-import { PublishBus } from '@mozhou/runtime'
+import { NoProviderError, PublishBus, RuntimeEngine } from '@mozhou/runtime'
+import type { CapabilityRecipe } from '@mozhou/runtime'
+import type { ContextPacket } from '@mozhou/context-compiler'
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
 
@@ -135,6 +139,52 @@ export interface ChangeMatrixResponse {
   readonly rerunCount?: number | undefined
 }
 
+/**
+ * T44（#89）中栏写作对话流读面/执行面。
+ * - /api/capabilities：技能多选胶囊列表（V1 静态词表 = 原型技能清单；
+ *   CapabilityRegistry 运行时注册面后续接真实能力时替换）。
+ * - /api/draft.question：墨舟先问（mock 生成；V1 无 LLM，返回固定先问块 +
+ *   关联承诺提示）。
+ * - /api/draft.stream：NDJSON 流式草稿端点。provider 未配（registry 对
+ *   CHAPTER_DRAFTING 无 resolve）⇒ 非流式 {ok:false, code:'PROVIDER_UNAVAILABLE'}
+ *   （Gate 3 纪律：显式 unavailable，不静默）。已配 ⇒ runDraftStep 全量产出按
+ *   字块序列化为 NDJSON 流（服务端打字机切分），前端逐块渐进渲染。
+ */
+export interface CapabilityListItem {
+  readonly id: string
+  readonly label: string
+}
+
+export interface CapabilitiesResponse {
+  readonly ok: true
+  readonly capabilities: readonly CapabilityListItem[]
+  /** CHAPTER_DRAFTING provider 是否已配置；false 时 composer 必须显式 unavailable。 */
+  readonly providerAvailable: boolean
+}
+
+export interface DraftQuestionResponse {
+  readonly ok: true
+  readonly question: string
+  readonly hint: string
+  /** 作者可选的快捷回答（原型 choice-row）。 */
+  readonly choices: readonly string[]
+}
+
+export interface DraftStreamInit {
+  /** provider 已配时的起始帧（含 writer 身份）。 */
+  readonly ok: true
+  readonly event: 'start'
+  readonly receiptId: string | null
+  readonly chapterIndex: number
+}
+
+/** provider 未配时端点载回的非流式错误（unavailable 显式）。 */
+export interface DraftStreamUnavailable {
+  readonly ok: false
+  readonly code: 'PROVIDER_UNAVAILABLE'
+  readonly error: string
+}
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -156,6 +206,103 @@ function urlPath(req: IncomingMessage): string {
   return url.split('?')[0] ?? '/'
 }
 
+/* ---- T44（#89）中栏对话流辅助 ---- */
+
+/** V1 静态技能词表（原型 codex-ui-ink-orbit.html 胶囊清单；CapabilityRegistry 接线前为读面）。 */
+const DIALOGUE_CAPABILITIES: readonly CapabilityListItem[] = [
+  { id: 'continuation', label: '续写' },
+  { id: 'suspense', label: '悬念调度' },
+  { id: 'dialogue-polish', label: '对白打磨' },
+  { id: 'atmosphere', label: '场景氛围' },
+  { id: 'consistency', label: '一致性自查' },
+]
+
+/** 判定 CHAPTER_DRAFTING 是否可解析（provider 未配 = registry 无该 taskType 的 resolve）。 */
+function hasDraftProvider(): boolean {
+  const configured = process.env['MOZHOU_DRAFT_PROVIDER']
+  if (configured !== 'mock') return false
+  const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root: '/' } })
+  engine.registerCapability({
+    taskType: 'CHAPTER_DRAFTING',
+    providerId: 'mock',
+    providerVersion: '0.0.0',
+    failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
+  })
+  try {
+    engine.registry.resolve('CHAPTER_DRAFTING')
+    return true
+  } catch (error) {
+    if (error instanceof NoProviderError) return false
+    throw error
+  }
+}
+
+/**
+ * Mock draft 引擎（V1 无真实 LLM）：构造 RuntimeEngine + 注册演示能力与
+ * makeDraftProviderBinding。stream 源 = 按 prompt 合成的确定性字块（测试可注入）。
+ * recipe fixture 对齐 draft-step 测试既有形状（T17 夹具，字段全量）。
+ */
+function makeMockEngine(
+  root: string,
+  chapterIndex: number,
+  prompt: string,
+  onDelta: (text: string) => void,
+): { engine: RuntimeEngine; recipe: CapabilityRecipe } {
+  const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
+  const recipe: CapabilityRecipe = {
+    id: 'chapter-drafting',
+    recipeVersion: '0.1.0',
+    source: { repo: 'original', commit: '0'.repeat(40), license: 'original', refinedAt: '2026-08-25', refineNote: 'T44 web mock' },
+    brief: { capability: '正文草稿流式生成', runtimeSemantics: '断流标 partial、半稿持久保留', triggers: ['draft'] },
+    taskType: 'CHAPTER_DRAFTING',
+    entry: { routerDoc: 'docs/router.md', phases: ['draft'], stopPoints: [] },
+    references: [],
+    artifacts: [],
+    prechecks: [],
+    trackingGate: {
+      authorityState: '正文/第一卷/第0001章.md',
+      casField: 'revision',
+      transactionModes: ['append'],
+      derivedViews: [],
+      budgets: { hotContextBytes: 8192, perChapterReads: [] },
+      failureTaxonomy: 'validationFailed',
+      hookPoint: 'postWrite',
+    },
+    contextBudget: { hotContextBytes: 8192, fixedSections: [], perChapterReads: [] },
+  }
+  engine.registerCapability({
+    taskType: 'CHAPTER_DRAFTING',
+    providerId: 'mock',
+    providerVersion: '0.0.0',
+    failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
+  })
+  engine.registerProviderBinding(
+    'mock',
+    makeDraftProviderBinding({ bookRoot: root, chapterIndex, provider: 'deepseek', mode: 'generate', stream: () => mockDraftStream(prompt, onDelta) }),
+  )
+  return { engine, recipe }
+}
+
+/** 确定性 mock 流源：按 prompt 词数合成字块（测试断言基线）。 */
+function mockDraftStream(prompt: string, onDelta?: (text: string) => void): AsyncIterable<string> {
+  const base = prompt.trim().length > 0 ? prompt.trim() : '夜雨敲窗，灯焰摇了三摇。'
+  const chunks = [base.slice(0, 8), base.slice(8, 18) === '' ? base : base.slice(8, 18), base.slice(18)]
+  return (async function* () {
+    for (const chunk of chunks) {
+      await Promise.resolve()
+      if (chunk.length > 0) {
+        onDelta?.(chunk)
+        yield chunk
+      }
+    }
+  })()
+}
+
+/** NDJSON 流写一块。 */
+function ndjson(res: ServerResponse, payload: unknown): void {
+  res.write(JSON.stringify(payload) + '\n')
+}
+
 /**
  * 中间件：仅处理 /api/* 前缀；非 API 请求交给 next()（Vite 静态或 prod serve）。
  * 端点：
@@ -168,6 +315,9 @@ function urlPath(req: IncomingMessage): string {
  *   POST /api/receipt              {root, receiptId} → 单张 Receipt 详情 + 会话投影续跑判态（T42）
  *   POST /api/change-matrix        {root}       → 变更矩阵投影（T43：assembleChangeMatrix 只读）
  *   POST /api/change-matrix.rerun  {root, traversalId} → runTraversal 幂等覆盖重跑（T43）
+ *   POST /api/capabilities         {}           → 技能多选胶囊列表（T44 读面）
+ *   POST /api/draft.question       {}           → 墨舟先问（T44，V1 mock）
+ *   POST /api/draft.stream         {root, prompt} → 流式草稿端点（T44：NDJSON；provider 未配 unavailable）
  *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  *   POST /api/chapter.review      {root, chapterIndex} → runReviewStep + 审查落账
  *   POST /api/chapter.rework      {root, chapterIndex} → 显式质量回炉（上限 2）
@@ -348,6 +498,79 @@ export function apiMiddleware(): Middleware {
             matrix: assembleChangeMatrix(root),
             rerunCount: 1,
           } satisfies ChangeMatrixResponse)
+          return
+        }
+        /* ---- T44（#89）中栏写作对话流：技能读面 / 墨舟先问 / 流式草稿端点 ---- */
+        if (req.method === 'POST' && path === '/api/capabilities') {
+          json(res, 200, {
+            ok: true,
+            capabilities: DIALOGUE_CAPABILITIES,
+            providerAvailable: hasDraftProvider(),
+          } satisfies CapabilitiesResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/draft.question') {
+          // V1 无 LLM：mock 先问（确定性）。关联承诺提示为占位文本，
+          // 后续 T44+ 接真实问答面时替换。
+          json(res, 200, {
+            ok: true,
+            question: '这一章，你更想让读者害怕「钟声」，还是害怕钟声之后的沉默？',
+            hint: '墨舟先问 · 关联承诺（V1 mock）',
+            choices: ['害怕钟声', '害怕沉默', '两者递进'],
+          } satisfies DraftQuestionResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/draft.stream') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          const chapterIndex = typeof body['chapterIndex'] === 'number' && Number.isInteger(body['chapterIndex']) && body['chapterIndex'] > 0
+            ? body['chapterIndex']
+            : null
+          const prompt = typeof body['prompt'] === 'string' ? body['prompt'] : ''
+          if (root === null || chapterIndex === null) {
+            json(res, 400, { ok: false, error: 'root and positive integer chapterIndex required' })
+            return
+          }
+          // Gate 3 纪律：provider 未配（registry 无 CHAPTER_DRAFTING resolve）⇒
+          // 显式 unavailable，发送动作被前端禁用。不静默假装可用。
+          if (!hasDraftProvider()) {
+            json(res, 200, {
+              ok: false,
+              code: 'PROVIDER_UNAVAILABLE',
+              error: '尚未配置草稿生成 provider——中栏写作对话显式不可用（Gate 3）。',
+            } satisfies DraftStreamUnavailable)
+            return
+          }
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+          res.setHeader('X-Accel-Buffering', 'no')
+          res.setHeader('Cache-Control', 'no-cache')
+          ndjson(res, { ok: true, event: 'start', chapterIndex, receiptId: null } satisfies DraftStreamInit)
+          const { engine, recipe } = makeMockEngine(root, chapterIndex, prompt, (delta: string) => {
+            ndjson(res, { ok: true, event: 'delta', text: delta })
+          })
+          try {
+            const outcome = await runDraftStep({
+              engine,
+              bookRoot: root,
+              chapterIndex,
+              packet: {
+                taskType: 'CHAPTER_DRAFTING',
+                chapterIndex,
+                structural: [],
+                settings: [],
+                story: { text: '', tokens: 0, trimType: 'none' },
+                text: prompt,
+                totalTokens: prompt.length,
+              } satisfies ContextPacket,
+              recipe,
+            })
+            ndjson(res, { ok: true, event: 'done', outcome: outcome.outcome, partial: outcome.partial, chars: outcome.chars })
+            res.end()
+          } catch (error) {
+            ndjson(res, { ok: true, event: 'error', error: (error as Error).message })
+            res.end()
+          }
           return
         }
         if (req.method === 'POST' && path === '/api/ledger') {
