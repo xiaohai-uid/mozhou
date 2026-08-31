@@ -8,9 +8,12 @@ import type { BookInfo } from './workbenchStorage'
 export function TopBar({
   book,
   onHome,
+  onReplayWizard,
 }: {
   book: BookInfo | null
   onHome: () => void
+  /** 书切换器重放：已建书时点书名 = 重放首次建书 Wizard（Q3 可重放）。 */
+  onReplayWizard: () => void
 }): JSX.Element {
   return (
     <header className="topbar">
@@ -22,11 +25,15 @@ export function TopBar({
         </div>
       </div>
 
-      <button className="book-switch" onClick={onHome} title="回到工作台">
+      <button
+        className="book-switch"
+        onClick={book === null ? onHome : onReplayWizard}
+        title={book === null ? '回到工作台' : '重放首次建书 Wizard'}
+      >
         <span className="cover" aria-hidden="true" />
         <span>
           {book === null ? '建立作品' : `《${book.title}》`}
-          <em>{book === null ? '尚未建书 · 前往工作台' : '本地书库 · 工作台'}</em>
+          <em>{book === null ? '尚未建书 · 前往工作台' : '本地书库 · 点按重放 Wizard'}</em>
         </span>
       </button>
 

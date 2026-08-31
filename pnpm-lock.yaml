@@ -26,6 +26,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@mozhou/context-compiler':
+        specifier: workspace:*
+        version: link:../../packages/context-compiler
       '@mozhou/data-plane':
         specifier: workspace:*
         version: link:../../packages/data-plane

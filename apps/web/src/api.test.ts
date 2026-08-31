@@ -11,7 +11,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, createChapterDraft, entityCardFileRel, readManifest, openDatabase, readProseChapter, proseChapterPath } from '@mozhou/data-plane'
+import { LocalDataPlane, createChapterDraft, entityCardFileRel, readManifest, openDatabase, readProseChapter, proseChapterPath, sha256Hex } from '@mozhou/data-plane'
+import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
 import { ChapterProductionSession, recordUserEdit } from '@mozhou/pipeline'
@@ -467,5 +468,118 @@ describe('T41 Story Brain 四读面 API 契约', () => {
     expect(status).toBe(400)
     expect(data.ok).toBe(false)
     expect(typeof data.error).toBe('string')
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * T42（#87）装配看板读面 API 契约：
+ * /api/receipts（列表：id/章/tok/INV-R6 hash match）+ /api/receipt（详情：
+ * loadReceiptForResume 直出 + 会话投影续跑判态）。零新增后端能力——纯读面。
+ * seed：直接落盘 receipt 文件（one-file-one-receipt），hash 值按真实重算
+ * 语义构造（canonicalJson(replayInputs) → sha256Hex）。
+ * ------------------------------------------------------------------------- */
+
+const T42_T0 = '2026-08-24T00:00:00.000Z'
+
+interface T42ReceiptSeed {
+  id: string
+  chapterIndex?: number
+  entries?: unknown[]
+  replayInputs?: Record<string, unknown>
+  totalTokens?: number
+}
+
+/** 构造可落盘的 Receipt JSON：inputsDigest 按 INV-R6 语义重算（真实校验路径）。 */
+function t42ReceiptJson(seed: T42ReceiptSeed): Record<string, unknown> {
+  const replayInputs = seed.replayInputs ?? { configVersion: 'v1', tokenizerVersion: 't1' }
+  return {
+    id: seed.id,
+    bookId: 'book_01JB00000000000000000000',
+    revision: 0,
+    createdAt: T42_T0,
+    updatedAt: T42_T0,
+    taskType: 'CHAPTER_DRAFTING',
+    ...(seed.chapterIndex === undefined ? {} : { chapterIndex: seed.chapterIndex }),
+    entries: seed.entries ?? [],
+    parseFailures: [],
+    storyTextQuota: { reservedTokens: 1024, actualTokens: 2048 },
+    totalTokens: seed.totalTokens ?? 4096,
+    assembledBy: 'server',
+    replayInputs,
+    inputsDigest: sha256Hex(canonicalJson(replayInputs)),
+    recomputationHash: 'h',
+  }
+}
+
+/** 落盘一张 receipt（.mozhou/receipts/<id>.json）。 */
+function t42SeedReceipt(root: string, json: Record<string, unknown>): void {
+  const dir = join(root, '.mozhou', 'receipts')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, String(json.id) + '.json'), JSON.stringify(json), 'utf8')
+}
+
+describe('T42 装配看板读面 API 契约', () => {
+  it('POST /api/receipts：列表直出 id/章/tok/hash match；空书 = 空数组', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t42-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '装配书', dir })
+    t42SeedReceipt(dir, t42ReceiptJson({ id: 'rcpt_t4201', chapterIndex: 1, totalTokens: 5120 }))
+
+    const { status, data } = await post(base, '/api/receipts', { root: dir })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(Array.isArray(data.receipts)).toBe(true)
+    const receipts = data.receipts as { receiptId: string; chapterIndex: number | null; totalTokens: number; hashMatch: boolean }[]
+    expect(receipts).toHaveLength(1)
+    expect(receipts[0]?.receiptId).toBe('rcpt_t4201')
+    expect(receipts[0]?.chapterIndex).toBe(1)
+    expect(receipts[0]?.totalTokens).toBe(5120)
+    expect(receipts[0]?.hashMatch).toBe(true)
+  })
+
+  it('hash mismatch 显式暴露（INV-R6 重算不一致），不静默降级', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t42-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '失谐书', dir })
+    const broken = t42ReceiptJson({ id: 'rcpt_t4202', chapterIndex: 2 })
+    broken['inputsDigest'] = 'deadbeefdeadbeefdeadbeefdeadbeef'
+    t42SeedReceipt(dir, broken)
+
+    const { data } = await post(base, '/api/receipts', { root: dir })
+    const receipts = data.receipts as { receiptId: string; hashMatch: boolean }[]
+    expect(receipts[0]?.hashMatch).toBe(false)
+  })
+
+  it('POST /api/receipt：详情直出 ContextReceipt + 会话投影续跑判态（无会话显式呈现）', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t42-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '详情书', dir })
+    t42SeedReceipt(dir, t42ReceiptJson({ id: 'rcpt_t4203', chapterIndex: 3, totalTokens: 3000 }))
+
+    const { status, data } = await post(base, '/api/receipt', { root: dir, receiptId: 'rcpt_t4203' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.receiptId).toBe('rcpt_t4203')
+    expect(data.chapterIndex).toBe(3)
+    expect(data.totalTokens).toBe(3000)
+    expect(data.hashMatch).toBe(true)
+    expect(data.receipt).toMatchObject({ id: 'rcpt_t4203', taskType: 'CHAPTER_DRAFTING', assembledBy: 'server' })
+    // 无会话投影：新书没有 TaskStarted 开卷，sessionOpen=false 显式呈现
+    expect(data.resume).toMatchObject({ sessionOpen: false, currentStep: null })
+    expect((data.resume as { committed: boolean }).committed).toBe(false)
+  })
+
+  it('缺 root/receiptId 返回 400 显式错误；receipts 缺 root 同', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/receipt', {})
+    expect(status).toBe(400)
+    expect(data.ok).toBe(false)
+    expect(typeof data.error).toBe('string')
+    const r2 = await post(base, '/api/receipts', {})
+    expect(r2.status).toBe(400)
+    expect(r2.data.ok).toBe(false)
   })
 })

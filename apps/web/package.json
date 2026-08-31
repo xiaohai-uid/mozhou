@@ -10,6 +10,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
     "@mozhou/data-plane": "workspace:*",
     "@mozhou/kernel": "workspace:*",
     "@mozhou/pipeline": "workspace:*",

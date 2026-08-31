@@ -2,9 +2,9 @@
  * 壳集成测试（实现票 T40）：Ink Orbit 工作台壳拼装 + localStorage
  * 恢复（书名 + 视图状态，刷新不丢）+ 导航切换显式占位。
  */
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
 import { okJson } from './test/http'
 import { emptyCanonState } from './test/fixtures'
@@ -14,13 +14,18 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
+/** 其余测试默认「Wizard 已完成」——Q3 仅首次，避免覆盖层挡住工作台断言。 */
+beforeEach(() => {
+  window.localStorage.setItem('mozhou.wizard.done', 'done')
+})
+
 const STORED_BOOK = {
   root: 'C:\\tmp\\stored-book',
   bookId: 'bk_stored',
   title: '雾港失真',
 }
 
-/** 壳级按路径 stub：建书 + Story Brain 三读面 + 质量门缺省；未知 /api 路径显式抛错（防未来回归静默通过）。 */
+/** 壳级按路径 stub：建书 + Story Brain 三读面 + 装配看板 + 质量门缺省；未知 /api 路径显式抛错（防未来回归静默通过）。 */
 function stubAppFetch(): void {
   vi.stubGlobal(
     'fetch',
@@ -30,6 +35,10 @@ function stubAppFetch(): void {
       if (path === '/api/story-brain.entities') return okJson({ ok: true, cards: [] })
       if (path === '/api/story-brain.facts') {
         return okJson({ ok: true, chapter: 1, currentChapterIndex: null, chapters: [], canon: [], perspective: [], invalidated: [] })
+      }
+      if (path === '/api/receipts') return okJson({ ok: true, receipts: [] })
+      if (path === '/api/receipt') {
+        return okJson({ ok: false, error: 'unexpected receipt path in shell test: ' + path })
       }
       if (path === '/api/chapter.quality') return okJson({ ok: true, hasReport: false })
       throw new Error('unexpected fetch path in shell test: ' + path)
@@ -87,7 +96,10 @@ describe('App 壳集成（T40）', () => {
     const receiptNav = document.querySelector('[data-view="context-receipt"]')
     if (receiptNav === null) throw new Error('missing context-receipt nav')
     await userEvent.click(receiptNav as HTMLElement)
-    expect(screen.getByTestId('placeholder-view').textContent).toContain('T42')
+    // T42 起装配看板为真实 tab：未建书呈显式空态（InspectorEmpty），不假装可用
+    const receiptPanel = document.querySelector('[data-panel="context-receipt"]')
+    if (receiptPanel === null) throw new Error('missing context-receipt panel')
+    expect(receiptPanel.querySelector('[data-testid="inspector-empty"]')?.textContent).toContain('装配看板')
     const rankNav = document.querySelector('[data-view="rank-scan"]')
     if (rankNav === null) throw new Error('missing rank-scan nav')
     await userEvent.click(rankNav as HTMLElement)
@@ -116,6 +128,75 @@ describe('App 壳集成（T40）', () => {
       expect(raw).not.toBeNull()
       const state = JSON.parse(raw as string) as { book: { title: string } | null }
       expect(state.book?.title).toBe('持久之书')
+    })
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * T42（#87）首次建书 Wizard 集成：仅首次自动进入 / 完成后不再自动弹出 /
+ * 书切换器可重放（Q3 US11）。
+ * ------------------------------------------------------------------------- */
+
+describe('App 首次建书 Wizard（T42）', () => {
+  it('无书且未完成 Wizard：覆盖层自动进入', () => {
+    window.localStorage.removeItem('mozhou.wizard.done')
+    stubAppFetch()
+    render(<App />)
+    expect(screen.getByTestId('wizard-overlay')).not.toBeNull()
+  })
+
+  it('Wizard 完成后进入常驻工作台；刷新不再自动弹出（localStorage 记忆）', async () => {
+    window.localStorage.removeItem('mozhou.wizard.done')
+    stubAppFetch()
+    render(<App />)
+    const wizard = screen.getByTestId('wizard-overlay')
+    await userEvent.type(within(wizard).getByLabelText('作品名'), '雾港失真')
+    await userEvent.click(within(wizard).getByRole('button', { name: /继续/ }))
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-eyebrow').textContent).toBe('STEP 02 / 05')
+    })
+    // 其余步空输入可过（输入为增强）
+    await userEvent.click(within(wizard).getByRole('button', { name: /继续/ }))
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-eyebrow').textContent).toBe('STEP 03 / 05')
+    })
+    await userEvent.click(within(wizard).getByRole('button', { name: /继续/ }))
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-eyebrow').textContent).toBe('STEP 04 / 05')
+    })
+    await userEvent.click(within(wizard).getByRole('button', { name: /继续/ }))
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-eyebrow').textContent).toBe('STEP 05 / 05')
+    })
+    await userEvent.click(within(wizard).getByRole('button', { name: /进入工作台/ }))
+    // 落地工作台：Wizard 覆盖层卸载（wizardOpen=false），书名出现在 chapterbar
+    await waitFor(() => {
+      expect(screen.queryByTestId('wizard-overlay')).toBeNull()
+    })
+    expect(document.querySelector('.chapterbar h1')?.textContent).toBe('《雾港失真》')
+    // wizard.done 已写
+    expect(window.localStorage.getItem('mozhou.wizard.done')).toBe('done')
+  })
+
+  it('Wizard 已完成后刷新：不自动弹出（常驻工作台）', () => {
+    stubAppFetch()
+    render(<App />)
+    expect(screen.queryByTestId('wizard-overlay')).toBeNull()
+  })
+
+  it('书切换器可重放：已建书时点书名重开 Wizard 覆盖层（Q3 可重放）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    expect(screen.queryByTestId('wizard-overlay')).toBeNull()
+    const bookSwitch = document.querySelector('.book-switch')
+    if (bookSwitch === null) throw new Error('missing book-switch')
+    await userEvent.click(bookSwitch as HTMLElement)
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-overlay')).not.toBeNull()
     })
   })
 })

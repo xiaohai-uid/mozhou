@@ -12,8 +12,10 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CORRECTION_REASONS, hashProse, isQualityReviewCurrent } from '@mozhou/quality-engine'
 import type { QualityPolicy, QualityReviewReport } from '@mozhou/quality-engine'
+import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-compiler'
 import {
   ChapterProductionSession,
+  loadReceiptForResume,
   projectSession,
   QualityReworkLimitExceededError,
   recordAuthorCorrection,
@@ -27,8 +29,10 @@ import {
   readNarrativeSnapshot,
   readProseChapter,
   scanEntityCards,
+  sha256Hex,
 } from '@mozhou/data-plane'
 import type { ChapterPhase } from '@mozhou/data-plane'
+import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import {
   queryActiveFacts as queryVisibleFactsInSnapshot,
   queryKnowledgePerspective,
@@ -65,6 +69,54 @@ export interface StoryBrainFactsResponse {
   readonly invalidated: readonly (KnowledgeState & { subject: EntityRef | null })[]
 }
 
+/**
+ * T42（#87）装配看板（Context Receipt）读面。
+ * 纯只读：列表 = receipts 目录扫描（one-file-one-receipt），
+ * 详情 = loadReceipt / loadReceiptForResume 直出（INV-R1/R2：指针存在即凭证在盘，
+ * 不重编译）。零新增后端能力——续跑语义由会话投影显式呈现（可恢复/已收卷/无会话）。
+ *
+ * 「hash match」徽标为真实校验：inputsDigest 恒 = sha256(canonicalJson(replayInputs))
+ * （INV-R6），服务端重算比对，漂移即 mismatch——绝不静默降级。
+ */
+export interface ReceiptListItem {
+  readonly receiptId: string
+  readonly chapterIndex: number | null
+  readonly totalTokens: number
+  /** INV-R6 重算校验：hashMatch=false 即盘上凭证与其重放输入面不一致。 */
+  readonly hashMatch: boolean
+}
+
+export interface ReceiptListResponse {
+  readonly ok: true
+  readonly receipts: readonly ReceiptListItem[]
+}
+
+export interface ReceiptResumeView {
+  /** 当前章生产会话投影（无会话 = null）：可恢复性唯一事实源。 */
+  readonly sessionOpen: boolean
+  readonly currentStep: string | null
+  readonly committed: boolean
+  readonly finished: boolean
+  /** Compile 后崩溃恢复凭据：本窗口最近一张 CHAPTER_DRAFTING 凭证。 */
+  readonly lastReceiptId: string | null
+}
+
+export interface ReceiptDetailResponse {
+  readonly ok: true
+  readonly receiptId: string
+  readonly chapterIndex: number | null
+  readonly totalTokens: number
+  readonly hashMatch: boolean
+  readonly receipt: ContextReceipt
+  /** Replay Inputs 已内嵌在 ContextReceipt.replayInputs（原样直出，不重复搬运）。 */
+  readonly resume: ReceiptResumeView
+}
+
+/** INV-R6 校验：盘上凭证自重的 replayInputs 规范序列摘要 === inputsDigest。 */
+function receiptDigestMatch(receipt: ContextReceipt): boolean {
+  return sha256Hex(canonicalJson(receipt.replayInputs)) === receipt.inputsDigest
+}
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -94,6 +146,8 @@ function urlPath(req: IncomingMessage): string {
  *   POST /api/story-brain.entities {root}       → scanEntityCards（Story Brain 实体网格，PR #82）
  *   POST /api/story-brain.facts    {root, entityIds?} → 认知三级通道（T41：canon /
  *                                      suspects-believes 安全投影 / invalidated + 章节锚点）
+ *   POST /api/receipts             {root}       → 装配看板 Receipt 列表（T42：id/章/tok/hash match）
+ *   POST /api/receipt              {root, receiptId} → 单张 Receipt 详情 + 会话投影续跑判态（T42）
  *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  *   POST /api/chapter.review      {root, chapterIndex} → runReviewStep + 审查落账
  *   POST /api/chapter.rework      {root, chapterIndex} → 显式质量回炉（上限 2）
@@ -188,6 +242,55 @@ export function apiMiddleware(): Middleware {
             invalidated,
           }
           json(res, 200, payload)
+          return
+        }
+        /* ---- T42（#87）装配看板读面：纯只读（loadReceipt / loadReceiptForResume 既有，
+         *      零新增后端能力）+ INV-R6 hash match 真实校验 + 会话投影续跑判态 ---- */
+        if (req.method === 'POST' && path === '/api/receipts') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+          const rows = readPipelineLedger(root)
+          const items: ReceiptListItem[] = []
+          for (const receiptId of listReceiptIds(root)) {
+            const receipt = loadReceipt(root, receiptId)
+            items.push({
+              receiptId,
+              chapterIndex: receipt.chapterIndex ?? null,
+              totalTokens: receipt.totalTokens,
+              hashMatch: receiptDigestMatch(receipt),
+            })
+          }
+          json(res, 200, { ok: true, receipts: items } satisfies ReceiptListResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/receipt') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          const receiptId = typeof body['receiptId'] === 'string' ? body['receiptId'] : null
+          if (root === null || receiptId === null) { json(res, 400, { ok: false, error: 'root and receiptId required' }); return }
+          // loadReceiptForResume = loadReceipt 同一读面（INV-R1/R2：指针在即凭证在，
+          // 恢复按 receiptId 取回产物，不重编译）——详见 packages/pipeline/src/compile-step.ts。
+          const receipt = loadReceiptForResume(root, receiptId as ContextReceiptId)
+          const chapterIndex = receipt.chapterIndex ?? null
+          const projection = chapterIndex === null
+            ? null
+            : projectSession(readPipelineLedger(root), chapterIndex)
+          json(res, 200, {
+            ok: true,
+            receiptId,
+            chapterIndex,
+            totalTokens: receipt.totalTokens,
+            hashMatch: receiptDigestMatch(receipt),
+            receipt,
+            resume: {
+              sessionOpen: projection?.sessionOpen ?? false,
+              currentStep: projection?.currentStep ?? null,
+              committed: projection?.committed ?? false,
+              finished: projection?.finished ?? false,
+              lastReceiptId: projection?.lastReceiptId ?? null,
+            } satisfies ReceiptResumeView,
+          } satisfies ReceiptDetailResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/ledger') {
