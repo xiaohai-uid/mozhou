@@ -45,6 +45,9 @@ function stubAppFetch(): void {
         return okJson({ ok: false, error: 'unexpected rerun path in shell test: ' + path })
       }
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
+      if (path === '/api/capability-square') {
+        return okJson({ ok: true, providerAvailable: false, groups: [] })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -231,5 +234,21 @@ describe('App 首次建书 Wizard（T42）', () => {
     })
     // 书库根 = 当前书父目录（C:\tmp\stored-book → C:\tmp）
     expect(screen.getByLabelText('bookshelf-view').textContent).toContain('C:\\tmp')
+  })
+
+  it('技能广场导航：点击 nav 挂载技能广场视图（V1 能力注册表读面）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const squareNav = document.querySelector('[data-view="capability-square"]')
+    if (squareNav === null) throw new Error('missing capability-square nav')
+    await userEvent.click(squareNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('capability-square-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('capability-square-view').textContent).toContain('技能广场')
   })
 })

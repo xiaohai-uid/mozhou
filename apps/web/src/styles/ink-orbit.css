@@ -732,6 +732,24 @@
     color: var(--warning);
   }
 
+  /* 技能广场能力状态徽标（T46）：native = 原生可用（success 语义），
+     其余 = 待接入（warning 语义）；语义由文字承载，颜色不单独表意。 */
+  .cap-badge {
+    padding: 5px 7px;
+    border-radius: 999px;
+    font: 9px var(--mono);
+  }
+
+  .cap-badge.native {
+    background: rgba(128, 214, 176, 0.12);
+    color: var(--success);
+  }
+
+  .cap-badge.pending {
+    background: rgba(228, 184, 117, 0.12);
+    color: var(--warning);
+  }
+
   .banner {
     margin-bottom: 10px;
     padding: 10px;

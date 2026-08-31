@@ -1,0 +1,148 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CapabilitySquareView（技能广场） > 分组/条目渲染（label/description/evidence + 状态徽标文字）；契约快照 1`] = `
+<section
+  aria-label="capability-square-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      技能广场
+    </h1>
+    <span
+      class="meta"
+    >
+      V1 能力注册表 · 
+      3
+       项
+    </span>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="capability-square-group"
+    >
+      <h2>
+        创作
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              工作台
+            </b>
+            <span
+              class="cap-badge native"
+              data-testid="capability-square-badge"
+            >
+              原生可用
+            </span>
+          </div>
+          <p
+            class="muted"
+            style="margin: 0px; font-size: 11px; line-height: 1.8;"
+          >
+            建书、首章与工作台
+          </p>
+          <p
+            class="mono muted"
+            style="margin: 6px 0px 0px;"
+          >
+            workbench
+             · 
+            已接入（T40–T44）
+          </p>
+        </div>
+      </div>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              写作对话
+            </b>
+            <span
+              class="cap-badge pending"
+              data-testid="capability-square-badge"
+            >
+              需要模型服务
+            </span>
+          </div>
+          <p
+            class="muted"
+            style="margin: 0px; font-size: 11px; line-height: 1.8;"
+          >
+            中栏写作对话与草稿流式生成
+          </p>
+          <p
+            class="mono muted"
+            style="margin: 6px 0px 0px;"
+          >
+            dialogue
+             · 
+            provider 未配显式不可用（Gate 3）
+          </p>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="capability-square-group"
+    >
+      <h2>
+        资源
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              网文扫榜
+            </b>
+            <span
+              class="cap-badge pending"
+              data-testid="capability-square-badge"
+            >
+              需要外部数据源
+            </span>
+          </div>
+          <p
+            class="muted"
+            style="margin: 0px; font-size: 11px; line-height: 1.8;"
+          >
+            网文扫榜
+          </p>
+          <p
+            class="mono muted"
+            style="margin: 6px 0px 0px;"
+          >
+            rank-scan
+             · 
+            外部榜单源未接入；页面为显式占位
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

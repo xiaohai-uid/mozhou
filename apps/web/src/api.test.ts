@@ -864,3 +864,53 @@ describe('书架（本地书库）API 契约', () => {
     expect(missing.data.ok).toBe(false)
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 技能广场（能力注册表）API 契约：/api/capability-square（T46）。
+ * 纯静态读面：5 组 17 项航道诚实状态 + evidence；providerAvailable 随
+ * MOZHOU_DRAFT_PROVIDER 动态翻转（负路径默认 false，mock 显式开 true）。
+ * ------------------------------------------------------------------------- */
+describe('技能广场（能力注册表）API 契约', () => {
+  it('POST /api/capability-square：5 组 17 项、id 唯一；占位航道不得标记原生可用；证据非空', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/capability-square', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.providerAvailable).toBe(false)
+    const groups = data.groups as { group: string; entries: { id: string; status: string; evidence: string }[] }[]
+    expect(groups).toHaveLength(5)
+    const entries = groups.flatMap((g) => g.entries)
+    expect(entries).toHaveLength(17)
+    expect(new Set(entries.map((e) => e.id)).size).toBe(17)
+    // 航道词表与 views.ts 同源：抽查关键 id 存在
+    expect(entries.map((e) => e.id)).toEqual(
+      expect.arrayContaining(['workbench', 'dialogue', 'story-brain', 'quality-gate', 'rank-scan', 'cloud-sync', 'membership']),
+    )
+    // 诚实状态：缺前提的航道显式声明，不假装可用
+    const rank = entries.find((e) => e.id === 'rank-scan')
+    expect(rank?.status).toBe('external_source_required')
+    const dialogue = entries.find((e) => e.id === 'dialogue')
+    expect(dialogue?.status).toBe('provider_required')
+    const shelf = entries.find((e) => e.id === 'book-shelf')
+    expect(shelf?.status).toBe('native')
+    // 证据非空（能力不因名字存在而显示可用）
+    for (const entry of entries) {
+      expect(entry.evidence.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('POST /api/capability-square：MOZHOU_DRAFT_PROVIDER=mock 时 providerAvailable=true', async () => {
+    const before = process.env['MOZHOU_DRAFT_PROVIDER']
+    try {
+      process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+      const base = await listen()
+      const { status, data } = await post(base, '/api/capability-square', {})
+      expect(status).toBe(200)
+      expect(data.ok).toBe(true)
+      expect(data.providerAvailable).toBe(true)
+    } finally {
+      if (before === undefined) delete process.env['MOZHOU_DRAFT_PROVIDER']
+      else process.env['MOZHOU_DRAFT_PROVIDER'] = before
+    }
+  })
+})

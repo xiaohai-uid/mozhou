@@ -207,6 +207,188 @@ export interface LibraryOpenResponse {
   readonly title: string
 }
 
+/**
+ * T46（技能广场）V1 能力注册表读面。
+ * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
+ * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
+ * configuration_required / external_source_required 指缺的明确前提，页面为
+ * 显式占位（DESIGN.md §4.3：不模拟可用）。能力永不因存在一个名字而显示为可用。
+ */
+export type CapabilityStatus =
+  | 'native'
+  | 'provider_required'
+  | 'configuration_required'
+  | 'external_source_required'
+
+export interface CapabilitySquareEntry {
+  readonly id: string
+  readonly label: string
+  readonly description: string
+  readonly status: CapabilityStatus
+  /** 证据：真实接线位置或缺失前提（UI 明示，不假装）。 */
+  readonly evidence: string
+}
+
+export interface CapabilitySquareGroup {
+  readonly group: string
+  readonly entries: readonly CapabilitySquareEntry[]
+}
+
+export interface CapabilitySquareResponse {
+  readonly ok: true
+  /** CHAPTER_DRAFTING provider 是否已配置；true 时写作对话补充「已接入」标记。 */
+  readonly providerAvailable: boolean
+  readonly groups: readonly CapabilitySquareGroup[]
+}
+
+/** V1 静态能力注册表（T46）：与 views.ts 航道词汇对齐，状态为当前新栈实况。 */
+const CAPABILITY_SQUARE_GROUPS: readonly CapabilitySquareGroup[] = [
+  {
+    group: '创作',
+    entries: [
+      {
+        id: 'workbench',
+        label: '工作台',
+        description: '建书、首章与工作台',
+        status: 'native',
+        evidence: '建书/首章/账本与中栏写作对话已接入（T40–T44）',
+      },
+      {
+        id: 'dialogue',
+        label: '写作对话',
+        description: '中栏写作对话与草稿流式生成',
+        status: 'provider_required',
+        evidence: '草稿流式端点已接线；provider 未配时显式不可用（Gate 3）',
+      },
+      {
+        id: 'works',
+        label: '我的作品',
+        description: '我的作品列表',
+        status: 'native',
+        evidence: '本地书库读面已就绪（书源书架 T45）；独立作品页待迁移',
+      },
+      {
+        id: 'style-distill',
+        label: '风格蒸馏',
+        description: '风格蒸馏',
+        status: 'provider_required',
+        evidence: '需文本模型服务；页面为显式占位',
+      },
+      {
+        id: 'novel-breakdown',
+        label: '小说拆解',
+        description: '小说拆解',
+        status: 'provider_required',
+        evidence: '需文本模型服务；页面为显式占位',
+      },
+    ],
+  },
+  {
+    group: '检视 · Novel OS',
+    entries: [
+      {
+        id: 'story-brain',
+        label: 'Story Brain',
+        description: 'Story Brain 三区面板',
+        status: 'native',
+        evidence: '实体卡/大纲树/认知三级事实（T41）',
+      },
+      {
+        id: 'context-receipt',
+        label: '装配看板',
+        description: '装配看板',
+        status: 'native',
+        evidence: 'Receipt 列表/详情 + hash 校验 + 续跑判态（T42）',
+      },
+      {
+        id: 'change-matrix',
+        label: '变更矩阵',
+        description: '变更矩阵',
+        status: 'native',
+        evidence: '遍历×受影响章矩阵 + 幂等重跑（T43）',
+      },
+      {
+        id: 'quality-gate',
+        label: '质量门',
+        description: '文学质量门',
+        status: 'native',
+        evidence: '结构规则审查 + 显式回炉/纠错；语义审查者未接入',
+      },
+    ],
+  },
+  {
+    group: '工作流',
+    entries: [
+      {
+        id: 'tasks',
+        label: '任务中心',
+        description: '任务中心',
+        status: 'configuration_required',
+        evidence: '任务数据源未接线（徽标恒 0，不假装有后台任务）',
+      },
+    ],
+  },
+  {
+    group: '资源',
+    entries: [
+      {
+        id: 'book-source',
+        label: '书源搜索',
+        description: '书源搜索',
+        status: 'native',
+        evidence: '书源导入：书名 → 本地建书落地（T45）',
+      },
+      {
+        id: 'book-shelf',
+        label: '书源书架',
+        description: '书源书架',
+        status: 'native',
+        evidence: '本地书库扫描/开书/切书（T45）',
+      },
+      {
+        id: 'capability-square',
+        label: '技能广场',
+        description: '技能广场',
+        status: 'native',
+        evidence: '本页：V1 能力注册表读面（T46）',
+      },
+      {
+        id: 'rank-scan',
+        label: '网文扫榜',
+        description: '网文扫榜',
+        status: 'external_source_required',
+        evidence: '外部榜单源未接入；页面为显式占位',
+      },
+      {
+        id: 'web-search',
+        label: '联网搜索',
+        description: '联网搜索',
+        status: 'external_source_required',
+        evidence: '外部搜索源未接入；页面为显式占位',
+      },
+      {
+        id: 'cloud-sync',
+        label: '云同步',
+        description: '云同步',
+        status: 'configuration_required',
+        evidence: '云端服务/账号未接入；页面为显式占位',
+      },
+    ],
+  },
+  {
+    group: '账户',
+    entries: [
+      {
+        id: 'membership',
+        label: '会员中心',
+        description: '会员中心',
+        status: 'configuration_required',
+        evidence: '账号/授权/计费未接入；页面为显式占位',
+      },
+    ],
+  },
+]
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -344,6 +526,7 @@ function ndjson(res: ServerResponse, payload: unknown): void {
  *   POST /api/change-matrix        {root}       → 变更矩阵投影（T43：assembleChangeMatrix 只读）
  *   POST /api/change-matrix.rerun  {root, traversalId} → runTraversal 幂等覆盖重跑（T43）
  *   POST /api/capabilities         {}           → 技能多选胶囊列表（T44 读面）
+ *   POST /api/capability-square    {}           → 技能广场 V1 能力注册表（T46 读面）
  *   POST /api/draft.question       {}           → 墨舟先问（T44，V1 mock）
  *   POST /api/draft.stream         {root, prompt} → 流式草稿端点（T44：NDJSON；provider 未配 unavailable）
  *   POST /api/library              {parentDir} → 书架扫描（本地书库读面）
@@ -538,6 +721,16 @@ export function apiMiddleware(): Middleware {
             capabilities: DIALOGUE_CAPABILITIES,
             providerAvailable: hasDraftProvider(),
           } satisfies CapabilitiesResponse)
+          return
+        }
+        /* ---- T46（技能广场）：V1 能力注册表读面（17 航道诚实状态 + evidence +
+         *      providerAvailable 动态翻转）。纯静态读面，零新后端能力。 ---- */
+        if (req.method === 'POST' && path === '/api/capability-square') {
+          json(res, 200, {
+            ok: true,
+            providerAvailable: hasDraftProvider(),
+            groups: CAPABILITY_SQUARE_GROUPS,
+          } satisfies CapabilitySquareResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {

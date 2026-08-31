@@ -18,6 +18,7 @@ import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
 import { ReceiptPanel } from './context-receipt/ReceiptPanel'
 import { BookshelfView } from './shelf/BookshelfView'
+import { CapabilitySquareView } from './capability-square/CapabilitySquareView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
@@ -156,6 +157,8 @@ export function App(): JSX.Element {
             currentRoot={book?.root ?? null}
             onSwitchBook={handleBookSwitch}
           />
+        ) : view === 'capability-square' ? (
+          <CapabilitySquareView />
         ) : (
           <PlaceholderView view={view} />
         )}
