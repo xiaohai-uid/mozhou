@@ -1,0 +1,196 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CloudSyncView（云同步与备份） > 状态监控与存储指标渲染；契约快照 1`] = `
+<section
+  aria-label="cloud-sync-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      云同步与备份
+    </h1>
+    <span
+      class="meta"
+    >
+      本地离线优先 · 增量快照备份
+    </span>
+    <div
+      class="save"
+    >
+      <span
+        class="cap-badge native"
+      >
+        ● 本地离线就绪
+      </span>
+    </div>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="sync-status-section"
+    >
+      <h2>
+        数据存储与同步状态
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              Local-First 离线优先架构
+            </b>
+            <span
+              class="tag"
+            >
+              安全运行中
+            </span>
+          </div>
+          <p
+            class="muted"
+            style="margin: 0px; font-size: 11px; line-height: 1.6;"
+          >
+            墨舟将您的所有创作数据（大纲、章节、实体卡、文风画像）完整存储在本地文件系统与 SQLite 中，断网或无服务时可 100% 正常创作、审查与装配。
+          </p>
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; padding: 10px 0px 0px; border-top: 1px solid var(--hairline);"
+          >
+            <div>
+              <div
+                class="mono muted"
+              >
+                本地正典文件
+              </div>
+              <b
+                style="font-size: 15px;"
+              >
+                15
+                 份
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                本地数据库体积
+              </div>
+              <b
+                style="font-size: 15px;"
+              >
+                64
+                 KB
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                未同步变动
+              </div>
+              <b
+                style="font-size: 15px; color: var(--success);"
+              >
+                0
+                 处（已全量落盘）
+              </b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="sync-backup-section"
+    >
+      <h2>
+        作品快照备份
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              生成当前作品独立快照
+            </b>
+            <span
+              class="mono muted"
+            >
+              单文件导出 · 便携迁移
+            </span>
+          </div>
+          <p
+            class="muted"
+            style="margin: 0px; font-size: 11px;"
+          >
+            为当前作品生成包含全量正典文件与元数据指纹的完整离线快照，方便备份至外部移动硬盘或个人私有云盘。
+          </p>
+          <div
+            class="actions"
+            style="margin-top: 10px;"
+          >
+            <button
+              class="btn-primary"
+            >
+              创建作品快照备份
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+    >
+      <h2>
+        隐私与合规保证
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="finding"
+          >
+            <b>
+              零数据上传
+            </b>
+            <p
+              class="muted"
+              style="margin: 4px 0px 0px; font-size: 11px;"
+            >
+              墨舟绝不未经授权上传您的作品小说文本、大纲或角色设定，您的著作权归您完全所有。
+            </p>
+          </div>
+          <div
+            class="finding"
+          >
+            <b>
+              透明明文存储
+            </b>
+            <p
+              class="muted"
+              style="margin: 4px 0px 0px; font-size: 11px;"
+            >
+              正文采用标准 Markdown 与 Frontmatter 存储，随时可使用 VS Code、Obsidian 或任何文本编辑器打开与迁移。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

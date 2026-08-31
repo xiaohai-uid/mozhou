@@ -99,6 +99,16 @@ function stubAppFetch(): void {
           hotQueries: [],
         })
       }
+      if (path === '/api/cloud-sync' || path === '/api/cloud-sync.backup') {
+        return okJson({
+          ok: true,
+          localReady: true,
+          syncStatus: 'offline_ready',
+          lastLocalSnapshotAt: '',
+          pendingChangesCount: 0,
+          storageUsage: { localCanonFiles: 0, databaseBytes: 0 },
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -170,9 +180,9 @@ describe('App 壳集成（T40）', () => {
     const receiptPanel = document.querySelector('[data-panel="context-receipt"]')
     if (receiptPanel === null) throw new Error('missing context-receipt panel')
     expect(receiptPanel.querySelector('[data-testid="inspector-empty"]')?.textContent).toContain('装配看板')
-    const cloudNav = document.querySelector('[data-view="cloud-sync"]')
-    if (cloudNav === null) throw new Error('missing cloud-sync nav')
-    await userEvent.click(cloudNav)
+    const memberNav = document.querySelector('[data-view="membership"]')
+    if (memberNav === null) throw new Error('missing membership nav')
+    await userEvent.click(memberNav)
     expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
   })
 
@@ -413,5 +423,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('web-search-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('web-search-view').textContent).toContain('联网搜索')
+  })
+
+  it('云同步导航：点击 nav 挂载云同步视图（离线优先与快照）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const cloudNav = document.querySelector('[data-view="cloud-sync"]')
+    if (cloudNav === null) throw new Error('missing cloud-sync nav')
+    await userEvent.click(cloudNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('cloud-sync-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('cloud-sync-view').textContent).toContain('云同步与备份')
   })
 })

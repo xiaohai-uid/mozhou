@@ -1061,3 +1061,30 @@ describe('联网搜索 API 契约', () => {
     expect(hotQueries.length).toBeGreaterThanOrEqual(3)
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * 云同步与备份 API 契约：/api/cloud-sync 与 /api/cloud-sync.backup（T54）。
+ * ------------------------------------------------------------------------- */
+describe('云同步与备份 API 契约', () => {
+  it('POST /api/cloud-sync：返回本地离线优先状态与存储用量', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/cloud-sync', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.localReady).toBe(true)
+    expect(data.syncStatus).toBe('offline_ready')
+  })
+
+  it('POST /api/cloud-sync.backup：生成作品独立快照摘要', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-sync-api-'))
+    roots.push(dir)
+    const book = createBook({ dir: join(dir, '快照测试书'), title: '快照测试书' })
+
+    const { status, data } = await post(base, '/api/cloud-sync.backup', { root: book.root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(typeof data.snapshotId).toBe('string')
+    expect(data.bookTitle).toBe('快照测试书')
+  })
+})

@@ -24,6 +24,7 @@ import { StyleDistillView } from './style-distill/StyleDistillView'
 import { NovelBreakdownView } from './novel-breakdown/NovelBreakdownView'
 import { RankScanView } from './rank-scan/RankScanView'
 import { WebSearchView } from './web-search/WebSearchView'
+import { CloudSyncView } from './cloud-sync/CloudSyncView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
@@ -194,6 +195,10 @@ export function App(): JSX.Element {
           <RankScanView />
         ) : view === 'web-search' ? (
           <WebSearchView />
+        ) : view === 'cloud-sync' ? (
+          <CloudSyncView
+            root={book?.root ?? null}
+          />
         ) : (
           <PlaceholderView view={view} />
         )}

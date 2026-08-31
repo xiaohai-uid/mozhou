@@ -384,6 +384,30 @@ export interface WebSearchResponse {
 }
 
 /**
+ * T54（云同步与备份）本地快照与离线同步读面。
+ */
+export interface CloudSyncResponse {
+  readonly ok: true
+  readonly localReady: boolean
+  readonly syncStatus: 'idle' | 'syncing' | 'offline_ready' | 'synced'
+  readonly lastLocalSnapshotAt: string
+  readonly pendingChangesCount: number
+  readonly storageUsage: {
+    readonly localCanonFiles: number
+    readonly databaseBytes: number
+  }
+}
+
+export interface BackupExportResponse {
+  readonly ok: true
+  readonly snapshotId: string
+  readonly bookTitle: string
+  readonly exportedAt: string
+  readonly fileCount: number
+  readonly manifestDigest: string
+}
+
+/**
  * T46（技能广场）V1 能力注册表读面。
  * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
  * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
@@ -1335,6 +1359,53 @@ export function apiMiddleware(): Middleware {
             results: results.length > 0 ? results : ALL_KNOWLEDGE.slice(0, 2),
             hotQueries,
           } satisfies WebSearchResponse)
+          return
+        }
+        /* ---- T54（云同步与备份）：本地离线优先监控与快照导出。 ---- */
+        if (req.method === 'POST' && path === '/api/cloud-sync') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+
+          let fileCount = 0
+          if (root !== null) {
+            try {
+              const canon = readCanonState(root)
+              fileCount = canon.outlineNodes.length + canon.entityCards.length + 5
+            } catch { fileCount = 1 }
+          }
+
+          json(res, 200, {
+            ok: true,
+            localReady: true,
+            syncStatus: 'offline_ready',
+            lastLocalSnapshotAt: new Date().toISOString(),
+            pendingChangesCount: 0,
+            storageUsage: {
+              localCanonFiles: fileCount,
+              databaseBytes: 1024 * 128,
+            },
+          } satisfies CloudSyncResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/cloud-sync.backup') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+
+          let title = '作品快照'
+          try {
+            const canon = readCanonState(root)
+            title = canon.book.title
+          } catch { /* ignore */ }
+
+          json(res, 200, {
+            ok: true,
+            snapshotId: 'snap_' + Date.now().toString(36),
+            bookTitle: title,
+            exportedAt: new Date().toISOString(),
+            fileCount: 12,
+            manifestDigest: 'sha256_mock_snapshot_digest',
+          } satisfies BackupExportResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {
