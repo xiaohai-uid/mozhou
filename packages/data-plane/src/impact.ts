@@ -14,10 +14,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import type { DependencyManifestEntry } from '@mozhou/kernel'
+import type { DependencyManifest, DependencyManifestEntry } from '@mozhou/kernel'
 import { RUNTIME_EVENTS_PATH } from './layout.js'
 import { openPinsWindow, findReaders, assertWithinBudget } from './stale-cache.js'
 import type { PinsWindow } from './stale-cache.js'
+import { readChapterDependencyPins } from './stale.js'
 
 /** impact 投影目录（.mozhou 运行时区，与 usage.jsonl 同层，非 canon）。 */
 export const IMPACT_DIR_RELPATH = '.mozhou/impact'
@@ -159,4 +160,89 @@ export function rebuildFingerprintOf(records: readonly ImpactRecord[]): string {
     .map((r) => r.traversalId + '|' + [...r.affectedChapters].join(',') + '|' + r.affectedFingerprint)
     .sort()
   return createHash('sha256').update(contents.join('\n')).digest('hex')
+}
+
+/* ----------------------------------------------------------------------------
+ * 变更矩阵（实现票 T43 · #88）：变更矩阵读面投影。
+ *
+ * 行 = 一次 Traversal（上游变更 + stale 计数）；
+ * 列 = 受影响章 union（矩阵头部）；
+ * 单元格三态（纯机械，零 LLM）：
+ *   - needs_rework（红）：章仍依赖上游变更的旧版本（或从未重新提交）——需重写；
+ *   - resolved（绿）：章最新提交钉版已含上游新版本——漂移已消解；
+ *   - not_affected（—）：章不在该 traversal 的 affectedChapters。
+ *
+ * 真源 = listImpactRecords（impact 投影）+ readChapterDependencyPins
+ * （事件账本最新 ChapterCommitted 钉版）；stale 标记（章大纲 frontmatter）是
+ * 传播通道的落盘面，矩阵以钉版为消解判据（作者重新提交即消解，不依赖清除动作）。
+ * ------------------------------------------------------------------------- */
+
+export type ChangeMatrixCellState = 'needs_rework' | 'resolved' | 'not_affected'
+
+export interface ChangeMatrixCell {
+  readonly chapterIndex: number
+  readonly state: ChangeMatrixCellState
+}
+
+export interface ChangeMatrixRow {
+  readonly traversalId: string
+  readonly taskRef: string
+  readonly trigger: { readonly source: ImpactRecord['trigger']['source']; readonly ref: string }
+  readonly upstreamChanges: readonly DependencyManifestEntry[]
+  readonly recordedAt: string
+  /** 仍待重写的受影响章数（needs_rework 计数；stale 计数）。 */
+  readonly staleCount: number
+  /** 受影响章逐格（含 not_affected 占位以对齐矩阵头；仅 affected 章有实义）。 */
+  readonly cells: readonly ChangeMatrixCell[]
+}
+
+export interface ChangeMatrix {
+  /** 受影响章 union（矩阵列头，升序）。 */
+  readonly columns: readonly number[]
+  readonly rows: readonly ChangeMatrixRow[]
+}
+
+/** 钉版是否已含某上游条目的新版本：同 (kind,id) 且 revision ≥ 上游版本即消解。 */
+function pinSatisfies(
+  pin: { readonly manifest: DependencyManifest } | undefined,
+  change: DependencyManifestEntry,
+): boolean {
+  if (pin === undefined) return false
+  const entry = pin.manifest.entries.find((e) => e.kind === change.kind && e.id === change.id)
+  return entry !== undefined && entry.revision >= change.revision
+}
+
+/** 组装变更矩阵（只读投影）：纯函数、无副作用、可反复调用。 */
+export function assembleChangeMatrix(root: string): ChangeMatrix {
+  const records = listImpactRecords(root)
+  const pins = readChapterDependencyPins(root)
+
+  const affectedSet = new Set<number>()
+  for (const record of records) {
+    for (const chapter of record.affectedChapters) affectedSet.add(chapter)
+  }
+  const columns = [...affectedSet].sort((a, b) => a - b)
+
+  const rows = records.map((record): ChangeMatrixRow => {
+    const cells: ChangeMatrixCell[] = columns.map((chapterIndex) => {
+      if (!record.affectedChapters.includes(chapterIndex)) {
+        return { chapterIndex, state: 'not_affected' }
+      }
+      const pin = pins.get(chapterIndex)
+      // 全部上游变更都被钉版满足 ⇒ 已消解；任一未满足（pin 缺失亦算）⇒ 需重写。
+      const resolved = record.upstreamChanges.every((change) => pinSatisfies(pin, change))
+      return { chapterIndex, state: resolved ? 'resolved' : 'needs_rework' }
+    })
+    return {
+      traversalId: record.traversalId,
+      taskRef: record.taskRef,
+      trigger: record.trigger,
+      upstreamChanges: record.upstreamChanges,
+      recordedAt: record.recordedAt,
+      staleCount: cells.filter((cell) => cell.state === 'needs_rework').length,
+      cells,
+    }
+  })
+
+  return { columns, rows }
 }

@@ -40,6 +40,10 @@ function stubAppFetch(): void {
       if (path === '/api/receipt') {
         return okJson({ ok: false, error: 'unexpected receipt path in shell test: ' + path })
       }
+      if (path === '/api/change-matrix') return okJson({ ok: true, matrix: { columns: [], rows: [] } })
+      if (path === '/api/change-matrix.rerun') {
+        return okJson({ ok: false, error: 'unexpected rerun path in shell test: ' + path })
+      }
       if (path === '/api/chapter.quality') return okJson({ ok: true, hasReport: false })
       throw new Error('unexpected fetch path in shell test: ' + path)
     }),

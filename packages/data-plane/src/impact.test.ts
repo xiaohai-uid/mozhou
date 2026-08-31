@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createBook } from './create-book.js'
 import {
   IMPACT_DIR_RELPATH,
+  assembleChangeMatrix,
   listImpactRecords,
   rebuildFingerprintOf,
   runTraversal,
@@ -105,5 +106,101 @@ describe('impact · T27 遍历编排', () => {
     runTraversal({ root, taskRef: 't1b', traversalId: 'a', trigger: { source: 'reconciliation', ref: 'r1' }, upstreamChanges: [entry('temporalFact', 'fact_a', 2)], recordedAt: '2026-08-27T00:00:00.000Z', window })
     runTraversal({ root, taskRef: 't2b', traversalId: 'b', trigger: { source: 'commit', ref: 'c2' }, upstreamChanges: [entry('outlineNode', 'node_o', 3)], recordedAt: '2026-08-27T00:00:01.000Z', window })
     expect(rebuildFingerprintOf(listImpactRecords(root))).toBe(first)
+  })
+
+  it('assembleChangeMatrix：黄金路径——上游改动 applied 后矩阵出现新红行（需重写）', () => {
+    const root = hermeticRoot()
+    seedPins(root) // ch1/ch2 依赖 fact_a@1，ch4 依赖 node_o@2
+    const window = openPinsWindow(root)
+    runTraversal({
+      root,
+      taskRef: 'trav_1',
+      traversalId: 't_1',
+      trigger: { source: 'reconciliation', ref: 'rcln_x' },
+      upstreamChanges: [entry('temporalFact', 'fact_a', 2)], // fact_a 升到 2
+      recordedAt: '2026-08-27T00:00:00.000Z',
+      window,
+    })
+
+    const matrix = assembleChangeMatrix(root)
+    expect(matrix.columns).toEqual([1, 2])
+    expect(matrix.rows).toHaveLength(1)
+    const row = matrix.rows[0]
+    if (row === undefined) throw new Error('missing matrix row')
+    expect(row.staleCount).toBe(2)
+    // ch1/ch2 钉版仍引用 fact_a@1（<2）⇒ 需重写（红）
+    expect(row.cells).toEqual([
+      { chapterIndex: 1, state: 'needs_rework' },
+      { chapterIndex: 2, state: 'needs_rework' },
+    ])
+  })
+
+  it('assembleChangeMatrix：章重新提交至新版本后单元转绿（resolved）', () => {
+    const root = hermeticRoot()
+    seedPins(root)
+    const window = openPinsWindow(root)
+    runTraversal({
+      root,
+      taskRef: 'trav_1',
+      traversalId: 't_1',
+      trigger: { source: 'reconciliation', ref: 'rcln_x' },
+      upstreamChanges: [entry('temporalFact', 'fact_a', 2)],
+      recordedAt: '2026-08-27T00:00:00.000Z',
+      window,
+    })
+    // ch1 重新提交：钉版依赖 fact_a@2（新版本）⇒ 消解；ch2 未重提交 ⇒ 仍红
+    const eventsPath = join(root, '.mozhou', 'events.jsonl')
+    const lines = readFileSync(eventsPath, 'utf8').split('\n').filter((l) => l.length > 0)
+    lines.push(JSON.stringify({
+      type: 'ChapterCommitted',
+      seq: 4,
+      chapterIndex: 1,
+      commitId: 'c1b',
+      dependencyManifest: { entries: [{ kind: 'temporalFact', id: 'fact_a', revision: 2 }] },
+    }))
+    writeFileSync(eventsPath, lines.join('\n') + '\n')
+
+    const matrix = assembleChangeMatrix(root)
+    const row = matrix.rows[0]
+    if (row === undefined) throw new Error('missing matrix row')
+    expect(row.staleCount).toBe(1)
+    expect(row.cells).toEqual([
+      { chapterIndex: 1, state: 'resolved' },
+      { chapterIndex: 2, state: 'needs_rework' },
+    ])
+  })
+
+  it('assembleChangeMatrix：多行矩阵 + not_affected 占位对齐列头', () => {
+    const root = hermeticRoot()
+    seedPins(root)
+    const window = openPinsWindow(root)
+    runTraversal({
+      root, taskRef: 't1', traversalId: 'a',
+      trigger: { source: 'reconciliation', ref: 'r1' },
+      upstreamChanges: [entry('temporalFact', 'fact_a', 2)],
+      recordedAt: '2026-08-27T00:00:00.000Z', window,
+    })
+    runTraversal({
+      root, taskRef: 't2', traversalId: 'b',
+      trigger: { source: 'commit', ref: 'c2' },
+      upstreamChanges: [entry('outlineNode', 'node_o', 3)],
+      recordedAt: '2026-08-27T00:00:01.000Z', window,
+    })
+    // 列头 = affectedChapters union = ch1/ch2（fact_a）+ ch4（node_o）
+    const matrix = assembleChangeMatrix(root)
+    expect(matrix.columns).toEqual([1, 2, 4])
+    const rowA = matrix.rows.find((r) => r.traversalId === 'a')
+    const rowB = matrix.rows.find((r) => r.traversalId === 'b')
+    if (rowA === undefined || rowB === undefined) throw new Error('missing row')
+    // A 不涉 ch4 → not_affected 占位（—）
+    expect(rowA.cells.find((c) => c.chapterIndex === 4)?.state).toBe('not_affected')
+    // B 影响 ch4（node_o@3 > 钉版@2）→ needs_rework
+    expect(rowB.cells.find((c) => c.chapterIndex === 4)?.state).toBe('needs_rework')
+    // B 不涉 ch1/ch2
+    expect(rowB.cells.find((c) => c.chapterIndex === 1)?.state).toBe('not_affected')
+    // 无任何 impact 记录 ⇒ 空矩阵
+    const empty = assembleChangeMatrix(hermeticRoot())
+    expect(empty.columns).toEqual([])
+    expect(empty.rows).toEqual([])
   })
 })

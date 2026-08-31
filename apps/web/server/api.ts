@@ -22,16 +22,20 @@ import {
   runReviewStep,
 } from '@mozhou/pipeline'
 import {
+  assembleChangeMatrix,
   createBook,
+  listImpactRecords,
   proseChapterPath,
   queryInvalidatedKnowledgeStates,
   readCanonState,
   readNarrativeSnapshot,
   readProseChapter,
+  runTraversal,
   scanEntityCards,
   sha256Hex,
 } from '@mozhou/data-plane'
 import type { ChapterPhase } from '@mozhou/data-plane'
+import type { ChangeMatrix } from '@mozhou/data-plane'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import {
   queryActiveFacts as queryVisibleFactsInSnapshot,
@@ -117,6 +121,20 @@ function receiptDigestMatch(receipt: ContextReceipt): boolean {
   return sha256Hex(canonicalJson(receipt.replayInputs)) === receipt.inputsDigest
 }
 
+/**
+ * T43（#88）变更矩阵响应：行=Traversal（上游变更 + stale 计数）、
+ * 列=受影响章，单元格三态（红 needs_rework / 绿 resolved / — not_affected）。
+ * 数据面唯一新增后端能力 = data-plane 只读投影 assembleChangeMatrix(root)；
+ * 重跑 = runTraversal 幂等覆盖（同 traversalId 覆盖原 impact 文件，不产生重复副作用）。
+ * 组件 type-only 直引本类型（零 any）。
+ */
+export interface ChangeMatrixResponse {
+  readonly ok: true
+  readonly matrix: ChangeMatrix
+  /** 重跑后的矩阵（幂等覆盖后重投影）。 */
+  readonly rerunCount?: number | undefined
+}
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -148,6 +166,8 @@ function urlPath(req: IncomingMessage): string {
  *                                      suspects-believes 安全投影 / invalidated + 章节锚点）
  *   POST /api/receipts             {root}       → 装配看板 Receipt 列表（T42：id/章/tok/hash match）
  *   POST /api/receipt              {root, receiptId} → 单张 Receipt 详情 + 会话投影续跑判态（T42）
+ *   POST /api/change-matrix        {root}       → 变更矩阵投影（T43：assembleChangeMatrix 只读）
+ *   POST /api/change-matrix.rerun  {root, traversalId} → runTraversal 幂等覆盖重跑（T43）
  *   POST /api/ledger               {root}       → readPipelineLedger（Traversal/账本可见）
  *   POST /api/chapter.review      {root, chapterIndex} → runReviewStep + 审查落账
  *   POST /api/chapter.rework      {root, chapterIndex} → 显式质量回炉（上限 2）
@@ -290,6 +310,44 @@ export function apiMiddleware(): Middleware {
               lastReceiptId: projection?.lastReceiptId ?? null,
             } satisfies ReceiptResumeView,
           } satisfies ReceiptDetailResponse)
+          return
+        }
+        /* ---- T43（#88）变更矩阵：唯一新增后端能力 assembleChangeMatrix 只读投影
+         *      + runTraversal 幂等覆盖重跑（同 traversalId 覆盖原影响文件）。 ---- */
+        if (req.method === 'POST' && path === '/api/change-matrix') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
+          json(res, 200, { ok: true, matrix: assembleChangeMatrix(root) } satisfies ChangeMatrixResponse)
+          return
+        }
+        if (req.method === 'POST' && path === '/api/change-matrix.rerun') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          const traversalId = typeof body['traversalId'] === 'string' ? body['traversalId'] : null
+          if (root === null || traversalId === null) {
+            json(res, 400, { ok: false, error: 'root and traversalId required' })
+            return
+          }
+          const record = listImpactRecords(root).find((r) => r.traversalId === traversalId)
+          if (record === undefined) {
+            json(res, 404, { ok: false, error: 'no impact record for traversalId: ' + traversalId })
+            return
+          }
+          // 幂等重跑：同 traversalId 覆盖原影响文件；TraversalStarted/Finished 追加审计轨迹。
+          runTraversal({
+            root,
+            taskRef: record.taskRef,
+            traversalId: record.traversalId,
+            trigger: record.trigger,
+            upstreamChanges: record.upstreamChanges,
+            recordedAt: new Date().toISOString(),
+          })
+          json(res, 200, {
+            ok: true,
+            matrix: assembleChangeMatrix(root),
+            rerunCount: 1,
+          } satisfies ChangeMatrixResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/ledger') {

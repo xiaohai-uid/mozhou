@@ -824,6 +824,47 @@
     line-height: 1.6;
   }
 
+  /* ---- 变更矩阵（T43，自原型语义类迁移：
+     .matrix/.red/.green/.rowname 原样迁移） ---- */
+  .matrix {
+    width: 100%;
+    border-spacing: 3px;
+    border-collapse: separate;
+    font: 9px var(--mono);
+  }
+
+  .matrix th {
+    padding: 5px;
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+
+  .matrix td {
+    height: 31px;
+    border-radius: 6px;
+    background: var(--surface-3);
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  .matrix td.red {
+    background: rgba(242, 139, 155, 0.16);
+    color: var(--danger);
+  }
+
+  .matrix td.green {
+    background: rgba(128, 214, 176, 0.13);
+    color: var(--success);
+  }
+
+  .matrix td.rowname {
+    max-width: 86px;
+    padding-left: 7px;
+    color: var(--text-muted);
+    text-align: left;
+    font-family: var(--sans);
+  }
+
   /* ---- 面板控件材质 ---- */
   .actions {
     display: flex;

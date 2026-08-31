@@ -5,8 +5,9 @@
  */
 import { useEffect, useState } from 'react'
 import { CapabilityChannels } from './shell/CapabilityChannels'
+import { ChangeMatrixPanel } from './change-matrix/ChangeMatrixPanel'
 import { InkBackground } from './shell/InkBackground'
-import { InspectorEmpty, InspectorPlaceholder, InspectorTower } from './shell/InspectorTower'
+import { InspectorEmpty, InspectorTower } from './shell/InspectorTower'
 import type { InspectorTabId } from './shell/InspectorTower'
 import { PipelineStrip, PIPELINE_STAGES } from './shell/PipelineStrip'
 import { PlaceholderView } from './shell/PlaceholderView'
@@ -108,13 +109,12 @@ export function App(): JSX.Element {
       ) : (
         <ReceiptPanel root={book.root} onResume={() => setView('workbench')} />
       ),
-    'change-matrix': (
-      <InspectorPlaceholder
-        title="变更矩阵"
-        ticket="T43"
-        note="行=遍历 / 列=受影响章的影响矩阵与幂等重跑随实现票 T43 落地。"
-      />
-    ),
+    'change-matrix':
+      book === null ? (
+        <InspectorEmpty note="建书后可用——先在工作台建书，变更矩阵随后挂载 Traversal × 受影响章影响矩阵。" />
+      ) : (
+        <ChangeMatrixPanel root={book.root} />
+      ),
   }
 
   return (

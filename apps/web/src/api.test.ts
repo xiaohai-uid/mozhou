@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, createChapterDraft, entityCardFileRel, readManifest, openDatabase, readProseChapter, proseChapterPath, sha256Hex } from '@mozhou/data-plane'
+import { LocalDataPlane, createBook, createChapterDraft, entityCardFileRel, openPinsWindow, readManifest, openDatabase, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
@@ -581,5 +581,116 @@ describe('T42 装配看板读面 API 契约', () => {
     const r2 = await post(base, '/api/receipts', {})
     expect(r2.status).toBe(400)
     expect(r2.data.ok).toBe(false)
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * T43（#88）变更矩阵读面 API 契约：
+ * /api/change-matrix（assembleChangeMatrix 只读投影，行/列/单元格三态）+
+ * /api/change-matrix.rerun（runTraversal 幂等覆盖重跑）。唯一新增后端能力 = 投影。
+ * seed：建书 + 手工钉版事件 + runTraversal 落 impact 文件。
+ * ------------------------------------------------------------------------- */
+
+/** T43 seed：建书 + 2 章依赖 fact_a@1 的钉版 + 一次 fact_a@2 上游遍历。 */
+async function seedT43Matrix(): Promise<{ base: string; root: string }> {
+  const base = await listen()
+  bases.push(base)
+  const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t43-'))
+  roots.push(dir)
+  await post(base, '/api/book', { title: '矩阵书', dir })
+  const eventsPath = join(dir, '.mozhou', 'events.jsonl')
+  mkdirSync(dirname(eventsPath), { recursive: true })
+  writeFileSync(
+    eventsPath,
+    [
+      JSON.stringify({ type: 'ChapterCommitted', seq: 1, chapterIndex: 1, commitId: 'c1', dependencyManifest: { entries: [{ kind: 'temporalFact', id: 'fact_a', revision: 1 }] } }),
+      JSON.stringify({ type: 'ChapterCommitted', seq: 2, chapterIndex: 2, commitId: 'c2', dependencyManifest: { entries: [{ kind: 'temporalFact', id: 'fact_a', revision: 1 }] } }),
+    ].join('\n') + '\n',
+    'utf8',
+  )
+  runTraversal({
+    root: dir,
+    taskRef: 'trav_1',
+    traversalId: 't_1',
+    trigger: { source: 'reconciliation', ref: 'rcln_x' },
+    upstreamChanges: [{ kind: 'temporalFact', id: 'fact_a', revision: 2 }],
+    recordedAt: '2026-08-28T00:00:00.000Z',
+    window: openPinsWindow(dir),
+  })
+  return { base, root: dir }
+}
+
+describe('T43 变更矩阵读面 API 契约', () => {
+  it('POST /api/change-matrix：行=Traversal、列=受影响章、单元格红态（需重写）', async () => {
+    const { base, root } = await seedT43Matrix()
+    const { status, data } = await post(base, '/api/change-matrix', { root })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const matrix = data.matrix as {
+      columns: number[]
+      rows: {
+        traversalId: string
+        taskRef: string
+        staleCount: number
+        cells: { chapterIndex: number; state: string }[]
+      }[]
+    }
+    expect(matrix.columns).toEqual([1, 2])
+    expect(matrix.rows).toHaveLength(1)
+    expect(matrix.rows[0]?.traversalId).toBe('t_1')
+    expect(matrix.rows[0]?.taskRef).toBe('trav_1')
+    expect(matrix.rows[0]?.staleCount).toBe(2)
+    expect(matrix.rows[0]?.cells).toEqual([
+      { chapterIndex: 1, state: 'needs_rework' },
+      { chapterIndex: 2, state: 'needs_rework' },
+    ])
+  })
+
+  it('重跑后章重新钉版到新版本 → 单元转绿（resolved）并响应 rerunCount', async () => {
+    const { base, root } = await seedT43Matrix()
+    // 章 1 用新版本 fact_a@2 重新提交（消解）；章 2 仍旧
+    const eventsPath = join(root, '.mozhou', 'events.jsonl')
+    const lines = readFileSync(eventsPath, 'utf8').split('\n').filter((l) => l.length > 0)
+    lines.push(JSON.stringify({
+      type: 'ChapterCommitted',
+      seq: 3,
+      chapterIndex: 1,
+      commitId: 'c1b',
+      dependencyManifest: { entries: [{ kind: 'temporalFact', id: 'fact_a', revision: 2 }] },
+    }))
+    writeFileSync(eventsPath, lines.join('\n') + '\n')
+
+    const { status, data } = await post(base, '/api/change-matrix.rerun', { root, traversalId: 't_1' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.rerunCount).toBe(1)
+    const matrix = data.matrix as { rows: { traversalId: string; staleCount: number; cells: { chapterIndex: number; state: string }[] }[] }
+    expect(matrix.rows[0]?.staleCount).toBe(1)
+    expect(matrix.rows[0]?.cells).toEqual([
+      { chapterIndex: 1, state: 'resolved' },
+      { chapterIndex: 2, state: 'needs_rework' },
+    ])
+  })
+
+  it('未知 traversalId 重跑返回 404；缺 root 返回 400', async () => {
+    const { base, root } = await seedT43Matrix()
+    const missing = await post(base, '/api/change-matrix.rerun', { root, traversalId: 'nope' })
+    expect(missing.status).toBe(404)
+    expect(missing.data.ok).toBe(false)
+    const noRoot = await post(base, '/api/change-matrix', {})
+    expect(noRoot.status).toBe(400)
+    expect(noRoot.data.ok).toBe(false)
+  })
+
+  it('无 impact 记录书：矩阵空（columns=[] rows=[]）', async () => {
+    const base = await listen()
+    bases.push(base)
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t43-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '空矩阵书', dir })
+    const { data } = await post(base, '/api/change-matrix', { root: dir })
+    const matrix = data.matrix as { columns: number[]; rows: unknown[] }
+    expect(matrix.columns).toEqual([])
+    expect(matrix.rows).toEqual([])
   })
 })
