@@ -18,6 +18,7 @@ import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
 import { ReceiptPanel } from './context-receipt/ReceiptPanel'
 import { BookshelfView } from './shelf/BookshelfView'
+import { BookSourceView } from './book-source/BookSourceView'
 import { CapabilitySquareView } from './capability-square/CapabilitySquareView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
@@ -158,6 +159,12 @@ export function App(): JSX.Element {
             parentDir={parentDir}
             currentRoot={book?.root ?? null}
             onSwitchBook={handleBookSwitch}
+          />
+        ) : view === 'book-source' ? (
+          <BookSourceView
+            parentDir={parentDir}
+            onSwitchBook={handleBookSwitch}
+            onGoToWorkbench={() => setView('workbench')}
           />
         ) : view === 'capability-square' ? (
           <CapabilitySquareView />

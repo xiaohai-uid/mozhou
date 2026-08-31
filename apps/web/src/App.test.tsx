@@ -301,4 +301,20 @@ describe('App 首次建书 Wizard（T42）', () => {
     })
     expect(screen.getByLabelText('tasks-view').textContent).toContain('任务中心')
   })
+
+  it('书源搜索导航：点击 nav 挂载书源搜索视图（书源检索与导入）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const sourceNav = document.querySelector('[data-view="book-source"]')
+    if (sourceNav === null) throw new Error('missing book-source nav')
+    await userEvent.click(sourceNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('book-source-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('book-source-view').textContent).toContain('书源搜索')
+  })
 })
