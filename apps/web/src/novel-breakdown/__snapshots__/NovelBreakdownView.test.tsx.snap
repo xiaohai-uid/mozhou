@@ -1,0 +1,304 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`NovelBreakdownView（小说拆解） > 故事核、黄金三章与人物卡片渲染；契约快照 1`] = `
+<section
+  aria-label="novel-breakdown-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      小说拆解
+    </h1>
+    <span
+      class="meta"
+    >
+      故事核 · 黄金三章 · 人物弧光 · 情绪曲线
+    </span>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="breakdown-input"
+    >
+      <h2>
+        样本文本拆解
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              输入对标小说片段或设定
+            </b>
+            <span
+              class="mono muted"
+            >
+              深度节奏剖析
+            </span>
+          </div>
+          <textarea
+            aria-label="样章拆解输入"
+            class="control"
+            placeholder="粘贴一段样章（如前三章梗概或精彩高潮片段）…"
+            rows="3"
+            style="width: 100%; resize: vertical;"
+          />
+          <div
+            class="actions"
+            style="margin-top: 8px; justify-content: space-between;"
+          >
+            <div
+              style="display: flex; gap: 6px; align-items: center;"
+            >
+              <span
+                class="mono muted"
+              >
+                填入样例：
+              </span>
+              <button
+                class="btn"
+                style="font-size: 9px; padding: 3px 6px;"
+              >
+                样例 
+                1
+              </button>
+              <button
+                class="btn"
+                style="font-size: 9px; padding: 3px 6px;"
+              >
+                样例 
+                2
+              </button>
+            </div>
+            <button
+              class="btn-primary"
+            >
+              分析拆解
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="breakdown-story-core"
+    >
+      <h2>
+        核心故事核（Story Core）
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;"
+          >
+            <div>
+              <div
+                class="mono muted"
+              >
+                主角角色
+              </div>
+              <b
+                style="font-size: 13px;"
+              >
+                陆沉舟
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                终极欲望/主线
+              </div>
+              <b
+                style="font-size: 13px; color: var(--accent-strong);"
+              >
+                武道登神，横扫诸天
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                核心金手指
+              </div>
+              <b
+                style="font-size: 13px; color: var(--success);"
+              >
+                天道推演神图
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                主对立矛盾
+              </div>
+              <b
+                style="font-size: 13px; color: var(--danger);"
+              >
+                草根散修 vs 隐世世家
+              </b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="breakdown-pacing"
+    >
+      <h2>
+        黄金三章节奏点（Golden 3 Chapters）
+      </h2>
+      <div
+        style="display: flex; flex-direction: column; gap: 8px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                第 1 章 · 危机
+              </b>
+              <span
+                class="cap-badge native"
+              >
+                节奏评级: 
+                A+
+              </span>
+            </div>
+            <div
+              class="finding"
+            >
+              <b>
+                🎯 开篇钩子：
+              </b>
+              <span
+                style="font-size: 11px; margin-left: 4px;"
+              >
+                暗夜截杀
+              </span>
+            </div>
+            <div
+              class="finding"
+            >
+              <b>
+                ⚡ 爽点兑现：
+              </b>
+              <span
+                style="font-size: 11px; margin-left: 4px;"
+              >
+                觉醒神图反杀
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="breakdown-characters"
+    >
+      <h2>
+        主要人物弧光设定
+      </h2>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                陆沉舟
+              </b>
+              <span
+                class="tag"
+              >
+                主角
+              </span>
+            </div>
+            <div
+              class="mono muted"
+              style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;"
+            >
+              <div>
+                欲望：
+                长生
+              </div>
+              <div>
+                缺陷：
+                多疑
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="breakdown-beats"
+    >
+      <h2>
+        情绪节拍点分布
+      </h2>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <b>
+                决战爆发
+              </b>
+              <span
+                class="cap-badge native"
+              >
+                climax
+              </span>
+            </div>
+            <p
+              class="muted"
+              style="margin: 0px; font-size: 10px;"
+            >
+              当众反杀大宗师
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

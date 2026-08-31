@@ -21,6 +21,7 @@ import { BookshelfView } from './shelf/BookshelfView'
 import { BookSourceView } from './book-source/BookSourceView'
 import { CapabilitySquareView } from './capability-square/CapabilitySquareView'
 import { StyleDistillView } from './style-distill/StyleDistillView'
+import { NovelBreakdownView } from './novel-breakdown/NovelBreakdownView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
@@ -181,6 +182,10 @@ export function App(): JSX.Element {
           />
         ) : view === 'style-distill' ? (
           <StyleDistillView
+            root={book?.root ?? null}
+          />
+        ) : view === 'novel-breakdown' ? (
+          <NovelBreakdownView
             root={book?.root ?? null}
           />
         ) : (

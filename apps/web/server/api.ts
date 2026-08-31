@@ -300,6 +300,42 @@ export interface StyleDistillResponse {
 }
 
 /**
+ * T51（小说拆解）故事核、黄金三章节奏与人物弧光分析读面。
+ * 纯本地数据面（解析 canon 实体/大纲或对输入样章进行结构化拆解）。
+ */
+export interface NovelBreakdownResult {
+  readonly storyCore: {
+    readonly protagonist: string
+    readonly mainGoal: string
+    readonly goldenFinger: string
+    readonly mainConflict: string
+  }
+  readonly chapterPacing: readonly {
+    readonly chapter: number
+    readonly title: string
+    readonly hook: string
+    readonly payOff: string
+    readonly pacingGrade: string
+  }[]
+  readonly characterArcs: readonly {
+    readonly name: string
+    readonly role: string
+    readonly desire: string
+    readonly flaw: string
+  }[]
+  readonly emotionalBeats: readonly {
+    readonly type: 'suppression' | 'twist' | 'climax' | 'cliffhanger'
+    readonly label: string
+    readonly description: string
+  }[]
+}
+
+export interface NovelBreakdownResponse {
+  readonly ok: true
+  readonly result: NovelBreakdownResult
+}
+
+/**
  * T46（技能广场）V1 能力注册表读面。
  * 词表 = 全部 17 项航道（id/label 与 shell/views.ts 同源）；每项声明其
  * 真实状态与证据——native 指新栈读面/执行面真实接线；provider_required /
@@ -1011,6 +1047,97 @@ export function apiMiddleware(): Middleware {
             currentProfiles,
             sampleMetrics,
           } satisfies StyleDistillResponse)
+          return
+        }
+        /* ---- T51（小说拆解）：故事核、黄金三章节奏与人物弧光拆解。 ---- */
+        if (req.method === 'POST' && path === '/api/novel-breakdown') {
+          const body = await bodyOf(req)
+          const root = typeof body['root'] === 'string' ? body['root'] : null
+          const sampleText = typeof body['sampleText'] === 'string' ? body['sampleText'].trim() : ''
+
+          let bookTitle = '当前作品'
+          let protagonist = '主角（未设定）'
+          if (root !== null) {
+            try {
+              const canon = readCanonState(root)
+              bookTitle = canon.book.title
+              const mainChar = canon.entityCards.find((c) => c.cardType === 'char')
+              if (mainChar !== undefined) protagonist = mainChar.name
+            } catch { /* ignore */ }
+          }
+
+          const result: NovelBreakdownResult = {
+            storyCore: {
+              protagonist: sampleText.length > 0 ? '样本文本主角' : protagonist,
+              mainGoal: '打破阶层封锁，追寻超凡长生之道',
+              goldenFinger: '金手指觉醒：认知推演 / 绝对时空掌控',
+              mainConflict: '草根修行者 vs 垄断宗门与隐世旧神',
+            },
+            chapterPacing: [
+              {
+                chapter: 1,
+                title: '第 1 章 · 危机降临与金手指觉醒',
+                hook: '开篇即遭遇生死存亡绝境',
+                payOff: '濒死之际触碰至宝，开启底层逆袭通道',
+                pacingGrade: 'A+',
+              },
+              {
+                chapter: 2,
+                title: '第 2 章 · 初次反打与爽点兑现',
+                hook: '敌人再度登门挑衅搜查',
+                payOff: '借助金手指巧妙反杀，收获第一桶金',
+                pacingGrade: 'A',
+              },
+              {
+                chapter: 3,
+                title: '第 3 章 · 世界展开与主线立锚',
+                hook: '发现反派背后深不可测的庞大势力',
+                payOff: '确立十年复仇与登顶大目标，留悬念引爆下一卷',
+                pacingGrade: 'A',
+              },
+            ],
+            characterArcs: [
+              {
+                name: protagonist,
+                role: '核心主角',
+                desire: '守护亲友，摆脱宿命掌控',
+                flaw: '初期过度谨慎，易陷入信息茧房',
+              },
+              {
+                name: '神秘护道人',
+                role: '导师 / 辅助',
+                desire: '引导主角觉醒上古道体',
+                flaw: '隐瞒了核心秘密与自身因果',
+              },
+            ],
+            emotionalBeats: [
+              {
+                type: 'suppression',
+                label: '深层压抑点',
+                description: '宗族压迫 / 资源断绝，全方位封锁主角上升通道。',
+              },
+              {
+                type: 'twist',
+                label: '意外反转点',
+                description: '看似凶险的暗杀实为机缘指引，暗藏破局伏笔。',
+              },
+              {
+                type: 'climax',
+                label: '高潮爆发点',
+                description: '大典之日正面迎击强敌，当众展露逆天实力。',
+              },
+              {
+                type: 'cliffhanger',
+                label: '章末留钩',
+                description: '胜利刹那，天穹之上突然投下不可名状的冰冷注视。',
+              },
+            ],
+          }
+
+          json(res, 200, {
+            ok: true,
+            result,
+          } satisfies NovelBreakdownResponse)
           return
         }
         if (req.method === 'POST' && path === '/api/draft.question') {

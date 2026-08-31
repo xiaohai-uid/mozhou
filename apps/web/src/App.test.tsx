@@ -73,6 +73,17 @@ function stubAppFetch(): void {
           sampleMetrics: { charCount: 0, dialogueRatio: 0, avgSentenceLength: 0, shortSentenceRatio: 0, sensoryDensity: 0, actionPacing: 0 },
         })
       }
+      if (path === '/api/novel-breakdown') {
+        return okJson({
+          ok: true,
+          result: {
+            storyCore: { protagonist: '主角', mainGoal: '主线', goldenFinger: '金手指', mainConflict: '矛盾' },
+            chapterPacing: [],
+            characterArcs: [],
+            emotionalBeats: [],
+          },
+        })
+      }
       if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
       if (path === '/api/draft.stream') {
         return okJson({ ok: false, error: 'unexpected draft path in shell test: ' + path })
@@ -339,5 +350,21 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('style-distill-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('style-distill-view').textContent).toContain('风格蒸馏')
+  })
+
+  it('小说拆解导航：点击 nav 挂载小说拆解视图（故事核与节奏拆解）', async () => {
+    window.localStorage.setItem(
+      'mozhou.workbench.v1',
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+    )
+    stubAppFetch()
+    render(<App />)
+    const breakdownNav = document.querySelector('[data-view="novel-breakdown"]')
+    if (breakdownNav === null) throw new Error('missing novel-breakdown nav')
+    await userEvent.click(breakdownNav)
+    await waitFor(() => {
+      expect(screen.getByLabelText('novel-breakdown-view')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('novel-breakdown-view').textContent).toContain('小说拆解')
   })
 })

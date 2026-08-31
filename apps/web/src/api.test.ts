@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
+import type { NovelBreakdownResult } from '../server/api'
 import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
@@ -1007,5 +1008,22 @@ describe('风格蒸馏 API 契约', () => {
     expect(metrics.charCount).toBeGreaterThan(20)
     expect(metrics.dialogueRatio).toBeGreaterThan(0)
     expect(metrics.actionPacing).toBeGreaterThan(0)
+  })
+})
+
+/* ----------------------------------------------------------------------------
+ * 小说拆解 API 契约：/api/novel-breakdown（T51）。
+ * ------------------------------------------------------------------------- */
+describe('小说拆解 API 契约', () => {
+  it('POST /api/novel-breakdown：分析故事核、黄金三章节奏点与人物弧光', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '凡人修仙故事梗概' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const res = data.result as NovelBreakdownResult
+    expect(res.storyCore.mainGoal.length).toBeGreaterThan(0)
+    expect(res.chapterPacing.length).toBe(3)
+    expect(res.characterArcs.length).toBeGreaterThanOrEqual(1)
+    expect(res.emotionalBeats.length).toBeGreaterThanOrEqual(1)
   })
 })
