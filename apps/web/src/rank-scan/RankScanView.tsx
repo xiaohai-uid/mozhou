@@ -43,8 +43,9 @@ export function RankScanView(): JSX.Element {
     <section className="center solo" aria-label="rank-scan-view">
       <div className="chapterbar">
         <h1>网文扫榜</h1>
-        <span className="meta">多平台热榜透视 · 题材风向分析</span>
+        <span className="meta">多平台热榜透视 · 题材风向分析（本地离线样例）</span>
         <div className="save">
+          <span className="cap-badge native" style={{ fontSize: 9 }}>本地内置数据源</span>
           <button className="btn" onClick={() => { void load() }} disabled={busy} style={{ fontSize: 10, padding: '4px 8px' }}>
             {busy ? '更新中…' : '刷新榜单'}
           </button>

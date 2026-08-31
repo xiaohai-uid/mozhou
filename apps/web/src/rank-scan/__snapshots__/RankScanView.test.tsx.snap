@@ -14,11 +14,17 @@ exports[`RankScanView（网文扫榜） > 风向词与榜单项目渲染；契�
     <span
       class="meta"
     >
-      多平台热榜透视 · 题材风向分析
+      多平台热榜透视 · 题材风向分析（本地离线样例）
     </span>
     <div
       class="save"
     >
+      <span
+        class="cap-badge native"
+        style="font-size: 9px;"
+      >
+        本地内置数据源
+      </span>
       <button
         class="btn"
         style="font-size: 10px; padding: 4px 8px;"

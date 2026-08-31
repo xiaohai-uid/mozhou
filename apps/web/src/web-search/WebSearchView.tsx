@@ -43,7 +43,10 @@ export function WebSearchView(): JSX.Element {
     <section className="center solo" aria-label="web-search-view">
       <div className="chapterbar">
         <h1>联网搜索</h1>
-        <span className="meta">创作资料库 · 设定背景速查</span>
+        <span className="meta">创作资料库 · 设定背景速查（本地离线知识库）</span>
+        <div className="save">
+          <span className="cap-badge native" style={{ fontSize: 9 }}>本地内置资料库</span>
+        </div>
       </div>
 
       <div className="conversation">

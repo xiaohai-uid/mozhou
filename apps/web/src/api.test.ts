@@ -1135,12 +1135,20 @@ describe('会员中心 API 契约', () => {
     expect(plans.length).toBeGreaterThanOrEqual(3)
   })
 
-  it('POST /api/membership.activate：激活新许可证密钥', async () => {
+  it('POST /api/membership.activate：合法密钥激活成功；非法格式 400 显式报错', async () => {
     const base = await listen()
-    const { status, data } = await post(base, '/api/membership.activate', { key: 'MOZHOU-KEY-999' })
+    // 合法格式
+    const { status, data } = await post(base, '/api/membership.activate', { key: 'MOZHOU-PRO-LIFETIME-TEST' })
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
-    const license = data.license as { licenseKey: string }
-    expect(license.licenseKey).toBe('MOZHOU-KEY-999')
+    const license = data.license as { licenseKey: string; planId: string }
+    expect(license.licenseKey).toBe('MOZHOU-PRO-LIFETIME-TEST')
+    expect(license.planId).toBe('pro_lifetime')
+
+    // 非法格式密钥 -> 400
+    const bad = await post(base, '/api/membership.activate', { key: 'invalid_raw_string' })
+    expect(bad.status).toBe(400)
+    expect(bad.data.ok).toBe(false)
+    expect(bad.data.error).toContain('格式无效')
   })
 })

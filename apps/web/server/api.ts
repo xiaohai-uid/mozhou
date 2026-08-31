@@ -764,6 +764,37 @@ function hasDraftProvider(): boolean {
 }
 
 /**
+ * 根据作者在中栏选择的技能胶囊（特别是 sepia 4 大操作），增强底层提示词约束。
+ */
+function formatPromptWithSkills(prompt: string, rawSkills?: unknown): string {
+  const skills = Array.isArray(rawSkills) ? rawSkills.filter((s): s is string => typeof s === 'string') : []
+  if (skills.length === 0) return prompt
+
+  const constraints: string[] = []
+  if (skills.includes('sepia-write')) {
+    constraints.push('【sepia 架构创作】Pass 1: 禁止旁白主动提炼说教，松动单线因果，锚定物理实体，混合多维情绪。')
+  }
+  if (skills.includes('sepia-review')) {
+    constraints.push('【sepia 叙事诊断】依据 StoryScope 30 维指标诊断叙事僵化点，不破坏作者原有事实。')
+  }
+  if (skills.includes('sepia-refactor')) {
+    constraints.push('【sepia 就地去味】Pass 3: 最小限度就地修正 AI 腔调，保留原有情节走向。')
+  }
+  if (skills.includes('sepia-recreate')) {
+    constraints.push('【sepia 意图重写】依据大纲核心事实与作者意图，重构松弛自然的人类叙事。')
+  }
+  if (skills.includes('suspense')) {
+    constraints.push('【悬念调度】强化章末留钩，前置伏笔并延迟信息揭露。')
+  }
+  if (skills.includes('dialogue-polish')) {
+    constraints.push('【对白打磨】压缩交代性对白，增加潜台词与语调性格差异。')
+  }
+
+  if (constraints.length === 0) return prompt
+  return `${constraints.join('\n')}\n\n${prompt}`
+}
+
+/**
  * Mock draft 引擎（V1 无真实 LLM）：构造 RuntimeEngine + 注册演示能力与
  * makeDraftProviderBinding。stream 源 = 按 prompt 合成的确定性字块（测试可注入）。
  * recipe fixture 对齐 draft-step 测试既有形状（T17 夹具，字段全量）。
@@ -1542,17 +1573,19 @@ export function apiMiddleware(): Middleware {
         if (req.method === 'POST' && path === '/api/membership.activate') {
           const body = await bodyOf(req)
           const key = typeof body['key'] === 'string' ? body['key'].trim() : ''
-          if (key.length === 0) {
-            json(res, 400, { ok: false, error: '请输入有效的许可证密钥' })
+          // 规范许可证格式校验：需以 MOZHOU- 开头且至少包含 3 段
+          const isValidKeyFormat = /^MOZHOU-[A-Z0-9]+-[A-Z0-9]+(-[A-Z0-9]+)*$/i.test(key)
+          if (!isValidKeyFormat) {
+            json(res, 400, { ok: false, error: '许可证密钥格式无效（需形如 MOZHOU-PRO-LIFETIME-XXXX-YYYY）' })
             return
           }
 
           json(res, 200, {
             ok: true,
             license: {
-              planId: 'pro_lifetime',
-              planName: '墨舟 Pro 终身专业版',
-              licenseKey: key,
+              planId: key.toLowerCase().includes('team') ? 'studio_team' : 'pro_lifetime',
+              planName: key.toLowerCase().includes('team') ? '工作室多端团队版' : '墨舟 Pro 终身专业版',
+              licenseKey: key.toUpperCase(),
               activatedAt: new Date().toISOString().slice(0, 10),
               expiresAt: '永久有效',
               status: 'active',
@@ -1578,11 +1611,14 @@ export function apiMiddleware(): Middleware {
           const chapterIndex = typeof body['chapterIndex'] === 'number' && Number.isInteger(body['chapterIndex']) && body['chapterIndex'] > 0
             ? body['chapterIndex']
             : null
-          const prompt = typeof body['prompt'] === 'string' ? body['prompt'] : ''
+          const rawPrompt = typeof body['prompt'] === 'string' ? body['prompt'] : ''
           if (root === null || chapterIndex === null) {
             json(res, 400, { ok: false, error: 'root and positive integer chapterIndex required' })
             return
           }
+          // 根据选中的技能胶囊（如 sepia-write / sepia-refactor 等）增强提示词约束
+          const prompt = formatPromptWithSkills(rawPrompt, body['skills'])
+
           // Gate 3 纪律：provider 未配（registry 无 CHAPTER_DRAFTING resolve）⇒
           // 显式 unavailable，发送动作被前端禁用。不静默假装可用。
           if (!hasDraftProvider()) {
