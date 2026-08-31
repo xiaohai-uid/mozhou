@@ -34,7 +34,6 @@ import {
 import { join } from 'node:path'
 import { newUlid } from '@mozhou/kernel'
 import type Database from 'better-sqlite3'
-import type { BaselineReport } from './local-data-plane.js'
 import { readProseChapter } from './chapter.js'
 import { CanonStructureError, readBookRecord, scanEntityCards } from './canon-read.js'
 import {
@@ -58,8 +57,21 @@ import { sha256FileHex, sha256Hex } from './sha256.js'
 import { parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
 
 /* ----------------------------------------------------------------------------
- * 类型面：五态 / 触发源 / 变更摘要判别联合 / 提案记录
+ * 类型面：基线报告 / 五态 / 触发源 / 变更摘要判别联合 / 提案记录
  * ------------------------------------------------------------------------- */
+
+/**
+ * 基线核对报告：modified/missing = 基线有而盘上变了/没了；untracked = 盘上多出的
+ * canon 文件。S2 分面：reconcileSurface 进入对账（含全部缺失——文件没了无法读相位，
+ * 一律保守入面），freeDraftEdits 是 phase=draft 正文章的自由改动豁免。
+ */
+export interface BaselineReport {
+  readonly modified: string[]
+  readonly missing: string[]
+  readonly untracked: string[]
+  readonly reconcileSurface: string[]
+  readonly draftFreeEdits: string[]
+}
 
 export type ReconciliationState =
   | 'detected'

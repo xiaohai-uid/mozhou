@@ -16,7 +16,6 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseDependencyManifest } from '@mozhou/kernel'
 import { RUNTIME_EVENTS_PATH } from './layout.js'
-import { readChapterDependencyPins, type ChapterDependencyPin } from './stale.js'
 import type { DependencyManifest, DependencyManifestEntry } from '@mozhou/kernel'
 
 /** D04 预算定案值（t65 D04 终裁）。 */
@@ -26,6 +25,69 @@ export const BUDGET_PROPAGATION_MS = 100
 
 export class StaleBudgetError extends Error {
   override readonly name = 'StaleBudgetError'
+}
+
+/* ----------------------------------------------------------------------------
+ * 事件账本回读：各章当前生效的依赖钉版（同章后到提交者胜）
+ * -------------------------------------------------------------------------- */
+
+export interface ChapterDependencyPin {
+  readonly chapterIndex: number
+  readonly commitId: string
+  readonly manifest: DependencyManifest
+}
+
+function jsonlLines(content: string): string[] {
+  const lines = content.split('\n')
+  if (lines.at(-1) === '') {
+    lines.pop()
+  }
+  return lines
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * 扫描 `.mozhou/events.jsonl`，按章取最后一次 ChapterCommitted 的依赖钉版。
+ * - 后到提交不带 dependencyManifest ⇒ 该章退出映射（旧钉版随新提交作废）；
+ * - 撕裂 JSON 行（崩溃窗口产物）跳过——审计账本不是真源；
+ * - 已解析但形状非法的钉版宁败不脏（影响分析不容错）。
+ */
+export function readChapterDependencyPins(root: string): ReadonlyMap<number, ChapterDependencyPin> {
+  const pins = new Map<number, ChapterDependencyPin>()
+  const eventsPath = join(root, RUNTIME_EVENTS_PATH)
+  if (!existsSync(eventsPath)) {
+    return pins
+  }
+  for (const line of jsonlLines(readFileSync(eventsPath, 'utf8'))) {
+    let row: unknown
+    try {
+      row = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (!isRecord(row) || row['type'] !== 'ChapterCommitted') {
+      continue
+    }
+    const chapterIndex = row['chapterIndex']
+    const commitId = row['commitId']
+    if (typeof chapterIndex !== 'number' || !Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
+      continue
+    }
+    if (typeof commitId !== 'string') {
+      continue
+    }
+    const rawManifest = row['dependencyManifest']
+    if (rawManifest === undefined || rawManifest === null) {
+      pins.delete(chapterIndex)
+      continue
+    }
+    const entries = isRecord(rawManifest) ? rawManifest['entries'] : undefined
+    pins.set(chapterIndex, { chapterIndex, commitId, manifest: parseDependencyManifest(entries) })
+  }
+  return pins
 }
 
 /** 窗：pins 快照 + 上次读到的账本行尾（增量续读的下标）。 */

@@ -31,7 +31,12 @@ import { queryActiveFacts as queryActiveFactsFromRoot, queryInvalidatedKnowledge
 import type { QueryActiveFactsRequest } from '@mozhou/kernel'
 import { initProjection, populateProjection } from './projection.js'
 import { sha256FileHex } from './sha256.js'
-import { ReconciliationService, type ReconciliationOptions } from './reconciliation.js'
+import {
+  ReconciliationService,
+  type BaselineReport,
+  type ReconciliationOptions,
+} from './reconciliation.js'
+export type { BaselineReport } from './reconciliation.js'
 import {
   propagateStaleMarkers as propagateStaleMarkersIntoCanon,
   type StalePropagationRequest,
@@ -44,19 +49,6 @@ export class ProjectionMissingError extends Error {
   constructor(readonly dbPath: string) {
     super(`projection database missing: ${dbPath} — run rebuildProjectionFromCanon()`)
   }
-}
-
-/**
- * 基线核对报告：modified/missing = 基线有而盘上变了/没了；untracked = 盘上多出的
- * canon 文件。S2 分面：reconcileSurface 进入对账（含全部缺失——文件没了无法读相位，
- * 一律保守入面），freeDraftEdits 是 phase=draft 正文章的自由改动豁免。
- */
-export interface BaselineReport {
-  readonly modified: string[]
-  readonly missing: string[]
-  readonly untracked: string[]
-  readonly reconcileSurface: string[]
-  readonly draftFreeEdits: string[]
 }
 
 function removeProjectionFiles(root: string): void {

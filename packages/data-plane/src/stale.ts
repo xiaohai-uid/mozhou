@@ -29,73 +29,16 @@ import {
 } from '@mozhou/kernel'
 import type { DependencyManifest, DependencyManifestEntry, StaleMarker } from '@mozhou/kernel'
 import { assertPreWriteHash, atomicReplace, type PlaneContext } from './chapter.js'
-import { assertWithinBudget, staleMarkerEquivalent } from './stale-cache.js'
+import {
+  assertWithinBudget,
+  readChapterDependencyPins,
+  staleMarkerEquivalent,
+  type ChapterDependencyPin,
+} from './stale-cache.js'
+export { readChapterDependencyPins, type ChapterDependencyPin } from './stale-cache.js'
 import { RUNTIME_EVENTS_PATH, chapterOutlinePath } from './layout.js'
 import { refreshManifestEntries, writeManifest } from './manifest.js'
 import { emitFrontmatter, parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
-
-/* ----------------------------------------------------------------------------
- * 事件账本回读：各章当前生效的依赖钉版（同章后到提交者胜）
- * -------------------------------------------------------------------------- */
-
-export interface ChapterDependencyPin {
-  readonly chapterIndex: number
-  readonly commitId: string
-  readonly manifest: DependencyManifest
-}
-
-function jsonlLines(content: string): string[] {
-  const lines = content.split('\n')
-  if (lines.at(-1) === '') {
-    lines.pop()
-  }
-  return lines
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-/**
- * 扫描 `.mozhou/events.jsonl`，按章取最后一次 ChapterCommitted 的依赖钉版。
- * - 后到提交不带 dependencyManifest ⇒ 该章退出映射（旧钉版随新提交作废）；
- * - 撕裂 JSON 行（崩溃窗口产物）跳过——审计账本不是真源；
- * - 已解析但形状非法的钉版宁败不脏（影响分析不容错）。
- */
-export function readChapterDependencyPins(root: string): ReadonlyMap<number, ChapterDependencyPin> {
-  const pins = new Map<number, ChapterDependencyPin>()
-  const eventsPath = join(root, RUNTIME_EVENTS_PATH)
-  if (!existsSync(eventsPath)) {
-    return pins
-  }
-  for (const line of jsonlLines(readFileSync(eventsPath, 'utf8'))) {
-    let row: unknown
-    try {
-      row = JSON.parse(line)
-    } catch {
-      continue
-    }
-    if (!isRecord(row) || row['type'] !== 'ChapterCommitted') {
-      continue
-    }
-    const chapterIndex = row['chapterIndex']
-    const commitId = row['commitId']
-    if (typeof chapterIndex !== 'number' || !Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
-      continue
-    }
-    if (typeof commitId !== 'string') {
-      continue
-    }
-    const rawManifest = row['dependencyManifest']
-    if (rawManifest === undefined || rawManifest === null) {
-      pins.delete(chapterIndex)
-      continue
-    }
-    const entries = isRecord(rawManifest) ? rawManifest['entries'] : undefined
-    pins.set(chapterIndex, { chapterIndex, commitId, manifest: parseDependencyManifest(entries) })
-  }
-  return pins
-}
 
 /* ----------------------------------------------------------------------------
  * 章大纲节点上的 StaleMarker 编解码（frontmatter 三平铺字段）
