@@ -107,7 +107,7 @@ const DETAIL = seedReceipt({
 function stubReceiptFetch(list: ReceiptListResponse['receipts'] = LIST): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockImplementation(async (path: string) => {
+    vi.fn().mockImplementation((path: string) => {
       if (path === '/api/receipts') return okJson({ ok: true, receipts: list })
       if (path === '/api/receipt') return okJson(DETAIL)
       return okJson({ ok: false, error: 'unexpected path: ' + path })
@@ -182,7 +182,7 @@ describe('ReceiptPanel（T42）', () => {
     })
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (path: string) => {
+      vi.fn().mockImplementation((path: string) => {
         if (path === '/api/receipts') {
           return okJson({ ok: true, receipts: [{ receiptId: 'rcpt_t4201', chapterIndex: 1, totalTokens: 5120, hashMatch: true }] })
         }
@@ -217,7 +217,7 @@ describe('ReceiptPanel（T42）', () => {
   it('读取失败显式报错（role=alert），不静默', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async (path: string) => {
+      vi.fn().mockImplementation((path: string) => {
         if (path === '/api/receipts') {
           return new Response(JSON.stringify({ ok: false, error: 'receipts 读取失败' }), { status: 500 })
         }

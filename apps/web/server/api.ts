@@ -250,7 +250,6 @@ export function apiMiddleware(): Middleware {
           const body = await bodyOf(req)
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
-          const rows = readPipelineLedger(root)
           const items: ReceiptListItem[] = []
           for (const receiptId of listReceiptIds(root)) {
             const receipt = loadReceipt(root, receiptId)

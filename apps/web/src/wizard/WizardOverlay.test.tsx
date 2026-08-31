@@ -10,7 +10,6 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WizardOverlay } from './WizardOverlay'
 import type { WizardOutcome } from './WizardOverlay'
-import { okJson } from '../test/http'
 import type { BookInfo } from '../shell/workbenchStorage'
 
 afterEach(() => {
