@@ -40,6 +40,7 @@ export function BookSourceView({
   const [searching, setSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<BookSourceSearchResponse['books']>([])
   const [crawledExcerpt, setCrawledExcerpt] = useState<{ title: string; content: string; channel: string } | null>(null)
+  const [crawledFullContent, setCrawledFullContent] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastImported, setLastImported] = useState<string | null>(null)
@@ -50,6 +51,7 @@ export function BookSourceView({
     setSearching(true)
     setError(null)
     setCrawledExcerpt(null)
+    setCrawledFullContent(null)
 
     // 若输入的是 http/https URL，优先走 crawl4ai 网页深度正文提取
     if (clean.startsWith('http://') || clean.startsWith('https://')) {
@@ -61,10 +63,11 @@ export function BookSourceView({
             content: crawlRes.content.slice(0, 300) + (crawlRes.content.length > 300 ? '...' : ''),
             channel: crawlRes.channel === 'crawl4ai' ? 'crawl4ai 无头渲染' : 'HTTP 提取',
           })
+          setCrawledFullContent(crawlRes.content)
           setSearchResults([
             {
-              platform: 'fanqie',
-              platformName: crawlRes.channel === 'crawl4ai' ? 'crawl4ai 抓取' : '网页抓取',
+              platform: 'qidian',
+              platformName: crawlRes.channel === 'crawl4ai' ? 'crawl4ai 网页抓取' : 'HTTP 网页抓取',
               bookId: 'crawled_url',
               title: crawlRes.title,
               author: '网络抓取来源',
@@ -96,14 +99,19 @@ export function BookSourceView({
     }
   }
 
-  const handleImport = async (targetTitle: string): Promise<void> => {
+  const handleImport = async (targetTitle: string, initialBody?: string): Promise<void> => {
     const title = targetTitle.trim()
     if (parentDir === null || title.length === 0 || importing) return
     setImporting(true)
     setError(null)
     setLastImported(null)
     try {
-      const data = await post<LibraryOpenResponse>('/api/library.import', { parentDir, title })
+      const bodyToUse = initialBody ?? (title === crawledExcerpt?.title ? crawledFullContent ?? undefined : undefined)
+      const data = await post<LibraryOpenResponse>('/api/library.import', {
+        parentDir,
+        title,
+        ...(bodyToUse !== undefined ? { initialBody: bodyToUse } : {}),
+      })
       setLastImported(data.title)
       onSwitchBook({ root: data.root, bookId: data.bookId, title: data.title })
       setQuery('')

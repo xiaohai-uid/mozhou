@@ -8,7 +8,7 @@
  * 形态：Connect-style (req, res, next)。全部读面函数在此直调（零契约翻译层）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CORRECTION_REASONS, hashProse, isQualityReviewCurrent } from '@mozhou/quality-engine'
 import type { QualityPolicy, QualityReviewReport } from '@mozhou/quality-engine'
@@ -24,6 +24,7 @@ import {
   runReviewStep,
 } from '@mozhou/pipeline'
 import {
+  LocalDataPlane,
   assembleChangeMatrix,
   createBook,
   listImpactRecords,
@@ -33,6 +34,7 @@ import {
   readCanonState,
   readNarrativeSnapshot,
   readProseChapter,
+  renderProseChapter,
   readStyleProfiles,
   runTraversal,
   scanEntityCards,
@@ -1782,12 +1784,38 @@ export function apiMiddleware(): Middleware {
           const body = await bodyOf(req)
           const parentDir = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
           const title = typeof body['title'] === 'string' ? body['title'].trim() : ''
+          const initialBody = typeof body['initialBody'] === 'string' ? body['initialBody'].trim() : undefined
           if (parentDir === null || title.length === 0) {
             json(res, 400, { ok: false, error: 'parentDir and non-empty title required' })
             return
           }
           try {
             const result = createBook({ dir: join(parentDir, sanitizeDirName(title)), title })
+            // 如果携带有抓取的正文内容，自动建立第 1 章并将正文落盘
+            if (initialBody !== undefined && initialBody.length > 0) {
+              try {
+                const plane = LocalDataPlane.open(result.root)
+                try {
+                  plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+                  // 读取刚创建的草稿元数据，并将抓取的正文内容安全包装写入
+                  const scan = readProseChapter(result.root, proseChapterPath(1))
+                  const updatedContent = renderProseChapter({
+                    mozhouId: scan.mozhouId,
+                    revision: scan.revision,
+                    chapterIndex: 1,
+                    phase: 'draft',
+                    body: `# 第一章\n\n${initialBody}\n`,
+                  })
+                  const absPath = join(result.root, proseChapterPath(1))
+                  writeFileSync(absPath, updatedContent, 'utf8')
+                } finally {
+                  plane.close()
+                }
+              } catch {
+                // 容错处理：不阻断建书主链路
+              }
+            }
+
             json(res, 200, {
               ok: true,
               root: result.root,

@@ -873,6 +873,18 @@ describe('书架（本地书库）API 契约', () => {
     const scan = await post(base, '/api/library', { parentDir: parent })
     const books = scan.data.books as { title: string }[]
     expect(books.map((b) => b.title)).toContain('导入之书')
+    // 携 initialBody 导入：第 1 章草稿直接落盘包含抓取正文
+    const withContent = await post(base, '/api/library.import', {
+      parentDir: parent,
+      title: '带正文导入书',
+      initialBody: '从外部抓取的章节正文第一段。',
+    })
+    expect(withContent.status).toBe(200)
+    const contentRoot = withContent.data.root as string
+    const chapterScan = readProseChapter(contentRoot, proseChapterPath(1))
+    expect(chapterScan.phase).toBe('draft')
+    expect(chapterScan.body).toContain('从外部抓取的章节正文第一段')
+
     // 重名导入（目录已存在）→ 409
     const dup = await post(base, '/api/library.import', { parentDir: parent, title: '导入之书' })
     expect(dup.status).toBe(409)
@@ -1076,17 +1088,29 @@ describe('端侧多源书源检索 API 契约', () => {
     expect(typeof nonNull.data.degraded).toBe('boolean')
   })
 
-  it('POST /api/crawler.extract：缺 URL 返回 400；私网/非安全地址被安全策略拦截', async () => {
+  it('POST /api/crawler.extract：缺 URL 返回 400；私网/IPv6/非安全地址被安全策略拦截', async () => {
     const base = await listen()
     const missing = await post(base, '/api/crawler.extract', {})
     expect(missing.status).toBe(400)
     expect(missing.data.ok).toBe(false)
 
-    // 私网地址拦截测试
+    // 私网 IPv4 拦截测试
     const ssrf = await post(base, '/api/crawler.extract', { url: 'http://127.0.0.1:8080/admin' })
     expect(ssrf.status).toBe(200)
     expect(ssrf.data.ok).toBe(false)
     expect(ssrf.data.error).toContain('SECURITY_REJECT')
+
+    // IPv6 括号表示法 [::1] 拦截测试
+    const ipv6Ssrf = await post(base, '/api/crawler.extract', { url: 'http://[::1]:8080/admin' })
+    expect(ipv6Ssrf.status).toBe(200)
+    expect(ipv6Ssrf.data.ok).toBe(false)
+    expect(ipv6Ssrf.data.error).toContain('SECURITY_REJECT')
+
+    // 云元数据 IP 拦截测试 (169.254.169.254)
+    const metaSsrf = await post(base, '/api/crawler.extract', { url: 'http://169.254.169.254/latest/meta-data' })
+    expect(metaSsrf.status).toBe(200)
+    expect(metaSsrf.data.ok).toBe(false)
+    expect(metaSsrf.data.error).toContain('SECURITY_REJECT')
   })
 })
 
