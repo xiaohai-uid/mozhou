@@ -11,7 +11,10 @@
     "preinstall": "node scripts/check-install-env.mjs",
     "build": "tsc -b",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "graph:status": "node .gitnexus/run.cjs status",
+    "graph:analyze": "node .gitnexus/run.cjs analyze",
+    "graph:check": "gitnexus check --cycles --repo mozhou"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
