@@ -349,27 +349,8 @@ export interface NovelBreakdownResponse {
   readonly result: NovelBreakdownResult
 }
 
-/**
- * T52（网文扫榜）多平台榜单透视与题材风向分析读面。
- */
-export interface RankingItem {
-  readonly rank: number
-  readonly title: string
-  readonly author: string
-  readonly category: string
-  readonly hotScore: string
-  readonly tags: readonly string[]
-  readonly goldenFinger: string
-  readonly oneLineHook: string
-}
-
-export interface RankBoard {
-  readonly id: string
-  readonly name: string
-  readonly platform: 'fanqie' | 'qidian' | 'jjwxc'
-  readonly updatedAt: string
-  readonly items: readonly RankingItem[]
-}
+export type { RankBoard, RankingItem } from './crawlers/rankings.js'
+import type { RankBoard, RankingItem } from './crawlers/rankings.js'
 
 export interface RankScanResponse {
   readonly ok: true

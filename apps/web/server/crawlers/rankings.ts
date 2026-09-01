@@ -3,7 +3,25 @@
  * 在线实时抓取公开榜源，失败时自动降级并标记 degraded。
  */
 import { fetchText } from './provider-utils.js'
-import type { RankBoard, RankingItem } from '../api.js'
+
+export interface RankingItem {
+  readonly rank: number
+  readonly title: string
+  readonly author: string
+  readonly category: string
+  readonly hotScore: string
+  readonly tags: readonly string[]
+  readonly goldenFinger: string
+  readonly oneLineHook: string
+}
+
+export interface RankBoard {
+  readonly id: string
+  readonly name: string
+  readonly platform: 'fanqie' | 'qidian' | 'jjwxc'
+  readonly updatedAt: string
+  readonly items: readonly RankingItem[]
+}
 
 const UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari/604.1'
