@@ -38,6 +38,9 @@ const filesToCopy = [
   'package.json',
   'pnpm-workspace.yaml',
   'pnpm-lock.yaml',
+  'tsconfig.json',
+  'tsconfig.base.json',
+  'start.bat',
   '启动墨舟.bat',
   'start.sh',
   'Dockerfile',
@@ -95,7 +98,7 @@ const releaseReadme = `# 🌊 墨舟 (Novel OS) v${version} 生产级独立安�
 ## 🚀 快速启动指南
 
 ### 方式一：Windows 用户（最简一键启动）
-1. 双击运行 \`启动墨舟.bat\`；
+1. 双击运行 \`start.bat\` 或 \`启动墨舟.bat\`；
 2. 脚本将自动自检依赖并启动本地创作服务；
 3. 默认将在浏览器中自动打开：http://localhost:5173
 

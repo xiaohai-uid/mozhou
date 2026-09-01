@@ -4,21 +4,22 @@ AI 长篇小说辅助创作操作系统 —— 生产级 · 模型自由 · 本�
 
 ---
 
-## 📦 安装包下载与快速上手（推荐）
+## 📦 安装包与快速上手（推荐）
 
 墨舟提供全平台预打包的独立安装包与一键启动器，无需复杂环境配置即可快速启动：
 
-### 1. 从 GitHub Releases 下载
-前往 [Releases 页面](https://github.com/xiaohai-uid/mozhou/releases) 下载最新发行版：
-- 🪟 **Windows 用户**: 下载 `mozhou-*-windows-x64.tar.gz`，解压后双击 **`启动墨舟.bat`** 即可。
-- 🐧 **Linux 用户**: 下载 `mozhou-*-linux-x64.tar.gz`，解压后运行 `chmod +x start.sh && ./start.sh`。
-- 🍎 **macOS 用户**: 下载 `mozhou-*-darwin-universal.tar.gz`，解压后运行 `./start.sh`。
+### 1. 安装包获取与启动
+- 🪟 **Windows 用户**: 下载或获取 `mozhou-*-windows-x64.zip`（或 `.tar.gz`），解压后双击 **`start.bat`**（或 `启动墨舟.bat`）即可自动运行并在浏览器中打开。
+- 🐧 **Linux 用户**: 解压 `mozhou-*-linux-x64.tar.gz`，在终端运行 `chmod +x start.sh && ./start.sh`。
+- 🍎 **macOS 用户**: 解压 `mozhou-*-darwin-universal.tar.gz`，运行 `./start.sh`。
 - 🐳 **Docker 容器用户**:
   ```bash
-  # 克隆或解压后直接执行：
+  # 解压或在源码目录下直接执行：
   docker compose up -d
   # 访问 http://localhost:5173
   ```
+
+> 💡 **提示**：本项目为自有私有仓库，安装包通过离线安装包（`release-artifacts/`）直接分发测试。无需全局安装繁重依赖，首次运行脚本将自动自检并拉起本地服务。
 
 ---
 
