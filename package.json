@@ -1,7 +1,7 @@
 {
   "name": "mozhou",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -10,6 +10,9 @@
   "scripts": {
     "preinstall": "node scripts/check-install-env.mjs",
     "build": "tsc -b",
+    "start": "node scripts/launcher.mjs",
+    "build:release": "node scripts/build-release.mjs",
+    "package": "node scripts/build-release.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "graph:status": "node .gitnexus/run.cjs status",

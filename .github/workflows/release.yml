@@ -1,0 +1,94 @@
+name: Release & Packaging
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布版本标签 (例如 v0.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+
+jobs:
+  build-and-release:
+    name: Build & Package Multi-Platform Release Assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Packages (tsc -b)
+        run: pnpm build
+
+      - name: Run Test Suite (packages/*)
+        run: pnpm test
+
+      - name: Build Web App (vite build)
+        run: pnpm --filter @mozhou/web build
+
+      - name: Test Web App (vitest)
+        run: pnpm --filter @mozhou/web test
+
+      - name: Generate Release Installation Packages
+        run: node scripts/build-release.mjs
+
+      - name: Determine Release Tag
+        id: release_tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.ref_name }}" ]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v0.1.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish GitHub Release with Packages
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: 墨舟 (Novel OS) ${{ steps.release_tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 🌊 墨舟 (Novel OS) 生产级长篇小说 AI 辅助创作系统
+
+            ### 📦 本次发布的独立安装包清单：
+            - 🪟 **Windows 绿色免安装包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-windows-x64.tar.gz\`（含 \`启动墨舟.bat\` 双击即用）
+            - 🐧 **Linux 独立运行包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-linux-x64.tar.gz\`（含 \`start.sh\` 一键运行）
+            - 🍎 **macOS 通用安装包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-darwin-universal.tar.gz\`
+            - 🌐 **Web 纯静态产物包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-web-dist.tar.gz\`
+            - 🐳 **Docker 一键启动包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-docker.tar.gz\`
+
+            ### 🚀 快速启动：
+            - **Windows 用户**：解压后双击 \`启动墨舟.bat\` 即可。
+            - **Linux / macOS 用户**：解压后运行 \`chmod +x start.sh && ./start.sh\`。
+            - **Docker 用户**：解压后运行 \`docker compose up -d\`。
+          files: |
+            release-artifacts/*.tar.gz
+            release-artifacts/*.zip

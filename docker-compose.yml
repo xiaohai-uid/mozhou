@@ -4,6 +4,36 @@
 #   cd app && npm run dev                 # Web 开发模式（推荐，热重载）
 #   docker compose --profile prod up -d --build   # 全栈生产镜像（需 Docker 能访问镜像源）
 services:
+  # Novel OS 主线生产服务容器
+  mozhou:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mozhou-novel-os
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=production
+      - ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+      - PORT=5173
+      - HOST=0.0.0.0
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - MOZHOU_API_KEY=${MOZHOU_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CRAWL4AI_BASE_URL=http://crawl4ai:11235
+    depends_on:
+      - crawl4ai
+
+  crawl4ai:
+    image: unclecode/crawl4ai:latest
+    container_name: mozhou-crawl4ai
+    restart: unless-stopped
+    ports:
+      - "11235:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=local-dev-token
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: mozhou-postgres

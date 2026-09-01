@@ -6,6 +6,7 @@
 *.tsbuildinfo
 .scratch/
 dist/
+release-artifacts/
 figma-upload/
 node_modules/
 scripts/embedding-calib/.cache/

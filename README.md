@@ -1,8 +1,28 @@
-# 墨舟 (MoZhou)
+# 墨舟 (MoZhou / Novel OS)
 
-AI 小说写作平台 —— 自有品牌 · 模型自由 · 数据自有
+AI 长篇小说辅助创作操作系统 —— 生产级 · 模型自由 · 本地数据自有 · 100% 离线可用
 
-## 产品线划分（2026-08-30 起，ADR-0025）
+---
+
+## 📦 安装包下载与快速上手（推荐）
+
+墨舟提供全平台预打包的独立安装包与一键启动器，无需复杂环境配置即可快速启动：
+
+### 1. 从 GitHub Releases 下载
+前往 [Releases 页面](https://github.com/xiaohai-uid/mozhou/releases) 下载最新发行版：
+- 🪟 **Windows 用户**: 下载 `mozhou-*-windows-x64.tar.gz`，解压后双击 **`启动墨舟.bat`** 即可。
+- 🐧 **Linux 用户**: 下载 `mozhou-*-linux-x64.tar.gz`，解压后运行 `chmod +x start.sh && ./start.sh`。
+- 🍎 **macOS 用户**: 下载 `mozhou-*-darwin-universal.tar.gz`，解压后运行 `./start.sh`。
+- 🐳 **Docker 容器用户**:
+  ```bash
+  # 克隆或解压后直接执行：
+  docker compose up -d
+  # 访问 http://localhost:5173
+  ```
+
+---
+
+## 🚀 源码运行与开发构建
 
 - **`apps/web + packages/*` 是 Novel OS 2.0 主线**：pnpm monorepo（`@mozhou/kernel` / `data-plane` / `context-compiler` / `pipeline` / `runtime` / `flywheel` / `benchmark` 等），新的 Story Kernel 与 quality-engine 能力只在这里落地。
 - **`app/` 是遗留应用面（legacy）**：V1.x Next.js 单体，**只接收迁移/安全/可靠性修复**，不再新增核心能力；迁移完成前其用户数据导出/读取能力保持可用。
