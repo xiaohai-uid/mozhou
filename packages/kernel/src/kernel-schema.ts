@@ -202,9 +202,28 @@ export interface Scene extends KernelEntityHead {
   readonly stale: StaleMarker | null;
 }
 
+/**
+ * 场景退出状态（P0-1 · 场景微循环与会话暂存层）：
+ * 保存本场景结束时的结构化暂存清单（规范化 Delta 引用与后续约束），
+ * 绝不复制五族 Delta 自由文本，不直接写盘正典。
+ */
+export interface SceneExitState {
+  readonly sceneId: SceneId;
+  readonly chapterSessionId: string;
+  readonly draftHash: string;
+  /** 本场景提取并暂存的五族候选 Delta 引用列表 */
+  readonly deltaRefs: readonly string[];
+  /** 本场景产生或关涉但尚未兑现的伏笔/承诺 ID */
+  readonly unresolvedPromiseRefs: readonly NarrativePromiseId[];
+  /** 传给下一场景的显式上下文约束或目标要求 */
+  readonly nextSceneRequirements: readonly string[];
+  readonly schemaVersion: 1;
+}
+
 /* ----------------------------------------------------------------------------
  * 5. TemporalFact（时序事实；秘密即事实 Q7；压缩留位 Q9）
  * -------------------------------------------------------------------------- */
+
 
 export type FactImportance = 'trivial' | 'notable' | 'critical';
 export type FactStatus = 'planned' | 'candidate' | 'confirmed' | 'rejected';

@@ -246,3 +246,16 @@ export type {
   ConflictFactItem,
   RevisionTaskBrief,
 } from './revision-cascading.js';
+
+export {
+  createStagedOverlay,
+  invalidateDownstreamStages,
+  mergeStagedOverlay,
+  stageScene,
+} from './scene-stage.js';
+export type {
+  InvalidationResult,
+  SceneStageRecord,
+  StagedOverlay,
+} from './scene-stage.js';
+
