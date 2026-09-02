@@ -301,10 +301,12 @@ describe('Research 区硬隔离（#14 US17 / D6）', () => {
 })
 
 describe('投影 v2：版本守卫与重建幂等（含目录卡）', () => {
-  it('user_version=2；删库后两次重建指纹与基线逐字节复原', () => {
+  it('user_version=2；删库后两次重建指纹与基线逐字节复原', async () => {
     const ctx = makeCtx()
     createEntityCard(ctx, 'char:lin-wan', LIN_WAN)
     createEntityCard(ctx, 'faction:yun-lan', { name: '云澜宗', aiContext: 'never' })
+    // Windows 上删除 SQLite 文件前必须先释放所有打开的连接句柄
+    ctx.db.close()
     const dbPath = join(bookRoot, RUNTIME_DB_PATH)
 
     const opened = openDatabase({ path: dbPath })
@@ -316,7 +318,16 @@ describe('投影 v2：版本守卫与重建幂等（含目录卡）', () => {
 
     for (let round = 0; round < 2; round++) {
       for (const suffix of ['', '-wal', '-shm']) {
-        rmSync(`${dbPath}${suffix}`, { force: true })
+        const target = `${dbPath}${suffix}`
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          try {
+            rmSync(target, { force: true })
+            break
+          } catch (error) {
+            if (attempt === 4) throw error
+            await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
+          }
+        }
       }
       rebuildProjectionFromCanon(bookRoot)
 

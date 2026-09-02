@@ -91,6 +91,7 @@ export {
   recordUserEdit,
 } from './user-edit-step.js';
 export type {
+  AuthorCorrectionOutcome,
   EditActionLevel,
   EditDeltaStats,
   EditOperationBlock,
@@ -98,6 +99,7 @@ export type {
   RecordUserEditRequest,
   UserEditOutcome,
 } from './user-edit-step.js';
+
 
 /**
  * Review 步（T17 · #41；ADR-0025 升级）：draft 产物 → 机械核检输入记录 +

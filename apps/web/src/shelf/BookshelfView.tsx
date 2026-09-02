@@ -41,7 +41,7 @@ export function BookshelfView({
     try {
       const data = await post<LibraryResponse>('/api/library', { parentDir })
       setBooks(data.books)
-      setSkipped(data.skipped)
+      setSkipped(data.skipped.length)
     } catch (cause) {
       setError((cause as Error).message)
     } finally {

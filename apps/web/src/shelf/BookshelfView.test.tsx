@@ -22,7 +22,7 @@ const PARENT = 'C:/tmp/lib'
 
 const LIBRARY: LibraryResponse = {
   ok: true,
-  skipped: 0,
+  skipped: [],
   books: [
     { root: 'C:/tmp/lib/甲书', bookId: 'bk_a', title: '甲书', chapterCount: 1 },
     { root: 'C:/tmp/lib/乙书', bookId: 'bk_b', title: '乙书', chapterCount: 0 },
@@ -110,7 +110,7 @@ describe('BookshelfView（书架）', () => {
   })
 
   it('空书库 + skipped 显式提示', async () => {
-    stubShelfFetch({ library: { ok: true, books: [], skipped: 2 } })
+    stubShelfFetch({ library: { ok: true, books: [], skipped: [{ path: '坏书', reason: 'bad book.json' }, { path: '残书', reason: 'missing book.json' }] } })
     render(<BookshelfView parentDir={PARENT} currentRoot={null} onSwitchBook={() => {}} />)
     await waitFor(() => {
       expect(screen.getByTestId('bookshelf-none').textContent).toContain('暂无书籍')

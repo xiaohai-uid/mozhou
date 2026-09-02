@@ -17,6 +17,7 @@ const CATEGORY_LABELS: Record<TaskEventSummary['category'], { label: string; cls
   pipeline: { label: '管线生产', cls: 'cap-badge native' },
   traversal: { label: '影响遍历', cls: 'cap-badge pending' },
   review: { label: '质量审查', cls: 'verdict blocking' },
+  canon: { label: '正史提交', cls: 'cap-badge native' },
   system: { label: '系统领域', cls: 'tag' },
 }
 

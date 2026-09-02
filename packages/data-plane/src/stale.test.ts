@@ -34,7 +34,11 @@ beforeEach(() => {
 
 afterAll(() => {
   for (const root of tmpRoots.splice(0)) {
-    rmSync(root, { recursive: true, force: true })
+    try {
+      rmSync(root, { recursive: true, force: true })
+    } catch {
+      // Windows file lock tolerance
+    }
   }
 })
 
@@ -129,10 +133,14 @@ describe('验收① 自动化入口穷举保护断言', () => {
   it('rebuildProjectionFromCanon：零 canon 触碰（含保护位种子文件逐字节原样）', () => {
     const plane = newBook()
     const before = canonBytes(bookRoot)
+    // Windows 上重建前必须释放打开的 SQLite 连接句柄，否则文件删除被阻塞
+    plane.close()
     rebuildProjectionFromCanon(bookRoot)
     expectSameBytes(before, canonBytes(bookRoot))
     // 重建后基线逐字节相同（幂等硬断言的 T6 面投影）
-    expect(plane.verifyBaseline().reconcileSurface).toEqual([])
+    const reopened = LocalDataPlane.open(bookRoot)
+    expect(reopened.verifyBaseline().reconcileSurface).toEqual([])
+    reopened.close()
   })
 
   it('createChapterDraft：只新增文件，既有保护位工件原样', () => {

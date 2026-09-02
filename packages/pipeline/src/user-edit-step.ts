@@ -352,20 +352,29 @@ export interface RecordAuthorCorrectionRequest {
   readonly note?: string;
 }
 
+export interface AuthorCorrectionOutcome {
+  readonly reportId: string;
+  readonly revision: number;
+  readonly noteDigest: string | null;
+}
+
 /**
  * 纯纠错记录：AuthorCorrectionRecorded 落账 + 失败记忆折叠。不触碰正文文件、
  * 不步进 revision——纠错是元数据动作，编辑走 recordUserEdit。web 端
  * /api/chapter.corrections 与 recordUserEdit 共用本函数（单一事实源）。
  */
-export function recordAuthorCorrection(request: RecordAuthorCorrectionRequest): void {
-  if (request.reasons.length === 0) return;
+export function recordAuthorCorrection(request: RecordAuthorCorrectionRequest): AuthorCorrectionOutcome {
+  if (request.reasons.length === 0) {
+    return { reportId: '', revision: 0, noteDigest: null };
+  }
+  const noteDigest = request.note !== undefined ? hashProse(request.note) : null;
   const correctionEvent: DomainEvent = {
     type: 'AuthorCorrectionRecorded',
     taskRef: request.taskRef,
     chapterIndex: request.chapterIndex,
     payload: {
       reasons: [...request.reasons],
-      ...(request.note !== undefined ? { noteDigest: hashProse(request.note) } : {}),
+      ...(request.note !== undefined ? { noteDigest } : {}),
     },
   };
   request.bus.publish({ root: request.bookRoot }, correctionEvent);
@@ -383,4 +392,10 @@ export function recordAuthorCorrection(request: RecordAuthorCorrectionRequest): 
   );
   mkdirSync(memoryDir, { recursive: true });
   writeFileSync(memoryPath, serializeFailurePatterns(updated), 'utf8');
+
+  return {
+    reportId: `corr_${request.taskRef}_${request.chapterIndex}`,
+    revision: 0,
+    noteDigest,
+  };
 }
