@@ -7,8 +7,10 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:continuity": "vitest run src/continuity-assertions.test.ts"
   },
+
   "dependencies": {
     "@mozhou/context-compiler": "workspace:*",
     "@mozhou/kernel": "workspace:*",

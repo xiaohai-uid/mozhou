@@ -27,10 +27,12 @@ import {
   detectKeywordTriggers,
   embeddingRecall,
   khopGraphRecall,
+  mergeChannelsWithRRF,
   mergeRecallChannels,
   recallCandidates,
   type RecallEntityCard,
 } from './recall.js'
+
 
 /* ----------------------------------------------------------------------------
  * 确定性夹具
@@ -901,4 +903,42 @@ describe('embedding 直达卡片与合并收口', () => {
       ),
     ).rejects.toThrow(/维度不匹配/)
   })
+
+  it('P1-2: mergeChannelsWithRRF 加权倒数排名融合', () => {
+    const channels = [
+      {
+        channel: 'keyword' as const,
+        entries: [
+          { id: 'fact_k1', tier: 'active_fact' as const, relevanceScore: 0.95, content: '事实k1' },
+          { id: 'fact_common', tier: 'active_fact' as const, relevanceScore: 0.85, content: '事实common' },
+        ],
+      },
+      {
+        channel: 'graph_khop' as const,
+        entries: [
+          { id: 'fact_common', tier: 'active_fact' as const, relevanceScore: 0.90, content: '事实common' },
+          { id: 'fact_g1', tier: 'active_fact' as const, relevanceScore: 0.70, content: '事实g1' },
+        ],
+      },
+      {
+        channel: 'embedding' as const,
+        entries: [
+          { id: 'fact_e1', tier: 'distant_recall' as const, relevanceScore: 0.80, content: '事实e1' },
+          { id: 'fact_common', tier: 'active_fact' as const, relevanceScore: 0.75, content: '事实common' },
+        ],
+      },
+    ]
+
+
+    const result = mergeChannelsWithRRF(channels, {
+      k: 60,
+      weights: { keyword: 1.0, graph_khop: 1.2, embedding: 0.8 },
+    })
+
+    expect(result.candidates.length).toBe(4)
+    // 跨三通道同时命中的 fact_common 获得最高的 RRF 聚合累积分数
+    expect(result.candidates[0]?.id).toBe('fact_common')
+    expect(result.candidates[0]?.relevanceScore).toBeGreaterThan(0.04)
+  })
 })
+

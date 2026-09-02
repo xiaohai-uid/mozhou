@@ -27,6 +27,7 @@ import {
   TrackingRowError,
   TimelineOrderViolationError,
   assertTimelineBatchOrdered,
+  auditCausalContract,
   isSecretPredicate,
   liveMaxTimelineOrder,
   parseKnowledgeStateRow,
@@ -36,6 +37,7 @@ import {
   queryActiveFacts,
 } from '@mozhou/kernel';
 import type {
+  CausalContract,
   FactId,
   KnowledgeHolder,
   KnowledgeState,
@@ -44,6 +46,7 @@ import type {
   TemporalFact,
   TimelineEvent,
 } from '@mozhou/kernel';
+
 import { ChapterPhaseError, proseChapterPath, readNarrativeSnapshot, readProseChapter } from '@mozhou/data-plane';
 import { CANDIDATE_FAMILIES, emptyCandidateCounts } from './extract-step.js';
 import type { CandidateDeltaBatch, CandidateFamily } from './extract-step.js';
@@ -78,7 +81,10 @@ export interface ContinuityGateRequest {
   /** 终稿全文（旁路审查消费；缺省读盘上 draft 正文）。 */
   readonly prose?: string;
   readonly advisoryReviewer?: AdvisoryReviewer | undefined;
+  /** P1-1: 因果合约审查集（违约合法，超期未处置硬拦截） */
+  readonly causalContracts?: readonly CausalContract[] | undefined;
 }
+
 
 export interface GateCheckedCounts {
   readonly batch: Readonly<Record<CandidateFamily, number>>;
@@ -204,7 +210,22 @@ export function runContinuityGate(request: ContinuityGateRequest): ContinuityGat
     }
   }
 
+  /* ---- 5. 因果合约门禁审计（P1-1 · 违约合法，超期未处置判定为硬冲突） ---- */
+  if (request.causalContracts && request.causalContracts.length > 0) {
+    for (const contract of request.causalContracts) {
+      const issue = auditCausalContract(contract, request.chapterIndex);
+      if (issue !== null) {
+        conflicts.push({
+          factId: contract.id,
+          assertion: issue.message,
+          suggestion: '在正文中登记合约履约、违约、展期或放弃处置，方可通过连续性门禁',
+        });
+      }
+    }
+  }
+
   /* ---- 旁路建议：独立可选调用，结论只透传 ---- */
+
   const prose = request.prose ?? readDraftProse(request.bookRoot, request.chapterIndex);
   const advisory = request.advisoryReviewer
     ? [...request.advisoryReviewer({ chapterIndex: request.chapterIndex, prose, delta: request.delta })]

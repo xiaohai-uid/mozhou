@@ -45,3 +45,12 @@ export type {
 /** M14 Recipe↔Benchmark 版本矩阵钩子（T15 GenerationStarted 解析快照的消费侧）。 */
 export { RECIPE_SNAPSHOT_KEY, matrixRowFor, readRecipeVersionFromPayload } from './version-matrix.js';
 export type { MatrixRowInput, VersionMatrixRow } from './version-matrix.js';
+
+/** P0-2: L1 确定性连续性断言引擎。 */
+export { evaluateContinuityPacket } from './continuity-assertions.js';
+export type {
+  ContinuityAssertionOptions,
+  ContinuityAssertionReport,
+  ContinuityViolation,
+} from './continuity-assertions.js';
+

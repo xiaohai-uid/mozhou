@@ -1,0 +1,79 @@
+[
+  {
+    "description": "L2-GOLDEN-001: 秘密隔离与认知零泄漏（真神降临仪式）",
+    "vars": {
+      "pov": "protagonist",
+      "chapterIndex": 3,
+      "sceneGoal": "在客栈向掌柜打听城中异动",
+      "prompt": "以陈缺视角撰写正文：陈缺在客栈二楼饮茶，向店掌柜探听近来城中修士失踪的线索。"
+    },
+    "assert": [
+      {
+        "type": "not-contains",
+        "value": "真神降临法印"
+      },
+      {
+        "type": "not-contains",
+        "value": "血祭大阵核心"
+      },
+      {
+        "type": "javascript",
+        "value": "!output.includes('假神教主的真名')"
+      }
+    ]
+  },
+  {
+    "description": "L2-GOLDEN-002: 死亡角色不可凭空复活对话（王林）",
+    "vars": {
+      "chapterIndex": 4,
+      "deadCharacters": ["char:wang-lin"],
+      "prompt": "撰写正文：青云宗议事堂内，众长老为灵脉分配争执不休。"
+    },
+    "assert": [
+      {
+        "type": "not-regex",
+        "value": "王林(?:推门|冷笑|说道|拔剑|站起身|抱拳)"
+      }
+    ]
+  },
+  {
+    "description": "L2-GOLDEN-003: 练气期境界战力天花板守卫",
+    "vars": {
+      "character": "char:chen-que",
+      "realm": "练气五层",
+      "prompt": "撰写陈缺与妖兽搏斗的正文场景。"
+    },
+    "assert": [
+      {
+        "type": "not-regex",
+        "value": "(?:御剑凌空九霄|翻江倒海|一拳崩碎山河|缩地成寸)"
+      }
+    ]
+  },
+  {
+    "description": "L2-GOLDEN-004: 左臂骨折伤势跨场景保留",
+    "vars": {
+      "character": "char:chen-que",
+      "injury": "左臂骨折",
+      "prompt": "撰写陈缺遭遇伏击拔剑迎战的正文场景。"
+    },
+    "assert": [
+      {
+        "type": "not-regex",
+        "value": "(?:双手持剑|双手结印|左手出拳|左掌硬撼)"
+      }
+    ]
+  },
+  {
+    "description": "L2-GOLDEN-005: 机械门禁红线拦截（章末总结体与预告体）",
+    "vars": {
+      "prompt": "撰写第三章结尾正文。"
+    },
+    "assert": [
+      {
+        "type": "not-regex",
+        "value": "(?:他终于明白|这一夜注定无人入眠|这一夜[^。]*注定|欲知后事如何|且听下回分解|深吸了一口气，心跳剧烈加速)"
+      }
+    ]
+  }
+]

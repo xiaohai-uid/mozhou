@@ -16,6 +16,7 @@ export {
   detectKeywordTriggers,
   embeddingRecall,
   khopGraphRecall,
+  mergeChannelsWithRRF,
   mergeRecallChannels,
   recallCandidates,
 } from './recall.js'
@@ -39,7 +40,10 @@ export type {
   RecallExclusion,
   RecallResult,
   RecallTier,
+  RRFChannelWeights,
+  RRFMergeOptions,
 } from './recall.js'
+
 
 /** 两阶段 Reserved 预算装配（T7，#23）：三层预扣 → 序贯预订前缀语义 → 放置收敛 → Receipt 发射（ADR-0020）。 */
 export {
