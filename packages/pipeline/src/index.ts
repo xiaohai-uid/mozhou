@@ -240,8 +240,10 @@ export {
 export type { ReconciliationWarning } from './watcher-checkpoint.js';
 
 export {
+  buildRevisionBriefsForMatrix,
   generateRevisionBrief,
 } from './revision-cascading.js';
+
 export type {
   ConflictFactItem,
   RevisionTaskBrief,

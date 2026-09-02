@@ -119,3 +119,91 @@ export function evaluateContinuityPacket(
     totalChecked,
   };
 }
+
+export interface PromptfooGeneratedCase {
+  readonly description: string;
+  readonly vars: {
+    readonly pov: string;
+    readonly chapterIndex: number;
+    readonly deadCharacters?: readonly string[] | undefined;
+    readonly prompt: string;
+  };
+  readonly assert: readonly {
+    readonly type: 'not-contains' | 'not-regex' | 'javascript';
+    readonly value: string;
+  }[];
+}
+
+/**
+ * P0-2 动态测试编译器：从正史时空事实与实体状态自动编译出确定性连续性断言规则。
+ * 遵循终审裁决（Q3）：正史设定为唯一真理来源，自动化编译产出测试数据，不维护手写副本。
+ */
+export function generateContinuityAssertionsFromCanon(
+  facts: readonly TemporalFact[],
+  currentChapter: number,
+  pov: 'protagonist' | 'reader' | EntityRef,
+  deadCharacters: readonly EntityRef[] = [],
+  duePromises: readonly NarrativePromiseId[] = [],
+): ContinuityAssertionOptions {
+  const unrevealedSecrets = facts
+    .filter((f) => f.predicate.startsWith('secret.') && (f.validUntil === null || f.validUntil >= currentChapter))
+    .map((f) => ({
+      factId: f.id,
+      secretKeywords: [String(f.value), f.predicate.replace('secret.', '')],
+    }));
+
+  const expiredFacts = facts.filter((f) => f.validUntil !== null && f.validUntil < currentChapter);
+
+  return {
+    currentChapterIndex: currentChapter,
+    pov,
+    unrevealedSecrets,
+    expiredFacts,
+    deadCharacters,
+    duePromiseIds: duePromises,
+  };
+}
+
+/**
+ * 将正史派生的连续性规则导出为标准 Promptfoo 测试用例（用于 CI 与离线模型回归）。
+ */
+export function exportPromptfooTestCaseFromCanon(
+  options: ContinuityAssertionOptions,
+  chapterTitle: string,
+): PromptfooGeneratedCase {
+  const asserts: { type: 'not-contains' | 'not-regex' | 'javascript'; value: string }[] = [];
+
+  if (options.unrevealedSecrets) {
+    for (const s of options.unrevealedSecrets) {
+      for (const kw of s.secretKeywords) {
+        if (kw.length >= 2) asserts.push({ type: 'not-contains', value: kw });
+      }
+    }
+  }
+
+  if (options.deadCharacters && options.deadCharacters.length > 0) {
+    for (const dead of options.deadCharacters) {
+      const name = dead.replace('char:', '');
+      asserts.push({ type: 'not-regex', value: `${name}(?:推门|冷笑|说道|拔剑|站起身|抱拳)` });
+    }
+  }
+
+  asserts.push({
+    type: 'not-regex',
+    value: '(?:他终于明白|这一夜注定无人入眠|这一夜[^。]*注定|欲知后事如何|且听下回分解)',
+  });
+
+  return {
+    description: `[Canon-Derived] 第 ${options.currentChapterIndex} 章 (${chapterTitle}) 连续性回归断言`,
+    vars: {
+      pov: typeof options.pov === 'string' ? options.pov : 'protagonist',
+      chapterIndex: options.currentChapterIndex,
+      ...(options.deadCharacters && options.deadCharacters.length > 0
+        ? { deadCharacters: options.deadCharacters }
+        : {}),
+      prompt: `撰写第 ${options.currentChapterIndex} 章《${chapterTitle}》核心场景正文。`,
+    },
+    assert: asserts,
+  };
+}
+

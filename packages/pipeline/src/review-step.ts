@@ -198,7 +198,9 @@ export interface ExecuteChapterReviewOutcome extends ReviewStepOutcome {
   readonly mechanicalGate: MechanicalGateReport;
   readonly harvestedQuotesCount: number;
   readonly absorbedCounterexamplesCount: number;
+  readonly secondaryLifecycleWarnings?: readonly string[] | undefined;
 }
+
 
 /**
  * 章节审查深模块统一入口（Candidate 1 · 架构深化）。
@@ -255,6 +257,8 @@ export async function executeChapterReview(
   );
 
 
+  const secondaryWarnings: string[] = [];
+
   // 2. 自动金句收割
   let harvestedQuotesCount = 0;
   if (request.autoHarvestQuotes !== false) {
@@ -265,8 +269,8 @@ export async function executeChapterReview(
         reviewOutcome.input.body,
       );
       harvestedQuotesCount = Array.isArray(quotes) ? quotes.length : 0;
-    } catch {
-      // 容错不阻断核心审查产物
+    } catch (error) {
+      secondaryWarnings.push(`金句收割跳过: ${(error as Error)?.message || String(error)}`);
     }
   }
 
@@ -292,8 +296,8 @@ export async function executeChapterReview(
           aiFlavorIssues,
         );
       }
-    } catch {
-      // 容错不阻断核心审查产物
+    } catch (error) {
+      secondaryWarnings.push(`反例库吸收跳过: ${(error as Error)?.message || String(error)}`);
     }
   }
 
@@ -320,6 +324,8 @@ export async function executeChapterReview(
     mechanicalGate,
     harvestedQuotesCount,
     absorbedCounterexamplesCount,
+    ...(secondaryWarnings.length > 0 ? { secondaryLifecycleWarnings: secondaryWarnings } : {}),
   };
 }
+
 

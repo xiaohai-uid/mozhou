@@ -46,11 +46,17 @@ export type {
 export { RECIPE_SNAPSHOT_KEY, matrixRowFor, readRecipeVersionFromPayload } from './version-matrix.js';
 export type { MatrixRowInput, VersionMatrixRow } from './version-matrix.js';
 
-/** P0-2: L1 确定性连续性断言引擎。 */
-export { evaluateContinuityPacket } from './continuity-assertions.js';
+/** P0-2: L1 确定性连续性断言引擎与测试编译器。 */
+export {
+  evaluateContinuityPacket,
+  exportPromptfooTestCaseFromCanon,
+  generateContinuityAssertionsFromCanon,
+} from './continuity-assertions.js';
 export type {
   ContinuityAssertionOptions,
   ContinuityAssertionReport,
   ContinuityViolation,
+  PromptfooGeneratedCase,
 } from './continuity-assertions.js';
+
 

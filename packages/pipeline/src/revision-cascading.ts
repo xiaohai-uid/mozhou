@@ -72,3 +72,22 @@ export function generateRevisionBrief(
     suggestedReplacements,
   }
 }
+
+/**
+ * 批量为变更矩阵的受损列自动生成《回炉重构任务书》映射字典（消除上层 Feature Envy）。
+ */
+export function buildRevisionBriefsForMatrix(
+  columns: readonly number[],
+  impactRecords: readonly ImpactRecord[],
+): Record<number, RevisionTaskBrief> {
+  const briefs: Record<number, RevisionTaskBrief> = {}
+  for (const chIndex of columns) {
+    briefs[chIndex] = generateRevisionBrief(
+      chIndex,
+      `第 ${chIndex} 章`,
+      impactRecords,
+    )
+  }
+  return briefs
+}
+

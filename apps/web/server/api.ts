@@ -26,8 +26,8 @@ import type {
 import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-compiler'
 import {
   ChapterProductionSession,
+  buildRevisionBriefsForMatrix,
   executeChapterReview,
-  generateRevisionBrief,
   loadReceiptForResume,
   makeDraftProviderBinding,
   projectSession,
@@ -35,6 +35,7 @@ import {
   recordAuthorCorrection,
   runDraftStep,
 } from '@mozhou/pipeline'
+
 import type { RevisionTaskBrief } from '@mozhou/pipeline'
 import {
   LocalDataPlane,
@@ -925,18 +926,11 @@ export function apiMiddleware(): Middleware {
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
           const plane = LocalDataPlane.open(root)
           const matrix = plane.getChangeMatrix()
-          const impactRecords = listImpactRecords(root)
-          const revisionBriefs: Record<number, RevisionTaskBrief> = {}
-          for (const chIndex of matrix.columns) {
-            revisionBriefs[chIndex] = generateRevisionBrief(
-              chIndex,
-              `第 ${chIndex} 章`,
-              impactRecords,
-            )
-          }
+          const revisionBriefs = buildRevisionBriefsForMatrix(matrix.columns, listImpactRecords(root))
           json(res, 200, { ok: true, matrix, revisionBriefs } satisfies ChangeMatrixResponse)
           return
         }
+
 
         if (req.method === 'POST' && path === '/api/change-matrix.rerun') {
           const body = await bodyOf(req)

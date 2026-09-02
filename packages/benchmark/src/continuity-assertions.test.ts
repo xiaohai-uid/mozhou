@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ContextPacket } from '@mozhou/context-compiler';
 import type { NarrativePromiseId, TemporalFact } from '@mozhou/kernel';
-import { evaluateContinuityPacket } from './continuity-assertions.js';
+import {
+  evaluateContinuityPacket,
+  exportPromptfooTestCaseFromCanon,
+  generateContinuityAssertionsFromCanon,
+} from './continuity-assertions.js';
+
 
 describe('L1 确定性连续性断言引擎 (evaluateContinuityPacket)', () => {
   const dummyPacket: ContextPacket = {
@@ -131,4 +136,46 @@ describe('L1 确定性连续性断言引擎 (evaluateContinuityPacket)', () => {
     expect(report.passed).toBe(true);
     expect(report.violations.length).toBe(0);
   });
+
+  it('从正史事实动态编译连续性断言与 Promptfoo 测试用例', () => {
+    const mockFacts: TemporalFact[] = [
+      {
+        id: 'fact_secret_true_god' as any,
+        bookId: 'book_01' as any,
+        revision: 0,
+        createdAt: '',
+        updatedAt: '',
+        subject: 'char:chen-que',
+        predicate: 'secret.true_god_altar',
+        value: '真神降临古阵',
+        validFrom: 1,
+        validUntil: null,
+        importance: 'critical',
+        riskClass: 'high',
+        source: { kind: 'chapter', chapterIndex: 1 },
+        status: 'confirmed',
+        compactedIntoVolumeId: null,
+        provenance: { origin: 'author', protectedUserContent: true },
+      },
+    ];
+
+    const options = generateContinuityAssertionsFromCanon(
+      mockFacts,
+      3,
+      'protagonist',
+      ['char:wang-lin' as any],
+      ['prom_01' as any],
+    );
+
+    expect(options.currentChapterIndex).toBe(3);
+    expect(options.unrevealedSecrets?.length).toBe(1);
+    expect(options.unrevealedSecrets?.[0]?.secretKeywords).toContain('真神降临古阵');
+    expect(options.deadCharacters).toContain('char:wang-lin');
+
+    const promptfooCase = exportPromptfooTestCaseFromCanon(options, '古庙探秘');
+    expect(promptfooCase.description).toContain('第 3 章 (古庙探秘)');
+    expect(promptfooCase.assert.some((a) => a.value === '真神降临古阵')).toBe(true);
+    expect(promptfooCase.assert.some((a) => a.value.includes('wang-lin'))).toBe(true);
+  });
 });
+

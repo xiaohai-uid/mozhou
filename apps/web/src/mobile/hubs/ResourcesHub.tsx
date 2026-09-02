@@ -41,14 +41,19 @@ export function ResourcesHub({}: ResourcesHubProps): JSX.Element {
     const targetUrl = b.url || 'https://m.qidian.com'
     setImportingUrl(targetUrl)
     try {
-      await post('/api/crawler.extract', { url: targetUrl }).catch(() => null)
-      alert(`【Crawl4AI 抓取成功】《${b.title}》已提取并建立对标拆解！`)
-    } catch (err) {
-      alert(`抓取完成，对标《${b.title}》已入库`)
+      const res = await post<{ ok: boolean; title?: string; error?: string }>('/api/crawler.extract', { url: targetUrl })
+      if (res.ok) {
+        alert(`【Crawl4AI 抓取成功】《${b.title}》已提取并建立对标拆解！`)
+      } else {
+        alert(`【提取提示】《${b.title}》: ${res.error || '源站暂不可达，已标记为待抓取对标'}`)
+      }
+    } catch {
+      alert(`【提取失败】《${b.title}》网络连接异常，请检查抓取服务状态`)
     } finally {
       setImportingUrl(null)
     }
   }
+
 
   return (
     <>

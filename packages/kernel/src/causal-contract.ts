@@ -3,7 +3,8 @@
  * 表达仙侠/奇幻长篇中具有多方约束、对价、义务集合与违约责任的因果承诺。
  * 向通用内核投影 contract.* 派生时空事实，供 ContextCompiler 与图谱复用。
  */
-import type { Brand, EntityRef, KernelEntityHead, TemporalFact } from './kernel-schema.js';
+import type { Brand, EntityRef, FactId, KernelEntityHead, TemporalFact } from './kernel-schema.js';
+
 
 export type ContractId = Brand<`contract_${string}`, 'ContractId'>;
 
@@ -62,7 +63,7 @@ export function projectContractToTemporalFacts(contract: CausalContract): Tempor
 
   const facts: TemporalFact[] = [
     {
-      id: `fact_${contract.id}_status` as any,
+      id: `fact_${contract.id}_status` as FactId,
       bookId: contract.bookId,
       revision: contract.revision,
       createdAt: contract.createdAt,
@@ -83,7 +84,7 @@ export function projectContractToTemporalFacts(contract: CausalContract): Tempor
 
   if (contract.status === 'breached') {
     facts.push({
-      id: `fact_${contract.id}_breached` as any,
+      id: `fact_${contract.id}_breached` as FactId,
       bookId: contract.bookId,
       revision: contract.revision,
       createdAt: contract.createdAt,
@@ -101,6 +102,7 @@ export function projectContractToTemporalFacts(contract: CausalContract): Tempor
       provenance: { origin: 'author', protectedUserContent: true },
     });
   }
+
 
   return facts;
 }

@@ -36,6 +36,19 @@ export function createStagedOverlay(): StagedOverlay {
   };
 }
 
+/** 内部辅助函数：聚合多场景暂存记录中的五族候选 Delta */
+function accumulateStageDeltas(stages: readonly SceneStageRecord[]): CandidateDeltaBatch {
+  const accumulated: Record<string, unknown[]> = {};
+  for (const stage of stages) {
+    for (const [family, items] of Object.entries(stage.stagedDeltas)) {
+      if (!Array.isArray(items)) continue;
+      if (!accumulated[family]) accumulated[family] = [];
+      accumulated[family].push(...items);
+    }
+  }
+  return accumulated as CandidateDeltaBatch;
+}
+
 /**
  * 暂存单个场景产物。
  * 记录本场景正文、ExitState 与提取的 Candidate Deltas，累加暂存视图。
@@ -47,21 +60,13 @@ export function stageScene(
   const filtered = overlay.stages.filter((s) => s.sceneId !== record.sceneId);
   const updatedStages = [...filtered, record].sort((a, b) => a.orderIndex - b.orderIndex);
 
-  const accumulated: Record<string, unknown[]> = {};
-  for (const stage of updatedStages) {
-    for (const [family, items] of Object.entries(stage.stagedDeltas)) {
-      if (!Array.isArray(items)) continue;
-      if (!accumulated[family]) accumulated[family] = [];
-      accumulated[family].push(...items);
-    }
-  }
-
   return {
     stages: updatedStages,
-    accumulatedDeltas: accumulated as CandidateDeltaBatch,
+    accumulatedDeltas: accumulateStageDeltas(updatedStages),
     lastDraftHash: record.draftContentHash,
   };
 }
+
 
 /**
  * 将前序场景的暂存候选事实叠入基础事实集，生成供下一场景编译的临时视图。
@@ -100,21 +105,13 @@ export function invalidateDownstreamStages(
   const kept = overlay.stages.filter((s) => s.orderIndex <= modifiedOrderIndex);
   const removed = overlay.stages.filter((s) => s.orderIndex > modifiedOrderIndex);
 
-  const accumulated: Record<string, unknown[]> = {};
-  for (const stage of kept) {
-    for (const [family, items] of Object.entries(stage.stagedDeltas)) {
-      if (!Array.isArray(items)) continue;
-      if (!accumulated[family]) accumulated[family] = [];
-      accumulated[family].push(...items);
-    }
-  }
-
   const lastKept = kept[kept.length - 1];
 
   return {
     stages: kept,
-    accumulatedDeltas: accumulated as CandidateDeltaBatch,
+    accumulatedDeltas: accumulateStageDeltas(kept),
     lastDraftHash: lastKept?.draftContentHash ?? null,
     invalidatedSceneIds: removed.map((s) => s.sceneId),
   };
 }
+
