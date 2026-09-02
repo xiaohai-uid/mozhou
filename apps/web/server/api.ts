@@ -10,39 +10,47 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { CORRECTION_REASONS, hashProse, isQualityReviewCurrent } from '@mozhou/quality-engine'
-import type { QualityPolicy, QualityReviewReport } from '@mozhou/quality-engine'
+import {
+  CORRECTION_REASONS,
+  evaluateStyleMetrics,
+  hashProse,
+  isQualityReviewCurrent,
+} from '@mozhou/quality-engine'
+import type {
+  MechanicalGateReport,
+  QualityPolicy,
+  QualityReviewReport,
+  StyleMetrics,
+} from '@mozhou/quality-engine'
+
 import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-compiler'
 import {
   ChapterProductionSession,
+  executeChapterReview,
+  generateRevisionBrief,
   loadReceiptForResume,
   makeDraftProviderBinding,
   projectSession,
   QualityReworkLimitExceededError,
   recordAuthorCorrection,
   runDraftStep,
-  runReviewStep,
 } from '@mozhou/pipeline'
+import type { RevisionTaskBrief } from '@mozhou/pipeline'
 import {
   LocalDataPlane,
-  assembleChangeMatrix,
   createBook,
   listImpactRecords,
   proseChapterPath,
-  queryInvalidatedKnowledgeStates,
   readBookRecord,
   readCanonState,
-  readNarrativeSnapshot,
   readProseChapter,
-  renderProseChapter,
   readStyleProfiles,
+  renderProseChapter,
   runTraversal,
-  scanEntityCards,
   scanLibrary,
   sha256Hex,
 } from '@mozhou/data-plane'
-import type { ChapterPhase } from '@mozhou/data-plane'
-import type { ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
+import type { ChangeMatrix, ChapterPhase, ImpactRecord, StoryBrainOverview, WorksOverview } from '@mozhou/data-plane'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import {
   queryActiveFacts as queryVisibleFactsInSnapshot,
@@ -62,6 +70,7 @@ import { searchMultipleSources, type MultiSourceSearchOutcome } from './crawlers
 import { fetchQidianHotBoard } from './crawlers/rankings.js'
 import { smartExtractContent, isCrawl4aiAlive } from './crawlers/crawl4ai.js'
 import type { CrawledBook } from './crawlers/qidian.js'
+
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
 
@@ -146,6 +155,8 @@ export interface ChangeMatrixResponse {
   readonly matrix: ChangeMatrix
   /** 重跑后的矩阵（幂等覆盖后重投影）。 */
   readonly rerunCount?: number | undefined
+  /** 各受影响章节的回炉重构任务书 */
+  readonly revisionBriefs?: Record<number, RevisionTaskBrief> | undefined
 }
 
 /**
@@ -284,24 +295,11 @@ export interface TasksResponse {
  * - 四场景文风画像（动作/对话/情感/设定）
  * - 风格样本蒸馏指标（对白占比、句长分布、感官描写密度、动作节奏）
  */
-export interface StyleMetrics {
-  readonly charCount: number
-  readonly dialogueRatio: number
-  readonly avgSentenceLength: number
-  readonly shortSentenceRatio: number
-  readonly sensoryDensity: number
-  readonly actionPacing: number
-  /** sepia (StoryScope) 叙事架构与 De-AI 评定 */
-  readonly sepiaNarrativeScore: {
-    readonly pass1NarrativeArchitecture: number // [0, 100]
-    readonly pass2DiscourseFlow: number // [0, 100]
-    readonly pass3SurfacePurity: number // [0, 100]
-    readonly aiTellsCount: number
-    readonly aiTellsSummary: readonly string[]
-  }
-}
+export type { StyleMetrics }
+
 
 export interface StyleDistillResponse {
+
   readonly ok: true
   readonly currentProfiles: Record<string, {
     readonly scenarioType: string
@@ -351,6 +349,7 @@ export interface NovelBreakdownResponse {
 
 export type { RankBoard, RankingItem } from './crawlers/rankings.js'
 import type { RankBoard, RankingItem } from './crawlers/rankings.js'
+export type { CrawledBook } from './crawlers/qidian.js'
 
 export interface RankScanResponse {
   readonly ok: true
@@ -661,81 +660,8 @@ function sanitizeDirName(title: string): string {
   return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
-/** 风格样本蒸馏指标提取（T50 纯确定性算法 + sepia StoryScope 叙事架构与 De-AI 评定）。 */
-function computeStyleMetrics(text: string): StyleMetrics {
-  const clean = text.trim()
-  if (clean.length === 0) {
-    return {
-      charCount: 0,
-      dialogueRatio: 0,
-      avgSentenceLength: 0,
-      shortSentenceRatio: 0,
-      sensoryDensity: 0,
-      actionPacing: 0,
-      sepiaNarrativeScore: {
-        pass1NarrativeArchitecture: 100,
-        pass2DiscourseFlow: 100,
-        pass3SurfacePurity: 100,
-        aiTellsCount: 0,
-        aiTellsSummary: [],
-      },
-    }
-  }
-  const dialogueMatches = clean.match(/["“「][^"”」]+["”」]/g) ?? []
-  const dialogueChars = dialogueMatches.reduce((acc, m) => acc + m.length - 2, 0)
-  const dialogueRatio = Math.min(1, Math.round((dialogueChars / clean.length) * 100) / 100)
-
-  const sentences = clean.split(/[。！？；\n]+/).map((s) => s.trim()).filter((s) => s.length > 0)
-  const totalSentences = Math.max(1, sentences.length)
-  const avgLen = Math.round(clean.length / totalSentences)
-  const shortCount = sentences.filter((s) => s.length <= 15).length
-  const shortRatio = Math.round((shortCount / totalSentences) * 100) / 100
-
-  const sensoryKeywords = /看|望|见|听|闻|嗅|凉|冷|热|暗|光|影|红|白|黑|声|响|震|颤/g
-  const sensoryHits = (clean.match(sensoryKeywords) ?? []).length
-  const sensoryDensity = Math.min(1, Math.round((sensoryHits / Math.max(1, clean.length / 50)) * 10) / 100)
-
-  const actionKeywords = /拔|冲|刺|斩|跃|退|闪|击|落|飞|抓|握|挥|踢|撞|踏/g
-  const actionHits = (clean.match(actionKeywords) ?? []).length
-  const actionPacing = Math.min(1, Math.round((actionHits / Math.max(1, clean.length / 50)) * 10) / 100)
-
-  // sepia AI Tells 规则检测
-  const aiTells: string[] = []
-  const clicheMatches = clean.match(/不仅.*而且|值得注意|显而易见|总而言之|随着.*的推移|深吸了一口气|心跳.*加速/g)
-  if (clicheMatches && clicheMatches.length > 0) {
-    aiTells.push(`Pass 3 表层套话：检测到 ${clicheMatches.length} 处典型 AI 机械句式`)
-  }
-  const questionMatches = clean.split('\n').filter((p) => /[？\?]\s*$/.test(p.trim()))
-  if (questionMatches.length >= 2) {
-    aiTells.push(`Pass 2 语篇流动：段末模板化设问偏高 (${questionMatches.length} 处)`)
-  }
-  const moralMatches = clean.match(/明白了一个道理|这一刻.*终于懂了|生命的意义|这或许就是/g)
-  if (moralMatches && moralMatches.length > 0) {
-    aiTells.push(`Pass 1 叙事架构：存在旁白主题直接说教 / 顿悟倾向`)
-  }
-
-  const pass1 = Math.max(60, 100 - (moralMatches ? moralMatches.length * 15 : 0))
-  const pass2 = Math.max(60, 100 - (questionMatches.length >= 2 ? 20 : 0))
-  const pass3 = Math.max(50, 100 - (clicheMatches ? clicheMatches.length * 12 : 0))
-
-  return {
-    charCount: clean.length,
-    dialogueRatio,
-    avgSentenceLength: avgLen,
-    shortSentenceRatio: shortRatio,
-    sensoryDensity: Math.max(0.1, Math.min(0.95, sensoryDensity)),
-    actionPacing: Math.max(0.1, Math.min(0.95, actionPacing)),
-    sepiaNarrativeScore: {
-      pass1NarrativeArchitecture: pass1,
-      pass2DiscourseFlow: pass2,
-      pass3SurfacePurity: pass3,
-      aiTellsCount: aiTells.length,
-      aiTellsSummary: aiTells,
-    },
-  }
-}
-
 /* ---- T44（#89）中栏对话流辅助与 sepia 4 大核心操作入口 ---- */
+
 
 /** 技能词表（融入 sepia 4 大 De-AI 操作：write/review/refactor/recreate）。 */
 const DIALOGUE_CAPABILITIES: readonly CapabilityListItem[] = [
@@ -922,7 +848,8 @@ export function apiMiddleware(): Middleware {
           const body = await bodyOf(req)
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
-          json(res, 200, { ok: true, cards: scanEntityCards(root) })
+          const plane = LocalDataPlane.open(root)
+          json(res, 200, { ok: true, cards: plane.getEntityCards() })
           return
         }
         if (req.method === 'POST' && path === '/api/story-brain.facts') {
@@ -932,61 +859,16 @@ export function apiMiddleware(): Middleware {
           const rawEntityIds = Array.isArray(body['entityIds']) ? body['entityIds'] : []
           const entityIds = rawEntityIds.filter((r): r is EntityRef => typeof r === 'string' && r.length > 0)
 
-          // 章节锚点：正文章逐章探测（章一体两面），首个缺失即止——章序连续
-          // 由 createChapterDraft 纪律保证；缺章即停止，不猜测后续。
-          const chapters: { chapterIndex: number; phase: ChapterPhase }[] = []
-          for (let index = 1; ; index += 1) {
-            try {
-              const scan = readProseChapter(root, proseChapterPath(index))
-              chapters.push({ chapterIndex: scan.chapterIndex, phase: scan.phase })
-            } catch (error) {
-              if ((error as { code?: string }).code === 'ENOENT') break
-              throw error
-            }
-          }
-          const latestDraft = [...chapters].reverse().find((chapter) => chapter.phase === 'draft')
-          const latest = chapters[chapters.length - 1]
-          const currentChapterIndex = latestDraft?.chapterIndex ?? latest?.chapterIndex ?? null
-          const chapter = currentChapterIndex ?? 1
-
-          // 一次折叠，四读面同源：canon（kernel 纯函数 = data-plane
-          // queryActiveFacts 同语义）+ 逐持有者 suspects/believes 通道。
-          const snapshot = readNarrativeSnapshot(root)
-          const canon = queryVisibleFactsInSnapshot(snapshot, {
-            chapter,
-            pov: 'protagonist',
-            ...(entityIds.length > 0 ? { entityIds } : {}),
-          })
-
-          // reader 非可查询视角（零泄漏门禁拒绝全知视角）；knows 不进本通道
-          const holders = new Set<Exclude<KnowledgeState['holder'], 'reader'>>()
-          for (const ks of snapshot.knowledgeStates.values()) {
-            if (ks.holder === 'reader' || ks.level === 'knows' || ks.knownSinceChapter > chapter) continue
-            holders.add(ks.holder)
-          }
-          const perspective = [...holders].sort().flatMap((holder) =>
-            queryKnowledgePerspective(snapshot, { chapter, pov: holder }).map((entry) => ({
-              ...entry,
-              subject: snapshot.facts.get(entry.factId)?.subject ?? null,
-            })),
-          )
-          const invalidated = queryInvalidatedKnowledgeStates(root).map((ks) => ({
-            ...ks,
-            subject: snapshot.facts.get(ks.factId)?.subject ?? null,
-          }))
-
+          const plane = LocalDataPlane.open(root)
+          const overview = plane.queryStoryBrain({ entityIds })
           const payload: StoryBrainFactsResponse = {
             ok: true,
-            chapter,
-            currentChapterIndex,
-            chapters,
-            canon,
-            perspective,
-            invalidated,
+            ...overview,
           }
           json(res, 200, payload)
           return
         }
+
         /* ---- T42（#87）装配看板读面：纯只读（loadReceipt / loadReceiptForResume 既有，
          *      零新增后端能力）+ INV-R6 hash match 真实校验 + 会话投影续跑判态 ---- */
         if (req.method === 'POST' && path === '/api/receipts') {
@@ -1041,9 +923,21 @@ export function apiMiddleware(): Middleware {
           const body = await bodyOf(req)
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
-          json(res, 200, { ok: true, matrix: assembleChangeMatrix(root) } satisfies ChangeMatrixResponse)
+          const plane = LocalDataPlane.open(root)
+          const matrix = plane.getChangeMatrix()
+          const impactRecords = listImpactRecords(root)
+          const revisionBriefs: Record<number, RevisionTaskBrief> = {}
+          for (const chIndex of matrix.columns) {
+            revisionBriefs[chIndex] = generateRevisionBrief(
+              chIndex,
+              `第 ${chIndex} 章`,
+              impactRecords,
+            )
+          }
+          json(res, 200, { ok: true, matrix, revisionBriefs } satisfies ChangeMatrixResponse)
           return
         }
+
         if (req.method === 'POST' && path === '/api/change-matrix.rerun') {
           const body = await bodyOf(req)
           const root = typeof body['root'] === 'string' ? body['root'] : null
@@ -1068,9 +962,10 @@ export function apiMiddleware(): Middleware {
           })
           json(res, 200, {
             ok: true,
-            matrix: assembleChangeMatrix(root),
+            matrix: LocalDataPlane.open(root).getChangeMatrix(),
             rerunCount: 1,
           } satisfies ChangeMatrixResponse)
+
           return
         }
         /* ---- T44（#89）中栏写作对话流：技能读面 / 墨舟先问 / 流式草稿端点 ---- */
@@ -1098,56 +993,27 @@ export function apiMiddleware(): Middleware {
           const root = typeof body['root'] === 'string' ? body['root'] : null
           if (root === null) { json(res, 400, { ok: false, error: 'root required' }); return }
 
+          const plane = LocalDataPlane.open(root)
+          const overview = plane.getWorksOverview()
           const canon = readCanonState(root)
-          const chapters: WorksChapterSummary[] = []
-          let totalWords = 0
-          let committedCount = 0
-          let draftCount = 0
-
-          for (let index = 1; ; index += 1) {
-            try {
-              const scan = readProseChapter(root, proseChapterPath(index))
-              const words = scan.body.replace(/\s+/g, '').length
-              totalWords += words
-              if (scan.phase === 'committed') committedCount += 1
-              if (scan.phase === 'draft') draftCount += 1
-
-              // 尝试从大纲节点中寻找章标题（nodeType === 'chapter'）
-              const outlineNode = canon.outlineNodes.find(
-                (node) => node.nodeType === 'chapter' && node.orderIndex === index,
-              )
-              const chapterTitle = outlineNode?.title ?? `第 ${index} 章`
-
-              chapters.push({
-                chapterIndex: scan.chapterIndex,
-                title: chapterTitle,
-                phase: scan.phase,
-                wordCount: words,
-                revision: scan.revision,
-              })
-            } catch (error) {
-              if ((error as { code?: string }).code === 'ENOENT') break
-              throw error
-            }
-          }
 
           json(res, 200, {
             ok: true,
             book: {
-              id: canon.book.id,
-              title: canon.book.title,
+              id: overview.book.id,
+              title: overview.book.title,
               root,
               genres: [],
-              createdAt: canon.book.createdAt,
+              createdAt: overview.book.createdAt,
             },
             stats: {
-              totalChapters: chapters.length,
-              committedChapters: committedCount,
-              draftChapters: draftCount,
-              totalWords,
+              totalChapters: overview.chapters.length,
+              committedChapters: overview.committedCount,
+              draftChapters: overview.draftCount,
+              totalWords: overview.totalWordCount,
               entityCount: canon.entityCards.length,
             },
-            chapters,
+            chapters: overview.chapters,
             outlineNodes: canon.outlineNodes.map((n) => ({
               id: n.id,
               nodeType: n.nodeType,
@@ -1157,6 +1023,7 @@ export function apiMiddleware(): Middleware {
           } satisfies WorksOverviewResponse)
           return
         }
+
         /* ---- T48（任务中心）：账本事件流水与 Traversal 影响审计读面。 ---- */
         if (req.method === 'POST' && path === '/api/tasks') {
           const body = await bodyOf(req)
@@ -1238,12 +1105,13 @@ export function apiMiddleware(): Middleware {
             try { currentProfiles = readStyleProfiles(root) } catch { /* ignore */ }
           }
 
-          const sampleMetrics = computeStyleMetrics(text)
+          const sampleMetrics = evaluateStyleMetrics(text)
           json(res, 200, {
             ok: true,
             currentProfiles,
             sampleMetrics,
           } satisfies StyleDistillResponse)
+
           return
         }
         /* ---- T51（小说拆解）：故事核、黄金三章节奏与人物弧光拆解。 ---- */
@@ -1842,23 +1710,19 @@ export function apiMiddleware(): Middleware {
             Array.isArray(rawPolicy.rules)
               ? rawPolicy
               : undefined
-          const outcome = await runReviewStep({
+          const outcome = await executeChapterReview({
             bookRoot: root,
             chapterIndex,
+            session,
             receiptId,
             reviewer: { providerId: 'web', model: 'web-direct', recipeVersion: '0.0.0' },
             ...(policy !== undefined ? { policy } : {}),
-          })
-          session.recordQualityReview({
-            reportId: outcome.report.reportId,
-            verdict: outcome.report.verdict,
-            reportPath: outcome.reportRelPath,
-            draftRevision: outcome.input.revision,
-            draftContentHash: outcome.report.anchor.draftContentHash,
-            receiptId,
+            autoHarvestQuotes: true,
+            autoAbsorbCounterexamples: true,
           })
           const projection = session.project()
           const failed = outcome.report.evaluations.filter((e) => e.verdict === 'fail')
+
           json(res, 200, {
             ok: true,
             verdict: outcome.report.verdict,
@@ -1873,8 +1737,10 @@ export function apiMiddleware(): Middleware {
             advisories: failed.filter((e) => e.severity === 'advisory'),
             // Gate 3 边界标记：web 直连面未挂语义审查者（结构接线完成 / semantic review unavailable）
             semanticReviewer: 'unavailable',
+            mechanicalGate: outcome.mechanicalGate,
           })
           return
+
         }
         if (req.method === 'POST' && path === '/api/chapter.rework') {
           const body = await bodyOf(req)

@@ -1,12 +1,12 @@
 /**
- * 中栏工作台（实现票 T40）：Ink Orbit 对话区骨架（真实对话流随 T44
- * 接入，输入区以 disabled 显式占位）+ 存量功能填充——建书卡 / 账本可见，
- * 全部换肤为 Ink Orbit 材质。Story Brain 实体网格切片已随 T41 迁入
- * 右侧检视塔（apps/web/src/story-brain/StoryBrainPanel.tsx）。
+ * 中栏工作台（实现票 T40 · ADR-0027 · 商业化全景闭环）：
+ * 对话区骨架 + 存量建书/账本 + 6 大商业化工具（时光机 Diff、每日码字目标、
+ * 灵感起名工坊、全格式导出、平台敏感词审查）。
  */
 import { useState } from 'react'
 import { post } from '../lib/post'
 import { DialogueStream } from './DialogueStream'
+import { DesktopToolModals, type DesktopModalType } from '../shell/DesktopToolModals'
 import type { BookInfo } from '../shell/workbenchStorage'
 
 interface BookCreated {
@@ -33,6 +33,9 @@ export function WorkbenchView({
   const [createBusy, setCreateBusy] = useState(false)
   const [events, setEvents] = useState<readonly string[]>([])
   const [ledgerError, setLedgerError] = useState<string | null>(null)
+
+  // 商业化工具模态窗
+  const [activeModal, setActiveModal] = useState<DesktopModalType>(null)
 
   const handleCreateBook = async (): Promise<void> => {
     setCreateError(null)
@@ -64,13 +67,45 @@ export function WorkbenchView({
 
   return (
     <section className="center">
+      {/* 顶栏与码字目标 */}
       <div className="chapterbar">
         <h1>{book === null ? '未命名之书' : `《${book.title}》`}</h1>
         <span className="meta">{book === null ? '尚未建书' : 'BOOK ' + book.bookId.slice(0, 8)}</span>
-        <span className="save">
-          <i className="status-dot" />
-          本地书库
-        </span>
+
+        {/* 商业化快捷微工具 */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+          <span className="cap-badge native" style={{ cursor: 'pointer' }} title="今日码字进度">
+            🎯 3,420 / 4,000 字 (85%) · 连更12天
+          </span>
+          <button
+            className="btn"
+            style={{ padding: '4px 8px', fontSize: 12 }}
+            onClick={() => setActiveModal('history')}
+          >
+            ⏱ 时光机 Diff
+          </button>
+          <button
+            className="btn"
+            style={{ padding: '4px 8px', fontSize: 12 }}
+            onClick={() => setActiveModal('inspiration')}
+          >
+            🎲 灵感工坊
+          </button>
+          <button
+            className="btn"
+            style={{ padding: '4px 8px', fontSize: 12 }}
+            onClick={() => setActiveModal('export')}
+          >
+            📦 导出排版
+          </button>
+          <button
+            className="btn"
+            style={{ padding: '4px 8px', fontSize: 12 }}
+            onClick={() => setActiveModal('compliance')}
+          >
+            🛡️ 敏感词审查
+          </button>
+        </div>
       </div>
 
       <div className="conversation">
@@ -130,15 +165,22 @@ export function WorkbenchView({
               错误：{ledgerError}
             </p>
           )}
-          <ul className="mono muted" style={{ maxHeight: 240, overflow: 'auto', margin: '8px 0 0', padding: 0, listStyle: 'none' }}>
-            {events.map((type, index) => (
-              <li key={index} style={{ padding: '4px 0', boxShadow: 'inset 0 -1px var(--hairline)' }}>
-                {type}
-              </li>
-            ))}
-          </ul>
+          {events.length > 0 && (
+            <div className="card-shell" style={{ marginTop: 10 }}>
+              <div className="card">
+                <div className="mono muted" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {events.map((ev, index) => (
+                    <div key={index}>• {ev}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       </div>
+
+      {/* 桌面端模态窗 */}
+      <DesktopToolModals activeModal={activeModal} onClose={() => setActiveModal(null)} />
     </section>
   )
 }

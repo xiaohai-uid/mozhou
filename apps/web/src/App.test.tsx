@@ -17,6 +17,7 @@ afterEach(() => {
 /** 其余测试默认「Wizard 已完成」——Q3 仅首次，避免覆盖层挡住工作台断言。 */
 beforeEach(() => {
   window.localStorage.setItem('mozhou.wizard.done', 'done')
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })
 
 const STORED_BOOK = {

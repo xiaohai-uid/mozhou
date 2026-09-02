@@ -104,8 +104,10 @@ export type {
  * 版本绑定 QualityReviewReport（报告落 .mozhou/quality-reviews/，非 Canon）。
  * 事件落账与回炉决策由编排者经 ChapterProductionSession 显式驱动。
  */
-export { loadDraftForReview, runReviewStep } from './review-step.js';
+export { executeChapterReview, loadDraftForReview, runReviewStep } from './review-step.js';
 export type {
+  ExecuteChapterReviewOutcome,
+  ExecuteChapterReviewRequest,
   MechanicalReviewInput,
   ReviewStepOutcome,
   RunReviewStepRequest,
@@ -236,3 +238,11 @@ export {
   stepBoundaryCheckpoint,
 } from './watcher-checkpoint.js';
 export type { ReconciliationWarning } from './watcher-checkpoint.js';
+
+export {
+  generateRevisionBrief,
+} from './revision-cascading.js';
+export type {
+  ConflictFactItem,
+  RevisionTaskBrief,
+} from './revision-cascading.js';

@@ -4,10 +4,14 @@
 # 设计期产物与部署工作目录：不得入库
 *.log
 *.tsbuildinfo
+*.patch
 .scratch/
+.mimosa/
+.next/
 dist/
 release-artifacts/
 figma-upload/
 node_modules/
 scripts/embedding-calib/.cache/
 scripts/embedding-calib/fp32-model/
+

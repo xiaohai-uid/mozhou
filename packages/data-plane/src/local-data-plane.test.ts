@@ -28,9 +28,14 @@ beforeEach(() => {
 
 afterAll(() => {
   for (const root of tmpRoots.splice(0)) {
-    rmSync(root, { recursive: true, force: true })
+    try {
+      rmSync(root, { recursive: true, force: true })
+    } catch {
+      // Windows file lock tolerance
+    }
   }
 })
+
 
 function makeBook(): void {
   createBook({ dir: bookRoot, title: '凡人修仙传' })
@@ -183,4 +188,33 @@ describe('rebuildProjectionFromCanon（幂等硬断言）', () => {
     expect(() => assertProjectionVersion(plane.db)).not.toThrow()
     plane.close()
   })
+
+  it('provides unified query facades: queryStoryBrain, getWorksOverview, getEntityCards, getChangeMatrix', () => {
+    makeBook()
+    const plane = LocalDataPlane.open(bookRoot)
+    plane.createChapterDraft({ chapterIndex: 1, title: '第一章 启程' })
+
+    const brain = plane.queryStoryBrain()
+    expect(brain.chapter).toBe(1)
+    expect(brain.currentChapterIndex).toBe(1)
+    expect(brain.chapters.length).toBe(1)
+    expect(brain.chapters[0]?.phase).toBe('draft')
+    expect(Array.isArray(brain.canon)).toBe(true)
+    expect(Array.isArray(brain.perspective)).toBe(true)
+    expect(Array.isArray(brain.invalidated)).toBe(true)
+
+    const cards = plane.getEntityCards()
+    expect(Array.isArray(cards)).toBe(true)
+
+    const matrix = plane.getChangeMatrix()
+    expect(matrix).toBeDefined()
+
+    const works = plane.getWorksOverview()
+    expect(works.book.title).toBe('凡人修仙传')
+    expect(works.chapters.length).toBe(1)
+    expect(works.chapters[0]?.chapterIndex).toBe(1)
+
+    plane.close()
+  })
 })
+

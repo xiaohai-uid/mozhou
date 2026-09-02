@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>PROTOTYPE · 墨舟手机端 UI 三案发散 (ui-prototype)</title>
+  <style>
+    /* ========================================================
+       墨舟 Ink Orbit 品牌设计 Token (与 production 完全一致)
+       ======================================================== */
+    :root {
+      --bg: #0b0a0f;
+      --surface: #15131a;
+      --surface-2: #211c29;
+      --surface-raised: #282330;
+      --fg: #f4f1fa;
+      --text-muted: #aba4b8;
+      --text-faint: #7c7487;
+      --accent: #8b78ff;
+      --accent-strong: #9d8eff;
+      --accent-soft: rgba(139, 120, 255, 0.12);
+      --accent-border: rgba(139, 120, 255, 0.28);
+      --hairline: rgba(244, 241, 250, 0.09);
+      --hairline-strong: rgba(244, 241, 250, 0.18);
+      --danger: #f28b9b;
+      --success: #3dd68c;
+      --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+      --font-prose: "Songti SC", "SimSun", "STSong", "Noto Serif SC", serif;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100vh;
+      background: #060508; color: var(--fg); font-family: var(--font-ui);
+      display: flex; flex-direction: column; align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* 桌面预览展示台架 */
+    .viewport-harness {
+      width: 100%; max-width: 440px; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 20px 12px 90px;
+    }
+
+    .device-chrome {
+      width: 380px; height: 780px; max-width: 100%;
+      background: var(--bg); border: 1px solid var(--hairline-strong);
+      border-radius: 46px; box-shadow: 0 28px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06);
+      display: flex; flex-direction: column; overflow: hidden; position: relative;
+    }
+
+    /* 状态栏模拟 */
+    .status-bar {
+      height: 40px; display: flex; justify-content: space-between; align-items: center;
+      padding: 0 24px; font-size: 11px; color: var(--text-faint); font-weight: 600;
+      flex-shrink: 0; z-index: 10;
+    }
+    .status-notch {
+      width: 110px; height: 18px; background: #000; border-radius: 0 0 12px 12px;
+      margin: 0 auto;
+    }
+
+    /* 动态渲染舞台 */
+    #stage { flex: 1; display: flex; flex-direction: column; height: calc(100% - 40px); overflow: hidden; position: relative; }
+
+    /* 通用组件 */
+    .prose-text { font-family: var(--font-prose); line-height: 1.8; font-size: 15px; color: #ece6f6; letter-spacing: 0.02em; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; }
+
+    /* ========================================================
+       PICKER.md 规范样式 (不可做任何设计改动，严格原样复刻)
+       ======================================================== */
+    .proto-picker {
+      position: fixed;
+      top: 20px; /* 移动端底栏有常驻交互，依规采用 data-position=top 避免遮挡 */
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(10, 10, 10, 0.88);
+      -webkit-backdrop-filter: blur(14px) saturate(1.4);
+      backdrop-filter: blur(14px) saturate(1.4);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 8px 24px rgba(0, 0, 0, 0.35),
+        0 2px 6px rgba(0, 0, 0, 0.15);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .proto-picker-highlight {
+      position: absolute;
+      top: 4px;
+      left: 0;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      will-change: transform;
+    }
+
+    .proto-picker[data-ready] .proto-picker-highlight {
+      transition:
+        transform 250ms cubic-bezier(0.23, 1, 0.32, 1),
+        width 250ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .proto-picker[data-ready] .proto-picker-highlight { transition: none; }
+    }
+
+    .proto-picker-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.55);
+      font: inherit;
+      cursor: pointer;
+      transition: color 150ms ease-out;
+      white-space: nowrap;
+    }
+
+    .proto-picker-item:hover { color: rgba(255, 255, 255, 0.85); }
+    .proto-picker-item:active { transform: scale(0.97); }
+    .proto-picker-item:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.4); outline-offset: 2px; }
+    .proto-picker-item[data-active] { color: #fff; }
+    .proto-picker-divider { width: 1px; height: 16px; margin: 0 4px; background: rgba(255, 255, 255, 0.12); }
+    .proto-picker-replay { padding: 0 10px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="viewport-harness">
+    <div class="device-chrome">
+      <div class="status-bar">
+        <span>09:41</span>
+        <div class="status-notch"></div>
+        <span>5G · 100%</span>
+      </div>
+      <div id="stage"></div>
+    </div>
+  </div>
+
+  <!-- PICKER.md 规约标准浮动选择器 -->
+  <nav class="proto-picker" data-position="top" aria-label="Prototype variants">
+    <span class="proto-picker-highlight" aria-hidden="true"></span>
+    <button class="proto-picker-item" data-active aria-current="true">沉浸墨流 (Quiet)</button>
+    <button class="proto-picker-item">精密罗盘 (Deck)</button>
+    <button class="proto-picker-item">灵感剧场 (Stage)</button>
+    <span class="proto-picker-divider" aria-hidden="true"></span>
+    <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
+  </nav>
+
+  <script>
+    /* ========================================================
+       三套发散变体实现代码 (Divergence on Named Axes)
+       ======================================================== */
+
+    // 变体 1: 沉浸墨流 (Quiet · 极简主义，专注正文，收敛输入条)
+    function renderQuiet() {
+      return `
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between; padding:0 16px 12px; animation: fadeIn 220ms cubic-bezier(0.23,1,0.32,1);">
+          <!-- 极简顶栏 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--hairline);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:14px; font-weight:600; letter-spacing:-0.01em;">假神真显灵</span>
+              <span style="font-size:11px; color:var(--text-faint); padding:1px 6px; background:rgba(255,255,255,0.05); border-radius:4px;">第1章</span>
+            </div>
+            <div style="display:flex; gap:12px; font-size:12px; color:var(--accent-strong);">
+              <span style="cursor:pointer;" onclick="alert('展开章节目录')">目录</span>
+              <span style="cursor:pointer;" onclick="alert('展开审查报告')">质量门 98</span>
+            </div>
+          </div>
+
+          <!-- 沉浸正文与提问流 -->
+          <div style="flex:1; overflow-y:auto; padding:16px 0; display:flex; flex-direction:column; gap:16px;">
+            <!-- 墨舟先问 -->
+            <div style="background:var(--accent-soft); border:1px solid var(--accent-border); border-radius:14px; padding:12px 14px;">
+              <div style="font-size:11px; font-weight:700; color:var(--accent-strong); text-transform:uppercase; margin-bottom:4px;">墨舟先问 · 悬念钩子</div>
+              <div style="font-size:13px; line-height:1.5; color:#d9d3e8;">道观外的敲门声停了，但门板上却浮现出一只带血的掌印。主角是要继续装聋作哑，还是假借神名呵斥？</div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button style="border:1px solid var(--hairline-strong); background:var(--surface); color:var(--fg); border-radius:999px; padding:4px 10px; font-size:11.5px; cursor:pointer;" onclick="this.style.borderColor='var(--accent)'">装作没听见</button>
+                <button style="border:1px solid var(--hairline-strong); background:var(--surface); color:var(--fg); border-radius:999px; padding:4px 10px; font-size:11.5px; cursor:pointer;" onclick="this.style.borderColor='var(--accent)'">呵斥门外邪祟</button>
+              </div>
+            </div>
+
+            <!-- 正文流淌 -->
+            <div class="prose-text">
+              夜雨越下越急。陆沉舟缩在泥塑神像后方，指尖掐得发白。他不是什么得道真仙，不过是个靠祖传戏法混口饭吃的江湖骗子。可门外那东西……分明在用头骨撞击门闩。
+            </div>
+            <div class="prose-text" style="color:var(--text-muted);">
+              「神君在此，何方邪祟敢来讨死？」他深吸一口气，将嗓音压得苍老而威严，同时暗暗扣住了袖中的火磷粉。
+            </div>
+          </div>
+
+          <!-- 极简收缩式 Composer (平时为胶囊条，展开为输入卡) -->
+          <div id="quiet-composer" style="background:var(--surface); border:1px solid var(--hairline-strong); border-radius:22px; padding:8px 12px; box-shadow:0 8px 30px rgba(0,0,0,0.5);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="text" placeholder="输入续写走向、对话或神态批注..." style="flex:1; background:transparent; border:none; color:var(--fg); outline:none; font-size:13.5px;" />
+              <button style="width:32px; height:32px; border-radius:999px; background:var(--accent); border:none; color:#fff; font-size:14px; display:grid; place-items:center; cursor:pointer;" onclick="alert('已触发流式草稿生成')">➤</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:10.5px; color:var(--text-faint);">
+              <span>⚡ sepia-write 开启 · 4200字</span>
+              <span style="color:var(--accent-strong); cursor:pointer;">+ 调优参数</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 变体 2: 精密罗盘 (Deck · 机械仪表，紧凑三层 Composer v2，底栏常驻)
+    function renderDeck() {
+      return `
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between; animation: fadeIn 220ms cubic-bezier(0.23,1,0.32,1);">
+          <!-- 顶部精密 HUD 状态 -->
+          <div style="padding:10px 16px; background:rgba(21,19,26,0.85); border-bottom:1px solid var(--hairline); display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--text-faint); text-transform:uppercase;">INSPECTION DECK</span>
+              <div style="display:flex; gap:6px;">
+                <span class="tag" style="background:rgba(61,214,140,0.12); color:var(--success); border:1px solid rgba(61,214,140,0.25);">● Gate 3 PASS</span>
+                <span class="tag" style="background:var(--accent-soft); color:var(--accent-strong);">Story Brain</span>
+              </div>
+            </div>
+            <div style="display:flex; gap:4px; overflow-x:auto; scrollbar-width:none;">
+              <span style="font-size:10px; padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.04); color:var(--text-muted); white-space:nowrap;">1.准备</span>
+              <span style="font-size:10px; padding:2px 8px; border-radius:4px; background:var(--accent); color:#fff; font-weight:600; white-space:nowrap;">2.草稿中</span>
+              <span style="font-size:10px; padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.04); color:var(--text-faint); white-space:nowrap;">3.审查</span>
+              <span style="font-size:10px; padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.04); color:var(--text-faint); white-space:nowrap;">4.落定</span>
+            </div>
+          </div>
+
+          <!-- 正文预览区 -->
+          <div style="flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="font-size:12px; color:var(--text-faint); border-left:2px solid var(--accent); padding-left:8px;">
+              当前章节 · 第 001 章 泥塑撞客 (4,230 字)
+            </div>
+            <div class="prose-text" style="font-size:14.5px;">
+              风穿堂而过，将香案上的引魂幡吹得猎猎作响。陆沉舟眯起双眼，看着石阶上一寸寸蔓延的青苔。那些青苔不是绿色的，而透着一股发霉的灰黑，像死人的指甲。
+            </div>
+            <div style="padding:10px 12px; background:var(--surface); border:1px dashed var(--hairline-strong); border-radius:10px; font-size:12px; color:var(--text-muted);">
+              💡 伏笔提醒：袖中暗藏的火磷粉已受潮30%，若强行动用将引发反噬（来自时间线账本）。
+            </div>
+          </div>
+
+          <!-- 完整复刻 Composer v2 三层结构 -->
+          <div style="padding:0 12px 6px;">
+            <div style="border-radius:18px; border:1px solid var(--accent-border); background:linear-gradient(180deg, #241f2e 0%, var(--surface-2) 100%); box-shadow:0 10px 32px rgba(0,0,0,0.45); overflow:hidden;">
+              <!-- 1. 上下文行 -->
+              <div style="display:flex; align-items:center; gap:6px; padding:8px 12px 0;">
+                <span class="tag" style="background:var(--accent-soft); color:var(--accent-strong);">⚡ 破案/灵异</span>
+                <span class="tag" style="background:rgba(255,255,255,0.06); color:var(--text-muted);">锚点: 陆沉舟</span>
+                <span style="margin-left:auto; font-size:10.5px; color:var(--text-faint);">预算 8.4k</span>
+              </div>
+              <!-- 2. 弹性输入域 -->
+              <textarea placeholder="指示 AI 推进情节或调整叙事..." style="width:100%; border:none; outline:none; background:transparent; padding:8px 12px 4px; color:var(--fg); font-size:13.5px; line-height:1.6; resize:none; min-height:50px; font-family:inherit;"></textarea>
+              <!-- 3. 动作操作行 -->
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 10px 8px;">
+                <div style="display:flex; gap:6px;">
+                  <button style="border:1px solid var(--hairline-strong); background:transparent; border-radius:999px; padding:3px 8px; font-size:11px; color:var(--text-muted);">+ 技能胶囊</button>
+                  <button style="border:1px solid var(--hairline-strong); background:transparent; border-radius:999px; padding:3px 8px; font-size:11px; color:var(--text-muted);">文风蒸馏</button>
+                </div>
+                <button style="width:30px; height:30px; border-radius:999px; background:linear-gradient(135deg, #9d8eff, #6f5ae8); border:none; color:#fff; display:grid; place-items:center; font-size:13px; box-shadow:0 4px 12px rgba(139,120,255,0.4); cursor:pointer;">➤</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 移动端底栏 Tabbar (避让安全区) -->
+          <div style="height:48px; border-top:1px solid var(--hairline); background:rgba(15,13,20,0.95); display:flex; justify-content:space-around; align-items:center; padding-bottom:env(safe-area-inset-bottom);">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--accent-strong);">
+              <span>✍️</span><span>写作</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--text-faint);">
+              <span>📚</span><span>章节</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--text-faint);">
+              <span>🧠</span><span>故事脑</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--text-faint);">
+              <span>🧭</span><span>工作台</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 变体 3: 灵感剧场 (Stage · 剧情节拍卡片，左右轻扫候选，浮岛式输入)
+    function renderStage() {
+      return `
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between; padding:0 14px 14px; animation: fadeIn 220ms cubic-bezier(0.23,1,0.32,1);">
+          <!-- 灵感顶栏 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0;">
+            <div style="font-size:13px; font-weight:700; color:var(--fg);">节拍 04 · 庙堂对峙</div>
+            <div style="display:flex; gap:6px;">
+              <span class="tag" style="background:rgba(255,255,255,0.06); color:var(--text-muted); cursor:pointer;">候选 1/3 ↻</span>
+              <span class="tag" style="background:var(--accent-soft); color:var(--accent-strong); cursor:pointer;">全景图</span>
+            </div>
+          </div>
+
+          <!-- 卡片舞台流 -->
+          <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:14px; padding-bottom:10px;">
+            <!-- 节拍情节卡 A -->
+            <div style="background:var(--surface); border:1px solid var(--hairline-strong); border-radius:16px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,0.3);">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-size:10.5px; font-weight:700; color:var(--accent); text-transform:uppercase;">AI 候选路径 A · 威压破局</span>
+                <span style="font-size:11px; color:var(--text-faint);">置信度 94%</span>
+              </div>
+              <div class="prose-text" style="font-size:14px;">
+                陆沉舟猛然挥袖，供桌两侧的红烛轰然炸起三尺碧火！「放肆！本座座下岂容你这等无头游魂咆哮？」门外凄厉的抓挠声戛然而止。
+              </div>
+              <div style="margin-top:10px; display:flex; justify-content:flex-end; gap:8px;">
+                <button style="border:none; background:rgba(255,255,255,0.06); color:var(--text-muted); padding:4px 10px; border-radius:8px; font-size:11.5px; cursor:pointer;">弃用</button>
+                <button style="border:none; background:var(--accent); color:#fff; padding:4px 12px; border-radius:8px; font-size:11.5px; font-weight:600; cursor:pointer;" onclick="alert('已采纳入正典')">采纳接写</button>
+              </div>
+            </div>
+
+            <!-- 节拍情节卡 B (滑动参考) -->
+            <div style="background:rgba(21,19,26,0.5); border:1px dashed var(--hairline); border-radius:16px; padding:14px; opacity:0.75;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-size:10.5px; font-weight:700; color:var(--text-faint); text-transform:uppercase;">AI 候选路径 B · 示弱设伏</span>
+                <span style="font-size:11px; color:var(--text-faint);">置信度 88%</span>
+              </div>
+              <div class="prose-text" style="font-size:13.5px; color:var(--text-muted);">
+                他没有出声，反倒顺势倒退一步，故意踢翻了脚边的铜盆。「当啷」一声脆响在死寂的大殿里格外刺耳……门闩悄然裂开了一道缝。
+              </div>
+            </div>
+          </div>
+
+          <!-- 浮岛式微型输入栏 (Floating Island) -->
+          <div style="background:rgba(27,24,36,0.92); border:1px solid rgba(255,255,255,0.12); border-radius:999px; padding:6px 8px 6px 14px; display:flex; align-items:center; gap:8px; box-shadow:0 12px 40px rgba(0,0,0,0.6); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);">
+            <span style="font-size:14px;">🪄</span>
+            <input type="text" placeholder="换个写法，或者生成下一段..." style="flex:1; background:transparent; border:none; outline:none; color:var(--fg); font-size:13px;" />
+            <button style="height:32px; padding:0 14px; border-radius:999px; background:var(--accent); border:none; color:#fff; font-size:12px; font-weight:600; cursor:pointer;" onclick="alert('正在生成新节拍')">生成</button>
+          </div>
+        </div>
+      `;
+    }
+
+    /* ========================================================
+       PICKER.md 严格行为接线 (Verbatim Reference Wiring)
+       ======================================================== */
+    const variants = [renderQuiet, renderDeck, renderStage];
+    const stage = document.getElementById('stage');
+    const picker = document.querySelector('.proto-picker');
+    const highlight = picker.querySelector('.proto-picker-highlight');
+    const items = [...picker.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')];
+    const replay = picker.querySelector('.proto-picker-replay');
+    let current = 0;
+
+    function moveHighlight() {
+      const el = items[current];
+      highlight.style.width = el.offsetWidth + 'px';
+      highlight.style.transform = `translateX(${el.offsetLeft}px)`;
+    }
+
+    function mount(i) {
+      stage.innerHTML = '';
+      requestAnimationFrame(() => { stage.innerHTML = variants[i](); });
+    }
+
+    function setActive(i) {
+      if (i < 0 || i >= variants.length) return;
+      current = i;
+      items.forEach((el, j) => {
+        el.toggleAttribute('data-active', j === i);
+        if (j === i) el.setAttribute('aria-current', 'true');
+        else el.removeAttribute('aria-current');
+      });
+      moveHighlight();
+      const url = new URL(location);
+      url.searchParams.set('v', i + 1);
+      history.replaceState(null, '', url);
+      mount(i);
+    }
+
+    items.forEach((el, i) => el.addEventListener('click', () => setActive(i)));
+    replay?.addEventListener('click', () => mount(current));
+    window.addEventListener('resize', moveHighlight);
+
+    document.addEventListener('keydown', (e) => {
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= variants.length) setActive(num - 1);
+      else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+      else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+      else if (e.key === 'r' || e.key === 'R') mount(current);
+    });
+
+    setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 2) - 1);
+    requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
+  </script>
+</body>
+</html>

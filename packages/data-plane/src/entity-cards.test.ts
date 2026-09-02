@@ -320,6 +320,8 @@ describe('投影 v2：版本守卫与重建幂等（含目录卡）', () => {
       }
       rebuildProjectionFromCanon(bookRoot)
 
+
+
       expect(readFileSync(join(bookRoot, '.mozhou/manifest.json'))).toEqual(manifestBefore)
       const reopened = openDatabase({ path: dbPath })
       expect(fingerprint(reopened)).toBe(fingerprintBefore)

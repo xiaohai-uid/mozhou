@@ -16,7 +16,7 @@ import type { SemanticBatchItem } from '../semantic/batch.js'
 
 let roots: string[] = []
 afterEach(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true })
+  for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch {} }
   roots = []
 })
 

@@ -201,7 +201,8 @@ export function StyleDistillView({
                       <div className="finding" style={{ marginTop: 8 }}>
                         <b>⚠️ AI 架构特征提示：</b>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
-                          {data.sampleMetrics.sepiaNarrativeScore.aiTellsSummary.map((tell, i) => (
+                          {data.sampleMetrics.sepiaNarrativeScore.aiTellsSummary.map((tell: string, i: number) => (
+
                             <span key={i} className="mono muted" style={{ fontSize: 10 }}>
                               • {tell}
                             </span>

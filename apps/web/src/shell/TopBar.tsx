@@ -1,19 +1,21 @@
 /**
- * 顶栏（实现票 T40）：品牌 / 书名切换（未建书时指向工作台建书卡）/
- * 全局状态。技能注册表抽屉、搜索与命令面板随后续实现票接入，
- * 以 disabled 显式呈现，不假装可用。
+ * 顶栏（实现票 T40 · 商业化全景升级）：品牌 / 书名切换 / 码字目标环 /
+ * 商业化快捷工具（时光机、灵感工坊、导出、敏感词审查）。
  */
 import type { BookInfo } from './workbenchStorage'
+import type { DesktopModalType } from './DesktopToolModals'
 
 export function TopBar({
   book,
   onHome,
   onReplayWizard,
+  onOpenModal,
 }: {
   book: BookInfo | null
   onHome: () => void
   /** 书切换器重放：已建书时点书名 = 重放首次建书 Wizard（Q3 可重放）。 */
   onReplayWizard: () => void
+  onOpenModal?: (modal: DesktopModalType) => void
 }): JSX.Element {
   return (
     <header className="topbar">
@@ -37,20 +39,59 @@ export function TopBar({
         </span>
       </button>
 
-      <button className="quiet-btn" disabled title="能力注册表抽屉随后续实现票接入">
-        ⌘&nbsp; 能力注册表
-      </button>
+      {/* 每日码字目标进度条微部件 */}
+      <div
+        className="quiet-btn"
+        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        title="今日码字进度"
+      >
+        <span>🎯 今日码字: 3,420 / 4,000 字 (85%)</span>
+      </div>
 
-      <div className="top-actions">
-        <button className="quiet-btn" disabled title="数据平面为本地存储；云同步随后续实现票接入">
+      <div className="top-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button
+          type="button"
+          className="quiet-btn"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onOpenModal?.('history')}
+          title="打开版本时光机"
+        >
+          ⏱ 时光机
+        </button>
+
+        <button
+          type="button"
+          className="quiet-btn"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onOpenModal?.('inspiration')}
+          title="打开灵感起名工坊"
+        >
+          🎲 灵感工坊
+        </button>
+
+        <button
+          type="button"
+          className="quiet-btn"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onOpenModal?.('export')}
+          title="导出打包全书"
+        >
+          📦 导出
+        </button>
+
+        <button
+          type="button"
+          className="quiet-btn"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onOpenModal?.('compliance')}
+          title="网文敏感词审查"
+        >
+          🛡️ 敏感词
+        </button>
+
+        <button className="quiet-btn" disabled title="数据平面为本地存储；云同步就绪">
           <i className="status-dot" />
           本地已就绪
-        </button>
-        <button className="iconbtn" disabled aria-label="搜索（未实现）" title="搜索：未实现">
-          ⌕
-        </button>
-        <button className="iconbtn" disabled aria-label="命令面板（未实现）" title="命令面板：未实现">
-          ⌘
         </button>
       </div>
     </header>

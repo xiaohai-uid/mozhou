@@ -1,0 +1,1850 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>墨舟 · 移动端商业化全景工作台</title>
+  <style>
+    /* ==========================================================================
+       墨舟设计规范：去AI味、极简克制、文人砚墨与商业化全景人机工学
+       ========================================================================== */
+    :root {
+      /* 纯粹深邃的砚墨背景与层次 */
+      --canvas: #050507;
+      --bg-screen: #0a090e;
+      --surface-shell: #121017;
+      --surface-core: #181520;
+      --surface-raised: #211c2c;
+      --surface-float: rgba(18, 16, 23, 0.92);
+
+      /* 内敛雅致的主题色 */
+      --accent: #8b78ff;
+      --accent-strong: #9d8dff;
+      --accent-soft: rgba(139, 120, 255, 0.12);
+      --accent-glow: rgba(139, 120, 255, 0.25);
+
+      --gold: #d4a359;
+      --gold-soft: rgba(212, 163, 89, 0.12);
+      
+      --emerald: #4ade80;
+      --emerald-soft: rgba(74, 222, 128, 0.1);
+      --rose: #f43f5e;
+      --rose-soft: rgba(244, 63, 94, 0.1);
+
+      /* 文字层级（纯正黑白灰） */
+      --fg-pure: #ffffff;
+      --fg-primary: #ece8f5;
+      --fg-secondary: #a39cb2;
+      --fg-muted: #6e677c;
+      --fg-faint: #443e50;
+
+      /* 极细发丝线与物理微边缘高光 */
+      --hairline-subtle: rgba(255, 255, 255, 0.06);
+      --hairline-crisp: rgba(255, 255, 255, 0.1);
+      --specular-rim: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      --specular-core: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+
+      /* 字体体系 */
+      --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --font-prose: "Songti SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+      --font-mono: "SF Mono", "Consolas", monospace;
+
+      /* 物理弹簧阻尼曲线 */
+      --spring-fast: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring-heavy: cubic-bezier(0.32, 0.72, 0, 1);
+
+      --safe-top: 48px;
+      --safe-bottom: 34px;
+      --tabbar-height: 60px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--canvas);
+      color: var(--fg-primary);
+      font-family: var(--font-display);
+      font-size: 15px;
+      line-height: 1.5;
+      overflow: hidden;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 桌面居中预览舞台 */
+    .viewport-stage {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 25%, #151120 0%, #040306 80%);
+      padding: 24px;
+      position: relative;
+    }
+
+    /* 手机物理机身容器 */
+    .phone-device {
+      position: relative;
+      width: 100%;
+      max-width: 414px;
+      height: 100%;
+      max-height: 896px;
+      background: var(--bg-screen);
+      border-radius: 48px;
+      box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.95),
+                  0 0 0 1px rgba(255, 255, 255, 0.1),
+                  0 0 0 9px #14121b,
+                  0 0 0 10px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      isolation: isolate;
+    }
+
+    @media (max-width: 480px) {
+      .viewport-stage { padding: 0; }
+      .phone-device {
+        max-width: 100vw;
+        max-height: 100dvh;
+        border-radius: 0;
+        box-shadow: none;
+        border: none;
+      }
+    }
+
+    /* 物理流动水墨背景 Canvas */
+    .fluid-ink-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    /* 极细微颗粒胶片噪点 */
+    .film-grain {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    /* SVG 矢量图标基础规范 */
+    .svg-icon {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    /* 顶部状态栏与极简状态胶囊 */
+    .status-bar {
+      position: relative;
+      z-index: 60;
+      height: var(--safe-top);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg-secondary);
+      flex-shrink: 0;
+    }
+
+    .status-capsule {
+      position: absolute;
+      left: 50%;
+      top: 10px;
+      transform: translateX(-50%);
+      height: 30px;
+      background: rgba(14, 12, 19, 0.9);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 999px;
+      padding: 2px 12px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--hairline-crisp);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      transition: all 0.2s var(--spring-fast);
+    }
+    .status-capsule:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+    .status-dot-pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .status-capsule-text {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--fg-primary);
+      letter-spacing: 0.02em;
+    }
+
+    .user-avatar-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface-raised);
+      border: 1px solid var(--hairline-crisp);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-strong);
+      cursor: pointer;
+    }
+
+    /* 主视口容器 */
+    .app-viewport {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .view-screen {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 24px);
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s ease, transform 0.25s var(--spring-heavy);
+    }
+    .view-screen.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .view-screen::-webkit-scrollbar { display: none; }
+
+    /* 卡片与通用组件 */
+    .panel-card {
+      margin: 12px 18px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-subtle);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--specular-core);
+    }
+
+    .panel-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .panel-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--fg-primary);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .tag-pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--surface-raised);
+      border: 1px solid var(--hairline-crisp);
+      color: var(--fg-muted);
+      font-weight: 500;
+    }
+    .tag-pill.accent { background: var(--accent-soft); border-color: rgba(139, 120, 255, 0.3); color: var(--accent-strong); }
+    .tag-pill.gold { background: var(--gold-soft); border-color: rgba(212, 163, 89, 0.3); color: var(--gold); }
+    .tag-pill.green { background: var(--emerald-soft); border-color: rgba(74, 222, 128, 0.3); color: var(--emerald); }
+    .tag-pill.red { background: var(--rose-soft); border-color: rgba(244, 63, 94, 0.3); color: var(--rose); }
+
+    .hub-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(10, 9, 14, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--hairline-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .hub-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .hub-mark-seal {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: var(--surface-raised);
+      border: 1px solid var(--hairline-crisp);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-prose);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--fg-primary);
+    }
+    .hub-title-text {
+      font-family: var(--font-prose);
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--fg-pure);
+    }
+    .hub-subtitle-text {
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    .action-btn-clean {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--surface-raised);
+      border: 1px solid var(--hairline-crisp);
+      color: var(--fg-primary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: var(--specular-rim);
+      transition: all 0.2s var(--spring-fast);
+    }
+    .action-btn-clean:active {
+      transform: scale(0.96);
+      background: var(--surface-core);
+    }
+
+    /* 每日码字目标进度条 */
+    .goal-progress-widget {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-subtle);
+      border-radius: 14px;
+      padding: 10px 14px;
+      margin: 10px 18px 0;
+    }
+    .goal-text-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .goal-title {
+      font-size: 11.5px;
+      color: var(--fg-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .goal-number {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--fg-pure);
+    }
+    .goal-track-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--surface-core);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--hairline-subtle);
+    }
+    .goal-fill-bar {
+      height: 100%;
+      width: 85%;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--emerald) 100%);
+      border-radius: 999px;
+    }
+
+    /* 八步管线滑轨 */
+    .pipeline-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 18px 6px;
+      scrollbar-width: none;
+    }
+    .pipeline-strip::-webkit-scrollbar { display: none; }
+    .stage-item {
+      flex: 0 0 auto;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-subtle);
+      font-size: 12px;
+      color: var(--fg-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .stage-item.current {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-strong);
+      font-weight: 500;
+    }
+    .stage-item.done {
+      color: var(--fg-secondary);
+      border-color: var(--hairline-crisp);
+    }
+
+    /* 剧情张力卡 */
+    .tension-compact-bar {
+      display: grid;
+      grid-template-columns: 1fr 100px;
+      gap: 12px;
+      align-items: center;
+    }
+    .tension-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tension-label {
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+    .tension-status-desc {
+      font-family: var(--font-prose);
+      font-size: 13.5px;
+      color: var(--fg-primary);
+    }
+    .sparkline-box {
+      width: 100%;
+      height: 42px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      border: 1px solid var(--hairline-subtle);
+    }
+    #sparklineCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 情节推演探讨 */
+    .plot-branch-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .branch-prompt-text {
+      font-family: var(--font-prose);
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--fg-primary);
+    }
+    .branch-choices-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .branch-choice-btn {
+      padding: 10px 12px;
+      background: var(--surface-core);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 12px;
+      font-size: 13px;
+      color: var(--fg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .branch-choice-btn:active, .branch-choice-btn.selected {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--fg-pure);
+    }
+
+    /* 正文沉浸阅读排版 */
+    .prose-reading-container {
+      padding: 16px 20px 110px;
+    }
+    .prose-header-h2 {
+      font-family: var(--font-prose);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--fg-pure);
+      margin-bottom: 6px;
+    }
+    .prose-sub-meta {
+      font-size: 11px;
+      color: var(--fg-muted);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--hairline-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .prose-meta-left {
+      display: flex;
+      gap: 12px;
+    }
+    .prose-article-body {
+      font-family: var(--font-prose);
+      font-size: 16.5px;
+      line-height: 2.0;
+      color: var(--fg-primary);
+      text-align: justify;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .prose-article-body p {
+      position: relative;
+    }
+    .prose-article-body p.foreshadow-line {
+      padding-left: 12px;
+      border-left: 2px solid var(--gold);
+      background: linear-gradient(90deg, var(--gold-soft) 0%, transparent 100%);
+      border-radius: 0 6px 6px 0;
+    }
+    .note-inline-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10.5px;
+      color: var(--gold);
+      background: var(--gold-soft);
+      border: 1px solid rgba(212, 163, 89, 0.25);
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* 悬浮输入船坞 (Composer) */
+    .composer-bottom-dock {
+      position: absolute;
+      bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 8px);
+      left: 16px;
+      right: 16px;
+      z-index: 50;
+      background: var(--surface-float);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 20px;
+      padding: 10px 14px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .composer-context-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+    .composer-textarea {
+      width: 100%;
+      min-height: 38px;
+      max-height: 90px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--fg-pure);
+      font-family: var(--font-display);
+      font-size: 14px;
+      line-height: 1.45;
+      resize: none;
+    }
+    .composer-textarea::placeholder { color: var(--fg-faint); }
+    .composer-bottom-tools {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 6px;
+      border-top: 1px solid var(--hairline-subtle);
+    }
+    .tool-pills-list {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tool-pills-list::-webkit-scrollbar { display: none; }
+    .tool-mini-chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--surface-core);
+      border: 1px solid var(--hairline-crisp);
+      font-size: 11.5px;
+      color: var(--fg-secondary);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tool-mini-chip:active {
+      border-color: var(--accent);
+      color: var(--accent-strong);
+    }
+    .send-action-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: 0 0 12px var(--accent-glow);
+      transition: transform 0.2s;
+    }
+    .send-action-circle:active { transform: scale(0.9); }
+
+    /* ==========================================================================
+       HUB 2: 检视塔 (Inspector)
+       ========================================================================== */
+    .ins-tab-strip {
+      display: flex;
+      gap: 6px;
+      padding: 10px 18px;
+      background: rgba(10, 9, 14, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--hairline-subtle);
+    }
+    .ins-nav-tab {
+      flex: 1;
+      padding: 7px 4px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      border-radius: 10px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-subtle);
+      cursor: pointer;
+      transition: all 0.2s var(--spring-fast);
+    }
+    .ins-nav-tab.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-strong);
+      font-weight: 600;
+    }
+
+    .fact-item-block {
+      padding: 12px;
+      background: var(--surface-core);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    .fact-item-head {
+      font-size: 11px;
+      color: var(--accent-strong);
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ==========================================================================
+       HUB 3: 作品与资产 (Works)
+       ========================================================================== */
+    .stat-row-trio {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 12px 18px;
+    }
+    .stat-card-unit {
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-subtle);
+      border-radius: 14px;
+      padding: 12px 8px;
+      text-align: center;
+    }
+    .stat-val-text {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--fg-pure);
+    }
+    .stat-lbl-text {
+      font-size: 11px;
+      color: var(--fg-muted);
+      margin-top: 2px;
+    }
+
+    .chapter-row-clean {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--hairline-subtle);
+      background: var(--surface-shell);
+      cursor: pointer;
+    }
+    .chapter-row-clean:last-child { border: none; }
+    .chapter-row-clean:active { background: var(--surface-core); }
+
+    /* ==========================================================================
+       HUB 4: 资源与书源 (Resources)
+       ========================================================================== */
+    .search-clean-box {
+      margin: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 12px;
+      padding: 9px 14px;
+    }
+    .search-clean-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--fg-pure);
+      font-size: 13.5px;
+    }
+
+    .book-card-clean {
+      display: flex;
+      gap: 12px;
+      padding: 14px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline-subtle);
+      border-radius: 14px;
+      margin: 10px 18px;
+    }
+    .book-cover-mock {
+      width: 58px;
+      height: 78px;
+      border-radius: 8px;
+      background: #1e1b27;
+      border: 1px solid var(--hairline-crisp);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-prose);
+      font-size: 11.5px;
+      color: var(--fg-secondary);
+      text-align: center;
+      padding: 4px;
+      flex-shrink: 0;
+    }
+
+    /* ==========================================================================
+       HUB 5: 系统与认证中心 (System & Account)
+       ========================================================================== */
+    .account-hero-card {
+      margin: 12px 18px;
+      padding: 16px;
+      background: linear-gradient(135deg, #181524 0%, #100e16 100%);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--specular-core);
+    }
+    .account-hero-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .account-avatar-lg {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--surface-raised);
+      border: 1px solid var(--accent);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-prose);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-strong);
+    }
+
+    .auth-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .auth-label {
+      font-size: 12px;
+      color: var(--fg-muted);
+    }
+    .auth-field {
+      width: 100%;
+      background: var(--surface-core);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: var(--fg-pure);
+      font-size: 14px;
+      outline: none;
+    }
+    .auth-field:focus {
+      border-color: var(--accent);
+    }
+
+    /* 时光机 Diff 渲染样式 */
+    .diff-del {
+      background: rgba(244, 63, 94, 0.2);
+      color: var(--rose);
+      text-decoration: line-through;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+    .diff-add {
+      background: rgba(74, 222, 128, 0.2);
+      color: var(--emerald);
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    /* 灵感骰子摇号器卡片 */
+    .dice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .dice-card-btn {
+      padding: 12px;
+      background: var(--surface-core);
+      border: 1px solid var(--hairline-crisp);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .dice-card-btn:active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    /* 底部全局五大导航栏 */
+    .clean-tabbar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 60;
+      height: calc(var(--tabbar-height) + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      background: rgba(12, 10, 16, 0.94);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-top: 1px solid var(--hairline-crisp);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+    }
+    .tabbar-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: 100%;
+      color: var(--fg-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .tabbar-item.active {
+      color: var(--accent-strong);
+    }
+    .tabbar-item .svg-icon {
+      width: 20px;
+      height: 20px;
+    }
+    .tabbar-item-label {
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    /* 半屏抽屉 (Modal Sheet) */
+    .sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .sheet-backdrop.open {
+      display: block;
+      opacity: 1;
+    }
+    .modal-sheet-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-height: 88%;
+      background: var(--surface-shell);
+      border-top: 1px solid var(--hairline-crisp);
+      border-radius: 28px 28px 0 0;
+      box-shadow: 0 -16px 50px rgba(0, 0, 0, 0.85);
+      padding: 14px 20px calc(20px + var(--safe-bottom));
+      z-index: 101;
+      transform: translateY(100%);
+      transition: transform 0.3s var(--spring-heavy);
+      overflow-y: auto;
+    }
+    .sheet-backdrop.open .modal-sheet-panel {
+      transform: translateY(0);
+    }
+    .sheet-handle-pill {
+      width: 38px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--fg-faint);
+      margin: 0 auto 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="viewport-stage">
+  <div class="phone-device">
+    <!-- 物理流体墨纹背景 -->
+    <canvas id="fluidInkCanvas" class="fluid-ink-canvas"></canvas>
+    <div class="film-grain"></div>
+
+    <!-- 顶部状态栏与极简状态胶囊 -->
+    <header class="status-bar">
+      <span style="font-size:12px; color:var(--fg-secondary);">09:41</span>
+      
+      <div class="status-capsule" onclick="openDrawer('auth')" title="创作者账户状态">
+        <span class="status-dot-pulse"></span>
+        <span class="status-capsule-text" id="statusCapsuleText">道玄先生 · Pro 终身版</span>
+      </div>
+
+      <div class="user-avatar-btn" onclick="openDrawer('auth')" title="账号与登录">
+        <span>道</span>
+      </div>
+    </header>
+
+    <!-- 核心 5 大 Hub 视口 -->
+    <main class="app-viewport">
+
+      <!-- ====================================================================
+           HUB 1: 创作台 (Workbench)
+           ==================================================================== -->
+      <section class="view-screen active" id="view-workbench">
+        <!-- 顶栏 -->
+        <div class="hub-header">
+          <div class="hub-title-group">
+            <div class="hub-mark-seal">墨</div>
+            <div>
+              <h1 class="hub-title-text">假神真显灵</h1>
+              <div class="hub-subtitle-text">第 001 章 · 破庙装神与显灵契机</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="action-btn-clean" onclick="openDrawer('history')" title="版本历史时光机">
+              <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>时光机</span>
+            </button>
+            <button class="action-btn-clean" onclick="openDrawer('chapters')">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+              <span>目录</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 每日码字目标进度条 -->
+        <div class="goal-progress-widget" onclick="openDrawer('goals')">
+          <div class="goal-text-group">
+            <span class="goal-title">
+              <svg class="svg-icon" style="width:13px; height:13px; color:var(--accent-strong);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+              今日码字目标
+            </span>
+            <span class="goal-number">3,420 <span style="font-size:11px; font-weight:normal; color:var(--fg-muted);">/ 4,000 字 (85%)</span></span>
+          </div>
+          <div class="goal-track-bar">
+            <div class="goal-fill-bar"></div>
+          </div>
+          <span style="font-size:11px; color:var(--emerald);">连更 12 天 ›</span>
+        </div>
+
+        <!-- 创作八步阶段 -->
+        <div class="pipeline-strip">
+          <div class="stage-item done">设定</div>
+          <div class="stage-item done">大纲</div>
+          <div class="stage-item current">草稿</div>
+          <div class="stage-item">审查</div>
+          <div class="stage-item">修订</div>
+          <div class="stage-item">排版</div>
+          <div class="stage-item">分卷</div>
+          <div class="stage-item">发布</div>
+        </div>
+
+        <!-- 剧情张力与走向 -->
+        <div class="panel-card">
+          <div class="tension-compact-bar">
+            <div class="tension-info">
+              <span class="tension-label">叙事张力与情绪波峰</span>
+              <div class="tension-status-desc">高潮临界 · 骗局被识破前的悬念压抑</div>
+            </div>
+            <div class="sparkline-box">
+              <canvas id="sparklineCanvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 情节推演探讨 -->
+        <div class="panel-card">
+          <div class="panel-card-header">
+            <span class="panel-title">
+              <svg class="svg-icon" style="color:var(--accent-strong);" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              情节走向推演
+            </span>
+            <span class="tag-pill accent">逻辑推荐</span>
+          </div>
+          <div class="plot-branch-box">
+            <div class="branch-prompt-text">
+              赵捕头按佩刀逼问神像真容时，陆玄如何化解危机？
+            </div>
+            <div class="branch-choices-list">
+              <div class="branch-choice-btn selected" onclick="toggleBranch(this)">
+                <span>借夜雷与袖中白磷引燃神像背光（回收道具伏笔）</span>
+                <span class="tag-pill accent">契合</span>
+              </div>
+              <div class="branch-choice-btn" onclick="toggleBranch(this)">
+                <span>反客为主：揭露赵捕头私下纳妾的秘密</span>
+                <span class="tag-pill">备选</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 正文沉浸阅读流 -->
+        <div class="prose-reading-container">
+          <h2 class="prose-header-h2">第一章 假道士与真显灵</h2>
+          <div class="prose-sub-meta">
+            <div class="prose-meta-left">
+              <span>3,420 字</span>
+              <span>修改版本：Rev 4</span>
+              <span style="color:var(--emerald);">● 敏感词合规通过</span>
+            </div>
+            <span class="tag-pill" style="cursor:pointer;" onclick="openDrawer('format')">一键规范排版</span>
+          </div>
+
+          <div class="prose-article-body">
+            <p>暴雨倾盆。落魄山腰处的山神庙早已破败多年，残垣断瓦间透着刺骨的阴风。</p>
+            <p class="foreshadow-line">
+              陆玄盘坐在冰冷的神台边，身上那件洗得发白的八卦道袍被夜风吹得猎猎作响。他手里捏着半块发硬的干粮，正小心翼翼地擦拭着袖子里的黄纸与白磷。
+              <span class="note-inline-badge">伏笔 · 物理道具</span>
+            </p>
+            <p>“陆半仙，你方才说这庙里真有神灵庇护，那为何这神台之上，只供着一具无头泥塑？”</p>
+            <p>庙门哐当一声被撞开，龙国安宁县特事治安官赵捕头按着腰间佩刀，满身雨水地大步跨入，目光如隼，死死盯在陆玄脸上。</p>
+          </div>
+        </div>
+
+        <!-- 悬浮输入船坞 -->
+        <div class="composer-bottom-dock">
+          <div class="composer-context-bar">
+            <span>主角视角：陆玄 · 山神庙场景</span>
+            <span style="color:var(--emerald);">● 服务就绪</span>
+          </div>
+          <textarea class="composer-textarea" placeholder="输入推进指令（如：强化雷雨声势、描写赵捕头神色变化）..."></textarea>
+          <div class="composer-bottom-tools">
+            <div class="tool-pills-list">
+              <button class="tool-mini-chip" onclick="openDrawer('inspiration')">🎲 灵感起名</button>
+              <button class="tool-mini-chip" onclick="insertTag('【增加冲突】')">增加冲突</button>
+              <button class="tool-mini-chip" onclick="insertTag('【精简叙述】')">精简叙述</button>
+              <button class="tool-mini-chip" onclick="insertTag('【回收伏笔】')">回收伏笔</button>
+            </div>
+            <button class="send-action-circle" onclick="triggerWriteStream()" title="生成草稿">
+              <svg class="svg-icon" style="stroke:#fff; width:16px; height:16px;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           HUB 2: 检视塔 (Inspector)
+           ==================================================================== -->
+      <section class="view-screen" id="view-inspector">
+        <div class="hub-header">
+          <div class="hub-title-group">
+            <div class="hub-mark-seal">塔</div>
+            <div>
+              <h1 class="hub-title-text">检视塔</h1>
+              <div class="hub-subtitle-text">设定一致性 · 凭证 · 影响分析 · 质量审查</div>
+            </div>
+          </div>
+          <button class="action-btn-clean" onclick="openDrawer('compliance')">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>敏感词审查</span>
+          </button>
+        </div>
+
+        <div class="ins-tab-strip">
+          <div class="ins-nav-tab active" onclick="switchTab('brain', this)">设定事实</div>
+          <div class="ins-nav-tab" onclick="switchTab('receipt', this)">装配看板</div>
+          <div class="ins-nav-tab" onclick="switchTab('matrix', this)">变更影响</div>
+          <div class="ins-nav-tab" onclick="switchTab('quality', this)">质量审查</div>
+        </div>
+
+        <!-- 设定事实 (Story Brain) -->
+        <div id="pane-brain" class="ins-pane">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-title">已确认事实 (Canon)</span>
+              <span class="tag-pill green">12 条正典</span>
+            </div>
+            <div class="fact-item-block">
+              <div class="fact-item-head">
+                <span>主角能力设定</span>
+                <span class="tag-pill green">已确认</span>
+              </div>
+              <div style="font-size:13px; color:var(--fg-primary); line-height:1.5;">陆玄目前为凡人之躯，暂无法力，一切神迹均依靠戏法道具与心理博弈。</div>
+            </div>
+            <div class="fact-item-block">
+              <div class="fact-item-head">
+                <span>龙国官方势力</span>
+                <span class="tag-pill green">已确认</span>
+              </div>
+              <div style="font-size:13px; color:var(--fg-primary); line-height:1.5;">安宁县特事治安官配备破煞法弩，专司探测与压制异象波动。</div>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-title">人物视角认知 (Perspective)</span>
+              <span class="tag-pill accent">主角陆玄</span>
+            </div>
+            <div class="fact-item-block">
+              <div class="fact-item-head">
+                <span style="color:var(--gold);">怀疑线索</span>
+                <span>置信</span>
+              </div>
+              <div style="font-size:13px; color:var(--fg-primary); line-height:1.5;">怀疑神庙地底埋有古神遗物，导致磷火受磁场影响出现非自然异燃。</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 装配看板 (Receipt) -->
+        <div id="pane-receipt" class="ins-pane" style="display:none;">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-title">上下文编译与凭证</span>
+              <span class="tag-pill green">SHA-256 校验一致</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--hairline-subtle);">
+                <span style="color:var(--fg-muted);">当前凭证</span>
+                <span style="font-family:var(--font-mono);">rcpt_ch001_rev4</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--hairline-subtle);">
+                <span style="color:var(--fg-muted);">上下文消耗</span>
+                <span style="font-family:var(--font-mono); color:var(--accent-strong);">2,840 字元</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0;">
+                <span style="color:var(--fg-muted);">会话状态</span>
+                <span style="color:var(--emerald);">草稿阶段就绪</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 变更矩阵 (Matrix) -->
+        <div id="pane-matrix" class="ins-pane" style="display:none;">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-title">跨章关联受损影响</span>
+              <button class="action-btn-clean" style="padding:2px 8px; font-size:11px;" onclick="alert('已重新分析关联章节！')">重新分析</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div class="fact-item-block" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>第 001 章 (破庙装神)</span>
+                <span style="color:var(--emerald); font-size:12px;">无冲突</span>
+              </div>
+              <div class="fact-item-block" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>第 002 章 (县衙大堂)</span>
+                <span style="color:var(--rose); font-size:12px;">受上游设定变更影响</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 质量审查 (Quality Gate) -->
+        <div id="pane-quality" class="ins-pane" style="display:none;">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-title">文学与逻辑质量审查</span>
+              <span class="tag-pill green">审查合格</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--fg-muted);">毒点阻断检测</span>
+                <span style="color:var(--emerald);">未发现毒点</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--fg-muted);">文风与语言纯度</span>
+                <span style="color:var(--fg-primary);">自然流畅，无生硬套话</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           HUB 3: 作品与资产 (Works)
+           ==================================================================== -->
+      <section class="view-screen" id="view-works">
+        <div class="hub-header">
+          <div class="hub-title-group">
+            <div class="hub-mark-seal">卷</div>
+            <div>
+              <h1 class="hub-title-text">作品管理</h1>
+              <div class="hub-subtitle-text">分卷目录 · 篇章规划 · 导出排版</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="action-btn-clean" onclick="openDrawer('export')">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>导出</span>
+            </button>
+            <button class="action-btn-clean" onclick="alert('新建章节')">
+              <svg class="svg-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>加章</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 统计三格 -->
+        <div class="stat-row-trio">
+          <div class="stat-card-unit">
+            <div class="stat-val-text">3,420</div>
+            <div class="stat-lbl-text">正文字数</div>
+          </div>
+          <div class="stat-card-unit">
+            <div class="stat-val-text">1/80</div>
+            <div class="stat-lbl-text">已写/规划章</div>
+          </div>
+          <div class="stat-card-unit">
+            <div class="stat-val-text">14</div>
+            <div class="stat-lbl-text">角色与设定卡</div>
+          </div>
+        </div>
+
+        <!-- 文风分析入口 -->
+        <div class="panel-card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:14px; font-weight:600; color:var(--fg-pure);">篇章文风分析画像</div>
+            <div style="font-size:12px; color:var(--fg-muted); margin-top:2px;">对白占比 42.8% · 快节奏叙事</div>
+          </div>
+          <button class="action-btn-clean" onclick="openDrawer('distill')">查看画像</button>
+        </div>
+
+        <!-- 目录列表 -->
+        <div class="panel-card" style="padding:0; overflow:hidden;">
+          <div style="padding:12px 16px; border-bottom:1px solid var(--hairline-subtle); font-size:13px; font-weight:600;">
+            第一卷 · 龙国夜行篇
+          </div>
+          <div class="chapter-row-clean">
+            <div>
+              <div style="font-family:var(--font-prose); font-size:14.5px; color:var(--fg-pure);">第 001 章 破庙装神与显灵契机</div>
+              <div style="font-size:11px; color:var(--fg-muted); margin-top:2px;">3,420 字 · 已定稿</div>
+            </div>
+            <span class="tag-pill green">定稿</span>
+          </div>
+          <div class="chapter-row-clean">
+            <div>
+              <div style="font-family:var(--font-prose); font-size:14.5px; color:var(--fg-primary);">第 002 章 县衙大堂上的测灵镜</div>
+              <div style="font-size:11px; color:var(--fg-muted); margin-top:2px;">规划 3,200 字 · 细纲就绪</div>
+            </div>
+            <span class="tag-pill gold">细纲</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           HUB 4: 资源与爬虫 (Resources)
+           ==================================================================== -->
+      <section class="view-screen" id="view-resources">
+        <div class="hub-header">
+          <div class="hub-title-group">
+            <div class="hub-mark-seal">源</div>
+            <div>
+              <h1 class="hub-title-text">资源与对标书库</h1>
+              <div class="hub-subtitle-text">多源检索 · 榜单扫描 · 参考拆解</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="search-clean-box">
+          <svg class="svg-icon" style="color:var(--fg-muted);" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="搜索对标作品、神魔设定、民俗资料..." value="灵异复苏 假道士" />
+        </div>
+
+        <div class="book-card-clean">
+          <div class="book-cover-mock">我在道观<br>装神仙</div>
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="font-weight:600; font-size:14.5px; color:var(--fg-pure);">我在道观装神仙</div>
+              <div style="font-size:11.5px; color:var(--fg-muted);">作者：夜行客 · 起点畅销榜</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span class="tag-pill gold">热度标杆</span>
+              <button class="action-btn-clean" style="padding:3px 10px; font-size:11px;" onclick="alert('已一键抓取正文并导入拆解库！')">导入拆解</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           HUB 5: 系统与认证中心 (System & Account)
+           ==================================================================== -->
+      <section class="view-screen" id="view-system">
+        <div class="hub-header">
+          <div class="hub-title-group">
+            <div class="hub-mark-seal">设</div>
+            <div>
+              <h1 class="hub-title-text">系统与账户中心</h1>
+              <div class="hub-subtitle-text">创作者账号 · 书库 · 许可证 · 备份</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 创作者登录身份卡 -->
+        <div class="account-hero-card">
+          <div class="account-hero-left">
+            <div class="account-avatar-lg">道</div>
+            <div>
+              <div style="font-size:15px; font-weight:600; color:var(--fg-pure);" id="accountAuthorName">道玄先生</div>
+              <div style="font-size:11.5px; color:var(--fg-muted);" id="accountEmail">daoxuan@mozhou.ai</div>
+            </div>
+          </div>
+          <button class="action-btn-clean" onclick="openDrawer('auth')">切换账号</button>
+        </div>
+
+        <div class="panel-card" style="padding:0; overflow:hidden;">
+          <div class="chapter-row-clean" onclick="openDrawer('license')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>许可证与商业授权</span>
+            </div>
+            <span class="tag-pill green">终身买断已激活</span>
+          </div>
+          <div class="chapter-row-clean" onclick="openDrawer('export')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>作品打包与平台排版</span>
+            </div>
+            <span style="font-size:12px; color:var(--fg-muted);">DOCX / TXT / EPUB ›</span>
+          </div>
+          <div class="chapter-row-clean" onclick="openDrawer('chapters')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <span>书源书架 (本地多作品)</span>
+            </div>
+            <span style="font-size:12px; color:var(--fg-muted);">假神真显灵 ›</span>
+          </div>
+          <div class="chapter-row-clean" onclick="alert('任务中心流水审计正常')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <span>任务中心 (流水记录)</span>
+            </div>
+            <span class="tag-pill green">正常</span>
+          </div>
+          <div class="chapter-row-clean" onclick="alert('云同步已在本地就绪')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <svg class="svg-icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+              <span>云同步与离线快照</span>
+            </div>
+            <span style="font-size:12px; color:var(--emerald);">已同步</span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 底部五大核心导航栏 -->
+    <nav class="clean-tabbar">
+      <div class="tabbar-item active" onclick="switchHub('view-workbench', this)">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span class="tabbar-item-label">创作</span>
+      </div>
+      <div class="tabbar-item" onclick="switchHub('view-inspector', this)">
+        <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span class="tabbar-item-label">检视</span>
+      </div>
+      <div class="tabbar-item" onclick="switchHub('view-works', this)">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span class="tabbar-item-label">作品</span>
+      </div>
+      <div class="tabbar-item" onclick="switchHub('view-resources', this)">
+        <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span class="tabbar-item-label">书源</span>
+      </div>
+      <div class="tabbar-item" onclick="switchHub('view-system', this)">
+        <svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="tabbar-item-label">设置</span>
+      </div>
+    </nav>
+
+    <!-- 半屏抽屉 (Modal Sheet) -->
+    <div class="sheet-backdrop" id="sheetBackdrop" onclick="closeDrawer(event)">
+      <div class="modal-sheet-panel">
+        <div class="sheet-handle-pill"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h3 style="font-family:var(--font-prose); font-size:17px; font-weight:600;" id="sheetTitleText">详情</h3>
+          <button class="action-btn-clean" style="padding:2px 8px; font-size:11px;" onclick="closeDrawerDirect()">关闭</button>
+        </div>
+        <div id="sheetContentBody"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // 1. 物理流体水墨粒子 Canvas
+  (function initFluidCanvas() {
+    const canvas = document.getElementById('fluidInkCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let w, h;
+    let particles = [];
+
+    function resize() {
+      w = canvas.width = canvas.offsetWidth;
+      h = canvas.height = canvas.offsetHeight;
+      particles = [];
+      for (let i = 0; i < 20; i++) {
+        particles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: 70 + Math.random() * 80,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          alpha: 0.06 + Math.random() * 0.08
+        });
+      }
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, w, h);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -p.r) p.x = w + p.r;
+        if (p.x > w + p.r) p.x = -p.r;
+        if (p.y < -p.r) p.y = h + p.r;
+        if (p.y > h + p.r) p.y = -p.r;
+
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        g.addColorStop(0, `rgba(139, 120, 255, ${p.alpha})`);
+        g.addColorStop(1, 'rgba(139, 120, 255, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      requestAnimationFrame(render);
+    }
+
+    window.addEventListener('resize', resize);
+    setTimeout(() => { resize(); render(); }, 40);
+  })();
+
+  // 2. 叙事张力折线图
+  (function initSparkline() {
+    const canvas = document.getElementById('sparklineCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.offsetWidth;
+    const h = canvas.height = canvas.offsetHeight;
+    const pts = [20, 38, 30, 60, 48, 75, 68, 85];
+    const step = w / (pts.length - 1);
+
+    ctx.strokeStyle = '#9d8dff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((v, i) => {
+      const x = i * step;
+      const y = h - (v / 100) * (h - 12) - 6;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    const lastX = (pts.length - 1) * step;
+    const lastY = h - (pts[pts.length - 1] / 100) * (h - 12) - 6;
+    ctx.fillStyle = '#d4a359';
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  })();
+
+  // 3. 导航切换
+  function switchHub(hubId, targetEl) {
+    document.querySelectorAll('.view-screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tabbar-item').forEach(i => i.classList.remove('active'));
+    const target = document.getElementById(hubId);
+    if (target) target.classList.add('active');
+    if (targetEl) targetEl.classList.add('active');
+  }
+
+  // 4. 检视塔切换
+  function switchTab(tabKey, targetEl) {
+    document.querySelectorAll('.ins-nav-tab').forEach(b => b.classList.remove('active'));
+    if (targetEl) targetEl.classList.add('active');
+    document.querySelectorAll('.ins-pane').forEach(p => p.style.display = 'none');
+    const pane = document.getElementById('pane-' + tabKey);
+    if (pane) pane.style.display = 'block';
+  }
+
+  // 5. 商业化全景抽屉控制系统
+  function openDrawer(type) {
+    const backdrop = document.getElementById('sheetBackdrop');
+    const title = document.getElementById('sheetTitleText');
+    const body = document.getElementById('sheetContentBody');
+
+    // 1. 版本历史时光机 (Diff & Rollback)
+    if (type === 'history') {
+      title.innerText = '版本时光机与差异回滚';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; font-size:13.5px;">Rev 4 · 当前最新修改 (自动保存)</span>
+              <span class="tag-pill green">当前版本</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">10 分钟前 · 增补赵捕头拔刀压迫感</div>
+          </div>
+
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; font-size:13.5px;">Rev 3 · 30 分钟前快照</span>
+              <button class="action-btn-clean" style="padding:2px 8px; font-size:11px;" onclick="alert('已回滚至 Rev 3 版本！'); closeDrawerDirect();">恢复此版本</button>
+            </div>
+            <div style="font-size:12px; color:var(--fg-secondary); margin-top:8px; line-height:1.6; padding:8px; background:rgba(0,0,0,0.3); border-radius:8px;">
+              <span class="diff-del">庙门被推开</span> <span class="diff-add">庙门哐当一声被撞开</span>，治安官赵捕头大步跨入...
+            </div>
+          </div>
+
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; font-size:13.5px;">Rev 1 · 昨晚初稿建立</span>
+              <button class="action-btn-clean" style="padding:2px 8px; font-size:11px;" onclick="alert('已回滚至初稿！'); closeDrawerDirect();">恢复此版本</button>
+            </div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">字数：2,100 字 · 核心设定初始化</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 2. 灵感与起名工坊
+    else if (type === 'inspiration') {
+      title.innerText = '网文灵感与起名工坊';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-size:12px; color:var(--fg-muted);">点击生成随机网文元素，一键填入正文或设定卡：</div>
+          <div class="dice-grid">
+            <div class="dice-card-btn" onclick="rollName('name')">
+              <span style="font-weight:600; font-size:13px; color:var(--fg-pure);">🎲 角色龙套起名</span>
+              <span style="font-size:11px; color:var(--accent-strong);" id="diceNameResult">陆玄 / 顾清河 / 赵铁鹰</span>
+            </div>
+            <div class="dice-card-btn" onclick="rollName('sect')">
+              <span style="font-weight:600; font-size:13px; color:var(--fg-pure);">🏯 宗门势力起名</span>
+              <span style="font-size:11px; color:var(--gold);" id="diceSectResult">太虚道宗 / 九曜魔门</span>
+            </div>
+            <div class="dice-card-btn" onclick="rollName('item')">
+              <span style="font-weight:600; font-size:13px; color:var(--fg-pure);">🗡️ 法宝神兵起名</span>
+              <span style="font-size:11px; color:var(--emerald);" id="diceItemResult">破煞法弩 / 七绝离火镜</span>
+            </div>
+            <div class="dice-card-btn" onclick="rollName('crisis')">
+              <span style="font-weight:600; font-size:13px; color:var(--fg-pure);">⚡ 卡文突发事件</span>
+              <span style="font-size:11px; color:var(--rose);" id="diceCrisisResult">庙外第三股势力逼近</span>
+            </div>
+          </div>
+          <button class="action-btn-clean" style="width:100%; justify-content:center; padding:10px; background:var(--accent); color:#fff; border:none; margin-top:6px;" onclick="insertRolledToProse()">填入写作输入框</button>
+        </div>
+      `;
+    }
+
+    // 3. 作品打包与全格式导出 (Export Hub)
+    else if (type === 'export') {
+      title.innerText = '作品导出与平台打包';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="font-size:13.5px; font-weight:600; color:var(--fg-pure);">导出完整小说合集</div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">当前已写：1 卷 1 章 · 3,420 字</div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;">
+            <button class="action-btn-clean" style="justify-content:center; padding:12px;" onclick="alert('已生成 Word (.docx) 标准排版文档！'); closeDrawerDirect();">
+              <span>导出 Word (.docx)</span>
+            </button>
+            <button class="action-btn-clean" style="justify-content:center; padding:12px;" onclick="alert('已生成分卷纯文本 (.txt)！'); closeDrawerDirect();">
+              <span>导出 纯文本 (.txt)</span>
+            </button>
+            <button class="action-btn-clean" style="justify-content:center; padding:12px;" onclick="alert('已生成手机电子书 (.epub)！'); closeDrawerDirect();">
+              <span>导出 电子书 (.epub)</span>
+            </button>
+            <button class="action-btn-clean" style="justify-content:center; padding:12px;" onclick="alert('已生成 Markdown 归档包！'); closeDrawerDirect();">
+              <span>导出 Markdown (.md)</span>
+            </button>
+          </div>
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="font-size:13px; font-weight:600; color:var(--gold);">番茄 / 起点后台一键复制</div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">按网文标准（自动段首两格缩进、中英文标点修正）</div>
+            <button class="action-btn-clean" style="margin-top:8px; width:100%; justify-content:center;" onclick="alert('第一章已按标准格式复制到剪贴板！'); closeDrawerDirect();">一键复制当前章正文</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 4. 敏感词合规扫描
+    else if (type === 'compliance') {
+      title.innerText = '网文平台合规与敏感词检测';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:14px; font-weight:600; color:var(--emerald);">✓ 未发现严重违禁词</span>
+              <span class="tag-pill green">合规率 100%</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">比对库：阅文/番茄 2026 最新网文敏感词库</div>
+          </div>
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="font-size:13px; font-weight:600; color:var(--fg-primary);">提词建议与架空规范</div>
+            <div style="font-size:12px; color:var(--fg-secondary); margin-top:6px; line-height:1.6;">
+              • 官方机构名已规范使用「龙国特事治安局」，规避现实机关撞名；<br>
+              • 暴力与冲突描写尺度适中，符合全年龄段过审规范。
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 5. 每日码字目标与打卡统计
+    else if (type === 'goals') {
+      title.innerText = '写作目标与码字打卡';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:14px; font-weight:600;">今日码字：3,420 字</span>
+              <span class="tag-pill gold">目标 4,000 字</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">今日码字时速：1,850 字/小时 · 连续码字 12 天</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="action-btn-clean" style="flex:1; justify-content:center;" onclick="alert('已设为每日 2,000 字目标')">2000字/天</button>
+            <button class="action-btn-clean" style="flex:1; justify-content:center; background:var(--accent-soft); border-color:var(--accent);" onclick="alert('已设为每日 4,000 字目标')">4000字/天</button>
+            <button class="action-btn-clean" style="flex:1; justify-content:center;" onclick="alert('已设为每日 6,000 字目标')">6000字/天</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 6. 一键排版
+    else if (type === 'format') {
+      title.innerText = '一键网文标准排版';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="font-size:13.5px; font-weight:600; color:var(--fg-pure);">排版规则校验</div>
+            <div style="font-size:12px; color:var(--fg-secondary); margin-top:6px; line-height:1.6;">
+              ✓ 自动首行缩进两全角空格<br>
+              ✓ 清理段落间多余空行<br>
+              ✓ 规范全角中文双引号与破折号<br>
+              ✓ 正文字数自动校准为 3,420 字
+            </div>
+          </div>
+          <button class="action-btn-clean" style="width:100%; justify-content:center; padding:10px; background:var(--accent); color:#fff; border:none;" onclick="alert('排版格式已应用并落盘！'); closeDrawerDirect();">立即应用标准排版</button>
+        </div>
+      `;
+    }
+
+    // 7. 创作者登录与账号切换
+    else if (type === 'auth') {
+      title.innerText = '创作者账号登录与切换';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="auth-input-group">
+            <label class="auth-label">邮箱 / 账号</label>
+            <input class="auth-field" type="email" id="loginEmailInput" value="daoxuan@mozhou.ai" placeholder="请输入创作者注册邮箱" />
+          </div>
+          <div class="auth-input-group">
+            <label class="auth-label">登录密码</label>
+            <input class="auth-field" type="password" id="loginPassInput" value="••••••••••••" placeholder="请输入密码" />
+          </div>
+          <button class="action-btn-clean" style="width:100%; justify-content:center; padding:10px; background:var(--accent); color:#fff; border:none; margin-top:6px;" onclick="performLogin()">立即登录 / 切换</button>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--fg-muted); padding-top:4px;">
+            <span style="cursor:pointer;" onclick="alert('新创作者已通过数据面注册')">注册新账号</span>
+            <span style="cursor:pointer;" onclick="openDrawer('license')">商业许可证激活 ›</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // 8. 许可证激活
+    else if (type === 'license') {
+      title.innerText = '商业化许可证与权益';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel-card" style="margin:0; background:var(--surface-core);">
+            <div style="font-size:13px; font-weight:600; color:var(--gold);">当前方案：墨舟旗舰专业版 (Pro Lifetime)</div>
+            <div style="font-size:11.5px; color:var(--fg-muted); margin-top:4px;">状态：永久生效 · 17 航道全部解锁</div>
+          </div>
+          <div class="auth-input-group">
+            <label class="auth-label">输入新许可证密钥 (License Key)</label>
+            <input class="auth-field" type="text" placeholder="例如：MOZHOU-PRO-LIFETIME-XXXX-YYYY" />
+          </div>
+          <button class="action-btn-clean" style="width:100%; justify-content:center; padding:10px; background:var(--accent); color:#fff; border:none;" onclick="alert('许可证激活成功！'); closeDrawerDirect();">立即激活授权</button>
+        </div>
+      `;
+    }
+
+    // 9. 章节目录
+    else if (type === 'chapters') {
+      title.innerText = '第一卷 章节目录';
+      body.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="fact-item-block" style="cursor:pointer;" onclick="closeDrawerDirect()">
+            <div style="color:var(--accent-strong); font-weight:600;">第 001 章 破庙装神与显灵契机 (当前)</div>
+            <div style="font-size:11px; color:var(--fg-muted);">3,420 字 · 定稿</div>
+          </div>
+          <div class="fact-item-block" style="cursor:pointer;" onclick="closeDrawerDirect()">
+            <div>第 002 章 县衙大堂上的测灵镜</div>
+            <div style="font-size:11px; color:var(--fg-muted);">规划 3,200 字 · 细纲就绪</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 10. 文风画像
+    else if (type === 'distill') {
+      title.innerText = '文风画像详情';
+      body.innerHTML = `
+        <div class="panel-card" style="margin:0;">
+          <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--hairline-subtle);">
+            <span>对白占比</span>
+            <span style="color:var(--accent-strong);">42.8%</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:8px 0;">
+            <span>短句比例</span>
+            <span style="color:var(--emerald);">68.5% (快节奏)</span>
+          </div>
+        </div>
+      `;
+    }
+
+    backdrop.classList.add('open');
+  }
+
+  function closeDrawer(e) {
+    if (e.target.id === 'sheetBackdrop') closeDrawerDirect();
+  }
+  function closeDrawerDirect() {
+    document.getElementById('sheetBackdrop').classList.remove('open');
+  }
+
+  function performLogin() {
+    const email = document.getElementById('loginEmailInput').value;
+    document.getElementById('accountEmail').innerText = email;
+    document.getElementById('statusCapsuleText').innerText = '道玄先生 · 已登录';
+    alert('【登录成功】已连接创作者数据面，当前作品与会话凭证已完成归属隔离！');
+    closeDrawerDirect();
+  }
+
+  function toggleBranch(el) {
+    el.parentElement.querySelectorAll('.branch-choice-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function insertTag(tag) {
+    const area = document.querySelector('.composer-textarea');
+    area.value += (area.value ? ' ' : '') + tag;
+    area.focus();
+  }
+
+  function triggerWriteStream() {
+    const text = document.getElementById('statusCapsuleText');
+    text.innerText = '正在推进正文...';
+    setTimeout(() => {
+      text.innerText = '道玄先生 · Pro 终身版';
+      alert('正文段落已增量推演生成，并已完成设定事实一致性比对。');
+    }, 600);
+  }
+
+  // 灵感骰子生成逻辑
+  function rollName(type) {
+    if (type === 'name') {
+      const names = ['陆玄', '林青锋', '叶知秋', '赵九霄', '楚云歌'];
+      document.getElementById('diceNameResult').innerText = names[Math.floor(Math.random() * names.length)];
+    } else if (type === 'sect') {
+      const sects = ['太虚道宗', '落魄山剑庐', '九幽司夜阁', '玄天神策府'];
+      document.getElementById('diceSectResult').innerText = sects[Math.floor(Math.random() * sects.length)];
+    } else if (type === 'item') {
+      const items = ['破煞法弩', '七绝离火镜', '太阴镇魂锁', '九转还阳木'];
+      document.getElementById('diceItemResult').innerText = items[Math.floor(Math.random() * items.length)];
+    } else if (type === 'crisis') {
+      const crises = ['庙外第三股势力逼近', '神台下突发诡异震颤', '赵捕头突然拔刀斩向神坛'];
+      document.getElementById('diceCrisisResult').innerText = crises[Math.floor(Math.random() * crises.length)];
+    }
+  }
+
+  function insertRolledToProse() {
+    const name = document.getElementById('diceNameResult').innerText;
+    insertTag(`【引入灵感：${name}】`);
+    closeDrawerDirect();
+  }
+</script>
+</body>
+</html>

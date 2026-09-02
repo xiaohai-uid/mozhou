@@ -19,13 +19,29 @@ import {
 } from '@mozhou/data-plane';
 import { defaultPlatformRules, hashProse, isQualityReviewCurrent } from '@mozhou/quality-engine';
 import type { QualityPolicy } from '@mozhou/quality-engine';
-import { loadDraftForReview, makeDraftProviderBinding, recordUserEdit, runDraftStep, runReviewStep } from './index.js';
+import {
+  ChapterProductionSession,
+  executeChapterReview,
+  loadDraftForReview,
+  makeDraftProviderBinding,
+  recordUserEdit,
+  runDraftStep,
+  runReviewStep,
+} from './index.js';
+
 
 let roots: string[] = [];
 afterEach(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true });
+  for (const root of roots) {
+    try {
+      rmSync(root, { recursive: true, force: true });
+    } catch {
+      // Windows file lock tolerance
+    }
+  }
   roots = [];
 });
+
 
 const PACKET: ContextPacket = {
   taskType: 'CHAPTER_DRAFTING',
@@ -72,9 +88,12 @@ function hermeticBook(): string {
   const dir = mkdtempSync(join(tmpdir(), 'mozhou-t17-review-'));
   roots.push(dir);
   createBook({ dir, title: '核检之书' });
-  LocalDataPlane.open(dir).createChapterDraft({ chapterIndex: 3, title: '第三章' });
+  const plane = LocalDataPlane.open(dir);
+  plane.createChapterDraft({ chapterIndex: 3, title: '第三章' });
+  plane.close();
   return dir;
 }
+
 
 function draftEngine(root: string, chunks: readonly string[]): RuntimeEngine {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_review' });
@@ -243,4 +262,51 @@ describe('ADR-0025 runReviewStep：版本绑定审查报告', () => {
       draftContentHash: hashProse(scan.body),
     })).toBe(false);
   });
+
+  it('executeChapterReview: 深度审查统摄机检、金句收割与会话记录', async () => {
+    const root = hermeticBook();
+    const bus = new PublishBus();
+    const session = ChapterProductionSession.start({
+      bus,
+      root,
+      chapterIndex: 3,
+      newTaskRef: () => 'tsk_deep_review',
+    });
+    session.advance('compile');
+    session.advance('draft');
+
+    await runDraftStep({
+      engine: draftEngine(root, [
+        '天下大势，分久必合。陈缺推门而入，看着案几上摆放的一纸文书，神色凝重地坐下，端起茶盏轻轻吹开浮沫。\n\n',
+        '窗外的夜雨淅淅沥沥地下着，将廊下的青苔洗得发亮，远处隐隐传来打更之声。\n\n',
+        '长生久视不过是虚妄。',
+      ]),
+      bookRoot: root,
+      chapterIndex: 3,
+      packet: PACKET,
+      recipe: RECIPE,
+    });
+
+
+
+    const outcome = await executeChapterReview({
+      bookRoot: root,
+      chapterIndex: 3,
+      session,
+      policy: deterministicOnlyPolicy(),
+      reviewer: REVIEWER,
+      mechanicalOptions: { minWords: 0 },
+      autoHarvestQuotes: true,
+      autoAbsorbCounterexamples: true,
+    });
+
+
+    expect(outcome.report.verdict).toBe('pass');
+    expect(outcome.mechanicalGate.passed).toBe(true);
+    expect(outcome.harvestedQuotesCount).toBeGreaterThanOrEqual(1);
+    expect(session.currentStep).toBe('review');
+    expect(session.project().lastQualityVerdict).toBe('pass');
+  });
 });
+
+

@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>墨舟 · 手机端顶级旗舰 UI 重构 (High-End Visual Design & Apple Fluid Motion)</title>
+  <!-- 引入顶级西文字体 Geist 与 Plus Jakarta Sans，结合苹方与高端宋体排印 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ========================================================
+       1. 顶级旗舰视觉 Token (Vanguard Ethereal Glass + Nocturnal Ink)
+       ======================================================== */
+    :root {
+      --bg-deep: #050407;
+      --bg-base: #0a090e;
+      --surface-shell: rgba(255, 255, 255, 0.04);
+      --surface-core: #131118;
+      --surface-raised: #1c1924;
+      --surface-glass: rgba(19, 17, 24, 0.72);
+      
+      --purple-energy: #8c7aff;
+      --purple-glow: rgba(140, 122, 255, 0.35);
+      --purple-soft: rgba(140, 122, 255, 0.12);
+      --purple-border: rgba(140, 122, 255, 0.28);
+      --purple-gradient: linear-gradient(135deg, #a394ff 0%, #7660ff 100%);
+      
+      --amber-accent: #ffb443;
+      --amber-soft: rgba(255, 180, 67, 0.12);
+      --emerald-accent: #3dd68c;
+      
+      --hairline: rgba(255, 255, 255, 0.08);
+      --hairline-bright: rgba(255, 255, 255, 0.18);
+      --inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
+      
+      --text-main: #f5f2fc;
+      --text-muted: #aba2b8;
+      --text-faint: #70687d;
+      
+      --font-sans: "Geist", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      --font-serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+      --bezier-apple: cubic-bezier(0.32, 0.72, 0, 1);
+      --bezier-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    html, body {
+      margin: 0; padding: 0; min-height: 100vh;
+      background: #030204; color: var(--text-main); font-family: var(--font-sans);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* 物理级手机外框展示 (Machined Hardware Enclosure) */
+    .mobile-stage-wrapper {
+      width: 100%; max-width: 440px; min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+
+    .phone-hardware {
+      width: 390px; height: 820px; max-width: 100%;
+      background: var(--bg-deep);
+      border-radius: 50px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 
+        0 0 0 1px rgba(0, 0, 0, 0.8),
+        0 30px 100px -10px rgba(0, 0, 0, 0.9),
+        0 0 80px -20px rgba(140, 122, 255, 0.15);
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+
+    /* 弥散光晕背景 (Atmospheric Radial Mesh) */
+    .glow-orb-top {
+      position: absolute; top: -120px; right: -80px; width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(140, 122, 255, 0.16) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none; z-index: 1; filter: blur(40px);
+    }
+    .glow-orb-bottom {
+      position: absolute; bottom: -80px; left: -60px; width: 260px; height: 260px;
+      background: radial-gradient(circle, rgba(118, 96, 255, 0.12) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none; z-index: 1; filter: blur(40px);
+    }
+
+    /* 状态栏与灵动岛 */
+    .status-bar {
+      height: 48px; padding: 0 28px; display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; font-weight: 600; color: var(--text-faint); z-index: 20; flex-shrink: 0;
+    }
+    .dynamic-island {
+      width: 105px; height: 24px; background: #000; border-radius: 20px;
+      margin: 0 auto; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px;
+    }
+    .island-lens { width: 10px; height: 10px; border-radius: 999px; background: #0d0d12; border: 1px solid #1a1a24; }
+
+    /* ========================================================
+       2. 悬浮双层结构 (Double-Bezel) 顶部导航
+       ======================================================== */
+    .header-island {
+      margin: 0 16px 8px;
+      padding: 3px;
+      background: var(--surface-shell);
+      border: 1px solid var(--hairline);
+      border-radius: 24px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 15; flex-shrink: 0;
+    }
+    .header-inner {
+      background: var(--surface-glass);
+      border-radius: 21px;
+      padding: 8px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: var(--inner-highlight);
+    }
+    .book-meta { display: flex; flex-direction: column; gap: 1px; }
+    .book-title { font-size: 13.5px; font-weight: 700; color: var(--text-main); letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px; }
+    .chapter-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--purple-soft); color: var(--purple-energy); border: 1px solid var(--purple-border); }
+    .status-pulse { width: 5px; height: 5px; border-radius: 999px; background: var(--emerald-accent); box-shadow: 0 0 6px var(--emerald-accent); }
+
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .hud-btn {
+      height: 28px; padding: 0 10px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hairline);
+      color: var(--text-muted); font-size: 11px; font-weight: 500;
+      display: flex; align-items: center; gap: 5px; cursor: pointer;
+      transition: all 200ms var(--bezier-apple);
+    }
+    .hud-btn:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.1); }
+
+    /* ========================================================
+       3. 核心内容流 (Fluid Prose Stream & Smart Cards)
+       ======================================================== */
+    .viewport-content {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 6px 16px 140px; /* 为底部双层 Composer 留出优雅视距 */
+      display: flex; flex-direction: column; gap: 18px;
+      z-index: 10;
+      scrollbar-width: none;
+    }
+    .viewport-content::-webkit-scrollbar { display: none; }
+
+    /* 墨舟先问：Double-Bezel 智能气泡 */
+    .inquiry-card-outer {
+      padding: 1.5px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(140, 122, 255, 0.35) 0%, rgba(255,255,255,0.06) 100%);
+      box-shadow: 0 12px 36px -8px rgba(0,0,0,0.5), 0 0 20px rgba(140,122,255,0.08);
+      animation: cardEntrance 600ms var(--bezier-spring);
+    }
+    .inquiry-card-inner {
+      background: linear-gradient(180deg, #181522 0%, #110f17 100%);
+      border-radius: 22.5px;
+      padding: 14px 16px;
+      box-shadow: var(--inner-highlight);
+    }
+    .inquiry-eyebrow {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+    }
+    .eyebrow-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--purple-energy);
+    }
+    .inquiry-body {
+      font-size: 13.5px; line-height: 1.6; color: #ded8eb;
+      margin-bottom: 12px; font-weight: 450;
+    }
+    .options-grid { display: flex; flex-direction: column; gap: 6px; }
+    .option-item {
+      padding: 9px 12px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid var(--hairline);
+      font-size: 12.5px; color: var(--text-main); cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      transition: all 250ms var(--bezier-apple);
+    }
+    .option-item:hover, .option-item:active {
+      background: var(--purple-soft); border-color: var(--purple-border);
+      color: #fff; transform: translateX(2px);
+    }
+
+    /* 正文排印 (High-End Variable Serif) */
+    .prose-section {
+      display: flex; flex-direction: column; gap: 14px;
+      padding: 4px 2px;
+    }
+    .prose-para {
+      font-family: var(--font-serif);
+      font-size: 15.5px; line-height: 1.88;
+      color: #ece7f5; letter-spacing: 0.015em;
+      text-align: justify;
+    }
+    .prose-para.lead {
+      color: #f7f4fc; font-weight: 500;
+    }
+    .prose-para.faint {
+      color: var(--text-muted);
+    }
+
+    /* 实时伏笔/实体感知卡片 */
+    .entity-anchor-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 999px;
+      background: rgba(255, 180, 67, 0.08); border: 1px solid rgba(255, 180, 67, 0.22);
+      font-size: 11.5px; color: #ffd68a; margin: 4px 0;
+    }
+
+    /* ========================================================
+       4. 旗舰级 Double-Bezel 悬浮 Composer v3 输入系统
+       ======================================================== */
+    .composer-float-container {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 0 16px calc(14px + env(safe-area-inset-bottom));
+      z-index: 30;
+      background: linear-gradient(180deg, rgba(5,4,7,0) 0%, rgba(5,4,7,0.95) 40%, #050407 100%);
+      pointer-events: none;
+    }
+
+    .composer-bezel-outer {
+      pointer-events: auto;
+      padding: 2px;
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(140, 122, 255, 0.25) 100%);
+      box-shadow: 
+        0 20px 50px rgba(0,0,0,0.8),
+        0 0 30px rgba(140, 122, 255, 0.12);
+      transition: all 300ms var(--bezier-spring);
+    }
+    .composer-bezel-outer:focus-within {
+      background: linear-gradient(180deg, var(--purple-energy) 0%, rgba(255,255,255,0.4) 100%);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 40px rgba(140, 122, 255, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .composer-bezel-inner {
+      background: #14121a;
+      border-radius: 30px;
+      padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      box-shadow: var(--inner-highlight);
+    }
+
+    /* 上下文标签轨 */
+    .composer-context-row {
+      display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    }
+    .composer-context-row::-webkit-scrollbar { display: none; }
+    .ctx-pill {
+      font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05); color: var(--text-muted);
+      white-space: nowrap; display: flex; align-items: center; gap: 4px;
+      border: 1px solid var(--hairline);
+    }
+    .ctx-pill.active {
+      background: var(--purple-soft); color: var(--purple-energy); border-color: var(--purple-border);
+    }
+
+    /* 文本输入域 */
+    .composer-input-row { display: flex; align-items: flex-end; gap: 8px; }
+    .composer-textarea {
+      flex: 1; border: none; outline: none; background: transparent;
+      color: var(--text-main); font-family: var(--font-sans);
+      font-size: 14px; line-height: 1.5; resize: none; min-height: 42px; max-height: 100px;
+      padding: 2px 0;
+    }
+    .composer-textarea::placeholder { color: var(--text-faint); }
+
+    /* 发信/动作按键组 (Button-in-Button 架构) */
+    .composer-action-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .action-chips { display: flex; gap: 6px; align-items: center; }
+    .chip-btn {
+      height: 24px; padding: 0 8px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04); border: 1px solid var(--hairline);
+      color: var(--text-muted); font-size: 10.5px; font-weight: 500;
+      display: flex; align-items: center; gap: 4px; cursor: pointer;
+    }
+    .chip-btn:active { transform: scale(0.96); }
+
+    .send-button-nested {
+      height: 36px; padding: 0 6px 0 14px; border-radius: 999px;
+      background: var(--purple-gradient); border: none;
+      color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      box-shadow: 0 4px 18px rgba(140, 122, 255, 0.45);
+      transition: all 200ms var(--bezier-apple);
+    }
+    .send-button-nested:active { transform: scale(0.95); }
+    .send-icon-circle {
+      width: 24px; height: 24px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+    }
+
+    /* ========================================================
+       5. 动效设计与关键帧
+       ======================================================== */
+    @keyframes cardEntrance {
+      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-stage-wrapper">
+    <div class="phone-hardware">
+      <!-- 背景光晕 -->
+      <div class="glow-orb-top"></div>
+      <div class="glow-orb-bottom"></div>
+
+      <!-- 顶栏状态与灵动岛 -->
+      <div class="status-bar">
+        <span>09:41</span>
+        <div class="dynamic-island"><div class="island-lens"></div></div>
+        <span>5G · 100%</span>
+      </div>
+
+      <!-- 悬浮双层 Header -->
+      <header class="header-island">
+        <div class="header-inner">
+          <div class="book-meta">
+            <div class="book-title">
+              <span class="status-pulse"></span>
+              假神真显灵
+              <span class="chapter-badge">第 001 章</span>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button class="hud-btn" onclick="alert('展开文学质量门审查：Continuity PASS · 冲突 0')">
+              <span>🛡️</span>
+              <span>质量门 98</span>
+            </button>
+            <button class="hud-btn" onclick="alert('展开 Story Brain 事实全景')">
+              <span>🧠</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- 核心内容视口流 -->
+      <main class="viewport-content">
+        <!-- 墨舟先问：Double-Bezel 智能气泡 -->
+        <div class="inquiry-card-outer">
+          <div class="inquiry-card-inner">
+            <div class="inquiry-eyebrow">
+              <div class="eyebrow-pill">
+                <span>✦</span>
+                <span>墨舟先问 · 情节分叉</span>
+              </div>
+              <span style="font-size:10px; color:var(--text-faint);">sepia-002</span>
+            </div>
+            <div class="inquiry-body">
+              道观门板被撞得吱呀作响，门缝里渗出带着腥甜气息的黑血。主角陆沉舟袖中的火磷粉已经受潮，继续虚张声势还是主动涉险？
+            </div>
+            <div class="options-grid">
+              <div class="option-item" onclick="selectOption(this)">
+                <span>借泥塑神像引燃残香，制造「神火降世」假象</span>
+                <span style="font-size:10px; color:var(--purple-energy);">92% 意图</span>
+              </div>
+              <div class="option-item" onclick="selectOption(this)">
+                <span>熄灭烛火，彻底隐入黑暗以静制动</span>
+                <span style="font-size:10px; color:var(--text-faint);">84% 意图</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 伏笔感知轻量 Tag -->
+        <div>
+          <div class="entity-anchor-pill">
+            <span>⚡ 伏笔锚点</span>
+            <span>祖传戏法「七星引火」· 道具破损度 30%</span>
+          </div>
+        </div>
+
+        <!-- 正文沉浸流水 -->
+        <div class="prose-section">
+          <p class="prose-para lead">
+            夜雨拍打着破败的殿瓦，冷风顺着窗棂的破洞灌进来，将香案两侧残存的白烛吹得忽明忽暗。
+          </p>
+          <p class="prose-para">
+            陆沉舟屏住呼吸，后背紧紧贴在冰凉的泥塑神像基座上。他手指微不可察地颤抖了一下，袖口内暗扣的那枚火磷丸已被掌心的冷汗浸湿。
+          </p>
+          <p class="prose-para faint">
+            门外的动静停了。但那股腐朽潮湿的气息，却顺着门缝一丝一缕地飘了进来，在死寂的殿堂中弥散开来……
+          </p>
+        </div>
+      </main>
+
+      <!-- 旗舰级悬浮 Double-Bezel Composer 输入面板 -->
+      <div class="composer-float-container">
+        <div class="composer-bezel-outer">
+          <div class="composer-bezel-inner">
+            <!-- 1. 上下文行 -->
+            <div class="composer-context-row">
+              <span class="ctx-pill active">⚡ sepia-write (叙事增强)</span>
+              <span class="ctx-pill">🎨 悬疑沉郁风</span>
+              <span class="ctx-pill">📍 破庙内堂</span>
+            </div>
+            <!-- 2. 文本输入域 -->
+            <div class="composer-input-row">
+              <textarea class="composer-textarea" rows="2" placeholder="输入续写走向、动作神态或修文指令..."></textarea>
+            </div>
+            <!-- 3. 操作行与 Nested Button -->
+            <div class="composer-action-row">
+              <div class="action-chips">
+                <button class="chip-btn" onclick="alert('切换技能胶囊')">
+                  <span>+</span><span>技能</span>
+                </button>
+                <button class="chip-btn" onclick="alert('开启去 AI 味深度重构')">
+                  <span>✨</span><span>De-AI</span>
+                </button>
+              </div>
+              <button class="send-button-nested" onclick="triggerGenerate()">
+                <span>生成正文</span>
+                <div class="send-icon-circle">➤</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function selectOption(el) {
+      document.querySelectorAll('.option-item').forEach(i => {
+        i.style.background = 'rgba(255, 255, 255, 0.03)';
+        i.style.borderColor = 'var(--hairline)';
+      });
+      el.style.background = 'var(--purple-soft)';
+      el.style.borderColor = 'var(--purple-border)';
+      
+      const textarea = document.querySelector('.composer-textarea');
+      textarea.value = '【剧情走向】' + el.querySelector('span').innerText;
+      textarea.focus();
+    }
+
+    function triggerGenerate() {
+      const btn = document.querySelector('.send-button-nested');
+      btn.innerHTML = '<span>生成中...</span><div class="send-icon-circle">⏹</div>';
+      btn.style.background = 'rgba(242, 139, 155, 0.15)';
+      btn.style.color = '#f28b9b';
+      btn.style.border = '1px solid rgba(242, 139, 155, 0.3)';
+      
+      setTimeout(() => {
+        btn.innerHTML = '<span>生成正文</span><div class="send-icon-circle">➤</div>';
+        btn.style.background = 'var(--purple-gradient)';
+        btn.style.color = '#fff';
+        btn.style.border = 'none';
+        alert('✨ 墨舟 AI 创作引擎已完成段落生成与文学质量门校验！');
+      }, 1500);
+    }
+  </script>
+</body>
+</html>

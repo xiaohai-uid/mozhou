@@ -23,9 +23,16 @@ import {
 
 let roots: string[] = [];
 afterEach(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true });
+  for (const root of roots) {
+    try {
+      rmSync(root, { recursive: true, force: true });
+    } catch {
+      // Windows file lock tolerance
+    }
+  }
   roots = [];
 });
+
 
 const NOW = '2026-08-25T00:00:00.000Z';
 const FINAL_PROSE = '林晚踏上墨舟，甲板下压着一行谁也没读过的铭文——那是她的真名。\n\n风起，舟行北岸。';

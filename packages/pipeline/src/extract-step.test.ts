@@ -15,7 +15,7 @@ import type { CandidateDeltaBatch } from './extract-step.js';
 
 let roots: string[] = [];
 afterEach(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true });
+  for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch {} }
   roots = [];
 });
 

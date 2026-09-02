@@ -5,30 +5,48 @@
  */
 import { existsSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { BookRecord, KnowledgeState, TemporalFact } from '@mozhou/kernel'
+import {
+  queryActiveFacts as queryVisibleFactsInSnapshot,
+  queryKnowledgePerspective,
+  type BookRecord,
+  type EntityRef,
+  type KnowledgePerspectiveEntry,
+  type KnowledgeState,
+  type QueryActiveFactsRequest,
+  type TemporalFact,
+} from '@mozhou/kernel'
 import Database from 'better-sqlite3'
 import {
   commitChapter,
   createChapterDraft,
+  readProseChapter,
   recoverPendingCommit,
   reopenChapter,
   splitByReconciliationSurface,
   type ChapterCommitResult,
   type ChapterDraftPaths,
+  type ChapterPhase,
   type ChapterReopenResult,
   type CommitChapterRequest,
   type CreateChapterDraftRequest,
   type PlaneContext,
 } from './chapter.js'
-import { readCanonState, readBookRecord } from './canon-read.js'
+import { readCanonState, readBookRecord, scanEntityCards } from './canon-read.js'
 import { assertProjectionVersion, openDatabase } from './database.js'
+import { assembleChangeMatrix, listImpactRecords, type ChangeMatrix } from './impact.js'
+
 import {
   isCanonRelPath,
+  proseChapterPath,
   RUNTIME_DB_PATH,
 } from './layout.js'
+
 import { buildManifest, listAllFiles, readManifest, writeManifest, type HashManifest } from './manifest.js'
-import { queryActiveFacts as queryActiveFactsFromRoot, queryInvalidatedKnowledgeStates as queryInvalidatedFromRoot } from './narrative-state.js'
-import type { QueryActiveFactsRequest } from '@mozhou/kernel'
+import {
+  queryActiveFacts as queryActiveFactsFromRoot,
+  queryInvalidatedKnowledgeStates as queryInvalidatedFromRoot,
+  readNarrativeSnapshot,
+} from './narrative-state.js'
 import { initProjection, populateProjection } from './projection.js'
 import { sha256FileHex } from './sha256.js'
 import {
@@ -43,6 +61,7 @@ import {
   type StalePropagationResult,
 } from './stale.js'
 
+
 export class ProjectionMissingError extends Error {
   override readonly name = 'ProjectionMissingError'
 
@@ -56,6 +75,8 @@ function removeProjectionFiles(root: string): void {
     rmSync(`${join(root, RUNTIME_DB_PATH)}${suffix}`, { force: true })
   }
 }
+
+
 
 export class LocalDataPlane {
   private constructor(
@@ -182,6 +203,119 @@ export class LocalDataPlane {
   }
 
   /**
+   * T41 · 实体卡片列表读面
+   */
+  getEntityCards(): ReturnType<typeof scanEntityCards> {
+    return scanEntityCards(this.root)
+  }
+
+  /**
+   * T41 · Story Brain 事实区只读视图（认知三级通道聚合，Candidate 3 门面深化）。
+   * 自动探测连续章节锚点，逐持有者计算安全视角投影与失效状态。
+   */
+  queryStoryBrain(options: { chapter?: number | undefined; entityIds?: readonly EntityRef[] | undefined } = {}): StoryBrainOverview {
+    const chapters: { chapterIndex: number; phase: ChapterPhase }[] = []
+    for (let index = 1; ; index += 1) {
+      try {
+        const scan = readProseChapter(this.root, proseChapterPath(index))
+        chapters.push({ chapterIndex: scan.chapterIndex, phase: scan.phase })
+      } catch (error) {
+        if ((error as { code?: string }).code === 'ENOENT') break
+        throw error
+      }
+    }
+    const latestDraft = [...chapters].reverse().find((chapter) => chapter.phase === 'draft')
+    const latest = chapters[chapters.length - 1]
+    const currentChapterIndex = latestDraft?.chapterIndex ?? latest?.chapterIndex ?? null
+    const chapter = options.chapter ?? currentChapterIndex ?? 1
+    const entityIds = options.entityIds ?? []
+
+    const snapshot = readNarrativeSnapshot(this.root)
+    const canon = queryVisibleFactsInSnapshot(snapshot, {
+      chapter,
+      pov: 'protagonist',
+      ...(entityIds.length > 0 ? { entityIds } : {}),
+    })
+
+    const holders = new Set<Exclude<KnowledgeState['holder'], 'reader'>>()
+    for (const ks of snapshot.knowledgeStates.values()) {
+      if (ks.holder === 'reader' || ks.level === 'knows' || ks.knownSinceChapter > chapter) continue
+      holders.add(ks.holder)
+    }
+    const perspective = [...holders].sort().flatMap((holder) =>
+      queryKnowledgePerspective(snapshot, { chapter, pov: holder }).map((entry) => ({
+        ...entry,
+        subject: snapshot.facts.get(entry.factId)?.subject ?? null,
+      })),
+    )
+    const invalidated = queryInvalidatedFromRoot(this.root).map((ks) => ({
+      ...ks,
+      subject: snapshot.facts.get(ks.factId)?.subject ?? null,
+    }))
+
+    return {
+      chapter,
+      currentChapterIndex,
+      chapters,
+      canon,
+      perspective,
+      invalidated,
+    }
+  }
+
+  /**
+   * T43 · 变更矩阵聚合视图（只读读面）
+   */
+  getChangeMatrix(): ChangeMatrix {
+    return assembleChangeMatrix(this.root)
+  }
+
+
+  /**
+   * T47 · 作品章节全景目录概览
+   */
+  getWorksOverview(): WorksOverview {
+    const canon = readCanonState(this.root)
+    const chapters: WorksChapterItem[] = []
+    let totalWordCount = 0
+    let committedCount = 0
+    let draftCount = 0
+    for (let index = 1; ; index += 1) {
+      try {
+        const scan = readProseChapter(this.root, proseChapterPath(index))
+        const words = scan.body.replace(/\s+/g, '').length
+        totalWordCount += words
+        if (scan.phase === 'committed') committedCount += 1
+        if (scan.phase === 'draft') draftCount += 1
+
+        const outlineNode = canon.outlineNodes.find(
+          (node) => node.nodeType === 'chapter' && node.orderIndex === index,
+        )
+        const chapterTitle = outlineNode?.title ?? `第 ${index} 章`
+
+        chapters.push({
+          chapterIndex: scan.chapterIndex,
+          title: chapterTitle,
+          phase: scan.phase,
+          wordCount: words,
+          revision: scan.revision,
+        })
+      } catch (error) {
+        if ((error as { code?: string }).code === 'ENOENT') break
+        throw error
+      }
+    }
+    return {
+      book: this.book,
+      chapters,
+      totalWordCount,
+      committedCount,
+      draftCount,
+    }
+  }
+
+
+  /**
    * T5：外部修改五态对账服务（本平面单例；options 仅首次生效）。
    * 应用壳在 open 后先 scanExternalModifications('startupScan')，再按需 startWatcher。
    */
@@ -198,6 +332,33 @@ export class LocalDataPlane {
     this._db.close()
   }
 }
+
+export interface StoryBrainOverview {
+  readonly chapter: number
+  readonly currentChapterIndex: number | null
+  readonly chapters: readonly { chapterIndex: number; phase: ChapterPhase }[]
+  readonly canon: readonly TemporalFact[]
+  readonly perspective: readonly (KnowledgePerspectiveEntry & { subject: EntityRef | null })[]
+  readonly invalidated: readonly (KnowledgeState & { subject: EntityRef | null })[]
+}
+
+export interface WorksChapterItem {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly phase: ChapterPhase
+  readonly wordCount: number
+  readonly revision: number
+}
+
+export interface WorksOverview {
+  readonly book: BookRecord
+  readonly chapters: readonly WorksChapterItem[]
+  readonly totalWordCount: number
+  readonly committedCount: number
+  readonly draftCount: number
+}
+
+
 
 /**
  * Full-Absorption Rebuild（Q14 恢复三权分立之一）：

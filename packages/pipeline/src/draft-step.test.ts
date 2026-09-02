@@ -29,9 +29,16 @@ import {
 
 let roots: string[] = [];
 afterEach(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true });
+  for (const root of roots) {
+    try {
+      rmSync(root, { recursive: true, force: true });
+    } catch {
+      // Windows file lock tolerance
+    }
+  }
   roots = [];
 });
+
 
 function hermeticBook(): { root: string; plane: LocalDataPlane } {
   const dir = mkdtempSync(join(tmpdir(), 'mozhou-t17-draft-'));

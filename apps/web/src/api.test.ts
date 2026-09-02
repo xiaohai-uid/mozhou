@@ -25,10 +25,17 @@ let bases: string[] = []
 afterEach(() => {
   for (const s of servers) s.close()
   servers = []
-  for (const r of roots) rmSync(r, { recursive: true, force: true })
+  for (const r of roots) {
+    try {
+      rmSync(r, { recursive: true, force: true })
+    } catch {
+      // Windows file lock tolerance
+    }
+  }
   roots = []
   bases = []
 })
+
 
 function listen(): Promise<string> {
   return new Promise((resolve) => {

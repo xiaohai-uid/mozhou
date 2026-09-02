@@ -1,7 +1,7 @@
 /**
- * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027）：
+ * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027 · 商业化双端全景）：
  * 顶栏 + 八步管线条 + 左侧五组功能航道 + 中栏（工作台填充/显式占位）
- * + 右侧检视塔 + WebGL 背景墨流。书名与视图状态经 localStorage 记忆。
+ * + 右侧检视塔 + WebGL 背景墨流 + 商业化模态窗提升 (Modal Hoisting)。
  */
 import { useEffect, useState } from 'react'
 import { CapabilityChannels } from './shell/CapabilityChannels'
@@ -32,6 +32,8 @@ import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
 import { WorkbenchView } from './workbench/WorkbenchView'
+import { MobileShell } from './mobile/MobileShell'
+import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
 
 /** 管线点击牵引的墨迹聚焦：activeStage 均匀映射到 [0,1]（原型同款）。 */
 function stageToFocus(stageIndex: number): number {
@@ -76,6 +78,24 @@ export function App(): JSX.Element {
     () => initial.book === null && !wizardCompleted(),
   )
 
+  // 桌面端全局模态窗状态
+  const [desktopModal, setDesktopModal] = useState<DesktopModalType>(null)
+
+  // 移动端响应式检测 (视口宽度 < 768px 时激活 MobileShell)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth > 0 && window.innerWidth < 768
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const checkViewport = () => {
+      setIsMobile(window.innerWidth > 0 && window.innerWidth < 768)
+    }
+    window.addEventListener('resize', checkViewport)
+    return () => window.removeEventListener('resize', checkViewport)
+  }, [])
+
   useEffect(() => {
     saveWorkbenchState({ book, view })
   }, [book, view])
@@ -116,6 +136,11 @@ export function App(): JSX.Element {
     setView('workbench')
   }
 
+  // 移动端优先渲染全景工作台
+  if (isMobile) {
+    return <MobileShell book={book} onSwitchBook={handleBookSwitch} />
+  }
+
   const panels = {
     quality:
       book === null ? (
@@ -151,6 +176,7 @@ export function App(): JSX.Element {
           book={book}
           onHome={() => setView('workbench')}
           onReplayWizard={() => setWizardOpen(true)}
+          onOpenModal={setDesktopModal}
         />
         <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
         <PipelineStrip activeStage={stage} onSelect={setStage} />
@@ -214,6 +240,9 @@ export function App(): JSX.Element {
           onReplay={handleWizardDismiss}
         />
       )}
+
+      {/* 桌面端全局模态窗 */}
+      <DesktopToolModals activeModal={desktopModal} onClose={() => setDesktopModal(null)} />
     </>
   )
 }

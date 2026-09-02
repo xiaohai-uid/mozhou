@@ -60,3 +60,17 @@ export {
 export type { AnchorStatus, AnchorType, MemoryAnchor } from './memory-anchor.js';
 export { hashProse, runQualityReview } from './review.js';
 export type { QualityReviewInput } from './review.js';
+export {
+  BUILTIN_REDLINES,
+  detect4GramRepetition,
+  evaluateMechanicalGates,
+  findCommon5Gram,
+  isInsideQuotes,
+} from './mechanical-gates.js';
+export type {
+  MechanicalCheckResult,
+  MechanicalGateReport,
+} from './mechanical-gates.js';
+export { evaluateStyleMetrics } from './style-metrics.js';
+export type { SepiaNarrativeScore, StyleMetrics } from './style-metrics.js';
+
