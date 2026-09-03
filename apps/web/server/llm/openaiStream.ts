@@ -55,6 +55,16 @@ function isPrivateOrReservedIpv6(address: string): boolean {
   const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
   if (mapped?.[1] !== undefined) return isPrivateOrReservedIpv4(mapped[1])
 
+  // URL 解析器会把点分映射形式（::ffff:127.0.0.1）规范化为十六进制（::ffff:7f00:1），
+  // 因此嵌入 IPv4 的十六进制形式也必须还原成 v4 再判定（含 ::ffff:0:/96 转换段与 NAT64 段）。
+  const hexMapped = normalized.match(/^(?:::ffff:(?:0:)?|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (hexMapped?.[1] !== undefined && hexMapped[2] !== undefined) {
+    const high = Number.parseInt(hexMapped[1], 16)
+    const low = Number.parseInt(hexMapped[2], 16)
+    const embeddedV4 = `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`
+    return isPrivateOrReservedIpv4(embeddedV4)
+  }
+
   const firstGroup = Number.parseInt(normalized.split(':')[0] || '0', 16)
   if (Number.isNaN(firstGroup)) return true
   if ((firstGroup & 0xfe00) === 0xfc00) return true // fc00::/7 unique-local

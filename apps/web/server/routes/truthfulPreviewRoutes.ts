@@ -7,7 +7,7 @@
  */
 import type { RouteHandler } from '../router.js'
 
-export const truthfulPreviewRoutes: RouteHandler = async (req, _res, { path, json }) => {
+export const truthfulPreviewRoutes: RouteHandler = (req, _res, { path, json }) => {
   if (req.method !== 'POST') return false
 
   if (path === '/api/novel-breakdown') {

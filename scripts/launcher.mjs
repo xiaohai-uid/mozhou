@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const rootDir = join(__dirname, '..')
 const webDistDir = join(rootDir, 'apps', 'web', 'dist')
-const serverEntry = join(rootDir, 'apps', 'web', 'dist-server', 'productionServer.js')
+const serverEntry = join(rootDir, 'apps/web/dist-server/productionServer.js')
 const port = process.env.PORT || '5173'
 // 安全默认：发行版仅本机可达。容器内部可显式 HOST=0.0.0.0，并由宿主端口映射限制访问面。
 const host = process.env.HOST || '127.0.0.1'

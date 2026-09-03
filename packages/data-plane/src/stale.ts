@@ -20,23 +20,21 @@
  * 「文件已标而基线未刷」状态，下次启动被对账提案捕获交作者过目，
  * canon 内容本身无损（宁可见、不可脏）。
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   computeStaleMarker,
-  parseDependencyManifest,
   parseDependencyManifestEntry,
 } from '@mozhou/kernel'
-import type { DependencyManifest, DependencyManifestEntry, StaleMarker } from '@mozhou/kernel'
+import type { DependencyManifestEntry, StaleMarker } from '@mozhou/kernel'
 import { assertPreWriteHash, atomicReplace, type PlaneContext } from './chapter.js'
 import {
   assertWithinBudget,
   readChapterDependencyPins,
   staleMarkerEquivalent,
-  type ChapterDependencyPin,
 } from './stale-cache.js'
 export { readChapterDependencyPins, type ChapterDependencyPin } from './stale-cache.js'
-import { RUNTIME_EVENTS_PATH, chapterOutlinePath } from './layout.js'
+import { chapterOutlinePath } from './layout.js'
 import { refreshManifestEntries, writeManifest } from './manifest.js'
 import { emitFrontmatter, parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
 

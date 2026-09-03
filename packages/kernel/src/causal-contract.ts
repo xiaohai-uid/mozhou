@@ -59,7 +59,7 @@ export interface CausalContract extends KernelEntityHead {
  */
 export function projectContractToTemporalFacts(contract: CausalContract): TemporalFact[] {
   const chapterAnchor = contract.deadline.kind === 'chapter' ? contract.deadline.chapterIndex : 1;
-  const primaryDebtor = contract.parties.find((p) => p.role === 'debtor')?.entity ?? ('char:unknown' as EntityRef);
+  const primaryDebtor = contract.parties.find((p) => p.role === 'debtor')?.entity ?? 'char:unknown';
 
   const facts: TemporalFact[] = [
     {

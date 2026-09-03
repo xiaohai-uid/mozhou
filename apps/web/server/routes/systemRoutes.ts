@@ -165,7 +165,7 @@ function databaseBytes(root: string | null): number {
   }
 }
 
-export const systemRoutes: RouteHandler = async (req, res, { path, body, json }) => {
+export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
 
   /* ---- 风格画像与蒸馏 ---- */

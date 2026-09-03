@@ -28,7 +28,7 @@ export function InspectorHub({ book, onOpenDrawer }: InspectorHubProps): JSX.Ele
     }
     let mounted = true
     setLoading(true)
-    Promise.all([
+    void Promise.all([
       post<StoryBrainFactsResponse>('/api/story-brain.facts', { root: book.root }).catch(() => null),
       post<ReceiptListResponse>('/api/receipts', { root: book.root }).catch(() => null),
       post<ChangeMatrixResponse>('/api/change-matrix', { root: book.root }).catch(() => null),

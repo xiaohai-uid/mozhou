@@ -30,10 +30,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Dependency audit (high/critical)
         run: pnpm audit --audit-level high
-      - name: Static lint gate
-        run: pnpm lint
       - name: Build workspace (tsc -b)
         run: pnpm build
+      # 类型感知 lint 依赖 packages/*/dist 的 .d.ts（types 指向 dist），
+      # 必须在 workspace 构建之后执行，否则工作区导入全部坍缩为 any 产生千级误报。
+      - name: Static lint gate
+        run: pnpm lint
       - name: Test workspace (vitest)
         run: pnpm test
       - name: Typecheck apps/web (tsc -b)

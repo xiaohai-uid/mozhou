@@ -24,7 +24,7 @@ export function SystemHub({
 
   useEffect(() => {
     let mounted = true
-    Promise.all([
+    void Promise.all([
       book ? post<TasksResponse>('/api/tasks', { root: book.root }).catch(() => null) : Promise.resolve(null),
       post<MembershipResponse>('/api/membership', {}).catch(() => null),
     ]).then(([t, m]) => {

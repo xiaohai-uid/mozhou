@@ -66,7 +66,7 @@ export function ResourcesHub({}: ResourcesHubProps): JSX.Element {
         </div>
       </div>
 
-      <form onSubmit={handleSearch} style={{ margin: '12px 18px' }}>
+      <form onSubmit={(e) => { void handleSearch(e) }} style={{ margin: '12px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-shell-mobile)', border: '1px solid var(--hairline-crisp-mobile)', borderRadius: 12, padding: '9px 14px' }}>
           <SearchIcon className="svg-icon" style={{ color: 'var(--fg-muted-mobile)' }} />
           <input

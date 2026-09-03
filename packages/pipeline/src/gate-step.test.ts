@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { newUlid } from '@mozhou/kernel';
+import { newUlid, type CausalContract, type ContractId, type BookId } from '@mozhou/kernel';
 import { PublishBus, readLedger } from '@mozhou/runtime';
 import { LocalDataPlane, createBook } from '@mozhou/data-plane';
 import type { CandidateDeltaBatch } from './extract-step.js';
@@ -16,7 +16,7 @@ import { ChapterProductionSession } from './session.js';
 
 let roots: string[] = [];
 afterEach(() => {
-  for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch {} }
+  for (const root of roots) { try { rmSync(root, { recursive: true, force: true }); } catch { /* 清理失败可忽略 */ } }
   roots = [];
 });
 
@@ -355,17 +355,17 @@ describe('ADR-0026 认知层级与秘密授权', () => {
 
   it('P1-1 因果合约：超期无处置阻断门禁，已处置违约与履约合法放行', () => {
     const { root } = newBook();
-    const contract = {
-      id: 'contract_01J_tian_dao' as any,
-      bookId: 'book_01J' as any,
+    const contract: CausalContract = {
+      id: 'contract_01J_tian_dao' as ContractId,
+      bookId: 'book_01J' as BookId,
       revision: 0,
       createdAt: NOW,
       updatedAt: NOW,
       title: '天道借法契约',
-      parties: [{ entity: 'char:gu-qing-zhou' as any, role: 'debtor' as any }],
-      obligations: [{ obligationId: 'ob_1', debtor: 'char:gu-qing-zhou' as any, description: '偿命', isFulfilled: false }],
-      deadline: { kind: 'chapter' as const, chapterIndex: 2 },
-      status: 'active' as const,
+      parties: [{ entity: 'char:gu-qing-zhou', role: 'debtor' }],
+      obligations: [{ obligationId: 'ob_1', debtor: 'char:gu-qing-zhou', description: '偿命', isFulfilled: false }],
+      deadline: { kind: 'chapter', chapterIndex: 2 },
+      status: 'active',
     };
 
     // 第 3 章且 status='active'（超期未处置） ⇒ hard_conflict

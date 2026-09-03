@@ -8,6 +8,8 @@
 .mimosa/
 .next/
 dist/
+dist-server/
+archive-legacy/
 release-artifacts/
 figma-upload/
 node_modules/

@@ -33,7 +33,7 @@ import {
 } from './chapter.js'
 import { readCanonState, readBookRecord, scanEntityCards } from './canon-read.js'
 import { assertProjectionVersion, openDatabase } from './database.js'
-import { assembleChangeMatrix, listImpactRecords, type ChangeMatrix } from './impact.js'
+import { assembleChangeMatrix, type ChangeMatrix } from './impact.js'
 
 import {
   isCanonRelPath,

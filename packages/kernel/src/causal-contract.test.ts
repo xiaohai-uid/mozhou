@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BookId, EntityRef } from './kernel-schema.js';
+import type { BookId } from './kernel-schema.js';
 import {
   auditCausalContract,
   projectContractToTemporalFacts,
@@ -16,13 +16,13 @@ describe('P1-1 CausalContract 领域扩展与门禁审计', () => {
     updatedAt: new Date().toISOString(),
     title: '天道借法契约',
     parties: [
-      { entity: 'char:gu-qing-zhou' as EntityRef, role: 'debtor' },
-      { entity: 'faction:tian-dao' as EntityRef, role: 'creditor' },
+      { entity: 'char:gu-qing-zhou', role: 'debtor' },
+      { entity: 'faction:tian-dao', role: 'creditor' },
     ],
     obligations: [
       {
         obligationId: 'ob_01',
-        debtor: 'char:gu-qing-zhou' as EntityRef,
+        debtor: 'char:gu-qing-zhou',
         description: '在第三章结束前献祭寿元十年',
         isFulfilled: false,
       },

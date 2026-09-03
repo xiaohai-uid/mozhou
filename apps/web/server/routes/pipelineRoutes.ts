@@ -11,8 +11,14 @@ import {
   recordAuthorCorrection,
   runDraftStep,
 } from '@mozhou/pipeline'
-import type { PipelineStep } from '@mozhou/pipeline'
-import { CORRECTION_REASONS, hashProse, isQualityReviewCurrent, type QualityPolicy } from '@mozhou/quality-engine'
+import {
+  CORRECTION_REASONS,
+  hashProse,
+  isQualityReviewCurrent,
+  type CorrectionReason,
+  type QualityPolicy,
+  type QualityReviewReport,
+} from '@mozhou/quality-engine'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
 import { PublishBus, RuntimeEngine } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
@@ -418,19 +424,23 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       return true
     }
 
-    const invalid = reasons.filter((r) => !CORRECTION_REASONS.includes(r as any))
+    const isCorrectionReason = (r: unknown): r is CorrectionReason =>
+      typeof r === 'string' && (CORRECTION_REASONS as readonly string[]).includes(r)
+
+    const invalid = reasons.filter((r) => !isCorrectionReason(r))
     if (invalid.length > 0) {
-      json(400, { ok: false, error: 'invalid correction reasons: ' + invalid.join(', ') })
+      json(400, { ok: false, error: 'invalid correction reasons: ' + invalid.map(String).join(', ') })
       return true
     }
 
+    const typedReasons = reasons as CorrectionReason[]
     const bus = new PublishBus()
     const outcome = recordAuthorCorrection({
       bus,
       bookRoot: root,
       taskRef: 'tsk_web_correction_' + String(chapterIndex),
       chapterIndex,
-      reasons: reasons as any,
+      reasons: typedReasons,
       ...(note ? { note } : {}),
     })
 
@@ -465,7 +475,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     }
 
     const latestFile = files[files.length - 1]!
-    const report = JSON.parse(readFileSync(join(reviewsDir, latestFile), 'utf8'))
+    const report = JSON.parse(readFileSync(join(reviewsDir, latestFile), 'utf8')) as QualityReviewReport
     const proseObj = readProseChapter(root, proseChapterPath(chapterIndex))
     const current = isQualityReviewCurrent(report, {
       draftRevision: proseObj.revision,

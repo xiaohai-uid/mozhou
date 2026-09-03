@@ -80,15 +80,15 @@ export const PublicationExportModal: React.FC<PublicationExportModalProps> = ({
         <div className="space-y-3 text-xs">
           <div className="text-zinc-400">选择导出格式：</div>
           <div className="grid grid-cols-3 gap-2">
-            {[
+            {([
               { id: 'txt', label: '作家助手 TXT', desc: '起点/番茄规范排版' },
               { id: 'docx', label: '责编审稿 Docx', desc: '首行缩进与字号规范' },
               { id: 'epub', label: '读者 EPUB', desc: '电子书封装格式' },
-            ].map((item) => (
+            ] as const).map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setFormat(item.id as any)}
+                onClick={() => setFormat(item.id)}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
                   format === item.id
                     ? 'bg-indigo-600/20 border-indigo-500 text-white'

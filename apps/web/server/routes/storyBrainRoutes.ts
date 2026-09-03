@@ -5,7 +5,7 @@ import type { RouteHandler } from '../router.js'
 import { createBook, LocalDataPlane, readCanonState } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 
-export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, json }) => {
+export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
 
   if (path === '/api/book') {

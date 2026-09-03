@@ -18,20 +18,20 @@ describe('release hardening · outbound LLM SSRF boundary', () => {
     'https://[fe80::1]',
     'https://[::ffff:127.0.0.1]',
   ])('rejects private/reserved literal target %s', async (url) => {
-    await expect(assertSafeRemoteTarget(new URL(url), async () => [])).rejects.toThrow(/SSRF/i)
+    await expect(assertSafeRemoteTarget(new URL(url), () => Promise.resolve([]))).rejects.toThrow(/SSRF/i)
   })
 
   it('rejects a public hostname when DNS resolves to a private address', async () => {
     await expect(assertSafeRemoteTarget(
       new URL('https://model.example.com'),
-      async () => [{ address: '10.2.3.4', family: 4 }],
+      () => Promise.resolve([{ address: '10.2.3.4', family: 4 }]),
     )).rejects.toThrow(/SSRF/i)
   })
 
   it('accepts a public HTTPS hostname when all resolved addresses are public', async () => {
     await expect(assertSafeRemoteTarget(
       new URL('https://model.example.com'),
-      async () => [{ address: '8.8.8.8', family: 4 }],
+      () => Promise.resolve([{ address: '8.8.8.8', family: 4 }]),
     )).resolves.toBeUndefined()
   })
 })

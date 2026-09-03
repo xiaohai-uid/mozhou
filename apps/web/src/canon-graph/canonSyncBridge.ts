@@ -1,4 +1,4 @@
-import { GraphNode, GraphLink } from './useCanonGraphData';
+import { GraphLink } from './useCanonGraphData';
 
 export function syncContractToLocalCanon(
   contract: {

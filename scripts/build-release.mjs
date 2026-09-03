@@ -16,22 +16,42 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const rootDir = join(__dirname, '..')
-const pkgJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'))
-const version = pkgJson.version || '0.1.0'
+/**
+ * @param {string} raw
+ * @returns {{ version?: string }}
+ */
+function parsePkg(raw) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  return JSON.parse(raw)
+}
+const version = parsePkg(readFileSync(join(rootDir, 'package.json'), 'utf8')).version || '0.1.0'
 const artifactsDir = join(rootDir, 'release-artifacts')
 const bundleName = `mozhou-v${version}`
 const runtimeDir = join(artifactsDir, bundleName)
 
 process.env.ONNXRUNTIME_NODE_INSTALL_CUDA = 'skip'
 
+/**
+ * @param {string} command
+ * @param {readonly string[]} args
+ * @param {string} [cwd]
+ */
 function run(command, args, cwd = rootDir) {
   execFileSync(command, args, { cwd, stdio: 'inherit', env: process.env })
 }
 
+/**
+ * @param {string} path
+ * @param {string} label
+ */
 function requirePath(path, label) {
   if (!existsSync(path)) throw new Error(`release invariant failed: missing ${label}: ${path}`)
 }
 
+/**
+ * @param {string} relativePath
+ * @param {string} [destinationRoot]
+ */
 function copyIfPresent(relativePath, destinationRoot = runtimeDir) {
   const src = join(rootDir, relativePath)
   if (!existsSync(src)) return
@@ -40,6 +60,9 @@ function copyIfPresent(relativePath, destinationRoot = runtimeDir) {
   cpSync(src, dest, { recursive: true })
 }
 
+/**
+ * @param {string} dir
+ */
 function pruneTestArtifacts(dir) {
   if (!existsSync(dir)) return
   for (const entry of readdirSync(dir)) {

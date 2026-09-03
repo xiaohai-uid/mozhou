@@ -8,7 +8,7 @@ This document records the hardening boundary used for PR #90. It is intentionall
 - All package tests pass.
 - `apps/web` typecheck, tests, and production Vite build pass.
 - Dependency audit gate passes with no configured blocking vulnerabilities.
-- CodeQL completes without a blocking finding.
+- Security workflow (gitleaks secret scan + SPDX SBOM) passes. CodeQL SARIF upload requires GitHub Advanced Security on this private repository, so the executable security gates in `security.yml` replace CodeQL; `codeql.yml` was removed for that reason.
 - Legacy app CI remains green.
 - HTTP API rejects untrusted Host/Origin, malformed JSON, and oversized bodies.
 - Desktop/server defaults bind locally unless explicitly deployed inside the container network.

@@ -102,7 +102,7 @@ describe('P0-1 章节事务内的场景微循环与 Staged Overlay', () => {
 
     const mergedFacts = mergeStagedOverlay(baseFacts, overlay);
     // 后序场景观察到的状态必须反映 Scene 1 的最新暂存事实
-    const injuredFact = mergedFacts.find((f: any) => f.predicate === 'state.injured');
+    const injuredFact = mergedFacts.find((f) => f.predicate === 'state.injured');
     expect(injuredFact).toBeDefined();
     expect(injuredFact?.value).toBe('左臂重伤');
   });

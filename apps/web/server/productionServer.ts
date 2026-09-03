@@ -84,50 +84,56 @@ function serveFile(res: ServerResponse, absolutePath: string, headOnly: boolean)
   stream.pipe(res)
 }
 
-const server = createServer(async (req, res) => {
-  setSecurityHeaders(res)
+const server = createServer((req, res) => {
+  void (async () => {
+    setSecurityHeaders(res)
 
-  if ((req.url ?? '/').startsWith('/api/')) {
-    const handled = await apiRouter.dispatch(req, res)
-    if (!handled && !res.writableEnded) {
-      res.statusCode = 404
-      res.setHeader('Content-Type', 'application/json; charset=utf-8')
-      res.end(JSON.stringify({ ok: false, code: 'NOT_FOUND', error: 'API route not found' }))
+    if ((req.url ?? '/').startsWith('/api/')) {
+      const handled = await apiRouter.dispatch(req, res)
+      if (!handled && !res.writableEnded) {
+        res.statusCode = 404
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, code: 'NOT_FOUND', error: 'API route not found' }))
+      }
+      return
     }
-    return
-  }
 
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.statusCode = 405
-    res.setHeader('Allow', 'GET, HEAD')
-    res.end('Method Not Allowed')
-    return
-  }
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.statusCode = 405
+      res.setHeader('Allow', 'GET, HEAD')
+      res.end('Method Not Allowed')
+      return
+    }
 
-  let pathname: string
-  try {
-    pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
-  } catch {
-    res.statusCode = 400
-    res.end('Bad Request')
-    return
-  }
+    let pathname: string
+    try {
+      pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
+    } catch {
+      res.statusCode = 400
+      res.end('Bad Request')
+      return
+    }
 
-  const candidate = resolve(distDir, '.' + pathname)
-  if (!insideDist(candidate)) {
-    res.statusCode = 403
-    res.end('Forbidden')
-    return
-  }
+    const candidate = resolve(distDir, '.' + pathname)
+    if (!insideDist(candidate)) {
+      res.statusCode = 403
+      res.end('Forbidden')
+      return
+    }
 
-  let chosen = candidate
-  try {
-    if (!statSync(chosen).isFile()) chosen = indexPath
-  } catch {
-    // SPA 路由无扩展名时回退 index；真实静态资产缺失则 404。
-    if (extname(pathname) === '') chosen = indexPath
-  }
-  serveFile(res, chosen, req.method === 'HEAD')
+    let chosen = candidate
+    try {
+      if (!statSync(chosen).isFile()) chosen = indexPath
+    } catch {
+      // SPA 路由无扩展名时回退 index；真实静态资产缺失则 404。
+      if (extname(pathname) === '') chosen = indexPath
+    }
+    serveFile(res, chosen, req.method === 'HEAD')
+  })().catch((error) => {
+    console.error('[mozhou-production] unhandled server error', error)
+    if (!res.headersSent) res.statusCode = 500
+    res.end()
+  })
 })
 
 server.on('clientError', (_error, socket) => {

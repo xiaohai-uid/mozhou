@@ -19,20 +19,16 @@ export function CloudSyncView({
 }): JSX.Element {
   const [data, setData] = useState<CloudSyncResponse | null>(null)
   const [backup, setBackup] = useState<BackupExportResponse | null>(null)
-  const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<void> => {
-    setBusy(true)
     setError(null)
     try {
       const res = await post<CloudSyncResponse>('/api/cloud-sync', { root: root ?? undefined })
       setData(res)
     } catch (cause) {
       setError((cause as Error).message)
-    } finally {
-      setBusy(false)
     }
   }, [root])
 

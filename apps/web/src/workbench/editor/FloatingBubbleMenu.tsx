@@ -9,10 +9,8 @@ export interface FloatingBubbleMenuProps {
 }
 
 export const FloatingBubbleMenu: React.FC<FloatingBubbleMenuProps> = ({
-  selectedText,
   position,
   onAction,
-  onClose,
   loading = false,
 }) => {
   const [showCustomInput, setShowCustomInput] = useState(false);

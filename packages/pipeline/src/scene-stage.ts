@@ -42,11 +42,13 @@ function accumulateStageDeltas(stages: readonly SceneStageRecord[]): CandidateDe
   for (const stage of stages) {
     for (const [family, items] of Object.entries(stage.stagedDeltas)) {
       if (!Array.isArray(items)) continue;
-      if (!accumulated[family]) accumulated[family] = [];
-      accumulated[family].push(...items);
+      const bucket = (accumulated[family] ??= []);
+      for (const item of items) {
+        bucket.push(item);
+      }
     }
   }
-  return accumulated as CandidateDeltaBatch;
+  return accumulated;
 }
 
 /**

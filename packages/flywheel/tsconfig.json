@@ -7,6 +7,7 @@
   "include": ["src"],
   "references": [
     { "path": "../kernel" },
+    { "path": "../data-plane" },
     { "path": "../pipeline" },
     { "path": "../runtime" },
     { "path": "../benchmark" }

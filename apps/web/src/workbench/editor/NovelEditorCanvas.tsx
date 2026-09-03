@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useEditorSelection } from './useEditorSelection';
 import { EditorQualityTelemetry } from './EditorQualityTelemetry';
 
@@ -14,13 +14,12 @@ export interface NovelEditorCanvasProps {
 export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
   value,
   onChange,
-  onSelectionAction,
   placeholder = '在此开始构思正文...',
   readOnly = false,
   className = '',
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { selection, clearSelection } = useEditorSelection(textareaRef);
+  useEditorSelection(textareaRef);
 
   // Auto-indent paragraphs with standard Chinese 2 em spaces upon pressing Enter
   const handleKeyDown = useCallback(

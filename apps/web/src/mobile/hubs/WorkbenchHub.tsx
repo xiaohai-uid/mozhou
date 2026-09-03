@@ -147,7 +147,7 @@ export function WorkbenchHub({ book, onOpenDrawer }: WorkbenchHubProps): JSX.Ele
       <ProseReadingFlow />
 
       <MobileComposer
-        onSendPrompt={handleSendPrompt}
+        onSendPrompt={(p) => { void handleSendPrompt(p) }}
         onOpenInspiration={() => onOpenDrawer('inspiration')}
       />
     </>

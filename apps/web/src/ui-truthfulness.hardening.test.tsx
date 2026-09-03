@@ -84,11 +84,11 @@ describe('Technical Preview UI truthfulness', () => {
   })
 
   it('does not claim a paid lifetime license is active when the API reports community preview', async () => {
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+    globalThis.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
       ok: true,
       license: null,
       plans: [{ id: 'free_community', name: '社区免费版', price: '免费', features: [], current: true }],
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
 
     render(<MembershipView />)
     await screen.findByTestId('membership-no-license')

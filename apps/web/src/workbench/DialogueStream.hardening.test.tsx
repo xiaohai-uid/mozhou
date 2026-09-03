@@ -11,25 +11,25 @@ afterEach(() => {
 
 function installFetchRecorder(): { requests: { url: string; body: Record<string, unknown> }[] } {
   const requests: { url: string; body: Record<string, unknown> }[] = []
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input)
+  globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : {}
     requests.push({ url, body })
 
     if (url === '/api/capabilities') {
-      return new Response(JSON.stringify({
+      return Promise.resolve(new Response(JSON.stringify({
         ok: true,
         providerAvailable: true,
         capabilities: [{ id: 'suspense', label: '悬念调度' }],
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     if (url === '/api/draft.question') {
-      return new Response(JSON.stringify({
+      return Promise.resolve(new Response(JSON.stringify({
         ok: true,
         question: '下一段？',
         hint: '测试',
         choices: ['继续'],
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     if (url === '/api/draft.stream') {
       const stream = new ReadableStream({
@@ -38,10 +38,10 @@ function installFetchRecorder(): { requests: { url: string; body: Record<string,
           controller.close()
         },
       })
-      return new Response(stream, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })
+      return Promise.resolve(new Response(stream, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } }))
     }
-    return new Response('{}', { status: 404, headers: { 'Content-Type': 'application/json' } })
-  }) as typeof fetch
+    return Promise.resolve(new Response('404', { status: 404 }))
+  })
   return { requests }
 }
 

@@ -22,7 +22,7 @@ import type {
 } from '@mozhou/kernel'
 import type { RevisionTaskBrief } from '@mozhou/pipeline'
 import type { StyleMetrics } from '@mozhou/quality-engine'
-import type { RankBoard, RankingItem } from './crawlers/rankings.js'
+import type { RankBoard } from './crawlers/rankings.js'
 import type { CrawledBook } from './crawlers/qidian.js'
 
 export type Middleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
@@ -362,13 +362,21 @@ export interface CapabilitySquareResponse {
  * 路由分发器与中间件装配 (Router Dispatcher)
  * ========================================================================== */
 
-const apiRouter = new ApiRouter()
-  .use(storyBrainRoutes)
-  .use(pipelineRoutes)
-  .use(worksRoutes)
-  .use(truthfulPreviewRoutes)
-  .use(crawlerRoutes)
-  .use(systemRoutes)
+/**
+ * 路由装配工厂：生产服务器（productionServer.ts）与 Vite 中间件各自持有独立实例，
+ * 避免跨入口共享可变路由状态。
+ */
+export function createMoZhouApiRouter(): ApiRouter {
+  return new ApiRouter()
+    .use(storyBrainRoutes)
+    .use(pipelineRoutes)
+    .use(worksRoutes)
+    .use(truthfulPreviewRoutes)
+    .use(crawlerRoutes)
+    .use(systemRoutes)
+}
+
+const apiRouter = createMoZhouApiRouter()
 
 export function apiMiddleware(): Middleware {
   return (req, res, next) => {

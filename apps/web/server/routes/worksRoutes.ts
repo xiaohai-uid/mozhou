@@ -36,7 +36,7 @@ function sanitizeDirName(title: string): string {
   return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
-export const worksRoutes: RouteHandler = async (req, res, { path, body, json }) => {
+export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
 
   /* ---- 装配看板 Receipt 读面 ---- */
@@ -203,11 +203,13 @@ export const worksRoutes: RouteHandler = async (req, res, { path, body, json }) 
         if (rowType.includes('Traversal')) cat = 'traversal'
         else if (rowType.includes('Quality')) cat = 'review'
 
+        const seq = r['seq']
+        const seqText = typeof seq === 'number' || typeof seq === 'string' ? String(seq) : '—'
         return {
           position: row.position,
           type: rowType,
           timestamp: typeof r['at'] === 'string' ? r['at'] : undefined,
-          summary: `${rowType} (seq: ${String(r['seq'] ?? '—')})`,
+          summary: `${rowType} (seq: ${seqText})`,
           category: cat,
         }
       }

@@ -45,7 +45,8 @@ export async function searchMultipleSources(query: string): Promise<MultiSourceS
     }
   } else {
     degraded = true
-    notes.push(`起点异常: ${qidianRes.reason?.message ?? '超时'}`)
+    const msg = qidianRes.reason instanceof Error ? qidianRes.reason.message : '超时'
+    notes.push(`起点异常: ${msg}`)
   }
 
   if (qimaoRes.status === 'fulfilled') {
@@ -57,7 +58,8 @@ export async function searchMultipleSources(query: string): Promise<MultiSourceS
     }
   } else {
     degraded = true
-    notes.push(`七猫异常: ${qimaoRes.reason?.message ?? '超时'}`)
+    const msg = qimaoRes.reason instanceof Error ? qimaoRes.reason.message : '超时'
+    notes.push(`七猫异常: ${msg}`)
   }
 
   // 按书名 + 作者组合去重
