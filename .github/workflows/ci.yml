@@ -1,6 +1,4 @@
-# Novel OS 主线 CI（ADR-0025 · 2026-08-30 审查修复）：
-# pnpm workspace（packages/* + apps/web）的构建与全量测试在 master 推送/PR 上强制运行。
-# Legacy app/ 的 CI 原样迁至 legacy-app.yml（触发面保持 main）。
+# Novel OS 主线 CI：构建、测试、类型检查、静态检查与依赖漏洞门禁。
 name: ci
 
 on:
@@ -8,25 +6,36 @@ on:
     branches: [master, main]
   pull_request:
 
+permissions:
+  contents: read
+
 env:
   ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 
 jobs:
   novel-os:
-    name: build / test (packages/* + apps/web)
-    runs-on: ubuntu-latest
+    name: build / test / security (packages/* + apps/web)
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 22
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
+          node-version: 22.23.2
+          package-manager-cache: false
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@9.15.0
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit (high/critical)
+        run: pnpm audit --audit-level high
       - name: Build workspace (tsc -b)
         run: pnpm build
+      # 类型感知 lint 依赖 packages/*/dist 的 .d.ts（types 指向 dist），
+      # 必须在 workspace 构建之后执行，否则工作区导入全部坍缩为 any 产生千级误报。
+      - name: Static lint gate
+        run: pnpm lint
       - name: Test workspace (vitest)
         run: pnpm test
       - name: Typecheck apps/web (tsc -b)

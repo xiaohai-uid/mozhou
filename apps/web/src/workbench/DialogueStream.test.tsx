@@ -37,7 +37,6 @@ const QUESTION: DraftQuestionResponse = {
   choices: ['害怕钟声', '害怕沉默', '两者递进'],
 }
 
-/** NDJSON 流 Response（逐帧一行；每次新建——Response 体只能消费一次）。 */
 function ndjsonResponse(frames: readonly Record<string, unknown>[]): Response {
   return new Response(frames.map((frame) => JSON.stringify(frame)).join('\n') + '\n', {
     status: 200,
@@ -108,7 +107,7 @@ describe('DialogueStream（T44）', () => {
       root: BOOK.root,
       chapterIndex: 1,
       prompt: '两者递进',
-      skills: ['continuation'],
+      activeSkills: ['continuation'],
     })
   })
 
@@ -121,7 +120,6 @@ describe('DialogueStream（T44）', () => {
     expect(screen.getByLabelText('写作指令')).toBeDisabled()
     expect(screen.getByLabelText('发送')).toBeDisabled()
     expect(screen.getByRole('button', { name: '续写' })).toBeDisabled()
-    // 即便有残留回答也无法触发 draft.stream
     await userEvent.click(screen.getByLabelText('发送'))
     expect(fetchMock.mock.calls.some((call) => call[0] === '/api/draft.stream')).toBe(false)
   })

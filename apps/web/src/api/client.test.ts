@@ -20,7 +20,7 @@ describe('MoZhouApiClient', () => {
 
 
   it('delegates to post with correct endpoint and wrapped payload', async () => {
-    const postSpy = vi.spyOn(postModule, 'post').mockResolvedValue({ ok: true } as any)
+    const postSpy = vi.spyOn(postModule, 'post').mockResolvedValue({ ok: true })
     const client = new MoZhouApiClient({ root: '/mock/book' })
 
     await client.getStoryBrainFacts({ entityIds: ['char:lin'] })

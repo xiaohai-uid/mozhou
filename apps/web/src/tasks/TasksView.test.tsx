@@ -91,7 +91,7 @@ describe('TasksView（任务中心）', () => {
     expect(screen.getByTestId('tasks-events').textContent).not.toContain('ChapterCommitted')
   })
 
-  it('未建书时呈现显式引导', async () => {
+  it('未建书时呈现显式引导', () => {
     render(<TasksView root={null} onGoToWorkbench={() => {}} />)
     expect(screen.getByTestId('tasks-empty')).toBeInTheDocument()
     expect(screen.getByTestId('tasks-empty').textContent).toContain('任务中心暂不可用')

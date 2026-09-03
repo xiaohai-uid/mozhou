@@ -11,13 +11,19 @@ import {
   recordAuthorCorrection,
   runDraftStep,
 } from '@mozhou/pipeline'
-import type { PipelineStep } from '@mozhou/pipeline'
-import { CORRECTION_REASONS, hashProse, isQualityReviewCurrent, type QualityPolicy } from '@mozhou/quality-engine'
+import {
+  CORRECTION_REASONS,
+  hashProse,
+  isQualityReviewCurrent,
+  type CorrectionReason,
+  type QualityPolicy,
+  type QualityReviewReport,
+} from '@mozhou/quality-engine'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
 import { PublishBus, RuntimeEngine } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
-import type { ContextPacket } from '@mozhou/context-compiler'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
+import { buildDraftContext } from '../draftContext.js'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -79,36 +85,37 @@ function decoratePromptWithSkills(prompt: string, skills: readonly string[]): st
 }
 
 /**
- * 构造草稿流引擎：真实 provider 配置时走真实 OpenAI-compatible SSE 流；
- * 显式 MOZHOU_DRAFT_PROVIDER=mock 时才降级为本地演示流（诚实声明，非伪装）。
+ * 真实 provider 消费完整编译上下文；mock 仅用作者指令生成演示正文，避免把
+ * ContextPacket 自身写回小说正文，但 start 帧仍暴露真实 modelPrompt 供契约审计。
  */
 function makeStreamEngine(
   root: string,
   chapterIndex: number,
-  prompt: string,
+  modelPrompt: string,
+  mockOutputSeed: string,
   onDelta: (text: string) => void,
 ): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
   const recipe: CapabilityRecipe = {
     id: 'chapter-drafting',
-    recipeVersion: '0.1.0',
-    source: { repo: 'original', commit: '0'.repeat(40), license: 'original', refinedAt: '2026-08-25', refineNote: 'T44 web streaming' },
-    brief: { capability: '正文草稿流式生成', runtimeSemantics: '断流标 partial、半稿持久保留', triggers: ['draft'] },
+    recipeVersion: '0.1.1',
+    source: { repo: 'original', commit: '0'.repeat(40), license: 'original', refinedAt: '2026-09-03', refineNote: 'release hardening: compiled context' },
+    brief: { capability: '正文草稿流式生成', runtimeSemantics: 'Context Compiler → provider；断流标 partial、半稿持久保留', triggers: ['draft'] },
     taskType: 'CHAPTER_DRAFTING',
     entry: { routerDoc: 'docs/router.md', phases: ['draft'], stopPoints: [] },
     references: [],
     artifacts: [],
     prechecks: [],
     trackingGate: {
-      authorityState: '正文/第一卷/第0001章.md',
+      authorityState: proseChapterPath(chapterIndex),
       casField: 'revision',
       transactionModes: ['append'],
       derivedViews: [],
-      budgets: { hotContextBytes: 8192, perChapterReads: [] },
+      budgets: { hotContextBytes: 48_000, perChapterReads: [] },
       failureTaxonomy: 'validationFailed',
       hookPoint: 'postWrite',
     },
-    contextBudget: { hotContextBytes: 8192, fixedSections: [], perChapterReads: [] },
+    contextBudget: { hotContextBytes: 48_000, fixedSections: [], perChapterReads: [] },
   }
 
   const explicitMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock'
@@ -123,7 +130,13 @@ function makeStreamEngine(
     })
     engine.registerProviderBinding(
       'deepseek',
-      makeDraftProviderBinding({ bookRoot: root, chapterIndex, provider: 'deepseek', mode: 'generate', stream: () => mockDraftStream(prompt, onDelta) }),
+      makeDraftProviderBinding({
+        bookRoot: root,
+        chapterIndex,
+        provider: 'deepseek',
+        mode: 'generate',
+        stream: () => mockDraftStream(mockOutputSeed, onDelta),
+      }),
     )
   } else {
     const endpoint = resolveChatEndpoint(process.env)
@@ -147,10 +160,10 @@ function makeStreamEngine(
         stream: () =>
           (async function* () {
             const systemPrompt =
-              '你是资深中文网文作者。严格按用户要求续写正文：' +
-              '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用，' +
-              '用具体动作和生理反应外化心理。只输出正文，不要输出任何说明。'
-            for await (const chunk of streamOpenAiChat(endpoint, prompt, systemPrompt)) {
+              '你是资深中文网文作者。输入已由墨舟 Context Compiler 按当前作品正典与章节状态装配。' +
+              '严格遵守其中的事实、人物知识边界、承诺与作者指令；只输出本章正文，不复述上下文。' +
+              '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用。'
+            for await (const chunk of streamOpenAiChat(endpoint, modelPrompt, systemPrompt)) {
               if (chunk.delta.length > 0) {
                 onDelta(chunk.delta)
                 yield chunk.delta
@@ -190,12 +203,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     }
     try {
       const session = ChapterProductionSession.start({ bus: new PublishBus(), root, chapterIndex })
-      json(200, {
-        ok: true,
-        taskRef: session.taskRef,
-        currentStep: session.currentStep,
-        chapterIndex,
-      })
+      json(200, { ok: true, taskRef: session.taskRef, currentStep: session.currentStep, chapterIndex })
     } catch (error) {
       json(409, { ok: false, error: (error as Error).message })
     }
@@ -230,11 +238,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/capabilities') {
-    json(200, {
-      ok: true,
-      capabilities: DIALOGUE_CAPABILITIES,
-      providerAvailable: hasDraftProvider(),
-    })
+    json(200, { ok: true, capabilities: DIALOGUE_CAPABILITIES, providerAvailable: hasDraftProvider() })
     return true
   }
 
@@ -269,11 +273,13 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     const root = typeof body['root'] === 'string' ? body['root'] : null
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     const rawPrompt = typeof body['prompt'] === 'string' ? body['prompt'].trim() : ''
-    const activeSkills = Array.isArray(body['activeSkills']) ? (body['activeSkills'] as string[]) : []
-    const prompt = decoratePromptWithSkills(rawPrompt, activeSkills)
+    const activeSkills = Array.isArray(body['activeSkills'])
+      ? (body['activeSkills'] as unknown[]).filter((entry): entry is string => typeof entry === 'string')
+      : []
+    const authorPrompt = decoratePromptWithSkills(rawPrompt, activeSkills)
 
-    if (root === null || chapterIndex === null) {
-      json(400, { ok: false, error: 'root and chapterIndex required' })
+    if (root === null || chapterIndex === null || !Number.isInteger(chapterIndex) || chapterIndex < 1) {
+      json(400, { ok: false, error: 'valid root and chapterIndex required' })
       return true
     }
 
@@ -288,36 +294,37 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
 
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
-
-    const ndjson = (payload: unknown) => {
-      res.write(JSON.stringify(payload) + '\n')
-    }
+    const ndjson = (payload: unknown) => { res.write(JSON.stringify(payload) + '\n') }
 
     try {
-      const { engine, recipe, real } = makeStreamEngine(root, chapterIndex, prompt, (delta) => {
-        ndjson({ ok: true, event: 'delta', text: delta })
-      })
+      const context = await buildDraftContext({ root, chapterIndex, authorPrompt })
+      const { engine, recipe, real } = makeStreamEngine(
+        root,
+        chapterIndex,
+        context.packet.text,
+        authorPrompt,
+        (delta) => ndjson({ ok: true, event: 'delta', text: delta }),
+      )
 
-      ndjson({ ok: true, event: 'start', prompt, provider: real ? 'real-openai-compatible' : 'mock' })
+      ndjson({
+        ok: true,
+        event: 'start',
+        prompt: context.packet.text,
+        contextMode: context.mode,
+        contextTokens: context.packet.totalTokens,
+        provider: real ? 'real-openai-compatible' : 'mock',
+      })
       const outcome = await runDraftStep({
         engine,
         bookRoot: root,
         chapterIndex,
-        packet: {
-          taskType: 'CHAPTER_DRAFTING',
-          chapterIndex,
-          structural: [],
-          settings: [],
-          story: { text: '', tokens: 0, trimType: 'none' },
-          text: prompt,
-          totalTokens: prompt.length,
-        } satisfies ContextPacket,
+        packet: context.packet,
         recipe,
       })
       ndjson({ ok: true, event: 'done', outcome: outcome.outcome, partial: outcome.partial, chars: outcome.chars })
       res.end()
     } catch (error) {
-      ndjson({ ok: true, event: 'error', error: (error as Error).message })
+      ndjson({ ok: false, event: 'error', error: (error as Error).message })
       res.end()
     }
     return true
@@ -402,11 +409,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       }
       throw error
     }
-    json(200, {
-      ok: true,
-      currentStep: session.currentStep,
-      reworkCount: session.project().qualityReworkCount,
-    })
+    json(200, { ok: true, currentStep: session.currentStep, reworkCount: session.project().qualityReworkCount })
     return true
   }
 
@@ -421,19 +424,23 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       return true
     }
 
-    const invalid = reasons.filter((r) => !CORRECTION_REASONS.includes(r as any))
+    const isCorrectionReason = (r: unknown): r is CorrectionReason =>
+      typeof r === 'string' && (CORRECTION_REASONS as readonly string[]).includes(r)
+
+    const invalid = reasons.filter((r) => !isCorrectionReason(r))
     if (invalid.length > 0) {
-      json(400, { ok: false, error: 'invalid correction reasons: ' + invalid.join(', ') })
+      json(400, { ok: false, error: 'invalid correction reasons: ' + invalid.map(String).join(', ') })
       return true
     }
 
+    const typedReasons = reasons as CorrectionReason[]
     const bus = new PublishBus()
     const outcome = recordAuthorCorrection({
       bus,
       bookRoot: root,
       taskRef: 'tsk_web_correction_' + String(chapterIndex),
       chapterIndex,
-      reasons: reasons as any,
+      reasons: typedReasons,
       ...(note ? { note } : {}),
     })
 
@@ -468,7 +475,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     }
 
     const latestFile = files[files.length - 1]!
-    const report = JSON.parse(readFileSync(join(reviewsDir, latestFile), 'utf8'))
+    const report = JSON.parse(readFileSync(join(reviewsDir, latestFile), 'utf8')) as QualityReviewReport
     const proseObj = readProseChapter(root, proseChapterPath(chapterIndex))
     const current = isQualityReviewCurrent(report, {
       draftRevision: proseObj.revision,

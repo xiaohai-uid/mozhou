@@ -205,6 +205,6 @@ export class MoZhouApiClient {
 }
 
 /** 统一工厂函数 */
-export function createApiClient(root?: string | null | undefined): MoZhouApiClient {
+export function createApiClient(root?: string | null): MoZhouApiClient {
   return new MoZhouApiClient({ root })
 }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { EditorQualityTelemetry } from './EditorQualityTelemetry';
 

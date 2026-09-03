@@ -1,6 +1,6 @@
 /**
- * 顶栏（实现票 T40 · 商业化全景升级）：品牌 / 书名切换 / 码字目标环 /
- * 商业化快捷工具（时光机、灵感工坊、导出、敏感词审查）。
+ * 顶栏（实现票 T40 · 商业化全景升级）：品牌 / 书名切换 / 码字统计状态 /
+ * 商业化快捷工具入口（尚未接线的工具只展示明确不可用状态）。
  */
 import type { BookInfo } from './workbenchStorage'
 import type { DesktopModalType } from './DesktopToolModals'
@@ -39,57 +39,24 @@ export function TopBar({
         </span>
       </button>
 
-      {/* 每日码字目标进度条微部件 */}
-      <div
-        className="quiet-btn"
-        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-        title="今日码字进度"
-      >
-        <span>🎯 今日码字: 3,420 / 4,000 字 (85%)</span>
+      <div className="quiet-btn" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title="每日码字统计尚未接入">
+        <span>今日码字统计未接入</span>
       </div>
 
       <div className="top-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button
-          type="button"
-          className="quiet-btn"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onOpenModal?.('history')}
-          title="打开版本时光机"
-        >
+        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('history')} title="版本历史尚未接入">
           ⏱ 时光机
         </button>
-
-        <button
-          type="button"
-          className="quiet-btn"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onOpenModal?.('inspiration')}
-          title="打开灵感起名工坊"
-        >
+        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('inspiration')} title="打开本地灵感工坊">
           🎲 灵感工坊
         </button>
-
-        <button
-          type="button"
-          className="quiet-btn"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onOpenModal?.('export')}
-          title="导出打包全书"
-        >
+        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('export')} title="导出尚未接入">
           📦 导出
         </button>
-
-        <button
-          type="button"
-          className="quiet-btn"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onOpenModal?.('compliance')}
-          title="网文敏感词审查"
-        >
+        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('compliance')} title="合规审查尚未接入">
           🛡️ 敏感词
         </button>
-
-        <button className="quiet-btn" disabled title="数据平面为本地存储；云同步就绪">
+        <button className="quiet-btn" disabled title="数据平面为本地存储；云同步未接入">
           <i className="status-dot" />
           本地已就绪
         </button>

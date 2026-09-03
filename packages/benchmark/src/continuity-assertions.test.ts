@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ContextPacket } from '@mozhou/context-compiler';
-import type { NarrativePromiseId, TemporalFact } from '@mozhou/kernel';
+import type { BookId, FactId, NarrativePromiseId, TemporalFact } from '@mozhou/kernel';
 import {
   evaluateContinuityPacket,
   exportPromptfooTestCaseFromCanon,
@@ -63,8 +63,8 @@ describe('L1 确定性连续性断言引擎 (evaluateContinuityPacket)', () => {
 
   it('过期事实拦截：上下文包含已于此前章节过期的事实时精准报错', () => {
     const expiredFact: TemporalFact = {
-      id: 'fact_expired_wound' as any,
-      bookId: 'book_01' as any,
+      id: 'fact_expired_wound' as FactId,
+      bookId: 'book_01' as BookId,
       revision: 0,
       createdAt: '',
       updatedAt: '',
@@ -140,8 +140,8 @@ describe('L1 确定性连续性断言引擎 (evaluateContinuityPacket)', () => {
   it('从正史事实动态编译连续性断言与 Promptfoo 测试用例', () => {
     const mockFacts: TemporalFact[] = [
       {
-        id: 'fact_secret_true_god' as any,
-        bookId: 'book_01' as any,
+        id: 'fact_secret_true_god' as FactId,
+        bookId: 'book_01' as BookId,
         revision: 0,
         createdAt: '',
         updatedAt: '',
@@ -163,8 +163,8 @@ describe('L1 确定性连续性断言引擎 (evaluateContinuityPacket)', () => {
       mockFacts,
       3,
       'protagonist',
-      ['char:wang-lin' as any],
-      ['prom_01' as any],
+      ['char:wang-lin'],
+      ['prom_01' as NarrativePromiseId],
     );
 
     expect(options.currentChapterIndex).toBe(3);

@@ -9,7 +9,6 @@ export interface SlashCommandMenuProps {
 export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
   position,
   onSelectCommand,
-  onClose,
 }) => {
   if (!position) return null;
 

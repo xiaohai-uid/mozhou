@@ -1,10 +1,7 @@
-# 墨舟 (MoZhou) — 开发环境编排
-# 用法:
-#   docker compose up -d                  # 基础设施（postgres + one-api）
-#   cd app && npm run dev                 # Web 开发模式（推荐，热重载）
-#   docker compose --profile prod up -d --build   # 全栈生产镜像（需 Docker 能访问镜像源）
+# 墨舟 (Novel OS) 分发编排。
+# 默认仅启动 local-first Novel OS。历史 Postgres/one-api/Crawl4AI 栈必须显式启用：
+#   docker compose --profile legacy-infra up -d
 services:
-  # Novel OS 主线生产服务容器
   mozhou:
     build:
       context: .
@@ -12,40 +9,41 @@ services:
     container_name: mozhou-novel-os
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "127.0.0.1:${MOZHOU_PORT:-5173}:5173"
     environment:
       - NODE_ENV=production
       - ONNXRUNTIME_NODE_INSTALL_CUDA=skip
       - PORT=5173
+      # 容器内需监听全部接口以供宿主端口转发；宿主映射仍锁定 127.0.0.1。
       - HOST=0.0.0.0
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - MOZHOU_API_KEY=${MOZHOU_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - CRAWL4AI_BASE_URL=http://crawl4ai:11235
-    depends_on:
-      - crawl4ai
 
+  # 以下均为旧 Web/SaaS 栈兼容设施，不属于 v0.1 local-first 默认发行攻击面。
   crawl4ai:
+    profiles: ["legacy-infra"]
     image: unclecode/crawl4ai:latest
     container_name: mozhou-crawl4ai
     restart: unless-stopped
-    ports:
-      - "11235:11235"
+    expose:
+      - "11235"
     environment:
-      - CRAWL4AI_API_TOKEN=local-dev-token
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:?legacy-infra requires CRAWL4AI_API_TOKEN}
 
   postgres:
+    profiles: ["legacy-infra"]
     image: pgvector/pgvector:pg16
     container_name: mozhou-postgres
     environment:
       POSTGRES_USER: mozhou
-      POSTGRES_PASSWORD: mozhou_dev
+      POSTGRES_PASSWORD: ${MOZHOU_POSTGRES_PASSWORD:?legacy-infra requires MOZHOU_POSTGRES_PASSWORD}
       POSTGRES_DB: mozhou
-    ports:
-      - "5433:5432"   # 5432 被本机 WSL Postgres 占用，映射到 5433
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/init:/docker-entrypoint-initdb.d:ro   # 首次初始化：启用 pgvector
+      - ./docker/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mozhou"]
       interval: 5s
@@ -53,15 +51,15 @@ services:
       retries: 10
 
   one-api:
-    # Pinned digest verified with MoZhou real PUBLIC_FREE smoke on 2026-08-20.
+    profiles: ["legacy-infra"]
     image: justsong/one-api@sha256:a55fb5181854aa0823cc04797ee875dfc5a953c0deb5e7e7ec39a8148e70cbc3
     container_name: mozhou-one-api
     environment:
       TZ: Asia/Shanghai
       SQL_DSN: ""
-      SESSION_SECRET: mozhou-dev-secret-change-me
-    ports:
-      - "3001:3000"
+      SESSION_SECRET: ${ONEAPI_SESSION_SECRET:?legacy-infra requires ONEAPI_SESSION_SECRET}
+    expose:
+      - "3000"
     volumes:
       - oneapi-data:/data
     depends_on:
@@ -76,21 +74,19 @@ services:
     restart: unless-stopped
 
   app:
+    profiles: ["legacy-infra"]
     build:
       context: ./app
       dockerfile: Dockerfile
-    profiles: ["prod"]   # 默认不启动（构建需镜像源；开发用宿主 npm run dev）
-    container_name: mozhou-app
+    container_name: mozhou-legacy-app
     environment:
-      DATABASE_URL: postgres://mozhou:mozhou_dev@postgres:5432/mozhou
-      # 生产必需密钥（从宿主环境注入；部署前必须设置，见 docs/deployment.md）
-      AUTH_SECRET: ${AUTH_SECRET:?生产必须设置 AUTH_SECRET}
+      DATABASE_URL: postgres://mozhou:${MOZHOU_POSTGRES_PASSWORD}@postgres:5432/mozhou
+      AUTH_SECRET: ${AUTH_SECRET:?legacy-infra requires AUTH_SECRET}
       ONEAPI_BASE_URL: ${ONEAPI_BASE_URL:-http://one-api:3000}
-      ONEAPI_TOKEN: ${ONEAPI_TOKEN:?生产必须设置 ONEAPI_TOKEN}
-    ports:
-      - "3000:3000"
+      ONEAPI_TOKEN: ${ONEAPI_TOKEN:?legacy-infra requires ONEAPI_TOKEN}
+    expose:
+      - "3000"
     healthcheck:
-      # /api/v1/health 公开探测端点（含 db ping，503=库不可达）
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s

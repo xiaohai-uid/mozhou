@@ -1,4 +1,3 @@
-
 # 墨舟仓库根忽略（app/ 内另有 .gitignore）
 # 标定产物与模型缓存不入库
 # 设计期产物与部署工作目录：不得入库
@@ -9,9 +8,21 @@
 .mimosa/
 .next/
 dist/
+dist-server/
+archive-legacy/
 release-artifacts/
 figma-upload/
 node_modules/
 scripts/embedding-calib/.cache/
 scripts/embedding-calib/fp32-model/
 
+# 本地凭据与私钥：商业发行仓库禁止误提交
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx

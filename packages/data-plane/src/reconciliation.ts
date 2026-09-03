@@ -38,14 +38,8 @@ import { readProseChapter } from './chapter.js'
 import { CanonStructureError, readBookRecord, scanEntityCards } from './canon-read.js'
 import {
   AUTHOR_INTENT_PATH,
-  BOOK_RECORD_PATH,
-  CHAPTER_OUTLINE_DIR,
-  ENTITY_CARD_DIR_BY_PREFIX,
-  PROSE_DIR,
   RUNTIME_EVENTS_PATH,
   RUNTIME_RECONCILIATIONS_DIR,
-  STYLE_PROFILE_PATH,
-  TRACKING_STREAMS,
   VOLUME_ONE_OUTLINE_PATH,
   ZONGGANG_PATH,
   isCanonRelPath,

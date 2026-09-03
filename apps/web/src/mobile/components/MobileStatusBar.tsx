@@ -1,17 +1,23 @@
 export interface MobileStatusBarProps {
-  authorName?: string
-  statusText?: string
+  authorName: string
+  statusText: string
   onOpenAuth: () => void
 }
 
 export function MobileStatusBar({
-  authorName = '道玄先生',
-  statusText = '已就绪',
+  authorName,
+  statusText,
   onOpenAuth,
 }: MobileStatusBarProps): JSX.Element {
+  const localTime = new Date().toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
   return (
     <header className="mobile-status-bar">
-      <span style={{ fontSize: 12, color: 'var(--fg-secondary-mobile)' }}>09:41</span>
+      <span style={{ fontSize: 12, color: 'var(--fg-secondary-mobile)' }}>{localTime}</span>
 
       <button
         type="button"

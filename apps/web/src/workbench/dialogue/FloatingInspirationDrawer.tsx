@@ -34,7 +34,7 @@ export const FloatingInspirationDrawer: React.FC<FloatingInspirationDrawerProps>
 
     // Simulated streaming response / generation
     setTimeout(() => {
-      let reply = `针对你的想法【${userText}】，建议从以下两个方向展开矛盾：\n1. 【伏笔暗扣】：让受害者身上携带一个本该属于主角的信物；\n2. 【情绪反扑】：反派的动机其实是为了掩盖更大的门派旧案。`;
+      const reply = `针对你的想法【${userText}】，建议从以下两个方向展开矛盾：\n1. 【伏笔暗扣】：让受害者身上携带一个本该属于主角的信物；\n2. 【情绪反扑】：反派的动机其实是为了掩盖更大的门派旧案。`;
       setMessages([...newMsgs, { role: 'assistant', text: reply }]);
       setLoading(false);
     }, 600);

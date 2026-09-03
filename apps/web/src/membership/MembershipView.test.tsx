@@ -1,12 +1,10 @@
 /**
- * 会员与授权中心（MembershipView）组件测试（实现票 T55）：
- * - 契约快照：输入形状 = server/api 导出类型（MembershipResponse），
- *   包类型漂移即 typecheck + 快照双报警；
- * - 许可证卡片与版本权益矩阵渲染；
- * - 密钥激活交互与成功提示。
+ * 会员与授权中心（MembershipView）Technical Preview 组件测试：
+ * - 社区免费版是真实当前状态；
+ * - 未开放购买/激活时不显示付费许可证或密钥输入；
+ * - 未来方案可以展示，但不得伪装为已激活。
  */
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MembershipResponse } from '../../server/api'
 import { okJson } from '../test/http'
@@ -18,66 +16,54 @@ afterEach(() => {
 
 const MOCK_MEMBERSHIP: MembershipResponse = {
   ok: true,
-  license: {
-    planId: 'pro_lifetime',
-    planName: '墨舟 Pro 终身专业版',
-    licenseKey: 'MOZHOU-PRO-LIFETIME-TEST',
-    activatedAt: '2026-08-30',
-    expiresAt: '永久有效',
-    status: 'active',
-  },
+  license: null,
   plans: [
+    {
+      id: 'free_community',
+      name: '社区免费版',
+      price: '免费',
+      tag: 'Technical Preview 当前版本',
+      features: ['单书本地正典创作', '本地 SQLite 数据库存储'],
+      current: true,
+    },
     {
       id: 'pro_lifetime',
       name: '墨舟 Pro 终身专业版',
-      price: '¥299',
-      tag: '当前已激活',
-      features: ['无限作品库', 'Story Brain', '质量门审查'],
-      current: true,
+      price: '尚未开放',
+      tag: '规划中 · 当前不可购买/激活',
+      features: ['Story Brain', '质量门审查'],
+      current: false,
     },
   ],
 }
 
 describe('MembershipView（会员中心）', () => {
-  it('许可证与方案矩阵渲染；契约快照', async () => {
+  it('社区免费版为当前版本，付费方案只作为未开放计划展示', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_MEMBERSHIP)))
-    const { container } = render(<MembershipView />)
+    render(<MembershipView />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('membership-license-card')).toBeInTheDocument()
+      expect(screen.getByTestId('membership-no-license')).toBeInTheDocument()
     })
 
-    expect(screen.getByTestId('membership-license-card').textContent).toContain('墨舟 Pro 终身专业版')
-    expect(screen.getByTestId('membership-plans-section').textContent).toContain('¥299')
-
-    const view = container.querySelector('[aria-label="membership-view"]')
-    if (view === null) throw new Error('missing membership-view')
-    expect(view).toMatchSnapshot()
+    expect(screen.getByText('会员与授权中心')).toBeInTheDocument()
+    expect(screen.getByTestId('membership-no-license').textContent).toContain('社区免费版')
+    expect(screen.getByTestId('membership-plans-section').textContent).toContain('尚未开放')
+    expect(screen.queryByTestId('membership-license-card')).not.toBeInTheDocument()
+    expect(screen.queryByText(/当前已激活/)).not.toBeInTheDocument()
   })
 
-  it('激活密钥交互', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((path: string) => {
-        if (path === '/api/membership') return okJson(MOCK_MEMBERSHIP)
-        if (path === '/api/membership.activate') return okJson(MOCK_MEMBERSHIP)
-        return okJson({ ok: false })
-      }),
-    )
-
+  it('未开放激活服务时不暴露密钥输入或激活按钮，并明确不接受密钥', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_MEMBERSHIP)))
     render(<MembershipView />)
+
     await waitFor(() => {
       expect(screen.getByTestId('membership-activate-section')).toBeInTheDocument()
     })
 
-    const input = screen.getByLabelText('许可证密钥输入')
-    await userEvent.type(input, 'NEW-KEY-1234')
-    const btn = screen.getByRole('button', { name: '激活授权' })
-    await userEvent.click(btn)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('membership-success')).toBeInTheDocument()
-      expect(input).toHaveValue('')
-    })
+    expect(screen.queryByLabelText('许可证密钥输入')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '激活授权' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('membership-activate-section').textContent).toContain('尚未开放')
+    expect(screen.getByTestId('membership-activate-section').textContent).toContain('不会接受或保存许可证密钥')
   })
 })
