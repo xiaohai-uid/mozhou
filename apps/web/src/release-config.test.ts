@@ -13,6 +13,18 @@ describe('release hardening · distribution configuration', () => {
     expect(source).not.toContain("const host = process.env.HOST || '0.0.0.0'")
   })
 
+  it('uses the production Node server rather than Vite preview for distributed runtime', () => {
+    const launcher = read('scripts/launcher.mjs')
+    const webPackage = JSON.parse(read('apps/web/package.json')) as { scripts?: Record<string, string> }
+    const dockerfile = read('Dockerfile')
+
+    expect(webPackage.scripts?.['serve']).toBe('node dist-server/productionServer.js')
+    expect(launcher).toContain('dist-server/productionServer.js')
+    expect(launcher).not.toContain("'preview'")
+    expect(dockerfile).toContain('dist-server/productionServer.js')
+    expect(dockerfile).toContain('USER node')
+  })
+
   it('does not publish legacy infrastructure ports or fixed development secrets by default', () => {
     const compose = read('docker-compose.yml')
     expect(compose).not.toContain('"11235:11235"')
@@ -27,5 +39,12 @@ describe('release hardening · distribution configuration', () => {
     const config = JSON.parse(read('src-tauri/tauri.conf.json')) as { app?: { security?: { csp?: unknown } } }
     expect(typeof config.app?.security?.csp).toBe('string')
     expect(config.app?.security?.csp).not.toBe('')
+  })
+
+  it('ignores local credentials and signing-key material', () => {
+    const ignore = read('.gitignore')
+    for (const pattern of ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx']) {
+      expect(ignore).toContain(pattern)
+    }
   })
 })
