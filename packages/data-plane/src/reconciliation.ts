@@ -51,7 +51,15 @@ import {
   isCanonRelPath,
   type TrackingKind,
 } from './layout.js'
+import {
+  classifyReconciliationPath,
+  itemIdsOf,
+  ReconciliationError,
+  trackingKindOf,
+  type ReconciliationPathClass,
+} from './reconciliation-paths.js'
 import { listAllFiles, refreshManifestEntries, writeManifest, type HashManifest } from './manifest.js'
+
 import { syncEntityCardRows } from './projection.js'
 import { sha256FileHex, sha256Hex } from './sha256.js'
 import { parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
@@ -114,18 +122,17 @@ export interface InvalidTrackingLine {
   readonly reason: string
 }
 
-/** 路径类别：检测与应用两段共用的分派键。 */
-export type ReconciliationPathClass =
-  | 'proseChapter'
-  | 'trackingStream'
-  | 'entityCard'
-  | 'outlineNode'
-  | 'planningArtifact'
-  | 'bookRecord'
-  | 'other'
+export type { ReconciliationPathClass } from './reconciliation-paths.js'
+export {
+  classifyReconciliationPath,
+  itemIdsOf,
+  ReconciliationError,
+} from './reconciliation-paths.js'
 
 /**
  * 变更摘要（Q8 的确定性 v1）：按路径类别给出作者可读的差异面。
+
+
  * 正文区无基线文本可 diff（基线只存指纹），正文摘要以相位机 frontmatter 为准；
  * 追踪流以投影行为基线做行级三分法（Q12）；结构化 md 与投影行做字段 diff。
  */
@@ -219,47 +226,10 @@ export interface ReconciliationHost {
   reloadManifest(): void
 }
 
-export class ReconciliationError extends Error {
-  override readonly name = 'ReconciliationError'
-}
-
-/* ----------------------------------------------------------------------------
- * 路径分类（唯一真源）
- * ------------------------------------------------------------------------- */
-
-const CARD_DIRS = Object.values(ENTITY_CARD_DIR_BY_PREFIX)
-
-export function classifyReconciliationPath(relPosixPath: string): ReconciliationPathClass {
-  if (relPosixPath === BOOK_RECORD_PATH) return 'bookRecord'
-  if (TRACKING_STREAMS.some((stream) => stream.path === relPosixPath)) return 'trackingStream'
-  if (CARD_DIRS.some((dir) => relPosixPath.startsWith(`${dir}/`)) && relPosixPath.endsWith('.md')) {
-    return 'entityCard'
-  }
-  if (
-    relPosixPath === ZONGGANG_PATH ||
-    relPosixPath === VOLUME_ONE_OUTLINE_PATH ||
-    relPosixPath.startsWith(`${CHAPTER_OUTLINE_DIR}/`)
-  ) {
-    return 'outlineNode'
-  }
-  if (relPosixPath === AUTHOR_INTENT_PATH || relPosixPath === STYLE_PROFILE_PATH) {
-    return 'planningArtifact'
-  }
-  if (relPosixPath.startsWith(`${PROSE_DIR}/`) && relPosixPath.endsWith('.md')) return 'proseChapter'
-  return 'other'
-}
-
-function trackingKindOf(rel: string): TrackingKind {
-  const stream = TRACKING_STREAMS.find((candidate) => candidate.path === rel)
-  if (stream === undefined) {
-    throw new ReconciliationError(`not a tracking stream path: ${rel}`)
-  }
-  return stream.kind
-}
-
 /* ----------------------------------------------------------------------------
  * 缺省确定性提取器
  * ------------------------------------------------------------------------- */
+
 
 function diskLines(content: string): string[] {
   const lines = content.split('\n')
@@ -536,22 +506,11 @@ export function buildDefaultExtractor(): Extractor {
 }
 
 /* ----------------------------------------------------------------------------
- * 条目命名与抑制账本
+ * 抑制账本
  * ------------------------------------------------------------------------- */
 
-/** 作者门条目命名：整文件类恒 `whole`；追踪流 `change:<seq>` / `add:<seqOnDisk>` / `remove:<seq>`。 */
-/** 提案项词表（T18 · #42 ProposalPort 复用面）：对账提案的可决策条目 id 全集。 */
-export function itemIdsOf(summary: ChangeSummary): Set<string> {
-  const ids = new Set<string>(['whole'])
-  if (summary.kind === 'trackingStream') {
-    for (const change of summary.changes) ids.add(`change:${change.seq}`)
-    for (const addition of summary.additions) ids.add(`add:${addition.seqOnDisk}`)
-    for (const removal of summary.removals) ids.add(`remove:${removal.seq}`)
-  }
-  return ids
-}
-
 function rejectedLedgerOf(
+
   summary: ChangeSummary,
   accepted: ReadonlySet<string>,
 ): Pick<ReconciliationProposal, 'rejectedLineChanges' | 'rejectedLineAdditions'> {
