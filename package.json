@@ -30,7 +30,10 @@
   },
   "pnpm": {
     "overrides": {
-      "tar": "7.5.21"
+      "tar": "7.5.22"
+    },
+    "patchedDependencies": {
+      "fastembed@2.1.0": "patches/fastembed@2.1.0.patch"
     }
   }
 }
