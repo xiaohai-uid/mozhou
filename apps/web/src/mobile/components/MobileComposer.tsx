@@ -15,7 +15,6 @@ export function MobileComposer({
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // 动态监听 iOS/Android visualViewport 软键盘高度避让
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return
 
@@ -36,9 +35,9 @@ export function MobileComposer({
     }
   }, [])
 
-  const handleChange = (val: string) => {
-    setText(val)
-    saveDraftCache(val, 'composer_draft')
+  const handleChange = (value: string) => {
+    setText(value)
+    saveDraftCache(value, 'composer_draft')
   }
 
   const handleAddTag = (tag: string) => {
@@ -64,8 +63,8 @@ export function MobileComposer({
       }}
     >
       <div className="composer-context-bar">
-        <span>主角视角：陆玄 · 山神庙场景</span>
-        <span style={{ color: 'var(--emerald-mobile)' }}>● 服务就绪</span>
+        <span>当前作品上下文由草稿请求实时装配</span>
+        <span>Technical Preview</span>
       </div>
 
       <textarea
@@ -73,7 +72,7 @@ export function MobileComposer({
         className="composer-textarea"
         value={text}
         onChange={(e) => handleChange(e.target.value)}
-        placeholder="输入推进指令（如：强化雷雨声势、描写赵捕头神色变化）..."
+        placeholder="输入推进指令（如：强化环境声势、描写人物神色变化）..."
       />
 
       <div className="composer-bottom-tools">
