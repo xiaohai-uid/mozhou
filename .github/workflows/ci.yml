@@ -1,6 +1,4 @@
-# Novel OS 主线 CI（ADR-0025 · 2026-08-30 审查修复）：
-# pnpm workspace（packages/* + apps/web）的构建与全量测试在 master 推送/PR 上强制运行。
-# Legacy app/ 的 CI 原样迁至 legacy-app.yml（触发面保持 main）。
+# Novel OS 主线 CI：构建、测试、类型检查、依赖漏洞门禁。
 name: ci
 
 on:
@@ -8,12 +6,15 @@ on:
     branches: [master, main]
   pull_request:
 
+permissions:
+  contents: read
+
 env:
   ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 
 jobs:
   novel-os:
-    name: build / test (packages/* + apps/web)
+    name: build / test / security (packages/* + apps/web)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +26,8 @@ jobs:
           version: 9.15.0
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit (high/critical)
+        run: pnpm audit --audit-level high
       - name: Build workspace (tsc -b)
         run: pnpm build
       - name: Test workspace (vitest)
