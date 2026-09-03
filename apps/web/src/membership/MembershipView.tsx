@@ -32,7 +32,7 @@ export function MembershipView(): JSX.Element {
   return (
     <section className="center solo" aria-label="membership-view">
       <div className="chapterbar">
-        <h1>版本与授权</h1>
+        <h1>会员与授权中心</h1>
         <span className="meta">Technical Preview · 社区免费版</span>
         <div className="save">
           <span className="cap-badge native">● 社区免费版</span>
