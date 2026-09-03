@@ -31,7 +31,7 @@ describe('release hardening · outbound LLM SSRF boundary', () => {
   it('accepts a public HTTPS hostname when all resolved addresses are public', async () => {
     await expect(assertSafeRemoteTarget(
       new URL('https://model.example.com'),
-      async () => [{ address: '203.0.113.10', family: 4 }],
+      async () => [{ address: '8.8.8.8', family: 4 }],
     )).resolves.toBeUndefined()
   })
 })
