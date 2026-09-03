@@ -1,0 +1,115 @@
+name: release-hardening-contract-migration
+
+on:
+  push:
+    branches: [release-hardening-2026-09-03]
+    paths:
+      - '.github/workflows/release-hardening-contract-migration.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release-hardening-2026-09-03
+      - name: Align legacy API contracts with truthful preview behavior
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('apps/web/src/api.test.ts')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("import type { NovelBreakdownResult } from '../server/api'\n", '')
+          old = '''describe('小说拆解 API 契约', () => {
+            it('POST /api/novel-breakdown：分析故事核、黄金三章节奏点与人物弧光', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '凡人修仙故事梗概' })
+              expect(status).toBe(200)
+              expect(data.ok).toBe(true)
+              const res = data.result as NovelBreakdownResult
+              expect(res.storyCore.mainGoal.length).toBeGreaterThan(0)
+              expect(res.chapterPacing.length).toBe(3)
+              expect(res.characterArcs.length).toBeGreaterThanOrEqual(1)
+              expect(res.emotionalBeats.length).toBeGreaterThanOrEqual(1)
+            })
+          })'''
+          new = '''describe('小说拆解 API 契约', () => {
+            it('POST /api/novel-breakdown：真实分析 provider 未接入时显式 501', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '凡人修仙故事梗概' })
+              expect(status).toBe(501)
+              expect(data.ok).toBe(false)
+              expect(data.code).toBe('NOVEL_BREAKDOWN_NOT_IMPLEMENTED')
+              expect(data.result).toBeUndefined()
+            })
+          })'''
+          if old not in s: raise SystemExit('novel breakdown block not found')
+          s = s.replace(old, new)
+          old = '''describe('网文扫榜 API 契约', () => {
+            it('POST /api/rank-scan：返回多平台榜单数据与热门题材风向词', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/rank-scan', {})
+              expect(status).toBe(200)
+              expect(data.ok).toBe(true)
+              const boards = data.boards as { id: string; name: string; items: unknown[] }[]
+              expect(boards.length).toBeGreaterThanOrEqual(2)
+              expect(boards[0]?.items.length).toBeGreaterThanOrEqual(1)
+              const keywords = data.trendingKeywords as { name: string; heat: number }[]
+              expect(keywords.length).toBeGreaterThanOrEqual(2)
+            })
+          })'''
+          new = '''describe('网文扫榜 API 契约', () => {
+            it('POST /api/rank-scan：无可验证实时榜单源时显式 501', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/rank-scan', {})
+              expect(status).toBe(501)
+              expect(data.ok).toBe(false)
+              expect(data.code).toBe('RANK_SOURCE_NOT_CONFIGURED')
+              expect(data.boards).toBeUndefined()
+              expect(data.trendingKeywords).toBeUndefined()
+            })
+          })'''
+          if old not in s: raise SystemExit('rank block not found')
+          s = s.replace(old, new)
+          old = '''describe('联网搜索 API 契约', () => {
+            it('POST /api/web-search：返回资料库检索结果与热门检索词', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/web-search', { query: '唐代' })
+              expect(status).toBe(200)
+              expect(data.ok).toBe(true)
+              const results = data.results as { id: string; title: string; category: string }[]
+              expect(results.length).toBeGreaterThanOrEqual(1)
+              expect(results[0]?.title).toContain('唐代')
+              const hotQueries = data.hotQueries as string[]
+              expect(hotQueries.length).toBeGreaterThanOrEqual(3)
+            })
+          })'''
+          new = '''describe('联网搜索 API 契约', () => {
+            it('POST /api/web-search：真实外部搜索源未接入时显式 501', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/web-search', { query: '唐代' })
+              expect(status).toBe(501)
+              expect(data.ok).toBe(false)
+              expect(data.code).toBe('WEB_SEARCH_NOT_CONFIGURED')
+              expect(data.results).toBeUndefined()
+            })
+          })'''
+          if old not in s: raise SystemExit('web search block not found')
+          s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Remove obsolete membership snapshot and one-shot workflow
+        run: |
+          rm -f apps/web/src/membership/__snapshots__/MembershipView.test.tsx.snap
+          rm -f .github/workflows/release-hardening-contract-migration.yml
+      - name: Commit migration
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "test: align legacy preview contracts with truthful behavior"
+          git push origin HEAD:release-hardening-2026-09-03
