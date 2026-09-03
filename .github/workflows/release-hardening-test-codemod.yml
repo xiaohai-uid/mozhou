@@ -1,0 +1,96 @@
+name: release-hardening-test-codemod
+
+on:
+  push:
+    branches: [release-hardening-2026-09-03]
+    paths:
+      - '.github/workflows/release-hardening-test-codemod.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-approved-contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release-hardening-2026-09-03
+      - name: Update tests whose approved behavior changed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/api.test.ts')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace("skills: ['continuation']", "activeSkills: ['continuation']")
+
+          marker = "/* ----------------------------------------------------------------------------\n * 云同步与备份 API 契约"
+          index = text.index(marker)
+          tail = r'''/* ----------------------------------------------------------------------------
+           * 云同步与备份 API 契约：Technical Preview 明确区分本地状态与未实现备份。
+           * ------------------------------------------------------------------------- */
+          describe('云同步与备份 API 契约', () => {
+            it('POST /api/cloud-sync：返回本地离线优先状态与真实存储面', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/cloud-sync', {})
+              expect(status).toBe(200)
+              expect(data.ok).toBe(true)
+              expect(data.localReady).toBe(true)
+              expect(data.syncStatus).toBe('offline_ready')
+              expect((data.storageUsage as { databaseBytes: number }).databaseBytes).toBe(0)
+            })
+
+            it('POST /api/cloud-sync.backup：未实现时 501，绝不伪造归档路径或摘要', async () => {
+              const base = await listen()
+              const dir = mkdtempSync(join(tmpdir(), 'mozhou-sync-api-'))
+              roots.push(dir)
+              const book = createBook({ dir: join(dir, '快照测试书'), title: '快照测试书' })
+
+              const { status, data } = await post(base, '/api/cloud-sync.backup', { root: book.root })
+              expect(status).toBe(501)
+              expect(data.ok).toBe(false)
+              expect(data.code).toBe('BACKUP_NOT_IMPLEMENTED')
+              expect(JSON.stringify(data)).not.toContain('sha256_mock_snapshot_digest')
+              expect(data.backupPath).toBeUndefined()
+            })
+          })
+
+          /* ----------------------------------------------------------------------------
+           * 会员中心 API 契约：Technical Preview 仅社区免费版；支付/激活尚未上线。
+           * ------------------------------------------------------------------------- */
+          describe('会员中心 API 契约', () => {
+            it('POST /api/membership：社区免费版为当前版本，不伪造付费许可证', async () => {
+              const base = await listen()
+              const { status, data } = await post(base, '/api/membership', {})
+              expect(status).toBe(200)
+              expect(data.ok).toBe(true)
+              expect(data.license).toBeNull()
+              const plans = data.plans as { id: string; current: boolean; price: string }[]
+              expect(plans.find((plan) => plan.id === 'free_community')?.current).toBe(true)
+              expect(plans.find((plan) => plan.id === 'pro_lifetime')?.current).toBe(false)
+            })
+
+            it('POST /api/membership.activate：服务未上线时一律 501，不做格式即授权', async () => {
+              const base = await listen()
+              const goodFormat = await post(base, '/api/membership.activate', { key: 'MOZHOU-PRO-LIFETIME-TEST' })
+              expect(goodFormat.status).toBe(501)
+              expect(goodFormat.data.ok).toBe(false)
+              expect(goodFormat.data.code).toBe('LICENSE_ACTIVATION_NOT_IMPLEMENTED')
+
+              const badFormat = await post(base, '/api/membership.activate', { key: 'invalid_raw_string' })
+              expect(badFormat.status).toBe(501)
+              expect(badFormat.data.code).toBe('LICENSE_ACTIVATION_NOT_IMPLEMENTED')
+            })
+          })
+          '''
+          path.write_text(text[:index] + tail, encoding='utf-8')
+          PY
+      - name: Commit approved test contract migration
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/web/src/api.test.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "test: align preview contracts with truthful release behavior"
+          git push origin HEAD:release-hardening-2026-09-03
