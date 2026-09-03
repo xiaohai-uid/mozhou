@@ -26,6 +26,8 @@ describe('MobileShell - 移动端 Technical Preview 工作台组件测试', () =
     expect(screen.getByText('情节走向推演尚未生成')).toBeDefined()
     expect(screen.queryByText(/借夜雷与袖中白磷/)).toBeNull()
     expect(screen.queryByText(/赵捕头按佩刀逼问神像真容/)).toBeNull()
+    expect(screen.queryByText(/主角视角：陆玄/)).toBeNull()
+    expect(screen.queryByText(/服务就绪/)).toBeNull()
     expect(screen.getByRole('button', { name: /^创作$/ })).toBeDefined()
     expect(screen.getByRole('button', { name: /^检视$/ })).toBeDefined()
     expect(screen.getByRole('button', { name: /^作品$/ })).toBeDefined()
