@@ -3,7 +3,9 @@
  */
 import type { RouteHandler } from '../router.js'
 import { evaluateStyleMetrics } from '@mozhou/quality-engine'
-import { readCanonState, readStyleProfiles } from '@mozhou/data-plane'
+import { readCanonState, readStyleProfiles, RUNTIME_DB_PATH } from '@mozhou/data-plane'
+import { existsSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { hasDraftProvider } from './pipelineRoutes.js'
 
 const CAPABILITY_SQUARE_GROUPS = [
@@ -147,11 +149,21 @@ const CAPABILITY_SQUARE_GROUPS = [
         label: '会员中心',
         description: '会员中心',
         status: 'configuration_required',
-        evidence: '账号/授权/计费未接入；页面为显式占位',
+        evidence: '账号/授权/计费未接入；Technical Preview 仅社区免费版',
       },
     ],
   },
 ]
+
+function databaseBytes(root: string | null): number {
+  if (root === null) return 0
+  const databasePath = join(root, RUNTIME_DB_PATH)
+  try {
+    return existsSync(databasePath) ? statSync(databasePath).size : 0
+  } catch {
+    return 0
+  }
+}
 
 export const systemRoutes: RouteHandler = async (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
@@ -166,15 +178,9 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
 
     try {
       const profiles = readStyleProfiles(root)
-      json(200, {
-        ok: true,
-        currentProfiles: profiles,
-      })
+      json(200, { ok: true, currentProfiles: profiles })
     } catch {
-      json(200, {
-        ok: true,
-        currentProfiles: null,
-      })
+      json(200, { ok: true, currentProfiles: null })
     }
     return true
   }
@@ -193,11 +199,7 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
     }
 
     const sampleMetrics = evaluateStyleMetrics(text)
-    json(200, {
-      ok: true,
-      currentProfiles,
-      sampleMetrics,
-    })
+    json(200, { ok: true, currentProfiles, sampleMetrics })
     return true
   }
 
@@ -206,12 +208,10 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
     const root = typeof body['root'] === 'string' ? body['root'] : null
     const sampleText = typeof body['sampleText'] === 'string' ? body['sampleText'].trim() : ''
 
-    let bookTitle = '当前作品'
     let protagonist = '主角（未设定）'
     if (root !== null) {
       try {
         const canon = readCanonState(root)
-        bookTitle = canon.book.title
         const mainChar = canon.entityCards.find((c) => c.cardType === 'char')
         if (mainChar !== undefined) protagonist = mainChar.name
       } catch {
@@ -287,10 +287,7 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
       ],
     }
 
-    json(200, {
-      ok: true,
-      result,
-    })
+    json(200, { ok: true, result })
     return true
   }
 
@@ -304,19 +301,19 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
     return true
   }
 
-  /* ---- 本地快照备份（诚实声明：本地优先模式） ---- */
+  /* ---- 本地离线状态（不伪装成云同步） ---- */
   if (path === '/api/cloud-sync') {
     const root = typeof body['root'] === 'string' ? body['root'] : null
-
-    let fileCount = 1
+    let fileCount = 0
     if (root !== null) {
       try {
         const canon = readCanonState(root)
-        fileCount = canon.outlineNodes.length + canon.entityCards.length + 5
+        fileCount = canon.outlineNodes.length + canon.entityCards.length + canon.planningArtifacts.length
       } catch {
-        /* 保持缺省 */
+        /* 无有效书根时保持真实的 0 */
       }
     }
+    const dbBytes = databaseBytes(root)
 
     json(200, {
       ok: true,
@@ -327,14 +324,14 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
       pendingChangesCount: 0,
       storageUsage: {
         localCanonFiles: fileCount,
-        databaseBytes: 1024 * 128,
+        databaseBytes: dbBytes,
       },
       syncState: {
-        lastSyncedAt: '云同步尚未上线；当前仅为本地文件快照模式',
+        lastSyncedAt: '云同步尚未上线；当前仅为本地文件模式',
         status: 'idle',
         pendingUploads: 0,
         pendingDownloads: 0,
-        storageUsedBytes: 42 * 1024,
+        storageUsedBytes: dbBytes,
       },
     })
     return true
@@ -347,43 +344,37 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
       return true
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    let bookTitle = '当前作品'
     try {
-      const canon = readCanonState(root)
-      bookTitle = canon.book.title
-    } catch {
-      /* 保持缺省 */
+      readCanonState(root)
+    } catch (error) {
+      json(404, { ok: false, code: 'INVALID_BOOK_ROOT', error: (error as Error).message })
+      return true
     }
 
-    json(200, {
-      ok: true,
-      snapshotId: `snap_${timestamp}`,
-      bookTitle,
-      backupId: `bkp_${timestamp}`,
-      backupPath: `.mozhou/backups/snapshot_${timestamp}.tar.gz`,
-      sizeBytes: 128 * 1024,
-      fileCount: 12,
-      manifestDigest: 'sha256_mock_snapshot_digest',
+    json(501, {
+      ok: false,
+      code: 'BACKUP_NOT_IMPLEMENTED',
+      error: 'Technical Preview 尚未提供可验证的备份归档；未创建任何文件。',
     })
     return true
   }
 
-  /* ---- 会员中心与许可证激活 ---- */
+  /* ---- Technical Preview：仅社区免费版，付费/激活尚未开放 ---- */
   if (path === '/api/membership') {
     const plans = [
       {
         id: 'free_community',
         name: '社区免费版',
         price: '免费',
+        tag: 'Technical Preview 当前版本',
         features: ['单书本地正典创作', '基础大纲与章节管理', '本地 SQLite 数据库存储', '社区技能广场查看'],
-        current: false,
+        current: true,
       },
       {
         id: 'pro_lifetime',
         name: '墨舟 Pro 终身专业版',
-        price: '¥299 (终身买断)',
-        tag: '推荐方案 · 当前已激活',
+        price: '尚未开放',
+        tag: '规划中 · 当前不可购买/激活',
         features: [
           '无限作品库与多书无缝切换',
           'Story Brain 认知三级穿透面板',
@@ -393,52 +384,27 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
           '全场景 StyleProfile 文风蒸馏与飞轮演化',
           '本地离线快照与全量便携迁移',
         ],
-        current: true,
+        current: false,
       },
       {
         id: 'studio_team',
         name: '工作室多端团队版',
-        price: '¥899 / 年',
+        price: '尚未开放',
         tag: '规划中',
         features: ['包含 Pro 版全部权益', '多设备局域网实时同步协同', '专属小说拆解高级提示词库', '优先技术支持通道'],
         current: false,
       },
     ]
 
-    json(200, {
-      ok: true,
-      license: {
-        planId: 'pro_lifetime',
-        planName: '墨舟 Pro 终身专业版',
-        licenseKey: 'MOZHOU-PRO-LIFETIME-PERMANENT-2026',
-        activatedAt: '2026-08-30',
-        expiresAt: '永久有效',
-        status: 'active',
-      },
-      plans,
-    })
+    json(200, { ok: true, license: null, plans })
     return true
   }
 
   if (path === '/api/membership.activate') {
-    const key = typeof body['key'] === 'string' ? body['key'].trim() : ''
-    const isValidKeyFormat = /^MOZHOU-[A-Z0-9]+-[A-Z0-9]+(-[A-Z0-9]+)*$/i.test(key)
-    if (!isValidKeyFormat) {
-      json(400, { ok: false, error: '许可证密钥格式无效（需形如 MOZHOU-PRO-LIFETIME-XXXX-YYYY）' })
-      return true
-    }
-
-    json(200, {
-      ok: true,
-      license: {
-        planId: key.toLowerCase().includes('team') ? 'studio_team' : 'pro_lifetime',
-        planName: key.toLowerCase().includes('team') ? '工作室多端团队版' : '墨舟 Pro 终身专业版',
-        licenseKey: key.toUpperCase(),
-        activatedAt: new Date().toISOString().slice(0, 10),
-        expiresAt: '永久有效',
-        status: 'active',
-      },
-      plans: [],
+    json(501, {
+      ok: false,
+      code: 'LICENSE_ACTIVATION_NOT_IMPLEMENTED',
+      error: 'Technical Preview 尚未开放许可证购买或激活服务。',
     })
     return true
   }
