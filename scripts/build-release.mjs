@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 /**
- * 墨舟 (Novel OS) 自动化多平台发布包打包脚本。
- * 构建 workspace 与 web dist，打包 Windows/Linux/macOS/Web/Docker 全套安装包。
+ * 墨舟 (Novel OS) 可发布资产构建器。
+ *
+ * 只生成实际经过当前仓库构建链验证的三类资产：
+ * 1) local-runtime：跨平台 Node 22 本地运行时（不是伪装的原生安装包）；
+ * 2) web-dist：纯前端静态产物；
+ * 3) docker：基于已编译运行时的本机 Docker 包。
+ *
+ * 任一构建/复制/压缩失败都会直接失败，禁止“告警后仍发布”。
  */
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,67 +19,32 @@ const rootDir = join(__dirname, '..')
 const pkgJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'))
 const version = pkgJson.version || '0.1.0'
 const artifactsDir = join(rootDir, 'release-artifacts')
-
-console.log(`\n📦 开始构建墨舟 v${version} 发布与安装包...\n`)
+const bundleName = `mozhou-v${version}`
+const runtimeDir = join(artifactsDir, bundleName)
 
 process.env.ONNXRUNTIME_NODE_INSTALL_CUDA = 'skip'
 
-// 1. 确保构建 workspace 和 web
-console.log('🔨 [1/5] 编译 packages/* 与 apps/web...')
-execSync('pnpm build', { cwd: rootDir, stdio: 'inherit' })
-execSync('pnpm --filter @mozhou/web build', { cwd: rootDir, stdio: 'inherit' })
-
-// 2. 清理并准备 release-artifacts 目录
-if (existsSync(artifactsDir)) {
-  rmSync(artifactsDir, { recursive: true, force: true })
-}
-mkdirSync(artifactsDir, { recursive: true })
-
-const tempBundleDir = join(artifactsDir, `mozhou-v${version}`)
-mkdirSync(tempBundleDir, { recursive: true })
-
-// 3. 复制分发所需核心资产
-console.log('📁 [2/5] 收集发布核心资产与启动脚本...')
-const filesToCopy = [
-  'package.json',
-  'pnpm-workspace.yaml',
-  'pnpm-lock.yaml',
-  'tsconfig.json',
-  'tsconfig.base.json',
-  'start.bat',
-  '启动墨舟.bat',
-  'start.sh',
-  'Dockerfile',
-  'docker-compose.yml',
-  'README.md',
-]
-
-for (const file of filesToCopy) {
-  const src = join(rootDir, file)
-  if (existsSync(src)) {
-    cpSync(src, join(tempBundleDir, file), { recursive: true })
-  }
+function run(command, args, cwd = rootDir) {
+  execFileSync(command, args, { cwd, stdio: 'inherit', env: process.env })
 }
 
-// 复制 scripts 目录
-cpSync(join(rootDir, 'scripts'), join(tempBundleDir, 'scripts'), { recursive: true })
+function requirePath(path, label) {
+  if (!existsSync(path)) throw new Error(`release invariant failed: missing ${label}: ${path}`)
+}
 
-// 复制 packages (仅源码及编译 dist 与 package.json)
-const packagesDir = join(rootDir, 'packages')
-const targetPackagesDir = join(tempBundleDir, 'packages')
-mkdirSync(targetPackagesDir, { recursive: true })
+function copyIfPresent(relativePath, destinationRoot = runtimeDir) {
+  const src = join(rootDir, relativePath)
+  if (!existsSync(src)) return
+  const dest = join(destinationRoot, relativePath)
+  mkdirSync(dirname(dest), { recursive: true })
+  cpSync(src, dest, { recursive: true })
+}
 
-/** 递归清理 dist 中的测试产物与源码映射（*.test.js / *.test.d.ts / *.map），瘦身发布包。 */
 function pruneTestArtifacts(dir) {
   if (!existsSync(dir)) return
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
-    let stat
-    try {
-      stat = statSync(full)
-    } catch {
-      continue
-    }
+    const stat = statSync(full)
     if (stat.isDirectory()) {
       pruneTestArtifacts(full)
     } else if (/\.test\.(js|d\.ts|js\.map)$/.test(entry) || entry.endsWith('.map')) {
@@ -82,131 +53,97 @@ function pruneTestArtifacts(dir) {
   }
 }
 
-const pkgFolders = ['context-compiler', 'data-plane', 'flywheel', 'kernel', 'pipeline', 'quality-engine', 'runtime', 'benchmark']
-for (const folder of pkgFolders) {
-  const srcPkg = join(packagesDir, folder)
-  const destPkg = join(targetPackagesDir, folder)
-  if (existsSync(srcPkg)) {
-    mkdirSync(destPkg, { recursive: true })
-    // dist 编译产物 + package.json + assets + fixtures（fixtures 供测试与 recipe 运行期读取）
-    const files = ['package.json', 'dist', 'assets', 'fixtures']
-    for (const f of files) {
-      const s = join(srcPkg, f)
-      if (existsSync(s)) {
-        cpSync(s, join(destPkg, f), { recursive: true })
-      }
-    }
-    // 瘦身：清理复制进发布包的测试与 map 产物
-    pruneTestArtifacts(join(destPkg, 'dist'))
+console.log(`\n[release] building MoZhou v${version}\n`)
+run('pnpm', ['build'])
+run('pnpm', ['--filter', '@mozhou/web', 'build'])
+
+requirePath(join(rootDir, 'apps/web/dist/index.html'), 'web dist')
+requirePath(join(rootDir, 'apps/web/dist-server/productionServer.js'), 'production server')
+
+rmSync(artifactsDir, { recursive: true, force: true })
+mkdirSync(runtimeDir, { recursive: true })
+
+for (const file of [
+  'package.json',
+  'pnpm-workspace.yaml',
+  'pnpm-lock.yaml',
+  'start.bat',
+  '启动墨舟.bat',
+  'start.sh',
+  'README.md',
+  'LICENSE',
+]) {
+  copyIfPresent(file)
+}
+copyIfPresent('scripts/launcher.mjs')
+copyIfPresent('scripts/check-install-env.mjs')
+
+const packageFolders = ['context-compiler', 'data-plane', 'flywheel', 'kernel', 'pipeline', 'quality-engine', 'runtime', 'benchmark']
+for (const folder of packageFolders) {
+  for (const item of ['package.json', 'dist', 'assets', 'fixtures']) {
+    copyIfPresent(`packages/${folder}/${item}`)
   }
+  pruneTestArtifacts(join(runtimeDir, 'packages', folder, 'dist'))
 }
 
-// 复制 apps/web (dist, server, package.json, vite.config.ts)
-const targetWebDir = join(tempBundleDir, 'apps', 'web')
-mkdirSync(targetWebDir, { recursive: true })
-const webFiles = ['package.json', 'vite.config.ts', 'dist', 'server']
-for (const f of webFiles) {
-  const s = join(rootDir, 'apps', 'web', f)
-  if (existsSync(s)) {
-    cpSync(s, join(targetWebDir, f), { recursive: true })
-  }
+for (const item of ['package.json', 'dist', 'dist-server']) {
+  copyIfPresent(`apps/web/${item}`)
 }
 
-// 生成发布说明
-const releaseReadme = `# 🌊 墨舟 (Novel OS) v${version} 技术预览版
+const instructions = `# 墨舟 (Novel OS) v${version} 本地发行版
 
-> ⚠️ 当前版本定位：**技术预览 / Demo**。核心本地引擎（十步创作管道、Story Brain、
-> 质量门、本地 embedding）为真实实现；「AI 生成 / 会员 / 云同步」等在线服务尚未
-> 正式上线，未配置真实 LLM Key 时草稿流为显式演示模式（页面有诚实标注）。
+这是可商用部署的本地优先运行时包。它不冒充 Windows/macOS 原生安装器；当前通用包需要 Node.js 22（CI 固定 22.23.2）与 pnpm 9.15.0。
 
-## 🚀 快速启动指南
+## 启动
 
-### 方式一：Windows 用户（最简一键启动）
-1. 双击运行 \`start.bat\` 或 \`启动墨舟.bat\`；
-2. 脚本将自动自检依赖并启动本地创作服务；
-3. 默认将在浏览器中自动打开：http://localhost:5173
+- Windows：运行 \`start.bat\`（或 \`启动墨舟.bat\`）
+- Linux/macOS：\`chmod +x start.sh && ./start.sh\`
+- 默认地址：\`http://127.0.0.1:5173\`
 
-### 方式二：Linux / macOS 用户
-\`\`\`bash
-chmod +x start.sh
-./start.sh
-\`\`\`
+首次启动会按锁文件安装**生产依赖**。发行包已经包含前端构建产物与正式 Node HTTP 服务，不使用 Vite preview 承担发行流量。
 
-### 方式三：Docker 容器一键部署
-\`\`\`bash
-docker compose up -d
-\`\`\`
+## AI / BYOK
 
-## 🔑 配置真实 AI 生成（BYOK）
+未配置 Key 时，界面必须明确保持演示/未配置状态。真实生成可配置：
 
-在启动环境中配置以下环境变量之一即可启用真实流式生成（默认未配置时走演示模式）：
-- \`MOZHOU_API_KEY\` / \`DEEPSEEK_API_KEY\` / \`OPENAI_API_KEY\`：上游 API Key
-- \`MOZHOU_API_BASE\`：可选，OpenAI-compatible 端点
-- \`MOZHOU_MODEL\`：可选，模型名（默认 deepseek-chat）
+- \`MOZHOU_API_KEY\` / \`DEEPSEEK_API_KEY\` / \`OPENAI_API_KEY\`
+- \`MOZHOU_API_BASE\`（可选，默认公网端点必须 HTTPS）
+- \`MOZHOU_MODEL\`（可选）
+- \`MOZHOU_ALLOW_PRIVATE_LLM=1\`：仅当部署者明确需要本机/私网 OpenAI-compatible 服务时启用
 
----
-© 2026 墨舟团队 · 保留所有权利
+## 当前不随此资产宣称的能力
+
+- 云同步/云备份尚未实现；接口会显式返回 NOT_IMPLEMENTED。
+- 付费许可证激活尚未实现；不会接受伪许可证密钥。
+- 原生 Tauri 安装器/代码签名不包含在本发行资产中。
+
+请使用同一 Release 中的 \`SHA256SUMS.txt\` 与 SPDX SBOM 验证供应链信息。
 `
-writeFileSync(join(tempBundleDir, 'RELEASE_INSTRUCTIONS.md'), releaseReadme, 'utf8')
+writeFileSync(join(runtimeDir, 'RELEASE_INSTRUCTIONS.md'), instructions, 'utf8')
 
-// 4. 打包各平台压缩包
-console.log('🗜️ [3/5] 正在生成各平台安装压缩包...')
+const runtimeArchive = join(artifactsDir, `${bundleName}-local-runtime.tar.gz`)
+run('tar', ['-czf', runtimeArchive, bundleName], artifactsDir)
 
-try {
-  // Web 纯静态产物包
-  const webDistName = `mozhou-v${version}-web-dist.tar.gz`
-  execSync(`tar --force-local -czf "${join(artifactsDir, webDistName)}" dist`, {
-    cwd: join(rootDir, 'apps', 'web'),
-    stdio: 'inherit',
-  })
+const webArchive = join(artifactsDir, `${bundleName}-web-dist.tar.gz`)
+run('tar', ['-czf', webArchive, '-C', join(rootDir, 'apps', 'web', 'dist'), '.'])
 
-  // Windows 绿色免安装包 (.tar.gz)
-  const winTarName = `mozhou-v${version}-windows-x64.tar.gz`
-  execSync(`tar --force-local -czf "${join(artifactsDir, winTarName)}" "mozhou-v${version}"`, {
-    cwd: artifactsDir,
-    stdio: 'inherit',
-  })
+const dockerDir = join(artifactsDir, 'docker-bundle')
+mkdirSync(dockerDir, { recursive: true })
+cpSync(runtimeDir, dockerDir, { recursive: true })
+writeFileSync(join(dockerDir, 'Dockerfile'), `FROM node:22.23.2-bookworm-slim\nWORKDIR /app\nENV NODE_ENV=production\nENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip\nENV PORT=5173\nENV HOST=0.0.0.0\nRUN npm install -g pnpm@9.15.0\nCOPY --chown=node:node ${bundleName}/ /app/\nRUN pnpm install --prod --frozen-lockfile\nUSER node\nEXPOSE 5173\nCMD ["node", "apps/web/dist-server/productionServer.js"]\n`, 'utf8')
+writeFileSync(join(dockerDir, 'docker-compose.yml'), `services:\n  mozhou:\n    build: .\n    restart: unless-stopped\n    ports:\n      - "127.0.0.1:\${MOZHOU_PORT:-5173}:5173"\n    environment:\n      NODE_ENV: production\n      ONNXRUNTIME_NODE_INSTALL_CUDA: skip\n      PORT: 5173\n      HOST: 0.0.0.0\n      MOZHOU_API_KEY: \${MOZHOU_API_KEY:-}\n      DEEPSEEK_API_KEY: \${DEEPSEEK_API_KEY:-}\n      OPENAI_API_KEY: \${OPENAI_API_KEY:-}\n`, 'utf8')
+writeFileSync(join(dockerDir, 'README.md'), '# 墨舟 Docker 本地发行包\n\n执行 `docker compose up --build -d`。宿主端默认只监听 127.0.0.1。\n', 'utf8')
 
-  // Linux 独立包
-  const linuxTarName = `mozhou-v${version}-linux-x64.tar.gz`
-  execSync(`tar --force-local -czf "${join(artifactsDir, linuxTarName)}" "mozhou-v${version}"`, {
-    cwd: artifactsDir,
-    stdio: 'inherit',
-  })
+const dockerArchive = join(artifactsDir, `${bundleName}-docker.tar.gz`)
+run('tar', ['-czf', dockerArchive, 'docker-bundle'], artifactsDir)
+rmSync(dockerDir, { recursive: true, force: true })
+rmSync(runtimeDir, { recursive: true, force: true })
 
-  // macOS 通用包
-  const macTarName = `mozhou-v${version}-darwin-universal.tar.gz`
-  execSync(`tar --force-local -czf "${join(artifactsDir, macTarName)}" "mozhou-v${version}"`, {
-    cwd: artifactsDir,
-    stdio: 'inherit',
-  })
-
-  // Docker 快速启动包
-  const dockerTarName = `mozhou-v${version}-docker.tar.gz`
-  const dockerTemp = join(artifactsDir, 'docker-bundle')
-  mkdirSync(dockerTemp, { recursive: true })
-  cpSync(join(rootDir, 'Dockerfile'), join(dockerTemp, 'Dockerfile'))
-  cpSync(join(rootDir, 'docker-compose.yml'), join(dockerTemp, 'docker-compose.yml'))
-  writeFileSync(join(dockerTemp, 'README.md'), '# 墨舟 Docker 部署包\n\n执行 `docker compose up -d` 即可启动服务。', 'utf8')
-  execSync(`tar --force-local -czf "${join(artifactsDir, dockerTarName)}" docker-bundle`, {
-    cwd: artifactsDir,
-    stdio: 'inherit',
-  })
-  rmSync(dockerTemp, { recursive: true, force: true })
-
-  console.log('✅ [4/5] 压缩包打包成功！')
-} catch (err) {
-  console.warn('⚠️ 打包命令异常:', err.message)
+for (const archive of [runtimeArchive, webArchive, dockerArchive]) {
+  requirePath(archive, 'release archive')
 }
 
-// 5. 输出汇总
-console.log('\n🎉 [5/5] 安装包构建完毕！产物清单：')
-const artifacts = ['mozhou-v' + version + '-windows-x64.tar.gz', 'mozhou-v' + version + '-linux-x64.tar.gz', 'mozhou-v' + version + '-darwin-universal.tar.gz', 'mozhou-v' + version + '-web-dist.tar.gz', 'mozhou-v' + version + '-docker.tar.gz']
-
-for (const a of artifacts) {
-  const p = join(artifactsDir, a)
-  if (existsSync(p)) {
-    console.log(`  📦 ${a}`)
-  }
-}
-console.log(`\n存放路径: ${artifactsDir}\n`)
+console.log('[release] verified assets:')
+console.log(`  ${runtimeArchive}`)
+console.log(`  ${webArchive}`)
+console.log(`  ${dockerArchive}`)
