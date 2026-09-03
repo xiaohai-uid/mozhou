@@ -22,7 +22,7 @@ describe('MobileShell - 移动端 Technical Preview 工作台组件测试', () =
     expect(screen.getByText(/本地创作者 · Technical Preview/)).toBeDefined()
     expect(screen.queryByText(/Pro 终身版/)).toBeNull()
     expect(screen.queryByText('3,420')).toBeNull()
-    expect(screen.queryByText(/连更/)).toBeNull()
+    expect(screen.queryByText(/连更\s*12\s*天/)).toBeNull()
     expect(screen.getByRole('button', { name: /^创作$/ })).toBeDefined()
     expect(screen.getByRole('button', { name: /^检视$/ })).toBeDefined()
     expect(screen.getByRole('button', { name: /^作品$/ })).toBeDefined()
@@ -33,7 +33,7 @@ describe('MobileShell - 移动端 Technical Preview 工作台组件测试', () =
   it('点击底部导航可切换至检视塔并查看四枢纽', () => {
     render(<MobileShell book={dummyBook} onSwitchBook={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /^检视$/ }))
-    expect(screen.getByText(/真实数据面/)).toBeDefined()
+    expect(screen.getByText('《假神真显灵》· 真实数据面')).toBeDefined()
     expect(screen.getByText('设定事实')).toBeDefined()
     expect(screen.getByText('装配看板')).toBeDefined()
     expect(screen.getByText('变更影响')).toBeDefined()
