@@ -144,6 +144,39 @@ describe('release hardening · truthful Technical Preview surfaces', () => {
     expect(data.code).toBe('BACKUP_NOT_IMPLEMENTED')
     expect(JSON.stringify(data)).not.toContain('sha256_mock_snapshot_digest')
   })
+
+  it('does not fabricate a novel breakdown when no real breakdown provider is wired', async () => {
+    const base = await listen()
+    const { response, data } = await jsonPost(base, '/api/novel-breakdown', { sampleText: '真实样本文本' })
+    expect(response.status).toBe(501)
+    expect(data.code).toBe('NOVEL_BREAKDOWN_NOT_IMPLEMENTED')
+    expect(data.result).toBeUndefined()
+  })
+
+  it('does not present the built-in knowledge demo as live web search', async () => {
+    const base = await listen()
+    const { response, data } = await jsonPost(base, '/api/web-search', { query: '唐代夜禁' })
+    expect(response.status).toBe(501)
+    expect(data.code).toBe('WEB_SEARCH_NOT_CONFIGURED')
+    expect(data.results).toBeUndefined()
+  })
+
+  it('rank scan never falls back to fabricated boards or fabricated heat values', async () => {
+    const base = await listen()
+    const { response, data } = await jsonPost(base, '/api/rank-scan', {})
+    const serialized = JSON.stringify(data)
+    expect(serialized).not.toContain('惹金枝')
+    expect(serialized).not.toContain('98.5万在读')
+    expect(serialized).not.toContain('长生苟道')
+    if (response.status === 200) {
+      expect(data.ok).toBe(true)
+      expect(data.degraded).toBe(false)
+      expect(Array.isArray(data.boards)).toBe(true)
+    } else {
+      expect(response.status).toBe(503)
+      expect(data.code).toBe('RANK_SOURCE_UNAVAILABLE')
+    }
+  })
 })
 
 describe('release hardening · core draft context', () => {
