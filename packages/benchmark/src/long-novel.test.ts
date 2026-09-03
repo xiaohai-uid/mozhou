@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { ContextPacket } from '@mozhou/context-compiler'
-import type { NarrativePromiseId, TemporalFact } from '@mozhou/kernel'
+import type { EntityRef, NarrativePromiseId, TemporalFact } from '@mozhou/kernel'
 import { evaluateContinuityPacket } from './continuity-assertions.js'
 
 interface LongNovelFixture {
@@ -51,6 +51,10 @@ function expiredFact(): TemporalFact {
   }
 }
 
+function deadCharacterRef(): EntityRef {
+  return fixture.deadCharacter.ref as EntityRef
+}
+
 describe('50 章长篇连续性基准', () => {
   it('fixture 覆盖连续 1–50 章，并固定回溯修改的受影响章集合', () => {
     expect(fixture.chapters).toEqual(Array.from({ length: 50 }, (_, index) => index + 1))
@@ -66,7 +70,7 @@ describe('50 章长篇连续性基准', () => {
         27,
         `错误上下文：${fixture.secret.keyword}；${fixture.expiredFact.value}`,
         [{
-          identifier: fixture.deadCharacter.ref,
+          identifier: deadCharacterRef(),
           tier: 'entity_card',
           text: '老船长：status: active',
           tokens: 8,
@@ -79,7 +83,7 @@ describe('50 章长篇连续性基准', () => {
         pov: 'protagonist',
         unrevealedSecrets: [{ factId: fixture.secret.factId, secretKeywords: [fixture.secret.keyword] }],
         expiredFacts: [expiredFact()],
-        deadCharacters: [fixture.deadCharacter.ref],
+        deadCharacters: [deadCharacterRef()],
       },
     )
 
@@ -97,7 +101,7 @@ describe('50 章长篇连续性基准', () => {
       currentChapterIndex: 40,
       pov: 'protagonist',
       duePromiseIds: [due],
-      deadCharacters: [fixture.deadCharacter.ref],
+      deadCharacters: [deadCharacterRef()],
     })
     expect(missing.passed).toBe(false)
     expect(missing.violations.some((entry) => entry.ruleId === 'L1-CONT-004-DUE-PROMISE-MISSING')).toBe(true)
@@ -106,7 +110,7 @@ describe('50 章长篇连续性基准', () => {
       currentChapterIndex: 40,
       pov: 'protagonist',
       duePromiseIds: [due],
-      deadCharacters: [fixture.deadCharacter.ref],
+      deadCharacters: [deadCharacterRef()],
     })
     expect(paid.passed).toBe(true)
   })
