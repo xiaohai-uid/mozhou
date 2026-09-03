@@ -12,6 +12,8 @@
     "build": "tsc -b",
     "start": "node scripts/launcher.mjs",
     "build:release": "node scripts/build-release.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
     "package": "node scripts/build-release.mjs",
     "lint": "eslint .",
     "test": "vitest run",

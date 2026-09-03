@@ -73,4 +73,14 @@ export type {
 } from './mechanical-gates.js';
 export { evaluateStyleMetrics } from './style-metrics.js';
 export type { SepiaNarrativeScore, StyleMetrics } from './style-metrics.js';
+export {
+  runDeAiDiagnostics,
+  TIER_1_PATTERNS,
+  TIER_2_CLUSTER_TERMS,
+} from './de-ai-engine.js';
+export type {
+  DeAiEngineReport,
+  DeAiFinding,
+  DeAiSeverity,
+} from './de-ai-engine.js';
 

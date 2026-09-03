@@ -4,7 +4,7 @@
  * 构建 workspace 与 web dist，打包 Windows/Linux/macOS/Web/Docker 全套安装包。
  */
 import { execSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -63,19 +63,41 @@ const packagesDir = join(rootDir, 'packages')
 const targetPackagesDir = join(tempBundleDir, 'packages')
 mkdirSync(targetPackagesDir, { recursive: true })
 
+/** 递归清理 dist 中的测试产物与源码映射（*.test.js / *.test.d.ts / *.map），瘦身发布包。 */
+function pruneTestArtifacts(dir) {
+  if (!existsSync(dir)) return
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    let stat
+    try {
+      stat = statSync(full)
+    } catch {
+      continue
+    }
+    if (stat.isDirectory()) {
+      pruneTestArtifacts(full)
+    } else if (/\.test\.(js|d\.ts|js\.map)$/.test(entry) || entry.endsWith('.map')) {
+      rmSync(full, { force: true })
+    }
+  }
+}
+
 const pkgFolders = ['context-compiler', 'data-plane', 'flywheel', 'kernel', 'pipeline', 'quality-engine', 'runtime', 'benchmark']
 for (const folder of pkgFolders) {
   const srcPkg = join(packagesDir, folder)
   const destPkg = join(targetPackagesDir, folder)
   if (existsSync(srcPkg)) {
     mkdirSync(destPkg, { recursive: true })
-    const files = ['package.json', 'dist', 'assets']
+    // dist 编译产物 + package.json + assets + fixtures（fixtures 供测试与 recipe 运行期读取）
+    const files = ['package.json', 'dist', 'assets', 'fixtures']
     for (const f of files) {
       const s = join(srcPkg, f)
       if (existsSync(s)) {
         cpSync(s, join(destPkg, f), { recursive: true })
       }
     }
+    // 瘦身：清理复制进发布包的测试与 map 产物
+    pruneTestArtifacts(join(destPkg, 'dist'))
   }
 }
 
@@ -91,9 +113,11 @@ for (const f of webFiles) {
 }
 
 // 生成发布说明
-const releaseReadme = `# 🌊 墨舟 (Novel OS) v${version} 生产级独立安装包
+const releaseReadme = `# 🌊 墨舟 (Novel OS) v${version} 技术预览版
 
-墨舟是一款生产级、可商用的长篇小说 AI 辅助创作操作系统。
+> ⚠️ 当前版本定位：**技术预览 / Demo**。核心本地引擎（十步创作管道、Story Brain、
+> 质量门、本地 embedding）为真实实现；「AI 生成 / 会员 / 云同步」等在线服务尚未
+> 正式上线，未配置真实 LLM Key 时草稿流为显式演示模式（页面有诚实标注）。
 
 ## 🚀 快速启动指南
 
@@ -112,6 +136,13 @@ chmod +x start.sh
 \`\`\`bash
 docker compose up -d
 \`\`\`
+
+## 🔑 配置真实 AI 生成（BYOK）
+
+在启动环境中配置以下环境变量之一即可启用真实流式生成（默认未配置时走演示模式）：
+- \`MOZHOU_API_KEY\` / \`DEEPSEEK_API_KEY\` / \`OPENAI_API_KEY\`：上游 API Key
+- \`MOZHOU_API_BASE\`：可选，OpenAI-compatible 端点
+- \`MOZHOU_MODEL\`：可选，模型名（默认 deepseek-chat）
 
 ---
 © 2026 墨舟团队 · 保留所有权利
