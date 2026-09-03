@@ -19,7 +19,7 @@ env:
 
 jobs:
   build-and-release:
-    name: Build & Package Multi-Platform Release Assets
+    name: Verify & Package Technical Preview
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -40,20 +40,34 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Dependency audit (high/critical)
+        run: pnpm audit --audit-level high
+
       - name: Build Packages (tsc -b)
         run: pnpm build
 
       - name: Run Test Suite (packages/*)
         run: pnpm test
 
-      - name: Build Web App (vite build)
-        run: pnpm --filter @mozhou/web build
+      - name: Typecheck Web App
+        run: pnpm --filter @mozhou/web typecheck
 
       - name: Test Web App (vitest)
         run: pnpm --filter @mozhou/web test
 
+      - name: Build Web App (vite build)
+        run: pnpm --filter @mozhou/web build
+
       - name: Generate Release Installation Packages
         run: node scripts/build-release.mjs
+
+      - name: Generate SHA-256 manifest
+        run: |
+          find release-artifacts -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > release-artifacts/SHA256SUMS.txt
+          test -s release-artifacts/SHA256SUMS.txt
 
       - name: Determine Release Tag
         id: release_tag
@@ -66,29 +80,29 @@ jobs:
             echo "tag=v0.1.0" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish GitHub Release with Packages
+      - name: Publish GitHub Technical Preview with Packages
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
-          name: 墨舟 (Novel OS) ${{ steps.release_tag.outputs.tag }}
+          name: 墨舟 (Novel OS) ${{ steps.release_tag.outputs.tag }} Technical Preview
           draft: false
-          prerelease: false
+          prerelease: true
           generate_release_notes: true
           body: |
-            ## 🌊 墨舟 (Novel OS) 生产级长篇小说 AI 辅助创作系统
+            ## 🌊 墨舟 (Novel OS) Technical Preview
 
-            ### 📦 本次发布的独立安装包清单：
-            - 🪟 **Windows 绿色免安装包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-windows-x64.tar.gz\`（含 \`启动墨舟.bat\` 双击即用）
-            - 🐧 **Linux 独立运行包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-linux-x64.tar.gz\`（含 \`start.sh\` 一键运行）
-            - 🍎 **macOS 通用安装包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-darwin-universal.tar.gz\`
-            - 🌐 **Web 纯静态产物包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-web-dist.tar.gz\`
-            - 🐳 **Docker 一键启动包**：\`mozhou-${{ steps.release_tag.outputs.tag }}-docker.tar.gz\`
+            这是面向早期测试者的长篇小说 AI 创作操作系统技术预览版，不宣称云同步、付费许可证或尚未接线的能力已经可用。
 
-            ### 🚀 快速启动：
-            - **Windows 用户**：解压后双击 \`启动墨舟.bat\` 即可。
-            - **Linux / macOS 用户**：解压后运行 \`chmod +x start.sh && ./start.sh\`。
-            - **Docker 用户**：解压后运行 \`docker compose up -d\`。
+            ### 📦 独立安装包
+            - 🪟 Windows 绿色免安装包
+            - 🐧 Linux 独立运行包
+            - 🍎 macOS 通用包
+            - 🌐 Web 产物包
+            - 🐳 Docker 本机预览包（默认仅绑定宿主 127.0.0.1）
+
+            下载后请使用同一 Release 中的 `SHA256SUMS.txt` 校验文件完整性。
           files: |
             release-artifacts/*.tar.gz
             release-artifacts/*.zip
+            release-artifacts/SHA256SUMS.txt
