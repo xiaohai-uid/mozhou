@@ -1190,6 +1190,14 @@ describe('会员中心 API 契约', () => {
     expect(plans.find((plan) => plan.id === 'pro_lifetime')?.current).toBe(false)
   })
 
+  it('GET /api/membership：支持运维健康检查与 CLI 探针直接获取社区版信息', async () => {
+    const base = await listen()
+    const res = await fetch(`${base}/api/membership`, { method: 'GET', headers: { Host: new URL(base).host } })
+    expect(res.status).toBe(200)
+    const text = await res.text()
+    expect(text).toContain('free_community')
+  })
+
   it('POST /api/membership.activate：服务未上线时一律 501，不做格式即授权', async () => {
     const base = await listen()
     const goodFormat = await post(base, '/api/membership.activate', { key: 'MOZHOU-PRO-LIFETIME-TEST' })

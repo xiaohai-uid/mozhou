@@ -166,7 +166,7 @@ function databaseBytes(root: string | null): number {
 }
 
 export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
-  if (req.method !== 'POST') return false
+  if (req.method !== 'POST' && !(req.method === 'GET' && path === '/api/membership')) return false
 
   /* ---- 风格画像与蒸馏 ---- */
   if (path === '/api/style') {
