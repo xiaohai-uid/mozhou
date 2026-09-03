@@ -3,14 +3,6 @@
  * 墨舟先问（choice-row 快捷回答）→ 作者作答 → AI 确认 → draft.stream
  * NDJSON 流式渲染草稿片段（打字机渐进 append）。composer 在 provider 未配时
  * 显式 unavailable（Gate 3 纪律：不静默假装可用）。
- *
- * 数据面（/api 中间件直出，组件 type-only 直引契约形状，零 any）：
- * - /api/capabilities   → 技能多选胶囊列表
- * - /api/draft.question → 墨舟先问（V1 mock）
- * - /api/draft.stream   → NDJSON 流式草稿（start/delta/done 帧，error 帧）
- *
- * 双胶囊轨：技能多选选中集随请求注入 draft.stream；风格单选 V1 显式空态
- * 「未接入」（styleProfile 数据源未到，不假装可用）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
@@ -31,8 +23,11 @@ interface DraftStreamFrame {
 
 export function DialogueStream({
   book,
+  chapterIndex = 1,
 }: {
   book: BookInfo | null
+  /** 兼容旧调用面缺省第 1 章；生产 App 始终传入当前选中章。 */
+  chapterIndex?: number
 }): JSX.Element {
   const [phase, setPhase] = useState<DialoguePhase>('ask')
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse['capabilities']>([])
@@ -66,7 +61,6 @@ export function DialogueStream({
     return () => { void readerRef.current?.cancel() }
   }, [])
 
-  /** 发送：把作者回答送进 draft.stream，逐 NDJSON 帧渐进渲染。 */
   const handleSend = useCallback(async (): Promise<void> => {
     if (book === null || phase === 'drafting' || sending) return
     const prompt = answer.trim()
@@ -79,9 +73,9 @@ export function DialogueStream({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           root: book.root,
-          chapterIndex: 1,
+          chapterIndex,
           prompt,
-          skills: selectedSkills,
+          activeSkills: selectedSkills,
         }),
       })
       const contentType = res.headers.get('Content-Type') ?? ''
@@ -140,7 +134,7 @@ export function DialogueStream({
       setPhase('error')
       setSending(false)
     }
-  }, [answer, book, phase, selectedSkills, sending])
+  }, [answer, book, chapterIndex, phase, selectedSkills, sending])
 
   const handleChoice = (choice: string): void => {
     setAnswer(choice)
@@ -173,7 +167,7 @@ export function DialogueStream({
 
   return (
     <>
-      <div className="date-rule">CHAPTER PRODUCTION SESSION · 对话流 T44</div>
+      <div className="date-rule">CHAPTER {chapterIndex} PRODUCTION SESSION · 对话流 T44</div>
 
       {providerUnavailable && (
         <div className="wb-error" role="alert" data-testid="provider-unavailable">
@@ -287,9 +281,7 @@ export function DialogueStream({
               ↑
             </button>
             <div className="composer-foot">
-              <span>
-                已注入 {selectedSkills.length} 项技能 · 风格未接入 · 质量门常驻
-              </span>
+              <span>已注入 {selectedSkills.length} 项技能 · 风格未接入 · 质量门常驻</span>
               <span>⌘ Enter 发送</span>
             </div>
           </div>
@@ -299,7 +291,6 @@ export function DialogueStream({
   )
 }
 
-/** JSON 契约助手（与 lib/post 同语义；组件内聚避免二次依赖）。 */
 async function fetchJson<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(path, {
     method: 'POST',
