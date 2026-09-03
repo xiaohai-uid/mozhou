@@ -1,43 +1,56 @@
 @echo off
+setlocal
 chcp 65001 > nul
 title 墨舟 (Novel OS) 一键启动器
 
 echo ========================================================
-echo   🌊 墨舟 (Novel OS) - 生产级长篇小说 AI 创作系统
+echo   墨舟 (Novel OS) - 本地优先长篇小说 AI 创作系统
 echo ========================================================
 echo.
 
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Node.js 环境！
-    echo 请先前往官网下载并安装 Node.js (推荐 v20 或 v22 LTS): https://nodejs.org/
-    echo.
+    echo [错误] 未检测到 Node.js 22。
     pause
     exit /b 1
 )
 
-where pnpm >nul 2>nul
+node -e "process.exit(Number(process.versions.node.split('.')[0]) === 22 ? 0 : 1)"
 if %errorlevel% neq 0 (
-    echo [提示] 未检测到 pnpm，正在通过 npm 自动安装 pnpm...
-    call npm install -g pnpm
+    echo [错误] 本发行版要求 Node.js 22。当前版本：
+    node --version
+    pause
+    exit /b 1
+)
+
+set ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+
+if not exist node_modules (
+    echo [提示] 首次运行：按锁文件安装生产依赖（pnpm 9.15.0）...
+    call npx --yes pnpm@9.15.0 install --prod --frozen-lockfile
     if %errorlevel% neq 0 (
-        echo [错误] pnpm 安装失败，请手动执行: npm i -g pnpm
+        echo [错误] 生产依赖安装失败；未放宽锁文件约束。
         pause
         exit /b 1
     )
 )
 
-if not exist node_modules (
-    echo [提示] 首次运行，正在安装生产依赖...
-    set ONNXRUNTIME_NODE_INSTALL_CUDA=skip
-    call pnpm install --frozen-lockfile
-    if %errorlevel% neq 0 (
-        call pnpm install
-    )
+if not exist apps\web\dist\index.html (
+    echo [错误] 发行包缺少 apps\web\dist\index.html
+    pause
+    exit /b 1
+)
+if not exist apps\web\dist-server\productionServer.js (
+    echo [错误] 发行包缺少正式 Node 服务产物。
+    pause
+    exit /b 1
 )
 
-echo [提示] 正在启动墨舟创作工作台...
-set ONNXRUNTIME_NODE_INSTALL_CUDA=skip
-node scripts/launcher.mjs
+node scripts\launcher.mjs
+if %errorlevel% neq 0 (
+    echo [错误] 墨舟服务异常退出。
+    pause
+    exit /b %errorlevel%
+)
 
-pause
+endlocal
