@@ -1,28 +1,35 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 echo "========================================================"
-echo "  🌊 墨舟 (Novel OS) - 生产级长篇小说 AI 创作系统"
+echo "  墨舟 (Novel OS) - 本地优先长篇小说 AI 创作系统"
 echo "========================================================"
-echo ""
 
-if ! command -v node &> /dev/null; then
-    echo "[错误] 未检测到 Node.js 环境！"
-    echo "请先安装 Node.js (推荐 v20 或 v22 LTS): https://nodejs.org/"
-    exit 1
+if ! command -v node >/dev/null 2>&1; then
+  echo "[错误] 未检测到 Node.js 22。"
+  exit 1
 fi
 
-if ! command -v pnpm &> /dev/null; then
-    echo "[提示] 未检测到 pnpm，正在通过 npm 安装..."
-    npm install -g pnpm
+if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) === 22 ? 0 : 1)"; then
+  echo "[错误] 当前 Node.js 版本为 $(node --version)，本发行版要求 Node.js 22。"
+  exit 1
 fi
 
 export ONNXRUNTIME_NODE_INSTALL_CUDA=skip
 
 if [ ! -d "node_modules" ]; then
-    echo "[提示] 首次运行，正在安装生产依赖..."
-    pnpm install --frozen-lockfile || pnpm install
+  echo "[提示] 首次运行：按锁文件安装生产依赖（pnpm 9.15.0）..."
+  npx --yes pnpm@9.15.0 install --prod --frozen-lockfile
 fi
 
-echo "[提示] 正在启动墨舟创作工作台..."
+require_file() {
+  if [ ! -f "$1" ]; then
+    echo "[错误] 发行包缺少必要产物: $1"
+    exit 1
+  fi
+}
+
+require_file "apps/web/dist/index.html"
+require_file "apps/web/dist-server/productionServer.js"
+
 node scripts/launcher.mjs
