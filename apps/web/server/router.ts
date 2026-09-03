@@ -60,9 +60,12 @@ export class ApiRouter {
         }
       } catch (error) {
         if (!res.writableEnded) {
+          // 详细异常仅进入本机日志；HTTP 响应不泄露路径、SQL、文件名或上游内部信息。
+          console.error('[mozhou-api] unhandled route error', error)
           sendJson(500, {
             ok: false,
-            error: (error as Error)?.message ?? 'Internal Server Error',
+            code: 'INTERNAL_SERVER_ERROR',
+            error: 'Internal Server Error',
           })
         }
         return true
