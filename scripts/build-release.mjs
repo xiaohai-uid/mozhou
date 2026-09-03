@@ -37,7 +37,7 @@ process.env.ONNXRUNTIME_NODE_INSTALL_CUDA = 'skip'
  * @param {string} [cwd]
  */
 function run(command, args, cwd = rootDir) {
-  execFileSync(command, args, { cwd, stdio: 'inherit', env: process.env })
+  execFileSync(command, args, { cwd, stdio: 'inherit', env: process.env, shell: process.platform === 'win32' })
 }
 
 /**
@@ -100,6 +100,7 @@ for (const file of [
 }
 copyIfPresent('scripts/launcher.mjs')
 copyIfPresent('scripts/check-install-env.mjs')
+copyIfPresent('patches')
 
 const packageFolders = ['context-compiler', 'data-plane', 'flywheel', 'kernel', 'pipeline', 'quality-engine', 'runtime', 'benchmark']
 for (const folder of packageFolders) {
