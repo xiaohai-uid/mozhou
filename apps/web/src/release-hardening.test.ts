@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createServer } from 'node:http'
+import { createServer, request } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -42,11 +42,47 @@ async function jsonPost(base: string, path: string, body: unknown, headers: Reco
   return { response, data }
 }
 
+function rawJsonPostWithHost(
+  base: string,
+  path: string,
+  hostHeader: string,
+): Promise<{ status: number; data: Record<string, unknown> }> {
+  const target = new URL(base)
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path,
+        method: 'POST',
+        headers: {
+          Host: hostHeader,
+          'Content-Type': 'application/json',
+          'Content-Length': '2',
+        },
+      },
+      (res) => {
+        let raw = ''
+        res.setEncoding('utf8')
+        res.on('data', (chunk: string) => { raw += chunk })
+        res.on('end', () => {
+          resolve({
+            status: res.statusCode ?? 0,
+            data: JSON.parse(raw) as Record<string, unknown>,
+          })
+        })
+      },
+    )
+    req.on('error', reject)
+    req.end('{}')
+  })
+}
+
 describe('release hardening · HTTP boundary', () => {
   it('rejects an untrusted Host before routing', async () => {
     const base = await listen()
-    const { response, data } = await jsonPost(base, '/api/capabilities', {}, { Host: 'evil.example' })
-    expect(response.status).toBe(403)
+    const { status, data } = await rawJsonPostWithHost(base, '/api/capabilities', 'evil.example')
+    expect(status).toBe(403)
     expect(data.code).toBe('UNTRUSTED_HOST')
   })
 
