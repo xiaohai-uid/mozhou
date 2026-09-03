@@ -25,6 +25,18 @@ describe('release hardening · distribution configuration', () => {
     expect(dockerfile).toContain('USER node')
   })
 
+  it('publishes only truthful generic runtime/web/docker assets', () => {
+    const script = read('scripts/build-release.mjs')
+    expect(script).toContain('-local-runtime.tar.gz')
+    expect(script).toContain('-web-dist.tar.gz')
+    expect(script).toContain('-docker.tar.gz')
+    expect(script).not.toContain('-windows-x64.tar.gz')
+    expect(script).not.toContain('-darwin-universal.tar.gz')
+    expect(script).not.toContain('Windows 绿色免安装包')
+    expect(script).not.toContain('macOS 通用包')
+    expect(script).not.toContain("console.warn('⚠️ 打包命令异常:'")
+  })
+
   it('does not publish legacy infrastructure ports or fixed development secrets by default', () => {
     const compose = read('docker-compose.yml')
     expect(compose).not.toContain('"11235:11235"')
