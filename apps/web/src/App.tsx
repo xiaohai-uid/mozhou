@@ -1,7 +1,5 @@
 /**
- * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027 · 商业化双端全景）：
- * 顶栏 + 八步管线条 + 左侧五组功能航道 + 中栏（工作台填充/显式占位）
- * + 右侧检视塔 + WebGL 背景墨流 + 商业化模态窗提升 (Modal Hoisting)。
+ * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027 · 商业化双端全景）。
  */
 import { useEffect, useState } from 'react'
 import { CapabilityChannels } from './shell/CapabilityChannels'
@@ -35,18 +33,15 @@ import { WorkbenchView } from './workbench/WorkbenchView'
 import { MobileShell } from './mobile/MobileShell'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
 
-/** 管线点击牵引的墨迹聚焦：activeStage 均匀映射到 [0,1]（原型同款）。 */
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
 }
 
-/** 书根 → 书库父目录（浏览器无 node:path，取最后分隔符前段；无分隔符回落根自身）。 */
 function parentDirOf(root: string): string {
   const index = Math.max(root.lastIndexOf('/'), root.lastIndexOf('\\'))
   return index > 0 ? root.slice(0, index) : root
 }
 
-/** 检视组导航 → 检视塔 tab 的牵引映射。 */
 const INSPECTOR_VIEW_TO_TAB: Partial<Record<ViewId, InspectorTabId>> = {
   'quality-gate': 'quality',
   'story-brain': 'story-brain',
@@ -54,10 +49,7 @@ const INSPECTOR_VIEW_TO_TAB: Partial<Record<ViewId, InspectorTabId>> = {
   'change-matrix': 'change-matrix',
 }
 
-/** 壳级默认阶段：审查（与原型关键屏一致的初始高亮；真实会话绑定随后续票接入）。 */
 const DEFAULT_STAGE = PIPELINE_STAGES.findIndex((stage) => stage.id === 'review')
-
-/** Wizard 完成标记：Q3「仅首次」——完成前 localStorage 无标记时未建书自动进入。 */
 const WIZARD_DONE_KEY = 'mozhou.wizard.done'
 
 function wizardCompleted(): boolean {
@@ -72,16 +64,14 @@ export function App(): JSX.Element {
   const [initial] = useState(loadWorkbenchState)
   const [book, setBook] = useState<BookInfo | null>(initial.book)
   const [view, setView] = useState<ViewId>(initial.view)
+  const [chapterIndex, setChapterIndex] = useState(1)
   const [stage, setStage] = useState(DEFAULT_STAGE)
   const [inspectorTab, setInspectorTab] = useState<InspectorTabId>('quality')
   const [wizardOpen, setWizardOpen] = useState(
     () => initial.book === null && !wizardCompleted(),
   )
-
-  // 桌面端全局模态窗状态
   const [desktopModal, setDesktopModal] = useState<DesktopModalType>(null)
 
-  // 移动端响应式检测 (视口宽度 < 768px 时激活 MobileShell)
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.innerWidth > 0 && window.innerWidth < 768
@@ -106,18 +96,14 @@ export function App(): JSX.Element {
     if (tab !== undefined) setInspectorTab(tab)
   }
 
-  const handleBookCreated = (created: BookInfo): void => {
-    setBook(created)
+  const selectBook = (nextBook: BookInfo): void => {
+    setBook(nextBook)
+    setChapterIndex(1)
     setView('workbench')
   }
 
-  /** 书架切书：开书/导入后切换到该书（localStorage 记忆随 book/view effect 落）。 */
-  const handleBookSwitch = (switched: BookInfo): void => {
-    setBook(switched)
-    setView('workbench')
-  }
-
-  /** 书库父目录：当前书根的父目录（无书 = null，书架显式引导）。 */
+  const handleBookCreated = (created: BookInfo): void => selectBook(created)
+  const handleBookSwitch = (switched: BookInfo): void => selectBook(switched)
   const parentDir = book === null ? null : parentDirOf(book.root)
 
   const handleWizardComplete = (outcome: WizardOutcome): void => {
@@ -126,8 +112,7 @@ export function App(): JSX.Element {
     } catch {
       // localStorage 不可用：完成标记是增强，不阻塞工作台。
     }
-    setBook({ root: outcome.root, bookId: outcome.bookId, title: outcome.title })
-    setView('workbench')
+    selectBook({ root: outcome.root, bookId: outcome.bookId, title: outcome.title })
     setWizardOpen(false)
   }
 
@@ -136,7 +121,6 @@ export function App(): JSX.Element {
     setView('workbench')
   }
 
-  // 移动端优先渲染全景工作台
   if (isMobile) {
     return <MobileShell book={book} onSwitchBook={handleBookSwitch} />
   }
@@ -146,7 +130,7 @@ export function App(): JSX.Element {
       book === null ? (
         <InspectorEmpty note="建书后可用——先在工作台建书，再回到本面板运行文学质量审查。" />
       ) : (
-        <QualityPanel root={book.root} chapterIndex={1} />
+        <QualityPanel root={book.root} chapterIndex={chapterIndex} />
       ),
     'story-brain':
       book === null ? (
@@ -184,6 +168,8 @@ export function App(): JSX.Element {
           <WorkbenchView
             key={book?.root ?? 'no-book'}
             book={book}
+            chapterIndex={chapterIndex}
+            onChapterIndexChange={setChapterIndex}
             onBookCreated={handleBookCreated}
           />
         ) : view === 'book-shelf' ? (
@@ -201,31 +187,19 @@ export function App(): JSX.Element {
         ) : view === 'capability-square' ? (
           <CapabilitySquareView />
         ) : view === 'works' ? (
-          <WorksView
-            root={book?.root ?? null}
-            onGoToWorkbench={() => setView('workbench')}
-          />
+          <WorksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
         ) : view === 'tasks' ? (
-          <TasksView
-            root={book?.root ?? null}
-            onGoToWorkbench={() => setView('workbench')}
-          />
+          <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
         ) : view === 'style-distill' ? (
-          <StyleDistillView
-            root={book?.root ?? null}
-          />
+          <StyleDistillView root={book?.root ?? null} />
         ) : view === 'novel-breakdown' ? (
-          <NovelBreakdownView
-            root={book?.root ?? null}
-          />
+          <NovelBreakdownView root={book?.root ?? null} />
         ) : view === 'rank-scan' ? (
           <RankScanView />
         ) : view === 'web-search' ? (
           <WebSearchView />
         ) : view === 'cloud-sync' ? (
-          <CloudSyncView
-            root={book?.root ?? null}
-          />
+          <CloudSyncView root={book?.root ?? null} />
         ) : view === 'membership' ? (
           <MembershipView />
         ) : (
@@ -240,8 +214,6 @@ export function App(): JSX.Element {
           onReplay={handleWizardDismiss}
         />
       )}
-
-      {/* 桌面端全局模态窗 */}
       <DesktopToolModals activeModal={desktopModal} onClose={() => setDesktopModal(null)} />
     </>
   )
