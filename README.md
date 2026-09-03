@@ -1,88 +1,93 @@
-# 墨舟 (MoZhou / Novel OS)
+# 🌊 墨舟 (MoZhou / Novel OS)
 
-AI 长篇小说辅助创作操作系统 —— 生产级 · 模型自由 · 本地数据自有 · 100% 离线可用
-
----
-
-## 📦 安装包与快速上手（推荐）
-
-墨舟提供全平台预打包的独立安装包与一键启动器，无需复杂环境配置即可快速启动：
-
-### 1. 安装包获取与启动
-- 🪟 **Windows 用户**: 下载或获取 `mozhou-*-windows-x64.zip`（或 `.tar.gz`），解压后双击 **`start.bat`**（或 `启动墨舟.bat`）即可自动运行并在浏览器中打开。
-- 🐧 **Linux 用户**: 解压 `mozhou-*-linux-x64.tar.gz`，在终端运行 `chmod +x start.sh && ./start.sh`。
-- 🍎 **macOS 用户**: 解压 `mozhou-*-darwin-universal.tar.gz`，运行 `./start.sh`。
-- 🐳 **Docker 容器用户**:
-  ```bash
-  # 解压或在源码目录下直接执行：
-  docker compose up -d
-  # 访问 http://localhost:5173
-  ```
-
-> 💡 **提示**：本项目为自有私有仓库，安装包通过离线安装包（`release-artifacts/`）直接分发测试。无需全局安装繁重依赖，首次运行脚本将自动自检并拉起本地服务。
+> **定位**：长篇小说 AI 辅助创作操作系统 —— 工业级状态机 · 11 项机械门禁 · 本地数据自有 · 确定性长程因果契约
 
 ---
 
-## 🚀 源码运行与开发构建
+## 📌 版本声明与当前状态
 
-- **`apps/web + packages/*` 是 Novel OS 2.0 主线**：pnpm monorepo（`@mozhou/kernel` / `data-plane` / `context-compiler` / `pipeline` / `runtime` / `flywheel` / `benchmark` 等），新的 Story Kernel 与 quality-engine 能力只在这里落地。
-- **`app/` 是遗留应用面（legacy）**：V1.x Next.js 单体，**只接收迁移/安全/可靠性修复**，不再新增核心能力；迁移完成前其用户数据导出/读取能力保持可用。
+当前发布版本定位为 **技术预览版 (Technical Preview / v0.1.0)**：
+- **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、11 项机械门禁与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据平面（`@mozhou/data-plane`）；
+- **AI 模型通道**：支持 **USER_BYOK（用户自带 Key）** 真实流式调用（OpenAI-compatible / DeepSeek / Claude）。未配置 API Key 时系统降级为显式演示模式；
+- **商业化状态**：当前为**社区免费版**，云同步目前为本地快照模式，会员充值与付费通道暂未开放。
 
-## 快速开始（开发环境）
+---
+
+## 🚀 快速启动与安装
+
+### 方式一：发布包一键启动（免繁琐配置）
+
+获取 `release-artifacts/` 目录下的对应平台安装包：
+- 🪟 **Windows**: 解压 `mozhou-v0.1.0-windows-x64.zip`，双击运行 **`启动墨舟.bat`**（或 `start.bat`）；
+- 🐧 **Linux**: 解压 `mozhou-v0.1.0-linux-x64.tar.gz`，执行 `chmod +x start.sh && ./start.sh`；
+- 🍎 **macOS**: 解压 `mozhou-v0.1.0-darwin-universal.tar.gz`，执行 `./start.sh`；
+- 服务就绪后默认自动打开浏览器：**`http://localhost:5173`**。
+
+### 方式二：源码启动（开发者推荐）
 
 ```bash
-# Novel OS 2.0 主线（packages/* + apps/web）
+# 1. 安装依赖
 pnpm install
+
+# 2. 全量构建
 pnpm build
+
+# 3. 运行测试（888 项全绿）
 pnpm test
 
-# 1. 启动基础设施（Postgres+pgvector、one-api 网关）— legacy 应用依赖
-docker compose up -d
-
-# 2. 启动遗留 Web 应用（开发模式）
-cd app
-npm install
-npm run dev
-# 打开 http://localhost:3000（若 3000 被占用会自动换端口，见终端输出）
+# 4. 启动本地完整桌面/Web 创作工作台
+pnpm --filter @mozhou/web dev
 ```
 
-- one-api 控制台: http://localhost:3001 （默认账号 root / 密码 123456，见容器日志）
-- 初始化渠道与令牌（DeepSeek + Qwen + 应用令牌）：
-  `DEEPSEEK_API_KEY=sk-xxx QWEN_API_KEY=sk-xxx bash scripts/init-one-api.sh`
-  （不传 key 会创建占位渠道，之后在控制台补填；应用令牌 key 在控制台「令牌」页查看）
-- Postgres 端口 **5433**（避开本机 WSL 原生 Postgres 的 5432）；pgvector 扩展已启用（docker/init/01-init.sql）
+---
 
-## 发布前真实模型门禁
+## 🔑 配置真实 AI 生成通道（BYOK）
 
-发布前在 `app/` 目录执行：
+墨舟支持完全无中转的本地直连 OpenAI 兼容上游服务。启动前在环境或 `.env` 中指定：
 
 ```bash
-npm run gate:release
+# 必填一项即可开启真实 LLM 流式草稿
+export DEEPSEEK_API_KEY="sk-your-deepseek-key"
+# 或 export OPENAI_API_KEY="sk-your-openai-key"
+# 或 export MOZHOU_API_KEY="sk-your-custom-key"
+
+# 可选：自定义上游地址与模型名（默认: https://api.deepseek.com / deepseek-chat）
+export MOZHOU_API_BASE="https://api.deepseek.com"
+export MOZHOU_MODEL="deepseek-chat"
 ```
 
-这条命令会依次执行完整测试、生产构建和真实 one-api smoke。真实 smoke 需要 `.env` 中配置可用的 `DATABASE_URL`、`AUTH_SECRET`、`ONEAPI_BASE_URL` 和 `ONEAPI_TOKEN`；它会启动临时 Web 服务，验证真实 SSE、消息持久化和候选插入，结束后自动清理测试账号与作品。不要把它加入日常开发门禁，也不要用 `CHAT_PROVIDER=mock` 代替发布前验证。
+---
 
-如需保留服务和测试账号做浏览器复验，单独执行 `npm run smoke:real-llm -- --keep`，完成后手动清理该账号。
+## 🏛️ 项目工程架构
 
-## 结构
+项目采用统一的标准 Pnpm Monorepo 架构，彻底告别历史遗留单体代码：
 
+```text
+mozhou/
+├── packages/
+│   ├── kernel/            # 领域九柱、CausalContract 因果契约、SceneExitState
+│   ├── data-plane/        # 本地 SQLite WAL 数据库、Markdown 目录卡、五态对账
+│   ├── context-compiler/  # fastembed 向量模型、3通道加权 RRF、Reserved 预算装配
+│   ├── quality-engine/    # 11 项机械门禁、4-gram 审查、De-AI 工业级引擎 v2.0
+│   ├── pipeline/          # 10 步章节生产会话状态机、回炉降级、版本追踪
+│   ├── runtime/           # 多模型运行时底座、能力注册表、Recipe 执行器
+│   ├── flywheel/          # 创作者风格画像（StyleProfile vN）、负向学习飞轮
+│   └── benchmark/         # L1 确定性连续性断言、Promptfoo 测试编译器
+├── apps/
+│   └── web/               # 现代化 Web/桌面 UI (Vite + React + TipTap AST + Tailwind)
+├── src-tauri/             # Tauri 2.0 原生跨平台桌面外壳 (<15MB 体积，<40MB 内存)
+├── scripts/               # 启动自检、多平台发布打包与工程脚本
+└── release-artifacts/     # 全平台发布构建产物
 ```
-packages/            Novel OS 核心包（kernel/data-plane/context-compiler/pipeline/runtime/flywheel/benchmark/…）
-apps/web             Novel OS 2.0 UI（Vite + React，主线）
-app/                 遗留 Next.js 应用（legacy，只收迁移/安全/可靠性修复）
-docs/adr/            架构决策记录
-docs/specs/          规格文档（chapter-pipeline-spec 等）
-docker-compose.yml   Postgres(pgvector) + one-api 编排
-.scratch/            本地工单 tracker
-prototype/           原型（pipeline-engine.prototype.html）
-CONTEXT.md           设计决策记录（grill-with-docs）
-```
 
-## 技术栈
+---
 
-- **Novel OS 主线**: TypeScript 5.5 + Node 22 + pnpm workspace + Vitest；UI 为 Vite + React（apps/web）
-- **遗留 app/**: Next.js (App Router) + TypeScript + Tailwind + shadcn/ui；PostgreSQL 16 + pgvector + Drizzle ORM；one-api 网关
+## 🛡️ 质量保证与图谱门禁
 
-## 设计来源
+- **自动化测试**：全仓库包含 **888+ 项自动化单测与端到端测试**，测试覆盖率高且全数跑通；
+- **GitNexus 代码图谱门禁**：通过 `pnpm graph:check` 进行架构拓扑依赖检查，**保证 0 循环依赖（Zero Circular Dependencies）**；
+- **严格类型检查**：全仓库 `tsc --noEmit` **0 错误**。
 
-墨舟为自有品牌产品。功能方法论参考对 OpenWrite v1.3.2 的完整逆向分析（提示词结构/交互流程），代码与文案全原创；Agent 管线理念借鉴 DeterminFlow（AGPL-3.0，仅理念，无代码依赖）。
+---
+
+© 2026 墨舟团队 (MoZhou Novel OS) · 保留所有权利

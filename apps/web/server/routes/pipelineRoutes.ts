@@ -6,15 +6,18 @@ import {
   ChapterProductionSession,
   executeChapterReview,
   makeDraftProviderBinding,
+  nextStepOf,
   QualityReworkLimitExceededError,
   recordAuthorCorrection,
   runDraftStep,
 } from '@mozhou/pipeline'
+import type { PipelineStep } from '@mozhou/pipeline'
 import { CORRECTION_REASONS, hashProse, isQualityReviewCurrent, type QualityPolicy } from '@mozhou/quality-engine'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
-import { NoProviderError, PublishBus, RuntimeEngine } from '@mozhou/runtime'
+import { PublishBus, RuntimeEngine } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
 import type { ContextPacket } from '@mozhou/context-compiler'
+import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -75,17 +78,21 @@ function decoratePromptWithSkills(prompt: string, skills: readonly string[]): st
   return `${constraints.join('\n')}\n\n${prompt}`
 }
 
-function makeMockEngine(
+/**
+ * 构造草稿流引擎：真实 provider 配置时走真实 OpenAI-compatible SSE 流；
+ * 显式 MOZHOU_DRAFT_PROVIDER=mock 时才降级为本地演示流（诚实声明，非伪装）。
+ */
+function makeStreamEngine(
   root: string,
   chapterIndex: number,
   prompt: string,
   onDelta: (text: string) => void,
-): { engine: RuntimeEngine; recipe: CapabilityRecipe } {
+): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
   const recipe: CapabilityRecipe = {
     id: 'chapter-drafting',
     recipeVersion: '0.1.0',
-    source: { repo: 'original', commit: '0'.repeat(40), license: 'original', refinedAt: '2026-08-25', refineNote: 'T44 web mock' },
+    source: { repo: 'original', commit: '0'.repeat(40), license: 'original', refinedAt: '2026-08-25', refineNote: 'T44 web streaming' },
     brief: { capability: '正文草稿流式生成', runtimeSemantics: '断流标 partial、半稿持久保留', triggers: ['draft'] },
     taskType: 'CHAPTER_DRAFTING',
     entry: { routerDoc: 'docs/router.md', phases: ['draft'], stopPoints: [] },
@@ -103,17 +110,58 @@ function makeMockEngine(
     },
     contextBudget: { hotContextBytes: 8192, fixedSections: [], perChapterReads: [] },
   }
-  engine.registerCapability({
-    taskType: 'CHAPTER_DRAFTING',
-    providerId: 'mock',
-    providerVersion: '0.0.0',
-    failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
-  })
-  engine.registerProviderBinding(
-    'mock',
-    makeDraftProviderBinding({ bookRoot: root, chapterIndex, provider: 'deepseek', mode: 'generate', stream: () => mockDraftStream(prompt, onDelta) }),
-  )
-  return { engine, recipe }
+
+  const explicitMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock'
+  let real = false
+
+  if (explicitMock) {
+    engine.registerCapability({
+      taskType: 'CHAPTER_DRAFTING',
+      providerId: 'deepseek',
+      providerVersion: '0.0.0',
+      failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
+    })
+    engine.registerProviderBinding(
+      'deepseek',
+      makeDraftProviderBinding({ bookRoot: root, chapterIndex, provider: 'deepseek', mode: 'generate', stream: () => mockDraftStream(prompt, onDelta) }),
+    )
+  } else {
+    const endpoint = resolveChatEndpoint(process.env)
+    if (endpoint === null) {
+      throw new Error('PROVIDER_UNAVAILABLE: 未配置真实 LLM Key（MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）')
+    }
+    real = true
+    engine.registerCapability({
+      taskType: 'CHAPTER_DRAFTING',
+      providerId: 'deepseek',
+      providerVersion: '1.0.0',
+      failurePolicy: { timeoutMs: 60_000, fallbackProviderIds: [] },
+    })
+    engine.registerProviderBinding(
+      'deepseek',
+      makeDraftProviderBinding({
+        bookRoot: root,
+        chapterIndex,
+        provider: 'deepseek',
+        mode: 'generate',
+        stream: () =>
+          (async function* () {
+            const systemPrompt =
+              '你是资深中文网文作者。严格按用户要求续写正文：' +
+              '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用，' +
+              '用具体动作和生理反应外化心理。只输出正文，不要输出任何说明。'
+            for await (const chunk of streamOpenAiChat(endpoint, prompt, systemPrompt)) {
+              if (chunk.delta.length > 0) {
+                onDelta(chunk.delta)
+                yield chunk.delta
+              }
+            }
+          })(),
+      }),
+    )
+  }
+
+  return { engine, recipe, real }
 }
 
 function mockDraftStream(prompt: string, onDelta?: (text: string) => void): AsyncIterable<string> {
@@ -132,6 +180,54 @@ function mockDraftStream(prompt: string, onDelta?: (text: string) => void): Asyn
 
 export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
+
+  if (path === '/api/session.open') {
+    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    if (root === null || chapterIndex === null) {
+      json(400, { ok: false, error: 'root and chapterIndex required' })
+      return true
+    }
+    try {
+      const session = ChapterProductionSession.start({ bus: new PublishBus(), root, chapterIndex })
+      json(200, {
+        ok: true,
+        taskRef: session.taskRef,
+        currentStep: session.currentStep,
+        chapterIndex,
+      })
+    } catch (error) {
+      json(409, { ok: false, error: (error as Error).message })
+    }
+    return true
+  }
+
+  if (path === '/api/session.advance') {
+    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    if (root === null || chapterIndex === null) {
+      json(400, { ok: false, error: 'root and chapterIndex required' })
+      return true
+    }
+    const session = ChapterProductionSession.resume({ bus: new PublishBus(), root, chapterIndex })
+    if (session === null) {
+      json(409, { ok: false, error: 'chapter ' + chapterIndex + ' has no open production session' })
+      return true
+    }
+    try {
+      const target = nextStepOf(session.currentStep)
+      if (target === null) {
+        json(409, { ok: false, error: 'session already at terminal step ' + session.currentStep })
+        return true
+      }
+      const previousStep = session.currentStep
+      session.advance(target)
+      json(200, { ok: true, previousStep, currentStep: session.currentStep })
+    } catch (error) {
+      json(409, { ok: false, error: (error as Error).message })
+    }
+    return true
+  }
 
   if (path === '/api/capabilities') {
     json(200, {
@@ -198,11 +294,11 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     }
 
     try {
-      const { engine, recipe } = makeMockEngine(root, chapterIndex, prompt, (delta) => {
+      const { engine, recipe, real } = makeStreamEngine(root, chapterIndex, prompt, (delta) => {
         ndjson({ ok: true, event: 'delta', text: delta })
       })
 
-      ndjson({ ok: true, event: 'start', prompt })
+      ndjson({ ok: true, event: 'start', prompt, provider: real ? 'real-openai-compatible' : 'mock' })
       const outcome = await runDraftStep({
         engine,
         bookRoot: root,

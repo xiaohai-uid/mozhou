@@ -304,7 +304,7 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
     return true
   }
 
-  /* ---- 云同步与备份 ---- */
+  /* ---- 本地快照备份（诚实声明：本地优先模式） ---- */
   if (path === '/api/cloud-sync') {
     const root = typeof body['root'] === 'string' ? body['root'] : null
 
@@ -322,14 +322,15 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
       ok: true,
       localReady: true,
       syncStatus: 'offline_ready',
-      lastLocalSnapshotAt: new Date().toISOString(),
+      cloudSyncAvailable: false,
+      lastLocalSnapshotAt: null,
       pendingChangesCount: 0,
       storageUsage: {
         localCanonFiles: fileCount,
         databaseBytes: 1024 * 128,
       },
       syncState: {
-        lastSyncedAt: '未同步（本地优先模式）',
+        lastSyncedAt: '云同步尚未上线；当前仅为本地文件快照模式',
         status: 'idle',
         pendingUploads: 0,
         pendingDownloads: 0,
@@ -373,7 +374,7 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
     const plans = [
       {
         id: 'free_community',
-        name: '社区开源版',
+        name: '社区免费版',
         price: '免费',
         features: ['单书本地正典创作', '基础大纲与章节管理', '本地 SQLite 数据库存储', '社区技能广场查看'],
         current: false,
@@ -398,6 +399,7 @@ export const systemRoutes: RouteHandler = async (req, res, { path, body, json })
         id: 'studio_team',
         name: '工作室多端团队版',
         price: '¥899 / 年',
+        tag: '规划中',
         features: ['包含 Pro 版全部权益', '多设备局域网实时同步协同', '专属小说拆解高级提示词库', '优先技术支持通道'],
         current: false,
       },

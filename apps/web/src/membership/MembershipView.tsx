@@ -99,6 +99,24 @@ export function MembershipView(): JSX.Element {
           </section>
         )}
 
+        {/* 未激活付费许可证时的诚实提示 */}
+        {data && data.license === null && (
+          <section className="wb-section" data-testid="membership-no-license">
+            <h2>当前许可证状态</h2>
+            <div className="card-shell">
+              <div className="card">
+                <div className="card-title">
+                  <b>社区免费版</b>
+                  <span className="tag">未激活付费许可证</span>
+                </div>
+                <p className="mono muted" style={{ margin: '10px 0 0', fontSize: 12 }}>
+                  当前以社区免费版运行。正式购买与激活服务尚未上线，Pro 权益不对外宣称已解锁。
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* 商业化方案矩阵 */}
         {data?.plans && data.plans.length > 0 && (
           <section className="wb-section" data-testid="membership-plans-section">

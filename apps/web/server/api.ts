@@ -320,6 +320,7 @@ export interface LicensePlan {
 
 export interface MembershipResponse {
   readonly ok: true
+  /** 未开通支付/激活前为 null（诚实声明：当前仅社区免费版）。 */
   readonly license: {
     readonly planId: string
     readonly planName: string
@@ -327,7 +328,7 @@ export interface MembershipResponse {
     readonly activatedAt: string
     readonly expiresAt: string
     readonly status: 'active' | 'expired' | 'revoked'
-  }
+  } | null
   readonly plans: readonly LicensePlan[]
 }
 
