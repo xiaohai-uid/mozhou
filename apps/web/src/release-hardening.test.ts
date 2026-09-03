@@ -168,14 +168,10 @@ describe('release hardening · truthful Technical Preview surfaces', () => {
     expect(serialized).not.toContain('惹金枝')
     expect(serialized).not.toContain('98.5万在读')
     expect(serialized).not.toContain('长生苟道')
-    if (response.status === 200) {
-      expect(data.ok).toBe(true)
-      expect(data.degraded).toBe(false)
-      expect(Array.isArray(data.boards)).toBe(true)
-    } else {
-      expect(response.status).toBe(503)
-      expect(data.code).toBe('RANK_SOURCE_UNAVAILABLE')
-    }
+    expect(response.status).toBe(501)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('RANK_SOURCE_NOT_CONFIGURED')
+    expect(data.boards).toBeUndefined()
   })
 })
 
