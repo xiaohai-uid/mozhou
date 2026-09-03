@@ -12,7 +12,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const rootDir = join(__dirname, '..')
 const webDistDir = join(rootDir, 'apps', 'web', 'dist')
 const port = process.env.PORT || '5173'
-const host = process.env.HOST || '0.0.0.0'
+// 安全默认：发行版仅本机可达。需要 LAN/容器暴露时必须显式设置 HOST。
+const host = process.env.HOST || '127.0.0.1'
 
 process.env.ONNXRUNTIME_NODE_INSTALL_CUDA = 'skip'
 
@@ -28,7 +29,6 @@ console.log('\x1b[36m%s\x1b[0m', `
   ╚═══════════════════════════════════════════════════════════════╝
 `)
 
-// 如果未构建 web dist，先自动执行构建
 if (!existsSync(webDistDir)) {
   console.log('ℹ 首次运行：检测到前端产物未编译，正在执行生产构建...')
   const buildProcess = spawn('pnpm', ['--filter', '@mozhou/web', 'build'], {
@@ -57,7 +57,6 @@ function startServer() {
     shell: true,
   })
 
-  // 自动打开默认浏览器
   if (process.env.MOZHOU_NO_OPEN !== '1') {
     setTimeout(() => {
       const url = `http://localhost:${port}`
