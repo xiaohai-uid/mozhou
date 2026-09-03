@@ -12,7 +12,7 @@ permissions:
 env:
   ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 
-# One-shot verification after aligning all workspace test-runner constraints.
+# One-shot verification after dependency and benchmark type fixes.
 jobs:
   refresh-and-verify:
     runs-on: ubuntu-latest
