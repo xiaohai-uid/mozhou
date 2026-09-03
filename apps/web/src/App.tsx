@@ -122,7 +122,14 @@ export function App(): JSX.Element {
   }
 
   if (isMobile) {
-    return <MobileShell book={book} onSwitchBook={handleBookSwitch} />
+    return (
+      <MobileShell
+        book={book}
+        onSwitchBook={handleBookSwitch}
+        chapterIndex={chapterIndex}
+        onSelectChapter={setChapterIndex}
+      />
+    )
   }
 
   const panels = {

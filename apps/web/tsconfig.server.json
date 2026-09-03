@@ -9,5 +9,13 @@
     "outDir": "dist-server",
     "types": ["node"]
   },
-  "include": ["server/**/*.ts"]
+  "include": ["server/**/*.ts"],
+  "references": [
+    { "path": "../../packages/kernel" },
+    { "path": "../../packages/data-plane" },
+    { "path": "../../packages/context-compiler" },
+    { "path": "../../packages/pipeline" },
+    { "path": "../../packages/quality-engine" },
+    { "path": "../../packages/runtime" }
+  ]
 }

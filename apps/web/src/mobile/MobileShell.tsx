@@ -22,6 +22,8 @@ export type { ActiveDrawerType } from './types'
 export interface MobileShellProps {
   book: BookInfo | null
   onSwitchBook: (book: BookInfo) => void
+  chapterIndex?: number | undefined
+  onSelectChapter?: ((index: number) => void) | undefined
 }
 
 function PreviewUnavailable({ label }: { label: string }): JSX.Element {
@@ -35,7 +37,12 @@ function PreviewUnavailable({ label }: { label: string }): JSX.Element {
   )
 }
 
-export function MobileShell({ book, onSwitchBook }: MobileShellProps): JSX.Element {
+export function MobileShell({
+  book,
+  onSwitchBook,
+  chapterIndex = 1,
+  onSelectChapter,
+}: MobileShellProps): JSX.Element {
   const [activeHub, setActiveHub] = useState<MobileHubId>('workbench')
   const [activeDrawer, setActiveDrawer] = useState<ActiveDrawerType>(null)
 
@@ -63,7 +70,12 @@ export function MobileShell({ book, onSwitchBook }: MobileShellProps): JSX.Eleme
 
       <main className="mobile-viewport">
         <div className={`mobile-view-pane ${activeHub === 'workbench' ? 'active' : ''}`}>
-          <WorkbenchHub book={book} onOpenDrawer={handleOpenDrawer} />
+          <WorkbenchHub
+            book={book}
+            onOpenDrawer={handleOpenDrawer}
+            chapterIndex={chapterIndex}
+            onSelectChapter={onSelectChapter}
+          />
         </div>
         <div className={`mobile-view-pane ${activeHub === 'inspector' ? 'active' : ''}`}>
           <InspectorHub book={book} onOpenDrawer={handleOpenDrawer} />

@@ -12,9 +12,15 @@ import type { DraftQuestionResponse } from '../../../server/api'
 export interface WorkbenchHubProps {
   book: BookInfo | null
   onOpenDrawer: (type: ActiveDrawerType) => void
+  chapterIndex?: number | undefined
+  onSelectChapter?: ((index: number) => void) | undefined
 }
 
-export function WorkbenchHub({ book, onOpenDrawer }: WorkbenchHubProps): JSX.Element {
+export function WorkbenchHub({
+  book,
+  onOpenDrawer,
+  chapterIndex = 1,
+}: WorkbenchHubProps): JSX.Element {
   const [currentStage, setCurrentStage] = useState(2)
   const [questionData, setQuestionData] = useState<DraftQuestionResponse | null>(null)
   const [drafting, setDrafting] = useState(false)
@@ -46,7 +52,7 @@ export function WorkbenchHub({ book, onOpenDrawer }: WorkbenchHubProps): JSX.Ele
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           root: book.root,
-          chapterIndex: 1,
+          chapterIndex,
           prompt,
           activeSkills: [],
         }),

@@ -25,6 +25,7 @@ import {
 } from '@mozhou/pipeline'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import { sha256Hex } from '@mozhou/data-plane'
+import { assertSafeBookRoot, assertSafeParentDirectory } from '../security.js'
 
 function receiptDigestMatch(receipt: ContextReceipt): boolean {
   const digest = sha256Hex(canonicalJson(receipt.replayInputs))
@@ -41,11 +42,12 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 装配看板 Receipt 读面 ---- */
   if (path === '/api/receipts') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
-    if (root === null) {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
     const items = []
     for (const receiptId of listReceiptIds(root)) {
       const receipt = loadReceipt(root, receiptId)
@@ -61,12 +63,13 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/receipt') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     const receiptId = typeof body['receiptId'] === 'string' ? body['receiptId'] : null
-    if (root === null || receiptId === null) {
+    if (rawRoot === null || receiptId === null) {
       json(400, { ok: false, error: 'root and receiptId required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
     const receipt = loadReceiptForResume(root, receiptId as ContextReceiptId)
     const chapterIndex = receipt.chapterIndex ?? null
     const projection = chapterIndex === null ? null : projectSession(readPipelineLedger(root), chapterIndex)
@@ -90,11 +93,12 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 变更矩阵与 Traversal 影响审计 ---- */
   if (path === '/api/change-matrix') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
-    if (root === null) {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
     const plane = LocalDataPlane.open(root)
     const matrix = plane.getChangeMatrix()
     const revisionBriefs = buildRevisionBriefsForMatrix(matrix.columns, listImpactRecords(root))
@@ -103,12 +107,13 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/change-matrix.rerun') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     const traversalId = typeof body['traversalId'] === 'string' ? body['traversalId'] : null
-    if (root === null || traversalId === null) {
+    if (rawRoot === null || traversalId === null) {
       json(400, { ok: false, error: 'root and traversalId required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
     const record = listImpactRecords(root).find((r) => r.traversalId === traversalId)
     if (record === undefined) {
       json(404, { ok: false, error: 'no impact record for traversalId: ' + traversalId })
@@ -132,11 +137,12 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 作品概览与全景目录 ---- */
   if (path === '/api/works') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
-    if (root === null) {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
 
     const plane = LocalDataPlane.open(root)
     const overview = plane.getWorksOverview()
@@ -237,11 +243,12 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 本地书架扫描与导入 ---- */
   if (path === '/api/library') {
-    const parentDir = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
-    if (parentDir === null) {
+    const rawParent = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
+    if (rawParent === null) {
       json(400, { ok: false, error: 'parentDir required' })
       return true
     }
+    const { parentDir } = assertSafeParentDirectory(rawParent)
     const scan = scanLibrary(parentDir)
     json(200, {
       ok: true,
@@ -257,11 +264,12 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/library.open') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
-    if (root === null) {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
     try {
       const book = readBookRecord(root)
       json(200, { ok: true, root, bookId: book.id, title: book.title })
@@ -272,15 +280,16 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/library.import') {
-    const parentDir = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
+    const rawParent = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
     const title = typeof body['title'] === 'string' ? body['title'].trim() : ''
     const initialBody = typeof body['initialBody'] === 'string' ? body['initialBody'].trim() : undefined
-    if (parentDir === null || title.length === 0) {
+    if (rawParent === null || title.length === 0) {
       json(400, { ok: false, error: 'parentDir and non-empty title required' })
       return true
     }
+    const { targetDir } = assertSafeParentDirectory(rawParent, sanitizeDirName(title))
     try {
-      const result = createBook({ dir: join(parentDir, sanitizeDirName(title)), title })
+      const result = createBook({ dir: targetDir ?? join(rawParent, sanitizeDirName(title)), title })
       if (initialBody !== undefined && initialBody.length > 0) {
         try {
           const plane = LocalDataPlane.open(result.root)

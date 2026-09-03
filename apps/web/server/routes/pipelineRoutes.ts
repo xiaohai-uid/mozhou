@@ -24,6 +24,7 @@ import { PublishBus, RuntimeEngine } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
 import { buildDraftContext } from '../draftContext.js'
+import { assertSafeBookRoot } from '../security.js'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -282,6 +283,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       json(400, { ok: false, error: 'valid root and chapterIndex required' })
       return true
     }
+    const safeRoot = assertSafeBookRoot(root)
 
     if (!hasDraftProvider()) {
       json(200, {
@@ -297,9 +299,9 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     const ndjson = (payload: unknown) => { res.write(JSON.stringify(payload) + '\n') }
 
     try {
-      const context = await buildDraftContext({ root, chapterIndex, authorPrompt })
+      const context = await buildDraftContext({ root: safeRoot, chapterIndex, authorPrompt })
       const { engine, recipe, real } = makeStreamEngine(
-        root,
+        safeRoot,
         chapterIndex,
         context.packet.text,
         authorPrompt,
@@ -316,7 +318,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       })
       const outcome = await runDraftStep({
         engine,
-        bookRoot: root,
+        bookRoot: safeRoot,
         chapterIndex,
         packet: context.packet,
         recipe,

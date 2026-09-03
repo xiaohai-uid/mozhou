@@ -60,6 +60,10 @@ export class ApiRouter {
         }
       } catch (error) {
         if (!res.writableEnded) {
+          if (error instanceof RequestBoundaryError) {
+            sendJson(error.status, { ok: false, code: error.code, error: error.message })
+            return true
+          }
           // 详细异常仅进入本机日志；HTTP 响应不泄露路径、SQL、文件名或上游内部信息。
           console.error('[mozhou-api] unhandled route error', error)
           sendJson(500, {

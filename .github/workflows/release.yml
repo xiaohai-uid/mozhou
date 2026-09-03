@@ -121,9 +121,9 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          name: 墨舟 (Novel OS) ${{ github.ref_name }}
+          name: 墨舟 (Novel OS) ${{ github.ref_name }} · Technical Preview
           draft: false
-          prerelease: false
+          prerelease: true
           generate_release_notes: true
           body: |
             ## 墨舟 (Novel OS) 本地发行版

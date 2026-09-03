@@ -1,4 +1,6 @@
 import type { IncomingMessage } from 'node:http'
+import { existsSync, statSync } from 'node:fs'
+import { resolve, sep } from 'node:path'
 
 export const DEFAULT_MAX_JSON_BODY_BYTES = 1024 * 1024
 
@@ -11,6 +13,73 @@ export class RequestBoundaryError extends Error {
     super(message)
     this.name = 'RequestBoundaryError'
   }
+}
+
+/**
+ * 统一文件系统路径守卫（Path Guard）：
+ * 1. 验证既有书根的合法性（存在、是目录、包含正典标记 book.json）；
+ * 2. 避免客户端传入恶意相对路径或任意目录穿越。
+ */
+export function assertSafeBookRoot(rawPath: unknown): string {
+  if (typeof rawPath !== 'string' || rawPath.trim().length === 0) {
+    throw new RequestBoundaryError(400, 'INVALID_PATH', 'book root must be a non-empty string')
+  }
+  const target = resolve(rawPath)
+  let stat
+  try {
+    stat = statSync(target)
+  } catch {
+    throw new RequestBoundaryError(404, 'BOOK_ROOT_NOT_FOUND', `book root directory not found: ${rawPath}`)
+  }
+  if (!stat.isDirectory()) {
+    throw new RequestBoundaryError(400, 'NOT_A_DIRECTORY', `book root is not a directory: ${rawPath}`)
+  }
+  const marker = resolve(target, 'book.json')
+  if (!existsSync(marker)) {
+    throw new RequestBoundaryError(
+      400,
+      'NOT_A_MOZHOU_BOOK',
+      `target directory does not contain a MoZhou book marker (book.json): ${rawPath}`,
+    )
+  }
+  return target
+}
+
+/**
+ * 校验新建/导入书目的父级目录：
+ * 1. 父级必须是真实存在的本地目录；
+ * 2. 派生的目标子目录必须严格收敛在父目录范围之内，禁止目录穿越。
+ */
+export function assertSafeParentDirectory(
+  rawParent: unknown,
+  childName?: string,
+): { readonly parentDir: string; readonly targetDir?: string | undefined } {
+  if (typeof rawParent !== 'string' || rawParent.trim().length === 0) {
+    throw new RequestBoundaryError(400, 'INVALID_PATH', 'parent directory must be a non-empty string')
+  }
+  const parentDir = resolve(rawParent)
+  let stat
+  try {
+    stat = statSync(parentDir)
+  } catch {
+    throw new RequestBoundaryError(404, 'PARENT_DIR_NOT_FOUND', `parent directory does not exist: ${rawParent}`)
+  }
+  if (!stat.isDirectory()) {
+    throw new RequestBoundaryError(400, 'NOT_A_DIRECTORY', `parent path is not a directory: ${rawParent}`)
+  }
+  if (childName === undefined) {
+    return { parentDir }
+  }
+  const sanitized = childName.replace(/[\\/:*?"<>|]/g, ' ').trim()
+  if (!sanitized) {
+    throw new RequestBoundaryError(400, 'INVALID_CHILD_NAME', 'derived child directory name must not be empty')
+  }
+  const targetDir = resolve(parentDir, sanitized)
+  const allowedPrefix = parentDir.endsWith(sep) ? parentDir : parentDir + sep
+  if (targetDir !== parentDir && !targetDir.startsWith(allowedPrefix)) {
+    throw new RequestBoundaryError(403, 'PATH_TRAVERSAL_BLOCKED', 'child directory escapes parent directory')
+  }
+  return { parentDir, targetDir }
 }
 
 function normalizeHostHeader(value: string): string {

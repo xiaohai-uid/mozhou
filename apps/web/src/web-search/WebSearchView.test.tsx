@@ -64,4 +64,25 @@ describe('WebSearchView（联网搜索）', () => {
 
     expect(fetchMock).toHaveBeenCalled()
   })
+
+  it('501 未配置响应：展示显式未就绪提示，不伪造搜索结果', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 501,
+        json: () => Promise.resolve({
+          ok: false,
+          code: 'WEB_SEARCH_NOT_CONFIGURED',
+          error: '联网搜索尚未接入真实外部搜索源',
+        }),
+      }),
+    )
+
+    render(<WebSearchView />)
+    await waitFor(() => {
+      expect(screen.getByTestId('search-error')).toBeInTheDocument()
+      expect(screen.getByTestId('search-error').textContent).toContain('联网搜索尚未接入')
+    })
+  })
 })

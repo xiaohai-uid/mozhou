@@ -86,7 +86,7 @@ export function WebSearchView(): JSX.Element {
                 </button>
               </div>
 
-              {data?.hotQueries && (
+              {data?.ok && data.hotQueries && (
                 <div className="actions" style={{ marginTop: 10, alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                   <span className="mono muted">热门检索：</span>
                   {data.hotQueries.map((hq) => (
@@ -108,8 +108,21 @@ export function WebSearchView(): JSX.Element {
           </div>
         </section>
 
+        {/* 501 / 未配置状态提示 */}
+        {data !== null && !data.ok && (
+          <section className="wb-section" data-testid="search-unavailable-section">
+            <div className="card-shell">
+              <div className="card" style={{ borderColor: 'var(--border-warn, #eab308)' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted, #a1a1aa)' }}>
+                  ⚠️ {data.error}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* 搜索结果列表 */}
-        {data !== null && (
+        {data !== null && data.ok && (
           <section className="wb-section" data-testid="search-results-section">
             <h2>检索结果 ({data.results.length})</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="search-results-list">

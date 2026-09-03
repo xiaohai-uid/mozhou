@@ -272,12 +272,20 @@ export interface SearchResultItem {
   readonly tags: readonly string[]
 }
 
-export interface WebSearchResponse {
+export interface ApiUnavailableResponse {
+  readonly ok: false
+  readonly code: string
+  readonly error: string
+}
+
+export interface WebSearchSuccessResponse {
   readonly ok: true
   readonly query: string
   readonly results: readonly SearchResultItem[]
   readonly hotQueries: readonly string[]
 }
+
+export type WebSearchResponse = WebSearchSuccessResponse | ApiUnavailableResponse
 
 export interface CloudSyncResponse {
   readonly ok: true

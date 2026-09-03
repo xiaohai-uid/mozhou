@@ -10,19 +10,25 @@ import {
 import { EmptyRecallError, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
 import { runCompileStep } from '@mozhou/pipeline'
 
-const PREVIEW_CONTEXT_WINDOW_BYTES = 48_000
+const PREVIEW_CONTEXT_WINDOW_TOKENS = 32_000
 const MAX_RECENT_CHAPTERS = 3
 const MAX_RECENT_CHARS_PER_CHAPTER = 12_000
 
 /**
- * v0.1 Technical Preview 的确定性保守预算器。
- * 这里的 profile 明确按 UTF-8 bytes 计预算，而不是伪称某个远端模型的精确 BPE；
- * Receipt 会记录该 version，后续接 provider 精确 tokenizer 时可无歧义替换。
+ * v0.1 Technical Preview 的确定性本地 Token 计数器。
+ * 依据加固设计要求（Plan §Task 5）：采用确定性 Unicode 码点（codepoint count）计量，
+ * 使中文正典与小说上下文按 1 字符 ≈ 1 Token 比例拟合大模型 Token 预算，
+ * 避免直接以 UTF-8 原始字节三倍虚高导致正典过早截断。
  */
-const previewByteBudget: ExactTokenizer = {
-  version: 'mozhou-preview-utf8-byte-budget-v1',
+const previewCodepointTokenizer: ExactTokenizer = {
+  version: 'mozhou-preview-codepoint-budget-v1',
   count(text: string): number {
-    return Buffer.byteLength(text, 'utf8')
+    let count = 0
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for (const _char of text) {
+      count += 1
+    }
+    return count
   },
 }
 
@@ -59,7 +65,7 @@ function structuralFallback(
       section: `entity:${card.ref}`,
       text: `${card.brief ?? ''}\n`,
     })),
-  ].map((piece) => ({ ...piece, tokens: previewByteBudget.count(piece.text) }))
+  ].map((piece) => ({ ...piece, tokens: previewCodepointTokenizer.count(piece.text) }))
 
   const storyBody = storyText.join('\n\n')
   const storyRendered = storyBody.length > 0 ? storyBody + '\n' : ''
@@ -71,11 +77,11 @@ function structuralFallback(
     settings: [],
     story: {
       text: storyRendered,
-      tokens: previewByteBudget.count(storyRendered),
+      tokens: previewCodepointTokenizer.count(storyRendered),
       trimType: 'none',
     },
     text,
-    totalTokens: previewByteBudget.count(text),
+    totalTokens: previewCodepointTokenizer.count(text),
   }
 }
 
@@ -121,10 +127,10 @@ export async function buildDraftContext(input: {
         structuralSections,
         storyText,
         modelProfile: {
-          id: 'mozhou-preview-utf8-byte-budget-v1',
-          contextWindow: PREVIEW_CONTEXT_WINDOW_BYTES,
+          id: 'mozhou-preview-codepoint-budget-v1',
+          contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
         },
-        tokenizer: previewByteBudget,
+        tokenizer: previewCodepointTokenizer,
       },
     )
     return { packet: outcome.packet, mode: 'compiled_receipt' }
