@@ -785,7 +785,7 @@ describe('T44 中栏对话流 API 契约', () => {
       const res = await fetch(base + '/api/draft.stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: dir, chapterIndex: 1, prompt: '夜雨敲窗，灯焰摇了三摇。他推门而入。', skills: ['continuation'] }),
+        body: JSON.stringify({ root: dir, chapterIndex: 1, prompt: '夜雨敲窗，灯焰摇了三摇。他推门而入。', activeSkills: ['continuation'] }),
       })
       expect(res.status).toBe(200)
       expect(res.headers.get('Content-Type')).toContain('ndjson')
@@ -1156,62 +1156,58 @@ describe('联网搜索 API 契约', () => {
 })
 
 /* ----------------------------------------------------------------------------
- * 云同步与备份 API 契约：/api/cloud-sync 与 /api/cloud-sync.backup（T54）。
+ * 云同步与备份 API 契约：Technical Preview 明确区分本地状态与未实现备份。
  * ------------------------------------------------------------------------- */
 describe('云同步与备份 API 契约', () => {
-  it('POST /api/cloud-sync：返回本地离线优先状态与存储用量', async () => {
+  it('POST /api/cloud-sync：返回本地离线优先状态与真实存储面', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/cloud-sync', {})
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.localReady).toBe(true)
     expect(data.syncStatus).toBe('offline_ready')
+    expect((data.storageUsage as { databaseBytes: number }).databaseBytes).toBe(0)
   })
 
-  it('POST /api/cloud-sync.backup：生成作品独立快照摘要', async () => {
+  it('POST /api/cloud-sync.backup：未实现时 501，绝不伪造归档路径或摘要', async () => {
     const base = await listen()
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-sync-api-'))
     roots.push(dir)
     const book = createBook({ dir: join(dir, '快照测试书'), title: '快照测试书' })
 
     const { status, data } = await post(base, '/api/cloud-sync.backup', { root: book.root })
-    expect(status).toBe(200)
-    expect(data.ok).toBe(true)
-    expect(typeof data.snapshotId).toBe('string')
-    expect(data.bookTitle).toBe('快照测试书')
+    expect(status).toBe(501)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('BACKUP_NOT_IMPLEMENTED')
+    expect(JSON.stringify(data)).not.toContain('sha256_mock_snapshot_digest')
+    expect(data.backupPath).toBeUndefined()
   })
 })
 
 /* ----------------------------------------------------------------------------
- * 会员中心 API 契约：/api/membership 与 /api/membership.activate（T55）。
+ * 会员中心 API 契约：Technical Preview 仅社区免费版；支付/激活尚未上线。
  * ------------------------------------------------------------------------- */
 describe('会员中心 API 契约', () => {
-  it('POST /api/membership：返回许可证状态与版本方案列表', async () => {
+  it('POST /api/membership：社区免费版为当前版本，不伪造付费许可证', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/membership', {})
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
-    const license = data.license as { planName: string; status: string }
-    expect(license.planName).toContain('Pro')
-    expect(license.status).toBe('active')
-    const plans = data.plans as { id: string; name: string }[]
-    expect(plans.length).toBeGreaterThanOrEqual(3)
+    expect(data.license).toBeNull()
+    const plans = data.plans as { id: string; current: boolean; price: string }[]
+    expect(plans.find((plan) => plan.id === 'free_community')?.current).toBe(true)
+    expect(plans.find((plan) => plan.id === 'pro_lifetime')?.current).toBe(false)
   })
 
-  it('POST /api/membership.activate：合法密钥激活成功；非法格式 400 显式报错', async () => {
+  it('POST /api/membership.activate：服务未上线时一律 501，不做格式即授权', async () => {
     const base = await listen()
-    // 合法格式
-    const { status, data } = await post(base, '/api/membership.activate', { key: 'MOZHOU-PRO-LIFETIME-TEST' })
-    expect(status).toBe(200)
-    expect(data.ok).toBe(true)
-    const license = data.license as { licenseKey: string; planId: string }
-    expect(license.licenseKey).toBe('MOZHOU-PRO-LIFETIME-TEST')
-    expect(license.planId).toBe('pro_lifetime')
+    const goodFormat = await post(base, '/api/membership.activate', { key: 'MOZHOU-PRO-LIFETIME-TEST' })
+    expect(goodFormat.status).toBe(501)
+    expect(goodFormat.data.ok).toBe(false)
+    expect(goodFormat.data.code).toBe('LICENSE_ACTIVATION_NOT_IMPLEMENTED')
 
-    // 非法格式密钥 -> 400
-    const bad = await post(base, '/api/membership.activate', { key: 'invalid_raw_string' })
-    expect(bad.status).toBe(400)
-    expect(bad.data.ok).toBe(false)
-    expect(bad.data.error).toContain('格式无效')
+    const badFormat = await post(base, '/api/membership.activate', { key: 'invalid_raw_string' })
+    expect(badFormat.status).toBe(501)
+    expect(badFormat.data.code).toBe('LICENSE_ACTIVATION_NOT_IMPLEMENTED')
   })
 })
