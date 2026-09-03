@@ -11,7 +11,6 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import type { NovelBreakdownResult } from '../server/api'
 import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
@@ -1064,16 +1063,13 @@ describe('风格蒸馏 API 契约', () => {
  * 小说拆解 API 契约：/api/novel-breakdown（T51）。
  * ------------------------------------------------------------------------- */
 describe('小说拆解 API 契约', () => {
-  it('POST /api/novel-breakdown：分析故事核、黄金三章节奏点与人物弧光', async () => {
+  it('POST /api/novel-breakdown：真实分析 provider 未接入时显式 501', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '凡人修仙故事梗概' })
-    expect(status).toBe(200)
-    expect(data.ok).toBe(true)
-    const res = data.result as NovelBreakdownResult
-    expect(res.storyCore.mainGoal.length).toBeGreaterThan(0)
-    expect(res.chapterPacing.length).toBe(3)
-    expect(res.characterArcs.length).toBeGreaterThanOrEqual(1)
-    expect(res.emotionalBeats.length).toBeGreaterThanOrEqual(1)
+    expect(status).toBe(501)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('NOVEL_BREAKDOWN_NOT_IMPLEMENTED')
+    expect(data.result).toBeUndefined()
   })
 })
 
@@ -1125,16 +1121,14 @@ describe('端侧多源书源检索 API 契约', () => {
  * 网文扫榜 API 契约：/api/rank-scan（T52）。
  * ------------------------------------------------------------------------- */
 describe('网文扫榜 API 契约', () => {
-  it('POST /api/rank-scan：返回多平台榜单数据与热门题材风向词', async () => {
+  it('POST /api/rank-scan：无可验证实时榜单源时显式 501', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/rank-scan', {})
-    expect(status).toBe(200)
-    expect(data.ok).toBe(true)
-    const boards = data.boards as { id: string; name: string; items: unknown[] }[]
-    expect(boards.length).toBeGreaterThanOrEqual(2)
-    expect(boards[0]?.items.length).toBeGreaterThanOrEqual(1)
-    const keywords = data.trendingKeywords as { name: string; heat: number }[]
-    expect(keywords.length).toBeGreaterThanOrEqual(2)
+    expect(status).toBe(501)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('RANK_SOURCE_NOT_CONFIGURED')
+    expect(data.boards).toBeUndefined()
+    expect(data.trendingKeywords).toBeUndefined()
   })
 })
 
@@ -1142,16 +1136,13 @@ describe('网文扫榜 API 契约', () => {
  * 联网搜索 API 契约：/api/web-search（T53）。
  * ------------------------------------------------------------------------- */
 describe('联网搜索 API 契约', () => {
-  it('POST /api/web-search：返回资料库检索结果与热门检索词', async () => {
+  it('POST /api/web-search：真实外部搜索源未接入时显式 501', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/web-search', { query: '唐代' })
-    expect(status).toBe(200)
-    expect(data.ok).toBe(true)
-    const results = data.results as { id: string; title: string; category: string }[]
-    expect(results.length).toBeGreaterThanOrEqual(1)
-    expect(results[0]?.title).toContain('唐代')
-    const hotQueries = data.hotQueries as string[]
-    expect(hotQueries.length).toBeGreaterThanOrEqual(3)
+    expect(status).toBe(501)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('WEB_SEARCH_NOT_CONFIGURED')
+    expect(data.results).toBeUndefined()
   })
 })
 
