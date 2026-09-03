@@ -12,23 +12,29 @@ export interface PlotBranchWidgetProps {
   onSelectChoice?: (choice: PlotBranchChoice) => void
 }
 
-const DEFAULT_CHOICES: PlotBranchChoice[] = [
-  { id: 'opt_1', text: '借夜雷与袖中白磷引燃神像背光（回收道具伏笔）', tag: '契合' },
-  { id: 'opt_2', text: '反客为主：揭露赵捕头私下纳妾的秘密', tag: '备选' },
-]
-
 export function PlotBranchWidget({
   question,
   choices,
   onSelectChoice,
 }: PlotBranchWidgetProps): JSX.Element {
-  const activeQuestion = question || '赵捕头按佩刀逼问神像真容时，陆玄如何化解危机？'
-  const activeChoices = choices && choices.length > 0 ? choices : DEFAULT_CHOICES
-  const [selectedId, setSelectedId] = useState<string>(activeChoices[0]?.id || '')
+  const available = typeof question === 'string' && question.trim().length > 0 && Array.isArray(choices) && choices.length > 0
+  const activeChoices = available ? choices : []
+  const [selectedId, setSelectedId] = useState<string>('')
 
-  const handleSelect = (c: PlotBranchChoice) => {
-    setSelectedId(c.id)
-    onSelectChoice?.(c)
+  const handleSelect = (choice: PlotBranchChoice): void => {
+    setSelectedId(choice.id)
+    onSelectChoice?.(choice)
+  }
+
+  if (!available) {
+    return (
+      <div className="mobile-card">
+        <b>情节走向推演尚未生成</b>
+        <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--fg-muted-mobile)', lineHeight: 1.6 }}>
+          Technical Preview 仅展示真实生成链路返回的问题与候选，不使用示例情节冒充当前作品建议。
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -44,7 +50,7 @@ export function PlotBranchWidget({
           </svg>
           情节走向推演
         </span>
-        <span className="mobile-tag accent">逻辑推荐</span>
+        <span className="mobile-tag accent">生成结果</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -60,28 +66,28 @@ export function PlotBranchWidget({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {activeChoices.map((c) => {
-            const isSel = c.id === selectedId
+          {activeChoices.map((choice) => {
+            const isSelected = choice.id === selectedId
             return (
               <div
-                key={c.id}
+                key={choice.id}
                 style={{
                   padding: '10px 12px',
-                  background: isSel ? 'var(--accent-soft-mobile)' : 'var(--surface-core-mobile)',
-                  border: `1px solid ${isSel ? 'var(--accent-mobile)' : 'var(--hairline-crisp-mobile)'}`,
+                  background: isSelected ? 'var(--accent-soft-mobile)' : 'var(--surface-core-mobile)',
+                  border: `1px solid ${isSelected ? 'var(--accent-mobile)' : 'var(--hairline-crisp-mobile)'}`,
                   borderRadius: 12,
                   fontSize: 13,
-                  color: isSel ? 'var(--fg-pure-mobile)' : 'var(--fg-secondary-mobile)',
+                  color: isSelected ? 'var(--fg-pure-mobile)' : 'var(--fg-secondary-mobile)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
-                onClick={() => handleSelect(c)}
+                onClick={() => handleSelect(choice)}
               >
-                <span>{c.text}</span>
-                <span className={`mobile-tag ${isSel ? 'accent' : ''}`}>{c.tag}</span>
+                <span>{choice.text}</span>
+                <span className={`mobile-tag ${isSelected ? 'accent' : ''}`}>{choice.tag}</span>
               </div>
             )
           })}
