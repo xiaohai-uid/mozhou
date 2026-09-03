@@ -35,7 +35,7 @@ export function SystemHub({
     return () => { mounted = false }
   }, [book])
 
-  const planName = membership?.license?.planName ?? '社区免费版 · Technical Preview'
+  const planName = membership?.license?.planName ?? '未激活许可证 · Technical Preview'
 
   return (
     <>
