@@ -3,6 +3,7 @@
  * 统一请求体解析、路径分发与异常包装。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { assertTrustedRequest, readJsonBody, RequestBoundaryError } from './security.js'
 
 export type RouteHandler = (
   req: IncomingMessage,
@@ -30,11 +31,23 @@ export class ApiRouter {
       return false
     }
 
-    const body = await this.parseBody(req)
     const sendJson = (status: number, payload: unknown) => {
       res.statusCode = status
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
       res.end(JSON.stringify(payload))
+    }
+
+    let body: Record<string, unknown>
+    try {
+      assertTrustedRequest(req)
+      body = await readJsonBody(req)
+    } catch (error) {
+      if (error instanceof RequestBoundaryError) {
+        sendJson(error.status, { ok: false, code: error.code, error: error.message })
+      } else {
+        sendJson(400, { ok: false, code: 'BAD_REQUEST', error: 'invalid request' })
+      }
+      return true
     }
 
     const context = { path, body, json: sendJson }
@@ -57,21 +70,5 @@ export class ApiRouter {
     }
 
     return false
-  }
-
-  private parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
-    return new Promise((resolve) => {
-      let raw = ''
-      req.on('data', (chunk: Buffer) => {
-        raw += chunk.toString('utf8')
-      })
-      req.on('end', () => {
-        try {
-          resolve(JSON.parse(raw) as Record<string, unknown>)
-        } catch {
-          resolve({})
-        }
-      })
-    })
   }
 }
