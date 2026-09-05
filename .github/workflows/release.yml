@@ -118,25 +118,47 @@ jobs:
           test -s SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
 
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
-        with:
-          name: 墨舟 (Novel OS) ${{ github.ref_name }} · Technical Preview
-          draft: false
-          prerelease: true
-          generate_release_notes: true
-          body: |
-            ## 墨舟 (Novel OS) 本地发行版
+      - name: Publish or update GitHub release idempotently
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          title="墨舟 (Novel OS) ${tag} · Technical Preview"
+          notes_file="$(mktemp)"
+          cat >"$notes_file" <<'EOF'
+          ## 墨舟 (Novel OS) 本地发行版
 
-            本 Release 只发布已经在 CI 中安装并启动验证过的资产：
-            - `*-local-runtime.tar.gz`：Node.js 22 本地运行时（跨平台，不冒充原生安装器）
-            - `*-web-dist.tar.gz`：前端静态产物
-            - `*-docker.tar.gz`：本机 Docker 发行包
-            - `mozhou-sbom.spdx.json`：SPDX SBOM
-            - `SHA256SUMS.txt`：完整性校验清单
+          本 Release 只发布已经在 CI 中安装并启动验证过的资产：
+          - `*-local-runtime.tar.gz`：Node.js 22 本地运行时（跨平台，不冒充原生安装器）
+          - `*-web-dist.tar.gz`：前端静态产物
+          - `*-docker.tar.gz`：本机 Docker 发行包
+          - `mozhou-sbom.spdx.json`：SPDX SBOM
+          - `SHA256SUMS.txt`：完整性校验清单
 
-            默认服务只绑定本机回环地址。云备份、付费许可证激活、未接线的数据源不会伪装成已实现。
-          files: |
-            release-artifacts/*.tar.gz
-            release-artifacts/mozhou-sbom.spdx.json
-            release-artifacts/SHA256SUMS.txt
+          默认服务只绑定本机回环地址。云备份、付费许可证激活、未接线的数据源不会伪装成已实现。
+          EOF
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --notes-file "$notes_file" \
+              --prerelease \
+              --draft=false
+          else
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --notes-file "$notes_file" \
+              --prerelease \
+              --verify-tag
+          fi
+
+          gh release upload "$tag" \
+            release-artifacts/*.tar.gz \
+            release-artifacts/mozhou-sbom.spdx.json \
+            release-artifacts/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
