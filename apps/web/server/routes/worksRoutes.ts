@@ -206,6 +206,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
         wordCount: scan.body.length,
         revision: scan.revision,
         hash,
+        contentHash: hash,
       })
     } catch (err) {
       json(404, { ok: false, code: 'CHAPTER_NOT_FOUND', error: (err as Error).message })
@@ -311,6 +312,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
         wordCount: outcome.body.length,
         revision: outcome.revisionAfter,
         hash: newHash,
+        contentHash: newHash,
       })
     } catch (err) {
       json(500, { ok: false, error: (err as Error).message })

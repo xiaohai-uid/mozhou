@@ -151,6 +151,9 @@ export function createBook(options: CreateBookOptions): CreateBookResult {
   // 大纲两层种子：总纲（BookNode 根）+ 第一卷（VolumeNode）
   const bookNodeId = newBookNodeId()
   const volumeNodeId = newVolumeNodeId()
+  const volumePromiseText = options.authorIntent?.volumePromise
+    ? `## 卷级承诺\n\n${options.authorIntent.volumePromise.trim()}\n\n`
+    : ''
   writeFileSync(
     join(root, ZONGGANG_PATH),
     `${emitFrontmatter(outlineFrontmatter({ mozhouId: bookNodeId, nodeType: 'book', parentId: null }))}# ${title}\n\n> 全书主线总纲。层级：卷 → 幕（大纲/章节/）→ 场景（章大纲文件的 scenes 数组）。\n`,
@@ -159,7 +162,7 @@ export function createBook(options: CreateBookOptions): CreateBookResult {
     join(root, VOLUME_ONE_OUTLINE_PATH),
     `${emitFrontmatter(
       outlineFrontmatter({ mozhouId: volumeNodeId, nodeType: 'volume', parentId: bookNodeId }),
-    )}# ${VOLUME_ONE_TITLE}\n\n- 目标：\n- 冲突：\n- 高潮：\n- 结局：\n`,
+    )}# ${VOLUME_ONE_TITLE}\n\n${volumePromiseText}- 目标：\n- 冲突：\n- 高潮：\n- 结局：\n`,
   )
 
   // 宪法层与风格档案种子

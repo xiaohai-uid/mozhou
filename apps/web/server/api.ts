@@ -164,6 +164,7 @@ export interface ChapterReadResponse {
   readonly wordCount: number
   readonly revision: number
   readonly hash: string
+  readonly contentHash?: string | undefined
 }
 
 export interface ChapterSaveRequest {

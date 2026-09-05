@@ -100,6 +100,7 @@ function makeStreamEngine(
   mockOutputSeed: string,
   activeSkills: readonly string[],
   onDelta: (text: string) => void,
+  explicitMode?: 'generate' | 'continue',
 ): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
   const recipe: CapabilityRecipe = {
@@ -126,7 +127,10 @@ function makeStreamEngine(
 
   const scan = readProseChapter(root, proseChapterPath(chapterIndex))
   const existingBody = (scan.body ?? '').trim()
-  const isContinuation = activeSkills.includes('continuation') && existingBody.length > 0
+  const isContinuation =
+    explicitMode !== undefined
+      ? explicitMode === 'continue'
+      : activeSkills.includes('continuation') && existingBody.length > 0
   const mode = isContinuation ? 'continue' : 'generate'
 
   const explicitMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock'
@@ -295,6 +299,29 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     }
     const safeRoot = assertSafeBookRoot(root)
 
+    const relPath = proseChapterPath(chapterIndex)
+    let scan
+    try {
+      scan = readProseChapter(safeRoot, relPath)
+    } catch {
+      json(404, { ok: false, code: 'CHAPTER_NOT_FOUND', error: `chapter ${chapterIndex} not found` })
+      return true
+    }
+
+    if (scan.phase !== 'draft') {
+      json(409, {
+        ok: false,
+        code: 'CHAPTER_PHASE_ERROR',
+        error: `chapter ${chapterIndex} phase is ${scan.phase}, cannot write draft directly; reopen the chapter first`,
+      })
+      return true
+    }
+
+    const explicitMode =
+      body['mode'] === 'continue' || body['mode'] === 'generate'
+        ? body['mode']
+        : undefined
+
     if (!hasDraftProvider()) {
       json(200, {
         ok: false,
@@ -332,6 +359,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
         authorPrompt,
         activeSkills,
         (delta) => ndjson({ ok: true, event: 'delta', text: delta }),
+        explicitMode,
       )
 
       ndjson({
