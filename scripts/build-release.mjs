@@ -100,6 +100,7 @@ for (const file of [
 }
 copyIfPresent('scripts/launcher.mjs')
 copyIfPresent('scripts/check-install-env.mjs')
+copyIfPresent('scripts/smoke-runtime-archive.mjs')
 copyIfPresent('patches')
 
 const packageFolders = ['context-compiler', 'data-plane', 'flywheel', 'kernel', 'pipeline', 'quality-engine', 'runtime', 'benchmark']
@@ -145,11 +146,13 @@ const instructions = `# 墨舟 (Novel OS) v${version} 本地发行版
 `
 writeFileSync(join(runtimeDir, 'RELEASE_INSTRUCTIONS.md'), instructions, 'utf8')
 
-const runtimeArchive = join(artifactsDir, `${bundleName}-local-runtime.tar.gz`)
-run('tar', ['-czf', runtimeArchive, bundleName], artifactsDir)
+const runtimeArchiveName = `${bundleName}-local-runtime.tar.gz`
+const runtimeArchive = join(artifactsDir, runtimeArchiveName)
+run('tar', ['--force-local', '-czf', runtimeArchiveName, bundleName], artifactsDir)
 
-const webArchive = join(artifactsDir, `${bundleName}-web-dist.tar.gz`)
-run('tar', ['-czf', webArchive, '-C', join(rootDir, 'apps', 'web', 'dist'), '.'])
+const webArchiveName = `${bundleName}-web-dist.tar.gz`
+const webArchive = join(artifactsDir, webArchiveName)
+run('tar', ['--force-local', '-czf', webArchiveName, '-C', join(rootDir, 'apps', 'web', 'dist'), '.'], artifactsDir)
 
 const dockerDir = join(artifactsDir, 'docker-bundle')
 const dockerRuntimeDir = join(dockerDir, bundleName)
@@ -159,8 +162,9 @@ writeFileSync(join(dockerDir, 'Dockerfile'), `FROM node:22.23.2-bookworm-slim\nW
 writeFileSync(join(dockerDir, 'docker-compose.yml'), `services:\n  mozhou:\n    build: .\n    restart: unless-stopped\n    ports:\n      - "127.0.0.1:\${MOZHOU_PORT:-5173}:5173"\n    environment:\n      NODE_ENV: production\n      ONNXRUNTIME_NODE_INSTALL_CUDA: skip\n      PORT: 5173\n      HOST: 0.0.0.0\n      MOZHOU_LIBRARY_DIR: /data/books\n      MOZHOU_API_KEY: \${MOZHOU_API_KEY:-}\n      DEEPSEEK_API_KEY: \${DEEPSEEK_API_KEY:-}\n      OPENAI_API_KEY: \${OPENAI_API_KEY:-}\n      MOZHOU_API_BASE: \${MOZHOU_API_BASE:-}\n      MOZHOU_MODEL: \${MOZHOU_MODEL:-}\n    volumes:\n      - mozhou_books:/data/books\nvolumes:\n  mozhou_books:\n`, 'utf8')
 writeFileSync(join(dockerDir, 'README.md'), '# 墨舟 Docker 本地发行包\n\n执行 `docker compose up --build -d`。宿主端默认只监听 127.0.0.1。\n', 'utf8')
 
-const dockerArchive = join(artifactsDir, `${bundleName}-docker.tar.gz`)
-run('tar', ['-czf', dockerArchive, 'docker-bundle'], artifactsDir)
+const dockerArchiveName = `${bundleName}-docker.tar.gz`
+const dockerArchive = join(artifactsDir, dockerArchiveName)
+run('tar', ['--force-local', '-czf', dockerArchiveName, 'docker-bundle'], artifactsDir)
 rmSync(dockerDir, { recursive: true, force: true })
 rmSync(runtimeDir, { recursive: true, force: true })
 

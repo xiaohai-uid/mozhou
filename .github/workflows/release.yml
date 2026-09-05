@@ -93,7 +93,7 @@ jobs:
             cat "$tmp/runtime.log"
             exit 1
           fi
-          curl --fail --silent --show-error http://127.0.0.1:5188/api/membership | grep -q 'community'
+          node scripts/smoke-runtime-archive.mjs
           kill "$pid"
           wait "$pid" || true
           trap - EXIT
