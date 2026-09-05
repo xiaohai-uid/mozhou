@@ -204,6 +204,13 @@ export function resolveChatEndpoint(env: NodeJS.ProcessEnv): ResolvedEndpoint | 
   return null
 }
 
+export class PrematureStreamTerminationError extends Error {
+  override readonly name = 'PrematureStreamTerminationError'
+  constructor(message = '上游流异常提前终止：未接收到 [DONE] 终态帧') {
+    super(message)
+  }
+}
+
 /**
  * 发起真实 OpenAI-compatible Chat Completions 流式请求，逐 delta 产出。
  * 仅在已配置真实 Key 且显式非 mock 时调用；网络错误按流式错误语义上抛。
@@ -252,6 +259,7 @@ export async function* streamOpenAiChat(
     const reader = response.body.getReader()
     const decoder = new TextDecoder('utf-8')
     let buffer = ''
+    let seenDone = false
 
     while (true) {
       const { done, value } = await reader.read()
@@ -265,6 +273,7 @@ export async function* streamOpenAiChat(
         if (!line.startsWith('data:')) continue
         const payload = line.slice(5).trim()
         if (payload === '[DONE]') {
+          seenDone = true
           controller.abort()
           return
         }
@@ -281,6 +290,10 @@ export async function* streamOpenAiChat(
           // 上游 SSE 可能包含心跳/非 JSON 行；忽略单行，不放宽目标地址门禁。
         }
       }
+    }
+
+    if (!seenDone) {
+      throw new PrematureStreamTerminationError()
     }
   } finally {
     clearTimeout(timeout)

@@ -1,6 +1,12 @@
 // @vitest-environment node
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
-import { resolveChatEndpoint } from '../server/llm/openaiStream'
+import {
+  PrematureStreamTerminationError,
+  resolveChatEndpoint,
+  streamOpenAiChat,
+} from '../server/llm/openaiStream'
 
 const DUMMY_MOZ = ['dummy', 'moz', 'token'].join('_')
 const DUMMY_DS = ['dummy', 'ds', 'token'].join('_')
@@ -70,5 +76,32 @@ describe('BYOK 路由配置解析（T07）', () => {
 
   it('5. 无任何 Key 时返回 null', () => {
     expect(resolveChatEndpoint({})).toBeNull()
+  })
+
+  it('6. 上游在未发送 [DONE] 情况下提前断开连接，抛出 PrematureStreamTerminationError', async () => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+      res.write('data: {"choices":[{"delta":{"content":"第一段"}}]}\n\n')
+      res.write('data: {"choices":[{"delta":{"content":"第二段"}}]}\n\n')
+      res.end()
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+    const port = (server.address() as AddressInfo).port
+    const endpoint = {
+      apiKey: DUMMY_MOZ,
+      baseUrl: `http://127.0.0.1:${port}`,
+      model: 'test-model',
+      allowPrivateNetwork: true,
+    }
+
+    const chunks: string[] = []
+    await expect(async () => {
+      for await (const chunk of streamOpenAiChat(endpoint, '测试指令', '系统提示')) {
+        chunks.push(chunk.delta)
+      }
+    }).rejects.toThrow(PrematureStreamTerminationError)
+
+    expect(chunks).toEqual(['第一段', '第二段'])
+    server.close()
   })
 })

@@ -58,6 +58,17 @@ export function DialogueStream({
   }, [book])
 
   useEffect(() => {
+    setDraftText('')
+    setError(null)
+    setAnswer('')
+    setPhase('ask')
+    if (readerRef.current) {
+      void readerRef.current.cancel().catch(() => {})
+      readerRef.current = null
+    }
+  }, [book?.root, chapterIndex])
+
+  useEffect(() => {
     return () => { void readerRef.current?.cancel() }
   }, [])
 
@@ -108,6 +119,8 @@ export function DialogueStream({
       readerRef.current = reader
       const decoder = new TextDecoder()
       let buffer = ''
+      let completed = false
+      let hasError = false
       for (;;) {
         const { done, value } = await reader.read()
         if (done) break
@@ -121,12 +134,18 @@ export function DialogueStream({
           if (frame.event === 'delta' && typeof frame.text === 'string') {
             setDraftText((prev) => prev + frame.text)
           } else if (frame.event === 'done') {
+            completed = true
             setPhase('draft_done')
           } else if (frame.event === 'error' || frame.ok === false) {
+            hasError = true
             setError(frame.error ?? '草稿流中断')
             setPhase('error')
           }
         }
+      }
+      if (!completed && !hasError) {
+        setError('草稿流在完成帧之前中断')
+        setPhase('error')
       }
       setSending(false)
     } catch (cause) {

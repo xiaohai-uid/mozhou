@@ -172,4 +172,49 @@ describe('DialogueStream（T44）', () => {
     render(<DialogueStream book={null} />)
     expect(screen.getByTestId('dialogue-no-book').textContent).toContain('先建书')
   })
+
+  it('流未发送 done 提前断开：停在错误态，不展示生成完成', async () => {
+    stubDialogueFetch({
+      stream: [
+        { ok: true, event: 'start', chapterIndex: 1, receiptId: null },
+        { ok: true, event: 'delta', text: '半截正文' },
+      ],
+    })
+    render(<DialogueStream book={BOOK} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '两者递进' })).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('button', { name: '两者递进' }))
+    await userEvent.click(screen.getByRole('button', { name: '发送' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('alert').textContent).toContain('中断')
+    expect(screen.queryByTestId('draft-slice')?.textContent ?? '').not.toContain('完成')
+  })
+
+  it('切换章节重置对话流展示与输入，不残留上一章状态', async () => {
+    stubDialogueFetch({
+      stream: [
+        { ok: true, event: 'start', chapterIndex: 1, receiptId: null },
+        { ok: true, event: 'delta', text: '第1章草稿' },
+        { ok: true, event: 'done', outcome: 'succeeded' },
+      ],
+    })
+    const { rerender } = render(<DialogueStream book={BOOK} chapterIndex={1} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '两者递进' })).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('button', { name: '两者递进' }))
+    await userEvent.click(screen.getByRole('button', { name: '发送' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('draft-text').textContent).toBe('第1章草稿')
+    })
+
+    // 切到第 2 章
+    rerender(<DialogueStream book={BOOK} chapterIndex={2} />)
+    expect(screen.queryByTestId('draft-text')).toBeNull()
+    expect(screen.getByLabelText('写作指令')).toHaveValue('')
+  })
 })

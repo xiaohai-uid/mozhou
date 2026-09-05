@@ -65,7 +65,7 @@ export function App(): JSX.Element {
   const [initial] = useState(loadWorkbenchState)
   const [book, setBook] = useState<BookInfo | null>(initial.book)
   const [view, setView] = useState<ViewId>(initial.view)
-  const [chapterIndex, setChapterIndex] = useState(1)
+  const [chapterIndex, setChapterIndex] = useState(() => initial.chapterIndex ?? 1)
   const [stage, setStage] = useState(DEFAULT_STAGE)
   const [inspectorTab, setInspectorTab] = useState<InspectorTabId>('quality')
   const [wizardOpen, setWizardOpen] = useState(
@@ -88,8 +88,8 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    saveWorkbenchState({ book, view })
-  }, [book, view])
+    saveWorkbenchState({ book, view, chapterIndex })
+  }, [book, view, chapterIndex])
 
   const handleSelectView = (next: ViewId): void => {
     setView(next)

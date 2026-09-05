@@ -163,13 +163,14 @@ describe('App 壳集成（T40）', () => {
   it('刷新恢复：localStorage 中的书与视图状态还原（US12）', () => {
     window.localStorage.setItem(
       'mozhou.workbench.v1',
-      JSON.stringify({ book: STORED_BOOK, view: 'workbench' }),
+      JSON.stringify({ book: STORED_BOOK, view: 'workbench', chapterIndex: 7 }),
     )
     stubAppFetch()
     render(<App />)
     expect(document.querySelector('.topbar .book-switch')?.textContent).toContain('雾港失真')
     expect(document.querySelector('.chapterbar h1')?.textContent).toBe('《雾港失真》')
     expect(screen.getByTestId('created-book').textContent).toContain('bk_stored')
+    expect(screen.getByLabelText('当前章节')).toHaveValue(7)
   })
 
   it('未建书时质量门 tab 呈显式空态；建书后挂载 QualityPanel', async () => {

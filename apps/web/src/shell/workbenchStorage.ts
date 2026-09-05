@@ -14,12 +14,13 @@ export interface BookInfo {
 export interface WorkbenchState {
   readonly book: BookInfo | null
   readonly view: ViewId
+  readonly chapterIndex?: number
 }
 
 const STORAGE_KEY = 'mozhou.workbench.v1'
 const DRAFT_CACHE_KEY = 'mozhou.draft.cache'
 
-export const DEFAULT_WORKBENCH_STATE: WorkbenchState = { book: null, view: 'workbench' }
+export const DEFAULT_WORKBENCH_STATE: WorkbenchState = { book: null, view: 'workbench', chapterIndex: 1 }
 
 export function loadWorkbenchState(): WorkbenchState {
   try {
@@ -27,15 +28,23 @@ export function loadWorkbenchState(): WorkbenchState {
     if (raw === null) return DEFAULT_WORKBENCH_STATE
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null) return DEFAULT_WORKBENCH_STATE
-    const { book, view } = parsed as { book?: unknown; view?: unknown }
+    const { book, view, chapterIndex: rawChapter } = parsed as {
+      book?: unknown
+      view?: unknown
+      chapterIndex?: unknown
+    }
     if (!isViewId(view)) return DEFAULT_WORKBENCH_STATE
-    if (book === null) return { book: null, view }
+    const chapterIndex =
+      typeof rawChapter === 'number' && Number.isSafeInteger(rawChapter) && rawChapter >= 1
+        ? rawChapter
+        : 1
+    if (book === null) return { book: null, view, chapterIndex }
     if (typeof book !== 'object') return DEFAULT_WORKBENCH_STATE
     const { root, bookId, title } = book as { root?: unknown; bookId?: unknown; title?: unknown }
     if (typeof root !== 'string' || typeof bookId !== 'string' || typeof title !== 'string') {
       return DEFAULT_WORKBENCH_STATE
     }
-    return { book: { root, bookId, title }, view }
+    return { book: { root, bookId, title }, view, chapterIndex }
   } catch {
     return DEFAULT_WORKBENCH_STATE
   }
