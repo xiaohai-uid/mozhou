@@ -1229,6 +1229,41 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     expect(content).toContain('OPENING_TAG_0905')
     expect(content).toContain('FIRST_CHAPTER_GOAL_TAG_0905')
   })
+
+  it('POST /api/draft.stream：start 帧的 prompt 必须包含向导或设定中的世界规则与承诺', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-prompt-intent-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '意图提示词书' })
+    const root = created.data.root as string
+
+    // 写入特异意图
+    await post(base, '/api/author-intent.update', {
+      root,
+      worldRule: 'RULE_MUST_INCLUDE_IN_PROMPT_111',
+      volumePromise: 'PROMISE_MUST_INCLUDE_IN_PROMPT_222',
+      opening: 'OPENING_SCENE_IN_PROMPT_333',
+      firstChapterGoal: 'GOAL_FIRST_CHAPTER_IN_PROMPT_444',
+    })
+
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    try {
+      const res = await fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root, chapterIndex: 1, prompt: '动笔写第一段' }),
+      })
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      const lines = text.split('\n').filter((l) => l.trim().length > 0)
+      const startFrame = JSON.parse(lines[0] ?? '{}') as { ok: boolean; event: string; prompt: string }
+      expect(startFrame.event).toBe('start')
+      expect(startFrame.prompt).toContain('RULE_MUST_INCLUDE_IN_PROMPT_111')
+      expect(startFrame.prompt).toContain('PROMISE_MUST_INCLUDE_IN_PROMPT_222')
+    } finally {
+      delete process.env['MOZHOU_DRAFT_PROVIDER']
+    }
+  })
 })
 
 /* ----------------------------------------------------------------------------

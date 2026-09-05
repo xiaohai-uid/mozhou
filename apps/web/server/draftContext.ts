@@ -1,6 +1,8 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  AUTHOR_INTENT_PATH,
+  parseFrontmatter,
   proseChapterPath,
   readBookRecord,
   readNarrativeSnapshot,
@@ -13,6 +15,19 @@ import { runCompileStep } from '@mozhou/pipeline'
 const PREVIEW_CONTEXT_WINDOW_TOKENS = 32_000
 const MAX_RECENT_CHAPTERS = 3
 const MAX_RECENT_CHARS_PER_CHAPTER = 12_000
+
+function readAuthorIntentText(root: string): string | null {
+  const p = join(root, AUTHOR_INTENT_PATH)
+  if (!existsSync(p)) return null
+  try {
+    const raw = readFileSync(p, 'utf8')
+    const doc = parseFrontmatter(raw)
+    const body = doc.body.trim()
+    return body.length > 0 ? body : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * v0.1 Technical Preview 的确定性本地 Token 计数器。
@@ -55,20 +70,50 @@ function structuralFallback(
   authorPrompt: string,
   storyText: readonly string[],
   alwaysCards: readonly { ref: string; brief?: string | null }[],
+  authorIntentText?: string | null,
 ): ContextPacket {
-  const sections = [
+  const rawSections = [
     {
       section: 'book_identity',
       text: `作品：《${bookTitle}》\n当前章节：第 ${chapterIndex} 章\n作者指令：${authorPrompt}\n`,
     },
+    ...(authorIntentText ? [{ section: 'author_intent', text: `【作者核心设定与意图】\n${authorIntentText}\n` }] : []),
     ...alwaysCards.map((card) => ({
       section: `entity:${card.ref}`,
       text: `${card.brief ?? ''}\n`,
     })),
-  ].map((piece) => ({ ...piece, tokens: previewCodepointTokenizer.count(piece.text) }))
+  ]
 
-  const storyBody = storyText.join('\n\n')
-  const storyRendered = storyBody.length > 0 ? storyBody + '\n' : ''
+  let usedTokens = 0
+  const sections: { section: string; text: string; tokens: number }[] = []
+  for (const s of rawSections) {
+    const tokens = previewCodepointTokenizer.count(s.text)
+    if (usedTokens + tokens <= PREVIEW_CONTEXT_WINDOW_TOKENS) {
+      sections.push({ ...s, tokens })
+      usedTokens += tokens
+    } else {
+      const available = PREVIEW_CONTEXT_WINDOW_TOKENS - usedTokens
+      if (available > 10) {
+        const truncatedText = s.text.slice(0, available)
+        sections.push({ section: s.section, text: truncatedText, tokens: previewCodepointTokenizer.count(truncatedText) })
+        usedTokens += previewCodepointTokenizer.count(truncatedText)
+      }
+      break
+    }
+  }
+
+  const remainingBudget = PREVIEW_CONTEXT_WINDOW_TOKENS - usedTokens
+  let storyRendered = ''
+  if (remainingBudget > 0 && storyText.length > 0) {
+    const fullStory = storyText.join('\n\n') + '\n'
+    const fullTokens = previewCodepointTokenizer.count(fullStory)
+    if (fullTokens <= remainingBudget) {
+      storyRendered = fullStory
+    } else {
+      storyRendered = fullStory.slice(-remainingBudget)
+    }
+  }
+
   const text = sections.map((piece) => piece.text).join('') + storyRendered
   return {
     taskType: 'CHAPTER_DRAFTING',
@@ -78,7 +123,7 @@ function structuralFallback(
     story: {
       text: storyRendered,
       tokens: previewCodepointTokenizer.count(storyRendered),
-      trimType: 'none',
+      trimType: storyRendered.length < storyText.join('\n\n').length ? 'truncated' : 'none',
     },
     text,
     totalTokens: previewCodepointTokenizer.count(text),
@@ -105,12 +150,14 @@ export async function buildDraftContext(input: {
   const snapshot = readNarrativeSnapshot(input.root)
   const storyText = recentStoryText(input.root, input.chapterIndex)
   const alwaysCards = cards.filter((card) => card.aiContext === 'always')
+  const authorIntentText = readAuthorIntentText(input.root)
 
   const structuralSections = [
     {
       section: 'book_identity',
       content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
     },
+    ...(authorIntentText ? [{ section: 'author_intent', content: `【作者核心设定与意图】\n${authorIntentText}` }] : []),
   ]
 
   try {
@@ -137,7 +184,14 @@ export async function buildDraftContext(input: {
   } catch (error) {
     if (!(error instanceof EmptyRecallError)) throw error
     return {
-      packet: structuralFallback(book.title, input.chapterIndex, input.authorPrompt, storyText, alwaysCards),
+      packet: structuralFallback(
+        book.title,
+        input.chapterIndex,
+        input.authorPrompt,
+        storyText,
+        alwaysCards,
+        authorIntentText,
+      ),
       mode: 'structural_fallback',
     }
   }
