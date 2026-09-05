@@ -31,6 +31,8 @@ ENV HOST=0.0.0.0
 # node 官方镜像内置 uid/gid 1000 的非 root 用户；运行期文件归其所有。
 COPY --chown=node:node --from=builder /app /app
 
+RUN mkdir -p /data/books && chown -R node:node /data/books
+
 USER node
 
 EXPOSE 5173

@@ -43,3 +43,18 @@ pnpm build && pnpm lint && pnpm test   # 三绿 = 就绪
 - **安装立刻失败并提示缺 `ONNXRUNTIME_NODE_INSTALL_CUDA=skip`** → 按提示 export 后重试。
 - **测试报 better-sqlite3 `NODE_MODULE_VERSION` 不符 / Module did not self-register** → Node 版本不是 22.23.2，回前置步骤重装。
 - **报模型资产 hash 不符或缺失** → 资产文件被改动或未随仓检出；恢复该目录后重试（以 `manifest.json` 为准）。
+
+## 书库长期存储与数据备份
+
+墨舟采用本地优先文件系统存储，作品与章节草稿保存在独立的书库目录中：
+
+- **默认书库目录**：`~/MoZhou/Books/`（Windows 下位于 `%USERPROFILE%\MoZhou\Books\`，Linux/macOS 下位于 `$HOME/MoZhou/Books/`）。
+- **自定义书库环境变量**：可通过环境变量 `MOZHOU_LIBRARY_DIR` 显式指定长期保存根目录，例如 `export MOZHOU_LIBRARY_DIR=/my/safe/novels`。
+- **Docker 容器环境**：默认挂载命名数据卷 `mozhou_books:/data/books`，容器内固定为 `MOZHOU_LIBRARY_DIR=/data/books`，容器销毁或重建不会丢失书稿。
+
+### 书库数据备份与迁移操作
+
+1. **先停止墨舟服务**：确保无并发写入或未完成的流式任务。
+2. **完整复制书目录**：将原书目录（例如 `~/MoZhou/Books/<bookId>/`）整包复制到目标备份或新书库位置。
+3. **校验完整性**：确认目标目录下包含 `book.json` 及 `正文/` 目录结构。
+4. **重新启动服务**：在墨舟界面点击“书架”或调用“打开作品”，选择新路径即可立即恢复写作与目录索引。

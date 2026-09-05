@@ -6,9 +6,9 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
 import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
@@ -69,6 +69,44 @@ describe('apps/web api 中间件 · T31/T32', () => {
     expect(data.ok).toBe(true)
     expect(typeof data.root).toBe('string')
     expect(typeof data.bookId).toBe('string')
+  })
+
+  it('POST /api/book 不传 dir 时建书至 MOZHOU_LIBRARY_DIR 长期目录并包含首章', async () => {
+    const base = await listen()
+    const libDir = mkdtempSync(join(tmpdir(), 'mozhou-lib-test-'))
+    roots.push(libDir)
+    const before = process.env['MOZHOU_LIBRARY_DIR']
+    process.env['MOZHOU_LIBRARY_DIR'] = libDir
+    try {
+      const { status, data } = await post(base, '/api/book', { title: '长期书库作品' })
+      expect(status).toBe(200)
+      expect(data.ok).toBe(true)
+      const root = data.root as string
+      expect(root.startsWith(resolve(libDir))).toBe(true)
+      expect(existsSync(join(root, 'book.json'))).toBe(true)
+      expect(readProseChapter(root, proseChapterPath(1)).phase).toBe('draft')
+    } finally {
+      if (before === undefined) delete process.env['MOZHOU_LIBRARY_DIR']
+      else process.env['MOZHOU_LIBRARY_DIR'] = before
+    }
+  })
+
+  it('POST /api/book 支持含中文与空格的路径创建与重开', async () => {
+    const base = await listen()
+    const parent = mkdtempSync(join(tmpdir(), 'mozhou-chinese-'))
+    roots.push(parent)
+    const dir = join(parent, '我的 小说 目录（测试）')
+    const { status, data } = await post(base, '/api/book', { dir, title: '中文空格书' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    const root = data.root as string
+    expect(existsSync(join(root, 'book.json'))).toBe(true)
+    expect(readProseChapter(root, proseChapterPath(1)).phase).toBe('draft')
+    // 重新打开
+    const openRes = await post(base, '/api/library.open', { root })
+    expect(openRes.status).toBe(200)
+    expect(openRes.data.ok).toBe(true)
+    expect((openRes.data as { title: string }).title).toBe('中文空格书')
   })
 
   it('new HTTP book is immediately draftable', async () => {

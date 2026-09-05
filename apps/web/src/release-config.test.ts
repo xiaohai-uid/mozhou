@@ -59,4 +59,19 @@ describe('release hardening · distribution configuration', () => {
       expect(ignore).toContain(pattern)
     }
   })
+
+  it('configures long-term book storage volume and permissions for Docker bundles', () => {
+    const buildScript = read('scripts/build-release.mjs')
+    expect(buildScript).toContain('MOZHOU_LIBRARY_DIR: /data/books')
+    expect(buildScript).toContain('mozhou_books:/data/books')
+    expect(buildScript).toContain('mkdir -p /data/books && chown -R node:node /data/books')
+
+    const rootCompose = read('docker-compose.yml')
+    expect(rootCompose).toContain('MOZHOU_LIBRARY_DIR=/data/books')
+    expect(rootCompose).toContain('mozhou_books:/data/books')
+    expect(rootCompose).toContain('mozhou_books:')
+
+    const rootDockerfile = read('Dockerfile')
+    expect(rootDockerfile).toContain('mkdir -p /data/books && chown -R node:node /data/books')
+  })
 })

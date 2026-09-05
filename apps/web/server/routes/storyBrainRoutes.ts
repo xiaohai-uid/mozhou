@@ -2,6 +2,10 @@
  * apps/web · Story Brain 与核心书目数据路由控制器。
  */
 import type { RouteHandler } from '../router.js'
+import { homedir } from 'node:os'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { createBook, LocalDataPlane, readCanonState } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 
@@ -9,7 +13,15 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) =
   if (req.method !== 'POST') return false
 
   if (path === '/api/book') {
-    const dir = typeof body['dir'] === 'string' ? body['dir'] : '/tmp/mozhou-book-' + Date.now()
+    const rawDir = typeof body['dir'] === 'string' && body['dir'].trim().length > 0 ? body['dir'].trim() : null
+    let dir: string
+    if (rawDir !== null) {
+      dir = resolve(rawDir)
+    } else {
+      const library = resolve(process.env['MOZHOU_LIBRARY_DIR'] ?? join(homedir(), 'MoZhou', 'Books'))
+      mkdirSync(library, { recursive: true })
+      dir = join(library, randomUUID())
+    }
     const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
     const result = createBook({ dir, title })
     const plane = LocalDataPlane.open(result.root)
@@ -18,7 +30,7 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) =
     } finally {
       plane.close()
     }
-    json(200, { ok: true, root: result.root, bookId: result.book.id })
+    json(200, { ok: true, root: resolve(result.root), bookId: result.book.id })
     return true
   }
 

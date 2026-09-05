@@ -16,9 +16,14 @@ services:
       - PORT=5173
       # 容器内需监听全部接口以供宿主端口转发；宿主映射仍锁定 127.0.0.1。
       - HOST=0.0.0.0
+      - MOZHOU_LIBRARY_DIR=/data/books
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - MOZHOU_API_KEY=${MOZHOU_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MOZHOU_API_BASE=${MOZHOU_API_BASE:-}
+      - MOZHOU_MODEL=${MOZHOU_MODEL:-}
+    volumes:
+      - mozhou_books:/data/books
 
   # 以下均为旧 Web/SaaS 栈兼容设施，不属于 v0.1 local-first 默认发行攻击面。
   crawl4ai:
@@ -100,5 +105,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  mozhou_books:
   pgdata:
   oneapi-data:
