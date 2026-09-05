@@ -32,6 +32,7 @@ import type { WizardOutcome } from './wizard/WizardOverlay'
 import { WorkbenchView } from './workbench/WorkbenchView'
 import { MobileShell } from './mobile/MobileShell'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
+import { UxGoldenPathPrototype } from './prototype/UxGoldenPathPrototype'
 
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
@@ -60,7 +61,16 @@ function wizardCompleted(): boolean {
   }
 }
 
+function uxPrototypeEnabled(): boolean {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('prototype') === 'ux-golden-path'
+}
+
 export function App(): JSX.Element {
+  return uxPrototypeEnabled() ? <UxGoldenPathPrototype /> : <ProductionApp />
+}
+
+function ProductionApp(): JSX.Element {
   const [initial] = useState(loadWorkbenchState)
   const [book, setBook] = useState<BookInfo | null>(initial.book)
   const [view, setView] = useState<ViewId>(initial.view)
