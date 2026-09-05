@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { TensionSparkWidget } from '../components/TensionSparkWidget'
 import { PlotBranchWidget } from '../components/PlotBranchWidget'
 import { ProseReadingFlow } from '../components/ProseReadingFlow'
@@ -7,7 +7,7 @@ import { HistoryIcon, ListIcon } from '../components/MobileIcons'
 import { post } from '../../lib/post'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
-import type { DraftQuestionResponse } from '../../../server/api'
+import type { ChapterReadResponse, DraftQuestionResponse } from '../../../server/api'
 
 export interface WorkbenchHubProps {
   book: BookInfo | null
@@ -23,7 +23,29 @@ export function WorkbenchHub({
 }: WorkbenchHubProps): JSX.Element {
   const [currentStage, setCurrentStage] = useState(2)
   const [questionData, setQuestionData] = useState<DraftQuestionResponse | null>(null)
+  const [chapterProse, setChapterProse] = useState<ChapterReadResponse | null>(null)
+  const [streamDelta, setStreamDelta] = useState('')
   const [drafting, setDrafting] = useState(false)
+
+  const loadChapter = useCallback(async (): Promise<void> => {
+    if (!book) {
+      setChapterProse(null)
+      return
+    }
+    try {
+      const res = await post<ChapterReadResponse>('/api/chapter.read', {
+        root: book.root,
+        chapterIndex,
+      })
+      setChapterProse(res)
+    } catch {
+      setChapterProse(null)
+    }
+  }, [book, chapterIndex])
+
+  useEffect(() => {
+    void loadChapter()
+  }, [loadChapter])
 
   useEffect(() => {
     let mounted = true
@@ -46,6 +68,7 @@ export function WorkbenchHub({
     }
 
     setDrafting(true)
+    setStreamDelta('')
     try {
       const res = await fetch('/api/draft.stream', {
         method: 'POST',
@@ -81,17 +104,33 @@ export function WorkbenchHub({
           const line = buffer.slice(0, newline).trim()
           buffer = buffer.slice(newline + 1)
           if (line.length > 0) {
-            const frame = JSON.parse(line) as { ok?: boolean; event?: string; error?: string }
+            const frame = JSON.parse(line) as {
+              ok?: boolean
+              event?: string
+              text?: string
+              error?: string
+              partial?: boolean
+              outcome?: string
+            }
             if (frame.ok === false || frame.event === 'error') {
               throw new Error(frame.error ?? '草稿生成失败')
             }
-            if (frame.event === 'done') completed = true
+            if (frame.event === 'delta' && typeof frame.text === 'string') {
+              setStreamDelta((prev) => prev + frame.text)
+            } else if (frame.event === 'done') {
+              if (frame.partial === true || (frame.outcome && frame.outcome !== 'succeeded')) {
+                throw new Error(`草稿生成未完全成功（${frame.outcome ?? 'partial'}，半稿已保留）`)
+              }
+              completed = true
+            }
           }
           newline = buffer.indexOf('\n')
         }
       }
 
       if (!completed) throw new Error('草稿流在完成帧之前结束')
+      await loadChapter()
+      setStreamDelta('')
       alert('正文草稿已由真实生成链路完成。请在正文/作品视图查看持久化结果。')
     } catch (error) {
       alert(`草稿生成失败：${(error as Error).message}`)
@@ -105,6 +144,12 @@ export function WorkbenchHub({
     text: c,
     tag: i === 0 ? '推荐' : '备选',
   }))
+
+  const rawBody = (chapterProse?.body ?? '') + (streamDelta ? `\n${streamDelta}` : '')
+  const proseParagraphs = rawBody
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
 
   return (
     <>
@@ -150,7 +195,12 @@ export function WorkbenchHub({
 
       <PlotBranchWidget question={questionData?.question} choices={choices} />
 
-      <ProseReadingFlow />
+      <ProseReadingFlow
+        title={chapterProse?.title ?? `第 ${chapterIndex} 章`}
+        wordCount={chapterProse?.wordCount ?? (rawBody.length > 0 ? rawBody.length : undefined)}
+        revision={chapterProse?.revision}
+        proseParagraphs={proseParagraphs}
+      />
 
       <MobileComposer
         onSendPrompt={(p) => { void handleSendPrompt(p) }}

@@ -1,9 +1,9 @@
 export interface ProseReadingFlowProps {
-  title?: string
-  wordCount?: number
-  revision?: number
-  proseParagraphs?: string[]
-  onOpenFormat?: () => void
+  title?: string | undefined
+  wordCount?: number | undefined
+  revision?: number | undefined
+  proseParagraphs?: string[] | undefined
+  onOpenFormat?: (() => void) | undefined
 }
 
 export function ProseReadingFlow({

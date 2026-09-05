@@ -175,13 +175,7 @@ export interface ChapterSaveRequest {
   readonly baseHash?: string | undefined
 }
 
-export interface ChapterSaveResponse {
-  readonly ok: true
-  readonly chapterIndex: number
-  readonly wordCount: number
-  readonly revision: number
-  readonly hash: string
-}
+export type ChapterSaveResponse = ChapterReadResponse
 
 export interface MechanicalReviewRequest {
   readonly root: string

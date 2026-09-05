@@ -1230,7 +1230,7 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     })
     expect(conflict.status).toBe(409)
     expect(conflict.data.ok).toBe(false)
-    expect(conflict.data.code).toBe('HASH_MISMATCH')
+    expect(conflict.data.code).toBe('CHAPTER_CONFLICT')
 
     // 确认正文依然是第三方提交的内容，未被覆盖
     const readFinal = await post(base, '/api/chapter.read', { root, chapterIndex: 1 })
@@ -1396,7 +1396,7 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     })
     expect(res.status).toBe(409)
     expect(res.data.ok).toBe(false)
-    expect(res.data.code).toBe('REVISION_MISMATCH')
+    expect(res.data.code).toBe('CHAPTER_CONFLICT')
   })
 
   it('POST /api/chapter.mechanical-review：无 session 真实草稿的基础机械检查及 404 容错', async () => {

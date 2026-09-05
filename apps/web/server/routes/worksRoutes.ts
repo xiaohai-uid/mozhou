@@ -25,7 +25,7 @@ import {
   readPipelineLedger,
   recordUserEdit,
 } from '@mozhou/pipeline'
-import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
+import { newUlid, type ContextReceipt, type ContextReceiptId } from '@mozhou/kernel'
 import { sha256Hex } from '@mozhou/data-plane'
 import { hashProse } from '@mozhou/quality-engine'
 import { PublishBus } from '@mozhou/runtime'
@@ -255,7 +255,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
       if (expectedRevision !== undefined && scan.revision !== expectedRevision) {
         json(409, {
           ok: false,
-          code: 'REVISION_MISMATCH',
+          code: 'CHAPTER_CONFLICT',
           error: `expected revision ${expectedRevision}, but current revision is ${scan.revision}`,
         })
         return true
@@ -264,7 +264,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
       if (expectedContentHash !== undefined && expectedContentHash !== currentHash) {
         json(409, {
           ok: false,
-          code: 'HASH_MISMATCH',
+          code: 'CHAPTER_CONFLICT',
           error: 'base hash mismatch, chapter was modified on disk',
         })
         return true
@@ -285,17 +285,29 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
       const outcome = recordUserEdit({
         bus: new PublishBus(),
         bookRoot: root,
-        taskRef: 'edit_web_' + chapterIndex + '_' + Date.now(),
+        taskRef: 'tsk_edit_' + newUlid(),
         chapterIndex,
-        level: 'cursor',
+        level: 'selection',
         source: 'author',
         blocks,
       })
 
       const newHash = hashProse(outcome.body)
+      let title = `第 ${chapterIndex} 章`
+      try {
+        const outline = readCanonState(root).outlineNodes.find(
+          (n) => n.nodeType === 'chapter' && (n.orderIndex === chapterIndex - 1 || n.title.includes(String(chapterIndex))),
+        )
+        if (outline && outline.title) title = outline.title
+      } catch {
+        // ignore
+      }
       json(200, {
         ok: true,
         chapterIndex,
+        title,
+        phase: 'draft',
+        body: outcome.body,
         wordCount: outcome.body.length,
         revision: outcome.revisionAfter,
         hash: newHash,

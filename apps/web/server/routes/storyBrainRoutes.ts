@@ -23,6 +23,30 @@ import {
 import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 
+function parseInitialAuthorIntent(input: unknown): InitialAuthorIntentInput | undefined {
+  if (typeof input !== 'object' || input === null) return undefined
+  const obj = input as Record<string, unknown>
+  const result: {
+    worldRule?: string
+    volumePromise?: string
+    opening?: string
+    firstChapterGoal?: string
+  } = {}
+  if (typeof obj['worldRule'] === 'string' && obj['worldRule'].trim().length > 0) {
+    result.worldRule = obj['worldRule'].trim()
+  }
+  if (typeof obj['volumePromise'] === 'string' && obj['volumePromise'].trim().length > 0) {
+    result.volumePromise = obj['volumePromise'].trim()
+  }
+  if (typeof obj['opening'] === 'string' && obj['opening'].trim().length > 0) {
+    result.opening = obj['opening'].trim()
+  }
+  if (typeof obj['firstChapterGoal'] === 'string' && obj['firstChapterGoal'].trim().length > 0) {
+    result.firstChapterGoal = obj['firstChapterGoal'].trim()
+  }
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
 export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
 
@@ -37,10 +61,7 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) =
       dir = join(library, randomUUID())
     }
     const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
-    const rawIntent =
-      typeof body['authorIntent'] === 'object' && body['authorIntent'] !== null
-        ? (body['authorIntent'] as InitialAuthorIntentInput)
-        : undefined
+    const rawIntent = parseInitialAuthorIntent(body['authorIntent'])
     const result = createBook({
       dir,
       title,
