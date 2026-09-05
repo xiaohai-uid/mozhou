@@ -47,6 +47,16 @@ describe('release hardening · distribution configuration', () => {
     }
   })
 
+  it('publishes releases idempotently by updating an existing tag and clobbering its assets', () => {
+    const workflow = read('.github/workflows/release.yml')
+    expect(workflow).toContain('gh release view')
+    expect(workflow).toContain('gh release edit')
+    expect(workflow).toContain('gh release create')
+    expect(workflow).toContain('gh release upload')
+    expect(workflow).toContain('--clobber')
+    expect(workflow).not.toContain('softprops/action-gh-release')
+  })
+
   it('does not publish legacy infrastructure ports or fixed development secrets by default', () => {
     const compose = read('docker-compose.yml')
     expect(compose).not.toContain('"11235:11235"')
