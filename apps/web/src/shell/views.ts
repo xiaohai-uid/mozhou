@@ -48,7 +48,7 @@ export const NAV_GROUPS = [
       { id: 'capability-square', label: '技能广场', icon: '13' },
       { id: 'rank-scan', label: '网文扫榜', icon: '14' },
       { id: 'web-search', label: '联网搜索', icon: '15' },
-      { id: 'cloud-sync', label: '云同步', icon: '16' },
+      { id: 'cloud-sync', label: '云同步 · 规划中', icon: '16' },
     ],
   },
   {
