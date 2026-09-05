@@ -4,11 +4,26 @@
  * 在解压后的纯生产包中执行：真实 HTTP 建书 → 首章生成夹具 → 读 → 保存 → 读 → 导出 TXT。
  * 零外网依赖，不索取或使用真实 Key，标明不验证 LLM 质量。
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const port = process.env.PORT || '5188'
 const baseUrl = `http://127.0.0.1:${port}`
+
+interface BookJson {
+  root: string
+}
+
+interface ChapterReadJson {
+  revision: number
+  hash: string
+  body: string
+}
+
+interface ChapterSaveJson {
+  revision: number
+  hash: string
+}
 
 async function main() {
   console.log(`[smoke] starting runtime archive smoke probe against ${baseUrl}...`)
@@ -20,7 +35,7 @@ async function main() {
     body: JSON.stringify({ title: '发行运行时冒烟书' }),
   })
   if (!bookRes.ok) throw new Error(`[smoke] /api/book failed: HTTP ${bookRes.status}`)
-  const book = await bookRes.json()
+  const book = (await bookRes.json()) as BookJson
   const root = book.root
   console.log(`[smoke] step 1: book created at ${root}`)
 
@@ -38,7 +53,7 @@ async function main() {
     body: JSON.stringify({ root, chapterIndex: 1 }),
   })
   if (!readRes1.ok) throw new Error(`[smoke] /api/chapter.read failed: HTTP ${readRes1.status}`)
-  const read1 = await readRes1.json()
+  const read1 = (await readRes1.json()) as ChapterReadJson
   console.log(`[smoke] step 3: chapter 1 read, revision=${read1.revision}, hash=${read1.hash}`)
 
   // 4. 手工编辑并保存
@@ -54,7 +69,7 @@ async function main() {
     }),
   })
   if (!saveRes.ok) throw new Error(`[smoke] /api/chapter.save failed: HTTP ${saveRes.status}`)
-  const saveOutcome = await saveRes.json()
+  const saveOutcome = (await saveRes.json()) as ChapterSaveJson
   console.log(`[smoke] step 4: chapter 1 saved, revision=${saveOutcome.revision}, hash=${saveOutcome.hash}`)
 
   // 5. 再次读取核验
@@ -63,7 +78,7 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ root, chapterIndex: 1 }),
   })
-  const read2 = await readRes2.json()
+  const read2 = (await readRes2.json()) as ChapterReadJson
   if (read2.body.trim() !== editedText) {
     throw new Error('[smoke] step 5 failed: persisted body does not match edited text')
   }

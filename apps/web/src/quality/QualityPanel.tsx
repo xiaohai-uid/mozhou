@@ -32,6 +32,28 @@ export interface ReviewResponse extends QualitySummary {
   readonly reportPath?: string
 }
 
+export interface MechanicalReviewResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly draftRevision: number
+  readonly draftContentHash: string
+  readonly mechanicalGate: {
+    readonly passed: boolean
+    readonly checks: readonly {
+      readonly id: string
+      readonly name: string
+      readonly ok: boolean
+      readonly detail: string
+    }[]
+    readonly stats: {
+      readonly totalChars: number
+      readonly totalParagraphs: number
+      readonly totalHanzi: number
+    }
+  }
+  readonly semanticReviewer: 'unavailable'
+}
+
 /** 与 packages/quality-engine/src/types.ts CORRECTION_REASONS 同源；
  * 不可直引包根——policy/review 模块携 node:crypto，进浏览器包必炸。
  * 词表漂移由 api.test.ts 的 400 未知原因契约测试兜底。 */
@@ -66,6 +88,8 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const [selectedReason, setSelectedReason] = useState<string>('outline_expansion')
   const [note, setNote] = useState('')
   const [correctionSaved, setCorrectionSaved] = useState(false)
+  const [mechanicalResult, setMechanicalResult] = useState<MechanicalReviewResponse | null>(null)
+  const [mechanicalBusy, setMechanicalBusy] = useState(false)
 
   const refresh = useCallback(async () => {
     setError(null)
@@ -77,6 +101,22 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   }, [root, chapterIndex])
 
   useEffect(() => { void refresh() }, [refresh])
+
+  const runMechanicalReview = async () => {
+    setError(null)
+    setMechanicalBusy(true)
+    try {
+      const res = await post<MechanicalReviewResponse>('/api/chapter.mechanical-review', {
+        root,
+        chapterIndex,
+      })
+      setMechanicalResult(res)
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setMechanicalBusy(false)
+    }
+  }
 
   const runReview = async () => {
     setError(null)
@@ -207,12 +247,48 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
           <button className="btn-primary" onClick={() => { void runReview() }}>
             Run literary review
           </button>
+          <button
+            className="btn"
+            onClick={() => { void runMechanicalReview() }}
+            disabled={mechanicalBusy}
+            data-testid="run-mechanical-review-btn"
+          >
+            {mechanicalBusy ? '检查中…' : '运行基础检查'}
+          </button>
           {verdict === 'blocking_fail' && (
             <button className="btn" onClick={() => { void applyRework() }} disabled={reworkCount >= 2}>
               Apply rework{reworkCount >= 2 ? '（已达上限）' : ''}
             </button>
           )}
         </div>
+
+        {mechanicalResult !== null && (
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--hairline)', paddingTop: 10 }} data-testid="mechanical-gate-report">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <b style={{ fontSize: 12 }}>基础机械门禁检查</b>
+              <span
+                className="tag"
+                style={{
+                  color: mechanicalResult.mechanicalGate.passed ? 'var(--success)' : 'var(--danger)',
+                  borderColor: mechanicalResult.mechanicalGate.passed ? 'var(--success)' : 'var(--danger)',
+                }}
+              >
+                {mechanicalResult.mechanicalGate.passed ? '全部通过' : '未通过'}
+              </span>
+            </div>
+            <div className="mono muted" style={{ fontSize: 11, marginBottom: 6 }}>
+              字数：{mechanicalResult.mechanicalGate.stats.totalHanzi} 汉字 · {mechanicalResult.mechanicalGate.stats.totalParagraphs} 段落
+            </div>
+            {mechanicalResult.mechanicalGate.checks.map((c) => (
+              <div key={c.id} className="finding" style={{ fontSize: 11, marginBottom: 4 }}>
+                <span style={{ color: c.ok ? 'var(--success)' : 'var(--danger)', marginRight: 6 }}>
+                  {c.ok ? '✓' : '✗'}
+                </span>
+                <b>{c.name}</b>：{c.detail}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={{ marginTop: 12, borderTop: '1px solid var(--hairline)', paddingTop: 10 }}>
           <h4 className="mono muted" style={{ margin: '0 0 8px' }}>RECORD MY CORRECTION</h4>

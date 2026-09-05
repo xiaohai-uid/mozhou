@@ -1344,6 +1344,62 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     const posCh2 = text.indexOf('第 2 章 · 迷雾重重')
     expect(posBook).toBeLessThan(posCh1)
     expect(posCh1).toBeLessThan(posCh2)
+
+    // JSON 结构化接口 POST /api/book.export-txt
+    const jsonRes = await post(base, '/api/book.export-txt', { root })
+    expect(jsonRes.status).toBe(200)
+    expect(jsonRes.data.ok).toBe(true)
+    expect(jsonRes.data.title).toBe('夜雨江澜')
+    expect((jsonRes.data.content as string)).toContain('第 1 章 · 第一章')
+    expect((jsonRes.data.content as string)).toContain('第 2 章 · 迷雾重重')
+  })
+
+  it('POST /api/chapter.save：支持 expectedRevision 校验，失谐时返回 409 REVISION_MISMATCH', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-rev-mismatch-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '版本失谐书' })
+    const root = created.data.root as string
+
+    // 当前 revision 为 0，传入 expectedRevision: 5 应当触发 409
+    const res = await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 1,
+      body: '企图越过版本保存',
+      expectedRevision: 5,
+    })
+    expect(res.status).toBe(409)
+    expect(res.data.ok).toBe(false)
+    expect(res.data.code).toBe('REVISION_MISMATCH')
+  })
+
+  it('POST /api/chapter.mechanical-review：无 session 真实草稿的基础机械检查及 404 容错', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-mech-rev-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '基础机检书' })
+    const root = created.data.root as string
+
+    // 写入含有占位符和正常字数的草稿
+    await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 1,
+      body: '正文开头，江水拍击石阶。TODO: 补全后续对白。',
+    })
+
+    const res = await post(base, '/api/chapter.mechanical-review', { root, chapterIndex: 1 })
+    expect(res.status).toBe(200)
+    expect(res.data.ok).toBe(true)
+    expect(res.data.chapterIndex).toBe(1)
+    expect(res.data.semanticReviewer).toBe('unavailable')
+    const gate = res.data.mechanicalGate as { passed: boolean; checks: { id: string; ok: boolean }[] }
+    expect(gate.passed).toBe(false) // 占位符拦截导致未通过
+    expect(gate.checks.find((c) => c.id === 'mech_02_placeholder')?.ok).toBe(false)
+
+    // 不存在的章节返回 404
+    const notFound = await post(base, '/api/chapter.mechanical-review', { root, chapterIndex: 99 })
+    expect(notFound.status).toBe(404)
+    expect(notFound.data.ok).toBe(false)
   })
 })
 

@@ -52,6 +52,12 @@ exports[`QualityPanel（Ink Orbit 换肤后语义保全） > 契约快照：pass
         >
           Run literary review
         </button>
+        <button
+          class="btn"
+          data-testid="run-mechanical-review-btn"
+        >
+          运行基础检查
+        </button>
       </div>
       <div
         style="margin-top: 12px; border-top: 1px solid var(--hairline); padding-top: 10px;"

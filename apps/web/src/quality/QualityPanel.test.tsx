@@ -124,6 +124,36 @@ describe('QualityPanel（Ink Orbit 换肤后语义保全）', () => {
     })
   })
 
+  it('运行基础检查点击触发 /api/chapter.mechanical-review 并渲染检查条目', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/chapter.quality') return okJson({ ok: true, hasReport: false })
+      if (path === '/api/chapter.mechanical-review') {
+        return okJson({
+          ok: true,
+          chapterIndex: 1,
+          draftRevision: 1,
+          draftContentHash: 'hash_mech',
+          mechanicalGate: {
+            passed: true,
+            checks: [{ id: 'mech_01_words', name: '字数窗口', ok: true, detail: '符合标准' }],
+            repeatedNgrams: [],
+            stats: { totalChars: 3000, totalParagraphs: 15, totalHanzi: 2800 },
+          },
+          semanticReviewer: 'unavailable',
+        })
+      }
+      return okJson({ ok: false })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
+    await userEvent.click(screen.getByRole('button', { name: '运行基础检查' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('mechanical-gate-report')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('mechanical-gate-report').textContent).toContain('全部通过')
+    expect(screen.getByTestId('mechanical-gate-report').textContent).toContain('字数窗口')
+  })
+
   it('纠错：原因下拉 + 附注 + 显式保存（附注原文只留本机）', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       okJson({ ok: true, recorded: 1, noteDigest: 'd' }),

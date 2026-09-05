@@ -25,7 +25,7 @@ export function PipelineStrip({
   onSelect: (stageIndex: number) => void
 }): JSX.Element {
   return (
-    <section className="pipeline" aria-label="章节生产管线">
+    <section className="pipeline" aria-label="章节生产管线" title="完整生产流程尚未接入工作台（仅供查看阶段说明）">
       {PIPELINE_STAGES.map((stage, index) => {
         const state =
           index < activeStage ? ' done' : index === activeStage ? ' active' : ''

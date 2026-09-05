@@ -437,7 +437,52 @@ interface StyleGuide {
 //   扫榜 POST /api/v1/rankings/scan    全局 60s 冷却（路由内置，非通用限流器）
 ```
 
+## 26. Technical Preview 本地写作版契约（DELTA-003，2026-09-05）
+
+```typescript
+// 1. 新建章节草稿
+// POST /api/chapter.create
+// 请求：{ root: string, chapterIndex: number, title: string }
+// 200 { ok: true, chapterIndex: number }
+// 409 { ok: false, code: "CHAPTER_EXISTS", error: string }
+
+// 2. 章节正文读取
+// POST /api/chapter.read
+// 请求：{ root: string, chapterIndex: number }
+// 200 { ok: true, chapterIndex, title, phase, body, wordCount, revision, hash }
+// 404 { ok: false, code: "CHAPTER_NOT_FOUND", error: string }
+
+// 3. 章节正文安全保存（乐观锁防并发覆盖）
+// POST /api/chapter.save
+// 请求：{ root: string, chapterIndex: number, body: string, expectedRevision?: number, expectedContentHash?: string, baseHash?: string }
+// 200 { ok: true, chapterIndex, wordCount, revision, hash }
+// 409 { ok: false, code: "HASH_MISMATCH" | "REVISION_MISMATCH" | "WRITE_IN_PROGRESS", error: string }
+
+// 4. 五步向导作者意图落盘
+// POST /api/author-intent.update
+// 请求：{ root: string, worldRule?: string, volumePromise?: string, opening?: string, firstChapterGoal?: string }
+// 200 { ok: true }
+// 404 { ok: false, error: string }
+
+// 5. 独立基础机械门禁检查（无需生产会话）
+// POST /api/chapter.mechanical-review
+// 请求：{ root: string, chapterIndex: number }
+// 200 { ok: true, chapterIndex, draftRevision, draftContentHash, mechanicalGate, semanticReviewer: "unavailable" }
+// 404 { ok: false, code: "CHAPTER_NOT_FOUND", error: string }
+
+// 6. 全书纯文本导出
+// POST /api/book.export-txt (结构化 JSON 契约)
+// 请求：{ root: string }
+// 200 { ok: true, title: string, content: string }
+// 400 { ok: false, error: "无可导出章节正文" }
+//
+// POST /api/export.txt (文件附件流直接下载)
+// 请求：{ root: string }
+// 200 Content-Type: text/plain; charset=utf-8
+```
+
 ## 历史
 
 - DELTA-001：PATCH 正文乐观并发（expectedRevision + 409 ContentChanged）
 - DELTA-002（2026-08-22）：任务重试与 WebDAV 推送限流；同日完成全量契约回填（openapi 23→53 paths，覆盖全部已实现路由）
+- DELTA-003（2026-09-05）：Technical Preview 本地写作收口契约（chapter.create/read/save/export/mechanical-review/author-intent.update，哈希并发锁与保真纯文本导出）

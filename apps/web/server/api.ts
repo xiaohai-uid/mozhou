@@ -21,7 +21,7 @@ import type {
   TemporalFact,
 } from '@mozhou/kernel'
 import type { RevisionTaskBrief } from '@mozhou/pipeline'
-import type { StyleMetrics } from '@mozhou/quality-engine'
+import type { MechanicalGateReport, StyleMetrics } from '@mozhou/quality-engine'
 import type { RankBoard } from './crawlers/rankings.js'
 import type { CrawledBook } from './crawlers/qidian.js'
 
@@ -139,8 +139,19 @@ export interface LibraryOpenResponse {
   readonly title: string
 }
 
+export interface ChapterCreateRequest {
+  readonly root: string
+  readonly chapterIndex: number
+  readonly title: string
+}
+
 export interface ChapterCreateResponse {
   readonly ok: true
+  readonly chapterIndex: number
+}
+
+export interface ChapterReadRequest {
+  readonly root: string
   readonly chapterIndex: number
 }
 
@@ -155,12 +166,57 @@ export interface ChapterReadResponse {
   readonly hash: string
 }
 
+export interface ChapterSaveRequest {
+  readonly root: string
+  readonly chapterIndex: number
+  readonly body: string
+  readonly expectedRevision?: number | undefined
+  readonly expectedContentHash?: string | undefined
+  readonly baseHash?: string | undefined
+}
+
 export interface ChapterSaveResponse {
   readonly ok: true
   readonly chapterIndex: number
   readonly wordCount: number
   readonly revision: number
   readonly hash: string
+}
+
+export interface MechanicalReviewRequest {
+  readonly root: string
+  readonly chapterIndex: number
+}
+
+export interface MechanicalReviewResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly draftRevision: number
+  readonly draftContentHash: string
+  readonly mechanicalGate: MechanicalGateReport
+  readonly semanticReviewer: 'unavailable'
+}
+
+export interface AuthorIntentUpdateRequest {
+  readonly root: string
+  readonly worldRule?: string | undefined
+  readonly volumePromise?: string | undefined
+  readonly opening?: string | undefined
+  readonly firstChapterGoal?: string | undefined
+}
+
+export interface AuthorIntentUpdateResponse {
+  readonly ok: true
+}
+
+export interface BookExportTxtRequest {
+  readonly root: string
+}
+
+export interface BookExportTxtResponse {
+  readonly ok: true
+  readonly title: string
+  readonly content: string
 }
 
 export interface WorksChapterSummary {

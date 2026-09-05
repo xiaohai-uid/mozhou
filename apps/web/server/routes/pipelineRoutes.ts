@@ -15,6 +15,7 @@ import {
 } from '@mozhou/pipeline'
 import {
   CORRECTION_REASONS,
+  evaluateMechanicalGates,
   hashProse,
   isQualityReviewCurrent,
   type CorrectionReason,
@@ -27,7 +28,7 @@ import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
-import { acquireChapterLock, releaseChapterLock } from '../chapterWriteGuard.js'
+import { acquireChapterLock, makeChapterLockKey, releaseChapterLock } from '../chapterWriteGuard.js'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -303,7 +304,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       return true
     }
 
-    const lockKey = `${safeRoot}:${chapterIndex}`
+    const lockKey = makeChapterLockKey(safeRoot, chapterIndex)
     if (!acquireChapterLock(lockKey)) {
       json(409, {
         ok: false,
@@ -356,6 +357,33 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     } finally {
       req.removeListener('close', onReqClose)
       releaseChapterLock(lockKey)
+    }
+    return true
+  }
+
+  /* ---- 基础机械检查（独立轻量端点，无需会话） ---- */
+  if (path === '/api/chapter.mechanical-review') {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    if (rawRoot === null || chapterIndex === null || !Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
+      json(400, { ok: false, error: 'root and safe integer chapterIndex >= 1 required' })
+      return true
+    }
+    const safeRoot = assertSafeBookRoot(rawRoot)
+    const relPath = proseChapterPath(chapterIndex)
+    try {
+      const proseObj = readProseChapter(safeRoot, relPath)
+      const mechanicalGate = evaluateMechanicalGates(proseObj.body)
+      json(200, {
+        ok: true,
+        chapterIndex,
+        draftRevision: proseObj.revision,
+        draftContentHash: hashProse(proseObj.body),
+        mechanicalGate,
+        semanticReviewer: 'unavailable',
+      })
+    } catch (err) {
+      json(404, { ok: false, code: 'CHAPTER_NOT_FOUND', error: (err as Error).message })
     }
     return true
   }

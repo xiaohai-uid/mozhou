@@ -27,9 +27,10 @@ import {
 } from '@mozhou/pipeline'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import { sha256Hex } from '@mozhou/data-plane'
+import { hashProse } from '@mozhou/quality-engine'
 import { PublishBus } from '@mozhou/runtime'
 import { assertSafeBookRoot, assertSafeParentDirectory } from '../security.js'
-import { acquireChapterLock, releaseChapterLock } from '../chapterWriteGuard.js'
+import { acquireChapterLock, makeChapterLockKey, releaseChapterLock } from '../chapterWriteGuard.js'
 
 function receiptDigestMatch(receipt: ContextReceipt): boolean {
   const digest = sha256Hex(canonicalJson(receipt.replayInputs))
@@ -186,7 +187,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     const relPath = proseChapterPath(chapterIndex)
     try {
       const scan = readProseChapter(root, relPath)
-      const hash = sha256Hex(scan.body)
+      const hash = hashProse(scan.body)
       let title = `第 ${chapterIndex} 章`
       try {
         const outline = readCanonState(root).outlineNodes.find(
@@ -217,7 +218,14 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     const rawBody = body['body']
-    const baseHash = typeof body['baseHash'] === 'string' ? body['baseHash'] : undefined
+    const expectedContentHash =
+      typeof body['expectedContentHash'] === 'string'
+        ? body['expectedContentHash']
+        : typeof body['baseHash'] === 'string'
+          ? body['baseHash']
+          : undefined
+    const expectedRevision =
+      typeof body['expectedRevision'] === 'number' ? body['expectedRevision'] : undefined
 
     if (rawRoot === null || chapterIndex === null || !Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
       json(400, { ok: false, error: 'valid root and chapterIndex >= 1 required' })
@@ -230,7 +238,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     const root = assertSafeBookRoot(rawRoot)
     const relPath = proseChapterPath(chapterIndex)
 
-    const lockKey = `${root}:${chapterIndex}`
+    const lockKey = makeChapterLockKey(root, chapterIndex)
     if (!acquireChapterLock(lockKey)) {
       json(409, {
         ok: false,
@@ -242,8 +250,18 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
     try {
       const scan = readProseChapter(root, relPath)
-      const currentHash = sha256Hex(scan.body)
-      if (baseHash !== undefined && baseHash !== currentHash) {
+      const currentHash = hashProse(scan.body)
+
+      if (expectedRevision !== undefined && scan.revision !== expectedRevision) {
+        json(409, {
+          ok: false,
+          code: 'REVISION_MISMATCH',
+          error: `expected revision ${expectedRevision}, but current revision is ${scan.revision}`,
+        })
+        return true
+      }
+
+      if (expectedContentHash !== undefined && expectedContentHash !== currentHash) {
         json(409, {
           ok: false,
           code: 'HASH_MISMATCH',
@@ -274,7 +292,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
         blocks,
       })
 
-      const newHash = sha256Hex(outcome.body)
+      const newHash = hashProse(outcome.body)
       json(200, {
         ok: true,
         chapterIndex,
@@ -290,8 +308,8 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     return true
   }
 
-  /* ---- 全书纯文本导出 ---- */
-  if (path === '/api/export.txt') {
+  /* ---- 全书纯文本导出 (JSON 契约 / 文件下载双模式) ---- */
+  if (path === '/api/book.export-txt' || path === '/api/export.txt') {
     const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
@@ -300,8 +318,18 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     const root = assertSafeBookRoot(rawRoot)
     const book = readBookRecord(root)
     const plane = LocalDataPlane.open(root)
-    const overview = plane.getWorksOverview()
-    const sortedChapters = [...overview.chapters].sort((a, b) => a.chapterIndex - b.chapterIndex)
+    let sortedChapters: readonly { chapterIndex: number; title: string }[] = []
+    try {
+      const overview = plane.getWorksOverview()
+      sortedChapters = [...overview.chapters].sort((a, b) => a.chapterIndex - b.chapterIndex)
+    } finally {
+      plane.close()
+    }
+
+    if (sortedChapters.length === 0) {
+      json(400, { ok: false, error: '无可导出章节正文' })
+      return true
+    }
 
     const parts: string[] = [`《${book.title}》\n`]
     for (const ch of sortedChapters) {
@@ -316,6 +344,16 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     }
 
     const fullText = parts.join('\n')
+
+    if (path === '/api/book.export-txt') {
+      json(200, {
+        ok: true,
+        title: book.title,
+        content: fullText,
+      })
+      return true
+    }
+
     res.statusCode = 200
     res.setHeader('Content-Type', 'text/plain; charset=utf-8')
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`《${book.title}》.txt`)}`)
