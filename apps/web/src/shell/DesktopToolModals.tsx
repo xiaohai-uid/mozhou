@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { BookInfo } from './workbenchStorage'
 import {
   INSPIRATION_CHARACTERS,
   INSPIRATION_SECTS,
@@ -12,6 +13,7 @@ export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'co
 export interface DesktopToolModalsProps {
   activeModal: DesktopModalType
   onClose: () => void
+  book?: BookInfo | null
 }
 
 function Unavailable({ children }: { children: string }): JSX.Element {
@@ -25,7 +27,95 @@ function Unavailable({ children }: { children: string }): JSX.Element {
   )
 }
 
-export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsProps): JSX.Element | null {
+function ExportContent({ book }: { book: BookInfo }): JSX.Element {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+
+  const handleExport = async () => {
+    setDownloading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/export.txt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: book.root }),
+      })
+      if (!res.ok) {
+        throw new Error('导出请求失败（HTTP ' + res.status + '）')
+      }
+      const text = await res.text()
+      setPreview(text.slice(0, 500) + (text.length > 500 ? '\n…（以下正文略）' : ''))
+
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `《${book.title}》.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="card-title" style={{ marginBottom: 12 }}>
+        <b>全本纯文本 (TXT) 导出</b>
+        <span className="mono muted">{book.title}</span>
+      </div>
+      <p className="muted" style={{ fontSize: 12, lineHeight: 1.6, margin: '0 0 16px' }}>
+        从本地磁盘依次读取全书已创建正文章节，依序拼接书名与章节标题，生成标准 TXT 纯文本文件。
+      </p>
+
+      {error !== null && (
+        <p className="wb-error" role="alert" style={{ marginBottom: 12 }}>
+          {error}
+        </p>
+      )}
+
+      {preview !== null && (
+        <div style={{ marginBottom: 16 }}>
+          <div className="mono muted" style={{ fontSize: 11, marginBottom: 4 }}>
+            导出内容预览：
+          </div>
+          <pre
+            style={{
+              maxHeight: 180,
+              overflowY: 'auto',
+              padding: 10,
+              background: 'var(--surface-shell)',
+              borderRadius: 8,
+              fontSize: 11,
+              fontFamily: 'monospace',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {preview}
+          </pre>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <button
+          className="btn-primary"
+          onClick={() => void handleExport()}
+          disabled={downloading}
+          data-testid="export-txt-btn"
+        >
+          {downloading ? '正在生成 TXT…' : '下载全本 TXT'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function DesktopToolModals({ activeModal, onClose, book = null }: DesktopToolModalsProps): JSX.Element | null {
   const [nameResult, setNameResult] = useState('陆玄 / 顾清河 / 赵铁鹰')
   const [sectResult, setSectResult] = useState('太虚道宗 / 九曜魔门')
   const [itemResult, setItemResult] = useState('破煞法弩 / 七绝离火镜')
@@ -76,7 +166,20 @@ export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsPro
             </div>
           )}
 
-          {activeModal === 'export' && <Unavailable>导出</Unavailable>}
+          {activeModal === 'export' && (
+            <div>
+              {book === null ? (
+                <div className="card" style={{ background: 'var(--surface-raised)', padding: 12 }}>
+                  <b>导出尚未接入（未选作品）</b>
+                  <p className="mono muted" style={{ fontSize: 12, margin: '8px 0 0' }}>
+                    Technical Preview 仅支持全本纯文本 (TXT) 真实导出；Word / EPUB 等高级排版暂未上线，不会展示虚构记录。请在工作台打开作品后再执行导出。
+                  </p>
+                </div>
+              ) : (
+                <ExportContent book={book} />
+              )}
+            </div>
+          )}
           {activeModal === 'compliance' && <Unavailable>合规审查</Unavailable>}
         </div>
       </div>

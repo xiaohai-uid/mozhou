@@ -50,7 +50,7 @@ export function TopBar({
         <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('inspiration')} title="打开本地灵感工坊">
           🎲 灵感工坊
         </button>
-        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('export')} title="导出尚未接入">
+        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('export')} title="导出全本 TXT">
           📦 导出
         </button>
         <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('compliance')} title="合规审查尚未接入">

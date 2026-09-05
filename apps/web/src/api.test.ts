@@ -1296,6 +1296,55 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
       delete process.env['MOZHOU_DRAFT_PROVIDER']
     }
   })
+
+  it('POST /api/export.txt：依序导出全书章节纯文本 TXT', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-export-test-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '夜雨江澜' })
+    const root = created.data.root as string
+
+    // 编辑保存第 1 章
+    await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 1,
+      body: '第1章江水初涨，渡口无人。',
+    })
+
+    // 创建并编辑保存第 2 章
+    await post(base, '/api/chapter.create', {
+      root,
+      chapterIndex: 2,
+      title: '迷雾重重',
+    })
+    await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 2,
+      body: '第2章灯火尽灭，钟声骤响。',
+    })
+
+    const res = await fetch(base + '/api/export.txt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root }),
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toContain('text/plain')
+    const text = await res.text()
+
+    expect(text).toContain('《夜雨江澜》')
+    expect(text).toContain('第 1 章 · 第一章')
+    expect(text).toContain('第1章江水初涨，渡口无人。')
+    expect(text).toContain('第 2 章 · 迷雾重重')
+    expect(text).toContain('第2章灯火尽灭，钟声骤响。')
+
+    // 依序排列检查
+    const posBook = text.indexOf('《夜雨江澜》')
+    const posCh1 = text.indexOf('第 1 章 · 第一章')
+    const posCh2 = text.indexOf('第 2 章 · 迷雾重重')
+    expect(posBook).toBeLessThan(posCh1)
+    expect(posCh1).toBeLessThan(posCh2)
+  })
 })
 
 /* ----------------------------------------------------------------------------

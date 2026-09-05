@@ -3,7 +3,7 @@
  * 打开书（投影版本守卫）/ 基线核对 / 全量吸收重建 / 章节相位机（T3）。
  * EXTERNAL_MODIFIED 五态协议的完整接线归 T5 对账票。
  */
-import { existsSync, rmSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   queryActiveFacts as queryVisibleFactsInSnapshot,
@@ -36,6 +36,7 @@ import { assertProjectionVersion, openDatabase } from './database.js'
 import { assembleChangeMatrix, type ChangeMatrix } from './impact.js'
 
 import {
+  chapterOutlinePath,
   isCanonRelPath,
   proseChapterPath,
   RUNTIME_DB_PATH,
@@ -275,7 +276,6 @@ export class LocalDataPlane {
    * T47 · 作品章节全景目录概览
    */
   getWorksOverview(): WorksOverview {
-    const canon = readCanonState(this.root)
     const chapters: WorksChapterItem[] = []
     let totalWordCount = 0
     let committedCount = 0
@@ -288,10 +288,20 @@ export class LocalDataPlane {
         if (scan.phase === 'committed') committedCount += 1
         if (scan.phase === 'draft') draftCount += 1
 
-        const outlineNode = canon.outlineNodes.find(
-          (node) => node.nodeType === 'chapter' && node.orderIndex === index,
-        )
-        const chapterTitle = outlineNode?.title ?? `第 ${index} 章`
+        const outlineRel = chapterOutlinePath(index)
+        let chapterTitle = `第 ${index} 章`
+        const outlineFile = join(this.root, outlineRel)
+        if (existsSync(outlineFile)) {
+          try {
+            const rawOutline = readFileSync(outlineFile, 'utf8')
+            const heading = rawOutline.split('\n').find((l) => l.startsWith('# '))
+            if (heading) {
+              chapterTitle = heading.slice(2).trim()
+            }
+          } catch {
+            // ignore
+          }
+        }
 
         chapters.push({
           chapterIndex: scan.chapterIndex,

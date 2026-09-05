@@ -290,6 +290,39 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     return true
   }
 
+  /* ---- 全书纯文本导出 ---- */
+  if (path === '/api/export.txt') {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const book = readBookRecord(root)
+    const plane = LocalDataPlane.open(root)
+    const overview = plane.getWorksOverview()
+    const sortedChapters = [...overview.chapters].sort((a, b) => a.chapterIndex - b.chapterIndex)
+
+    const parts: string[] = [`《${book.title}》\n`]
+    for (const ch of sortedChapters) {
+      const relPath = proseChapterPath(ch.chapterIndex)
+      try {
+        const scan = readProseChapter(root, relPath)
+        const cleanBody = scan.body.trim()
+        parts.push(`第 ${ch.chapterIndex} 章 · ${ch.title}\n${cleanBody}\n`)
+      } catch {
+        // ignore missing chapter file
+      }
+    }
+
+    const fullText = parts.join('\n')
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`《${book.title}》.txt`)}`)
+    res.end(fullText)
+    return true
+  }
+
   if (path === '/api/works') {
     const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     if (rawRoot === null) {

@@ -238,7 +238,7 @@ export function App(): JSX.Element {
           onReplay={handleWizardDismiss}
         />
       )}
-      <DesktopToolModals activeModal={desktopModal} onClose={() => setDesktopModal(null)} />
+      <DesktopToolModals activeModal={desktopModal} onClose={() => setDesktopModal(null)} book={book} />
     </>
   )
 }

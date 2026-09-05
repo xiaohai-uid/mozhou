@@ -10,7 +10,7 @@ export function ExportPublishDrawer({ onClose }: ExportPublishDrawerProps): JSX.
           导出尚未接入
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-muted-mobile)', marginTop: 6, lineHeight: 1.6 }}>
-          Technical Preview 尚未实现 Word、TXT、EPUB、Markdown 打包或平台直发；不会显示虚构字数、预检或下载成功状态。
+          全本 TXT 导出已在桌面工作台就绪；移动端暂不支持直接下载，不会显示虚构字数、预检或下载成功状态。
         </div>
       </div>
       <button type="button" className="mobile-action-btn" onClick={onClose}>关闭</button>
