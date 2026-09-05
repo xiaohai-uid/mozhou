@@ -26,22 +26,22 @@
 ### 方式一：发布包本地运行
 
 从 `release-artifacts/` 或 GitHub Release 下载对应发行包：
-- 📦 **本地独立运行时包**: `mozhou-0.1.1-local-runtime.tar.gz`
+- 📦 **本地独立运行时包**: `mozhou-v0.1.1-local-runtime.tar.gz`
   ```bash
-  tar -xzf mozhou-0.1.1-local-runtime.tar.gz
-  cd mozhou-0.1.1
+  tar -xzf mozhou-v0.1.1-local-runtime.tar.gz
+  cd mozhou-v0.1.1
   export ONNXRUNTIME_NODE_INSTALL_CUDA=skip
   pnpm install --prod --frozen-lockfile
   node scripts/launcher.mjs
   ```
-- 🐳 **Docker Compose 部署包**: `mozhou-0.1.1-docker.tar.gz`
+- 🐳 **Docker Compose 部署包**: `mozhou-v0.1.1-docker.tar.gz`
   ```bash
-  tar -xzf mozhou-0.1.1-docker.tar.gz
+  tar -xzf mozhou-v0.1.1-docker.tar.gz
   cd docker-bundle
   docker compose up --build -d
   # 数据卷 mozhou_books 自动挂载至 /data/books，容器重建不丢书稿
   ```
-- 🌐 **纯静态 Web 包**: `mozhou-0.1.1-web-dist.tar.gz`（用于自定义静态资源托管）
+- 🌐 **纯静态 Web 包**: `mozhou-v0.1.1-web-dist.tar.gz`（用于自定义静态资源托管）
 
 服务就绪后默认自动监听本机回环地址：**`http://127.0.0.1:5173`**。
 
@@ -56,7 +56,7 @@ pnpm install --frozen-lockfile
 pnpm build
 pnpm --filter @mozhou/web build
 
-# 3. 运行全量测试套件（950+ 项全绿）
+# 3. 运行全量测试套件
 pnpm test
 pnpm --filter @mozhou/web test
 
@@ -130,9 +130,12 @@ mozhou/
 
 ## 🛡️ 质量保证与图谱门禁
 
-- **自动化测试**：全仓库包含 **950+ 项自动化单测、集成测试与 API 契约测试**，持续保持 100% 通过；
-- **GitNexus 代码图谱门禁**：通过 `npx gitnexus check --cycles` 进行全仓库架构依赖拓扑检查，**保证 0 循环依赖（Zero Circular Dependencies）**；
-- **严格类型检查**：全仓库 TypeScript **0 错误**。
+最近一次完整交付验收记录位于 `docs/verification/2026-09-05-closure/acceptance.md`：
+- **自动化测试**：记录为 **952 项**单元、集成与 API 契约测试通过；
+- **GitNexus 代码图谱门禁**：记录为 `npx gitnexus check --cycles` → `cycleCount: 0`；
+- **严格类型与静态检查**：验收记录为 TypeScript 0 错误、ESLint 0 错误/0 警告。
+
+发布前仍应以目标提交对应的最新 CI / clean-environment 验证结果为最终门禁，不以 README 声明替代实际执行证据。
 
 ---
 
