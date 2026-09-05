@@ -194,7 +194,14 @@ export function App(): JSX.Element {
         ) : view === 'capability-square' ? (
           <CapabilitySquareView />
         ) : view === 'works' ? (
-          <WorksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
+          <WorksView
+            root={book?.root ?? null}
+            onGoToWorkbench={() => setView('workbench')}
+            onSelectChapter={(idx) => {
+              setChapterIndex(idx)
+              setView('workbench')
+            }}
+          />
         ) : view === 'tasks' ? (
           <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
         ) : view === 'style-distill' ? (

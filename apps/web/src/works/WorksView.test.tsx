@@ -109,4 +109,47 @@ describe('WorksView（我的作品）', () => {
       expect(screen.getByTestId('works-error').textContent).toContain('作品读取失败')
     })
   })
+
+  it('点击打开此章回调 onSelectChapter 并传出章号', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_WORKS)))
+    const onSelectChapter = vi.fn()
+    render(<WorksView root="C:/tmp/fake-god" onGoToWorkbench={() => {}} onSelectChapter={onSelectChapter} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('open-chapter-2')).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByTestId('open-chapter-2'))
+    expect(onSelectChapter).toHaveBeenCalledWith(2)
+  })
+
+  it('新建章节表单发送 POST /api/chapter.create 并刷新目录', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/chapter.create') {
+        return Promise.resolve(okJson({ ok: true, chapterIndex: 3 }))
+      }
+      return Promise.resolve(okJson(MOCK_WORKS))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<WorksView root="C:/tmp/fake-god" onGoToWorkbench={() => {}} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('create-chapter-btn')).toBeInTheDocument()
+    })
+
+    const input = screen.getByTestId('new-chapter-title')
+    await userEvent.type(input, '第三章 雾隐')
+    await userEvent.click(screen.getByTestId('create-chapter-btn'))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chapter.create',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            root: 'C:/tmp/fake-god',
+            chapterIndex: 3,
+            title: '第三章 雾隐',
+          }),
+        }),
+      )
+    })
+  })
 })

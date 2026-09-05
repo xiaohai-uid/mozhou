@@ -10,21 +10,27 @@
  * 相位（草稿/已提交）与字数统计；统计面板展示总字数、章数与实体数。
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { WorksOverviewResponse } from '../../server/api'
+import type { ChapterCreateResponse, WorksOverviewResponse } from '../../server/api'
 import { post } from '../lib/post'
 
 export function WorksView({
   root,
   onGoToWorkbench,
+  onSelectChapter,
 }: {
   /** 当前书根（无书时为 null 显式引导）。 */
   root: string | null
   /** 前往工作台回调。 */
   onGoToWorkbench: () => void
+  /** 选择并打开指定章节回调。 */
+  onSelectChapter?: (chapterIndex: number) => void
 }): JSX.Element {
   const [data, setData] = useState<WorksOverviewResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [creatingChapter, setCreatingChapter] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<void> => {
     if (root === null) return
@@ -43,6 +49,31 @@ export function WorksView({
   useEffect(() => {
     void load()
   }, [load])
+
+  const nextChapterIndex =
+    data !== null && data.chapters.length > 0
+      ? Math.max(...data.chapters.map((c) => c.chapterIndex)) + 1
+      : 1
+
+  const handleCreateChapter = async (): Promise<void> => {
+    if (root === null) return
+    setCreatingChapter(true)
+    setCreateError(null)
+    const titleToUse = newTitle.trim() || `第 ${nextChapterIndex} 章`
+    try {
+      await post<ChapterCreateResponse>('/api/chapter.create', {
+        root,
+        chapterIndex: nextChapterIndex,
+        title: titleToUse,
+      })
+      setNewTitle('')
+      await load()
+    } catch (err) {
+      setCreateError((err as Error).message)
+    } finally {
+      setCreatingChapter(false)
+    }
+  }
 
   if (root === null) {
     return (
@@ -180,7 +211,35 @@ export function WorksView({
 
             {/* 章节全景列表 */}
             <section className="wb-section" data-testid="works-chapters">
-              <h2>章节目录 ({data.chapters.length})</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h2 style={{ margin: 0 }}>章节目录 ({data.chapters.length})</h2>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder={`第 ${nextChapterIndex} 章标题`}
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    style={{ fontSize: 11, padding: '3px 6px', width: 140 }}
+                    data-testid="new-chapter-title"
+                  />
+                  <button
+                    className="btn"
+                    style={{ fontSize: 10, padding: '3px 8px' }}
+                    disabled={creatingChapter}
+                    onClick={() => {
+                      void handleCreateChapter()
+                    }}
+                    data-testid="create-chapter-btn"
+                  >
+                    {creatingChapter ? '创建中…' : '＋ 新建章节'}
+                  </button>
+                </div>
+              </div>
+              {createError !== null && (
+                <p className="wb-error" role="alert" style={{ marginTop: 4, marginBottom: 8 }} data-testid="create-chapter-error">
+                  {createError}
+                </p>
+              )}
               {data.chapters.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>
                   作品尚未创建正文章节，前往工作台即可开始撰写第一章。
@@ -201,9 +260,27 @@ export function WorksView({
                           {ch.phase === 'committed' ? '已定稿' : '草稿中'}
                         </span>
                       </div>
-                      <div className="actions" style={{ marginTop: 6 }}>
-                        <span className="mono muted">字数：{ch.wordCount} 字</span>
-                        <span className="mono muted">修订版本：r{ch.revision}</span>
+                      <div className="actions" style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span className="mono muted">字数：{ch.wordCount} 字</span>
+                          <span className="mono muted" style={{ marginLeft: 12 }}>
+                            修订版本：r{ch.revision}
+                          </span>
+                        </div>
+                        <button
+                          className="btn"
+                          style={{ fontSize: 10, padding: '2px 8px' }}
+                          data-testid={`open-chapter-${ch.chapterIndex}`}
+                          onClick={() => {
+                            if (onSelectChapter) {
+                              onSelectChapter(ch.chapterIndex)
+                            } else {
+                              onGoToWorkbench()
+                            }
+                          }}
+                        >
+                          打开此章 →
+                        </button>
                       </div>
                     </div>
                   </div>

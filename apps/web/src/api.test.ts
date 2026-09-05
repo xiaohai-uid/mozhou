@@ -71,6 +71,20 @@ describe('apps/web api 中间件 · T31/T32', () => {
     expect(typeof data.bookId).toBe('string')
   })
 
+  it('new HTTP book is immediately draftable', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-first-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '新书' })
+    expect(created.status).toBe(200)
+    const root = created.data.root as string
+    expect(readProseChapter(root, proseChapterPath(1)).phase).toBe('draft')
+    const overview = await post(base, '/api/works', { root })
+    expect(overview.data.chapters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ chapterIndex: 1 }),
+    ]))
+  })
+
   it('POST /api/story-brain.entities：直出 scanEntityCards 的实体卡契约（PR #82 移植）', async () => {
     const base = await listen()
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-api-'))
@@ -152,7 +166,6 @@ async function makeBookAtReview(title: string): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-quality-'))
   roots.push(dir)
   await post(base, '/api/book', { title, dir })
-  LocalDataPlane.open(dir).createChapterDraft({ chapterIndex: 1, title: '第一章' })
   const session = ChapterProductionSession.start({ bus: new PublishBus(), root: dir, chapterIndex: 1, newTaskRef: () => 'tsk_web' })
   session.advance('compile')
   session.advance('draft')
@@ -335,7 +348,6 @@ async function seedT41Book(title: string): Promise<{ base: string; root: string 
   await post(base, '/api/book', { title, dir })
   const plane = LocalDataPlane.open(dir)
   try {
-    plane.createChapterDraft({ chapterIndex: 1, title: '风起' })
     const factA = t41FactRow(plane.book.id, { subject: 'char:lin-wan', predicate: 'located', value: '灰潮港' })
     const factB = t41FactRow(plane.book.id, { subject: 'char:gu-chen', predicate: 'secret.true_name', value: '绝密真名值X', riskClass: 'high' })
     const factC = t41FactRow(plane.book.id, { subject: 'char:gu-chen', predicate: 'secret.whereabouts', value: '绝密行踪值Y', riskClass: 'high' })
@@ -459,7 +471,7 @@ describe('T41 Story Brain 四读面 API 契约', () => {
     const base = await listen()
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t41-'))
     roots.push(dir)
-    await post(base, '/api/book', { title: '空书', dir })
+    createBook({ title: '空书', dir })
     const { data } = await post(base, '/api/story-brain.facts', { root: dir })
     expect(data.chapter).toBe(1)
     expect(data.currentChapterIndex).toBeNull()
@@ -773,12 +785,6 @@ describe('T44 中栏对话流 API 契约', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-t44-'))
     roots.push(dir)
     await post(base, '/api/book', { title: '流式书', dir })
-    const plane = LocalDataPlane.open(dir)
-    try {
-      plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
-    } finally {
-      plane.close()
-    }
     process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
     try {
       const res = await fetch(base + '/api/draft.stream', {
@@ -987,6 +993,48 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     expect(status).toBe(400)
     expect(data.ok).toBe(false)
     expect(typeof data.error).toBe('string')
+  })
+
+  it('POST /api/chapter.create：新建章节草稿、防重复与非法参数拦截', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-chapter-create-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '连载书' })
+    const root = created.data.root as string
+
+    // 成功创建第 2 章
+    const res = await post(base, '/api/chapter.create', { root, chapterIndex: 2, title: '第二章 逆境' })
+    expect(res.status).toBe(200)
+    expect(res.data.ok).toBe(true)
+    expect(res.data.chapterIndex).toBe(2)
+    expect(readProseChapter(root, proseChapterPath(2)).phase).toBe('draft')
+
+    // 重复章号返回 409 CHAPTER_EXISTS
+    const conflict = await post(base, '/api/chapter.create', { root, chapterIndex: 2, title: '重复章' })
+    expect(conflict.status).toBe(409)
+    expect(conflict.data.ok).toBe(false)
+    expect(conflict.data.code).toBe('CHAPTER_EXISTS')
+
+    // 非法章号 0、-1、1.5 返回 400
+    for (const badIndex of [0, -1, 1.5]) {
+      const bad = await post(base, '/api/chapter.create', { root, chapterIndex: badIndex, title: '错误章' })
+      expect(bad.status).toBe(400)
+      expect(bad.data.ok).toBe(false)
+    }
+
+    // 标题空白或超长（>200）返回 400
+    const emptyTitle = await post(base, '/api/chapter.create', { root, chapterIndex: 3, title: '   ' })
+    expect(emptyTitle.status).toBe(400)
+    expect(emptyTitle.data.ok).toBe(false)
+
+    const longTitle = await post(base, '/api/chapter.create', { root, chapterIndex: 3, title: '字'.repeat(201) })
+    expect(longTitle.status).toBe(400)
+    expect(longTitle.data.ok).toBe(false)
+
+    // 缺 root 返回 400
+    const noRoot = await post(base, '/api/chapter.create', { chapterIndex: 3, title: '无根' })
+    expect(noRoot.status).toBe(400)
+    expect(noRoot.data.ok).toBe(false)
   })
 })
 

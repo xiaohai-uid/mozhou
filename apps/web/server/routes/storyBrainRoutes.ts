@@ -12,6 +12,12 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) =
     const dir = typeof body['dir'] === 'string' ? body['dir'] : '/tmp/mozhou-book-' + Date.now()
     const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
     const result = createBook({ dir, title })
+    const plane = LocalDataPlane.open(result.root)
+    try {
+      plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    } finally {
+      plane.close()
+    }
     json(200, { ok: true, root: result.root, bookId: result.book.id })
     return true
   }

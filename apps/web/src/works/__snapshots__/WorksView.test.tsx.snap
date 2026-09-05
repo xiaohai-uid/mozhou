@@ -214,11 +214,35 @@ exports[`WorksView（我的作品） > 作品概览与章节目录渲染（书�
       class="wb-section"
       data-testid="works-chapters"
     >
-      <h2>
-        章节目录 (
-        2
-        )
-      </h2>
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+      >
+        <h2
+          style="margin: 0px;"
+        >
+          章节目录 (
+          2
+          )
+        </h2>
+        <div
+          style="display: flex; gap: 6px; align-items: center;"
+        >
+          <input
+            data-testid="new-chapter-title"
+            placeholder="第 3 章标题"
+            style="font-size: 11px; padding: 3px 6px; width: 140px;"
+            type="text"
+            value=""
+          />
+          <button
+            class="btn"
+            data-testid="create-chapter-btn"
+            style="font-size: 10px; padding: 3px 8px;"
+          >
+            ＋ 新建章节
+          </button>
+        </div>
+      </div>
       <div
         class="card-shell"
       >
@@ -242,21 +266,31 @@ exports[`WorksView（我的作品） > 作品概览与章节目录渲染（书�
           </div>
           <div
             class="actions"
-            style="margin-top: 6px;"
+            style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;"
           >
-            <span
-              class="mono muted"
+            <div>
+              <span
+                class="mono muted"
+              >
+                字数：
+                3000
+                 字
+              </span>
+              <span
+                class="mono muted"
+                style="margin-left: 12px;"
+              >
+                修订版本：r
+                2
+              </span>
+            </div>
+            <button
+              class="btn"
+              data-testid="open-chapter-1"
+              style="font-size: 10px; padding: 2px 8px;"
             >
-              字数：
-              3000
-               字
-            </span>
-            <span
-              class="mono muted"
-            >
-              修订版本：r
-              2
-            </span>
+              打开此章 →
+            </button>
           </div>
         </div>
       </div>
@@ -283,21 +317,31 @@ exports[`WorksView（我的作品） > 作品概览与章节目录渲染（书�
           </div>
           <div
             class="actions"
-            style="margin-top: 6px;"
+            style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;"
           >
-            <span
-              class="mono muted"
+            <div>
+              <span
+                class="mono muted"
+              >
+                字数：
+                2200
+                 字
+              </span>
+              <span
+                class="mono muted"
+                style="margin-left: 12px;"
+              >
+                修订版本：r
+                1
+              </span>
+            </div>
+            <button
+              class="btn"
+              data-testid="open-chapter-2"
+              style="font-size: 10px; padding: 2px 8px;"
             >
-              字数：
-              2200
-               字
-            </span>
-            <span
-              class="mono muted"
-            >
-              修订版本：r
-              1
-            </span>
+              打开此章 →
+            </button>
           </div>
         </div>
       </div>

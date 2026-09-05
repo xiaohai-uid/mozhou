@@ -139,6 +139,11 @@ export interface LibraryOpenResponse {
   readonly title: string
 }
 
+export interface ChapterCreateResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+}
+
 export interface WorksChapterSummary {
   readonly chapterIndex: number
   readonly title: string

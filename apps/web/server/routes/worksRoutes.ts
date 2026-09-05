@@ -5,6 +5,7 @@ import type { RouteHandler } from '../router.js'
 import { join } from 'node:path'
 import { writeFileSync } from 'node:fs'
 import {
+  ChapterExistsError,
   LocalDataPlane,
   createBook,
   listImpactRecords,
@@ -136,6 +137,40 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   /* ---- 作品概览与全景目录 ---- */
+  if (path === '/api/chapter.create') {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawIndex = body['chapterIndex']
+    const rawTitle = typeof body['title'] === 'string' ? body['title'] : ''
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    if (typeof rawIndex !== 'number' || !Number.isSafeInteger(rawIndex) || rawIndex < 1) {
+      json(400, { ok: false, error: 'chapterIndex must be a safe integer >= 1' })
+      return true
+    }
+    const trimmedTitle = rawTitle.trim()
+    if (trimmedTitle.length === 0 || trimmedTitle.length > 200) {
+      json(400, { ok: false, error: 'title must be non-empty and at most 200 characters' })
+      return true
+    }
+    const plane = LocalDataPlane.open(root)
+    try {
+      plane.createChapterDraft({ chapterIndex: rawIndex, title: trimmedTitle })
+      json(200, { ok: true, chapterIndex: rawIndex })
+    } catch (err) {
+      if (err instanceof ChapterExistsError || (err as Error).name === 'ChapterExistsError') {
+        json(409, { ok: false, code: 'CHAPTER_EXISTS', error: (err as Error).message })
+        return true
+      }
+      throw err
+    } finally {
+      plane.close()
+    }
+    return true
+  }
+
   if (path === '/api/works') {
     const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     if (rawRoot === null) {
