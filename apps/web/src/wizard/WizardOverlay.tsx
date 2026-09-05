@@ -145,7 +145,7 @@ export function WizardOverlay({
     }
     if (current === 'continue') {
       if (created === null) return
-      onComplete({
+      const outcome: WizardOutcome = {
         root: created.root,
         bookId: created.bookId,
         title: values.create.trim() || '未命名之书',
@@ -153,7 +153,19 @@ export function WizardOverlay({
         volumePromise: values.outline.trim(),
         opening: values['first-chapter'].trim(),
         firstChapterGoal: values.continue.trim(),
-      })
+      }
+      try {
+        await post('/api/author-intent.update', {
+          root: outcome.root,
+          worldRule: outcome.worldRule,
+          volumePromise: outcome.volumePromise,
+          opening: outcome.opening,
+          firstChapterGoal: outcome.firstChapterGoal,
+        })
+      } catch {
+        // 保持向后宽容
+      }
+      onComplete(outcome)
       return
     }
     const nextIndex = (stepIndex + 1) % WIZARD_STEPS.length

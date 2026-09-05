@@ -1204,6 +1204,31 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     const readFinal = await post(base, '/api/chapter.read', { root, chapterIndex: 1 })
     expect((readFinal.data.body as string).trim()).toBe('第三方并发提交的正文')
   })
+
+  it('POST /api/author-intent.update：五步向导资料落盘至 设定/作者意图.md 并刷新基线', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-intent-test-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '向导意图书' })
+    const root = created.data.root as string
+
+    const res = await post(base, '/api/author-intent.update', {
+      root,
+      worldRule: 'WORLD_RULE_TAG_0905',
+      volumePromise: 'VOLUME_PROMISE_TAG_0905',
+      opening: 'OPENING_TAG_0905',
+      firstChapterGoal: 'FIRST_CHAPTER_GOAL_TAG_0905',
+    })
+    expect(res.status).toBe(200)
+    expect(res.data.ok).toBe(true)
+
+    const intentFile = join(root, '设定', '作者意图.md')
+    const content = readFileSync(intentFile, 'utf8')
+    expect(content).toContain('WORLD_RULE_TAG_0905')
+    expect(content).toContain('VOLUME_PROMISE_TAG_0905')
+    expect(content).toContain('OPENING_TAG_0905')
+    expect(content).toContain('FIRST_CHAPTER_GOAL_TAG_0905')
+  })
 })
 
 /* ----------------------------------------------------------------------------

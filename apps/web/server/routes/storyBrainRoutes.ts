@@ -4,10 +4,24 @@
 import type { RouteHandler } from '../router.js'
 import { homedir } from 'node:os'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { createBook, LocalDataPlane, readCanonState } from '@mozhou/data-plane'
+import {
+  AUTHOR_INTENT_PATH,
+  atomicReplace,
+  createBook,
+  emitFrontmatter,
+  LocalDataPlane,
+  parseFrontmatter,
+  readCanonState,
+  readManifest,
+  refreshManifestEntries,
+  renderAuthorIntentBody,
+  writeManifest,
+  type InitialAuthorIntentInput,
+} from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
+import { assertSafeBookRoot } from '../security.js'
 
 export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
@@ -23,7 +37,15 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) =
       dir = join(library, randomUUID())
     }
     const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
-    const result = createBook({ dir, title })
+    const rawIntent =
+      typeof body['authorIntent'] === 'object' && body['authorIntent'] !== null
+        ? (body['authorIntent'] as InitialAuthorIntentInput)
+        : undefined
+    const result = createBook({
+      dir,
+      title,
+      ...(rawIntent !== undefined ? { authorIntent: rawIntent } : {}),
+    })
     const plane = LocalDataPlane.open(result.root)
     try {
       plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
@@ -31,6 +53,38 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) =
       plane.close()
     }
     json(200, { ok: true, root: resolve(result.root), bookId: result.book.id })
+    return true
+  }
+
+  if (path === '/api/author-intent.update') {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const intentPath = join(root, AUTHOR_INTENT_PATH)
+    if (!existsSync(intentPath)) {
+      json(404, { ok: false, error: 'author intent file not found' })
+      return true
+    }
+    const raw = readFileSync(intentPath, 'utf8')
+    const doc = parseFrontmatter(raw)
+    const worldRule = typeof body['worldRule'] === 'string' ? body['worldRule'].trim() : ''
+    const volumePromise = typeof body['volumePromise'] === 'string' ? body['volumePromise'].trim() : ''
+    const opening = typeof body['opening'] === 'string' ? body['opening'].trim() : ''
+    const firstChapterGoal = typeof body['firstChapterGoal'] === 'string' ? body['firstChapterGoal'].trim() : ''
+
+    const content = `${emitFrontmatter(doc.data)}${renderAuthorIntentBody({
+      worldRule,
+      volumePromise,
+      opening,
+      firstChapterGoal,
+    })}`
+
+    atomicReplace(root, AUTHOR_INTENT_PATH, content)
+    writeManifest(root, refreshManifestEntries(readManifest(root), root, [AUTHOR_INTENT_PATH]))
+    json(200, { ok: true })
     return true
   }
 

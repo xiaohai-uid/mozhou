@@ -29,9 +29,10 @@ import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
-import { WorkbenchView } from './workbench/WorkbenchView'
-import { MobileShell } from './mobile/MobileShell'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
+import { MobileShell } from './mobile/MobileShell'
+import { WorkbenchView } from './workbench/WorkbenchView'
+import { post } from './lib/post'
 
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
@@ -112,6 +113,15 @@ export function App(): JSX.Element {
     } catch {
       // localStorage 不可用：完成标记是增强，不阻塞工作台。
     }
+    void post('/api/author-intent.update', {
+      root: outcome.root,
+      worldRule: outcome.worldRule,
+      volumePromise: outcome.volumePromise,
+      opening: outcome.opening,
+      firstChapterGoal: outcome.firstChapterGoal,
+    }).catch(() => {
+      // 保持宽容
+    })
     selectBook({ root: outcome.root, bookId: outcome.bookId, title: outcome.title })
     setWizardOpen(false)
   }

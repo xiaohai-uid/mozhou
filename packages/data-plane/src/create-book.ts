@@ -42,11 +42,40 @@ export class BookDirectoryNotEmptyError extends Error {
   }
 }
 
+export interface InitialAuthorIntentInput {
+  readonly worldRule?: string
+  readonly volumePromise?: string
+  readonly opening?: string
+  readonly firstChapterGoal?: string
+}
+
+export function renderAuthorIntentBody(intent?: InitialAuthorIntentInput): string {
+  const parts = [
+    '# 作者意图\n\n> 宪法层：本文件整体受保护（protectedUserContent=true），自动化通道不得改写。\n',
+  ]
+  if (intent?.worldRule) {
+    parts.push(`## 世界观核心规则\n\n${intent.worldRule.trim()}\n`)
+  }
+  if (intent?.volumePromise) {
+    parts.push(`## 卷级核心承诺\n\n${intent.volumePromise.trim()}\n`)
+  }
+  if (intent?.opening) {
+    parts.push(`## 开场切入画面\n\n${intent.opening.trim()}\n`)
+  }
+  if (intent?.firstChapterGoal) {
+    parts.push(`## 首章核心目标\n\n${intent.firstChapterGoal.trim()}\n`)
+  }
+  parts.push('## 核心爽点\n\n-\n\n## 主角欲望\n\n\n## 绝对禁区\n\n-\n\n## 目标结局\n\n\n## 基调偏好\n')
+  return parts.join('\n')
+}
+
 export interface CreateBookOptions {
   /** 书目录（一书一目录：打开目录 = 打开一本书）。 */
   readonly dir: string
   /** 书名，落 book.json；文件名只是皮。 */
   readonly title: string
+  /** 初始作者意图设定（T05）。 */
+  readonly authorIntent?: InitialAuthorIntentInput | undefined
 }
 
 export interface CreateBookResult {
@@ -136,7 +165,7 @@ export function createBook(options: CreateBookOptions): CreateBookResult {
   // 宪法层与风格档案种子
   writeFileSync(
     join(root, AUTHOR_INTENT_PATH),
-    `${emitFrontmatter(planningFrontmatter(newAuthorIntentId(), 'authorIntent'))}# 作者意图\n\n> 宪法层：本文件整体受保护（protectedUserContent=true），自动化通道不得改写。\n\n## 核心爽点\n\n-\n\n## 主角欲望\n\n\n## 绝对禁区\n\n-\n\n## 目标结局\n\n\n## 基调偏好\n`,
+    `${emitFrontmatter(planningFrontmatter(newAuthorIntentId(), 'authorIntent'))}${renderAuthorIntentBody(options.authorIntent)}`,
   )
   writeFileSync(
     join(root, STYLE_PROFILE_PATH),
