@@ -19,6 +19,11 @@ describe('CapabilityChannels', () => {
     expect(new Set(VIEW_IDS).size).toBe(VIEW_COUNT)
   })
 
+  it('未开放的云同步在一级入口直接标记为规划中', () => {
+    render(<CapabilityChannels activeView="workbench" onSelect={() => {}} taskCount={0} />)
+    expect(screen.getByText('云同步 · 规划中')).toBeInTheDocument()
+  })
+
   it('点击功能项回调对应视图 id', async () => {
     const onSelect = vi.fn()
     render(<CapabilityChannels activeView="workbench" onSelect={onSelect} taskCount={0} />)
