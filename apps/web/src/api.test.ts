@@ -1146,6 +1146,64 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     expect(noRoot.status).toBe(400)
     expect(noRoot.data.ok).toBe(false)
   })
+
+  it('POST /api/chapter.read 与 /api/chapter.save：正文读取、编辑安全保存与哈希冲突拦截', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-chapter-rw-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '编辑测试书' })
+    const root = created.data.root as string
+
+    // 1. 读取初始第 1 章
+    const read1 = await post(base, '/api/chapter.read', { root, chapterIndex: 1 })
+    expect(read1.status).toBe(200)
+    expect(read1.data.ok).toBe(true)
+    expect(read1.data.chapterIndex).toBe(1)
+    expect(typeof read1.data.hash).toBe('string')
+    const hash1 = read1.data.hash as string
+
+    // 2. 用该 hash 保存新正文
+    const save1 = await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 1,
+      body: '手动修改稿·第一版',
+      baseHash: hash1,
+    })
+    expect(save1.status).toBe(200)
+    expect(save1.data.ok).toBe(true)
+    const hash2 = save1.data.hash as string
+    expect(hash2).not.toBe(hash1)
+
+    // 再次读取确认内容逐字一致
+    const read2 = await post(base, '/api/chapter.read', { root, chapterIndex: 1 })
+    expect(read2.status).toBe(200)
+    expect((read2.data.body as string).trim()).toBe('手动修改稿·第一版')
+    expect(read2.data.hash).toBe(hash2)
+
+    // 3. 产生第三方中间修改
+    const saveInterim = await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 1,
+      body: '第三方并发提交的正文',
+      baseHash: hash2,
+    })
+    expect(saveInterim.status).toBe(200)
+
+    // 4. 再次拿旧 hash2 保存，必须被 409 HASH_MISMATCH 拦截
+    const conflict = await post(base, '/api/chapter.save', {
+      root,
+      chapterIndex: 1,
+      body: '企图覆盖第三方的过期内容',
+      baseHash: hash2,
+    })
+    expect(conflict.status).toBe(409)
+    expect(conflict.data.ok).toBe(false)
+    expect(conflict.data.code).toBe('HASH_MISMATCH')
+
+    // 确认正文依然是第三方提交的内容，未被覆盖
+    const readFinal = await post(base, '/api/chapter.read', { root, chapterIndex: 1 })
+    expect((readFinal.data.body as string).trim()).toBe('第三方并发提交的正文')
+  })
 })
 
 /* ----------------------------------------------------------------------------

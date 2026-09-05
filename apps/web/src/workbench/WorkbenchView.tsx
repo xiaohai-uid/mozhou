@@ -3,11 +3,13 @@
  * 对话区骨架 + 建书/账本 + 创作辅助工具。所有状态文案必须来自真实数据；
  * 未接入的数据指标不得以示例数值伪装成当前用户状态。
  */
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { post } from '../lib/post'
 import { DialogueStream } from './DialogueStream'
 import { DesktopToolModals, type DesktopModalType } from '../shell/DesktopToolModals'
 import type { BookInfo } from '../shell/workbenchStorage'
+import type { ChapterReadResponse, ChapterSaveResponse } from '../../server/api'
+import { NovelEditorCanvas } from './editor/NovelEditorCanvas'
 
 interface BookCreated {
   ok: true
@@ -38,6 +40,68 @@ export function WorkbenchView({
   const [events, setEvents] = useState<readonly string[]>([])
   const [ledgerError, setLedgerError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<DesktopModalType>(null)
+
+  const [proseBody, setProseBody] = useState('')
+  const [proseHash, setProseHash] = useState<string | null>(null)
+  const [proseRevision, setProseRevision] = useState(0)
+  const [proseWordCount, setProseWordCount] = useState(0)
+  const [proseTitle, setProseTitle] = useState('第一章')
+  const [proseDirty, setProseDirty] = useState(false)
+  const [proseBusy, setProseBusy] = useState(false)
+  const [proseStatusText, setProseStatusText] = useState<string | null>(null)
+  const [proseError, setProseError] = useState<string | null>(null)
+
+  const loadProse = useCallback(async (): Promise<void> => {
+    if (book === null) return
+    setProseBusy(true)
+    setProseError(null)
+    try {
+      const res = await post<ChapterReadResponse>('/api/chapter.read', {
+        root: book.root,
+        chapterIndex,
+      })
+      setProseBody(res.body)
+      setProseHash(res.hash)
+      setProseRevision(res.revision)
+      setProseWordCount(res.wordCount)
+      setProseTitle(res.title)
+      setProseDirty(false)
+      setProseStatusText(`已同步磁盘 (Rev ${res.revision})`)
+    } catch (err) {
+      setProseError((err as Error).message)
+    } finally {
+      setProseBusy(false)
+    }
+  }, [book, chapterIndex])
+
+  useEffect(() => {
+    void loadProse()
+  }, [loadProse])
+
+  const handleSaveProse = async (): Promise<void> => {
+    if (book === null) return
+    setProseBusy(true)
+    setProseError(null)
+    setProseStatusText('正在保存…')
+    try {
+      const res = await post<ChapterSaveResponse>('/api/chapter.save', {
+        root: book.root,
+        chapterIndex,
+        body: proseBody,
+        baseHash: proseHash ?? undefined,
+      })
+      setProseHash(res.hash)
+      setProseRevision(res.revision)
+      setProseWordCount(res.wordCount)
+      setProseDirty(false)
+      setProseStatusText(`保存成功 (Rev ${res.revision} · ${res.wordCount} 字)`)
+    } catch (err) {
+      setProseError((err as Error).message)
+      setProseStatusText('保存失败')
+    } finally {
+      setProseBusy(false)
+    }
+  }
 
   const handleCreateBook = async (): Promise<void> => {
     setCreateError(null)
@@ -109,6 +173,65 @@ export function WorkbenchView({
 
       <div className="conversation">
         <DialogueStream book={book} chapterIndex={chapterIndex} />
+
+        {book !== null && (
+          <section className="wb-section" data-testid="prose-editor">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0 }}>第 {chapterIndex} 章 · {proseTitle}</h2>
+                <span className="mono muted" style={{ fontSize: 11 }}>
+                  {proseWordCount} 字 · Rev {proseRevision}
+                </span>
+                {proseDirty && (
+                  <span className="tag" style={{ color: 'var(--warning)', borderColor: 'var(--warning)' }}>
+                    未保存
+                  </span>
+                )}
+                {proseStatusText !== null && (
+                  <span className="mono muted" style={{ fontSize: 11 }}>
+                    {proseStatusText}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button
+                  className="btn"
+                  style={{ fontSize: 11, padding: '3px 8px' }}
+                  onClick={() => void loadProse()}
+                  disabled={proseBusy}
+                  data-testid="reload-prose-btn"
+                >
+                  重新读取
+                </button>
+                <button
+                  className="btn-primary"
+                  style={{ fontSize: 11, padding: '3px 12px' }}
+                  onClick={() => void handleSaveProse()}
+                  disabled={proseBusy || !proseDirty}
+                  data-testid="save-prose-btn"
+                >
+                  {proseBusy ? '处理中…' : '保存正文'}
+                </button>
+              </div>
+            </div>
+
+            {proseError !== null && (
+              <p className="wb-error" role="alert" data-testid="prose-error" style={{ marginBottom: 8 }}>
+                {proseError}
+              </p>
+            )}
+
+            <NovelEditorCanvas
+              value={proseBody}
+              onChange={(val) => {
+                setProseBody(val)
+                setProseDirty(true)
+                setProseWordCount(val.length)
+              }}
+              placeholder="在此处撰写或手工修改正文，点击保存正文写入磁盘…"
+            />
+          </section>
+        )}
 
         <section className="wb-section" data-testid="create-book">
           <h2>建书</h2>

@@ -67,6 +67,9 @@ describe('WorkbenchView', () => {
       vi.fn().mockImplementation((path: string) => {
         if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
         if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
+        if (path === '/api/chapter.read') {
+          return okJson({ ok: true, chapterIndex: 1, title: '第一章', phase: 'draft', body: '初始正文内容', wordCount: 6, revision: 1, hash: 'h_1' })
+        }
         if (path === '/api/ledger') {
           return okJson({
             ok: true,
@@ -85,5 +88,63 @@ describe('WorkbenchView', () => {
       expect(screen.getByTestId('ledger').textContent).toContain('TraverseCompleted')
     })
     expect(screen.getByTestId('ledger').textContent).toContain('style_learned')
+  })
+
+  it('正文编辑器：读取展示正文，编辑后点击保存正文触发 /api/chapter.save', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
+      if (path === '/api/draft.question') return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
+      if (path === '/api/chapter.read') {
+        return okJson({
+          ok: true,
+          chapterIndex: 1,
+          title: '第一章 启程',
+          phase: 'draft',
+          body: '原有正文',
+          wordCount: 4,
+          revision: 1,
+          hash: 'h_initial',
+        })
+      }
+      if (path === '/api/chapter.save') {
+        return okJson({
+          ok: true,
+          chapterIndex: 1,
+          wordCount: 10,
+          revision: 2,
+          hash: 'h_saved',
+        })
+      }
+      return okJson({ ok: false, error: 'unexpected path: ' + path })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<WorkbenchView book={BOOK} onBookCreated={() => {}} chapterIndex={1} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('prose-editor')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('prose-editor').textContent).toContain('第一章 启程')
+
+    const textarea = screen.getByPlaceholderText('在此处撰写或手工修改正文，点击保存正文写入磁盘…')
+    expect(textarea).toHaveValue('原有正文')
+
+    await userEvent.type(textarea, '，追加手工修改')
+    expect(screen.getByTestId('save-prose-btn')).not.toBeDisabled()
+
+    await userEvent.click(screen.getByTestId('save-prose-btn'))
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chapter.save',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            root: BOOK.root,
+            chapterIndex: 1,
+            body: '原有正文，追加手工修改',
+            baseHash: 'h_initial',
+          }),
+        }),
+      )
+    })
   })
 })

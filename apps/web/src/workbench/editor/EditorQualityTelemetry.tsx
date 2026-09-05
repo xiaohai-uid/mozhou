@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { runDeAiDiagnostics } from '@mozhou/quality-engine';
 
 export interface EditorQualityTelemetryProps {
   content: string;
@@ -9,7 +8,6 @@ export interface EditorQualityTelemetryProps {
 
 export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
   content,
-  whitelistWords = [],
   className = '',
 }) => {
   const telemetry = useMemo(() => {
@@ -31,20 +29,23 @@ export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
       }
     }
 
-    // Comprehensive De-AI Industrial Diagnostics
-    const deAiReport = runDeAiDiagnostics(text, whitelistWords);
-
-    const isClean = repetitionCount === 0 && deAiReport.clean;
+    // Pure frontend fast diagnostics (avoid importing node:crypto into browser bundles)
+    const tier1Matches = (text.match(/不仅如此|显而易见|不难看出|正如前文所述|总而言之/g) || []).length;
+    const tier2Matches = (text.match(/仿佛在诉说着|宛如一幅画卷|深邃的眸子|嘴角勾起一抹/g) || []).length;
+    const clean = repetitionCount === 0 && tier1Matches === 0;
+    const score = Math.max(0, 100 - repetitionCount * 5 - tier1Matches * 15 - tier2Matches * 5);
 
     return {
       charCount,
       wordCount,
       paragraphCount,
       repetitionCount,
-      deAiReport,
-      isClean,
+      tier1Count: tier1Matches,
+      tier2Count: tier2Matches,
+      score,
+      isClean: clean,
     };
-  }, [content, whitelistWords]);
+  }, [content]);
 
   return (
     <div className={`flex items-center gap-4 text-xs font-mono text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800 ${className}`}>
@@ -65,20 +66,20 @@ export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-zinc-500">Tier 1 必阻断:</span>
-        <span className={telemetry.deAiReport.tier1Count === 0 ? 'text-emerald-400' : 'text-rose-400 font-semibold'}>
-          {telemetry.deAiReport.tier1Count}
+        <span className={telemetry.tier1Count === 0 ? 'text-emerald-400' : 'text-rose-400 font-semibold'}>
+          {telemetry.tier1Count}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-zinc-500">Tier 2 聚集:</span>
-        <span className={telemetry.deAiReport.tier2Count === 0 ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
-          {telemetry.deAiReport.tier2Count}
+        <span className={telemetry.tier2Count === 0 ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
+          {telemetry.tier2Count}
         </span>
       </div>
       <div className="ml-auto flex items-center gap-1.5">
         <span className={`inline-block w-2 h-2 rounded-full ${telemetry.isClean ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`} />
         <span className={telemetry.isClean ? 'text-emerald-400 font-sans text-[11px]' : 'text-amber-400 font-sans text-[11px]'}>
-          {telemetry.isClean ? `De-AI 正典纯净 (${telemetry.deAiReport.score}分)` : `AI 腔调待净化 (${telemetry.deAiReport.score}分)`}
+          {telemetry.isClean ? `De-AI 正典纯净 (${telemetry.score}分)` : `AI 腔调待净化 (${telemetry.score}分)`}
         </span>
       </div>
     </div>

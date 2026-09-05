@@ -23,10 +23,13 @@ import {
   loadReceiptForResume,
   projectSession,
   readPipelineLedger,
+  recordUserEdit,
 } from '@mozhou/pipeline'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 import { sha256Hex } from '@mozhou/data-plane'
+import { PublishBus } from '@mozhou/runtime'
 import { assertSafeBookRoot, assertSafeParentDirectory } from '../security.js'
+import { acquireChapterLock, releaseChapterLock } from '../chapterWriteGuard.js'
 
 function receiptDigestMatch(receipt: ContextReceipt): boolean {
   const digest = sha256Hex(canonicalJson(receipt.replayInputs))
@@ -167,6 +170,122 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
       throw err
     } finally {
       plane.close()
+    }
+    return true
+  }
+
+  /* ---- 章节正文读取 ---- */
+  if (path === '/api/chapter.read') {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    if (rawRoot === null || chapterIndex === null || !Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
+      json(400, { ok: false, error: 'valid root and chapterIndex >= 1 required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const relPath = proseChapterPath(chapterIndex)
+    try {
+      const scan = readProseChapter(root, relPath)
+      const hash = sha256Hex(scan.body)
+      let title = `第 ${chapterIndex} 章`
+      try {
+        const outline = readCanonState(root).outlineNodes.find(
+          (n) => n.nodeType === 'chapter' && (n.orderIndex === chapterIndex - 1 || n.title.includes(String(chapterIndex))),
+        )
+        if (outline && outline.title) title = outline.title
+      } catch {
+        // ignore
+      }
+      json(200, {
+        ok: true,
+        chapterIndex,
+        title,
+        phase: scan.phase,
+        body: scan.body,
+        wordCount: scan.body.length,
+        revision: scan.revision,
+        hash,
+      })
+    } catch (err) {
+      json(404, { ok: false, code: 'CHAPTER_NOT_FOUND', error: (err as Error).message })
+    }
+    return true
+  }
+
+  /* ---- 章节正文安全保存 ---- */
+  if (path === '/api/chapter.save') {
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const rawBody = body['body']
+    const baseHash = typeof body['baseHash'] === 'string' ? body['baseHash'] : undefined
+
+    if (rawRoot === null || chapterIndex === null || !Number.isSafeInteger(chapterIndex) || chapterIndex < 1) {
+      json(400, { ok: false, error: 'valid root and chapterIndex >= 1 required' })
+      return true
+    }
+    if (typeof rawBody !== 'string') {
+      json(400, { ok: false, error: 'body must be a string' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const relPath = proseChapterPath(chapterIndex)
+
+    const lockKey = `${root}:${chapterIndex}`
+    if (!acquireChapterLock(lockKey)) {
+      json(409, {
+        ok: false,
+        code: 'WRITE_IN_PROGRESS',
+        error: `chapter ${chapterIndex} already has an active write in progress`,
+      })
+      return true
+    }
+
+    try {
+      const scan = readProseChapter(root, relPath)
+      const currentHash = sha256Hex(scan.body)
+      if (baseHash !== undefined && baseHash !== currentHash) {
+        json(409, {
+          ok: false,
+          code: 'HASH_MISMATCH',
+          error: 'base hash mismatch, chapter was modified on disk',
+        })
+        return true
+      }
+
+      const normalizedBody = rawBody.length > 0 && !rawBody.endsWith('\n') ? rawBody + '\n' : rawBody
+
+      const oldLines = scan.body.split('\n')
+      if (oldLines.at(-1) === '') oldLines.pop()
+
+      const blocks =
+        oldLines.length === 0
+          ? [{ op: 'insert' as const, paragraphStart: 1, paragraphEnd: 1, replacementText: normalizedBody }]
+          : normalizedBody.trim().length === 0
+            ? [{ op: 'delete' as const, paragraphStart: 1, paragraphEnd: oldLines.length }]
+            : [{ op: 'replace' as const, paragraphStart: 1, paragraphEnd: oldLines.length, replacementText: normalizedBody }]
+
+      const outcome = recordUserEdit({
+        bus: new PublishBus(),
+        bookRoot: root,
+        taskRef: 'edit_web_' + chapterIndex + '_' + Date.now(),
+        chapterIndex,
+        level: 'cursor',
+        source: 'author',
+        blocks,
+      })
+
+      const newHash = sha256Hex(outcome.body)
+      json(200, {
+        ok: true,
+        chapterIndex,
+        wordCount: outcome.body.length,
+        revision: outcome.revisionAfter,
+        hash: newHash,
+      })
+    } catch (err) {
+      json(500, { ok: false, error: (err as Error).message })
+    } finally {
+      releaseChapterLock(lockKey)
     }
     return true
   }

@@ -144,6 +144,25 @@ export interface ChapterCreateResponse {
   readonly chapterIndex: number
 }
 
+export interface ChapterReadResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly title: string
+  readonly phase: ChapterPhase
+  readonly body: string
+  readonly wordCount: number
+  readonly revision: number
+  readonly hash: string
+}
+
+export interface ChapterSaveResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly wordCount: number
+  readonly revision: number
+  readonly hash: string
+}
+
 export interface WorksChapterSummary {
   readonly chapterIndex: number
   readonly title: string
