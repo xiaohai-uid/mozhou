@@ -25,6 +25,7 @@ import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
+import { acquireChapterLock, releaseChapterLock } from '../chapterWriteGuard.js'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -94,6 +95,7 @@ function makeStreamEngine(
   chapterIndex: number,
   modelPrompt: string,
   mockOutputSeed: string,
+  activeSkills: readonly string[],
   onDelta: (text: string) => void,
 ): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
@@ -119,6 +121,11 @@ function makeStreamEngine(
     contextBudget: { hotContextBytes: 48_000, fixedSections: [], perChapterReads: [] },
   }
 
+  const scan = readProseChapter(root, proseChapterPath(chapterIndex))
+  const existingBody = (scan.body ?? '').trim()
+  const isContinuation = activeSkills.includes('continuation') && existingBody.length > 0
+  const mode = isContinuation ? 'continue' : 'generate'
+
   const explicitMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock'
   let real = false
 
@@ -135,7 +142,7 @@ function makeStreamEngine(
         bookRoot: root,
         chapterIndex,
         provider: 'deepseek',
-        mode: 'generate',
+        mode,
         stream: () => mockDraftStream(mockOutputSeed, onDelta),
       }),
     )
@@ -157,7 +164,7 @@ function makeStreamEngine(
         bookRoot: root,
         chapterIndex,
         provider: 'deepseek',
-        mode: 'generate',
+        mode,
         stream: () =>
           (async function* () {
             const systemPrompt =
@@ -183,7 +190,7 @@ function mockDraftStream(prompt: string, onDelta?: (text: string) => void): Asyn
   const chunks = [base.slice(0, 8), base.slice(8, 18) === '' ? base : base.slice(8, 18), base.slice(18)]
   return (async function* () {
     for (const chunk of chunks) {
-      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 20))
       if (chunk.length > 0) {
         onDelta?.(chunk)
         yield chunk
@@ -294,6 +301,21 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       return true
     }
 
+    const lockKey = `${safeRoot}:${chapterIndex}`
+    if (!acquireChapterLock(lockKey)) {
+      json(409, {
+        ok: false,
+        code: 'WRITE_IN_PROGRESS',
+        error: `chapter ${chapterIndex} already has an active write stream in progress`,
+      })
+      return true
+    }
+
+    const onReqClose = () => {
+      releaseChapterLock(lockKey)
+    }
+    req.once('close', onReqClose)
+
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
     const ndjson = (payload: unknown) => { res.write(JSON.stringify(payload) + '\n') }
@@ -305,6 +327,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
         chapterIndex,
         context.packet.text,
         authorPrompt,
+        activeSkills,
         (delta) => ndjson({ ok: true, event: 'delta', text: delta }),
       )
 
@@ -328,6 +351,9 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     } catch (error) {
       ndjson({ ok: false, event: 'error', error: (error as Error).message })
       res.end()
+    } finally {
+      req.removeListener('close', onReqClose)
+      releaseChapterLock(lockKey)
     }
     return true
   }

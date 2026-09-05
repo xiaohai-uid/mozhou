@@ -163,7 +163,7 @@ function loadProseSnapshot(opts: DraftBindingOptions, mode: DraftMode): ProseSna
     mozhouId: scan.mozhouId,
     revision: scan.revision,
     chapterIndex: scan.chapterIndex,
-    baseBody: mode === 'continue' ? scan.body : '',
+    baseBody: mode === 'continue' ? normalizeBody(scan.body) : '',
   };
 }
 

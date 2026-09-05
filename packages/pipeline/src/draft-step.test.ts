@@ -253,6 +253,23 @@ describe('断流 partial 标记与半稿保留', () => {
     expect(scan.body).not.toContain('旧稿痕迹。');
     expect(scan.body).toContain('全新开篇。');
   });
+
+  it('续写模式（mode=continue）在已有正文后追加新正文，两者皆保留且顺序正确', async () => {
+    const { root } = hermeticBook();
+    const engine1 = makeEngine(root);
+    registerDraftBinding(engine1, root, 'deepseek', 'deepseek', fakeStream(['前情提要。']), 'generate');
+    const first = await runDraftStep({ engine: engine1, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE, mode: 'generate' });
+    expect(first.outcome).toBe('succeeded');
+    expect(readProseChapter(root, proseChapterPath(7)).body).toBe('前情提要。\n');
+
+    const engine2 = makeEngine(root);
+    registerDraftBinding(engine2, root, 'deepseek', 'deepseek', fakeStream(['后续展开。']), 'continue');
+    const second = await runDraftStep({ engine: engine2, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE, mode: 'continue' });
+    expect(second.outcome).toBe('succeeded');
+
+    const scan = readProseChapter(root, proseChapterPath(7));
+    expect(scan.body).toBe('前情提要。\n后续展开。\n');
+  });
 });
 
 describe('M17 三级降级可见性接线', () => {

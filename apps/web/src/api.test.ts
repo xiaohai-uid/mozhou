@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
+import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, renderProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
@@ -845,6 +845,78 @@ describe('T44 中栏对话流 API 契约', () => {
       const scan = readProseChapter(dir, proseChapterPath(1))
       expect(scan.phase).toBe('draft')
       expect(scan.body).toContain('夜雨敲窗')
+    } finally {
+      delete process.env['MOZHOU_DRAFT_PROVIDER']
+    }
+  })
+
+  it('POST /api/draft.stream：续写模式（continuation）保留既有正文并追加', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-continue-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '续写书', dir })
+    // 预置第 1 章正文为“前情提要”
+    const ch1Rel = proseChapterPath(1)
+    const scan = readProseChapter(dir, ch1Rel)
+    const preset = renderProseChapter({
+      mozhouId: scan.mozhouId,
+      revision: scan.revision,
+      chapterIndex: 1,
+      phase: 'draft',
+      body: '前情提要\n',
+    })
+    writeFileSync(join(dir, ch1Rel), preset, 'utf8')
+
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    try {
+      const res = await fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          root: dir,
+          chapterIndex: 1,
+          prompt: '后续发展',
+          activeSkills: ['continuation'],
+        }),
+      })
+      expect(res.status).toBe(200)
+      await res.text()
+      const afterScan = readProseChapter(dir, ch1Rel)
+      expect(afterScan.body).toContain('前情提要')
+      expect(afterScan.body).toContain('后续发展')
+      expect(afterScan.body.indexOf('前情提要')).toBeLessThan(afterScan.body.indexOf('后续发展'))
+    } finally {
+      delete process.env['MOZHOU_DRAFT_PROVIDER']
+    }
+  })
+
+  it('POST /api/draft.stream：同一章并发写入互斥，后发者返回 409 WRITE_IN_PROGRESS', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-lock-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '并发锁书', dir })
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    try {
+      const p1 = fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: dir, chapterIndex: 1, prompt: '流一' }),
+      })
+      const p2 = fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: dir, chapterIndex: 1, prompt: '流二' }),
+      })
+      const [res1, res2] = await Promise.all([p1, p2])
+      const statuses = [res1.status, res2.status].sort()
+      expect(statuses).toEqual([200, 409])
+      const conflictRes = res1.status === 409 ? res1 : res2
+      const conflictData = (await conflictRes.json()) as { ok: boolean; code: string }
+      expect(conflictData.ok).toBe(false)
+      expect(conflictData.code).toBe('WRITE_IN_PROGRESS')
+      // 读完 200 的流
+      const okRes = res1.status === 200 ? res1 : res2
+      await okRes.text()
     } finally {
       delete process.env['MOZHOU_DRAFT_PROVIDER']
     }
