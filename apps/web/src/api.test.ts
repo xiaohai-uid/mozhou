@@ -1297,6 +1297,32 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     }
   })
 
+  it('POST /api/draft.stream：作者指令超长导致结构层超预算时，显式报错 CONTEXT_OVERFLOW 拒绝，不静默截断', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-overflow-test-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '超预算书' })
+    const root = created.data.root as string
+
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    try {
+      const res = await fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          root,
+          chapterIndex: 1,
+          prompt: '超长指令内容'.repeat(6000), // >36000 tokens
+        }),
+      })
+      expect(res.status).toBe(200)
+      const text = await res.text()
+      expect(text).toContain('CONTEXT_OVERFLOW')
+    } finally {
+      delete process.env['MOZHOU_DRAFT_PROVIDER']
+    }
+  })
+
   it('POST /api/export.txt：依序导出全书章节纯文本 TXT', async () => {
     const base = await listen()
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-export-test-'))

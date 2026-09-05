@@ -134,8 +134,14 @@ export function DialogueStream({
           if (frame.event === 'delta' && typeof frame.text === 'string') {
             setDraftText((prev) => prev + frame.text)
           } else if (frame.event === 'done') {
-            completed = true
-            setPhase('draft_done')
+            if (frame.partial === true || (frame.outcome !== undefined && frame.outcome !== 'succeeded')) {
+              hasError = true
+              setError(`草稿生成未完全成功（${frame.outcome ?? 'partial'}，半稿已保留在盘）`)
+              setPhase('error')
+            } else {
+              completed = true
+              setPhase('draft_done')
+            }
           } else if (frame.event === 'error' || frame.ok === false) {
             hasError = true
             setError(frame.error ?? '草稿流中断')

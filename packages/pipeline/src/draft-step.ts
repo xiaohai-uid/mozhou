@@ -51,6 +51,7 @@ import {
   readProseChapter,
   refreshManifestEntries,
   renderProseChapter,
+  sha256Hex,
   writeManifest,
 } from '@mozhou/data-plane';
 import { readPipelineLedger } from './ledger.js';
@@ -71,6 +72,14 @@ export class ProviderTransportError extends Error {
   override readonly name = 'ProviderTransportError';
   constructor(readonly raw: RawProviderError, message?: string) {
     super(message ?? 'provider transport error: ' + JSON.stringify(raw));
+  }
+}
+
+/** 外部并发正文修改碰撞中止错误（保护作者在外部编辑器中保存的内容）。 */
+export class ExternalProseCollisionError extends Error {
+  override readonly name = 'ExternalProseCollisionError';
+  constructor(relPath: string) {
+    super(`EXTERNAL_COLLISION: 正文文件 ${relPath} 在流式写入期间被外部修改，已主动中止写入以保护外部修改`);
   }
 }
 
@@ -204,6 +213,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
     let body = prose.baseBody;
     // chars 恒等盘上持久化字节数（含规范化尾换行），与正文文件逐字节对账
     let chars = normalizeBody(body).length;
+    let lastWrittenHash = sha256Hex(readProseChapter(opts.bookRoot, prose.relPath).body);
     writeDraftState(opts.bookRoot, {
       chapterIndex: prose.chapterIndex,
       proseRelPath: prose.relPath,
@@ -213,8 +223,15 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
     try {
       for await (const delta of opts.stream()) {
         if (delta.length === 0) continue;
+        const currentDisk = readProseChapter(opts.bookRoot, prose.relPath);
+        const currentDiskHash = sha256Hex(currentDisk.body);
+        if (currentDiskHash !== lastWrittenHash) {
+          throw new ExternalProseCollisionError(prose.relPath);
+        }
         body += delta;
-        chars = persistProse(opts.bookRoot, prose, body).length;
+        const normalized = persistProse(opts.bookRoot, prose, body);
+        lastWrittenHash = sha256Hex(normalized);
+        chars = normalized.length;
       }
     } catch (error) {
       // 半稿已在盘上（逐 delta 落盘）；此处补 partial 标记并按 T13 表归类上抛
@@ -260,8 +277,8 @@ function generationFinishedReason(root: string, taskRef: string): string | undef
 
 /** T13 错误表接线：传输样本 → 归一化 verdict → retryable 分流为可恢复/终态。 */
 function classifyStreamFailure(error: unknown, provider: NormalizedProviderId): Error {
-  if (error instanceof RecoverableError) {
-    return error; // 上游已分类（如 structuredOutput 校验失败带 repairHint），原样上抛
+  if (error instanceof ExternalProseCollisionError || error instanceof RecoverableError) {
+    return error; // 碰撞中止或上游已分类错误直接上抛
   }
   const raw = error instanceof ProviderTransportError ? error.raw : extractRawSample(error);
   if (raw !== null) {

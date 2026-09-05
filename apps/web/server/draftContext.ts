@@ -92,13 +92,9 @@ function structuralFallback(
       sections.push({ ...s, tokens })
       usedTokens += tokens
     } else {
-      const available = PREVIEW_CONTEXT_WINDOW_TOKENS - usedTokens
-      if (available > 10) {
-        const truncatedText = s.text.slice(0, available)
-        sections.push({ section: s.section, text: truncatedText, tokens: previewCodepointTokenizer.count(truncatedText) })
-        usedTokens += previewCodepointTokenizer.count(truncatedText)
-      }
-      break
+      throw new Error(
+        `CONTEXT_OVERFLOW: 设定与作者意图等结构信息超出上下文总预算 (${PREVIEW_CONTEXT_WINDOW_TOKENS})，请精简设定或缩短作者指令`,
+      )
     }
   }
 

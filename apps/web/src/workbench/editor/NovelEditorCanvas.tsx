@@ -24,6 +24,11 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
   // Auto-indent paragraphs with standard Chinese 2 em spaces upon pressing Enter
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // 中文 IME 输入法合成期不拦截 Enter（避免打断拼音选词）
+      if (e.nativeEvent.isComposing || e.keyCode === 229) {
+        return;
+      }
+
       if (e.key === 'Enter') {
         const textarea = textareaRef.current;
         if (!textarea) return;
@@ -88,6 +93,7 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
       <div className="relative flex-1 p-6 overflow-y-auto">
         <textarea
           ref={textareaRef}
+          aria-label="章节正文"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}

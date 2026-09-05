@@ -217,4 +217,26 @@ describe('DialogueStream（T44）', () => {
     expect(screen.queryByTestId('draft-text')).toBeNull()
     expect(screen.getByLabelText('写作指令')).toHaveValue('')
   })
+
+  it('done 帧带 partial: true 时：呈现未完全成功错误，不误报草稿完成', async () => {
+    stubDialogueFetch({
+      stream: [
+        { ok: true, event: 'start', chapterIndex: 1, receiptId: null },
+        { ok: true, event: 'delta', text: '部分生成内容' },
+        { ok: true, event: 'done', outcome: 'failed_recoverable', partial: true },
+      ],
+    })
+    render(<DialogueStream book={BOOK} chapterIndex={1} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '两者递进' })).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('button', { name: '两者递进' }))
+    await userEvent.click(screen.getByRole('button', { name: '发送' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('alert').textContent).toContain('未完全成功')
+    expect(screen.queryByTestId('draft-slice')?.textContent ?? '').not.toContain('完成')
+  })
 })

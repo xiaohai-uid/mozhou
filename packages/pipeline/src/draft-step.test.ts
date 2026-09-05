@@ -4,7 +4,7 @@
  * M17 三级降级可见性各一例（一级静默 / 二级 attempt 事件 / 三级 failed_recoverable 上报）。
  * 零时钟零外部服务：假 provider 流夹具禁真网；taskRef 注入固定值；hermetic 临时书。
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -18,6 +18,7 @@ import {
   proseChapterPath,
   readManifest,
   readProseChapter,
+  renderProseChapter,
   sha256FileHex,
 } from '@mozhou/data-plane';
 import {
@@ -269,6 +270,56 @@ describe('断流 partial 标记与半稿保留', () => {
 
     const scan = readProseChapter(root, proseChapterPath(7));
     expect(scan.body).toBe('前情提要。\n后续展开。\n');
+  });
+
+  it('流式写入期间正文被外部修改 ⇒ 触发 ExternalProseCollisionError 中止，保护外部修改并标 partial', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+
+    // 构造一个在第一个 delta 产出后篡改磁盘正文的流
+    async function* collidingStream() {
+      await Promise.resolve();
+      yield '流的第一句。';
+      // 模拟外部编辑器保存
+      const chPath = join(root, proseChapterPath(7));
+      const scan = readProseChapter(root, proseChapterPath(7));
+      writeFileSync(
+        chPath,
+        renderProseChapter({
+          mozhouId: scan.mozhouId,
+          revision: scan.revision,
+          chapterIndex: 7,
+          phase: 'draft',
+          body: '外部编辑器抢先写入的内容！\n',
+        }),
+        'utf8',
+      );
+      yield '流的第二句（应被拒绝）。';
+    }
+
+    engine.registerProviderBinding(
+      'deepseek',
+      makeDraftProviderBinding({
+        bookRoot: root,
+        chapterIndex: 7,
+        provider: 'deepseek',
+        mode: 'generate',
+        stream: () => collidingStream(),
+      }),
+    );
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+    expect(outcome.outcome).toBe('failed_terminal');
+
+    // 外部修改内容完好无损，未被流冲掉
+    const scanAfter = readProseChapter(root, proseChapterPath(7));
+    expect(scanAfter.body).toContain('外部编辑器抢先写入的内容！');
+    expect(scanAfter.body).not.toContain('流的第二句');
+
+    // draftState 标 partial
+    const state = readDraftState(root, 7);
+    expect(state?.status).toBe('partial');
+    expect(state?.reason).toContain('EXTERNAL_COLLISION');
   });
 });
 

@@ -479,10 +479,23 @@ interface StyleGuide {
 // POST /api/export.txt (文件附件流直接下载)
 // 请求：{ root: string }
 // 200 Content-Type: text/plain; charset=utf-8
+
+// 7. 章节质量审查（平铺契约）
+// POST /api/chapter.review
+// 请求：{ root: string, chapterIndex: number, policy?: QualityPolicy }
+// 200 { ok: true, hasReport: true, verdict: "pass"|"blocking_fail"|"refused", reportId: string, reportPath?: string, draftRevision: number, draftContentHash: string, reworkCount: number, current: boolean, blockingFailures: EvaluationView[], advisories: EvaluationView[], semanticReviewer: "unavailable", mechanicalGate: MechanicalGateReport, report: QualityReviewReport }
+// 409 { ok: false, error: string }
+
+// 8. 章节质量报告读取（平铺契约，无报告时不误报 stale）
+// POST /api/chapter.quality
+// 请求：{ root: string, chapterIndex: number }
+// 200 （未审阅）{ ok: true, hasReport: false, status: "no_review", current: true, report: null, reworkCount: 0, blockingFailures: [], advisories: [] }
+// 200 （已审阅）{ ok: true, hasReport: true, status: "current"|"stale", current: boolean, verdict, reportId, draftRevision, draftContentHash, reworkCount, blockingFailures, advisories, semanticReviewer, report }
+// 400 { ok: false, error: string }
 ```
 
 ## 历史
 
 - DELTA-001：PATCH 正文乐观并发（expectedRevision + 409 ContentChanged）
 - DELTA-002（2026-08-22）：任务重试与 WebDAV 推送限流；同日完成全量契约回填（openapi 23→53 paths，覆盖全部已实现路由）
-- DELTA-003（2026-09-05）：Technical Preview 本地写作收口契约（chapter.create/read/save/export/mechanical-review/author-intent.update，哈希并发锁与保真纯文本导出）
+- DELTA-003（2026-09-05）：Technical Preview 本地写作收口契约（chapter.create/read/save/export/mechanical-review/author-intent.update 与 chapter.quality/review 统一平铺响应，哈希并发锁与保真纯文本导出）
