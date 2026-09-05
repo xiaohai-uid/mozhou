@@ -129,25 +129,79 @@ export async function assertSafeRemoteTarget(
   }
 }
 
+function validateEndpointUrl(baseUrl: string, allowPrivateNetwork: boolean): void {
+  if (!baseUrl) return
+  const target = new URL(baseUrl)
+  assertProtocol(target, allowPrivateNetwork)
+  const hostname = normalizeAddress(target.hostname)
+  if (!allowPrivateNetwork && isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
+    throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
+  }
+  if (!allowPrivateNetwork && (hostname === 'localhost' || hostname.endsWith('.localhost'))) {
+    throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
+  }
+}
+
 export function resolveChatEndpoint(env: NodeJS.ProcessEnv): ResolvedEndpoint | null {
-  const apiKey = env['MOZHOU_API_KEY'] ?? env['DEEPSEEK_API_KEY'] ?? env['OPENAI_API_KEY'] ?? ''
-  const baseUrl = env['MOZHOU_API_BASE'] ?? env['DEEPSEEK_API_BASE'] ?? env['OPENAI_API_BASE'] ?? ''
-  const model = env['MOZHOU_MODEL'] ?? env['DEEPSEEK_MODEL'] ?? 'deepseek-chat'
   const allowPrivateNetwork = env['MOZHOU_ALLOW_PRIVATE_LLM'] === '1'
 
-  if (!apiKey) return null
-  if (baseUrl) {
-    const target = new URL(baseUrl)
-    assertProtocol(target, allowPrivateNetwork)
-    const hostname = normalizeAddress(target.hostname)
-    if (!allowPrivateNetwork && isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
-      throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
-    }
-    if (!allowPrivateNetwork && (hostname === 'localhost' || hostname.endsWith('.localhost'))) {
-      throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
-    }
+  // 1. MOZHOU 通用覆盖层最高优先级
+  if (env['MOZHOU_API_KEY']) {
+    const apiKey = env['MOZHOU_API_KEY']
+    const baseUrl = env['MOZHOU_API_BASE'] ?? ''
+    const model = env['MOZHOU_MODEL'] ?? 'deepseek-chat'
+    validateEndpointUrl(baseUrl, allowPrivateNetwork)
+    return { baseUrl, apiKey, model, allowPrivateNetwork }
   }
-  return { baseUrl, apiKey, model, allowPrivateNetwork }
+
+  const hasDeepSeek = Boolean(env['DEEPSEEK_API_KEY'])
+  const hasOpenAi = Boolean(env['OPENAI_API_KEY'])
+
+  if (!hasDeepSeek && !hasOpenAi) {
+    return null
+  }
+
+  // 4. 两者皆有：按 MOZHOU_PROVIDER 判定；未指定显式报错拒绝猜选
+  if (hasDeepSeek && hasOpenAi) {
+    const provider = env['MOZHOU_PROVIDER']?.toLowerCase().trim()
+    if (provider === 'deepseek') {
+      const apiKey = env['DEEPSEEK_API_KEY']!
+      const baseUrl = env['DEEPSEEK_API_BASE'] ?? 'https://api.deepseek.com'
+      const model = env['DEEPSEEK_MODEL'] ?? 'deepseek-chat'
+      validateEndpointUrl(baseUrl, allowPrivateNetwork)
+      return { baseUrl, apiKey, model, allowPrivateNetwork }
+    }
+    if (provider === 'openai') {
+      const apiKey = env['OPENAI_API_KEY']!
+      const baseUrl = env['OPENAI_API_BASE'] ?? 'https://api.openai.com/v1'
+      const model = env['OPENAI_MODEL'] ?? 'gpt-4o-mini'
+      validateEndpointUrl(baseUrl, allowPrivateNetwork)
+      return { baseUrl, apiKey, model, allowPrivateNetwork }
+    }
+    throw new Error(
+      '检测到同时配置了 DEEPSEEK_API_KEY 与 OPENAI_API_KEY，请显式设置 MOZHOU_PROVIDER=deepseek 或 MOZHOU_PROVIDER=openai',
+    )
+  }
+
+  // 2. 仅 DeepSeek
+  if (hasDeepSeek) {
+    const apiKey = env['DEEPSEEK_API_KEY']!
+    const baseUrl = env['DEEPSEEK_API_BASE'] ?? 'https://api.deepseek.com'
+    const model = env['DEEPSEEK_MODEL'] ?? 'deepseek-chat'
+    validateEndpointUrl(baseUrl, allowPrivateNetwork)
+    return { baseUrl, apiKey, model, allowPrivateNetwork }
+  }
+
+  // 3. 仅 OpenAI
+  if (hasOpenAi) {
+    const apiKey = env['OPENAI_API_KEY']!
+    const baseUrl = env['OPENAI_API_BASE'] ?? 'https://api.openai.com/v1'
+    const model = env['OPENAI_MODEL'] ?? 'gpt-4o-mini'
+    validateEndpointUrl(baseUrl, allowPrivateNetwork)
+    return { baseUrl, apiKey, model, allowPrivateNetwork }
+  }
+
+  return null
 }
 
 /**

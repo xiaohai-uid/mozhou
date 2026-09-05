@@ -58,3 +58,16 @@ pnpm build && pnpm lint && pnpm test   # 三绿 = 就绪
 2. **完整复制书目录**：将原书目录（例如 `~/MoZhou/Books/<bookId>/`）整包复制到目标备份或新书库位置。
 3. **校验完整性**：确认目标目录下包含 `book.json` 及 `正文/` 目录结构。
 4. **重新启动服务**：在墨舟界面点击“书架”或调用“打开作品”，选择新路径即可立即恢复写作与目录索引。
+
+## BYOK 模型服务配置规则（大模型密钥）
+
+墨舟支持通过环境变量接入兼容 OpenAI 协议的模型提供商，遵循以下严格的优先级规则：
+
+1. **通用自定义网关（最高优先级）**：
+   - 设置 `MOZHOU_API_KEY`、可选 `MOZHOU_API_BASE`（如自建 OneAPI/NewAPI/云网关）与可选 `MOZHOU_MODEL`（默认为 `deepseek-chat`）。
+2. **DeepSeek 官方服务**：
+   - 仅配置 `DEEPSEEK_API_KEY` 时，默认指向官方端点 `https://api.deepseek.com` 并使用 `deepseek-chat`。
+3. **OpenAI 官方服务**：
+   - 仅配置 `OPENAI_API_KEY` 时，默认指向官方端点 `https://api.openai.com/v1` 并使用 `gpt-4o-mini`，绝不会错误回落到 DeepSeek。
+4. **多 Key 共存**：
+   - 若同时配置了 `DEEPSEEK_API_KEY` 与 `OPENAI_API_KEY`，必须显式声明 `MOZHOU_PROVIDER=deepseek` 或 `MOZHOU_PROVIDER=openai`，系统不进行不可控的隐式猜测。
