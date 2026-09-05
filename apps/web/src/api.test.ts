@@ -227,6 +227,38 @@ function writeWaterfallBody(root: string): void {
 }
 
 describe('ADR-0025 质量审查 API 契约', () => {
+  it('空新书未审阅时：/api/chapter.quality 返回 hasReport=false，不误报 stale', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-quality-fresh-'))
+    roots.push(dir)
+    await post(base, '/api/book', { title: '未审阅新书', dir })
+    const { status, data } = await post(base, '/api/chapter.quality', { root: dir, chapterIndex: 1 })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.hasReport).toBe(false)
+    expect(data.status).toBe('no_review')
+    expect(data.verdict).toBeUndefined()
+  })
+
+  it('review 与 quality 统一响应契约：平铺输出 verdict、failures、advisories', async () => {
+    const root = await makeBookAtReview('契约一致书')
+    const base = bases[bases.length - 1]!
+    const reviewRes = await post(base, '/api/chapter.review', { root, chapterIndex: 1, policy: DETERMINISTIC_POLICY })
+    expect(reviewRes.status).toBe(200)
+    expect(reviewRes.data.verdict).toBe('pass')
+    expect(reviewRes.data.hasReport).toBe(true)
+
+    // 重新通过 /api/chapter.quality 读取，契约形状平铺一致
+    const qualityRes = await post(base, '/api/chapter.quality', { root, chapterIndex: 1 })
+    expect(qualityRes.status).toBe(200)
+    expect(qualityRes.data.ok).toBe(true)
+    expect(qualityRes.data.hasReport).toBe(true)
+    expect(qualityRes.data.verdict).toBe('pass')
+    expect(qualityRes.data.current).toBe(true)
+    expect(Array.isArray(qualityRes.data.blockingFailures)).toBe(true)
+    expect(Array.isArray(qualityRes.data.advisories)).toBe(true)
+  })
+
   it('review pass 返回 current=true', async () => {
     await makeBookAtReview('通过之书')
     const { status, data } = await post(bases[bases.length - 1]!, '/api/chapter.review', { root: roots[roots.length - 1]!, chapterIndex: 1, policy: DETERMINISTIC_POLICY })

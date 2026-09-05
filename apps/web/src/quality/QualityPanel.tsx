@@ -137,12 +137,12 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
 
         {verdict === undefined && (
           <p className="muted" style={{ margin: 0, fontSize: 11 }}>
-            {summary?.hasReport === false ? '（尚无报告）' : '—'}
+            {summary?.hasReport === false ? '尚未运行检查——点击下方按钮开始基础检查' : '—'}
           </p>
         )}
-        {summary?.current === false && (
-          <p className="mono muted" style={{ margin: '6px 0 0' }}>
-            报告已 stale——正文在审查后变化
+        {summary?.hasReport === true && summary?.current === false && (
+          <p className="mono muted" style={{ margin: '6px 0 0', color: 'var(--warning)' }}>
+            报告已 stale——正文在审查后变化，建议重新检查
           </p>
         )}
         {summary?.draftRevision !== undefined && (
@@ -150,7 +150,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
             Exact draft: revision {summary.draftRevision} · hash {hashShort}…
           </p>
         )}
-        {summary?.hasReport !== false && (
+        {summary?.hasReport === true && (
           <p className="mono muted" style={{ margin: '6px 0 0' }}>
             Rework attempt {Math.min(reworkCount, 2)}/2
           </p>
@@ -199,7 +199,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
         )}
         {summary?.semanticReviewer === 'unavailable' && (
           <p className="banner" style={{ marginTop: 10, marginBottom: 0 }}>
-            语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。
+            已包含基础机检（字数/段落/格式/占位符）；未配置语义 Reviewer，不参与判定。
           </p>
         )}
 

@@ -42,7 +42,7 @@ exports[`QualityPanel（Ink Orbit 换肤后语义保全） > 契约快照：pass
         class="banner"
         style="margin-top: 10px; margin-bottom: 0px;"
       >
-        语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。
+        已包含基础机检（字数/段落/格式/占位符）；未配置语义 Reviewer，不参与判定。
       </p>
       <div
         class="actions"

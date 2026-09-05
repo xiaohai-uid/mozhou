@@ -7,7 +7,9 @@ import {
   executeChapterReview,
   makeDraftProviderBinding,
   nextStepOf,
+  projectSession,
   QualityReworkLimitExceededError,
+  readPipelineLedger,
   recordAuthorCorrection,
   runDraftStep,
 } from '@mozhou/pipeline'
@@ -401,6 +403,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
 
     json(200, {
       ok: true,
+      hasReport: true,
       verdict: outcome.report.verdict,
       reportId: outcome.report.reportId,
       reportPath: outcome.reportRelPath,
@@ -412,6 +415,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       advisories: failed.filter((e) => e.severity === 'advisory'),
       semanticReviewer: 'unavailable',
       mechanicalGate: outcome.mechanicalGate,
+      report: outcome.report,
     })
     return true
   }
@@ -491,14 +495,21 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
     }
 
     const reviewsDir = join(root, '.mozhou', 'quality-reviews', `chapter_${chapterIndex}`)
-    if (!existsSync(reviewsDir)) {
-      json(200, { ok: true, status: 'no_review', report: null, current: false })
-      return true
-    }
+    const files = existsSync(reviewsDir)
+      ? readdirSync(reviewsDir).filter((f) => f.startsWith('report_') && f.endsWith('.json')).sort()
+      : []
 
-    const files = readdirSync(reviewsDir).filter((f) => f.startsWith('report_') && f.endsWith('.json')).sort()
     if (files.length === 0) {
-      json(200, { ok: true, status: 'no_review', report: null, current: false })
+      json(200, {
+        ok: true,
+        hasReport: false,
+        status: 'no_review',
+        current: true,
+        report: null,
+        reworkCount: 0,
+        blockingFailures: [],
+        advisories: [],
+      })
       return true
     }
 
@@ -509,12 +520,23 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       draftRevision: proseObj.revision,
       draftContentHash: hashProse(proseObj.body),
     })
+    const failed = report.evaluations.filter((e) => e.verdict === 'fail')
+    const projection = projectSession(readPipelineLedger(root), chapterIndex)
 
     json(200, {
       ok: true,
+      hasReport: true,
       status: current ? 'current' : 'stale',
-      report,
       current,
+      verdict: report.verdict,
+      reportId: report.reportId,
+      draftRevision: report.anchor.draftRevision,
+      draftContentHash: report.anchor.draftContentHash,
+      reworkCount: projection?.qualityReworkCount ?? 0,
+      blockingFailures: failed.filter((e) => e.severity === 'blocking'),
+      advisories: failed.filter((e) => e.severity === 'advisory'),
+      semanticReviewer: 'unavailable',
+      report,
     })
     return true
   }

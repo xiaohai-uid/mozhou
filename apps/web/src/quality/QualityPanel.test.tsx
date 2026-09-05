@@ -94,12 +94,21 @@ describe('QualityPanel（Ink Orbit 换肤后语义保全）', () => {
     })
   })
 
-  it('Gate 3 横幅显式呈现（语义审查提供方 unavailable）', async () => {
+  it('Gate 3 横幅显式呈现（基础机检在位，语义审查未接入）', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(PASS_SUMMARY)))
     render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
     await waitFor(() => {
-      expect(screen.getByText(/语义审查提供方未接入（Gate 3）/)).toBeInTheDocument()
+      expect(screen.getByText(/已包含基础机检/)).toBeInTheDocument()
     })
+  })
+
+  it('未运行审查时显示尚未运行检查，不展示红字 stale', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson({ ok: true, hasReport: false, current: true })))
+    render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
+    await waitFor(() => {
+      expect(screen.getByText('尚未运行检查——点击下方按钮开始基础检查')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/报告已 stale/)).toBeNull()
   })
 
   it('Run literary review 点击触发 /api/chapter.review', async () => {
