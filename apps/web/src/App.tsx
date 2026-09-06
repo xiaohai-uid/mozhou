@@ -32,6 +32,7 @@ import type { WizardOutcome } from './wizard/WizardOverlay'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
 import { MobileShell } from './mobile/MobileShell'
 import { WorkbenchView } from './workbench/WorkbenchView'
+import { AuthorWorkspacePrototype } from './prototypes/author-workspace/AuthorWorkspacePrototype'
 
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
@@ -61,6 +62,10 @@ function wizardCompleted(): boolean {
 }
 
 export function App(): JSX.Element {
+  const [prototypeEnabled] = useState(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') return false
+    return new URLSearchParams(window.location.search).get('prototype') === 'author-workspace'
+  })
   const [initial] = useState(loadWorkbenchState)
   const [book, setBook] = useState<BookInfo | null>(initial.book)
   const [view, setView] = useState<ViewId>(initial.view)
@@ -87,8 +92,9 @@ export function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    if (prototypeEnabled) return
     saveWorkbenchState({ book, view, chapterIndex })
-  }, [book, view, chapterIndex])
+  }, [book, view, chapterIndex, prototypeEnabled])
 
   const handleSelectView = (next: ViewId): void => {
     setView(next)
@@ -119,6 +125,10 @@ export function App(): JSX.Element {
   const handleWizardDismiss = (): void => {
     setWizardOpen(false)
     setView('workbench')
+  }
+
+  if (prototypeEnabled) {
+    return <AuthorWorkspacePrototype />
   }
 
   if (isMobile) {
