@@ -113,6 +113,37 @@ describe('LocalDataPlane.open', () => {
     removeProjectionFiles()
     expect(() => LocalDataPlane.open(bookRoot)).toThrow(ProjectionMissingError)
   })
+
+  it('openOrRebuild restores a missing disposable projection from canon', () => {
+    makeBook()
+    removeProjectionFiles()
+
+    const plane = LocalDataPlane.openOrRebuild(bookRoot)
+    expect(plane.book.title).toBe('凡人修仙传')
+    expect(() => assertProjectionVersion(plane.db)).not.toThrow()
+    plane.close()
+  })
+
+  it('openOrRebuild heals a projection version mismatch from canon', () => {
+    makeBook()
+    const db = openDatabase({ path: join(bookRoot, RUNTIME_DB_PATH) })
+    db.pragma('user_version = 0')
+    db.close()
+
+    const plane = LocalDataPlane.openOrRebuild(bookRoot)
+    expect(() => assertProjectionVersion(plane.db)).not.toThrow()
+    plane.close()
+  })
+
+  it('openOrRebuild replaces a corrupt disposable projection from canon', () => {
+    makeBook()
+    writeFileSync(join(bookRoot, RUNTIME_DB_PATH), 'not-a-sqlite-database', 'utf8')
+
+    const plane = LocalDataPlane.openOrRebuild(bookRoot)
+    expect(() => assertProjectionVersion(plane.db)).not.toThrow()
+    expect(plane.book.title).toBe('凡人修仙传')
+    plane.close()
+  })
 })
 
 describe('verifyBaseline', () => {

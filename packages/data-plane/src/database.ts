@@ -13,9 +13,14 @@ export interface OpenDatabaseOptions {
 
 export function openDatabase(options: OpenDatabaseOptions): Database.Database {
   const db = new Database(options.path)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
-  return db
+  try {
+    db.pragma('journal_mode = WAL')
+    db.pragma('foreign_keys = ON')
+    return db
+  } catch (error) {
+    db.close()
+    throw error
+  }
 }
 
 export class ProjectionVersionMismatchError extends Error {

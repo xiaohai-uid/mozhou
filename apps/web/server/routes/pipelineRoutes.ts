@@ -14,19 +14,16 @@ import {
 import {
   CORRECTION_REASONS,
   hashProse,
-  isQualityReviewCurrent,
+  queryChapterQualityStatus,
   type CorrectionReason,
   type QualityPolicy,
-  type QualityReviewReport,
 } from '@mozhou/quality-engine'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
-import { PublishBus, RuntimeEngine } from '@mozhou/runtime'
+import { PublishBus, RuntimeEngine, createDraftRecipe } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 const DIALOGUE_CAPABILITIES = [
   { id: 'continuation', label: '续写' },
@@ -97,27 +94,7 @@ function makeStreamEngine(
   onDelta: (text: string) => void,
 ): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
-  const recipe: CapabilityRecipe = {
-    id: 'chapter-drafting',
-    recipeVersion: '0.1.1',
-    source: { repo: 'original', commit: '0'.repeat(40), license: 'original', refinedAt: '2026-09-03', refineNote: 'release hardening: compiled context' },
-    brief: { capability: '正文草稿流式生成', runtimeSemantics: 'Context Compiler → provider；断流标 partial、半稿持久保留', triggers: ['draft'] },
-    taskType: 'CHAPTER_DRAFTING',
-    entry: { routerDoc: 'docs/router.md', phases: ['draft'], stopPoints: [] },
-    references: [],
-    artifacts: [],
-    prechecks: [],
-    trackingGate: {
-      authorityState: proseChapterPath(chapterIndex),
-      casField: 'revision',
-      transactionModes: ['append'],
-      derivedViews: [],
-      budgets: { hotContextBytes: 48_000, perChapterReads: [] },
-      failureTaxonomy: 'validationFailed',
-      hookPoint: 'postWrite',
-    },
-    contextBudget: { hotContextBytes: 48_000, fixedSections: [], perChapterReads: [] },
-  }
+  const recipe = createDraftRecipe({ proseRelPath: proseChapterPath(chapterIndex) })
 
   const explicitMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock'
   let real = false
@@ -457,38 +434,36 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/chapter.quality') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (root === null || chapterIndex === null) {
+    if (rawRoot === null || chapterIndex === null) {
       json(400, { ok: false, error: 'root and chapterIndex required' })
       return true
     }
+    const root = assertSafeBookRoot(rawRoot)
 
-    const reviewsDir = join(root, '.mozhou', 'quality-reviews', `chapter_${chapterIndex}`)
-    if (!existsSync(reviewsDir)) {
-      json(200, { ok: true, status: 'no_review', report: null, current: false })
-      return true
+    // 章节文件不存在（新书/未建章）≠ 结构违例：诚实返回 no_review，而非 500。
+    let draftIdentity: { draftRevision: number; draftContentHash: string }
+    try {
+      const proseObj = readProseChapter(root, proseChapterPath(chapterIndex))
+      draftIdentity = {
+        draftRevision: proseObj.revision,
+        draftContentHash: hashProse(proseObj.body),
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        json(200, { ok: true, status: 'no_review', report: null, current: false })
+        return true
+      }
+      throw error
     }
-
-    const files = readdirSync(reviewsDir).filter((f) => f.startsWith('report_') && f.endsWith('.json')).sort()
-    if (files.length === 0) {
-      json(200, { ok: true, status: 'no_review', report: null, current: false })
-      return true
-    }
-
-    const latestFile = files[files.length - 1]!
-    const report = JSON.parse(readFileSync(join(reviewsDir, latestFile), 'utf8')) as QualityReviewReport
-    const proseObj = readProseChapter(root, proseChapterPath(chapterIndex))
-    const current = isQualityReviewCurrent(report, {
-      draftRevision: proseObj.revision,
-      draftContentHash: hashProse(proseObj.body),
-    })
+    const result = queryChapterQualityStatus(root, chapterIndex, draftIdentity)
 
     json(200, {
       ok: true,
-      status: current ? 'current' : 'stale',
-      report,
-      current,
+      status: result.status,
+      report: result.report,
+      current: result.current,
     })
     return true
   }

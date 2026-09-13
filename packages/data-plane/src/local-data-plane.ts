@@ -30,9 +30,10 @@ import {
   type CommitChapterRequest,
   type CreateChapterDraftRequest,
   type PlaneContext,
+  type ProseChapterScan,
 } from './chapter.js'
-import { readCanonState, readBookRecord, scanEntityCards } from './canon-read.js'
-import { assertProjectionVersion, openDatabase } from './database.js'
+import { readCanonState, readBookRecord, scanEntityCards, type CanonState } from './canon-read.js'
+import { assertProjectionVersion, openDatabase, ProjectionVersionMismatchError } from './database.js'
 import { assembleChangeMatrix, type ChangeMatrix } from './impact.js'
 
 import {
@@ -76,6 +77,12 @@ function removeProjectionFiles(root: string): void {
   }
 }
 
+function isCorruptProjectionError(error: unknown): boolean {
+  if (!(error instanceof Error) || !('code' in error)) return false
+  const code = (error as Error & { readonly code?: unknown }).code
+  return code === 'SQLITE_NOTADB' || code === 'SQLITE_CORRUPT'
+}
+
 
 
 export class LocalDataPlane {
@@ -107,6 +114,25 @@ export class LocalDataPlane {
     } catch (error) {
       db.close()
       throw error
+    }
+  }
+
+  /**
+   * 应用组合层恢复入口：runtime.sqlite 是 ADR-0006 定义的可丢弃投影。
+   * 仅在投影缺失、版本漂移或 SQLite 明确报告物理损坏时全量从 canon 重建；
+   * 其他错误继续原样抛出，避免把权限/正典结构问题伪装成可恢复故障。
+   */
+  static openOrRebuild(root: string): LocalDataPlane {
+    try {
+      return LocalDataPlane.open(root)
+    } catch (error) {
+      const rebuildable =
+        error instanceof ProjectionMissingError
+        || error instanceof ProjectionVersionMismatchError
+        || isCorruptProjectionError(error)
+      if (!rebuildable) throw error
+      rebuildProjectionFromCanon(root)
+      return LocalDataPlane.open(root)
     }
   }
 
@@ -200,6 +226,21 @@ export class LocalDataPlane {
   /** 对账终态后由 ReconciliationService 调用：从盘上重载基线（S4 吸收后保持 getter 一致）。 */
   reloadManifest(): void {
     this._ctx.manifest = readManifest(this.root)
+  }
+
+  /** 获取当前正典书目元记录。 */
+  getBookRecord(): ReturnType<typeof readBookRecord> {
+    return readBookRecord(this.root)
+  }
+
+  /** 获取当前完整正典状态快照。 */
+  getCanonState(): CanonState {
+    return readCanonState(this.root)
+  }
+
+  /** 读取指定章节的经过校验的正文领域实体。 */
+  getProseChapter(chapterIndex: number): ProseChapterScan {
+    return readProseChapter(this.root, proseChapterPath(chapterIndex))
   }
 
   /**

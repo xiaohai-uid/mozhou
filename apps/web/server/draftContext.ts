@@ -1,11 +1,6 @@
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import {
-  proseChapterPath,
-  readBookRecord,
+  LocalDataPlane,
   readNarrativeSnapshot,
-  readProseChapter,
-  scanEntityCards,
 } from '@mozhou/data-plane'
 import { EmptyRecallError, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
 import { runCompileStep } from '@mozhou/pipeline'
@@ -32,18 +27,16 @@ const previewCodepointTokenizer: ExactTokenizer = {
   },
 }
 
-function recentStoryText(root: string, chapterIndex: number): string[] {
+function recentStoryText(plane: LocalDataPlane, chapterIndex: number): string[] {
   const first = Math.max(1, chapterIndex - MAX_RECENT_CHAPTERS + 1)
   const slices: string[] = []
   for (let index = first; index <= chapterIndex; index += 1) {
-    const relPath = proseChapterPath(index)
-    if (!existsSync(join(root, relPath))) continue
     try {
-      const body = readProseChapter(root, relPath).body.trim()
+      const body = plane.getProseChapter(index).body.trim()
       if (body.length === 0) continue
       slices.push(body.slice(-MAX_RECENT_CHARS_PER_CHAPTER))
     } catch {
-      // 单个损坏章不在这里被吞成“正典”；Compile/质量面会另行暴露结构错误。
+      // 单个损坏/未创建章不在这里被吞成“正典”；Compile/质量面会另行暴露结构错误。
     }
   }
   return slices
@@ -100,45 +93,50 @@ export async function buildDraftContext(input: {
   readonly chapterIndex: number
   readonly authorPrompt: string
 }): Promise<DraftContextResult> {
-  const book = readBookRecord(input.root)
-  const cards = scanEntityCards(input.root)
-  const snapshot = readNarrativeSnapshot(input.root)
-  const storyText = recentStoryText(input.root, input.chapterIndex)
-  const alwaysCards = cards.filter((card) => card.aiContext === 'always')
-
-  const structuralSections = [
-    {
-      section: 'book_identity',
-      content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
-    },
-  ]
-
+  const plane = LocalDataPlane.openOrRebuild(input.root)
   try {
-    const outcome = await runCompileStep(
-      { chapterIndex: input.chapterIndex, staleMarker: null },
+    const book = plane.book
+    const cards = plane.getEntityCards()
+    const snapshot = readNarrativeSnapshot(input.root)
+    const storyText = recentStoryText(plane, input.chapterIndex)
+    const alwaysCards = cards.filter((card) => card.aiContext === 'always')
+
+    const structuralSections = [
       {
-        bookRoot: input.root,
-        bookId: book.id,
-        // keyword / graph / embedding 的激活查询同时看作者指令与近期正文。
-        draftText: [input.authorPrompt, ...storyText].join('\n\n'),
-        cards,
-        snapshot,
-        scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
-        structuralSections,
-        storyText,
-        modelProfile: {
-          id: 'mozhou-preview-codepoint-budget-v1',
-          contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
-        },
-        tokenizer: previewCodepointTokenizer,
+        section: 'book_identity',
+        content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
       },
-    )
-    return { packet: outcome.packet, mode: 'compiled_receipt' }
-  } catch (error) {
-    if (!(error instanceof EmptyRecallError)) throw error
-    return {
-      packet: structuralFallback(book.title, input.chapterIndex, input.authorPrompt, storyText, alwaysCards),
-      mode: 'structural_fallback',
+    ]
+
+    try {
+      const outcome = await runCompileStep(
+        { chapterIndex: input.chapterIndex, staleMarker: null },
+        {
+          bookRoot: input.root,
+          bookId: book.id,
+          // keyword / graph / embedding 的激活查询同时看作者指令与近期正文。
+          draftText: [input.authorPrompt, ...storyText].join('\n\n'),
+          cards,
+          snapshot,
+          scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
+          structuralSections,
+          storyText,
+          modelProfile: {
+            id: 'mozhou-preview-codepoint-budget-v1',
+            contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
+          },
+          tokenizer: previewCodepointTokenizer,
+        },
+      )
+      return { packet: outcome.packet, mode: 'compiled_receipt' }
+    } catch (error) {
+      if (!(error instanceof EmptyRecallError)) throw error
+      return {
+        packet: structuralFallback(book.title, input.chapterIndex, input.authorPrompt, storyText, alwaysCards),
+        mode: 'structural_fallback',
+      }
     }
+  } finally {
+    plane.close()
   }
 }

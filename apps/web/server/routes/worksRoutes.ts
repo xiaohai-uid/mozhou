@@ -9,8 +9,6 @@ import {
   createBook,
   listImpactRecords,
   proseChapterPath,
-  readBookRecord,
-  readCanonState,
   readProseChapter,
   renderProseChapter,
   runTraversal,
@@ -146,7 +144,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
     const plane = LocalDataPlane.open(root)
     const overview = plane.getWorksOverview()
-    const canon = readCanonState(root)
+    const canon = plane.getCanonState()
 
     json(200, {
       ok: true,
@@ -271,8 +269,12 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     }
     const root = assertSafeBookRoot(rawRoot)
     try {
-      const book = readBookRecord(root)
-      json(200, { ok: true, root, bookId: book.id, title: book.title })
+      const plane = LocalDataPlane.openOrRebuild(root)
+      try {
+        json(200, { ok: true, root, bookId: plane.book.id, title: plane.book.title })
+      } finally {
+        plane.close()
+      }
     } catch (error) {
       json(404, { ok: false, error: 'not a valid book root: ' + (error as Error).message })
     }

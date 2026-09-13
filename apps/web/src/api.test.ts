@@ -6,7 +6,7 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -371,6 +371,8 @@ describe('T41 Story Brain 四读面 API 契约', () => {
     roots.push(dir)
     const created = await post(base, '/api/book', { title: '基底书', dir })
     const root = created.data.root as string
+    const dbPath = join(root, '.mozhou', 'runtime.sqlite')
+    rmSync(dbPath, { force: true }) // projection 可丢弃；Web 组合层必须按 ADR-0006 自动恢复
     const { status, data } = await post(base, '/api/book.state', { root })
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
@@ -384,6 +386,11 @@ describe('T41 Story Brain 四读面 API 契约', () => {
     expect(state.outlineNodes.map((node) => node.nodeType)).toEqual(['book', 'volume'])
     expect(Object.keys(state.trackingLines)).toHaveLength(5)
     expect(state.entityCards).toEqual([])
+
+    // 路由返回即应释放 LocalDataPlane 持有的 SQLite handle；否则 Windows 上数据库无法原子改名。
+    const movedDbPath = dbPath + '.route-lifecycle-check'
+    renameSync(dbPath, movedDbPath)
+    renameSync(movedDbPath, dbPath)
   })
 
   it('POST /api/story-brain.facts：canon=knows 授权可见；suspects/believes 安全通道；invalidated 直出', async () => {
@@ -779,6 +786,7 @@ describe('T44 中栏对话流 API 契约', () => {
     } finally {
       plane.close()
     }
+    rmSync(join(dir, '.mozhou', 'runtime.sqlite'), { force: true }) // draft 入口也必须恢复可丢弃投影
     process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
     try {
       const res = await fetch(base + '/api/draft.stream', {
@@ -853,11 +861,18 @@ describe('书架（本地书库）API 契约', () => {
     const parent = mkdtempSync(join(tmpdir(), 'mozhou-web-lib-'))
     roots.push(parent)
     const book = createBook({ dir: join(parent, '可开之书'), title: '可开之书' })
+    const dbPath = join(book.root, '.mozhou', 'runtime.sqlite')
+    rmSync(dbPath, { force: true }) // projection 可重建；打开书不应因派生库丢失而把有效书误报为 404
     const ok = await post(base, '/api/library.open', { root: book.root })
     expect(ok.status).toBe(200)
     expect(ok.data.ok).toBe(true)
     expect(ok.data.bookId).toBe(book.book.id)
     expect(ok.data.title).toBe('可开之书')
+
+    // library.open 只做一次读操作，不得把 SQLite handle 泄漏到请求生命周期之外。
+    const movedDbPath = dbPath + '.route-lifecycle-check'
+    renameSync(dbPath, movedDbPath)
+    renameSync(movedDbPath, dbPath)
 
     const bad = await post(base, '/api/library.open', { root: join(parent, '不存在') })
     expect(bad.status).toBe(404)

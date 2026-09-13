@@ -22,8 +22,8 @@ export {
   mergeQualityPolicies,
   qualityRuleSetDigest,
 } from './policy.js';
-export type { DraftIdentity } from './staleness.js';
-export { isQualityReviewCurrent } from './staleness.js';
+export type { ChapterQualityStatus, DraftIdentity } from './staleness.js';
+export { isQualityReviewCurrent, queryChapterQualityStatus } from './staleness.js';
 export {
   DETERMINISTIC_RULE_VERSION,
   PARA_001_ID,

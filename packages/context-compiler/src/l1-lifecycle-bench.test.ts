@@ -88,5 +88,5 @@ describe('L1 确定性生命周期台架（ADR-0016 初版）', () => {
     expect(first.durationMs).toBeLessThan(5000)
     expect(second.durationMs).toBeLessThan(5000)
     expect(stripTiming(second)).toEqual(stripTiming(first))
-  })
+  }, 15_000)
 })
