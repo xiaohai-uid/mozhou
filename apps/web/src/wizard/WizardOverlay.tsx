@@ -6,13 +6,13 @@
  *
  * 五步数据绑定（t73 既有读面，零新增后端能力）：
  *   1 建书    → /api/book（createBook 直出 root+bookId，真实落盘）；
- *   2 世界观  → 收集世界规则（进入后续 Author Intent 的输入面）；
- *   3 大纲    → /api/book.state 读 back OutlineNodeScan（real 读面绑定）；
- *   4 首章    → 收集开场画面/首章目标（T44 将把其送入首个 ChapterProductionSession）；
+ *   2 世界观  → 收集世界规则（随 outcome 返回；Author Intent 持久化在后续票接线）；
+ *   3 大纲    → 收集卷级承诺（随 outcome 返回；向导不在此处写入 Canon）；
+ *   4 首章    → 收集开场画面/首章目标（章节生产会话接入在后续票）；
  *   5 连写    → 收口回调（App 设 book → 常驻工作台）。
  *
  * 错误族（BookDirectoryNotEmptyError / CanonStructureError / StepGuardError 族 /
- * SessionNotResumableError）以 Ink Orbit 语义色内联呈现，不弹裸异常。
+ * SessionNotResumableError）以内联语义色呈现，不弹裸异常。
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { BookInfo } from '../shell/workbenchStorage'
@@ -31,7 +31,7 @@ export const WIZARD_STEPS = [
     key: 'world',
     label: '世界观',
     eyebrow: '写下这个世界绝不能违背的规则',
-    lead: '从一条硬规则开始。它会进入 Author Intent，成为后续生成不可越过的边界。',
+    lead: '从一条硬规则开始。此输入会随完成结果保留在工作台——进入 Author Intent 生成边界的持久化在后续票接线。',
     field: '世界规则',
     placeholder: '如：被潮汐钟遗忘的人会从所有书面记录中消失',
   },
@@ -39,7 +39,7 @@ export const WIZARD_STEPS = [
     key: 'outline',
     label: '大纲',
     eyebrow: '确定第一卷必须兑现的承诺',
-    lead: '只描述读者最终会看到什么，不需要提前写出每一章。此处已读取新书的大纲骨架。',
+    lead: '只描述读者最终会看到什么，不需要提前写出每一章。总纲与卷骨架将在写作过程中由管线逐步展开。',
     field: '卷级承诺',
     placeholder: '如：林岚必须找回一个全城都不记得的人',
   },
@@ -47,7 +47,7 @@ export const WIZARD_STEPS = [
     key: 'first-chapter',
     label: '首章',
     eyebrow: '选择第一章最晚从哪里切入',
-    lead: '墨舟会先提问，再创建首个 Chapter Production Session。',
+    lead: '完成向导后进入常驻工作台，由写作对话先提问、再开始首章生产。',
     field: '开场画面',
     placeholder: '如：一张没有乘客姓名的末班船票',
   },
@@ -213,7 +213,7 @@ export function WizardOverlay({
 
             {current === 'outline' && (
               <div className="mono muted" data-testid="wizard-outline-scan" style={{ margin: '12px 0 0' }}>
-                新书已就绪：总纲 + 第一卷骨架（OutlineNodeScan）——后续章节在写作过程中由管线逐步展开。
+                总纲与卷骨架将在写作过程中由管线逐步展开——向导不在此处写入 Canon。
               </div>
             )}
 

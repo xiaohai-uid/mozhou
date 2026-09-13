@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>08 · 辅助工具与隐性子系统</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{background:#04070b}
+  .viewframe{margin:26px 0;border-radius:16px;overflow:hidden;border:1px solid var(--ir-hairline)}
+  .vf-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--ir-hairline);
+    background:linear-gradient(180deg,rgba(12,23,30,.92),rgba(8,17,23,.94));position:relative;z-index:2;flex-wrap:wrap}
+  .vf-head h2{font:600 16px/1.3 var(--ir-serif)}
+  .vf-body{position:relative;padding:20px}
+  .vf-inner{position:relative;z-index:1}
+  /* modal demos */
+  .modal-demo{max-width:580px;margin:0 auto;border-radius:14px;overflow:hidden;border:1px solid var(--ir-hairline-strong)}
+  .md-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ir-hairline)}
+  .dice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px}
+  .dice{padding:14px;text-align:left;cursor:pointer}
+  .dice b{display:block;font:600 13px/1.4 var(--ir-sans);margin-bottom:4px}
+  .dice .res{font-family:var(--ir-serif);font-size:15px;color:var(--ir-gold-bright);margin-top:8px;min-height:22px}
+  /* reading slate editor */
+  .slate-editor{border-radius:12px;position:relative}
+  .slate-editor .bar{display:flex;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--ir-hairline);font-size:11px;color:var(--ir-faint)}
+  .slate-pad{padding:26px 30px;position:relative}
+  .slate-pad .prose{margin:0}
+  mark.sel{background:rgba(114,201,196,.22);color:inherit;border-radius:2px;padding:1px 0}
+  .bubble{position:absolute;top:118px;left:34%;display:flex;gap:2px;padding:5px;border-radius:10px;
+    background:rgba(10,20,27,.96);border:1px solid var(--ir-hairline-strong);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .bubble button{border:none;background:transparent;color:var(--ir-muted);font:500 11.5px/1 var(--ir-sans);
+    padding:6px 9px;border-radius:7px;cursor:pointer;white-space:nowrap}
+  .bubble button:hover{color:var(--ir-jade);background:var(--ir-jade-soft)}
+  .slash{position:absolute;left:33%;top:210px;width:230px;padding:6px;border-radius:10px;
+    background:rgba(10,20,27,.97);border:1px solid var(--ir-hairline-strong);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .slash div{display:flex;gap:8px;align-items:center;padding:7px 9px;border-radius:7px;font-size:12px;color:var(--ir-muted);cursor:pointer}
+  .slash div:hover,.slash div.hot{color:var(--ir-fg);background:rgba(114,201,196,.1)}
+  .slash .k{font:600 10px/1 var(--ir-mono);color:var(--ir-faint);width:64px}
+  .diff2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .diff2>div{border-radius:9px;padding:12px 14px;font-family:var(--ir-serif);font-size:13.5px;line-height:1.8}
+  /* canon graph */
+  .graph{position:relative;height:260px;border-radius:12px;border:1px solid var(--ir-hairline);overflow:hidden;
+    background:radial-gradient(60% 80% at 60% 40%,rgba(114,201,196,.06),transparent 60%),rgba(6,12,17,.8)}
+  .gnode{position:absolute;transform:translate(-50%,-50%);text-align:center;cursor:pointer}
+  .gnode .dot{width:34px;height:34px;border-radius:50%;margin:0 auto 5px;display:grid;place-items:center;
+    font:600 11px/1 var(--ir-serif);border:1px solid var(--ir-hairline-strong);background:rgba(16,32,41,.9)}
+  .gnode em{font-style:normal;font-size:10.5px;color:var(--ir-muted);white-space:nowrap}
+  .gnode.char .dot{border-color:rgba(214,179,106,.5);color:var(--ir-gold-bright)}
+  .gnode.sys .dot{border-color:rgba(114,201,196,.45);color:var(--ir-jade)}
+  .gedge{position:absolute;height:1px;transform-origin:0 0}
+</style>
+</head>
+<body>
+<div class="ir-scene library"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.7"></div>
+<nav class="proto-nav" style="position:relative;z-index:5">
+  <a href="index.html">总览</a><a href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a href="04-views-creation.html">创作</a><a href="05-views-inspector.html">检视</a><a href="06-views-resources.html">资源</a><a href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a href="09-mobile.html">Mobile</a>
+</nav>
+<main class="proto-body">
+  <header class="proto-head"><h1>辅助工具与隐性子系统</h1><span class="proto-sub">对应主规格 §23（辅助工具）/ §13·§24（code-present 域）——绝不把未挂载画成已上线</span></header>
+
+  <!-- 灵感工坊 -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">AUX · INSPIRATION</span><h2>灵感工坊（真可用 · 本地预设）</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span><span style="margin-left:auto" class="note">卡牌化抽取 · 保留现业务</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="modal-demo mat-scene-glass">
+        <div class="md-head"><b>本地灵感起名工坊与卡文骰子</b><span class="badge b-neutral">LOCAL PRESET</span></div>
+        <div class="dice-grid">
+          <button class="dice card-capability" onclick="this.querySelector('.res').textContent='· 沈听澜'"><b>角色龙套起名</b><span class="note">点按抽取</span><div class="res">· 沈听澜</div></button>
+          <button class="dice card-capability" onclick="this.querySelector('.res').textContent='· 听潮阁'"><b>宗门势力起名</b><span class="note">点按抽取</span><div class="res">· 听潮阁</div></button>
+          <button class="dice card-capability" onclick="this.querySelector('.res').textContent='· 逆潮针'"><b>法宝神兵起名</b><span class="note">点按抽取</span><div class="res">· 逆潮针</div></button>
+          <button class="dice card-capability" onclick="this.querySelector('.res').textContent='· 信物被调包'"><b>卡文突发事件</b><span class="note">点按抽取</span><div class="res">· 信物被调包</div></button>
+        </div>
+        <p class="note" style="padding:0 16px 14px;margin:0">数据源 = <span class="t-mono">shared/inspirationPresets</span> 本地随机预设，零 API、零 AI 生成。结果色沿用语义映射（人物金/势力玉/法宝暖/危机红）。桌面与移动共用同一预设库。</p>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 三个诚实不可用 -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">AUX · UNAVAILABLE ×3</span><h2>时光机 / 导出 / 合规（诚实不可用）</h2><span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="three" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+        <div class="modal-demo mat-scene-glass"><div class="md-head"><b>⏱→ 版本时光机与差异回滚</b></div>
+          <div class="unavailable" style="margin:14px"><b>「版本历史」尚未接入</b>
+            <span class="why">Technical Preview 不会展示虚构记录，也不会模拟成功操作。接入真实数据面后再开放此功能。</span></div></div>
+        <div class="modal-demo mat-scene-glass"><div class="md-head"><b>作品导出</b></div>
+          <div class="unavailable" style="margin:14px"><b>「导出」尚未接入</b>
+            <span class="why">同上固定文案。主口径导出 unavailable；export-suite 实验代码见下方「隐性子系统」，不得越位宣称上线。</span></div></div>
+        <div class="modal-demo mat-scene-glass"><div class="md-head"><b>平台敏感词与合规审查</b></div>
+          <div class="unavailable" style="margin:14px"><b>「合规审查」尚未接入</b>
+            <span class="why">同上固定文案。入口保留、状态诚实。</span></div></div>
+      </div>
+      <p class="note" style="margin-top:10px">设计变化：非阻断工具优先 Popover/Sheet（L6），destructive 确认才用 L7 Modal；emoji 图标全部替换为 18px/1.4px stroke 自有 SVG（页面 03 已示范）。</p>
+    </div></div>
+  </section>
+
+  <!-- Advanced Editor -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">LATENT · ADVANCED EDITOR（9 文件 code-present unmounted）</span><h2>Advanced Editor · Reading Slate 形态</h2>
+      <span class="badge b-exp">CODE-PRESENT / INTEGRATION PENDING</span><span style="margin-left:auto" class="note">沉浸 10% · 全产品最安静</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="slate-editor mat-reading-slate">
+        <div class="bar"><span>CH 12 · 暗潮 · r3</span><span class="badge b-stale" style="font-size:9px">EditorQualityTelemetry：4-gram 复读 1 · Tier1 0 · De-AI 82</span><span style="margin-left:auto">NovelEditorCanvas · 中文 2em 缩进 · 一键网文排版</span></div>
+        <div class="slate-pad">
+          <p class="prose">　　巡潮司的灯笼在雨幕里连成一线。<mark class="sel">林守常把手按进湿冷的缆绳</mark>，潮契在腕骨底下轻轻一跳。</p>
+          <div class="bubble" aria-label="FloatingBubbleMenu">
+            <button>感官扩写</button><button>去味·锐化</button><button>对白打磨</button><button>情节反转</button><button>…</button>
+          </div>
+          <div class="slash" aria-label="SlashCommandMenu">
+            <div class="hot"><span class="k">/scene</span>场景切分</div>
+            <div><span class="k">/character</span>正典角色卡</div>
+            <div><span class="k">/beat</span>剧情节拍</div>
+            <div><span class="k">/rewrite</span>AI 自动续写</div>
+            <div><span class="k">/deslop</span>即时去味</div>
+          </div>
+          <p class="prose" style="margin-top:150px">　　（后续段落……）</p>
+        </div>
+      </div>
+      <div class="diff2">
+        <div style="background:rgba(217,131,131,.08);border:1px solid rgba(217,131,131,.3)"><span class="kicker" style="color:var(--ir-danger)">REMOVED · 原始片段（删除线+符号 −）</span><br>− 潮水<del style="color:var(--ir-danger)">仿佛</del>在替他说话。</div>
+        <div style="background:rgba(120,199,157,.07);border:1px solid rgba(120,199,157,.3)"><span class="kicker" style="color:var(--ir-success)">ADDED / CHANGED · 采纳后重构（+ 符号+下划强调）</span><br>+ 潮水<b style="color:var(--ir-success);border-bottom:1px dotted var(--ir-success)">在他耳道里换了人声</b>。</div>
+      </div>
+      <p class="note" style="margin-top:10px">InlineDiffViewer 语言：结构（双栏/行块）+ 符号（−/+）+ 颜色三重编码，绝不仅靠颜色。选区/caret/IME 优先于装饰动画；Bubble/Slash 从触发点原位出现（Esc/放弃可退）。挂载前标注 INTEGRATION PENDING，不进主工作台伪装上线（主规格 §13）。</p>
+    </div></div>
+  </section>
+
+  <!-- Canon Graph -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">LATENT · CANON GRAPH</span><h2>Canon Graph · 正典关系拓扑</h2><span class="badge b-exp">EXPERIMENTAL · mock-bound</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="graph">
+        <i class="gedge" style="left:20%;top:30%;width:26%;transform:rotate(18deg);background:linear-gradient(90deg,rgba(214,179,106,.5),transparent)"></i>
+        <i class="gedge" style="left:46%;top:44%;width:22%;transform:rotate(-24deg);background:linear-gradient(90deg,rgba(114,201,196,.5),transparent)"></i>
+        <i class="gedge" style="left:24%;top:64%;width:24%;transform:rotate(-8deg);background:rgba(205,225,222,.18)"></i>
+        <div class="gnode char" style="left:18%;top:28%"><div class="dot">林</div><em>林守常</em></div>
+        <div class="gnode char" style="left:44%;top:44%"><div class="dot">罗</div><em>引潮罗盘</em></div>
+        <div class="gnode sys" style="left:68%;top:34%"><div class="dot">巡</div><em>巡潮司</em></div>
+        <div class="gnode char" style="left:24%;top:70%"><div class="dot">周</div><em>老船工</em></div>
+        <div class="gnode sys" style="left:60%;top:74%"><div class="dot">雾</div><em>雾灯码头</em></div>
+      </div>
+      <p class="note" style="margin-top:10px"><b style="color:var(--ir-fg)">事实边界（Surface Map §7.2）</b>：useCanonGraphData 现含固定 mock nodes/links——当前<b>不得</b>放进 Story Brain 当作「作品真实关系」；首次上线必须替换为数据面契约。视觉方向：低饱和关系拓扑 + 局部 Jade/Gold contract edges（金=作者确认的契约、玉=系统提议的 contract），节点=Character/Lore Card 微缩，避免星空乱线。位置：Story Brain 域的实验面板，带 EXPERIMENTAL 徽标。</p>
+    </div></div>
+  </section>
+
+  <!-- Genre Kits + Export Suite -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">LATENT · GENRE KITS / EXPORT SUITE</span><h2>题材套件市场 · 导出套件</h2><span class="badge b-exp">CODE-PRESENT / INTEGRATION PENDING</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="three" style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px">
+        <div>
+          <span class="kicker">GENRE KITS · Skill/Resource 市场的 Narrative Kit 子域（不另起商店视觉）</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+            <div class="card-capability" style="padding:14px"><span class="badge b-neutral">KIT</span><h4 style="margin:8px 0 4px;font-size:13.5px">东方异闻·都市</h4><p class="note">实体卡种 + 场景基线 + 禁忌词族</p><button class="btn btn-ghost btn-sm" disabled title="apply 持久化契约未接入">应用到当前作品</button></div>
+            <div class="card-capability" style="padding:14px"><span class="badge b-neutral">KIT</span><h4 style="margin:8px 0 4px;font-size:13.5px">潮汐航海志</h4><p class="note">海事词汇 · 潮汐节拍 · 灯塔意象库</p><button class="btn btn-ghost btn-sm" disabled>应用到当前作品</button></div>
+          </div>
+          <p class="note" style="margin-top:8px">现状：apply 为局部 UI 状态（genrePresets），不宣称「已写入当前书」；按钮保持禁用直至持久化契约接入。</p>
+        </div>
+        <div>
+          <span class="kicker">EXPORT SUITE · 格式能力诚实区分</span>
+          <div class="card-system" style="padding:12px 14px;margin-top:10px">
+            <div class="row-evidence"><span class="em">TXT</span><span>纯文本导出（清洗排版）</span><span class="badge b-jade" style="margin-left:auto;font-size:9px">真实能力</span></div>
+            <div class="row-evidence"><span class="em">DOC</span><span>DOC/DOCX-like HTML</span><span class="badge b-jade" style="font-size:9px;margin-left:auto">真实能力</span></div>
+            <div class="row-evidence"><span class="em">EPUB</span><span>EPUB 打包 / fallback→文本</span><span class="badge b-stale" style="font-size:9px;margin-left:auto">fallback 不得标「完整 EPUB 封装成功」</span></div>
+          </div>
+          <p class="note" style="margin-top:8px">PublicationExportModal 为 code-present unmounted；桌面「导出」主口径仍为 unavailable（见上）。接入时本表即导出能力档案。</p>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- mobile deltas note -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">LATENT · MOBILE DEAD SURFACES（审计发现）</span><h2>移动端未挂载组件的处置</h2><span class="badge b-exp">CODE_PRESENT_UNMOUNTED</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="card-system" style="padding:14px 16px">
+        <div class="row-evidence"><span class="em">GoalProgressWidget</span><span>今日码字进度+连更——完整实现、零 importer</span><span class="badge b-stale" style="margin-left:auto;font-size:9px">保留设计位（09 页 WorkbenchHub），接线需真实数据源</span></div>
+        <div class="row-evidence"><span class="em">FloatingInspirationDrawer</span><span>setTimeout(600) 模拟回复 + 一键插入正文</span><span class="badge b-exp" style="font-size:9px;margin-left:auto">含 mock 对话——禁入产品，替换为灵感骰子/真实链路</span></div>
+        <div class="row-evidence"><span class="em">InspectorPlaceholder</span><span>旧检视占位组件（已无引用）</span><span class="badge b-neutral" style="font-size:9px;margin-left:auto">实现阶段可清</span></div>
+        <div class="row-evidence"><span class="em">MoZhouApiClient SDK</span><span>整包客户端 SDK 仅测试消费</span><span class="badge b-neutral" style="font-size:9px;margin-left:auto">实现阶段决策去留</span></div>
+      </div>
+    </div></div>
+  </section>
+
+</main>
+</body>
+</html>

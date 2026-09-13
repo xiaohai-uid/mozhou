@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export interface SlashCommandMenuProps {
   position: { top: number; left: number } | null;
@@ -6,49 +6,68 @@ export interface SlashCommandMenuProps {
   onClose: () => void;
 }
 
-export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
-  position,
-  onSelectCommand,
-}) => {
-  if (!position) return null;
+const COMMANDS = [
+  { id: 'scene', code: 'SC', label: '场景切分 (Scene Break)', desc: '插入独立时空与POV视点标记' },
+  { id: 'character', code: 'CC', label: '正典角色卡 (Character)', desc: '引用或创建世界观人物' },
+  { id: 'beat', code: 'PB', label: '剧情节拍 (Plot Beat)', desc: '插入本章核心推进冲突' },
+  { id: 'rewrite', code: 'AC', label: 'AI 自动续写 (Auto Complete)', desc: '需 draft provider（Gate 3）' },
+  { id: 'deslop', code: 'DS', label: '即时去味 (De-Slop Polish)', desc: '需正文编辑契约（后续票）' },
+] as const;
 
-  const commands = [
-    { id: 'scene', label: '场景切分 (Scene Break)', icon: '🎬', desc: '插入独立时空与POV视点标记' },
-    { id: 'character', label: '正典角色卡 (Character)', icon: '👤', desc: '引用或创建世界观人物' },
-    { id: 'beat', label: '剧情节拍 (Plot Beat)', icon: '🎯', desc: '插入本章核心推进冲突' },
-    { id: 'rewrite', label: 'AI 自动续写 (Auto Complete)', icon: '✨', desc: '根据前情与大纲流式生成' },
-    { id: 'deslop', label: '即时去味 (De-Slop Polish)', icon: '🔥', desc: '净化段落空洞修辞' },
-  ];
+/** Slash 快捷指令菜单（Ink Realm · Jade 系 AI 语义 · CSS hover · Escape/外点关闭）。 */
+export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({ position, onSelectCommand, onClose }) => {
+  useEffect(() => {
+    if (position === null) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[role="menu"]') === null) onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [position, onClose])
+
+  if (position === null) return null;
 
   return (
     <div
-      className="fixed z-50 bg-zinc-900 border border-zinc-700/80 rounded-xl shadow-2xl p-1.5 backdrop-blur-xl w-64 animate-in fade-in zoom-in-95 duration-100"
+      className="mat-ink-glass"
+      role="menu"
       style={{
-        top: `${position.top + 24}px`,
-        left: `${Math.min(window.innerWidth - 270, position.left)}px`,
+        position: 'fixed',
+        zIndex: 50,
+        width: 264,
+        padding: 6,
+        top: `${position.top}px`,
+        left: `${Math.min(window.innerWidth - 280, position.left)}px`,
+        boxShadow: '0 14px 34px rgba(0,0,0,.45)',
       }}
     >
-      <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-        快捷创作指令 (Slash Commands)
+      <div className="kicker" style={{ padding: '4px 8px', fontSize: 9.5 }}>
+        SLASH COMMANDS · Esc 收起
       </div>
-      <div className="space-y-0.5 mt-1">
-        {commands.map((cmd) => (
-          <button
-            key={cmd.id}
-            type="button"
-            onClick={() => onSelectCommand(cmd.id)}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left hover:bg-indigo-600/80 hover:text-white text-zinc-200 transition-colors group"
-          >
-            <span className="text-sm">{cmd.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{cmd.label}</div>
-              <div className="text-[10px] text-zinc-400 group-hover:text-indigo-200 truncate">
-                {cmd.desc}
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+      {COMMANDS.map((cmd) => (
+        <button
+          key={cmd.id}
+          type="button"
+          role="menuitem"
+          className="ir-menu-item"
+          onClick={() => onSelectCommand(cmd.id)}
+        >
+          <span className="ir-menu-code">{cmd.code}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="ir-menu-label">{cmd.label}</span>
+            <span className="ir-menu-desc">{cmd.desc}</span>
+          </span>
+        </button>
+      ))}
     </div>
   );
 };
+

@@ -12,6 +12,7 @@ export function MobileTabBar({ activeHub, onSelectHub }: MobileTabBarProps): JSX
     <nav className="mobile-tabbar" aria-label="移动端核心导航">
       <button
         type="button"
+        data-hub="workbench"
         className={`mobile-tabbar-item ${activeHub === 'workbench' ? 'active' : ''}`}
         onClick={() => onSelectHub('workbench')}
       >
@@ -21,6 +22,7 @@ export function MobileTabBar({ activeHub, onSelectHub }: MobileTabBarProps): JSX
 
       <button
         type="button"
+        data-hub="inspector"
         className={`mobile-tabbar-item ${activeHub === 'inspector' ? 'active' : ''}`}
         onClick={() => onSelectHub('inspector')}
       >
@@ -30,6 +32,7 @@ export function MobileTabBar({ activeHub, onSelectHub }: MobileTabBarProps): JSX
 
       <button
         type="button"
+        data-hub="works"
         className={`mobile-tabbar-item ${activeHub === 'works' ? 'active' : ''}`}
         onClick={() => onSelectHub('works')}
       >
@@ -39,6 +42,7 @@ export function MobileTabBar({ activeHub, onSelectHub }: MobileTabBarProps): JSX
 
       <button
         type="button"
+        data-hub="resources"
         className={`mobile-tabbar-item ${activeHub === 'resources' ? 'active' : ''}`}
         onClick={() => onSelectHub('resources')}
       >
@@ -48,6 +52,8 @@ export function MobileTabBar({ activeHub, onSelectHub }: MobileTabBarProps): JSX
 
       <button
         type="button"
+        data-hub="system"
+        data-testid="tab-system"
         className={`mobile-tabbar-item ${activeHub === 'system' ? 'active' : ''}`}
         onClick={() => onSelectHub('system')}
       >

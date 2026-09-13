@@ -128,24 +128,27 @@ exports[`CloudSyncView（云同步与备份） > 状态监控与存储指标渲�
             <span
               class="mono muted"
             >
-              单文件导出 · 便携迁移
+              规划能力 · 未上线
             </span>
           </div>
-          <p
-            class="muted"
-            style="margin: 0px; font-size: 11px;"
-          >
-            为当前作品生成包含全量正典文件与元数据指纹的完整离线快照，方便备份至外部移动硬盘或个人私有云盘。
-          </p>
           <div
-            class="actions"
+            class="ir-unavailable"
+            data-testid="sync-backup-unavailable"
             style="margin-top: 10px;"
           >
-            <button
-              class="btn-primary"
+            <b
+              style="color: var(--warning);"
             >
-              创建作品快照备份
-            </button>
+              快照备份 · 尚未提供
+            </b>
+            <br />
+            Technical Preview 尚未提供可验证的备份归档，因此这里不提供任何备份操作——不会出现「创建备份」按钮，也不会创建任何文件。
+            <br />
+            <span
+              style="color: var(--text-faint); font-size: 11px;"
+            >
+              过渡方案：正文为透明明文 Markdown，可直接复制作品目录完成外部备份（见下方隐私与安全规范）。
+            </span>
           </div>
         </div>
       </div>

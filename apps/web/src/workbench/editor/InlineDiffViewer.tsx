@@ -8,6 +8,7 @@ export interface InlineDiffViewerProps {
   actionLabel?: string;
 }
 
+/** 双栏 Inline Diff（Ink Realm · 三重编码：结构 + −/+ 符号 + 语义色；采纳=Gold 作者主权）。 */
 export const InlineDiffViewer: React.FC<InlineDiffViewerProps> = ({
   originalText,
   proposedText,
@@ -16,47 +17,89 @@ export const InlineDiffViewer: React.FC<InlineDiffViewerProps> = ({
   actionLabel = 'AI 调优结果',
 }) => {
   return (
-    <div className="bg-zinc-900 border border-zinc-700/80 rounded-xl p-4 shadow-2xl space-y-3 animate-in fade-in zoom-in-95 duration-150">
-      <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-          <span className="text-xs font-semibold text-zinc-200">{actionLabel} 对比</span>
+    <div
+      className="mat-ink-glass"
+      style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}
+      data-testid="inline-diff-viewer"
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: 8,
+          borderBottom: '1px solid var(--hairline)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="badge b-jade">AI CANDIDATE</span>
+          <span className="kicker">{actionLabel} · 对比</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onReject}
-            className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700/80 rounded-lg transition-colors"
-          >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button" onClick={onReject} className="btn btn-sm">
             放弃 (Esc)
           </button>
-          <button
-            type="button"
-            onClick={onAccept}
-            className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-md transition-colors"
-          >
+          <button type="button" onClick={onAccept} className="btn btn-author btn-sm">
             采纳替换 (Enter)
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-serif">
-        {/* Original */}
-        <div className="p-3 bg-red-950/20 border border-red-900/40 rounded-lg space-y-1">
-          <div className="text-[11px] font-sans font-medium text-red-400">原始片段</div>
-          <div className="text-red-200/90 leading-relaxed whitespace-pre-wrap line-through opacity-80">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 9,
+            background: 'rgba(217, 131, 131, 0.07)',
+            border: '1px solid rgba(217, 131, 131, 0.3)',
+          }}
+        >
+          <div className="kicker" style={{ color: 'var(--danger)', marginBottom: 6 }}>
+            − REMOVED · 原始片段
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--serif)',
+              fontSize: 13.5,
+              lineHeight: 1.8,
+              color: 'var(--danger)',
+              textDecoration: 'line-through',
+              opacity: 0.85,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
             {originalText}
           </div>
         </div>
 
-        {/* Proposed */}
-        <div className="p-3 bg-emerald-950/20 border border-emerald-900/40 rounded-lg space-y-1">
-          <div className="text-[11px] font-sans font-medium text-emerald-400">采纳后重构</div>
-          <div className="text-emerald-200 leading-relaxed whitespace-pre-wrap">
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 9,
+            background: 'rgba(120, 199, 157, 0.06)',
+            border: '1px solid rgba(120, 199, 157, 0.3)',
+          }}
+        >
+          <div className="kicker" style={{ color: 'var(--success)', marginBottom: 6 }}>
+            + PROPOSED · 采纳后重构
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--serif)',
+              fontSize: 13.5,
+              lineHeight: 1.8,
+              color: 'var(--foreground)',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
             {proposedText}
           </div>
         </div>
       </div>
+
+      <p className="note" style={{ margin: 0 }}>
+        采纳 = Accepted（作者主权，Gold）；durable 持久化以 Chapter Commit 为准——Accepted ≠ Committed。
+      </p>
     </div>
   );
 };

@@ -28,76 +28,93 @@ exports[`CapabilitySquareView（技能广场） > 分组/条目渲染（label/de
     >
       <h2>
         创作
+         · 
+        2
+         项
       </h2>
       <div
-        class="card-shell"
+        class="cap-wall"
       >
-        <div
-          class="card"
+        <button
+          aria-pressed="false"
+          class="card-capability cap"
+          data-capability-id="workbench"
+          data-testid="capability-square-card"
+          type="button"
         >
-          <div
-            class="card-title"
+          <span
+            class="cap-statusbar"
           >
-            <b>
-              工作台
-            </b>
             <span
               class="cap-badge native"
               data-testid="capability-square-badge"
             >
               原生可用
             </span>
-          </div>
-          <p
-            class="muted"
-            style="margin: 0px; font-size: 11px; line-height: 1.8;"
+            <span
+              class="cap-status-code"
+            >
+              native
+            </span>
+          </span>
+          <b
+            class="cap-label"
+          >
+            工作台
+          </b>
+          <span
+            class="cap-desc"
           >
             建书、首章与工作台
-          </p>
-          <p
-            class="mono muted"
-            style="margin: 6px 0px 0px;"
+          </span>
+          <span
+            class="cap-evidence"
           >
             workbench
              · 
             已接入（T40–T44）
-          </p>
-        </div>
-      </div>
-      <div
-        class="card-shell"
-      >
-        <div
-          class="card"
+          </span>
+        </button>
+        <button
+          aria-pressed="false"
+          class="card-capability cap"
+          data-capability-id="dialogue"
+          data-testid="capability-square-card"
+          type="button"
         >
-          <div
-            class="card-title"
+          <span
+            class="cap-statusbar"
           >
-            <b>
-              写作对话
-            </b>
             <span
-              class="cap-badge pending"
+              class="cap-badge pending st-provider"
               data-testid="capability-square-badge"
             >
               需要模型服务
             </span>
-          </div>
-          <p
-            class="muted"
-            style="margin: 0px; font-size: 11px; line-height: 1.8;"
+            <span
+              class="cap-status-code"
+            >
+              provider_required
+            </span>
+          </span>
+          <b
+            class="cap-label"
+          >
+            写作对话
+          </b>
+          <span
+            class="cap-desc"
           >
             中栏写作对话与草稿流式生成
-          </p>
-          <p
-            class="mono muted"
-            style="margin: 6px 0px 0px;"
+          </span>
+          <span
+            class="cap-evidence"
           >
             dialogue
              · 
             provider 未配显式不可用（Gate 3）
-          </p>
-        </div>
+          </span>
+        </button>
       </div>
     </section>
     <section
@@ -106,41 +123,53 @@ exports[`CapabilitySquareView（技能广场） > 分组/条目渲染（label/de
     >
       <h2>
         资源
+         · 
+        1
+         项
       </h2>
       <div
-        class="card-shell"
+        class="cap-wall"
       >
-        <div
-          class="card"
+        <button
+          aria-pressed="false"
+          class="card-capability cap"
+          data-capability-id="rank-scan"
+          data-testid="capability-square-card"
+          type="button"
         >
-          <div
-            class="card-title"
+          <span
+            class="cap-statusbar"
           >
-            <b>
-              网文扫榜
-            </b>
             <span
-              class="cap-badge pending"
+              class="cap-badge pending st-external"
               data-testid="capability-square-badge"
             >
               需要外部数据源
             </span>
-          </div>
-          <p
-            class="muted"
-            style="margin: 0px; font-size: 11px; line-height: 1.8;"
+            <span
+              class="cap-status-code"
+            >
+              external_source_required
+            </span>
+          </span>
+          <b
+            class="cap-label"
           >
             网文扫榜
-          </p>
-          <p
-            class="mono muted"
-            style="margin: 6px 0px 0px;"
+          </b>
+          <span
+            class="cap-desc"
+          >
+            网文扫榜
+          </span>
+          <span
+            class="cap-evidence"
           >
             rank-scan
              · 
             外部榜单源未接入；页面为显式占位
-          </p>
-        </div>
+          </span>
+        </button>
       </div>
     </section>
   </div>

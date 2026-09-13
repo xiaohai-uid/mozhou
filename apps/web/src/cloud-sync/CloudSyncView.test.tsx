@@ -6,9 +6,8 @@
  * - 隐私声明卡片展示。
  */
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CloudSyncResponse, BackupExportResponse } from '../../server/api'
+import type { CloudSyncResponse } from '../../server/api'
 import { okJson } from '../test/http'
 import { CloudSyncView } from './CloudSyncView'
 
@@ -28,15 +27,6 @@ const MOCK_SYNC: CloudSyncResponse = {
   },
 }
 
-const MOCK_BACKUP: BackupExportResponse = {
-  ok: true,
-  snapshotId: 'snap_test_01',
-  bookTitle: '测试之书',
-  exportedAt: '2026-08-31T12:00:00.000Z',
-  fileCount: 15,
-  manifestDigest: 'sha256_mock_digest',
-}
-
 describe('CloudSyncView（云同步与备份）', () => {
   it('状态监控与存储指标渲染；契约快照', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_SYNC)))
@@ -54,27 +44,24 @@ describe('CloudSyncView（云同步与备份）', () => {
     expect(view).toMatchSnapshot()
   })
 
-  it('创建快照备份交互', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((path: string) => {
-        if (path === '/api/cloud-sync') return okJson(MOCK_SYNC)
-        if (path === '/api/cloud-sync.backup') return okJson(MOCK_BACKUP)
-        return okJson({ ok: false })
-      }),
-    )
-
+  it('快照备份：真实归档能力未上线——不提供任何可执行备份动作，只呈现诚实 unavailable', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/cloud-sync') return Promise.resolve(okJson(MOCK_SYNC))
+      return Promise.resolve({ ok: false, status: 501, json: async () => ({ ok: false, code: 'BACKUP_NOT_IMPLEMENTED', error: '未创建任何文件' }) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
     render(<CloudSyncView root="C:/tmp/book" />)
     await waitFor(() => {
       expect(screen.getByTestId('sync-backup-section')).toBeInTheDocument()
     })
 
-    const btn = screen.getByRole('button', { name: '创建作品快照备份' })
-    await userEvent.click(btn)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('sync-backup-result')).toBeInTheDocument()
-      expect(screen.getByTestId('sync-backup-result').textContent).toContain('snap_test_01')
-    })
+    // 不存在可执行的备份按钮（Truthfulness：未实现能力不得包装成操作）
+    expect(screen.queryByRole('button', { name: /创建作品快照备份/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /打包快照中/ })).not.toBeInTheDocument()
+    // 显式 unavailable 卡：说明不可用与真实原因
+    expect(screen.getByTestId('sync-backup-unavailable').textContent).toContain('尚未提供')
+    expect(screen.getByTestId('sync-backup-unavailable').textContent).toContain('不会出现「创建备份」按钮')
+    // 不应发起备份请求
+    expect(fetchMock.mock.calls.some(([path]) => path === '/api/cloud-sync.backup')).toBe(false)
   })
 })

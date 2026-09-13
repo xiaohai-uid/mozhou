@@ -25,12 +25,30 @@ describe('PipelineStrip', () => {
     expect(screen.getByText('提交')).toBeInTheDocument()
   })
 
-  it('当前阶段高亮 active，之前阶段标 done', () => {
+  it('选中阶段高亮 active；无证据时不得伪造 done（ADR-0028 六态真实绑定）', () => {
     render(<PipelineStrip activeStage={3} onSelect={() => {}} />)
     expect(step('review').className).toContain('active')
-    expect(step('prepare').className).toContain('done')
+    // 无证据（未传 stageStates）的阶段一律不标记——「选中之前自动 done」已废除
+    expect(step('prepare').className).not.toContain('done')
     expect(step('commit').className).not.toContain('done')
     expect(step('review')).toHaveAttribute('aria-current', 'step')
+  })
+
+  it('stageStates 覆盖真实证据态；选中与 unavailable 正交', () => {
+    render(
+      <PipelineStrip
+        activeStage={3}
+        onSelect={() => {}}
+        stageStates={{ prepare: 'done', compile: 'done', review: 'blocked', commit: 'unavailable' }}
+      />,
+    )
+    expect(step('prepare').className).toContain('done')
+    expect(step('compile').className).toContain('done')
+    expect(step('review').className).toContain('blocked')
+    // 选中的 blocked 阶段同时表达焦点
+    expect(step('review').className).toContain('active')
+    expect(step('commit').className).toContain('unavailable')
+    expect(step('draft').className).not.toContain('done')
   })
 
   it('点击阶段回调其索引（牵引背景墨迹聚焦由 App 换算）', async () => {

@@ -14,6 +14,8 @@ export interface QualitySummary {
   readonly draftRevision?: number
   readonly draftContentHash?: string
   readonly current?: boolean
+  /** 报告与当前正文哈希是否失配（stale）。仅在有报告时有意义。 */
+  readonly stale?: boolean
   readonly reworkCount?: number
   readonly semanticReviewer?: 'unavailable' | 'attached'
   readonly blockingFailures?: readonly EvaluationView[]
@@ -26,6 +28,27 @@ interface EvaluationView {
   readonly verdict: string
   readonly severity: 'blocking' | 'advisory'
   readonly evidence: readonly { readonly ruleId: string; readonly note: string; readonly excerpt?: string }[]
+}
+
+/** GET 形状的初载读面（POST /api/chapter.quality，与 ReviewResponse 不同构）。
+ *  契约修订 2026-09：面板按 {status, report, current} 三态消费——no_review
+ *  不得伪装 stale；current 直接由落盘报告渲染完整 verdict/锚定/失败清单。 */
+interface ChapterQualityStatusResponse {
+  readonly ok: boolean
+  readonly status: 'no_review' | 'current' | 'stale'
+  readonly report: {
+    readonly reportId: string
+    readonly verdict: 'pass' | 'blocking_fail' | 'refused'
+    readonly anchor: { readonly draftRevision: number; readonly draftContentHash: string }
+    readonly evaluations: readonly {
+      readonly ruleId: string
+      readonly ruleVersion: string
+      readonly verdict: string
+      readonly severity: 'blocking' | 'advisory'
+      readonly evidence: readonly { readonly ruleId: string; readonly note: string; readonly excerpt?: string }[]
+    }[]
+  } | null
+  readonly current: boolean
 }
 
 export interface ReviewResponse extends QualitySummary {
@@ -60,6 +83,27 @@ const VERDICT_CLASS: Record<string, string> = {
   refused: 'verdict refused',
 }
 
+/** 落盘报告（QualityReviewReport 子集）→ 面板摘要视图。
+ *  reworkCount 仅由 review/rework 响应提供（报告本体不含）——初载不显示该行。 */
+function reportToSummary(report: ChapterQualityStatusResponse['report'], current: boolean): QualitySummary {
+  if (report === null) {
+    return { ok: true, hasReport: false, current: true }
+  }
+  const evaluations = report.evaluations
+  return {
+    ok: true,
+    hasReport: true,
+    verdict: report.verdict,
+    reportId: report.reportId,
+    draftRevision: report.anchor.draftRevision,
+    draftContentHash: report.anchor.draftContentHash,
+    current,
+    stale: !current,
+    blockingFailures: evaluations.filter((evaluation) => evaluation.severity === 'blocking'),
+    advisories: evaluations.filter((evaluation) => evaluation.severity === 'advisory'),
+  }
+}
+
 export function QualityPanel({ root, chapterIndex }: { root: string; chapterIndex: number }) {
   const [summary, setSummary] = useState<QualitySummary | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +114,10 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const refresh = useCallback(async () => {
     setError(null)
     try {
-      setSummary(await post<QualitySummary>('/api/chapter.quality', { root, chapterIndex }))
+      const status = await post<ChapterQualityStatusResponse>('/api/chapter.quality', { root, chapterIndex })
+      setSummary(status.status === 'no_review'
+        ? { ok: true, hasReport: false, current: true }
+        : reportToSummary(status.report, status.current))
     } catch (cause) {
       setError((cause as Error).message)
     }
@@ -137,10 +184,10 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
 
         {verdict === undefined && (
           <p className="muted" style={{ margin: 0, fontSize: 11 }}>
-            {summary?.hasReport === false ? '（尚无报告）' : '—'}
+            {summary?.hasReport === false ? '本章尚未审查——运行文学审查后此处呈现报告。' : '—'}
           </p>
         )}
-        {summary?.current === false && (
+        {summary?.stale === true && (
           <p className="mono muted" style={{ margin: '6px 0 0' }}>
             报告已 stale——正文在审查后变化
           </p>
@@ -150,9 +197,9 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
             Exact draft: revision {summary.draftRevision} · hash {hashShort}…
           </p>
         )}
-        {summary?.hasReport !== false && (
+        {summary?.reworkCount !== undefined && (
           <p className="mono muted" style={{ margin: '6px 0 0' }}>
-            Rework attempt {Math.min(reworkCount, 2)}/2
+            Rework attempt {Math.min(summary.reworkCount, 2)}/2
           </p>
         )}
 

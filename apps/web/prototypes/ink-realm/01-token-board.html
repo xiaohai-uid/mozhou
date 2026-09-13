@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 · Token Board — 墨境设计系统</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{background:#04070b}
+  .sec{margin:34px 0}
+  .sec h2{font:600 18px/1.4 var(--ir-serif);margin-bottom:4px}
+  .sec .lead{color:var(--ir-faint);font-size:12.5px;margin-bottom:14px}
+  .tok-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .tok{border-radius:10px;overflow:hidden;border:1px solid var(--ir-hairline)}
+  .tok .sw{height:58px}
+  .tok .tx{padding:8px 10px;background:var(--ir-ink-deep)}
+  .tok .tx b{display:block;font:600 12px/1.3 var(--ir-sans);color:var(--ir-fg)}
+  .tok .tx span{font:400 10.5px/1.5 var(--ir-mono);color:var(--ir-faint)}
+  .mat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .mat-demo{padding:18px;min-height:120px;display:flex;flex-direction:column;gap:8px;justify-content:flex-end}
+  .mat-demo b{font:600 13px/1 var(--ir-sans)}
+  .mat-demo span{font-size:11.5px;color:var(--ir-muted)}
+  .demo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .badge-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .stagebar{display:flex;gap:6px;flex-wrap:wrap;padding:10px;border:1px solid var(--ir-hairline);border-radius:10px;background:var(--ir-ink-deep)}
+</style>
+</head>
+<body>
+<div class="ir-scene city-night" style="opacity:.5"></div>
+<div class="ir-atmosphere"></div>
+<nav class="proto-nav" style="padding-left:clamp(16px,4vw,56px);padding-right:clamp(16px,4vw,56px)">
+  <a href="index.html">总览</a><a class="cur" href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a href="04-views-creation.html">创作</a><a href="05-views-inspector.html">检视</a><a href="06-views-resources.html">资源</a><a href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a href="09-mobile.html">Mobile</a>
+</nav>
+<main class="proto-body">
+
+  <header class="proto-head"><h1>Token Board</h1><span class="proto-sub">墨境设计系统 · 色彩即产品语义 · 对应主规格 §5–§9 / §26–§30</span></header>
+
+  <!-- 2.1 -->
+  <section class="sec">
+    <h2>2.1 基底与文字</h2>
+    <p class="lead">冷青墨系取代紫黑系；世界缝隙由 Scene 透出。</p>
+    <div class="tok-grid">
+      <div class="tok"><div class="sw" style="background:#05090D"></div><div class="tx"><b>Canvas Void</b><span>#05090D</span></div></div>
+      <div class="tok"><div class="sw" style="background:#081117"></div><div class="tx"><b>Ink Deep</b><span>#081117</span></div></div>
+      <div class="tok"><div class="sw" style="background:#0C171E"></div><div class="tx"><b>Surface 01</b><span>#0C171E</span></div></div>
+      <div class="tok"><div class="sw" style="background:#102029"></div><div class="tx"><b>Surface 02</b><span>#102029</span></div></div>
+      <div class="tok"><div class="sw" style="background:#152832"></div><div class="tx"><b>Surface 03</b><span>#152832</span></div></div>
+      <div class="tok"><div class="sw" style="background:#EDF1ED"></div><div class="tx"><b>Foreground</b><span>#EDF1ED</span></div></div>
+      <div class="tok"><div class="sw" style="background:#A2ADA9"></div><div class="tx"><b>Muted</b><span>#A2ADA9</span></div></div>
+      <div class="tok"><div class="sw" style="background:#687671"></div><div class="tx"><b>Faint</b><span>#687671</span></div></div>
+    </div>
+  </section>
+
+  <!-- 2.2 -->
+  <section class="sec">
+    <h2>2.2 语义色 — 颜色即产品语义</h2>
+    <p class="lead">Gold=作者主权 · Jade=AI/系统 · Green=verified · Warning=advisory/stale · Red=blocking。紫色仅存 experimental。</p>
+    <div class="tok-grid">
+      <div class="tok"><div class="sw" style="background:#D6B36A"></div><div class="tx"><b>Imperial Gold</b><span>#D6B36A · 作者决策</span></div></div>
+      <div class="tok"><div class="sw" style="background:#F0D18A"></div><div class="tx"><b>Gold Bright</b><span>#F0D18A · 高优作者行动</span></div></div>
+      <div class="tok"><div class="sw" style="background:#72C9C4"></div><div class="tx"><b>Jade Cyan</b><span>#72C9C4 · AI / 系统</span></div></div>
+      <div class="tok"><div class="sw" style="background:#78C79D"></div><div class="tx"><b>Success</b><span>#78C79D · verified</span></div></div>
+      <div class="tok"><div class="sw" style="background:#D3A765"></div><div class="tx"><b>Warning</b><span>#D3A765 · stale</span></div></div>
+      <div class="tok"><div class="sw" style="background:#D98383"></div><div class="tx"><b>Danger</b><span>#D98383 · blocking</span></div></div>
+      <div class="tok"><div class="sw" style="background:rgba(150,120,255,.5)"></div><div class="tx"><b>Violet（遗留）</b><span>仅 experimental</span></div></div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="sec">
+    <h2>3. Material System 四材质</h2>
+    <p class="lead">blur 只用于固定/悬浮层；Reading Slate 是全产品最安静的表面；Metal Rim 只给五类关键对象。</p>
+    <div class="mat-row">
+      <div class="mat-demo mat-scene-glass"><b>Scene Glass</b><span>Top HUD · 左导航 · 轻量 Sheet — 透出世界 + blur(14px) + 折射高光</span></div>
+      <div class="mat-demo mat-ink-glass"><b>Ink Glass</b><span>Inspector · 章节轨 · 辅助工具 — 更黑更稳 blur(6px)</span></div>
+      <div class="mat-demo mat-reading-slate"><b>Reading Slate</b><span>正文编辑 · 长篇阅读 · 重要 diff — 近实心 98.5%</span>
+        <p class="prose" style="font-size:14px;max-width:none;text-indent:2em;margin:4px 0 0">　　潮声在礁石背后碎成白沫，他数着第七次涨落。</p></div>
+      <div class="mat-demo mat-metal-rim"><b>Metal Rim / Double Bezel</b><span>当前章节 · 关键 Skill · Quality 摘要 · 当前作品 · 选中卡</span></div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="sec">
+    <h2>5. Typography 三轨</h2>
+    <p class="lead">UI=系统无衬线 · Prose=宋体系 · Evidence=Mono。正文 17px / lh 1.95 / measure≈60–75 字 / 2em 段缩进。</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+      <div class="card-system" style="padding:16px"><span class="kicker">UI / OPERATIONS — SANS</span>
+        <p style="margin:8px 0 0;font-size:13px">准备 装配 草稿 审查 · 提取 连续性 提案 提交 · 12 · 暗潮 · 刷新账本</p></div>
+      <div class="card-system" style="padding:16px"><span class="kicker">PROSE — SERIF</span>
+        <p class="t-serif" style="margin:8px 0 0;font-size:16px">《暗潮》第十二章 · 潮声在礁石背后碎成白沫</p></div>
+      <div class="card-system" style="padding:16px"><span class="kicker">EVIDENCE — MONO</span>
+        <p class="t-mono" style="margin:8px 0 0;font-size:12px">r3 · 9f2c1a77d0e4… · receipt 4a19 · 1,842 tok · traversal trv_8c2</p></div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="sec">
+    <h2>7. Card Taxonomy 五类卡</h2>
+    <p class="lead">不许一个 .card 通吃；每类有自己的密度与材质强度。</p>
+    <div class="demo-cards">
+      <div class="card-narrative" style="padding:16px"><span class="badge b-neutral">NARRATIVE</span>
+        <h3 class="t-serif" style="margin:8px 0 2px;font-size:16px">《潮汐之上》</h3>
+        <p class="note t-mono">128,400 字 · 32 章 · 29 定稿 · 3 草稿</p></div>
+      <div class="card-character" style="padding:14px"><span class="badge b-jade">CHARACTER</span>
+        <h3 class="t-serif" style="margin:8px 0 2px;font-size:15px">林守常</h3>
+        <p class="note">char:lin-shouchang · 听潮者 · 概念:潮契</p></div>
+      <div class="card-system" style="padding:14px"><span class="badge b-pass">SYSTEM · QUALITY</span>
+        <p class="t-mono" style="margin:8px 0 0">PASS · r3 · 9f2c1a77… · current</p></div>
+      <div class="card-capability" style="padding:16px"><span class="badge b-neutral">CAPABILITY</span>
+        <h3 style="margin:8px 0 4px;font-size:14px">sepia 就地去味</h3>
+        <p class="note">写作 · provider_required · evidence: draft provider Gate 3</p></div>
+      <div class="card-system" style="padding:10px 2px"><span class="kicker" style="padding-left:12px">EVIDENCE ROWS</span>
+        <div class="row-evidence"><span class="em">receipt 4a19</span><span>ch12 · 1,842 tok</span><span class="badge b-pass" style="margin-left:auto">hash match</span></div>
+        <div class="row-evidence"><span class="em">trv_8c2</span><span>ch07→ch12</span><span class="badge b-stale" style="margin-left:auto">stale 2</span></div></div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="sec">
+    <h2>8. Interaction Components 按钮语义 + Press</h2>
+    <p class="lead">Gold=作者 · Jade=AI · Neutral · Ghost · Danger。按下立即 scale(.985)；focus 2px Jade ring。</p>
+    <div class="card-system" style="padding:16px">
+      <div class="btn-row">
+        <button class="btn btn-author">采纳本章提案（作者）</button>
+        <button class="btn btn-ai">运行文学审查（AI）</button>
+        <button class="btn">刷新账本</button>
+        <button class="btn btn-ghost">展开证据 ↗</button>
+        <button class="btn btn-danger">删除作品覆盖</button>
+        <button class="btn btn-author" disabled>已提交 · r4 verified</button>
+      </div>
+      <p class="note" style="margin-top:10px">Commit 流：Gold 触发 → 持久化验证成功 → 状态转 Green。Accepted（Gold 瞬时确认）≠ Committed（Green 持久）。</p>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="sec">
+    <h2>9. Status Language 状态徽标</h2>
+    <p class="lead">状态永不只用颜色；unavailable 必答三问（不可用/为什么/恢复途径）。</p>
+    <div class="card-system" style="padding:16px">
+      <div class="badge-row">
+        <span class="badge b-pass">PASS</span><span class="badge b-committed">已定稿 · r4</span>
+        <span class="badge b-stale">STALE · 正文在审查后变化</span><span class="badge b-stale">需配置</span>
+        <span class="badge b-blocked">BLOCKING · hash mismatch</span><span class="badge b-refused">REFUSED · 语义审查不可用</span>
+        <span class="badge b-error">ERROR</span><span class="badge b-gold">ACCEPTED（前瞻 contract-pending）</span>
+        <span class="badge b-jade">AI CANDIDATE</span><span class="badge b-exp">EXPERIMENTAL</span>
+        <span class="badge b-fixture">DESIGN FIXTURE</span><span class="badge b-neutral">LOCAL PRESET</span>
+      </div>
+      <div class="unavailable" style="margin-top:12px">
+        <b>网文榜单 · 未配置</b>　<span class="t-mono">RANK_SOURCE_NOT_CONFIGURED</span>
+        <span class="why">为什么：网文榜单尚未接入可验证的实时数据源；Technical Preview 不返回静态示例榜单。→ 恢复途径：接入真实榜单数据源后此面板自动转为 FUTURE DATA LAYOUT。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- pipeline six states -->
+  <section class="sec">
+    <h2>Pipeline Spine 六态（§11）</h2>
+    <p class="lead">被点击 ≠ 执行成功。selected / live running / completed / blocked / failed / unavailable。</p>
+    <div class="stagebar">
+      <div class="stage done"><b>prepare</b><span>准备</span></div>
+      <div class="stage done"><b>compile</b><span>装配</span></div>
+      <div class="stage running"><b>draft</b><span>草稿</span></div>
+      <div class="stage selected"><b>review</b><span>审查</span></div>
+      <div class="stage blocked"><b>extract</b><span>提取</span></div>
+      <div class="stage failed"><b>continuity</b><span>连续性</span></div>
+      <div class="stage unavailable"><b>proposal</b><span>提案</span></div>
+      <div class="stage"><b>commit</b><span>提交</span></div>
+    </div>
+  </section>
+
+  <!-- 10 motion -->
+  <section class="sec">
+    <h2>10. Motion</h2>
+    <p class="lead">Physical / Interruptible / Spatial。微交互 200ms · Sheet 280ms · ease cubic-bezier(0.16,1,0.3,1)。AI stream 本身是主动画（caret），不叠 loading orb。</p>
+    <div class="card-system" style="padding:16px">
+      <div class="candidate" style="padding:12px 14px;border-radius:0 8px 8px 0">
+        <div class="cand-tag">AI CANDIDATE · STREAMING</div>
+        <p class="prose stream-caret" style="font-size:15px;max-width:none;text-indent:2em;margin:0">　　他把手按在湿冷的缆绳上，听见远处灯塔</p>
+      </div>
+      <p class="note" style="margin-top:10px">Sheet 从触发源方向出现、沿原路退出；Chapter 切换沿 Rail 方向；hover 无 layout shift；reduced-motion 全量降级为 cross-fade。</p>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="sec">
+    <h2>11. Immersion Budget 沉浸强度</h2>
+    <p class="lead">强度=装饰/背景可见度/卡牌感/材质/动效，非功能数量。正文编辑区=10%，全产品最安静。</p>
+    <div class="demo-grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+      <div class="card-system" style="padding:14px">
+        <div class="row-evidence"><span>Skill / Capability Square</span><span class="em" style="margin-left:auto">90%</span></div>
+        <div class="row-evidence"><span>Works / Bookshelf</span><span class="em" style="margin-left:auto">90%</span></div>
+        <div class="row-evidence"><span>Wizard</span><span class="em" style="margin-left:auto">90%</span></div>
+        <div class="row-evidence"><span>Workbench frame / Story Brain</span><span class="em" style="margin-left:auto">80%</span></div>
+        <div class="row-evidence"><span>Book Source / Style Distill</span><span class="em" style="margin-left:auto">60%</span></div>
+        <div class="row-evidence"><span>Rank / Search / Membership</span><span class="em" style="margin-left:auto">45%</span></div>
+        <div class="row-evidence"><span>Inspector / Tasks / Receipt / Matrix</span><span class="em" style="margin-left:auto">30%</span></div>
+        <div class="row-evidence"><span class="em">Prose editor — Reading Slate</span><span class="em" style="margin-left:auto;color:var(--ir-gold)">10%</span></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

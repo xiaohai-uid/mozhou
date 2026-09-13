@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>09 · Mobile 墨境 — 五 Hub + 抽屉</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{background:#04070b}
+  /* Touch contract: ALL interactive targets inside phones ≥ --touch-target-min (44px). No inline px mixing. */
+  .phone .btn,.phone .pill,.phone .choice,.phone .ptab,.phone .toggle{min-height:var(--touch-target-min)}
+  .phone .ptab{align-items:center}
+  .phone .pill{display:inline-flex;align-items:center}
+  .phone .tools-row .pill{min-height:var(--touch-target-min)}
+  .mrow{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .phone{width:372px;flex:none;border-radius:42px;border:1px solid var(--ir-hairline-strong);
+    box-shadow:0 30px 70px rgba(0,0,0,.55),inset 0 0 0 6px rgba(5,9,13,.9);overflow:hidden;position:relative;
+    background:var(--ir-void);height:788px;display:flex;flex-direction:column}
+  .phone .p-scene{position:absolute;inset:0;z-index:0}
+  .phone .p-atmo{position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(130% 90% at 50% 30%,transparent 36%,rgba(3,6,9,.72) 100%)}
+  /* mobile veil heavier than desktop (spec §25.2) */
+  .phone .p-veil{position:absolute;inset:0;z-index:2;pointer-events:none;background:rgba(4,8,12,.68)}
+  .p-status{position:relative;z-index:4;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 20px 6px;font:600 11px/1 var(--ir-mono);color:var(--ir-muted)}
+  .p-body{position:relative;z-index:4;flex:1;overflow:auto;padding:8px 14px 12px;display:flex;flex-direction:column;gap:10px}
+  .p-tabbar{position:relative;z-index:5;display:flex;border-top:1px solid var(--ir-hairline);
+    background:rgba(8,17,23,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    padding:6px 6px calc(10px + env(safe-area-inset-bottom))}
+  .ptab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 2px;min-height:48px;
+    border:none;background:transparent;color:var(--ir-faint);font:500 10.5px/1 var(--ir-sans);cursor:pointer;border-radius:10px}
+  .ptab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .ptab.on{color:var(--ir-gold-bright);background:rgba(214,179,106,.08)}
+  .phead{display:flex;align-items:center;gap:10px;padding:4px 2px 0}
+  .mcard{border-radius:12px;padding:12px 14px}
+  .mcard h4{margin:0 0 6px;font:600 13px/1.4 var(--ir-sans);display:flex;align-items:center;gap:8px}
+  .mstat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--ir-hairline);border:1px solid var(--ir-hairline);border-radius:10px;overflow:hidden}
+  .mstat>div{background:rgba(8,17,23,.85);padding:10px 12px}
+  .mstat .k{font-size:10px;color:var(--ir-faint)}
+  .mstat .v{font:600 15px/1.3 var(--ir-mono);margin-top:3px}
+  .mrow2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .choice{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;border-radius:10px;
+    border:1px solid var(--ir-hairline);background:rgba(10,20,27,.7);padding:12px;color:var(--ir-muted);font-size:12.5px}
+  .choice b{font:700 9px/1 var(--ir-mono);letter-spacing:.12em;color:var(--ir-gold-bright);border:1px solid rgba(214,179,106,.4);
+    padding:3px 6px;border-radius:4px;flex:none}
+  .choice.alt b{color:var(--ir-muted);border-color:var(--ir-hairline)}
+  .composer-dock{position:relative;z-index:5;margin:0 -14px -12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(8,17,23,.96);border-top:1px solid var(--ir-hairline)}
+  .send{width:46px;height:46px;border-radius:50%;flex:none;display:grid;place-items:center;cursor:pointer;border:none;
+    background:linear-gradient(150deg,var(--ir-jade),rgba(114,201,196,.55));color:#04241f;font-size:18px}
+  .tools-row{display:flex;gap:6px;flex-wrap:wrap}
+  .tools-row .pill{padding:8px 11px;min-height:var(--touch-target-min)}
+  .mrowlab{display:flex;align-items:baseline;gap:10px;margin-top:6px}
+  .mrowlab h3{font:600 15px/1.3 var(--ir-serif)}
+  .overlay{position:absolute;inset:0;z-index:6;background:rgba(3,6,9,.55);display:flex;align-items:flex-end}
+  .ov-note{position:absolute;z-index:7;inset:auto 0 100% 0;padding:8px 14px;text-align:center}
+</style>
+</head>
+<body>
+<div class="ir-scene city-night" style="opacity:.35"></div>
+<div class="ir-atmosphere"></div>
+<nav class="proto-nav" style="position:relative;z-index:5">
+  <a href="index.html">总览</a><a href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a href="04-views-creation.html">创作</a><a href="05-views-inspector.html">检视</a><a href="06-views-resources.html">资源</a><a href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a class="cur" href="09-mobile.html">Mobile</a>
+</nav>
+<main class="proto-body">
+  <header class="proto-head"><h1>Mobile 墨境 — 五 Hub + 抽屉系统</h1>
+    <span class="proto-sub">移动端是正式产品面（非桌面缩小版）。Scene 保留 · Figure 默认关 · veil 加重 · 触点 ≥44px · 同一 token 宇宙。对应 Surface Map §8。</span></header>
+
+  <div class="mrow">
+
+    <!-- ============ HUB 1 · Workbench ============ -->
+    <div class="phone">
+      <div class="p-scene ir-scene city-night"></div><div class="p-atmo"></div><div class="p-veil"></div>
+      <div class="p-status"><span>9:41</span><span>本地创作者 · Technical Preview</span><span>100%</span></div>
+      <div class="p-body">
+        <div class="phead">
+          <span class="seal" style="width:30px;height:30px;font-size:15px">墨</span>
+          <div><b class="t-serif" style="font-size:16px">《潮汐之上》</b><div class="kicker" style="font-size:9px">CH 12 · 暗潮 · r3 · draft</div></div>
+          <span style="flex:1"></span>
+          <button class="btn btn-ghost btn-sm" style="min-height:44px">⏱</button>
+          <button class="btn btn-ghost btn-sm" style="min-height:44px">目录</button>
+        </div>
+        <div class="mcard unavailable"><b>今日码字统计未接入</b><span class="why">不展示虚构字数、目标完成率或连更天数（GoalProgressWidget 设计位保留，待真实数据源）。</span></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">TENSION SPARK</span><span class="badge b-stale" style="margin-left:auto;font-size:9px">未接入</span></div>
+          <p class="note" style="margin:6px 0 0">管线阶段与叙事张力尚未接入——8 段 stage 条保留语义位，数据不伪造。</p></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">PLOT BRANCH · 墨舟先问</span></div>
+          <p style="margin:6px 0;font-size:13px;line-height:1.7">CH12 的冲突放在外部还是内心？</p>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <button class="choice" style="min-height:44px"><b>推荐</b>外部势力逼近——巡潮司堵到码头</button>
+            <button class="choice alt" style="min-height:44px"><b>备选</b>内心潮契动摇</button>
+            <button class="choice alt" style="min-height:44px"><b>备选</b>双线并进</button></div>
+          <p class="note" style="margin:6px 0 0">设计修复：选择点击 → 回填 Composer 上下文（现状仅本地高亮、onSelectChoice 未传）。</p></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">PROSE READING FLOW</span><span class="badge b-stale" style="margin-left:auto;font-size:9px">未载入</span></div>
+          <p class="note" style="margin:6px 0 0">正文数据尚未载入移动端阅读面——诚实空态；user-select 恢复可选（设计修复）。</p></div>
+      </div>
+      <div class="composer-dock">
+        <div class="tools-row">
+          <button class="pill">灵感起名</button><button class="pill">+冲突</button><button class="pill">精简叙述</button><button class="pill">回收伏笔</button>
+          <span class="note" style="margin-left:auto">skills：移动端 V1 固定 [] · 显式标注</span></div>
+        <div style="display:flex;gap:10px;margin-top:8px;align-items:flex-end">
+          <textarea class="textarea" style="flex:1;height:46px;min-height:46px" placeholder="回答墨舟，或直接下达写作指令…">让巡潮司的人堵到码头，主角先用潮契脱身。</textarea>
+          <button class="send" title="生成草稿（NDJSON 流）">↑</button></div>
+      </div>
+      <nav class="p-tabbar">
+        <button class="ptab on"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14M4 19a2 2 0 002 2h12a2 2 0 002-2M8 7h8M8 11h5"/></svg>创作</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>检视</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 4h13a3 3 0 013 3v13H7a3 3 0 01-3-3z"/><path d="M8 8h8M8 12h8"/></svg>作品</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>书源</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>设置</button>
+      </nav>
+    </div>
+
+    <!-- ============ HUB 2 · Inspector ============ -->
+    <div class="phone">
+      <div class="p-scene ir-scene rain-city"></div><div class="p-atmo"></div><div class="p-veil"></div>
+      <div class="p-status"><span>9:41</span><span>检视 · Inspector</span><span>100%</span></div>
+      <div class="p-body">
+        <div class="mrowlab"><h3>检视</h3><button class="btn btn-ghost btn-sm" style="margin-left:auto;min-height:44px">敏感词审查</button></div>
+        <div style="display:flex;gap:6px">
+          <button class="pill on" style="flex:1;justify-content:center;min-height:var(--touch-target-min)">设定事实</button>
+          <button class="pill" style="flex:1;justify-content:center;min-height:var(--touch-target-min)">装配看板</button>
+          <button class="pill" style="flex:1;justify-content:center;min-height:var(--touch-target-min)">变更影响</button>
+          <button class="pill" style="flex:1;justify-content:center;min-height:var(--touch-target-min)">质量审查</button></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">STORY BRAIN · FACTS</span><span class="note" style="margin-left:auto">canon 按主角 POV · ADR-0026</span></div>
+          <div class="factrow" style="margin-top:6px"><b>林守常</b> 持有 → 引潮罗盘 <span class="note">第 3 章起</span></div>
+          <div class="factrow"><b>雾灯码头</b> 位于 → 城南旧港</div>
+          <div class="factrow"><span class="badge b-jade" style="font-size:9px">suspect</span> 罗盘纹样似与巡潮司旧档相关（仅 presentation）</div>
+          <div class="factrow"><span class="badge b-error" style="font-size:9px">invalid</span> 老周 · f_31</div>
+          <button class="btn btn-ai btn-sm" style="margin-top:8px;min-height:44px;width:100%;justify-content:center">重新分析</button></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">RECEIPTS</span></div>
+          <div class="row-evidence" style="padding-left:0;padding-right:0"><span class="em">4a19</span><span>ch12 · 1,842 tok</span><span class="badge b-pass" style="margin-left:auto;font-size:9px">MATCH</span></div>
+          <div class="row-evidence" style="padding-left:0;padding-right:0"><span class="em">4a02</span><span>ch11 · 1,790 tok</span><span class="badge b-pass" style="margin-left:auto;font-size:9px">MATCH</span></div></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">CHANGE MATRIX</span><span class="badge b-stale" style="margin-left:auto;font-size:9px">需重构 1</span></div>
+          <div class="row-evidence" style="padding-left:0;padding-right:0"><span class="em">trv_8c2</span><span>CH12 需重构 · CH11 已收敛</span></div></div>
+        <div class="mcard unavailable"><b>质量审查 · 移动端未接入</b>
+          <span class="why">移动端尚未接入当前章节选择与质量报告，因此不宣称审查通过、无毒点或文风合格。请使用桌面检视塔中的真实质量门。</span></div>
+      </div>
+      <nav class="p-tabbar"><button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14M8 7h8M8 11h5"/></svg>创作</button>
+        <button class="ptab on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>检视</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 4h13a3 3 0 013 3v13H7a3 3 0 01-3-3z"/></svg>作品</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>书源</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>设置</button></nav>
+    </div>
+
+    <!-- ============ HUB 3 · Works ============ -->
+    <div class="phone">
+      <div class="p-scene ir-scene library"></div><div class="p-atmo"></div><div class="p-veil"></div>
+      <div class="p-status"><span>9:41</span><span>作品 · Works</span><span>100%</span></div>
+      <div class="p-body">
+        <div class="mrowlab"><h3 class="t-serif" style="font-size:17px">《潮汐之上》</h3><span class="badge b-fixture" style="font-size:9px">DESIGN FIXTURE</span></div>
+        <div class="mstat">
+          <div><div class="k">正文字数</div><div class="v">128,400</div></div>
+          <div><div class="k">章节</div><div class="v">32</div></div>
+          <div><div class="k">实体</div><div class="v">18</div></div></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">章节目录</span>
+            <button class="btn btn-sm" disabled style="margin-left:auto;min-height:44px" title="移动端加章尚未接入">＋ 加章</button></div>
+          <div class="row-evidence" style="padding-left:0"><span class="em">CH10</span><span>雾灯 · 4,388 字 · r3</span><span class="badge b-committed" style="margin-left:auto;font-size:9px">定稿</span></div>
+          <div class="row-evidence" style="padding-left:0"><span class="em">CH11</span><span>沉船名册 · 3,977 字 · r2</span><span class="badge b-committed" style="font-size:9px;margin-left:auto">定稿</span></div>
+          <div class="row-evidence" style="padding-left:0"><span class="em">CH12</span><span>暗潮 · 4,120 字 · r3</span><span class="badge b-gold" style="font-size:9px;margin-left:auto">草稿</span></div></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker">文风画像</span><button class="btn btn-ghost btn-sm" style="margin-left:auto;min-height:44px">查看状态</button></div>
+          <p class="note" style="margin:4px 0 0">移动端画像详情尚未接入 → distill 抽屉为诚实占位（现状行为保留并显式化）。</p></div>
+        <button class="btn btn-ghost btn-sm" style="min-height:44px">导出（移动端打包排版未接入）</button>
+      </div>
+      <nav class="p-tabbar"><button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14"/></svg>创作</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7"/></svg>检视</button>
+        <button class="ptab on"><svg viewBox="0 0 24 24"><path d="M4 4h13a3 3 0 013 3v13H7a3 3 0 01-3-3z"/></svg>作品</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>书源</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>设置</button></nav>
+    </div>
+
+    <!-- ============ HUB 4 · Resources ============ -->
+    <div class="phone">
+      <div class="p-scene ir-scene cloud-sea"></div><div class="p-atmo"></div><div class="p-veil"></div>
+      <div class="p-status"><span>9:41</span><span>书源 · Resources</span><span>100%</span></div>
+      <div class="p-body">
+        <div class="mrowlab"><h3>书源</h3></div>
+        <div style="display:flex;gap:8px"><input class="input" style="min-height:44px" placeholder="书名 / 关键词 / https://…">
+          <button class="btn btn-ai" style="min-height:44px;min-width:56px">检索</button></div>
+        <div class="card-narrative" style="padding:12px 14px">
+          <div style="display:flex;gap:10px"><div style="width:42px;height:58px;border-radius:6px;background:linear-gradient(160deg,#12242f,#0a1620);border:1px solid var(--ir-hairline);flex:none;display:grid;place-items:center"><span class="t-serif" style="color:var(--ir-gold);font-size:13px">潮</span></div>
+            <div><b style="font-size:13px">潮汐之上</b><p class="note t-mono" style="margin:2px 0">起点 · 都市异能 · 连载</p>
+              <p class="note" style="margin:0;font-size:11.5px">简介：潮水退去之后的第七年……</p>
+              <button class="btn btn-author btn-sm" style="margin-top:6px;min-height:var(--touch-target-min)">提取正文 → 导入</button></div></div></div>
+        <div class="mcard unavailable"><b>未返回真实书源结果</b>
+          <span class="why">不使用内置「推荐样例」补位，也不伪造榜单评分或热度。degraded 时显示服务端 notes 检索提示（设计修复：现未读取）。</span></div>
+        <p class="note">抓取成功反馈改 inline banner / sheet（替代现状 alert：《…》内容提取成功。后续拆解能力尚未接入。）；无 URL/失败同口径。</p>
+      </div>
+      <nav class="p-tabbar"><button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14"/></svg>创作</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7"/></svg>检视</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 4h13a3 3 0 013 3v13H7a3 3 0 01-3-3z"/></svg>作品</button>
+        <button class="ptab on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>书源</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>设置</button></nav>
+    </div>
+
+    <!-- ============ HUB 5 · System ============ -->
+    <div class="phone">
+      <div class="p-scene ir-scene city-night"></div><div class="p-atmo"></div><div class="p-veil"></div>
+      <div class="p-status"><span>9:41</span><span>设置 · System</span><span>100%</span></div>
+      <div class="p-body">
+        <div class="mcard mat-metal-rim" style="display:flex;align-items:center;gap:12px;padding:14px">
+          <span class="seal" style="width:38px;height:38px;font-size:18px">创</span>
+          <div><b style="font-size:14px">本地创作者</b><div class="note">未连接账号 · 点按管理账号与授权</div></div>
+          <span style="flex:1"></span><span class="badge b-neutral" style="font-size:9px">auth 抽屉</span></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline);padding:0">
+          <div class="row-evidence" style="padding:13px 14px;min-height:44px"><span>许可证与商业授权</span><span class="em" style="margin-left:auto;color:var(--ir-warning)">未激活许可证 · Technical Preview</span></div>
+          <div class="row-evidence" style="padding:13px 14px;min-height:44px"><span>作品打包与平台排版</span><span class="em" style="margin-left:auto;color:var(--ir-faint)">尚未接入</span></div>
+          <div class="row-evidence" style="padding:13px 14px;min-height:44px"><span>书源书架（本地多作品）</span><span class="em" style="margin-left:auto">《潮汐之上》</span></div>
+          <div class="row-evidence" style="padding:13px 14px;min-height:44px"><span>任务中心</span><span class="em" style="margin-left:auto">42 条真实事件</span></div>
+          <div class="row-evidence" style="padding:13px 14px;min-height:44px"><span>云同步与离线快照</span><span class="em" style="margin-left:auto;color:var(--ir-faint)">云同步未接入</span></div></div>
+        <p class="note">设计修复：书源书架行接入真实切书（现状 onSwitchBook 收而不用，移动端无法切书）；任务行点击 → 移动任务流水（真实 events 复用）。</p>
+      </div>
+      <nav class="p-tabbar"><button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14"/></svg>创作</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7"/></svg>检视</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 4h13a3 3 0 013 3v13H7a3 3 0 01-3-3z"/></svg>作品</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>书源</button>
+        <button class="ptab on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>设置</button></nav>
+    </div>
+
+    <!-- ============ Phone 6 · Stream + Drawer ============ -->
+    <div class="phone">
+      <div class="p-scene ir-scene rain-city"></div><div class="p-atmo"></div><div class="p-veil"></div>
+      <div class="p-status"><span>9:41</span><span>创作 · 流式中</span><span>100%</span></div>
+      <div class="p-body">
+        <div class="mcard candidate" style="padding:14px">
+          <div class="cand-tag">AI CANDIDATE · STREAMING</div>
+          <p class="prose stream-caret" style="font-size:14.5px;max-width:none;text-indent:2em;margin:0">　　巡潮司的灯笼在雨幕里连成一线。林守常把手按进湿冷的缆绳，</p>
+          <p class="note" style="margin-top:8px">流式成功/失败为显式状态（现状 alert「草稿生成失败：…」改为 inline banner；成功态附「已落为 CH12 草稿」证据）。</p></div>
+        <div class="mcard" style="background:rgba(8,17,23,.8);border:1px solid var(--ir-hairline)">
+          <div class="mrowlab"><span class="kicker"> Inspiration · 抽屉打开态</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <button class="card-capability" style="padding:12px;min-height:56px;text-align:left"><b style="font-size:12.5px">角色龙套起名</b><div class="note" style="margin-top:4px;color:var(--ir-gold-bright)">· 沈听澜</div></button>
+            <button class="card-capability" style="padding:12px;min-height:56px;text-align:left"><b style="font-size:12.5px">卡文突发事件</b><div class="note" style="margin-top:4px;color:var(--ir-gold-bright)">· 信物被调包</div></button></div>
+          <p class="note" style="margin:8px 0 0">「采用灵感」改为把元素真实回填 Composer 上下文（<b style="color:var(--ir-fg)">修复现状 alert 谎称已填入</b>），附 LOCAL PRESET 徽标。</p></div>
+        <div class="mcard unavailable" style="margin-top:auto"><b>8 个抽屉 · 1 真 7 诚</b>
+          <span class="why">inspiration 真可用；chapters/distill/history/export/compliance/license/auth = 诚实占位（「尚未接入 + 不展示虚构数据」）。Bottom Sheet 统一规格：语义 drag handle（aria / 键盘可关 / focus return）、Escape、滚动锁、reduced-motion cross-fade。</span></div>
+      </div>
+      <div class="overlay" aria-hidden="true">
+        <div class="ov-note note">Figure 层默认关闭 · veil .68 比桌面更重 · 无 parallax</div>
+        <div class="bsheet" style="position:relative;margin:0 -2px">
+          <div class="handle"></div>
+          <b style="font-size:14px">章节目录</b>
+          <p class="note" style="margin:6px 0 12px">chapters 抽屉当前为「移动端章节目录尚未接入」诚实占位；接入后复用 WorksHub 章节行（phase/字数/Rev 徽标）。</p>
+          <button class="btn btn-sm" style="width:100%;justify-content:center;min-height:44px">关闭</button>
+        </div>
+      </div>
+      <nav class="p-tabbar"><button class="ptab on"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14"/></svg>创作</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7"/></svg>检视</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><path d="M4 4h13a3 3 0 013 3v13H7a3 3 0 01-3-3z"/></svg>作品</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>书源</button>
+        <button class="ptab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>设置</button></nav>
+    </div>
+
+  </div>
+
+  <div class="card-system" style="margin-top:22px;padding:16px;max-width:860px">
+    <span class="kicker">MOBILE 收敛规则（主规格 §25 / §31.13）</span>
+    <p class="note" style="margin-top:8px;line-height:2">
+      ① 五 Hub 常驻：创作/检视/作品/书源/设置。② Scene 保留、Figure 默认关、veil 加重、无全屏 parallax。③ 移动 Quality 恒诚实 unavailable（不复用桌面 PASS 假数据）。④ 9 处 alert → inline / sheet / non-blocking 反馈，业务语义不变。⑤ 触点 ≥44px（现有 22–32px 控件全部放大）。⑥ 不引入第二套色彩语义——只允许密度/尺寸变体。⑦ 移动无 Wizard（现状即如此：App 分支在 wizard 之前 return）；桌面 Wizard 完成后的书在移动端正常打开。</p>
+  </div>
+</main>
+</body>
+</html>

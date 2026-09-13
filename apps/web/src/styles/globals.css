@@ -1,41 +1,60 @@
 /*
- * 墨舟 Ink Orbit 样式底座（ADR-0027 · 实现票 T40）。
- * 品牌 token 自 legacy app/app/globals.css 逐值迁移（基色不可偏移）；
- * Tailwind v4 @theme 语义槽位沿用 legacy 映射，并扩展 Ink Orbit 表面阶 /
- * 发丝线 / 排印双轨。组件与材质类见 ./ink-orbit.css（原型
- * codex-ui-ink-orbit.html 的语义类原样迁移）。
+ * 墨舟样式底座。ADR-0028（superseding ADR-0027 视觉层）：
+ * Ink Realm / 墨境 token——同名换值，消费方零改动。
+ * Gold=作者主权 · Jade=AI/系统 · Green=verified · Warning=stale · Red=blocking；
+ * 旧紫退役为 experimental 专用（--violet-experimental）。
+ * 组件与材质类见 ./ink-orbit.css（过渡底座）与 ./ink-realm.css（墨境材质）。
  */
 @import "tailwindcss";
 @import "./ink-orbit.css";
+@import "./ink-realm.css";
 
 :root {
-  /* 基色（legacy globals.css 逐值） */
-  --background: #0b0a0f;
-  --foreground: #f4f1fa;
-  --accent: #8b78ff;
-  --accent-strong: #9d8eff;
-  --accent-soft: rgba(139, 120, 255, 0.12);
-  --surface: #15131a;
-  --surface-2: #282330;
-  --surface-3: #1d1923;
-  --surface-raised: #211c29;
-  --surface-sunken: #100e14;
-  --hairline: rgba(244, 241, 250, 0.1);
-  --hairline-strong: rgba(244, 241, 250, 0.16);
-  --text-muted: #aba4b8;
-  --text-faint: #7c7487;
-  --danger: #f28b9b;
-  --success: #80d6b0;
-  --warning: #e4b875;
-  --shadow-ink: rgba(0, 0, 0, 0.36);
+  /* Ink Realm 基色（ADR-0028；原 legacy 紫黑系已由同名换值取代） */
+  --background: #05090d;
+  --foreground: #edf1ed;
+  --accent: #72c9c4;
+  --accent-strong: #8fdcd7;
+  --accent-soft: rgba(114, 201, 196, 0.12);
+  --surface: #0c171e;
+  --surface-2: #102029;
+  --surface-3: #152832;
+  --surface-raised: #132430;
+  --surface-sunken: #081117;
+  --hairline: rgba(205, 225, 222, 0.11);
+  --hairline-strong: rgba(225, 239, 235, 0.21);
+  --text-muted: #a2ada9;
+  --text-faint: #687671;
+  --danger: #d98383;
+  --success: #78c79d;
+  --warning: #d3a765;
+  --shadow-ink: rgba(0, 0, 0, 0.45);
 
-  /* Ink Orbit 衍生（原型；非基色，可演进） */
+  /* Ink Realm 语义色：Gold=作者主权 / Jade=AI·系统（ADR-0028） */
+  --gold: #d6b36a;
+  --gold-bright: #f0d18a;
+  --gold-soft: rgba(214, 179, 106, 0.13);
+  --gold-line: rgba(214, 179, 106, 0.55);
+  --gold-line-soft: rgba(214, 179, 106, 0.4);
+  --gold-glow: rgba(214, 179, 106, 0.55);
+  --jade: #72c9c4;
+  --jade-soft: rgba(114, 201, 196, 0.12);
+  --jade-line: rgba(114, 201, 196, 0.55);
+  --jade-line-soft: rgba(114, 201, 196, 0.4);
+  --jade-glow: rgba(114, 201, 196, 0.45);
+  --violet-experimental: rgba(150, 120, 255, 0.5);
+  --touch-target-min: 44px;
+  --world-gap: 8px;
+  --ir-r-md: 10px;
+  --ir-sheet-t: 0.28s;
+
+  /* 衍生（可演进） */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", "微软雅黑", sans-serif;
-  --serif: "Songti SC", "STSong", "SimSun", serif;
+  --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }

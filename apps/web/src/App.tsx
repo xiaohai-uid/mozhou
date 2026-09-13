@@ -4,10 +4,20 @@
 import { useEffect, useState } from 'react'
 import { CapabilityChannels } from './shell/CapabilityChannels'
 import { ChangeMatrixPanel } from './change-matrix/ChangeMatrixPanel'
-import { InkBackground } from './shell/InkBackground'
+import { SceneLayer } from './shell/scene/SceneLayer'
+import { SceneSettingsSheet } from './shell/scene/SceneSettingsSheet'
+import {
+  loadScenePreference,
+  resolveSceneProfile,
+  saveScenePreference,
+} from './shell/scene/scenePreference'
+import type { ScenePreference } from './shell/scene/scenePreference'
 import { InspectorEmpty, InspectorTower } from './shell/InspectorTower'
-import type { InspectorTabId } from './shell/InspectorTower'
+import type { InspectorTabId, InspectorSummary } from './shell/InspectorTower'
 import { PipelineStrip, PIPELINE_STAGES } from './shell/PipelineStrip'
+import { useShellTelemetry } from './shell/useShellTelemetry'
+import { deriveStageStates, deriveSummary } from './shell/shellTelemetry'
+import { parentDirOf } from './shell/paths'
 import { PlaceholderView } from './shell/PlaceholderView'
 import { TopBar } from './shell/TopBar'
 import { loadWorkbenchState, saveWorkbenchState } from './shell/workbenchStorage'
@@ -35,11 +45,6 @@ import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolMod
 
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
-}
-
-function parentDirOf(root: string): string {
-  const index = Math.max(root.lastIndexOf('/'), root.lastIndexOf('\\'))
-  return index > 0 ? root.slice(0, index) : root
 }
 
 const INSPECTOR_VIEW_TO_TAB: Partial<Record<ViewId, InspectorTabId>> = {
@@ -71,6 +76,30 @@ export function App(): JSX.Element {
     () => initial.book === null && !wizardCompleted(),
   )
   const [desktopModal, setDesktopModal] = useState<DesktopModalType>(null)
+  const [scenePreference, setScenePreference] = useState<ScenePreference>(loadScenePreference)
+  const [sceneSheetOpen, setSceneSheetOpen] = useState(false)
+
+  useEffect(() => {
+    saveScenePreference(scenePreference)
+  }, [scenePreference])
+
+  /** 管线六态 + 检视摘要轨的真实数据证据（works/receipts/quality/matrix）。 */
+  const telemetry = useShellTelemetry(book?.root ?? null, chapterIndex)
+  const stageStates = deriveStageStates({
+    bookExists: book !== null,
+    chapterIndex,
+    works: telemetry.works,
+    receipts: telemetry.receipts,
+    quality: telemetry.quality,
+  })
+  const inspectorSummary: InspectorSummary = deriveSummary({
+    bookExists: book !== null,
+    chapterIndex,
+    works: telemetry.works,
+    receipts: telemetry.receipts,
+    quality: telemetry.quality,
+    matrixRows: telemetry.matrixRows,
+  })
 
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -161,16 +190,20 @@ export function App(): JSX.Element {
 
   return (
     <>
-      <InkBackground focus={stageToFocus(stage)} />
+      <SceneLayer
+        profile={resolveSceneProfile(scenePreference, book?.bookId ?? null)}
+        focus={stageToFocus(stage)}
+      />
       <div className="app app-grain">
         <TopBar
           book={book}
           onHome={() => setView('workbench')}
           onReplayWizard={() => setWizardOpen(true)}
           onOpenModal={setDesktopModal}
+          onOpenScene={() => setSceneSheetOpen(true)}
         />
         <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
-        <PipelineStrip activeStage={stage} onSelect={setStage} />
+        <PipelineStrip activeStage={stage} onSelect={setStage} stageStates={stageStates} />
         {view === 'workbench' ? (
           <WorkbenchView
             key={book?.root ?? 'no-book'}
@@ -178,6 +211,7 @@ export function App(): JSX.Element {
             chapterIndex={chapterIndex}
             onChapterIndexChange={setChapterIndex}
             onBookCreated={handleBookCreated}
+            chapters={telemetry.works?.chapters}
           />
         ) : view === 'book-shelf' ? (
           <BookshelfView
@@ -212,7 +246,7 @@ export function App(): JSX.Element {
         ) : (
           <PlaceholderView view={view} />
         )}
-        <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} />
+        <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
       </div>
       {wizardOpen && (
         <WizardOverlay
@@ -222,6 +256,14 @@ export function App(): JSX.Element {
         />
       )}
       <DesktopToolModals activeModal={desktopModal} onClose={() => setDesktopModal(null)} />
+      {sceneSheetOpen && (
+        <SceneSettingsSheet
+          preference={scenePreference}
+          book={book}
+          onChange={setScenePreference}
+          onClose={() => setSceneSheetOpen(false)}
+        />
+      )}
     </>
   )
 }

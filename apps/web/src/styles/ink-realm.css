@@ -1,0 +1,655 @@
+/*
+ * 墨舟 Ink Realm / 墨境 材质层（ADR-0028）。
+ * 于 ink-orbit.css 之后 import：同名选择器按层叠顺序覆盖其视觉；
+ * 新增 Scene System 分层 / Pipeline 六态 / 导航金脊 / AI Candidate 标注。
+ * 纪律：blur 只用于固定/悬浮层；装饰层恒 pointer-events:none、不入键盘序；
+ * reduced-motion 全量降级；状态永不只用颜色。
+ */
+
+/* ============================================================
+   Scene System（L0 场景 · L1 氛围 · L2 暗幕+前景人物）
+   ============================================================ */
+.scene-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--background);
+  background-position: 50% 38%;
+  background-size: cover;
+  transition: filter 0.2s var(--ease);
+}
+/* 内置静态场景（CSS 合成占位画；上传图直接替换本层 background-image） */
+.scene-layer.v-city-night {
+  background-image:
+    radial-gradient(13% 19% at 58% 15%, rgba(240, 209, 138, 0.98), rgba(240, 209, 138, 0.26) 55%, transparent 74%),
+    radial-gradient(44% 60% at 58% 15%, rgba(240, 209, 138, 0.3), transparent 70%),
+    radial-gradient(60% 16% at 60% 72%, rgba(240, 209, 138, 0.18), transparent 72%),
+    radial-gradient(130% 60% at 70% 112%, rgba(114, 201, 196, 0.3), transparent 55%),
+    linear-gradient(180deg, #0b1826 0%, #143044 34%, #1d4258 60%, #2a5a74 82%, #35688a 100%);
+}
+.scene-layer.v-cloud-sea {
+  background-image:
+    radial-gradient(10% 15% at 22% 12%, rgba(237, 241, 237, 0.9), rgba(237, 241, 237, 0.18) 55%, transparent 74%),
+    radial-gradient(80% 36% at 76% 2%, rgba(114, 201, 196, 0.22), transparent 58%),
+    linear-gradient(180deg, #0a1a28 0%, #173244 38%, #225068 70%, #2e647e 100%);
+}
+.scene-layer.v-rain-city {
+  background-image:
+    radial-gradient(9% 13% at 28% 10%, rgba(214, 179, 106, 0.95), rgba(214, 179, 106, 0.2) 55%, transparent 72%),
+    radial-gradient(130% 60% at 70% 112%, rgba(114, 201, 196, 0.16), transparent 55%),
+    repeating-linear-gradient(105deg, transparent 0 26px, rgba(205, 225, 222, 0.06) 26px 27px, transparent 27px 54px),
+    linear-gradient(180deg, #09141f 0%, #112436 40%, #1a3750 72%, #224764 100%);
+}
+.scene-layer.v-library {
+  background-image:
+    radial-gradient(30% 40% at 22% 22%, rgba(240, 209, 138, 0.46), rgba(240, 209, 138, 0.1) 55%, transparent 75%),
+    radial-gradient(70% 40% at 84% 0%, rgba(114, 201, 196, 0.16), transparent 55%),
+    linear-gradient(180deg, #0b1522 0%, #132435 44%, #1c3448 76%, #24405a 100%);
+}
+/* 主体带（天际线/书架等可辨识轮廓）；上传整图替换时隐藏 */
+.scene-layer::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24%;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(5, 12, 18, 0.96) 0 22px, rgba(10, 23, 33, 0.92) 22px 31px, rgba(5, 12, 18, 0.97) 31px 52px, rgba(14, 32, 44, 0.9) 52px 61px, rgba(5, 12, 18, 0.96) 61px 84px),
+    repeating-linear-gradient(90deg, transparent 0 6px, rgba(240, 209, 138, 0.3) 6px 8px, transparent 8px 19px);
+  box-shadow: 0 -1px 0 rgba(225, 239, 235, 0.22);
+}
+.scene-layer.v-cloud-sea::after {
+  background:
+    radial-gradient(56% 80% at 18% 30%, rgba(233, 240, 240, 0.26), transparent 70%),
+    radial-gradient(72% 90% at 74% 55%, rgba(205, 225, 222, 0.22), transparent 72%),
+    radial-gradient(64% 84% at 40% 85%, rgba(233, 240, 240, 0.28), transparent 70%);
+  box-shadow: none;
+}
+.scene-layer.v-library::after {
+  background:
+    repeating-linear-gradient(90deg, rgba(8, 15, 24, 0.94) 0 14px, rgba(14, 28, 42, 0.9) 14px 18px, rgba(8, 15, 24, 0.94) 18px 40px),
+    repeating-linear-gradient(0deg, rgba(4, 10, 16, 0.6) 0 2px, transparent 2px 30px);
+  box-shadow: 0 -1px 0 rgba(225, 239, 235, 0.18);
+}
+.scene-layer.has-upload::after { display: none; }
+
+.scene-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(130% 100% at 50% 38%, transparent 56%, rgba(3, 6, 9, 0.4) 100%);
+}
+.scene-atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.scene-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(4, 8, 12, var(--scene-veil, 0.5));
+}
+.scene-figure {
+  position: fixed;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  transform-origin: bottom center;
+  opacity: var(--scene-figure-opacity, 0.6);
+  filter: drop-shadow(0 0 26px rgba(5, 9, 13, 0.8));
+}
+.scene-figure.pos-left { left: 3%; }
+.scene-figure.pos-center { left: 50%; transform: translateX(-50%); }
+.scene-figure.pos-right { right: 2%; }
+.scene-figure .sil {
+  width: min(220px, 22vw);
+  height: min(440px, 48vh);
+  background:
+    radial-gradient(36% 20% at 50% 8%, rgba(235, 242, 240, 0.5), transparent 72%),
+    radial-gradient(14% 10% at 50% 7%, rgba(20, 30, 34, 0.9), transparent 80%),
+    radial-gradient(46% 30% at 50% 33%, rgba(210, 224, 222, 0.24), transparent 72%),
+    radial-gradient(60% 40% at 50% 62%, rgba(180, 198, 196, 0.13), transparent 76%),
+    linear-gradient(180deg, rgba(170, 188, 186, 0.22) 0%, rgba(130, 150, 150, 0.12) 45%, transparent 80%);
+  border-radius: 46% 46% 8% 8% / 34% 34% 4% 4%;
+  box-shadow: inset -14px 0 22px rgba(240, 209, 138, 0.08), inset 12px 0 20px rgba(114, 201, 196, 0.07);
+  -webkit-mask-image: linear-gradient(180deg, #000 66%, transparent 97%);
+  mask-image: linear-gradient(180deg, #000 66%, transparent 97%);
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+/* ============================================================
+   材质：Scene Glass / Ink Glass / Reading Slate / Metal Rim
+   ============================================================ */
+.mat-scene-glass {
+  background: linear-gradient(180deg, rgba(12, 23, 30, 0.72), rgba(8, 17, 23, 0.66));
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
+  backdrop-filter: blur(14px) saturate(1.05);
+  border: 1px solid var(--hairline);
+}
+.mat-scene-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(160deg, rgba(225, 239, 235, 0.07), transparent 22%, transparent 78%, rgba(205, 225, 222, 0.05));
+  mix-blend-mode: screen;
+}
+
+/* 壳层换肤：顶栏 / 侧导航 / 管线条透出世界（世界缝隙由 .app 的 gap 透出） */
+.app { gap: var(--world-gap, 8px); background: transparent; }
+.topbar {
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  position: relative;
+  overflow: hidden;
+}
+.sidebar,
+.pipeline,
+.inspector {
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  position: relative;
+}
+.center {
+  background: rgba(8, 17, 23, 0.6);
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+}
+
+/* 导航选中态：金脊 + 微 surface lift（规格 §10） */
+.nav-item { position: relative; }
+.nav-item.active { background: rgba(214, 179, 106, 0.08); }
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  box-shadow: 0 0 8px var(--gold-glow);
+}
+.nav-item.active i { color: var(--gold); }
+
+/* ============================================================
+   Pipeline 六态（selected / running / done / blocked / failed / unavailable）
+   ============================================================ */
+.step { position: relative; border-radius: 8px; }
+.step.done b { color: var(--success); }
+.step.active {
+  background: var(--jade-soft);
+  border: 1px solid rgba(114, 201, 196, 0.3);
+}
+.step.active b { color: var(--jade); }
+.step.running b, .step.running span { color: var(--jade); }
+.step.running::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 30px;
+  height: 2px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, var(--jade), transparent);
+  animation: ir-spine 1.4s linear infinite;
+}
+@keyframes ir-spine {
+  0% { background-position: -30px 0; }
+  100% { background-position: 30px 0; }
+}
+.step.blocked { border: 1px dashed rgba(211, 167, 101, 0.35); }
+.step.blocked b { color: var(--warning); }
+.step.failed b { color: var(--danger); }
+.step.unavailable { opacity: 0.55; }
+.step.unavailable span { color: var(--text-faint); }
+/* 选中与 unavailable 正交：选中焦点在不可用阶段上仍可见 */
+.step.unavailable.active { opacity: 0.85; border-color: rgba(114, 201, 196, 0.3); background: var(--jade-soft); }
+
+/* ============================================================
+   按钮语义扩展：作者（Gold）/ AI（Jade）——现行 .btn/.btn-primary 保留
+   ============================================================ */
+.btn-author {
+  background: linear-gradient(180deg, rgba(214, 179, 106, 0.22), rgba(214, 179, 106, 0.1));
+  border: 1px solid var(--gold-line);
+  color: var(--gold-bright);
+}
+.btn-author:hover:not([disabled]) { background: rgba(214, 179, 106, 0.26); }
+.btn-ai {
+  background: var(--jade-soft);
+  border: 1px solid var(--jade-line-soft);
+  color: var(--jade);
+}
+.btn-ai:hover:not([disabled]) { border-color: var(--jade-line); }
+.btn:active:not([disabled]), .btn-primary:active:not([disabled]) { transform: scale(0.985) translateY(1px); }
+.btn:focus-visible, .btn-primary:focus-visible, .quiet-btn:focus-visible {
+  outline: 2px solid var(--jade);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   AI Candidate 标注（Candidate ≠ Accepted ≠ Committed）
+   ============================================================ */
+.draft-slice {
+  border-left: 2px solid var(--jade-line);
+  background: rgba(114, 201, 196, 0.045);
+  border-radius: 0 10px 10px 0;
+}
+.candidate-tag {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  font-size: 10px;
+  color: var(--jade);
+}
+.stream-caret::after {
+  content: "▎";
+  color: var(--jade);
+  animation: ir-caret 1s steps(2) infinite;
+}
+@keyframes ir-caret { 50% { opacity: 0; } }
+
+/* 诚实不可用卡（unavailable 必答三问） */
+.ir-unavailable {
+  border: 1px dashed rgba(211, 167, 101, 0.4);
+  border-radius: 10px;
+  background: rgba(211, 167, 101, 0.05);
+  padding: 12px 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ============================================================
+   Scene Settings Sheet（右侧 non-blocking，L6）
+   不设全屏 scrim：场景调整不打断写作，背景保持可操作（验收 P1 修订）。
+   ============================================================ */
+.scene-sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 396px;
+  max-width: 92vw;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(12, 23, 30, 0.96), rgba(8, 17, 23, 0.97));
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border-left: 1px solid var(--hairline-strong);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.5);
+  animation: ir-sheet-in var(--ir-sheet-t, 0.28s) var(--ease);
+}
+@keyframes ir-sheet-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.scene-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--hairline);
+}
+.scene-sheet-tabs { display: flex; gap: 2px; padding: 10px 14px 0; }
+.scene-sheet-tab {
+  flex: 1;
+  text-align: center;
+  font: 600 12px/1 var(--sans);
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 9px 4px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+}
+.scene-sheet-tab[aria-selected="true"] {
+  color: var(--jade);
+  background: rgba(114, 201, 196, 0.07);
+  border-color: var(--hairline);
+}
+.scene-sheet-body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 16px 20px;
+  border-top: 1px solid var(--hairline);
+}
+.scene-opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.scene-opt {
+  position: relative;
+  height: 56px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+  padding: 0;
+  background-size: cover;
+  background-position: center;
+}
+.scene-opt[aria-pressed="true"] {
+  border-color: rgba(214, 179, 106, 0.6);
+  box-shadow: 0 0 0 1px rgba(214, 179, 106, 0.35);
+}
+.scene-opt em {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  font: 600 10.5px/1 var(--sans);
+  font-style: normal;
+  color: var(--foreground);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.scene-ctl { margin: 14px 0; }
+.scene-ctl .lr {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.scene-ctl .lr b { font-family: var(--mono); color: var(--foreground); font-weight: 600; }
+.scene-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--jade) var(--fill, 50%), rgba(205, 225, 222, 0.14) var(--fill, 50%));
+  outline: none;
+}
+.scene-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--foreground);
+  border: 2px solid var(--surface-sunken);
+  box-shadow: 0 0 0 1px var(--hairline-strong);
+  cursor: pointer;
+}
+.scene-toggle {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: var(--surface-3);
+  border: 1px solid var(--hairline);
+  transition: background var(--ease) 0.2s;
+  flex: none;
+}
+.scene-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease);
+}
+.scene-toggle[aria-checked="true"] { background: rgba(214, 179, 106, 0.25); border-color: rgba(214, 179, 106, 0.5); }
+.scene-toggle[aria-checked="true"]::after { transform: translateX(14px); background: var(--gold-bright); }
+
+/* ============================================================
+   技能广场：能力卡墙 + detail Sheet（ADR-0028 · 10-skill-square 体系）
+   ============================================================ */
+.cap-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(224px, 1fr));
+  gap: 12px;
+}
+.card-capability.cap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 15px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.card-capability.cap .cap-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-capability.cap .cap-status-code {
+  margin-left: auto;
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+.card-capability.cap .cap-label {
+  font: 600 14px/1.4 var(--serif);
+  color: var(--foreground);
+  margin-top: 6px;
+}
+.card-capability.cap .cap-desc {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-muted);
+  min-height: 38px;
+}
+.card-capability.cap .cap-evidence {
+  font: 400 10.5px/1.6 var(--mono);
+  color: var(--text-faint);
+  border-top: 1px solid var(--hairline);
+  padding-top: 7px;
+  margin-top: 4px;
+}
+.cap-badge.st-provider { color: var(--jade); border-color: rgba(114, 201, 196, 0.4); }
+.cap-badge.st-config { color: var(--warning); border-color: rgba(211, 167, 101, 0.4); }
+.cap-badge.st-external { color: var(--danger); border-color: rgba(217, 131, 131, 0.4); }
+.capability-sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 396px;
+  max-width: 92vw;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(12, 23, 30, 0.96), rgba(8, 17, 23, 0.97));
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border-left: 1px solid var(--hairline-strong);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.5);
+  animation: ir-sheet-in var(--ir-sheet-t, 0.28s) var(--ease);
+}
+.cap-kv { margin: 12px 0; }
+.cap-kv .kicker { margin-bottom: 4px; }
+
+/* ============================================================
+   Workbench 章节轨（规格 §12.2）：主导航为横向轨，数字输入降级辅助。
+   字段全部来自真实 works 章节摘要；无缩略图数据不伪造封面。
+   ============================================================ */
+.chap-rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+}
+.chap-card {
+  flex: none;
+  width: 138px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  color: var(--text-muted);
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.chap-card:hover { border-color: var(--hairline-strong); transform: translateY(-1px); }
+.chap-card.current { border-color: var(--gold-line); background: rgba(214, 179, 106, 0.05); }
+.chap-card .cn { font: 600 10px/1 var(--mono); letter-spacing: 0.08em; color: var(--text-faint); }
+.chap-card .ct {
+  font: 600 13px/1.4 var(--serif);
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chap-card .cm { font: 400 10.5px/1.5 var(--mono); color: var(--text-faint); }
+
+/* ============================================================
+   Wizard 墨境化（规格 §22：大 Scene 背景 + 金色进度脊柱）
+   Scene 由壳层 L0 透出；此处只做脊柱与面板的语义升级。
+   ============================================================ */
+.wiz-step.active span { color: var(--gold-bright); }
+.wiz-step.active i {
+  color: var(--gold-bright);
+  background: rgba(214, 179, 106, 0.14);
+  border-color: rgba(214, 179, 106, 0.5);
+}
+
+/* ============================================================
+   Reading Slate 写作层（P1-2 冻结）：近实心、几乎无 blur、serif 正文、
+   稳定 measure；与 .mat-reading-slate 同材质家族。
+   ============================================================ */
+.reading-slate {
+  background: linear-gradient(180deg, rgba(9, 16, 22, 0.985), rgba(7, 13, 19, 0.985));
+  border: 1px solid rgba(205, 225, 222, 0.14);
+  border-radius: var(--ir-r-md, 10px);
+}
+.reading-slate textarea::placeholder { color: var(--text-faint); }
+
+/* ============================================================
+   共享元件：状态徽标 / 小按钮 / 证据行 / 附注 / 输入框
+   （此前仅在原型 HTML 存在——硬违规修复：类名回归 live CSS）
+   ============================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: 0.08em;
+  padding: 4px 9px;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background: rgba(205, 225, 222, 0.06);
+  border: 1px solid var(--hairline);
+}
+.badge::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.badge.b-neutral { color: var(--text-muted); }
+.badge.b-jade { color: var(--jade); background: var(--jade-soft); border-color: var(--jade-line-soft); }
+.badge.b-pass, .badge.b-committed { color: var(--success); background: rgba(120, 199, 157, 0.12); border-color: rgba(120, 199, 157, 0.4); }
+.badge.b-gold { color: var(--gold-bright); background: var(--gold-soft); border-color: var(--gold-line-soft); }
+.badge.b-stale { color: var(--warning); background: rgba(211, 167, 101, 0.12); border-color: rgba(211, 167, 101, 0.4); }
+.badge.b-blocked, .badge.b-error { color: var(--danger); background: var(--danger-soft, rgba(217, 131, 131, 0.14)); border-color: rgba(217, 131, 131, 0.45); }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+.row-evidence {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.row-evidence:last-child { border-bottom: none; }
+.row-evidence .em { color: var(--foreground); font-weight: 600; }
+
+.note { font-size: 11px; color: var(--text-faint); line-height: 1.7; }
+
+.input {
+  background: rgba(10, 20, 27, 0.8);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--foreground);
+  font: 400 13px/1.6 var(--sans);
+  padding: 8px 11px;
+  width: 100%;
+}
+.input:focus { outline: none; border-color: var(--jade-line); box-shadow: 0 0 0 2px var(--jade-soft); }
+.input::placeholder { color: var(--text-faint); }
+
+/* Slash/Bubble 菜单项：CSS hover 取代逐项 JS 处理（去重） */
+.ir-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  font: 400 12px/1.4 var(--sans);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.ir-menu-item:hover { background: var(--jade-soft); color: var(--foreground); }
+.ir-menu-item:hover .ir-menu-code { color: var(--jade); }
+.ir-menu-item:hover .ir-menu-label { color: var(--foreground); }
+.ir-menu-code { font: 600 10px/1 var(--mono); color: var(--text-faint); width: 24px; flex: none; letter-spacing: 0.06em; }
+.ir-menu-label { display: block; font-weight: 500; color: var(--foreground); }
+.ir-menu-desc { display: block; font-size: 10px; color: var(--text-faint); }
+
+/* 管线 done/failed 结构线索（状态不只用颜色表达） */
+.step.done b::before { content: "✓ "; font-size: 10px; }
+.step.failed b::before { content: "× "; font-size: 10px; }
+
+/* ============================================================
+   Reduced motion / reduced transparency：语义保留，动效退场
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .scene-layer, .scene-atmosphere, .scene-veil, .scene-figure { transition: none; animation: none; }
+  .step.running::after { animation: none; background: var(--jade); }
+  .scene-sheet { animation-duration: 0.001ms; }
+  .stream-caret::after { animation: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mat-scene-glass, .scene-sheet {
+    background: var(--surface-sunken);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* 旧 WebGL 墨流画布退场（V1 静帧场景为允许的 static fallback） */
+.ink-canvas { display: none; }
+
+/* ============================================================
+   1280 档（验收 P1）：顶栏工具图标化降级——只收文字标签，
+   控件不逐字换行；今日码字态缩为短文案。
+   ============================================================ */
+.top-actions .quiet-btn { white-space: nowrap; }
+@media (max-width: 1360px) {
+  .top-actions .top-btn-label { display: none; }
+  .quiet-btn-static-label { display: none; }
+  .quiet-btn-static { display: none; }
+  .brand small { display: none; }
+}
+@media (max-width: 1240px) {
+  .topbar { gap: 8px; }
+  .book-switch em { display: none; }
+}

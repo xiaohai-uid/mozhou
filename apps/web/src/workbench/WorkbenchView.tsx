@@ -6,8 +6,10 @@
 import { useState } from 'react'
 import { post } from '../lib/post'
 import { DialogueStream } from './DialogueStream'
+import { ProseEditorPanel } from './editor/ProseEditorPanel'
 import { DesktopToolModals, type DesktopModalType } from '../shell/DesktopToolModals'
 import type { BookInfo } from '../shell/workbenchStorage'
+import type { WorksChapterSummary } from '../../server/api'
 
 interface BookCreated {
   ok: true
@@ -26,11 +28,14 @@ export function WorkbenchView({
   onBookCreated,
   chapterIndex = 1,
   onChapterIndexChange,
+  chapters,
 }: {
   book: BookInfo | null
   onBookCreated: (book: BookInfo) => void
   chapterIndex?: number
   onChapterIndexChange?: (chapterIndex: number) => void
+  /** 章节轨数据（/api/works 真实章节摘要）；未提供时不渲染（测试/无书面）。 */
+  chapters?: readonly WorksChapterSummary[] | undefined
 }): JSX.Element {
   const [title, setTitle] = useState('未命名之书')
   const [createError, setCreateError] = useState<string | null>(null)
@@ -92,22 +97,50 @@ export function WorkbenchView({
               />
             </label>
           )}
-          <button className="btn" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => setActiveModal('history')}>
-            ⏱ 时光机 Diff
+          <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('history')}>
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z" /></svg>
+            时光机 Diff
           </button>
-          <button className="btn" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => setActiveModal('inspiration')}>
-            🎲 灵感工坊
+          <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('inspiration')}>
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>
+            灵感工坊
           </button>
-          <button className="btn" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => setActiveModal('export')}>
-            📦 导出排版
+          <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('export')}>
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></svg>
+            导出排版
           </button>
-          <button className="btn" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => setActiveModal('compliance')}>
-            🛡️ 敏感词审查
+          <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('compliance')}>
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></svg>
+            敏感词审查
           </button>
         </div>
       </div>
 
+      {chapters !== undefined && chapters.length > 0 && (
+        <div className="chap-rail" data-testid="chapter-rail" aria-label="章节轨">
+          {chapters.map((ch) => (
+            <button
+              key={ch.chapterIndex}
+              type="button"
+              className={'chap-card' + (ch.chapterIndex === chapterIndex ? ' current' : '')}
+              aria-current={ch.chapterIndex === chapterIndex || undefined}
+              onClick={() => onChapterIndexChange?.(ch.chapterIndex)}
+            >
+              <span className="cn">CH {String(ch.chapterIndex).padStart(2, '0')}</span>
+              <span className="ct">{ch.title}</span>
+              <span className="cm">
+                r{ch.revision} · {ch.wordCount} 字 ·{' '}
+                {ch.phase === 'committed' ? '已定稿' : ch.phase === 'draft' ? '草稿' : '规划'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="conversation">
+        {/* 正文写作层（Reading Slate）：Active Draft 本地草稿，全产品最安静区域 */}
+        <ProseEditorPanel book={book} chapterIndex={chapterIndex} />
+
         <DialogueStream book={book} chapterIndex={chapterIndex} />
 
         <section className="wb-section" data-testid="create-book">

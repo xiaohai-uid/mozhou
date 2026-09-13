@@ -18,6 +18,8 @@ export function InspectorHub({ book, onOpenDrawer }: InspectorHubProps): JSX.Ele
   const [receipts, setReceipts] = useState<ReceiptListResponse | null>(null)
   const [matrixData, setMatrixData] = useState<ChangeMatrixResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  /** 内联反馈（规格 §25.3：alert → inline）。 */
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
     if (!book) {
@@ -50,12 +52,22 @@ export function InspectorHub({ book, onOpenDrawer }: InspectorHubProps): JSX.Ele
       })
       setMatrixData(res)
     } catch (error) {
-      alert(`重新分析失败：${(error as Error).message}`)
+      setNotice({ kind: 'err', text: `重新分析失败：${(error as Error).message}` })
     }
   }
 
   return (
     <>
+      {notice !== null && (
+        <div
+          role="alert"
+          className={'mobile-inline-note err'}
+          style={{ margin: '10px 18px 0' }}
+          data-testid="inspector-notice"
+        >
+          {notice.text}
+        </div>
+      )}
       <div className="mobile-hub-header">
         <div className="mobile-hub-title-group">
           <div className="mobile-mark-seal">塔</div>

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`QualityPanel（Ink Orbit 换肤后语义保全） > 契约快照：pass 摘要渲染结构（ADR-0025 契约形状） 1`] = `
+exports[`QualityPanel（初载契约修复后语义保全） > 契约快照：初载 current 报告渲染结构 1`] = `
 <DocumentFragment>
   <section
     aria-label="literary-quality-panel"
@@ -28,21 +28,9 @@ exports[`QualityPanel（Ink Orbit 换肤后语义保全） > 契约快照：pass
         Exact draft: revision 3 · hash 91e4d2f0a1b2…
       </p>
       <p
-        class="mono muted"
-        style="margin: 6px 0px 0px;"
-      >
-        Rework attempt 0/2
-      </p>
-      <p
         style="margin: 8px 0px 0px; color: var(--success); font-size: 11px;"
       >
         审查通过，可进入作者编辑。
-      </p>
-      <p
-        class="banner"
-        style="margin-top: 10px; margin-bottom: 0px;"
-      >
-        语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。
       </p>
       <div
         class="actions"

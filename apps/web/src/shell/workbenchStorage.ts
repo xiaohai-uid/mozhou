@@ -69,3 +69,8 @@ export function saveDraftCache(text: string, chapterKey = 'ch_1'): void {
     // 静默容错
   }
 }
+
+/** 章维度草稿缓存键唯一出处（写作层/对话流/移动阅读面共用，禁止再内联）。 */
+export function chapterDraftKey(chapterIndex: number): string {
+  return `ch_${chapterIndex}`
+}

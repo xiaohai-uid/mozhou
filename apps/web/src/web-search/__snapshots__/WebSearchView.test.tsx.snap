@@ -14,18 +14,8 @@ exports[`WebSearchView（联网搜索） > 搜索输入、热门词与结果卡�
     <span
       class="meta"
     >
-      创作资料库 · 设定背景速查（本地离线知识库）
+      创作资料库 · 设定背景速查
     </span>
-    <div
-      class="save"
-    >
-      <span
-        class="cap-badge native"
-        style="font-size: 9px;"
-      >
-        本地内置资料库
-      </span>
-    </div>
   </div>
   <div
     class="conversation"

@@ -7,6 +7,12 @@ export interface EditorQualityTelemetryProps {
   className?: string;
 }
 
+/**
+ * 编辑器质量遥测条（Ink Realm · Evidence Row 语义）。
+ * 浏览器挂载注意：@mozhou/quality-engine 包根经 policy/staleness 携 node:crypto /
+ * node:fs——正式接入前需提供浏览器安全子路径导出；在那之前本组件保持
+ * CODE_PRESENT_UNMOUNTED，不进主包。
+ */
 export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
   content,
   whitelistWords = [],
@@ -18,7 +24,7 @@ export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
     const wordCount = (text.match(/[\u4e00-\u9fa5]|\b[a-zA-Z0-9_]+\b/g) || []).length;
     const paragraphCount = text ? text.split(/\n+/).filter(Boolean).length : 0;
 
-    // Fast 4-gram repetition check (Chinese characters sliding window)
+    // 4-gram 中文滑窗复读
     const cleanChars = text.replace(/[^\u4e00-\u9fa5]/g, '');
     const ngrams = new Map<string, number>();
     let repetitionCount = 0;
@@ -31,56 +37,32 @@ export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
       }
     }
 
-    // Comprehensive De-AI Industrial Diagnostics
     const deAiReport = runDeAiDiagnostics(text, whitelistWords);
-
     const isClean = repetitionCount === 0 && deAiReport.clean;
 
-    return {
-      charCount,
-      wordCount,
-      paragraphCount,
-      repetitionCount,
-      deAiReport,
-      isClean,
-    };
+    return { charCount, wordCount, paragraphCount, repetitionCount, deAiReport, isClean };
   }, [content, whitelistWords]);
 
+  const metricColor = (bad: boolean): string => (bad ? 'var(--danger)' : 'var(--success)');
+
   return (
-    <div className={`flex items-center gap-4 text-xs font-mono text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800 ${className}`}>
-      <div className="flex items-center gap-1.5">
-        <span className="text-zinc-500">字数:</span>
-        <span className="text-zinc-200 font-medium">{telemetry.wordCount}</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-zinc-500">段落:</span>
-        <span className="text-zinc-200 font-medium">{telemetry.paragraphCount}</span>
-      </div>
-      <div className="h-3 w-px bg-zinc-700" />
-      <div className="flex items-center gap-1.5">
-        <span className="text-zinc-500">4-gram 复读:</span>
-        <span className={telemetry.repetitionCount === 0 ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
-          {telemetry.repetitionCount}
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-zinc-500">Tier 1 必阻断:</span>
-        <span className={telemetry.deAiReport.tier1Count === 0 ? 'text-emerald-400' : 'text-rose-400 font-semibold'}>
-          {telemetry.deAiReport.tier1Count}
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-zinc-500">Tier 2 聚集:</span>
-        <span className={telemetry.deAiReport.tier2Count === 0 ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
-          {telemetry.deAiReport.tier2Count}
-        </span>
-      </div>
-      <div className="ml-auto flex items-center gap-1.5">
-        <span className={`inline-block w-2 h-2 rounded-full ${telemetry.isClean ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`} />
-        <span className={telemetry.isClean ? 'text-emerald-400 font-sans text-[11px]' : 'text-amber-400 font-sans text-[11px]'}>
+    <div
+      className={`row-evidence ${className}`}
+      style={{ gap: 14, padding: '6px 10px', flexWrap: 'wrap' }}
+      data-testid="editor-quality-telemetry"
+    >
+      <span><span style={{ color: 'var(--text-faint)' }}>字数 </span><span className="em">{telemetry.wordCount}</span></span>
+      <span><span style={{ color: 'var(--text-faint)' }}>段落 </span><span className="em">{telemetry.paragraphCount}</span></span>
+      <span><span style={{ color: 'var(--text-faint)' }}>4-gram 复读 </span><span className="em" style={{ color: metricColor(telemetry.repetitionCount > 0) }}>{telemetry.repetitionCount}</span></span>
+      <span><span style={{ color: 'var(--text-faint)' }}>Tier 1 必阻断 </span><span className="em" style={{ color: metricColor(telemetry.deAiReport.tier1Count > 0) }}>{telemetry.deAiReport.tier1Count}</span></span>
+      <span><span style={{ color: 'var(--text-faint)' }}>Tier 2 聚集 </span><span className="em" style={{ color: metricColor(telemetry.deAiReport.tier2Count > 0) }}>{telemetry.deAiReport.tier2Count}</span></span>
+      <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <span className="badge" style={{ fontSize: 9, ...(telemetry.isClean
+          ? { color: 'var(--success)', background: 'rgba(120,199,157,.12)', borderColor: 'rgba(120,199,157,.4)' }
+          : { color: 'var(--warning)', background: 'rgba(211,167,101,.12)', borderColor: 'rgba(211,167,101,.4)' }) }}>
           {telemetry.isClean ? `De-AI 正典纯净 (${telemetry.deAiReport.score}分)` : `AI 腔调待净化 (${telemetry.deAiReport.score}分)`}
         </span>
-      </div>
+      </span>
     </div>
   );
 };

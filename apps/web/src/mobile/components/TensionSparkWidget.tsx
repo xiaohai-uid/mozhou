@@ -7,7 +7,8 @@ export interface TensionSparkWidgetProps {
   onSelectStage?: (stageIndex: number) => void
 }
 
-const STAGES = ['设定', '大纲', '草稿', '审查', '修订', '排版', '分卷', '发布']
+/** 阶段词表 = 管线八步（与桌面 PipelineStrip 同源，禁止再用旧聊天七相位/发布词表）。 */
+const STAGES = ['准备', '装配', '草稿', '审查', '提取', '连续性', '提案', '提交']
 
 export function TensionSparkWidget({
   tensionScore,
@@ -35,7 +36,7 @@ export function TensionSparkWidget({
     const pts = [20, 38, 30, 60, 48, 75, 68, tensionScore]
     const step = w / (pts.length - 1)
     ctx.clearRect(0, 0, w, h)
-    ctx.strokeStyle = '#9d8dff'
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-mobile').trim() || '#72c9c4'
     ctx.lineWidth = 2
     ctx.beginPath()
     pts.forEach((v, i) => {

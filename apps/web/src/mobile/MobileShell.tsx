@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { FluidInkBackground } from './components/FluidInkBackground'
+import { useEffect, useMemo, useState } from 'react'
+import { SceneLayer } from '../shell/scene/SceneLayer'
+import { loadScenePreference, resolveSceneProfile } from '../shell/scene/scenePreference'
 import { MobileStatusBar } from './components/MobileStatusBar'
+import { MobileChaptersDrawer } from './drawers/MobileChaptersDrawer'
 import { MobileTabBar, type MobileHubId } from './components/MobileTabBar'
 import { MobileDrawerSheet } from './components/MobileDrawerSheet'
 import type { BookInfo } from '../shell/workbenchStorage'
@@ -19,13 +21,7 @@ import './styles/mobile.css'
 
 export type { ActiveDrawerType } from './types'
 
-export interface MobileShellProps {
-  book: BookInfo | null
-  onSwitchBook: (book: BookInfo) => void
-  chapterIndex?: number | undefined
-  onSelectChapter?: ((index: number) => void) | undefined
-}
-
+/** 未接入能力的诚实占位卡（不伪造数据）。 */
 function PreviewUnavailable({ label }: { label: string }): JSX.Element {
   return (
     <div className="mobile-card" style={{ margin: 0, background: 'var(--surface-core-mobile)' }}>
@@ -37,6 +33,13 @@ function PreviewUnavailable({ label }: { label: string }): JSX.Element {
   )
 }
 
+export interface MobileShellProps {
+  book: BookInfo | null
+  onSwitchBook: (book: BookInfo) => void
+  chapterIndex?: number | undefined
+  onSelectChapter?: ((index: number) => void) | undefined
+}
+
 export function MobileShell({
   book,
   onSwitchBook,
@@ -45,6 +48,30 @@ export function MobileShell({
 }: MobileShellProps): JSX.Element {
   const [activeHub, setActiveHub] = useState<MobileHubId>('workbench')
   const [activeDrawer, setActiveDrawer] = useState<ActiveDrawerType>(null)
+  /** 灵感采用 → Composer 回填管道（P1-3 链 4）。 */
+  const [composerInject, setComposerInject] = useState<{ id: number; text: string } | null>(null)
+
+  /** 移动端 Scene（规格 §25.2）：与桌面同一偏好源；Figure 默认关、veil 加重、无 parallax。
+   *  同会话偏好编辑（桌面 Sheet / storage 事件）即时跟随（规格 §3.4）。 */
+  const [sceneVersion, setSceneVersion] = useState(0)
+  useEffect(() => {
+    const onSceneRefresh = (): void => setSceneVersion((v) => v + 1)
+    window.addEventListener('mozhou:scene-refresh', onSceneRefresh)
+    window.addEventListener('storage', onSceneRefresh)
+    return () => {
+      window.removeEventListener('mozhou:scene-refresh', onSceneRefresh)
+      window.removeEventListener('storage', onSceneRefresh)
+    }
+  }, [])
+  const sceneProfile = useMemo(() => {
+    void sceneVersion
+    const profile = resolveSceneProfile(loadScenePreference(), book?.bookId ?? null)
+    return {
+      ...profile,
+      veil: Math.max(profile.veil, 0.62),
+      figure: { ...profile.figure, enabled: false },
+    }
+  }, [book?.bookId, sceneVersion])
 
   const handleOpenDrawer = (type: ActiveDrawerType) => setActiveDrawer(type)
   const handleCloseDrawer = () => setActiveDrawer(null)
@@ -65,7 +92,7 @@ export function MobileShell({
 
   return (
     <div className="mobile-app-root">
-      <FluidInkBackground />
+      <SceneLayer profile={sceneProfile} />
       <MobileStatusBar authorName="本地创作者" statusText="Technical Preview" onOpenAuth={() => handleOpenDrawer('auth')} />
 
       <main className="mobile-viewport">
@@ -74,7 +101,7 @@ export function MobileShell({
             book={book}
             onOpenDrawer={handleOpenDrawer}
             chapterIndex={chapterIndex}
-            onSelectChapter={onSelectChapter}
+            composerInject={composerInject ?? undefined}
           />
         </div>
         <div className={`mobile-view-pane ${activeHub === 'inspector' ? 'active' : ''}`}>
@@ -99,10 +126,22 @@ export function MobileShell({
         )}
         {activeDrawer === 'license' && <PreviewUnavailable label="许可证购买与激活" />}
         {activeDrawer === 'history' && <VersionHistoryDrawer onClose={handleCloseDrawer} />}
-        {activeDrawer === 'inspiration' && <InspirationDrawer onClose={handleCloseDrawer} />}
+        {activeDrawer === 'inspiration' && (
+          <InspirationDrawer
+            onClose={handleCloseDrawer}
+            onAdopt={(text) => setComposerInject({ id: Date.now(), text })}
+          />
+        )}
         {activeDrawer === 'export' && <ExportPublishDrawer onClose={handleCloseDrawer} />}
         {activeDrawer === 'compliance' && <ComplianceDrawer />}
-        {activeDrawer === 'chapters' && <PreviewUnavailable label="移动端章节目录" />}
+        {activeDrawer === 'chapters' && (
+          <MobileChaptersDrawer
+            book={book}
+            chapterIndex={chapterIndex ?? 1}
+            onSelectChapter={(index) => onSelectChapter?.(index)}
+            onClose={handleCloseDrawer}
+          />
+        )}
         {activeDrawer === 'distill' && <PreviewUnavailable label="移动端文风画像" />}
       </MobileDrawerSheet>
     </div>

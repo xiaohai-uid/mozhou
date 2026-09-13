@@ -208,14 +208,19 @@ describe('App 壳集成（T40）', () => {
     expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
   })
 
-  it('管线条点击切换激活阶段（牵引背景墨迹聚焦）', async () => {
+  it('管线条点击切换激活阶段（牵引背景聚焦）；无书时全部 unavailable——被点击 ≠ 执行成功', async () => {
     stubAppFetch()
     render(<App />)
     const commit = document.querySelector('[data-stage="commit"]')
     if (commit === null) throw new Error('missing commit step')
     await userEvent.click(commit)
+    // 选中态始终可表达
     expect(commit.className).toContain('active')
-    expect(document.querySelector('[data-stage="prepare"]')?.className).toContain('done')
+    // 无书 = 全阶段 unavailable（真实数据证据缺失），点击不得伪造 done
+    const prepare = document.querySelector('[data-stage="prepare"]')
+    if (prepare === null) throw new Error('missing prepare step')
+    expect(prepare.className).toContain('unavailable')
+    expect(prepare.className).not.toContain('done')
   })
 
   it('书名与视图经 localStorage 持久化（建书后写入）', async () => {

@@ -1,14 +1,13 @@
 /**
- * 云同步与备份（CloudSyncView）视图（实现票 T54）：
- * 本地离线优先（Local-First）状态监测、本地快照备份导出、
- * 存储指标与端到端隐私安全看板。
+ * 云同步与备份（CloudSyncView）视图（实现票 T54 · Ink Realm 真值修订）：
+ * Local-First 状态监测、存储指标与隐私安全看板。
+ * 快照备份：真实归档能力未上线（/api/cloud-sync.backup 恒 501 fail-closed）——
+ * UI 只呈现诚实 unavailable，不提供任何可执行备份动作（规格 §20）。
  *
- * 数据面（/api/cloud-sync 与 /api/cloud-sync.backup 中间件）：
- * - POST /api/cloud-sync {root?} → CloudSyncResponse
- * - POST /api/cloud-sync.backup {root} → BackupExportResponse
+ * 数据面：POST /api/cloud-sync {root?} → CloudSyncResponse
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { CloudSyncResponse, BackupExportResponse } from '../../server/api'
+import type { CloudSyncResponse } from '../../server/api'
 import { post } from '../lib/post'
 
 export function CloudSyncView({
@@ -18,8 +17,6 @@ export function CloudSyncView({
   root: string | null
 }): JSX.Element {
   const [data, setData] = useState<CloudSyncResponse | null>(null)
-  const [backup, setBackup] = useState<BackupExportResponse | null>(null)
-  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<void> => {
@@ -36,27 +33,15 @@ export function CloudSyncView({
     void load()
   }, [load])
 
-  const handleExportBackup = async (): Promise<void> => {
-    if (root === null) return
-    setExporting(true)
-    setError(null)
-    try {
-      const res = await post<BackupExportResponse>('/api/cloud-sync.backup', { root })
-      setBackup(res)
-    } catch (cause) {
-      setError((cause as Error).message)
-    } finally {
-      setExporting(false)
-    }
-  }
-
   return (
     <section className="center solo" aria-label="cloud-sync-view">
       <div className="chapterbar">
         <h1>云同步与备份</h1>
         <span className="meta">本地离线优先 · 增量快照备份</span>
         <div className="save">
-          <span className="cap-badge native">● 本地离线就绪</span>
+          <span className="cap-badge native">
+            {data === null ? '状态读取中…' : data.localReady ? '● 本地离线就绪' : '本地数据面未就绪'}
+          </span>
         </div>
       </div>
 
@@ -111,41 +96,25 @@ export function CloudSyncView({
           </div>
         </section>
 
-        {/* 本地快照导出与备份 */}
+        {/* 本地快照备份：真实归档能力未上线——诚实 unavailable，不提供任何可执行备份动作
+            （服务端 fail-closed：POST /api/cloud-sync.backup 恒 501 BACKUP_NOT_IMPLEMENTED，未创建任何文件） */}
         <section className="wb-section" data-testid="sync-backup-section">
           <h2>作品快照备份</h2>
           <div className="card-shell">
             <div className="card">
               <div className="card-title">
                 <b>生成当前作品独立快照</b>
-                <span className="mono muted">单文件导出 · 便携迁移</span>
+                <span className="mono muted">规划能力 · 未上线</span>
               </div>
-              <p className="muted" style={{ margin: 0, fontSize: 11 }}>
-                为当前作品生成包含全量正典文件与元数据指纹的完整离线快照，方便备份至外部移动硬盘或个人私有云盘。
-              </p>
-              <div className="actions" style={{ marginTop: 10 }}>
-                <button
-                  className="btn-primary"
-                  onClick={() => { void handleExportBackup() }}
-                  disabled={exporting || root === null}
-                >
-                  {exporting ? '打包快照中…' : '创建作品快照备份'}
-                </button>
-                {root === null && (
-                  <span className="mono muted" style={{ alignSelf: 'center' }}>
-                    （需先建立或打开作品）
-                  </span>
-                )}
+              <div className="ir-unavailable" style={{ marginTop: 10 }} data-testid="sync-backup-unavailable">
+                <b style={{ color: 'var(--warning)' }}>快照备份 · 尚未提供</b>
+                <br />
+                Technical Preview 尚未提供可验证的备份归档，因此这里不提供任何备份操作——不会出现「创建备份」按钮，也不会创建任何文件。
+                <br />
+                <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>
+                  过渡方案：正文为透明明文 Markdown，可直接复制作品目录完成外部备份（见下方隐私与安全规范）。
+                </span>
               </div>
-
-              {backup !== null && (
-                <div className="banner" style={{ marginTop: 12 }} data-testid="sync-backup-result">
-                  <b>快照创建成功：</b>
-                  <div className="mono" style={{ marginTop: 4 }}>
-                    ID: {backup.snapshotId} · 文件数: {backup.fileCount} · 签名: {backup.manifestDigest}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </section>

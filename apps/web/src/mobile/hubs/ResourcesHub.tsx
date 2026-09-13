@@ -17,6 +17,8 @@ export function ResourcesHub({}: ResourcesHubProps): JSX.Element {
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [importingUrl, setImportingUrl] = useState<string | null>(null)
+  /** 内联反馈（规格 §25.3：alert → inline）。 */
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -39,16 +41,16 @@ export function ResourcesHub({}: ResourcesHubProps): JSX.Element {
 
   const handleImportBook = async (book: CrawledBook) => {
     if (!book.url) {
-      alert('该检索结果没有可提取 URL。')
+      setNotice({ kind: 'err', text: '该检索结果没有可提取 URL。' })
       return
     }
     setImportingUrl(book.url)
     try {
       const res = await post<{ ok: boolean; title?: string; error?: string }>('/api/crawler.extract', { url: book.url })
-      if (res.ok) alert(`《${book.title}》内容提取成功。后续拆解能力尚未接入。`)
-      else alert(`《${book.title}》提取失败：${res.error ?? '未知错误'}`)
+      if (res.ok) setNotice({ kind: 'ok', text: `《${book.title}》内容提取成功。后续拆解能力尚未接入。` })
+      else setNotice({ kind: 'err', text: `《${book.title}》提取失败：${res.error ?? '未知错误'}` })
     } catch (cause) {
-      alert(`《${book.title}》提取失败：${(cause as Error).message}`)
+      setNotice({ kind: 'err', text: `《${book.title}》提取失败：${(cause as Error).message}` })
     } finally {
       setImportingUrl(null)
     }
@@ -81,6 +83,17 @@ export function ResourcesHub({}: ResourcesHubProps): JSX.Element {
           </button>
         </div>
       </form>
+
+      {notice !== null && (
+        <div
+          role={notice.kind === 'err' ? 'alert' : 'status'}
+          className={'mobile-inline-note ' + notice.kind}
+          style={{ margin: '10px 18px 0' }}
+          data-testid="resources-notice"
+        >
+          {notice.text}
+        </div>
+      )}
 
       {error && <div className="mobile-card" style={{ fontSize: 12, color: 'var(--fg-muted-mobile)' }}>检索提示：{error}</div>}
 

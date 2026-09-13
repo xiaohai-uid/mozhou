@@ -5,15 +5,26 @@ import { loadDraftCache, saveDraftCache } from '../../shell/workbenchStorage'
 export interface MobileComposerProps {
   onSendPrompt?: (prompt: string) => void
   onOpenInspiration?: () => void
+  /** 外部回填（情节选择/灵感采用）：变更时追加进输入框。 */
+  inject?: { id: number; text: string } | undefined
 }
 
 export function MobileComposer({
   onSendPrompt,
   onOpenInspiration,
+  inject,
 }: MobileComposerProps): JSX.Element {
   const [text, setText] = useState(() => loadDraftCache('composer_draft'))
   const [keyboardOffset, setKeyboardOffset] = useState(0)
+  const [lastInjectId, setLastInjectId] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    if (inject === undefined || inject.id === lastInjectId) return
+    setLastInjectId(inject.id)
+    setText((prev) => (prev.trim().length > 0 ? `${prev} ${inject.text}` : inject.text))
+    textareaRef.current?.focus()
+  }, [inject, lastInjectId])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return
@@ -82,7 +93,7 @@ export function MobileComposer({
             className="tool-mini-chip"
             onClick={onOpenInspiration}
           >
-            🎲 灵感起名
+            灵感起名
           </button>
           <button
             type="button"
@@ -112,8 +123,9 @@ export function MobileComposer({
           className="send-action-circle"
           onClick={handleSend}
           title="生成草稿"
+          aria-label="生成草稿"
         >
-          <SendIcon className="svg-icon" style={{ stroke: '#fff', width: 16, height: 16 }} />
+          <SendIcon className="svg-icon" style={{ stroke: '#fff', width: 18, height: 18 }} />
         </button>
       </div>
     </div>

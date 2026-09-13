@@ -5,6 +5,7 @@
  * 显式 unavailable（Gate 3 纪律：不静默假装可用）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { chapterDraftKey, loadDraftCache, saveDraftCache } from '../shell/workbenchStorage'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
 import type { BookInfo } from '../shell/workbenchStorage'
 
@@ -19,6 +20,10 @@ interface DraftStreamFrame {
   readonly partial?: boolean
   readonly chars?: number
   readonly code?: string
+  /** start 帧（规格 §12.3：候选证据行）。 */
+  readonly contextTokens?: number
+  readonly provider?: string
+  readonly contextMode?: string
 }
 
 export function DialogueStream({
@@ -38,6 +43,10 @@ export function DialogueStream({
   const [error, setError] = useState<string | null>(null)
   const [providerUnavailable, setProviderUnavailable] = useState(false)
   const [sending, setSending] = useState(false)
+  /** start 帧证据（装配 tokens/provider）——AI CANDIDATE 的来源可追溯性。 */
+  const [streamMeta, setStreamMeta] = useState<{ contextTokens?: number; provider?: string } | null>(null)
+  /** 采纳进写作层的回执（Candidate → Accept → Active Draft 链）。 */
+  const [adoptState, setAdoptState] = useState<string | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
 
   useEffect(() => {
@@ -118,7 +127,12 @@ export function DialogueStream({
           buffer = buffer.slice(nl + 1)
           if (line.trim().length === 0) continue
           const frame = JSON.parse(line) as DraftStreamFrame
-          if (frame.event === 'delta' && typeof frame.text === 'string') {
+          if (frame.event === 'start') {
+            setStreamMeta({
+              ...(frame.contextTokens !== undefined ? { contextTokens: frame.contextTokens } : {}),
+              ...(frame.provider !== undefined ? { provider: frame.provider } : {}),
+            })
+          } else if (frame.event === 'delta' && typeof frame.text === 'string') {
             setDraftText((prev) => prev + frame.text)
           } else if (frame.event === 'done') {
             setPhase('draft_done')
@@ -145,7 +159,23 @@ export function DialogueStream({
     setDraftText('')
     setError(null)
     setAnswer('')
+    setStreamMeta(null)
+    setAdoptState(null)
   }
+
+  /** Accept：把 AI Candidate 文本采纳进写作层 Active Draft（ch<N> 本地草稿缓存），
+   *  供 Reading Slate 继续编辑/落盘。不改变服务端已落章的草稿事实。
+   *  写作层已有作者文本时先确认（Author Sovereignty：不静默覆盖）。 */
+  const handleAdoptIntoSlate = useCallback((): void => {
+    const cacheKey = chapterDraftKey(chapterIndex)
+    const existing = loadDraftCache(cacheKey)
+    if (existing.trim().length > 0 && !window.confirm(`第 ${chapterIndex} 章写作层已有草稿文本（${existing.length} 字符）。采纳将替换为候选文本——继续？`)) {
+      return
+    }
+    saveDraftCache(draftText, cacheKey)
+    window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
+    setAdoptState(`已采纳进写作层（第 ${chapterIndex} 章 Active Draft，${draftText.length} 字符）——可在正文 · Active Draft 继续编辑，落盘经「Accept → Active Draft」。`)
+  }, [draftText, chapterIndex])
 
   const toggleSkill = (skillId: string): void => {
     setSelectedSkills((prev) =>
@@ -211,9 +241,34 @@ export function DialogueStream({
       ) : null}
 
       {(phase === 'drafting' || phase === 'draft_done') && (
-        <article className="draft-slice" data-testid="draft-slice">
-          <div className="kicker">DRAFT STREAM · {phase === 'drafting' ? '渲染中' : '完成'}</div>
-          <p data-testid="draft-text">{draftText}</p>
+        <article className="draft-slice candidate" data-testid="draft-slice">
+          <div className="kicker">
+            <span className="candidate-tag">AI CANDIDATE · {phase === 'drafting' ? 'STREAMING · 渲染中' : 'DONE · 完成'}</span>
+            {streamMeta !== null && (
+              <span className="mono muted" style={{ marginLeft: 8, fontSize: 10 }}>
+                start · {streamMeta.contextTokens !== undefined ? `${streamMeta.contextTokens} tok` : 'context —'}
+                {streamMeta.provider !== undefined ? ` · ${streamMeta.provider}` : ''}
+              </span>
+            )}
+          </div>
+          <p data-testid="draft-text" className={phase === 'drafting' ? 'stream-caret' : undefined}>{draftText}</p>
+          {phase === 'draft_done' && (
+            <>
+              <p className="mono muted" style={{ margin: '6px 0 0', fontSize: 10 }}>
+                已流式落盘为当前章草稿（服务端原子写入）——质量门常驻，Accepted ≠ Committed。
+              </p>
+              {adoptState !== null && (
+                <p role="status" className="mono" style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--success)' }} data-testid="adopt-state">
+                  {adoptState}
+                </p>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="btn btn-author btn-sm" data-testid="adopt-into-slate" onClick={handleAdoptIntoSlate}>
+                  采纳进写作层（Accept → Active Draft）
+                </button>
+              </div>
+            </>
+          )}
         </article>
       )}
 

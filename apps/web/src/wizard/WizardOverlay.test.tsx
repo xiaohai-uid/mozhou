@@ -43,8 +43,10 @@ describe('WizardOverlay（T42）', () => {
     await waitFor(() => {
       expect(screen.getByTestId('wizard-eyebrow').textContent).toBe('STEP 03 / 05')
     })
-    // 步 3 大纲（含 OutlineNodeScan 读面包络说明）
-    expect(screen.getByTestId('wizard-outline-scan').textContent).toContain('OutlineNodeScan')
+    // 步 3 大纲（诚实表述：总纲/卷骨架由管线逐步展开，向导不写入 Canon）
+    expect(screen.getByTestId('wizard-outline-scan').textContent).toContain('逐步展开')
+    expect(screen.getByTestId('wizard-outline-scan').textContent).toContain('不在此处写入 Canon')
+    expect(screen.getByTestId('wizard-outline-scan').textContent).not.toContain('OutlineNodeScan')
     await userEvent.type(screen.getByLabelText('卷级承诺'), '找回一个全城都不记得的人')
     await userEvent.click(screen.getByRole('button', { name: /继续/ }))
     await waitFor(() => {

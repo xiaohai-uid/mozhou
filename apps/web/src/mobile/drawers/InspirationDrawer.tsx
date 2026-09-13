@@ -9,9 +9,11 @@ import {
 
 export interface InspirationDrawerProps {
   onClose: () => void
+  /** 采用 → 回填写作输入框（MobileShell 管道）。提供时按钮语义为真。 */
+  onAdopt?: (text: string) => void
 }
 
-export function InspirationDrawer({ onClose }: InspirationDrawerProps): JSX.Element {
+export function InspirationDrawer({ onClose, onAdopt }: InspirationDrawerProps): JSX.Element {
   const [nameResult, setNameResult] = useState('陆玄 / 顾清河 / 赵铁鹰')
   const [sectResult, setSectResult] = useState('太虚道宗 / 九曜魔门')
   const [itemResult, setItemResult] = useState('破煞法弩 / 七绝离火镜')
@@ -138,7 +140,14 @@ export function InspirationDrawer({ onClose }: InspirationDrawerProps): JSX.Elem
           marginTop: 6,
         }}
         onClick={() => {
-          alert(`已将灵感元素填入写作上下文：${nameResult}`)
+          // 真实回填：经 Shell 管道送入 Composer 输入框（P1-5 修订——动作与语义一致）；
+          // 同时复制到剪贴板作为冗余。
+          try {
+            void navigator.clipboard?.writeText(nameResult).catch(() => {})
+          } catch {
+            // 剪贴板不可用不阻塞回填。
+          }
+          onAdopt?.(nameResult)
           onClose()
         }}
       >
