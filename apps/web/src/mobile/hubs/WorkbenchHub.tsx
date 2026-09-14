@@ -68,8 +68,9 @@ export function WorkbenchHub({
     }
   }, [book, chapterIndex])
 
-  // 本地 Active Draft 草稿缓存（桌面写作层与移动端同一 workbenchStorage 面）。
-  const draftCacheText = loadDraftCache(chapterDraftKey(chapterIndex))
+  // 本地 Active Draft 草稿缓存（桌面写作层与移动端同一 workbenchStorage 面；
+  // T00：键绑定书身份，未绑书不读任何缓存）。
+  const draftCacheText = loadDraftCache(book !== null ? chapterDraftKey(book, chapterIndex) : null)
   const proseParagraphs = draftCacheText
     .split(/\n+/)
     .map((p) => p.replace(/^　+/, '').trim())
@@ -193,6 +194,23 @@ export function WorkbenchHub({
         <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--fg-muted-mobile)' }}>
           Technical Preview 不展示虚构字数、目标完成率或连更天数。
         </div>
+      </div>
+
+      {/* 漫剧分镜入口（T04）：创作 Hub → 同一分镜视图（抽屉全高）。 */}
+      <div className="mobile-card" style={{ margin: '10px 18px 0' }}>
+        <b>漫剧分镜</b>
+        <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--fg-muted-mobile)' }}>
+          把第 {chapterIndex} 章转换为镜头（画面/对白/时长/提示词）；改编不改原文，不生成图片/视频。
+        </div>
+        <button
+          type="button"
+          className="mobile-action-btn"
+          style={{ marginTop: 10, minHeight: 44 }}
+          onClick={() => onOpenDrawer('storyboard')}
+          data-testid="workbench-open-storyboard"
+        >
+          打开分镜工作区 →
+        </button>
       </div>
 
       <TensionSparkWidget currentStage={currentStage} onSelectStage={setCurrentStage} />

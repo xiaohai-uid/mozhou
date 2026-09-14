@@ -2,8 +2,8 @@
  * 正文写作层（Reading Slate · ADR-0028 · P1-2 修订落地）：
  * 把已存在的 editor 组件链（Canvas + Slash + Bubble）正式挂载进 Workbench。
  *
- * 持久化：Active Draft 本地草稿缓存（mozhou.draft.cache.ch<N>，与移动端/账本
- * 同一 workbenchStorage 纪律）——这是作者的工作文本，不是 Chapter Commit。
+ * 持久化：Active Draft 本地草稿缓存（mozhou.draft.cache.ch_<书身份>_<N>，T00 起键绑定书，
+ * 与移动端/账本同一 workbenchStorage 纪律）——这是作者的工作文本，不是 Chapter Commit。
  * AI 选区动作（bubble 预设 / rewrite / deslop）：当前无正文编辑 AI 契约——
  * 呈现诚实不可用（需 provider/契约），不伪造调优结果。
  * 质量遥测条：@mozhou/quality-engine 包根携 node:crypto，不进浏览器包——
@@ -21,24 +21,26 @@ export interface ProseEditorPanelProps {
 }
 
 export function ProseEditorPanel({ book, chapterIndex }: ProseEditorPanelProps): JSX.Element {
-  const [text, setText] = useState(() => loadDraftCache(chapterDraftKey(chapterIndex)))
-  const [loadedFor, setLoadedFor] = useState(chapterIndex)
+  // T00：缓存键绑定书身份——切书（含同章号）必须重载对应书的草稿；未绑书不读缓存。
+  const draftKey = book !== null ? chapterDraftKey(book, chapterIndex) : null
+  const [text, setText] = useState(() => loadDraftCache(draftKey))
+  const [loadedFor, setLoadedFor] = useState(draftKey)
   const [notice, setNotice] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<{ kind: 'busy' | 'ok' | 'err'; text: string } | null>(null)
 
-  // 切章：载入对应章的本地 Active Draft 缓存
-  if (loadedFor !== chapterIndex) {
-    setLoadedFor(chapterIndex)
-    setText(loadDraftCache(chapterDraftKey(chapterIndex)))
+  // 切书或切章：载入对应书章的本地 Active Draft 缓存
+  if (loadedFor !== draftKey) {
+    setLoadedFor(draftKey)
+    setText(loadDraftCache(draftKey))
     setNotice(null)
   }
 
   const handleChange = useCallback(
     (next: string) => {
       setText(next)
-      saveDraftCache(next, chapterDraftKey(chapterIndex))
+      saveDraftCache(next, draftKey)
     },
-    [chapterIndex],
+    [draftKey],
   )
 
   const handleSelectionAction = useCallback((action: string): void => {
@@ -51,8 +53,8 @@ export function ProseEditorPanel({ book, chapterIndex }: ProseEditorPanelProps):
 
   const draftMeta = useMemo(() => {
     const chars = text.replace(/\s/g, '').length
-    return `${chars} 字 · 本地缓存 ${chapterDraftKey(chapterIndex)}`
-  }, [text, chapterIndex])
+    return `${chars} 字 · 本地缓存 ${draftKey ?? '未绑定书'}`
+  }, [text, draftKey])
 
   /** Accept → Active Draft：作者显式把写作层文本落为当前章草稿（phase 恒 draft；
    *  Commit 仍只经管线质量门后的 commitChapter）。成功后广播遥测刷新。 */

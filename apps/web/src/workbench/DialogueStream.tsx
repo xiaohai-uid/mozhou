@@ -163,19 +163,20 @@ export function DialogueStream({
     setAdoptState(null)
   }
 
-  /** Accept：把 AI Candidate 文本采纳进写作层 Active Draft（ch<N> 本地草稿缓存），
+  /** Accept：把 AI Candidate 文本采纳进写作层 Active Draft（ch_<书身份>_<N> 本地草稿缓存），
    *  供 Reading Slate 继续编辑/落盘。不改变服务端已落章的草稿事实。
    *  写作层已有作者文本时先确认（Author Sovereignty：不静默覆盖）。 */
   const handleAdoptIntoSlate = useCallback((): void => {
-    const cacheKey = chapterDraftKey(chapterIndex)
+    if (book === null) return
+    const cacheKey = chapterDraftKey(book, chapterIndex)
     const existing = loadDraftCache(cacheKey)
     if (existing.trim().length > 0 && !window.confirm(`第 ${chapterIndex} 章写作层已有草稿文本（${existing.length} 字符）。采纳将替换为候选文本——继续？`)) {
       return
     }
     saveDraftCache(draftText, cacheKey)
-    window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
-    setAdoptState(`已采纳进写作层（第 ${chapterIndex} 章 Active Draft，${draftText.length} 字符）——可在正文 · Active Draft 继续编辑，落盘经「Accept → Active Draft」。`)
-  }, [draftText, chapterIndex])
+    window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
+    setAdoptState(`已采纳进写作层（${book.title} 第 ${chapterIndex} 章 Active Draft，${draftText.length} 字符）——可在正文 · Active Draft 继续编辑，落盘经「Accept → Active Draft」。`)
+  }, [draftText, chapterIndex, book])
 
   const toggleSkill = (skillId: string): void => {
     setSelectedSkills((prev) =>

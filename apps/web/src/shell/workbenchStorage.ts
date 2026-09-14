@@ -49,8 +49,18 @@ export function saveWorkbenchState(state: WorkbenchState): void {
   }
 }
 
-/** 跨端缩放与热切换草稿暂存 */
-export function loadDraftCache(chapterKey = 'ch_1'): string {
+/**
+ * 跨端缩放与热切换草稿暂存。
+ * T00 修复：章草稿缓存键绑定书身份（bookId 优先，root 兜底）——同章号不同书不再串稿。
+ * 键格式 `ch_<identity>_<N>` 至少含两个下划线，旧版无归属键 `ch_<N>` 永不匹配：
+ * 旧缓存保留在 localStorage 中可手动导出，但不会自动分配给任何作品（Author Sovereignty）。
+ */
+
+/** 草稿缓存键：null 表示无可绑定书身份——禁止读旧缓存或落缓存。 */
+export type DraftCacheKey = string | null
+
+export function loadDraftCache(chapterKey: DraftCacheKey): string {
+  if (chapterKey === null) return ''
   try {
     return window.localStorage.getItem(`${DRAFT_CACHE_KEY}.${chapterKey}`) ?? ''
   } catch {
@@ -58,7 +68,8 @@ export function loadDraftCache(chapterKey = 'ch_1'): string {
   }
 }
 
-export function saveDraftCache(text: string, chapterKey = 'ch_1'): void {
+export function saveDraftCache(text: string, chapterKey: DraftCacheKey): void {
+  if (chapterKey === null) return
   try {
     if (text) {
       window.localStorage.setItem(`${DRAFT_CACHE_KEY}.${chapterKey}`, text)
@@ -70,7 +81,13 @@ export function saveDraftCache(text: string, chapterKey = 'ch_1'): void {
   }
 }
 
-/** 章维度草稿缓存键唯一出处（写作层/对话流/移动阅读面共用，禁止再内联）。 */
-export function chapterDraftKey(chapterIndex: number): string {
-  return `ch_${chapterIndex}`
+/** 章维度草稿缓存键唯一出处（写作层/对话流/移动阅读面共用，禁止再内联）。
+ *  书身份取 bookId（服务端 ULID，随书目持久化），缺失时以 root 兜底；两者皆空
+ *  返回 null——无身份内容不得写入或读出任何缓存槽。 */
+export function chapterDraftKey(
+  book: Pick<BookInfo, 'bookId' | 'root'>,
+  chapterIndex: number,
+): DraftCacheKey {
+  const identity = book.bookId || book.root
+  return identity ? `ch_${identity}_${chapterIndex}` : null
 }

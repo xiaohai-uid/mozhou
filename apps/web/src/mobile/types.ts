@@ -8,3 +8,4 @@ export type ActiveDrawerType =
   | 'compliance'
   | 'chapters'
   | 'distill'
+  | 'storyboard'
