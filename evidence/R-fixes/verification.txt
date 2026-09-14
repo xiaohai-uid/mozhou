@@ -1,0 +1,53 @@
+# R 系列修复证据（review-20260914 · 2026-09-14）
+
+## 基线探针（修复前）
+
+`node review-probe.cjs` 在源 sha256 47e63ecd… 上复现三缺陷：
+- conflictRevision: undefined（路由返回 document.revision，处理函数读 remote.revision）
+- retryRevision: actual 1 / expected 2（setDoc+setTimeout 不刷新闭包）
+- inFlightEdit: 'typed while saving' 被覆盖为 'before'，dirty=false
+
+## 修复（R1/R2，StoryboardView.tsx 保存链路重写）
+
+根因=闭包陈旧 + 成功路径用捕获 payload 整体覆盖：
+- doc/docIsSaved/saving 全部 ref 化；编辑计数器 editTickRef（保存起点捕获 savedTickRef）
+- handleSave(expectedRevisionOverride?) 显式基线；畸形 revision 拒绝保存
+- 冲突读 `/api/storyboard` 的 **document.revision**；retrySaveWithServerRevision 直接以该值调用 handleSave（无 setDoc/setTimeout 中转）
+- 成功只回写 id/revision 到当前文档；响应归属守卫（换文档/切章/卸载一律丢弃）
+- 保存期间编辑保留且保持 dirty（提示「保存期间你还有新修改」）
+
+R4 前置：移除 shot.origin→金色材质映射（材质不编码改编/AI 语义，仅徽标文字区分）。
+
+## 产品回归测试（替代探针断言旧缺陷；11/11 过）
+
+StoryboardView.test.tsx 新增 4 项（T04 原有 7 项保留全过）：
+1. 409 读 document.revision → 横幅「服务器为 r2」；文本保留；显式重试发送 expectedRevision=2；成功 r3
+2. 保存挂起期间编辑 → 成功后文本保留、dirty 保持、提示含「保存期间你还有新修改」
+3. 切章丢弃挂起保存的晚到成功响应（不重建工作区）
+4. 服务器 revision 未知（-1）→ 重试按钮禁用（畸形基线不发非法保存）
+
+修复后探针按预期 FAIL（其断言的旧缺陷已不存在）——探针是基线检测器，正确行为由上述测试锁定。
+
+## 全量回归（2026-09-14）
+
+- vitest 40 文件：269 passed + 1 skipped（真机模型冒烟）
+- tsc app / server：双绿；build：成功
+- gitnexus check --cycles：clean, 0
+
+## R1 浏览器级两客户端验收（真实 HTTP + 真实磁盘 + 真实临时书）
+
+时序：A、B 两页都先打开 r1 → A 存 r2 → B 存→409（横幅「服务器为 r2」、B 文本保留）→
+B 显式重试（基线 r2）→ 成功 r3。
+盘上断言（curl /api/storyboard）：`sb_01M2DWCDRAMZE91VKQ6NDQSW1P` revision=3，
+B 文本「（B 改，基于 r1）」已持久化，A 文本被显式覆盖（乐观并发语义）。
+截图：r1-b-conflict-409.png、r1-b-retry-r3.png、r4-production-storyboard-1440/390.png。
+
+## R3 真机模型验收：BLOCKED
+
+本机未配置 MOZHU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY（node env 探测 false）。
+按约定如实 BLOCKED，不以 mock 冒充。生成逻辑由注入式单测覆盖；真机冒烟用例
+（generate.test.ts skipIf 门控）在配置 key 后运行即可补验。
+
+## R4 视觉签样：待用户确认
+
+待确认物：prototypes/silver-forge 四页（银白场景、金银卡正反面）+ 生产分镜页实拍。

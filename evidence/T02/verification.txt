@@ -1,0 +1,31 @@
+=== T02 证据 2026-09-13T23:33:54+08:00 ===
+ M apps/web/server/api.ts
+ M apps/web/src/mobile/hubs/WorkbenchHub.tsx
+ M apps/web/src/shell/workbenchStorage.ts
+ M apps/web/src/workbench/DialogueStream.tsx
+ M apps/web/src/workbench/editor/ProseEditorPanel.tsx
+?? apps/web/prototypes/silver-forge/
+?? apps/web/server/routes/storyboardRoutes.test.ts
+?? apps/web/server/routes/storyboardRoutes.ts
+?? apps/web/server/storyboard/
+?? apps/web/src/shell/workbenchStorage.test.ts
+?? apps/web/src/storyboard/
+?? apps/web/src/workbench/editor/ProseEditorPanel.isolation.test.tsx
+?? evidence/
+apps/web/server/storyboard/contract.ts: 030b37f4ccd47cd1
+apps/web/server/storyboard/store.ts: e02cf3e5cef9d217
+apps/web/server/routes/storyboardRoutes.ts: 4a50731752e8083e
+apps/web/src/storyboard/types.ts: 0789863a763007f8
+apps/web/server/api.ts: d5f13b7e90cc8b4d
+--- vitest storyboard ---
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+--- vitest 全量 ---
+[2m Test Files [22m [1m[32m38 passed[39m[22m[90m (38)[39m
+[2m      Tests [22m [1m[32m251 passed[39m[22m[90m (251)[39m
+--- tsc app ---
+tsc_app_exit=0
+--- tsc server ---
+tsc_server_exit=0
+  "status": "clean",
+  "cycleCount": 0,

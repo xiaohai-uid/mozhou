@@ -1,0 +1,35 @@
+=== T00 证据 2026-09-13T22:38:32+08:00 ===
+--- git status ---
+ M apps/web/src/mobile/hubs/WorkbenchHub.tsx
+ M apps/web/src/shell/workbenchStorage.ts
+ M apps/web/src/workbench/DialogueStream.tsx
+ M apps/web/src/workbench/editor/ProseEditorPanel.tsx
+?? apps/web/src/shell/workbenchStorage.test.ts
+?? apps/web/src/workbench/editor/ProseEditorPanel.isolation.test.tsx
+?? evidence/
+--- 变更文件 SHA256 ---
+apps/web/src/mobile/hubs/WorkbenchHub.tsx
+apps/web/src/shell/workbenchStorage.ts
+apps/web/src/workbench/DialogueStream.tsx
+apps/web/src/workbench/editor/ProseEditorPanel.tsx
+apps/web/src/mobile/hubs/WorkbenchHub.tsx: 069a91279bb3f420
+apps/web/src/shell/workbenchStorage.ts: e598e23932371bb6
+apps/web/src/workbench/DialogueStream.tsx: 895533da9599716a
+apps/web/src/workbench/editor/ProseEditorPanel.tsx: 0d48b1245612d63d
+--- 测试命令与结果 ---
+--- vitest full ---
+[2m      Tests [22m [1m[32m242 passed[39m[22m[90m (242)[39m
+[2m   Start at [22m 22:39:03
+[2m   Duration [22m 4.57s[2m (transform 2.43s, setup 5.60s, collect 10.10s, tests 14.23s, environment 18.91s, prepare 4.12s)[22m
+
+--- tsc app ---
+tsc_app_exit=0
+--- tsc server ---
+tsc_server_exit=0
+{
+  "status": "clean",
+  "cycleCount": 0,
+  "cycles": []
+}
+(node:32752) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
