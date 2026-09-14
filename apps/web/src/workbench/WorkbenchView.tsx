@@ -141,7 +141,9 @@ export function WorkbenchView({
         {/* 正文写作层（Reading Slate）：Active Draft 本地草稿，全产品最安静区域 */}
         <ProseEditorPanel book={book} chapterIndex={chapterIndex} />
 
-        <DialogueStream book={book} chapterIndex={chapterIndex} />
+        <div id="dialogue-panel" data-testid="dialogue-panel">
+          <DialogueStream book={book} chapterIndex={chapterIndex} />
+        </div>
 
         <section className="wb-section" data-testid="create-book">
           <h2>建书</h2>

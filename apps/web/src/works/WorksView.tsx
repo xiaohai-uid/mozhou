@@ -16,11 +16,14 @@ import { post } from '../lib/post'
 export function WorksView({
   root,
   onGoToWorkbench,
+  onOpenStoryboard,
 }: {
   /** 当前书根（无书时为 null 显式引导）。 */
   root: string | null
   /** 前往工作台回调。 */
   onGoToWorkbench: () => void
+  /** 带章节进入漫剧分镜（T04）。 */
+  onOpenStoryboard?: ((chapterIndex: number) => void) | undefined
 }): JSX.Element {
   const [data, setData] = useState<WorksOverviewResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -204,6 +207,17 @@ export function WorksView({
                       <div className="actions" style={{ marginTop: 6 }}>
                         <span className="mono muted">字数：{ch.wordCount} 字</span>
                         <span className="mono muted">修订版本：r{ch.revision}</span>
+                        {onOpenStoryboard !== undefined && (
+                          <button
+                            type="button"
+                            className="btn"
+                            style={{ fontSize: 10, padding: '4px 8px' }}
+                            onClick={() => onOpenStoryboard(ch.chapterIndex)}
+                            data-testid={`works-storyboard-${ch.chapterIndex}`}
+                          >
+                            漫剧分镜 →
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

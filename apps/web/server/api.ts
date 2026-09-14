@@ -12,6 +12,7 @@ import { proseRoutes } from './routes/proseRoutes.js'
 import { truthfulPreviewRoutes } from './routes/truthfulPreviewRoutes.js'
 import { crawlerRoutes } from './routes/crawlerRoutes.js'
 import { systemRoutes } from './routes/systemRoutes.js'
+import { storyboardRoutes } from './routes/storyboardRoutes.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
 import type { ContextReceipt } from '@mozhou/kernel'
@@ -146,6 +147,43 @@ export interface WorksChapterSummary {
   readonly phase: ChapterPhase
   readonly wordCount: number
   readonly revision: number
+}
+
+/* ---- 漫剧分镜（T02 契约；领域类型真源在 server/storyboard/contract.ts）---- */
+
+export interface StoryboardSourceResponse {
+  readonly ok: true
+  readonly source: import('./storyboard/contract.js').SourceSnapshot
+  readonly title: string
+  readonly characterCount: number
+  readonly excerpt: string
+}
+
+export interface StoryboardSaveResponse {
+  readonly ok: true
+  readonly id: string
+  readonly revision: number
+  readonly sourceStale: boolean
+}
+
+export interface StoryboardListItemDto {
+  readonly id: string
+  readonly title: string
+  readonly revision: number
+  readonly sourceStale: boolean
+  readonly updatedAt: string
+}
+
+export interface StoryboardListResponse {
+  readonly ok: true
+  readonly items: readonly StoryboardListItemDto[]
+  readonly skippedInvalid: number
+}
+
+export interface StoryboardGetResponse {
+  readonly ok: true
+  readonly document: import('./storyboard/contract.js').StoryboardDocument
+  readonly sourceStale: boolean
 }
 
 export interface WorksOverviewResponse {
@@ -384,6 +422,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(truthfulPreviewRoutes)
     .use(crawlerRoutes)
     .use(systemRoutes)
+    .use(storyboardRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

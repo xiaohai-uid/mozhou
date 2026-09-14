@@ -40,6 +40,8 @@ import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
 import { WorkbenchView } from './workbench/WorkbenchView'
+import { StoryboardView } from './storyboard/StoryboardView'
+import { confirmStoryboardLeave } from './storyboard/dirtyGuard'
 import { MobileShell } from './mobile/MobileShell'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
 
@@ -78,6 +80,8 @@ export function App(): JSX.Element {
   const [desktopModal, setDesktopModal] = useState<DesktopModalType>(null)
   const [scenePreference, setScenePreference] = useState<ScenePreference>(loadScenePreference)
   const [sceneSheetOpen, setSceneSheetOpen] = useState(false)
+  /** 作品页「带章节进入分镜」的待打开章号（T04）。 */
+  const [storyboardChapter, setStoryboardChapter] = useState<number | null>(null)
 
   useEffect(() => {
     saveScenePreference(scenePreference)
@@ -119,13 +123,24 @@ export function App(): JSX.Element {
     saveWorkbenchState({ book, view })
   }, [book, view])
 
+  // U03：进入写作对话视图时滚动到真实对话面板（WorkbenchView 内锚点）
+  useEffect(() => {
+    if (view !== 'dialogue') return
+    document.getElementById('dialogue-panel')?.scrollIntoView({ block: 'start' })
+  }, [view, book])
+
   const handleSelectView = (next: ViewId): void => {
+    // U06：分镜有未保存修改时，切页先经确认（取消=留在原地，焦点/滚动自然保留）
+    if (next !== 'storyboard' && !confirmStoryboardLeave('切换到其他页面')) return
+    if (next !== 'storyboard') setStoryboardChapter(null) // 离开分镜不带旧章号
     setView(next)
     const tab = INSPECTOR_VIEW_TO_TAB[next]
     if (tab !== undefined) setInspectorTab(tab)
   }
 
   const selectBook = (nextBook: BookInfo): void => {
+    // U06：切书同样经过离开确认（干净文档直接通过）
+    if (!confirmStoryboardLeave('切换作品')) return
     setBook(nextBook)
     setChapterIndex(1)
     setView('workbench')
@@ -194,17 +209,21 @@ export function App(): JSX.Element {
         profile={resolveSceneProfile(scenePreference, book?.bookId ?? null)}
         focus={stageToFocus(stage)}
       />
-      <div className="app app-grain">
+      <div className={'app app-grain' + (view === 'storyboard' ? ' app-storyboard' : '')}>
         <TopBar
           book={book}
-          onHome={() => setView('workbench')}
+          onHome={() => handleSelectView('workbench')}
           onReplayWizard={() => setWizardOpen(true)}
           onOpenModal={setDesktopModal}
           onOpenScene={() => setSceneSheetOpen(true)}
         />
         <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
-        <PipelineStrip activeStage={stage} onSelect={setStage} stageStates={stageStates} />
-        {view === 'workbench' ? (
+        {/* U01：分镜页不挂小说生产管线与质量塔（独立创作任务面） */}
+        {view !== 'storyboard' && (
+          <PipelineStrip activeStage={stage} onSelect={setStage} stageStates={stageStates} />
+        )}
+        {/* U03：写作对话并入真实写作入口——dialogue 与 workbench 同元素同 key（状态不丢），仅滚动到对话面板 */}
+        {(view === 'workbench' || view === 'dialogue') ? (
           <WorkbenchView
             key={book?.root ?? 'no-book'}
             book={book}
@@ -228,7 +247,19 @@ export function App(): JSX.Element {
         ) : view === 'capability-square' ? (
           <CapabilitySquareView />
         ) : view === 'works' ? (
-          <WorksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
+          <WorksView
+            root={book?.root ?? null}
+            onGoToWorkbench={() => setView('workbench')}
+            onOpenStoryboard={(ch) => { setStoryboardChapter(ch); handleSelectView('storyboard') }}
+          />
+        ) : view === 'storyboard' ? (
+          <StoryboardView
+            key={book?.root ?? 'no-book'}
+            book={book}
+            initialChapterIndex={storyboardChapter ?? undefined}
+            onGoToShelf={() => { setStoryboardChapter(null); handleSelectView('book-shelf') }}
+            onCreateBook={() => setWizardOpen(true)}
+          />
         ) : view === 'tasks' ? (
           <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
         ) : view === 'style-distill' ? (
@@ -246,7 +277,10 @@ export function App(): JSX.Element {
         ) : (
           <PlaceholderView view={view} />
         )}
-        <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
+        {/* U01：质量塔/检视塔在分镜页不挂载 */}
+        {view !== 'storyboard' && (
+          <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
+        )}
       </div>
       {wizardOpen && (
         <WizardOverlay

@@ -8,6 +8,8 @@ import { MobileDrawerSheet } from './components/MobileDrawerSheet'
 import type { BookInfo } from '../shell/workbenchStorage'
 import type { ActiveDrawerType } from './types'
 import { WorkbenchHub } from './hubs/WorkbenchHub'
+import { StoryboardView } from '../storyboard/StoryboardView'
+import { confirmStoryboardLeave, onStoryboardSaveState, type StoryboardSaveState } from '../storyboard/dirtyGuard'
 import { InspectorHub } from './hubs/InspectorHub'
 import { WorksHub } from './hubs/WorksHub'
 import { ResourcesHub } from './hubs/ResourcesHub'
@@ -74,7 +76,15 @@ export function MobileShell({
   }, [book?.bookId, sceneVersion])
 
   const handleOpenDrawer = (type: ActiveDrawerType) => setActiveDrawer(type)
-  const handleCloseDrawer = () => setActiveDrawer(null)
+  const handleCloseDrawer = () => {
+    // U06：分镜全屏页有未保存修改时，返回/遮罩/Escape 统一先经确认
+    if (activeDrawer === 'storyboard' && !confirmStoryboardLeave('关闭分镜')) return
+    setActiveDrawer(null)
+  }
+  /* U05/U06：全屏分镜页顶栏的保存状态徽标（外壳侧镜像三态真源：
+     idle=就绪（无工作文档，不谎报已保存）· dirty=●未保存 · saved=已保存） */
+  const [saveState, setSaveState] = useState<StoryboardSaveState>('idle')
+  useEffect(() => onStoryboardSaveState(setSaveState), [])
 
   const getDrawerTitle = (): string => {
     switch (activeDrawer) {
@@ -86,6 +96,7 @@ export function MobileShell({
       case 'compliance': return '平台合规与敏感词审查'
       case 'chapters': return '章节目录'
       case 'distill': return '文风画像详情'
+      case 'storyboard': return '漫剧分镜'
       default: return '详情'
     }
   }
@@ -120,7 +131,8 @@ export function MobileShell({
 
       <MobileTabBar activeHub={activeHub} onSelectHub={setActiveHub} />
 
-      <MobileDrawerSheet open={activeDrawer !== null} title={getDrawerTitle()} onClose={handleCloseDrawer}>
+      {/* U05：分镜走全屏任务页（见下），不再以抽屉承载——其余抽屉照常 */}
+      <MobileDrawerSheet open={activeDrawer !== null && activeDrawer !== 'storyboard'} title={getDrawerTitle()} onClose={handleCloseDrawer}>
         {activeDrawer === 'auth' && (
           <AuthLicenseDrawer onLoginSuccess={() => undefined} onOpenLicense={() => handleOpenDrawer('license')} />
         )}
@@ -144,6 +156,25 @@ export function MobileShell({
         )}
         {activeDrawer === 'distill' && <PreviewUnavailable label="移动端文风画像" />}
       </MobileDrawerSheet>
+
+      {/* U05：手机分镜 = 全屏任务页（固定顶栏：返回/作品章节/保存状态），替代抽屉承载长编辑 */}
+      {activeDrawer === 'storyboard' && (
+        <section className="mobile-fullpage" role="dialog" aria-modal="true" aria-label="漫剧分镜">
+          <header className="mfp-top">
+            <button type="button" className="mfp-back" onClick={handleCloseDrawer} aria-label="返回（未保存会先确认）" data-testid="mfp-back">‹</button>
+            <div className="mfp-mid">
+              <b>{book?.title ?? '漫剧分镜'}</b>
+              <span>第 {chapterIndex ?? 1} 章</span>
+            </div>
+            <span className={'mfp-badge' + (saveState === 'dirty' ? ' dirty' : '')} data-testid="mfp-badge">
+              {saveState === 'dirty' ? '● 未保存' : saveState === 'saved' ? '已保存' : '就绪'}
+            </span>
+          </header>
+          <div className="mfp-body">
+            <StoryboardView book={book} initialChapterIndex={chapterIndex ?? 1} />
+          </div>
+        </section>
+      )}
     </div>
   )
 }

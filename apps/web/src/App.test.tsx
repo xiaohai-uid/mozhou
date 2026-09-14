@@ -2,7 +2,7 @@
  * 壳集成测试（实现票 T40）：Ink Orbit 工作台壳拼装 + localStorage
  * 恢复（书名 + 视图状态，刷新不丢）+ 导航切换显式占位。
  */
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -148,13 +148,20 @@ function stubAppFetch(): void {
   )
 }
 
+function ensureToolbox(): void {
+  if (document.querySelector('[data-view="context-receipt"]') === null) {
+    const toggle = document.querySelector('[data-testid="nav-toolbox-toggle"]') as HTMLButtonElement | null
+    if (toggle !== null) fireEvent.click(toggle)
+  }
+}
+
 describe('App 壳集成（T40）', () => {
   it('五屏齐备：顶栏 / 管线条 / 航道 / 中栏 / 检视塔', () => {
     stubAppFetch()
     render(<App />)
     expect(document.querySelector('.topbar')).not.toBeNull()
     expect(screen.getByLabelText('章节生产管线')).not.toBeNull()
-    expect(screen.getByLabelText('完整功能导航')).not.toBeNull()
+    expect(screen.getByLabelText('主导航')).not.toBeNull()
     expect(screen.getByTestId('create-book')).not.toBeNull()
     expect(screen.getByLabelText('检视塔')).not.toBeNull()
     expect(screen.getByLabelText('章节生产管线').querySelectorAll('.step')).toHaveLength(8)
@@ -195,17 +202,26 @@ describe('App 壳集成（T40）', () => {
   it('检视组导航点击切到中栏显式占位与检视塔联动', async () => {
     stubAppFetch()
     render(<App />)
-    const receiptNav = document.querySelector('[data-view="context-receipt"]')
+    const receiptNav = (() => { ensureToolbox(); return document.querySelector('[data-view="context-receipt"]'); })()
     if (receiptNav === null) throw new Error('missing context-receipt nav')
     await userEvent.click(receiptNav)
     // T42 起装配看板为真实 tab：未建书呈显式空态（InspectorEmpty），不假装可用
     const receiptPanel = document.querySelector('[data-panel="context-receipt"]')
     if (receiptPanel === null) throw new Error('missing context-receipt panel')
     expect(receiptPanel.querySelector('[data-testid="inspector-empty"]')?.textContent).toContain('装配看板')
-    const dialogueNav = document.querySelector('[data-view="dialogue"]')
+  })
+
+  it('U03 写作对话导航：到达真实对话面（WorkbenchView 对话面板），不再落占位', async () => {
+    stubAppFetch()
+    // jsdom 未实现 scrollIntoView：补 no-op（App 的滚动到对话面板在真机才有意义）
+    Element.prototype.scrollIntoView = () => {}
+    render(<App />)
+    const dialogueNav = (() => { ensureToolbox(); return document.querySelector('[data-view="dialogue"]'); })()
     if (dialogueNav === null) throw new Error('missing dialogue nav')
     await userEvent.click(dialogueNav)
-    expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
+    // U03：写作对话并入当前真实写作入口——分派到 WorkbenchView 并滚动到对话面板
+    expect(screen.queryByTestId('placeholder-view')).toBeNull()
+    expect(screen.getByTestId('dialogue-panel')).not.toBeNull()
   })
 
   it('管线条点击切换激活阶段（牵引背景聚焦）；无书时全部 unavailable——被点击 ≠ 执行成功', async () => {
@@ -314,7 +330,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const shelfNav = document.querySelector('[data-view="book-shelf"]')
+    const shelfNav = (() => { ensureToolbox(); return document.querySelector('[data-view="book-shelf"]'); })()
     if (shelfNav === null) throw new Error('missing book-shelf nav')
     await userEvent.click(shelfNav)
     await waitFor(() => {
@@ -331,7 +347,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const squareNav = document.querySelector('[data-view="capability-square"]')
+    const squareNav = (() => { ensureToolbox(); return document.querySelector('[data-view="capability-square"]'); })()
     if (squareNav === null) throw new Error('missing capability-square nav')
     await userEvent.click(squareNav)
     await waitFor(() => {
@@ -347,7 +363,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const worksNav = document.querySelector('[data-view="works"]')
+    const worksNav = (() => { ensureToolbox(); return document.querySelector('[data-view="works"]'); })()
     if (worksNav === null) throw new Error('missing works nav')
     await userEvent.click(worksNav)
     await waitFor(() => {
@@ -363,7 +379,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const tasksNav = document.querySelector('[data-view="tasks"]')
+    const tasksNav = (() => { ensureToolbox(); return document.querySelector('[data-view="tasks"]'); })()
     if (tasksNav === null) throw new Error('missing tasks nav')
     await userEvent.click(tasksNav)
     await waitFor(() => {
@@ -379,7 +395,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const sourceNav = document.querySelector('[data-view="book-source"]')
+    const sourceNav = (() => { ensureToolbox(); return document.querySelector('[data-view="book-source"]'); })()
     if (sourceNav === null) throw new Error('missing book-source nav')
     await userEvent.click(sourceNav)
     await waitFor(() => {
@@ -395,7 +411,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const styleNav = document.querySelector('[data-view="style-distill"]')
+    const styleNav = (() => { ensureToolbox(); return document.querySelector('[data-view="style-distill"]'); })()
     if (styleNav === null) throw new Error('missing style-distill nav')
     await userEvent.click(styleNav)
     await waitFor(() => {
@@ -411,7 +427,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const breakdownNav = document.querySelector('[data-view="novel-breakdown"]')
+    const breakdownNav = (() => { ensureToolbox(); return document.querySelector('[data-view="novel-breakdown"]'); })()
     if (breakdownNav === null) throw new Error('missing novel-breakdown nav')
     await userEvent.click(breakdownNav)
     await waitFor(() => {
@@ -427,7 +443,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const rankNav = document.querySelector('[data-view="rank-scan"]')
+    const rankNav = (() => { ensureToolbox(); return document.querySelector('[data-view="rank-scan"]'); })()
     if (rankNav === null) throw new Error('missing rank-scan nav')
     await userEvent.click(rankNav)
     await waitFor(() => {
@@ -443,7 +459,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const searchNav = document.querySelector('[data-view="web-search"]')
+    const searchNav = (() => { ensureToolbox(); return document.querySelector('[data-view="web-search"]'); })()
     if (searchNav === null) throw new Error('missing web-search nav')
     await userEvent.click(searchNav)
     await waitFor(() => {
@@ -459,7 +475,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const cloudNav = document.querySelector('[data-view="cloud-sync"]')
+    const cloudNav = (() => { ensureToolbox(); return document.querySelector('[data-view="cloud-sync"]'); })()
     if (cloudNav === null) throw new Error('missing cloud-sync nav')
     await userEvent.click(cloudNav)
     await waitFor(() => {
@@ -475,7 +491,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     )
     stubAppFetch()
     render(<App />)
-    const memberNav = document.querySelector('[data-view="membership"]')
+    const memberNav = (() => { ensureToolbox(); return document.querySelector('[data-view="membership"]'); })()
     if (memberNav === null) throw new Error('missing membership nav')
     await userEvent.click(memberNav)
     await waitFor(() => {
