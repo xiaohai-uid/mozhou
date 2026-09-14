@@ -20,6 +20,14 @@
   transition: filter 0.2s var(--ease);
 }
 /* 内置静态场景（CSS 合成占位画；上传图直接替换本层 background-image） */
+/* 银白中庭（ADR-0029 默认场景；原创银白空间资产，同 silver-space 设计候选） */
+.scene-layer.v-silver-atrium {
+  background-image: url("/scenes/silver-atrium.svg");
+  background-size: cover;
+  background-position: center;
+}
+/* 银白中庭为满幅空间，无天际线剪影带 */
+.scene-layer.v-silver-atrium::after { display: none; }
 .scene-layer.v-city-night {
   background-image:
     radial-gradient(13% 19% at 58% 15%, rgba(240, 209, 138, 0.98), rgba(240, 209, 138, 0.26) 55%, transparent 74%),
@@ -81,7 +89,7 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(130% 100% at 50% 38%, transparent 56%, rgba(3, 6, 9, 0.4) 100%);
+  background: radial-gradient(130% 100% at 50% 38%, transparent 60%, rgba(82, 97, 112, 0.16) 100%);
 }
 .scene-atmosphere::after {
   content: "";
@@ -95,7 +103,7 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: rgba(4, 8, 12, var(--scene-veil, 0.5));
+  background: rgba(236, 241, 246, var(--scene-veil, 0.5));
 }
 .scene-figure {
   position: fixed;
@@ -104,7 +112,7 @@
   pointer-events: none;
   transform-origin: bottom center;
   opacity: var(--scene-figure-opacity, 0.6);
-  filter: drop-shadow(0 0 26px rgba(5, 9, 13, 0.8));
+  filter: drop-shadow(0 0 26px rgba(32, 42, 53, 0.3));
 }
 .scene-figure.pos-left { left: 3%; }
 .scene-figure.pos-center { left: 50%; transform: translateX(-50%); }
@@ -131,7 +139,7 @@
    材质：Scene Glass / Ink Glass / Reading Slate / Metal Rim
    ============================================================ */
 .mat-scene-glass {
-  background: linear-gradient(180deg, rgba(12, 23, 30, 0.72), rgba(8, 17, 23, 0.66));
+  background: linear-gradient(180deg, rgba(247, 250, 253, 0.85), rgba(241, 244, 247, 0.8));
   -webkit-backdrop-filter: blur(14px) saturate(1.05);
   backdrop-filter: blur(14px) saturate(1.05);
   border: 1px solid var(--hairline);
@@ -162,7 +170,7 @@
   position: relative;
 }
 .center {
-  background: rgba(8, 17, 23, 0.6);
+  background: rgba(247, 250, 253, 0.55);
   border-radius: 12px;
   border: 1px solid var(--hairline);
 }
@@ -530,8 +538,8 @@
    稳定 measure；与 .mat-reading-slate 同材质家族。
    ============================================================ */
 .reading-slate {
-  background: linear-gradient(180deg, rgba(9, 16, 22, 0.985), rgba(7, 13, 19, 0.985));
-  border: 1px solid rgba(205, 225, 222, 0.14);
+  background: linear-gradient(180deg, rgba(253, 254, 254, 0.98), rgba(247, 250, 253, 0.98));
+  border: 1px solid rgba(32, 42, 53, 0.14);
   border-radius: var(--ir-r-md, 10px);
 }
 .reading-slate textarea::placeholder { color: var(--text-faint); }

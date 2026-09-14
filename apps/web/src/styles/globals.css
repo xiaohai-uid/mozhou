@@ -1,48 +1,48 @@
 /*
- * 墨舟样式底座。ADR-0028（superseding ADR-0027 视觉层）：
- * Ink Realm / 墨境 token——同名换值，消费方零改动。
- * Gold=作者主权 · Jade=AI/系统 · Green=verified · Warning=stale · Red=blocking；
- * 旧紫退役为 experimental 专用（--violet-experimental）。
- * 组件与材质类见 ./ink-orbit.css（过渡底座）与 ./ink-realm.css（墨境材质）。
+ * 墨舟样式底座。ADR-0029（superseding ADR-0028 视觉层）：
+ * Silver Realm / 银白创作空间 token——同名换值，消费方零改动。
+ * Gold=作者主权（香槟金） · Steel=AI/系统（冷银蓝） · Green=verified · Warning=stale · Red=blocking。
+ * 方向来源：ui-ux-review U02/U08 + 用户签样的 silver-space 设计候选。
+ * 组件与材质类见 ./ink-orbit.css（过渡底座）与 ./ink-realm.css（材质类）。
  */
 @import "tailwindcss";
 @import "./ink-orbit.css";
 @import "./ink-realm.css";
 
 :root {
-  /* Ink Realm 基色（ADR-0028；原 legacy 紫黑系已由同名换值取代） */
-  --background: #05090d;
-  --foreground: #edf1ed;
-  --accent: #72c9c4;
-  --accent-strong: #8fdcd7;
-  --accent-soft: rgba(114, 201, 196, 0.12);
-  --surface: #0c171e;
-  --surface-2: #102029;
-  --surface-3: #152832;
-  --surface-raised: #132430;
-  --surface-sunken: #081117;
-  --hairline: rgba(205, 225, 222, 0.11);
-  --hairline-strong: rgba(225, 239, 235, 0.21);
-  --text-muted: #a2ada9;
-  --text-faint: #687671;
-  --danger: #d98383;
-  --success: #78c79d;
-  --warning: #d3a765;
-  --shadow-ink: rgba(0, 0, 0, 0.45);
+  /* Silver Realm 基色（银白创作空间；原 Ink Realm 深墨系已由同名换值取代） */
+  --background: #e6ecf2;
+  --foreground: #202a35;
+  --accent: #5a7d9a;
+  --accent-strong: #3f6a8f;
+  --accent-soft: rgba(90, 125, 154, 0.12);
+  --surface: #f1f4f7;
+  --surface-2: #e9eef4;
+  --surface-3: #dfe7ef;
+  --surface-raised: #f7fafd;
+  --surface-sunken: #dce4ec;
+  --hairline: rgba(32, 42, 53, 0.13);
+  --hairline-strong: rgba(32, 42, 53, 0.22);
+  --text-muted: #526170;
+  --text-faint: #7e8ea0;
+  --danger: #b3423a;
+  --success: #2e7d54;
+  --warning: #a06a1f;
+  --shadow-ink: rgba(32, 42, 53, 0.14);
 
-  /* Ink Realm 语义色：Gold=作者主权 / Jade=AI·系统（ADR-0028） */
-  --gold: #d6b36a;
-  --gold-bright: #f0d18a;
-  --gold-soft: rgba(214, 179, 106, 0.13);
-  --gold-line: rgba(214, 179, 106, 0.55);
-  --gold-line-soft: rgba(214, 179, 106, 0.4);
-  --gold-glow: rgba(214, 179, 106, 0.55);
-  --jade: #72c9c4;
-  --jade-soft: rgba(114, 201, 196, 0.12);
-  --jade-line: rgba(114, 201, 196, 0.55);
-  --jade-line-soft: rgba(114, 201, 196, 0.4);
-  --jade-glow: rgba(114, 201, 196, 0.45);
-  --violet-experimental: rgba(150, 120, 255, 0.5);
+  /* Silver Realm 语义色：Gold=作者主权（香槟金）/ Steel=AI·系统 */
+  --gold: #ac803f;
+  --gold-bright: #8a6a2f;
+  --gold-soft: rgba(217, 184, 119, 0.18);
+  --gold-line: rgba(172, 128, 63, 0.5);
+  --gold-line-soft: rgba(172, 128, 63, 0.35);
+  --gold-glow: rgba(172, 128, 63, 0.4);
+  --jade: #5a7d9a;
+  --jade-soft: rgba(90, 125, 154, 0.12);
+  --jade-line: rgba(90, 125, 154, 0.5);
+  --jade-line-soft: rgba(90, 125, 154, 0.35);
+  --jade-glow: rgba(90, 125, 154, 0.4);
+  --violet-experimental: rgba(120, 100, 220, 0.5);
   --touch-target-min: 44px;
   --world-gap: 8px;
   --ir-r-md: 10px;
@@ -57,6 +57,11 @@
   --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* U02：文档超出首屏时页面底色跟随主题（此前露黑） */
+html, body {
+  background: var(--background);
 }
 
 @theme inline {

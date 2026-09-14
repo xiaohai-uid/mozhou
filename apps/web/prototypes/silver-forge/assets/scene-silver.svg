@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <!-- 银白现代空间 · 原创场景资产（T01 原型；非官方素材、非 CSS 条纹） -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F8FC"/>
+      <stop offset="0.55" stop-color="#E3EAF2"/>
+      <stop offset="1" stop-color="#D3DDE8"/>
+    </linearGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EDF2F7"/>
+      <stop offset="1" stop-color="#D8E1EA"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C2CEDA"/>
+      <stop offset="0.35" stop-color="#D6DFE9"/>
+      <stop offset="1" stop-color="#B6C2D0"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="slab" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7FAFD"/>
+      <stop offset="0.5" stop-color="#DEE6EE"/>
+      <stop offset="1" stop-color="#BCC8D5"/>
+    </linearGradient>
+    <linearGradient id="refl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.75">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>
+      <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 背景墙与天光 -->
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <rect y="120" width="1920" height="560" fill="url(#wall)"/>
+
+  <!-- 墙面竖向分缝（远处结构，不喧宾） -->
+  <g stroke="#C4CFDB" stroke-width="2" opacity="0.7">
+    <line x1="240" y1="140" x2="240" y2="660"/>
+    <line x1="480" y1="140" x2="480" y2="660"/>
+    <line x1="720" y1="140" x2="720" y2="660"/>
+    <line x1="960" y1="140" x2="960" y2="660"/>
+    <line x1="1200" y1="140" x2="1200" y2="660"/>
+    <line x1="1440" y1="140" x2="1440" y2="660"/>
+    <line x1="1680" y1="140" x2="1680" y2="660"/>
+  </g>
+  <rect y="132" width="1920" height="6" fill="#F7FAFD" opacity="0.8"/>
+
+  <!-- 两道静态斜向光带 -->
+  <polygon points="240,0 560,0 1180,1080 760,1080" fill="url(#beam)" opacity="0.5"/>
+  <polygon points="1280,0 1440,0 1020,1080 880,1080" fill="url(#beam)" opacity="0.32"/>
+
+  <!-- 两侧悬空金属厚板（空间纵深） -->
+  <g>
+    <path d="M -80 300 L 340 360 L 340 430 L -80 380 Z" fill="url(#slab)"/>
+    <path d="M -80 380 L 340 430 L 340 446 L -80 398 Z" fill="#9FAEC0" opacity="0.8"/>
+    <path d="M 2000 250 L 1560 330 L 1560 402 L 2000 330 Z" fill="url(#slab)"/>
+    <path d="M 2000 330 L 1560 402 L 1560 418 L 2000 346 Z" fill="#9FAEC0" opacity="0.8"/>
+  </g>
+
+  <!-- 地平线与地面 -->
+  <rect y="660" width="1920" height="420" fill="url(#floor)"/>
+  <rect y="656" width="1920" height="5" fill="#F7FAFD" opacity="0.9"/>
+
+  <!-- 地面透视缝 -->
+  <g stroke="#AAB8C7" stroke-width="2" opacity="0.55">
+    <line x1="120" y1="1080" x2="700" y2="662"/>
+    <line x1="480" y1="1080" x2="800" y2="662"/>
+    <line x1="960" y1="1080" x2="960" y2="662"/>
+    <line x1="1440" y1="1080" x2="1120" y2="662"/>
+    <line x1="1800" y1="1080" x2="1220" y2="662"/>
+    <line x1="0" y1="820" x2="1920" y2="820"/>
+    <line x1="0" y1="940" x2="1920" y2="940"/>
+  </g>
+
+  <!-- 地面反射光带（静态） -->
+  <rect x="300" y="662" width="220" height="300" fill="url(#refl)" opacity="0.6"/>
+  <rect x="900" y="662" width="140" height="220" fill="url(#refl)" opacity="0.5"/>
+  <rect x="1420" y="662" width="260" height="330" fill="url(#refl)" opacity="0.42"/>
+
+  <!-- 中央柔光 -->
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+</svg>

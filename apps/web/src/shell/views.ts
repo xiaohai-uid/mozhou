@@ -23,6 +23,7 @@ export const NAV_GROUPS = [
       { id: 'workbench', label: '工作台', icon: '01' },
       { id: 'dialogue', label: '写作对话', icon: '02' },
       { id: 'works', label: '我的作品', icon: '03' },
+      { id: 'storyboard', label: '漫剧分镜', icon: '06' },
       { id: 'style-distill', label: '风格蒸馏', icon: '04' },
       { id: 'novel-breakdown', label: '小说拆解', icon: '05' },
     ],

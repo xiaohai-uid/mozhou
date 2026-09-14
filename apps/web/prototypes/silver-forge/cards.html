@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>银白工坊 · 卡牌四种面 × 状态（T01 视觉签样）</title>
+<link rel="stylesheet" href="assets/silver.css">
+<style>
+  .sf-board { max-width: 1280px; margin: 0 auto; padding: 26px 28px 60px; display: grid; gap: 22px; }
+  .sf-row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  /* 6 张卡背 3+3 均衡排布 */
+  .sf-row.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 232px)); justify-content: center; }
+  @media (max-width: 900px) { .sf-row.grid3 { grid-template-columns: repeat(2, minmax(0, 232px)); } }
+  @media (max-width: 560px) { .sf-row.grid3 { grid-template-columns: minmax(0, 232px); justify-content: center; } }
+  .sf-cell { display: grid; gap: 10px; justify-items: center; }
+  .sf-cell > label { font-size: 12px; color: var(--sf-muted); letter-spacing: .04em; }
+  .sf-section h2 { font-size: 15px; margin: 0 0 4px; letter-spacing: .05em; }
+  .sf-section .sf-note { margin: 0 0 14px; }
+  .sf-card:focus-visible { outline: 2.5px solid var(--sf-focus); outline-offset: 4px; }
+  /* 显式翻面演示：点按钮转面，不依赖 hover/双击 */
+  .sf-flip { perspective: 1200px; }
+  .sf-flip .sf-flip-inner { position: relative; transition: transform 420ms ease; transform-style: preserve-3d; }
+  .sf-flip.flipped .sf-flip-inner { transform: rotateY(180deg); }
+  .sf-flip .sf-card { backface-visibility: hidden; }
+  .sf-flip .sf-card.face-b { position: absolute; inset: 0; transform: rotateY(180deg); }
+  @media (prefers-reduced-motion: reduce) { .sf-flip .sf-flip-inner { transition: none; } }
+</style>
+</head>
+<body>
+<div class="sf-stage">
+  <div class="sf-scene"><img src="assets/scene-silver.svg" alt=""></div>
+
+  <header class="sf-topbar sf-content">
+    <div class="sf-brand">
+      <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><g><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><path d="M60 21 v36" stroke="#5B6B7D" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#5B6B7D"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#5B6B7D"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#5B6B7D" stroke-width="3" stroke-linecap="round" opacity=".7"/><circle cx="26" cy="26" r="2.6" fill="#5B6B7D" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#5B6B7D" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#5B6B7D" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#5B6B7D" opacity=".5"/></g></svg>
+      墨舟 · 银白工坊
+    </div>
+    <nav class="sf-nav" aria-label="原型页导航">
+      <a href="index.html">总览</a>
+      <a href="cards.html" aria-current="page">卡牌四面</a>
+      <a href="workbench.html">工作台</a>
+      <a href="storyboard.html">分镜页</a>
+    </nav>
+    <span class="sf-chip"><span class="dot"></span>原型 · 待签样</span>
+  </header>
+
+  <main class="sf-board sf-content">
+    <div class="sf-section">
+      <h2>卡背 · 整面金属 + 原创浅浮雕标识（舟帆徽记，非任何游戏徽标）</h2>
+      <p class="sf-note">金银为<b>材质变体</b>，不代表稀有度/质量/身份；静态反射光带、边缘厚度；无持续扫光。</p>
+      <div class="sf-row grid3">
+        <div class="sf-cell">
+          <button type="button" class="sf-card back-silver" aria-label="银色卡背（常态）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-relief">
+                <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="embSilver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7FAFD"/><stop offset=".45" stop-color="#D8E1EB"/><stop offset="1" stop-color="#8FA0B2"/></linearGradient></defs><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><rect x="9.5" y="9.5" width="101" height="101" rx="20.5" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.6"/><path d="M60 21 v36" stroke="#56687B" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#56687B"/><path d="M47 39 h13 M43.5 48 h16.5" stroke="rgba(247,250,253,.8)" stroke-width="1.5"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#56687B"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#56687B" stroke-width="3" stroke-linecap="round" opacity=".7"/><path d="M38 100 Q50 95.5 62 100 T84 100" fill="none" stroke="#56687B" stroke-width="2.2" stroke-linecap="round" opacity=".45"/><circle cx="26" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#56687B" opacity=".5"/></svg>
+                <span class="sf-relief-word">MOZHOU</span>
+              </span>
+            </span>
+          </button>
+          <label>银卡背 · 常态</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card back-silver selected" aria-pressed="true" aria-label="银色卡背（选中）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-relief">
+                <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><rect x="9.5" y="9.5" width="101" height="101" rx="20.5" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.6"/><path d="M60 21 v36" stroke="#56687B" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#56687B"/><path d="M47 39 h13 M43.5 48 h16.5" stroke="rgba(247,250,253,.8)" stroke-width="1.5"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#56687B"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#56687B" stroke-width="3" stroke-linecap="round" opacity=".7"/><path d="M38 100 Q50 95.5 62 100 T84 100" fill="none" stroke="#56687B" stroke-width="2.2" stroke-linecap="round" opacity=".45"/><circle cx="26" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#56687B" opacity=".5"/></svg>
+                <span class="sf-relief-word">MOZHOU</span>
+              </span>
+            </span>
+          </button>
+          <label>银卡背 · 选中（焦点环 + 抬升）</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card back-silver" disabled aria-label="银色卡背（不可用）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-relief">
+                <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><path d="M60 21 v36" stroke="#56687B" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#56687B"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#56687B"/><circle cx="26" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#56687B" opacity=".5"/></svg>
+                <span class="sf-relief-word">MOZHOU</span>
+              </span>
+            </span>
+          </button>
+          <label>银卡背 · 不可用（去饱和）</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card back-gold" aria-label="金色卡背（常态）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-relief">
+                <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="embGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5E5C9"/><stop offset=".45" stop-color="#DDBE82"/><stop offset="1" stop-color="#A2793A"/></linearGradient></defs><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embGold)"/><rect x="9.5" y="9.5" width="101" height="101" rx="20.5" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.6"/><path d="M60 21 v36" stroke="#6B5320" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#6B5320"/><path d="M47 39 h13 M43.5 48 h16.5" stroke="rgba(255,244,224,.85)" stroke-width="1.5"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#6B5320"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#6B5320" stroke-width="3" stroke-linecap="round" opacity=".7"/><path d="M38 100 Q50 95.5 62 100 T84 100" fill="none" stroke="#6B5320" stroke-width="2.2" stroke-linecap="round" opacity=".45"/><circle cx="26" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#6B5320" opacity=".5"/></svg>
+                <span class="sf-relief-word">MOZHOU</span>
+              </span>
+            </span>
+          </button>
+          <label>金卡背（香槟金）· 常态</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card back-gold selected" aria-pressed="true" aria-label="金色卡背（选中）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-relief">
+                <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embGold)"/><rect x="9.5" y="9.5" width="101" height="101" rx="20.5" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.6"/><path d="M60 21 v36" stroke="#6B5320" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#6B5320"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#6B5320"/><circle cx="26" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#6B5320" opacity=".5"/></svg>
+                <span class="sf-relief-word">MOZHOU</span>
+              </span>
+            </span>
+          </button>
+          <label>金卡背 · 选中</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card back-gold" disabled aria-label="金色卡背（不可用）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-relief">
+                <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embGold)"/><path d="M60 21 v36" stroke="#6B5320" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#6B5320"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#6B5320"/><circle cx="26" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#6B5320" opacity=".5"/></svg>
+                <span class="sf-relief-word">MOZHOU</span>
+              </span>
+            </span>
+          </button>
+          <label>金卡背 · 不可用</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="sf-section">
+      <h2>卡面（正面）· 原创图区 + 金属外框 + 内凹铭牌 + 真实状态分层</h2>
+      <p class="sf-note">图区为<b>原创示意插画</b>（正式版为作品/角色/镜头真实图像）；无图时是明确「无封面」态，不假造作品图。状态用文字+图标，不用金银表义。</p>
+      <div class="sf-row">
+        <div class="sf-cell">
+          <button type="button" class="sf-card front" aria-label="银色卡面：雾港失真（常态）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-card-front-frame">
+                <span class="sf-card-art">
+                  <svg viewBox="0 0 214 212" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="artSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EFF4F9"/><stop offset="1" stop-color="#C7D3E0"/></linearGradient></defs><rect width="214" height="212" fill="url(#artSky)"/><circle cx="150" cy="56" r="26" fill="#FFFFFF" opacity=".85"/><path d="M-4 150 L52 84 L96 132 L138 78 L218 158 V216 H-4 Z" fill="#8FA3B8" opacity=".85"/><path d="M-4 172 L44 122 L92 164 L140 118 L218 178 V216 H-4 Z" fill="#66798D" opacity=".9"/><path d="M104 190 q10 -26 6 -44 l-4 -12 h8 l-2 12 q-4 18 4 44 Z" fill="#3E4E60"/><path d="M84 192 h50 l-8 10 h-34 Z" fill="#33445A"/><path d="M20 196 q22 -6 44 0 t44 0 t44 0 t44 0 v16 H20 Z" fill="#B9C6D4" opacity=".9"/></svg>
+                </span>
+                <span class="sf-card-plate">
+                  <span class="sf-title">雾港失真</span>
+                  <span class="sf-meta">
+                    <span class="sf-state-strip ok">✓ 已提交 r12</span>
+                    <span>14.2 万字</span>
+                  </span>
+                </span>
+              </span>
+            </span>
+          </button>
+          <label>银卡面 · 常态（原创示意图区）</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card front gold selected" aria-pressed="true" aria-label="金色卡面：深巷回声（选中）">
+            <span class="sf-card-face">
+              <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+              <span class="sf-card-front-frame">
+                <span class="sf-card-art">
+                  <svg viewBox="0 0 214 212" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="artGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7EDD8"/><stop offset="1" stop-color="#DCC494"/></linearGradient></defs><rect width="214" height="212" fill="url(#artGold)"/><rect x="26" y="18" width="58" height="176" fill="#8A6B33" opacity=".55"/><rect x="140" y="18" width="58" height="176" fill="#8A6B33" opacity=".55"/><path d="M98 96 l8 -16 8 16 v52 h-16 Z" fill="#4C3A17"/><circle cx="106" cy="88" r="15" fill="#C99B52"/><circle cx="106" cy="88" r="8" fill="#F5E5C9"/><path d="M99 103 h14 l3 26 h-20 Z" fill="#4C3A17"/><path d="M60 40 h18 M60 60 h18 M60 80 h18 M146 40 h18 M146 60 h18 M146 80 h18" stroke="#5E481C" stroke-width="4" opacity=".5"/></svg>
+                </span>
+                <span class="sf-card-plate">
+                  <span class="sf-title">深巷回声</span>
+                  <span class="sf-meta">
+                    <span class="sf-state-strip stale">● 源已变更 r13→r14</span>
+                    <span>3.8 万字</span>
+                  </span>
+                </span>
+              </span>
+            </span>
+          </button>
+          <label>金卡面 · 选中（状态条：源已变更）</label>
+        </div>
+        <div class="sf-cell">
+          <button type="button" class="sf-card front" disabled aria-label="银色卡面（不可用）">
+            <span class="sf-card-face">
+              <span class="sf-card-front-frame">
+                <span class="sf-card-art">
+                  <span class="sf-no-cover"><b>无封面</b><span>该作品尚未上传封面图</span></span>
+                </span>
+                <span class="sf-card-plate">
+                  <span class="sf-title">未命名之书</span>
+                  <span class="sf-meta">
+                    <span class="sf-state-strip">○ 草稿</span>
+                    <span>0 章</span>
+                  </span>
+                </span>
+              </span>
+            </span>
+          </button>
+          <label>银卡面 · 不可用 + 明确无封面态（不假造作品图）</label>
+        </div>
+        <div class="sf-cell sf-flip" id="flipDemo">
+          <div class="sf-flip-inner">
+            <button type="button" class="sf-card front gold" aria-label="金色卡面：钟楼来客（正面）">
+              <span class="sf-card-face">
+                <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+                <span class="sf-card-front-frame">
+                  <span class="sf-card-art">
+                    <svg viewBox="0 0 214 212" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="214" height="212" fill="#D9C9A6"/><rect x="70" y="20" width="74" height="150" fill="#6B5320" opacity=".75"/><path d="M70 20 l37 -14 37 14 Z" fill="#4C3A17"/><circle cx="107" cy="70" r="20" fill="#F5E5C9" stroke="#4C3A17" stroke-width="3"/><path d="M107 70 L107 58 M107 70 L115 74" stroke="#4C3A17" stroke-width="2.6" stroke-linecap="round"/><rect x="92" y="118" width="30" height="52" fill="#4C3A17"/></svg>
+                  </span>
+                  <span class="sf-card-plate">
+                    <span class="sf-title">钟楼来客</span>
+                    <span class="sf-meta">
+                      <span class="sf-state-strip ok">✓ 已提交 r7</span>
+                      <span>分镜 24 镜</span>
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </button>
+            <button type="button" class="sf-card back-gold face-b" aria-label="金色卡背（背面）">
+              <span class="sf-card-face">
+                <span class="sf-brushed" style="background:url(assets/brushed.svg)"></span>
+                <span class="sf-relief">
+                  <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embGold)"/><rect x="9.5" y="9.5" width="101" height="101" rx="20.5" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.6"/><path d="M60 21 v36" stroke="#6B5320" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#6B5320"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#6B5320"/><circle cx="26" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#6B5320" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#6B5320" opacity=".5"/></svg>
+                  <span class="sf-relief-word">MOZHOU</span>
+                </span>
+              </span>
+            </button>
+          </div>
+          <button type="button" class="sf-btn ghost" id="flipBtn" aria-pressed="false" style="min-height:44px">显式翻面（详情切换演示）</button>
+          <label>金卡 · 显式翻面（按钮触发，非 hover/双击）</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="sf-section sf-panel" style="padding:16px 18px">
+      <b style="font-size:13.5px">签样核对点（对照 references/）</b>
+      <ul class="sf-note" style="margin:8px 0 0; line-height:2">
+        <li>银白/香槟金为<b>金属实体卡</b>：倒角、边缘厚度、静态反射光带、浅浮雕徽记（原创舟帆，非游戏徽标）。</li>
+        <li>状态语义在<b>铭牌状态条</b>（文字+图标），金银不代表稀有度/质量/身份。</li>
+        <li>选中=焦点色描边+抬升；不可用=去饱和+禁点；无封面=明确占位说明。</li>
+        <li>卡背可作显式详情切换（翻面按钮演示）；关键状态不在背面隐藏。</li>
+      </ul>
+    </div>
+  </main>
+</div>
+<script>
+  const flip = document.getElementById('flipDemo');
+  document.getElementById('flipBtn').addEventListener('click', (e) => {
+    const on = flip.classList.toggle('flipped');
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+  });
+</script>
+<script>document.querySelector('.sf-nav a[aria-current]')?.scrollIntoView({block:'nearest',inline:'center'})</script>
+</body>
+</html>

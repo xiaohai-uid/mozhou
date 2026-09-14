@@ -70,15 +70,18 @@ describe('scenePreference（本地 UI 偏好，非 Canon）', () => {
 })
 
 describe('SceneLayer（L0 场景 / L1 氛围 / L2 暗幕+人物）', () => {
-  it('默认渲染：场景层 + 氛围 + 暗幕 + 人物层；装饰层不入键盘序', () => {
+  it('默认渲染：场景层 + 氛围 + 暗幕；装饰层不入键盘序；figure 默认关闭（银白方向）', () => {
     const { container } = render(<SceneLayer profile={DEFAULT_SCENE_PROFILE} />)
     expect(container.querySelector('.scene-layer')).not.toBeNull()
     expect(container.querySelector('.scene-atmosphere')).not.toBeNull()
     expect(container.querySelector('.scene-veil')).not.toBeNull()
-    expect(container.querySelector('.scene-figure')).not.toBeNull()
+    expect(container.querySelector('.scene-figure')).toBeNull() // ADR-0029 默认无前景人物
     for (const element of Array.from(container.querySelectorAll('div'))) {
       expect(element.getAttribute('tabindex')).toBeNull()
     }
+    const withFigure = { ...DEFAULT_SCENE_PROFILE, figure: { ...DEFAULT_SCENE_PROFILE.figure, enabled: true } }
+    const { container: shown } = render(<SceneLayer profile={withFigure} />)
+    expect(shown.querySelector('.scene-figure')).not.toBeNull()
   })
 
   it('人物关闭：不渲染 figure；上传背景：has-upload 且背景图内联', () => {
@@ -130,7 +133,7 @@ describe('SceneSettingsSheet（四分区 · 上传校验 · 作用域）', () =>
     fireEvent.click(screen.getByTestId('scene-figure-toggle'))
     expect(onChange).toHaveBeenCalledTimes(1)
     const next = firstPayload(onChange)
-    expect(next.global.figure.enabled).toBe(false)
+    expect(next.global.figure.enabled).toBe(true) // 银白默认关闭 → 点击开启
   })
 
   it('上传校验：非白名单格式 → 显式错误且不改偏好', () => {

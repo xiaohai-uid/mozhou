@@ -6,7 +6,7 @@
  * 上传图持久化预算：dataURL 超限时仅本次会话有效（不落盘），由 UI 明示。
  */
 
-export type SceneId = 'city-night' | 'cloud-sea' | 'rain-city' | 'library' | 'custom'
+export type SceneId = 'silver-atrium' | 'city-night' | 'cloud-sea' | 'rain-city' | 'library' | 'custom'
 export type SceneFigureAnchor = 'left' | 'center' | 'right'
 
 export interface SceneProfile {
@@ -53,13 +53,13 @@ export const SCENE_UPLOAD_BUDGET = {
 } as const
 
 export const DEFAULT_SCENE_PROFILE: SceneProfile = {
-  sceneId: 'city-night',
+  sceneId: 'silver-atrium',
   brightness: 100,
   blur: 0,
-  veil: 0.5,
+  veil: 0.12,
   focusX: 50,
   focusY: 38,
-  figure: { enabled: true, anchor: 'right', scale: 1, opacity: 0.6 },
+  figure: { enabled: false, anchor: 'right', scale: 1, opacity: 0.6 },
 }
 
 function isSceneProfile(value: unknown): value is SceneProfile {

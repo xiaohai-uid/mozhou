@@ -18,6 +18,7 @@ import {
 import type { SceneFigureAnchor, SceneId, SceneProfile, ScenePreference } from './scenePreference'
 
 const BUILT_IN_SCENES: readonly { id: Exclude<SceneId, 'custom'>; label: string }[] = [
+  { id: 'silver-atrium', label: '银白中庭' },
   { id: 'city-night', label: '海城 · 夜' },
   { id: 'cloud-sea', label: '云海之上' },
   { id: 'rain-city', label: '雨夜都市' },
