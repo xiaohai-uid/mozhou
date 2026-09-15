@@ -1,0 +1,14 @@
+{
+  "kind": "test",
+  "path": "evidence/full-release/20260915-1/T02/result.json",
+  "sourceCommit": "fb8bd71",
+  "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+  "command": "pnpm --filter @mozhou/web test -- server/billing/catalog.test.ts；pnpm exec vitest run（web 全套 313+1skip）；tsc -b；eslint 修改文件",
+  "exitCode": 0,
+  "scope": "catalog.ts 冻结 1900/3900 分 CNY（唯一真源，Object.freeze）；删除 pro_lifetime/studio_team 占位商品；entitlementKeys 服务端唯一裁决；maxIncludedCalls 公式 fixture=300；未实测成本时 sellable=false/includedCalls=null（不可售保护）；最坏成本上界+重试；1500 分模型预算建议；月末钳制周期；/api/billing/catalog 端点；/api/membership 改用 catalog 数据；api.ts 契约、eslint allowDefaultProject 登记 billing 测试目录；21 新测试+api52+membership2 全绿",
+  "limitations": [
+    "T02 verified ≠ Max 可销售：p95CallFen/pricePerMTokenFen 仍为 null，最终额度由 T18 实测后写入并变更 CATALOG_VERSION",
+    "同订单权益不重复的服务端唯一约束（DB）在 T14 的 orders 迁移中实现；本项为周期纯函数保证",
+    "未发任何支付订单；支付通道仍 blocked（T01）"
+  ]
+}

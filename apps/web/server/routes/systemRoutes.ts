@@ -7,6 +7,7 @@ import { readCanonState, readStyleProfiles, RUNTIME_DB_PATH } from '@mozhou/data
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { hasDraftProvider } from './pipelineRoutes.js'
+import { billingCatalog } from '../billing/catalog.js'
 
 const CAPABILITY_SQUARE_GROUPS = [
   {
@@ -359,44 +360,52 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
     return true
   }
 
-  /* ---- Technical Preview：仅社区免费版，付费/激活尚未开放 ---- */
+  /* ---- 定价目录（T02 冻结 · 唯一真源）：价格只在此保存一次，UI/账单/额度读这里 ---- */
+  if (path === '/api/billing/catalog') {
+    json(200, { ok: true, catalog: billingCatalog })
+    return true
+  }
+
+  /* ---- 会员中心：付费/激活尚未开放（真实订单在 T14）；价格与权益已按 catalog 冻结 ---- */
   if (path === '/api/membership') {
+    const planFeatures = (keys: readonly string[]): string[] => keys.map((key) => key)
     const plans = [
       {
         id: 'free_community',
         name: '社区免费版',
         price: '免费',
         tag: 'Technical Preview 当前版本',
-        features: ['单书本地正典创作', '基础大纲与章节管理', '本地 SQLite 数据库存储', '社区技能广场查看'],
+        features: ['建书/阅读/手写', '导出自己的作品', '备份与迁移（按服务能力启用）'],
         current: true,
       },
       {
-        id: 'pro_lifetime',
-        name: '墨舟 Pro 终身专业版',
-        price: '尚未开放',
-        tag: '规划中 · 当前不可购买/激活',
-        features: [
-          '无限作品库与多书无缝切换',
-          'Story Brain 认知三级穿透面板',
-          'Context Receipt 确定性装配看板',
-          'Change Matrix 变更影响矩阵与幂等重跑',
-          '全套文学质量审查与防过拟合回炉',
-          '全场景 StyleProfile 文风蒸馏与飞轮演化',
-          '本地离线快照与全量便携迁移',
-        ],
+        id: billingCatalog.pro.planId,
+        name: billingCatalog.pro.name,
+        price: `${(billingCatalog.pro.amountFen / 100).toFixed(0)} 元/月`,
+        tag: `catalog ${billingCatalog.version} · 尚未开放购买`,
+        features: planFeatures(billingCatalog.pro.entitlementKeys),
+        amountFen: billingCatalog.pro.amountFen,
+        currency: billingCatalog.currency,
+        catalogVersion: billingCatalog.version,
         current: false,
       },
       {
-        id: 'studio_team',
-        name: '工作室多端团队版',
-        price: '尚未开放',
-        tag: '规划中',
-        features: ['包含 Pro 版全部权益', '多设备局域网实时同步协同', '专属小说拆解高级提示词库', '优先技术支持通道'],
+        id: billingCatalog.max.planId,
+        name: billingCatalog.max.name,
+        price: `${(billingCatalog.max.amountFen / 100).toFixed(0)} 元/月`,
+        tag: billingCatalog.managed.sellable
+          ? `含封顶官方调用额度 ${billingCatalog.managed.includedCallsPerMonth} 次/月`
+          : '官方调用额度待真实成本测算后开放（当前不可购买）',
+        features: planFeatures(billingCatalog.max.entitlementKeys),
+        amountFen: billingCatalog.max.amountFen,
+        currency: billingCatalog.currency,
+        catalogVersion: billingCatalog.version,
+        sellable: billingCatalog.managed.sellable,
         current: false,
       },
     ]
 
-    json(200, { ok: true, license: null, plans })
+    json(200, { ok: true, license: null, plans, catalogVersion: billingCatalog.version })
     return true
   }
 

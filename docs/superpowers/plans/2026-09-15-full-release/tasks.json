@@ -94,7 +94,7 @@
     {
       "id": "T02",
       "title": "19/39权益和成本合同",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "T00"
       ],
@@ -106,8 +106,21 @@
       "deliverable": "价格固定、权益map、成本公式与不可销售未核实额度保护",
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "保留已售priceVersion",
-      "evidence": [],
-      "result": null
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T02/result.json",
+          "sourceCommit": "fb8bd71",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "pnpm --filter @mozhou/web test -- server/billing/catalog.test.ts",
+          "exitCode": 0,
+          "scope": "21 个 catalog 测试（价格/权益/公式/周期/不可售）",
+          "limitations": [
+            "最终额度待 T18"
+          ]
+        }
+      ],
+      "result": "catalog 冻结（1900/3900 CNY 唯一真源）+ 不可售保护（sellable=false）+ maxIncludedCalls 公式与最坏成本上界 + 月末周期；21+52+2 测试绿、tsc/lint 通过；已删永久/团队占位商品"
     },
     {
       "id": "T03",

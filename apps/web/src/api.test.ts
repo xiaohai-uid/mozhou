@@ -1200,9 +1200,13 @@ describe('会员中心 API 契约', () => {
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.license).toBeNull()
-    const plans = data.plans as { id: string; current: boolean; price: string }[]
+    const plans = data.plans as { id: string; current: boolean; price: string; amountFen?: number }[]
     expect(plans.find((plan) => plan.id === 'free_community')?.current).toBe(true)
-    expect(plans.find((plan) => plan.id === 'pro_lifetime')?.current).toBe(false)
+    expect(plans.find((plan) => plan.id === 'pro_monthly')?.current).toBe(false)
+    expect(plans.find((plan) => plan.id === 'pro_monthly')?.amountFen).toBe(1900)
+    expect(plans.find((plan) => plan.id === 'max_monthly')?.amountFen).toBe(3900)
+    expect(plans.find((plan) => plan.id === 'studio_team')).toBeUndefined()
+    expect(plans.find((plan) => plan.id === 'pro_lifetime')).toBeUndefined()
   })
 
   it('GET /api/membership：支持运维健康检查与 CLI 探针直接获取社区版信息', async () => {

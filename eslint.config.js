@@ -18,6 +18,7 @@ export default tseslint.config(
             'apps/web/server/productionServer.ts',
             'apps/web/server/routes/*.test.ts',
             'apps/web/server/storyboard/*.test.ts',
+            'apps/web/server/billing/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
         },

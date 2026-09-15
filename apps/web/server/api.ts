@@ -394,6 +394,29 @@ export interface LicensePlan {
   readonly tag?: string | undefined
   readonly features: readonly string[]
   readonly current: boolean
+  /** T02 catalog 冻结：付费档固定金额（分）；客户端不可覆盖，只读展示。 */
+  readonly amountFen?: number | undefined
+  readonly currency?: 'CNY' | undefined
+  readonly catalogVersion?: string | undefined
+  /** false = 官方调用额度/商品尚不可购买（未实测成本），UI 不得误导为可购。 */
+  readonly sellable?: boolean | undefined
+}
+
+/** GET /api/billing/catalog：服务端定价唯一真源（T02 冻结；C4 订单金额只取自这里）。 */
+export interface BillingCatalogResponse {
+  readonly ok: true
+  readonly catalog: {
+    readonly version: string
+    readonly currency: 'CNY'
+    readonly basicAlwaysAvailable: readonly string[]
+    readonly pro: { readonly planId: 'pro_monthly'; readonly amountFen: 1900; readonly entitlementKeys: readonly string[] }
+    readonly max: { readonly planId: 'max_monthly'; readonly amountFen: 3900; readonly entitlementKeys: readonly string[] }
+    readonly managed: {
+      readonly sellable: boolean
+      readonly includedCallsPerMonth: number | null
+      readonly worstCasePerCallFen: number | null
+    }
+  }
 }
 
 export interface MembershipResponse {
@@ -408,6 +431,7 @@ export interface MembershipResponse {
     readonly status: 'active' | 'expired' | 'revoked'
   } | null
   readonly plans: readonly LicensePlan[]
+  readonly catalogVersion?: string | undefined
 }
 
 export type CapabilityStatus =
