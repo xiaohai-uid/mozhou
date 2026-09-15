@@ -797,7 +797,7 @@ describe('T44 中栏对话流 API 契约', () => {
       expect(res.status).toBe(200)
       expect(res.headers.get('Content-Type')).toContain('ndjson')
       const text = await res.text()
-      const frames = text.split('\n').filter((line) => line.trim().length > 0).map((line) => JSON.parse(line) as { ok: boolean; event: string; text?: string; outcome?: string; partial?: boolean })
+      const frames = text.split('\n').filter((line) => line.trim().length > 0).map((line) => JSON.parse(line) as { ok: boolean; event: string; text?: string; outcome?: string; partial?: boolean; candidateId?: string })
       expect(frames[0]?.event).toBe('start')
       expect(frames.at(-1)?.event).toBe('done')
       expect(frames.at(-1)?.outcome).toBe('succeeded')
@@ -809,7 +809,7 @@ describe('T44 中栏对话流 API 契约', () => {
       const scan = readProseChapter(dir, proseChapterPath(1))
       expect(scan.phase).toBe('draft')
       expect(scan.body).not.toContain('夜雨敲窗')
-      const candidateId = frames[0]?.candidateId as string | undefined
+      const candidateId = frames[0]?.candidateId
       expect(candidateId).toBeTruthy()
       const candidate = candidateId === undefined ? null : readDraftCandidate(dir, candidateId)
       expect(candidate?.status).toBe('ready')

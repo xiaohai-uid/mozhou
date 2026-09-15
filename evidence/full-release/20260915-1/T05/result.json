@@ -1,0 +1,13 @@
+{
+  "kind": "test",
+  "path": "evidence/full-release/20260915-1/T05/result.json",
+  "sourceCommit": "a1d6fd2",
+  "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+  "command": "pnpm --filter @mozhou/web test -- src/workbench（DialogueStream 3+2+8=13 处链路）+ web 全套 + workspace 740 + tsc + eslint",
+  "exitCode": 0,
+  "scope": "T05 完成：DialogueStream 候选流（start 帧 candidateId+base 状态化）、采纳=真实 /api/draft.accept（不再先改 localStorage 却称落盘）、成功后服务端回读刷写作层缓存+prose-adopted 事件+一次可逆 Undo（新 revision 保存）、accept 409 → 双文本冲突面板（候选 vs 最新+复制/以最新现场重生成）、迟到帧按发起现场隔离（切书不串写）、selection 传输支持（replace-selection 模式，ProseEditorPanel 接入前保持诚实空态）；3 个新测试（accept 真实调用+Undo/409 冲突/迟到帧隔离）",
+  "limitations": [
+    "真实浏览器 IME/双窗口操作未在本次完成（dev server+浏览器 smoke 待设备就绪）；ProseEditorPanel 选区插入入口保持诚实不可用标注（无伪功能）",
+    "T05 组件测试用 fetch mock；磁盘回读语义由 T04 HTTP 集成测试覆盖"
+  ]
+}

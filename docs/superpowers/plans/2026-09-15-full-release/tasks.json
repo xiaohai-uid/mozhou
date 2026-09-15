@@ -215,7 +215,7 @@
     {
       "id": "T05",
       "title": "真实编辑与选择插入",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "T04"
       ],
@@ -228,8 +228,21 @@
       "deliverable": "候选采纳、撤销、冲突对比、切书隔离的真实UI",
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "不清空作者缓存",
-      "evidence": [],
-      "result": null
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T05/result.json",
+          "sourceCommit": "a1d6fd2",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "pnpm --filter @mozhou/web test -- src/workbench",
+          "exitCode": 0,
+          "scope": "采纳/冲突/undo/迟到隔离 UI 行为",
+          "limitations": [
+            "真浏览器操作待 T17 环境"
+          ]
+        }
+      ],
+      "result": "UI 候选采纳链落地：Accept 真实事务+回读刷新+Undo+409 双文本冲突面板+迟到帧隔离+selection 运输；13 个 workbench 测试+740 workspace 全绿"
     },
     {
       "id": "T08",

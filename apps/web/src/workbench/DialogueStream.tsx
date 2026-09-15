@@ -5,11 +5,36 @@
  * 显式 unavailable（Gate 3 纪律：不静默假装可用）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { chapterDraftKey, loadDraftCache, saveDraftCache } from '../shell/workbenchStorage'
+import { chapterDraftKey, saveDraftCache } from '../shell/workbenchStorage'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
 import type { BookInfo } from '../shell/workbenchStorage'
 
 type DialoguePhase = 'ask' | 'answered' | 'drafting' | 'draft_done' | 'error'
+
+interface WriteBaseFields {
+  readonly revision: number
+  readonly sha256: string
+}
+
+interface CandidateState {
+  readonly candidateId: string
+  readonly base: WriteBaseFields
+  readonly mode: 'replace' | 'continue' | 'insert' | 'replace-selection'
+}
+
+/** 采纳前的盘面现场（Undo 一次可逆编辑的数据源）。 */
+interface AcceptUndo {
+  readonly bookRoot: string
+  readonly chapterIndex: number
+  readonly oldText: string
+  readonly oldRevision: number | null
+}
+
+interface ConflictView {
+  readonly candidateText: string
+  readonly latestText: string
+  readonly latestRevision: number | null
+}
 
 interface DraftStreamFrame {
   readonly ok: boolean
@@ -24,15 +49,23 @@ interface DraftStreamFrame {
   readonly contextTokens?: number
   readonly provider?: string
   readonly contextMode?: string
+  /** C2（T05）：候选 id 与生成起点 base（服务端取盘面现场返回）。 */
+  readonly candidateId?: string
+  readonly base?: { readonly revision: number; readonly sha256: string }
 }
 
 export function DialogueStream({
   book,
   chapterIndex = 1,
+  selection,
 }: {
   book: BookInfo | null
   /** 兼容旧调用面缺省第 1 章；生产 App 始终传入当前选中章。 */
   chapterIndex?: number
+  /** C2（T05）选择插入/替换：生成开始时选区现场（from/to/selectedTextHash）。
+   *  写作面（ProseEditorPanel）接入前保持诚实空态；传入后按 replace-selection 模式生成，
+   *  生成期间编辑 → accept 409 → 冲突对比面板（本组件既有冲突恢复路径）。 */
+  selection?: { from: number; to: number; selectedTextHash: string }
 }): JSX.Element {
   const [phase, setPhase] = useState<DialoguePhase>('ask')
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse['capabilities']>([])
@@ -47,7 +80,16 @@ export function DialogueStream({
   const [streamMeta, setStreamMeta] = useState<{ contextTokens?: number; provider?: string } | null>(null)
   /** 采纳进写作层的回执（Candidate → Accept → Active Draft 链）。 */
   const [adoptState, setAdoptState] = useState<string | null>(null)
+  /** C2（T05）：候选状态（candidateId+base+mode），随流请求建立；切书/切章/重开即失效。 */
+  const [candidate, setCandidate] = useState<CandidateState | null>(null)
+  /** 冲突现场：accept 409 时保留双文本 + 最新版本供作者裁决。 */
+  const [conflictView, setConflictView] = useState<ConflictView | null>(null)
+  /** Undo 一次可逆编辑（accept 前的盘面）。 */
+  const [undo, setUndo] = useState<AcceptUndo | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
+  /** 发起流请求时的书/章现场：迟到响应与切书后身份不符时丢弃（T05 切书隔离）。 */
+  const requestSiteRef = useRef<{ bookId: string; chapterIndex: number } | null>(null)
+
 
   useEffect(() => {
     if (book === null) return
@@ -76,6 +118,11 @@ export function DialogueStream({
     setError(null)
     setSending(true)
     setDraftText('')
+    setCandidate(null)
+    setConflictView(null)
+    setUndo(null)
+    // 切书/切章隔离：迟到帧只属于发起现场（T05）
+    requestSiteRef.current = { bookId: book.bookId, chapterIndex }
     try {
       const res = await fetch('/api/draft.stream', {
         method: 'POST',
@@ -85,6 +132,8 @@ export function DialogueStream({
           chapterIndex,
           prompt,
           activeSkills: selectedSkills,
+          ...(selection === undefined ? {} : { mode: 'replace-selection', selection }),
+          // base 缺省：服务端取盘面现场并在 start 帧回传（UI 以回传值为准）
         }),
       })
       const contentType = res.headers.get('Content-Type') ?? ''
@@ -127,11 +176,19 @@ export function DialogueStream({
           buffer = buffer.slice(nl + 1)
           if (line.trim().length === 0) continue
           const frame = JSON.parse(line) as DraftStreamFrame
+          // 迟到响应隔离：发起现场与当前书/章不符 → 丢弃该帧（不写入当前新书）
+          const site = requestSiteRef.current
+          if (book === null || site === null || site.bookId !== book.bookId || site.chapterIndex !== chapterIndex) {
+            continue
+          }
           if (frame.event === 'start') {
             setStreamMeta({
               ...(frame.contextTokens !== undefined ? { contextTokens: frame.contextTokens } : {}),
               ...(frame.provider !== undefined ? { provider: frame.provider } : {}),
             })
+            if (typeof frame.candidateId === 'string' && frame.base !== undefined) {
+              setCandidate({ candidateId: frame.candidateId, base: frame.base, mode: selection === undefined ? 'replace' : 'replace-selection' })
+            }
           } else if (frame.event === 'delta' && typeof frame.text === 'string') {
             setDraftText((prev) => prev + frame.text)
           } else if (frame.event === 'done') {
@@ -148,7 +205,7 @@ export function DialogueStream({
       setPhase('error')
       setSending(false)
     }
-  }, [answer, book, chapterIndex, phase, selectedSkills, sending])
+  }, [answer, book, chapterIndex, phase, selectedSkills, sending, selection])
 
   const handleChoice = (choice: string): void => {
     setAnswer(choice)
@@ -161,22 +218,129 @@ export function DialogueStream({
     setAnswer('')
     setStreamMeta(null)
     setAdoptState(null)
+    setCandidate(null)
+    setConflictView(null)
+    setUndo(null)
+    requestSiteRef.current = null
   }
 
-  /** Accept：把 AI Candidate 文本采纳进写作层 Active Draft（ch_<书身份>_<N> 本地草稿缓存），
-   *  供 Reading Slate 继续编辑/落盘。不改变服务端已落章的草稿事实。
-   *  写作层已有作者文本时先确认（Author Sovereignty：不静默覆盖）。 */
-  const handleAdoptIntoSlate = useCallback((): void => {
-    if (book === null) return
-    const cacheKey = chapterDraftKey(book, chapterIndex)
-    const existing = loadDraftCache(cacheKey)
-    if (existing.trim().length > 0 && !window.confirm(`第 ${chapterIndex} 章写作层已有草稿文本（${existing.length} 字符）。采纳将替换为候选文本——继续？`)) {
+  /** 拉取章快照（accept 前置的盘面现场；Undo 数据源）。 */
+  const loadSnapshot = useCallback(async (activeBook: NonNullable<typeof book>): Promise<{ body: string; revision: number | null }> => {
+    const res = await fetch('/api/chapter.prose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: activeBook.root, chapterIndex }),
+    })
+    const data = (await res.json()) as { ok?: boolean; exists?: boolean; body?: string; revision?: number; error?: string }
+    if (!res.ok || data.ok !== true) throw new Error(data.error ?? '章快照读取失败')
+    return { body: data.body ?? '', revision: data.exists === false ? null : (data.revision ?? null) }
+  }, [chapterIndex])
+
+  /** C2（T05）Accept：调用 /api/draft.accept 真实落盘（不再先改 localStorage 却称已落盘）。
+   *  成功 → 刷新章快照到本地写作缓存 + 通知 Reading Slate + 记录一次可逆 Undo；
+   *  409 冲突 → 保留两份文本（候选 vs 最新盘面），交作者裁决。 */
+  const handleAccept = useCallback(async (): Promise<void> => {
+    if (book === null || candidate === null) return
+    setError(null)
+    setAdoptState(null)
+    let oldSnapshot: { body: string; revision: number | null }
+    try {
+      oldSnapshot = await loadSnapshot(book)
+    } catch (cause) {
+      setError((cause as Error).message)
       return
     }
-    saveDraftCache(draftText, cacheKey)
-    window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
-    setAdoptState(`已采纳进写作层（${book.title} 第 ${chapterIndex} 章 Active Draft，${draftText.length} 字符）——可在正文 · Active Draft 继续编辑，落盘经「Accept → Active Draft」。`)
-  }, [draftText, chapterIndex, book])
+    try {
+      const res = await fetch('/api/draft.accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          root: book.root,
+          candidateId: candidate.candidateId,
+          base: candidate.base,
+          idempotencyKey: 'ui_accept_' + candidate.candidateId,
+        }),
+      })
+      const data = (await res.json()) as {
+        ok?: boolean
+        revision?: number
+        sha256?: string
+        alreadyApplied?: boolean
+        code?: string
+        error?: string
+      }
+      if (res.ok && data.ok === true) {
+        // 成功后以服务端回读正文刷新写作层缓存（采纳后盘上正文为准）
+        const readback = await loadSnapshot(book)
+        saveDraftCache(readback.body, chapterDraftKey(book, chapterIndex))
+        window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
+        setUndo({ bookRoot: book.root, chapterIndex, oldText: oldSnapshot.body, oldRevision: oldSnapshot.revision })
+        setAdoptState(
+          data.alreadyApplied === true
+            ? `已采纳（幂等重放命中，不重复写入）——第 ${chapterIndex} 章服务端 r${String(data.revision)}`
+            : `已采纳进正文 — 服务端 r${String(data.revision)} · ${book.title} 第 ${chapterIndex} 章 Active Draft 已刷新，可在 Reading Slate 继续编辑`,
+        )
+        return
+      }
+      if (res.status === 409) {
+        // 冲突：候选文本保留（UI 内存+服务端候选区），展示差异
+        const latest = await loadSnapshot(book)
+        setConflictView({ candidateText: draftText, latestText: latest.body, latestRevision: latest.revision })
+        setAdoptState(null)
+        return
+      }
+      setError(data.error ?? '采纳失败（HTTP ' + res.status + '）')
+    } catch (cause) {
+      setError((cause as Error).message)
+    }
+  }, [book, candidate, chapterIndex, draftText, loadSnapshot])
+
+  /** 冲突裁决：作者读最新版并明确确认后，以最新盘面现场重新生成候选（再走 accept）。
+   *  旧候选文本保留在服务端候选区，可人工复制。 */
+  const handleRetryAcceptWithLatest = useCallback(async (): Promise<void> => {
+    if (book === null || conflictView === null) return
+    if (!window.confirm('以最新版本（r' + String(conflictView.latestRevision) + '）为基准重新生成候选？当前候选将被放弃（文本保留在候选区可复制）。')) return
+    setConflictView(null)
+    setDraftText('')
+    setCandidate(null)
+    setPhase('answered')
+    await handleSend()
+  }, [book, conflictView, handleSend])
+
+  /** 冲突双文本：复制候选文本到剪贴板。 */
+  const handleCopyCandidate = useCallback(async (): Promise<void> => {
+    if (conflictView === null) return
+    await navigator.clipboard.writeText(conflictView.candidateText).catch(() => undefined)
+  }, [conflictView])
+
+  /** Undo：一次可逆编辑——以新 revision 保存采纳前文本（不倒退服务器历史）。 */
+  const handleUndoAccept = useCallback(async (): Promise<void> => {
+    if (book === null || undo === null) return
+    const latest = await loadSnapshot(book)
+    try {
+      const res = await fetch('/api/chapter.prose.save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          root: book.root,
+          chapterIndex,
+          body: undo.oldText,
+          expectedRevision: latest.revision,
+        }),
+      })
+      const data = (await res.json()) as { ok?: boolean; revision?: number; error?: string }
+      if (res.ok && data.ok === true) {
+        saveDraftCache(undo.oldText, chapterDraftKey(book, chapterIndex))
+        window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
+        setUndo(null)
+        setAdoptState('已撤销采纳（新 revision 保存，不倒退服务端历史）')
+      } else {
+        setError(data.error ?? '撤销保存失败')
+      }
+    } catch (cause) {
+      setError((cause as Error).message)
+    }
+  }, [book, chapterIndex, loadSnapshot, undo])
 
   const toggleSkill = (skillId: string): void => {
     setSelectedSkills((prev) =>
@@ -256,19 +420,50 @@ export function DialogueStream({
           {phase === 'draft_done' && (
             <>
               <p className="mono muted" style={{ margin: '6px 0 0', fontSize: 10 }}>
-                已流式落盘为当前章草稿（服务端原子写入）——质量门常驻，Accepted ≠ Committed。
+                候选已就绪（未写入正文）——采纳经服务端受控事务（CAS + 幂等），质量门常驻，Accepted ≠ Committed。
               </p>
               {adoptState !== null && (
                 <p role="status" className="mono" style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--success)' }} data-testid="adopt-state">
                   {adoptState}
                 </p>
               )}
-              <div style={{ marginTop: 8 }}>
-                <button type="button" className="btn btn-author btn-sm" data-testid="adopt-into-slate" onClick={handleAdoptIntoSlate}>
-                  采纳进写作层（Accept → Active Draft）
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-author btn-sm" data-testid="adopt-into-slate" onClick={() => { void handleAccept() }} disabled={candidate === null}>
+                  采纳进正文（Accept → Active Draft）
                 </button>
+                {undo !== null && (
+                  <button type="button" className="btn btn-sm" data-testid="undo-accept" onClick={() => { void handleUndoAccept() }}>
+                    撤销采纳（Undo）
+                  </button>
+                )}
               </div>
             </>
+          )}
+
+          {conflictView !== null && (
+            <div className="wb-conflict" data-testid="accept-conflict" style={{ marginTop: 10, border: '1px solid var(--warn)', padding: 10, borderRadius: 8 }}>
+              <p role="alert" style={{ margin: 0, fontWeight: 600 }}>
+                采纳冲突：生成期间正文已被修改（基础版本过期，r{String(conflictView.latestRevision ?? '—')}）。
+              </p>
+              <p style={{ margin: '6px 0', fontSize: 12 }}>
+                两份文本都已保留，未覆盖任何内容。请选择：读最新正文 → 以最新现场重新生成；或复制候选文本自行处理。
+              </p>
+              <details style={{ margin: '6px 0', fontSize: 12 }}>
+                <summary>查看差异（候选 vs 最新盘上正文）</summary>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                  <pre style={{ whiteSpace: 'pre-wrap', background: 'var(--bg-soft)', padding: 8, borderRadius: 6, margin: 0 }} data-testid="conflict-candidate">{conflictView.candidateText}</pre>
+                  <pre style={{ whiteSpace: 'pre-wrap', background: 'var(--bg-soft)', padding: 8, borderRadius: 6, margin: 0 }} data-testid="conflict-latest">{conflictView.latestText}</pre>
+                </div>
+              </details>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-sm" data-testid="conflict-regenerate" onClick={() => { void handleRetryAcceptWithLatest() }}>
+                  读最新 → 以最新现场重新生成
+                </button>
+                <button type="button" className="btn btn-sm" data-testid="conflict-copy-candidate" onClick={() => { void handleCopyCandidate() }}>
+                  复制候选文本
+                </button>
+              </div>
+            </div>
           )}
         </article>
       )}
