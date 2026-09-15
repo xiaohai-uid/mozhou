@@ -17,7 +17,7 @@
     {
       "id": "T00",
       "title": "保护现状与执行分支",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [],
       "document": "01-core.md",
       "anchor": "T00",
@@ -28,8 +28,23 @@
       "deliverable": "仓库外可回读备份、当前源码指纹、执行分支与baseline提交",
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "还原本项逐文件更改，不覆盖原有dirty内容",
-      "evidence": [],
-      "result": null
+      "evidence": [
+        {
+          "kind": "filesystem",
+          "path": "evidence/full-release/20260915-1/T00/result.json",
+          "sourceCommit": "9fc2b4026c3e0240f0d3f76e3648915a9d0ea4b2",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "git snapshot+sha256sum+backup+switch -c+analyze+pnpm test",
+          "exitCode": 0,
+          "scope": "备份回读匹配、dirty 22项已归类登记、分支正确、测试基线全绿",
+          "limitations": [
+            "web真实模型测试1个按原样跳过",
+            "未push",
+            "测试绿≠发布验收"
+          ]
+        }
+      ],
+      "result": "baseline 9fc2b40：仓库外备份回读核对25文件mismatch=0；产品指纹59ab7480；分支codex/mozhou-full-release-20260915；图谱8947节点0循环；workspace 91/732、web 41/292+1skip全绿；交接自检PASS；未push"
     },
     {
       "id": "T01",
