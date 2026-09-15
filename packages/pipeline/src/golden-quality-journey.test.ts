@@ -6,7 +6,7 @@
  * 三连跑全过；两条负路径：stale PASS 交付拦截 / 第三次回炉拒绝。
  * 零时钟零外部服务：LLM 缝以假 provider/假 extractor 注入；taskRef 固定注入。
  */
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -14,13 +14,16 @@ import { newUlid } from '@mozhou/kernel';
 import { PublishBus, RuntimeEngine } from '@mozhou/runtime';
 import type { ContextPacket } from '@mozhou/context-compiler';
 import type { CapabilityRecipe } from '@mozhou/runtime';
-import { LocalDataPlane, createBook } from '@mozhou/data-plane';
+import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane';
 import { hashProse, isQualityReviewCurrent } from '@mozhou/quality-engine';
+import { createHash } from 'node:crypto';
 import {
+  AcceptConflictError,
   ChapterProductionSession,
   ProposalPort,
   QualityReviewNotPassError,
   QualityReworkLimitExceededError,
+  acceptDraft,
   makeDraftProviderBinding,
   createCanonProposal,
   readPipelineLedger,
@@ -29,6 +32,7 @@ import {
   runDraftStep,
   runFinalExtract,
   runReviewStep,
+  type WriteBase,
 } from './index.js';
 
 let roots: string[] = [];
@@ -87,7 +91,24 @@ const RECIPE: CapabilityRecipe = {
 };
 
 /** 假草稿 provider：跨异步边界逐块流式吐出 INITIAL_PROSE（零 LLM）。 */
-function makeDraftEngine(root: string, bus: PublishBus): RuntimeEngine {
+let goldenCandidateSeq = 0;
+function goldenCandidate(root: string, chapterIndex: number): { candidate: { id: string; operationId: string; bookId: string; base: WriteBase; mode: 'replace' }; base: WriteBase } {
+  goldenCandidateSeq += 1;
+  const id = 'b0000000-0000-4000-8000-' + String(goldenCandidateSeq).padStart(12, '0');
+  const plane = LocalDataPlane.open(root);
+  try {
+    const scan = plane.getProseChapter(chapterIndex);
+    const base: WriteBase = {
+      revision: scan.revision,
+      sha256: createHash('sha256').update(readFileSync(join(root, proseChapterPath(chapterIndex)))).digest('hex'),
+    };
+    return { candidate: { id, operationId: 'op_golden_' + String(goldenCandidateSeq), bookId: 'book-golden', base, mode: 'replace' }, base };
+  } finally {
+    plane.close();
+  }
+}
+
+function makeDraftEngine(root: string, bus: PublishBus): { engine: RuntimeEngine; candidate: { id: string; operationId: string; bookId: string; base: WriteBase; mode: 'replace' } } {
   const engine = new RuntimeEngine({ bus, ctx: { root }, newTaskRef: () => 'gen_golden' });
   engine.registerCapability({
     taskType: 'CHAPTER_DRAFTING',
@@ -99,11 +120,12 @@ function makeDraftEngine(root: string, bus: PublishBus): RuntimeEngine {
     await Promise.resolve();
     for (const chunk of INITIAL_PROSE.match(/.{1,8}/gu) ?? []) yield chunk;
   }
+  const { candidate } = goldenCandidate(root, 2);
   engine.registerProviderBinding(
     'deepseek',
-    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 2, provider: 'deepseek', mode: 'generate', stream }),
+    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 2, provider: 'deepseek', mode: 'generate', stream, candidate }),
   );
-  return engine;
+  return { engine, candidate };
 }
 
 /** 确定性-only 策略（语义面由 bench 与 API 契约覆盖）。 */
@@ -204,8 +226,9 @@ async function runGoldenJourney(runId: number): Promise<JourneyResult> {
   // 真实 compile/extract 缝在其他票的集成测试覆盖；本旅程用假 provider 补齐 draft 产物。
   session.advance('compile');
   session.advance('draft');
+  const draftCtx = makeDraftEngine(dir, bus);
   const draftOutcome = await runDraftStep({
-    engine: makeDraftEngine(dir, bus),
+    engine: draftCtx.engine,
     bookRoot: dir,
     chapterIndex: 2,
     packet: PACKET,
@@ -213,6 +236,15 @@ async function runGoldenJourney(runId: number): Promise<JourneyResult> {
   });
   expect(draftOutcome.outcome).toBe('succeeded');
   expect(draftOutcome.text).toContain('林晚登上墨舟');
+  // T04/C2：受控管线显式采纳候选后才落盘（I01）
+  const accepted = acceptDraft({
+    bookRoot: dir,
+    candidateId: draftCtx.candidate.id,
+    base: draftCtx.candidate.base,
+    idempotencyKey: 'accept_golden_' + String(runId),
+  });
+  expect(accepted.alreadyApplied).toBe(false);
+  expect(accepted.revision).toBeGreaterThan(draftCtx.candidate.base.revision);
 
   // literary review：版本绑定报告落 .mozhou/quality-reviews/，事件落账
   session.advance('review');
@@ -244,7 +276,8 @@ async function runGoldenJourney(runId: number): Promise<JourneyResult> {
     source: 'author',
     blocks: [{ op: 'replace', paragraphStart: 1, paragraphEnd: 1, replacementText: FINAL_PROSE.split('\n\n')[0] ?? '' }],
   });
-  expect(edit.revisionAfter).toBe(1);
+  // C2：draft accept 已占一次 revision（r0→r1），user edit 为下一次（r2）
+  expect(edit.revisionAfter).toBe(accepted.revision + 1);
 
   // final extract → continuity gate → canon proposal → 确认 → commit
   session.advance('final_extract');
@@ -306,7 +339,8 @@ describe('ADR-0025 Task 10 黄金章级旅程', () => {
     for (let runId = 1; runId <= 3; runId += 1) {
       const result = await runGoldenJourney(runId);
       expect(result.verdict).toBe('pass');
-      expect(result.finalRevision).toBe(1);
+      // C2：accept(r1) + user edit(r2) 后定稿
+      expect(result.finalRevision).toBe(2);
       // 提交后：报告文件在册（.mozhou/quality-reviews/chapter_2/）
       const reportDir = join(result.root, '.mozhou', 'quality-reviews', 'chapter_2');
       const reports = listReports(reportDir);
@@ -329,8 +363,9 @@ describe('ADR-0025 Task 10 黄金章级旅程', () => {
     const session = ChapterProductionSession.start({ bus: new PublishBus(), root: dir, chapterIndex: 2, newTaskRef: () => 'tsk_stale' });
     session.advance('compile');
     session.advance('draft');
+    const staleCtx = makeDraftEngine(dir, new PublishBus());
     const draft = await runDraftStep({
-      engine: makeDraftEngine(dir, new PublishBus()),
+      engine: staleCtx.engine,
       bookRoot: dir,
       chapterIndex: 2,
       packet: PACKET,
@@ -378,8 +413,9 @@ describe('ADR-0025 Task 10 黄金章级旅程', () => {
     const session = ChapterProductionSession.start({ bus: new PublishBus(), root: dir, chapterIndex: 2, newTaskRef: () => 'tsk_limit' });
     session.advance('compile');
     session.advance('draft');
+    const limitCtx = makeDraftEngine(dir, new PublishBus());
     void (await runDraftStep({
-      engine: makeDraftEngine(dir, new PublishBus()),
+      engine: limitCtx.engine,
       bookRoot: dir,
       chapterIndex: 2,
       packet: PACKET,

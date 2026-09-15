@@ -18,6 +18,10 @@ export {
 } from './draft-candidate.js';
 export type { CandidateMode, CandidateStatus, DraftCandidate, DraftCandidateRequest, WriteBase } from './draft-candidate.js';
 
+/** C2 受控采纳（T04）：意图日志 + 幂等恢复 + CAS 落盘。 */
+export { AcceptConflictError, acceptDraft, findIntentByKey, proseFileSha256 } from './draft-accept.js';
+export type { AcceptDraftRequest, AcceptDraftResult } from './draft-accept.js';
+
 /** 十步步进词表与序关系。 */
 export { PIPELINE_STEPS, isPipelineStep, nextStepOf, stepIndex } from './steps.js';
 export type { PipelineStep } from './steps.js';

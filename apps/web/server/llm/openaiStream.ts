@@ -153,11 +153,14 @@ export function resolveChatEndpoint(env: NodeJS.ProcessEnv): ResolvedEndpoint | 
 /**
  * 发起真实 OpenAI-compatible Chat Completions 流式请求，逐 delta 产出。
  * 仅在已配置真实 Key 且显式非 mock 时调用；网络错误按流式错误语义上抛。
+ * externalSignal（C2·T04）：HTTP 请求断开/显式 cancel 从中止到底层 fetch——
+ * 取消后的延迟 chunk 不再产出、不继续付费重试。
  */
 export async function* streamOpenAiChat(
   endpoint: ResolvedEndpoint,
   prompt: string,
   systemPrompt: string,
+  externalSignal?: AbortSignal,
 ): AsyncGenerator<OpenAiStreamChunk> {
   const base = endpoint.baseUrl || 'https://api.deepseek.com'
   const url = base.replace(/\/$/, '') + '/chat/completions'
@@ -166,6 +169,10 @@ export async function* streamOpenAiChat(
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 60_000)
+  const onExternalAbort = (): void => {
+    controller.abort()
+  }
+  externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
 
   try {
     const response = await fetch(url, {
@@ -230,5 +237,6 @@ export async function* streamOpenAiChat(
     }
   } finally {
     clearTimeout(timeout)
+    externalSignal?.removeEventListener('abort', onExternalAbort)
   }
 }

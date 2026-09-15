@@ -3,13 +3,20 @@
  */
 import type { RouteHandler } from '../router.js'
 import {
+  AcceptConflictError,
   ChapterProductionSession,
+  acceptDraft,
+  cancelCandidate,
+  createCandidateId,
   executeChapterReview,
   makeDraftProviderBinding,
   nextStepOf,
   QualityReworkLimitExceededError,
+  readDraftCandidate,
   recordAuthorCorrection,
   runDraftStep,
+  type CandidateMode,
+  type WriteBase,
 } from '@mozhou/pipeline'
 import {
   CORRECTION_REASONS,
@@ -19,6 +26,9 @@ import {
   type QualityPolicy,
 } from '@mozhou/quality-engine'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PublishBus, RuntimeEngine, createDraftRecipe } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
@@ -82,9 +92,16 @@ function decoratePromptWithSkills(prompt: string, skills: readonly string[]): st
   return `${constraints.join('\n')}\n\n${prompt}`
 }
 
+/** 正文 raw 文件 sha256（与 accept 落盘校验同源；base.sha256 的唯一合法默认）。 */
+function hashProseRaw(root: string, chapterIndex: number): string {
+  return createHash('sha256').update(readFileSync(join(root, proseChapterPath(chapterIndex)))).digest('hex')
+}
+
 /**
  * 真实 provider 消费完整编译上下文；mock 仅用作者指令生成演示正文，避免把
  * ContextPacket 自身写回小说正文，但 start 帧仍暴露真实 modelPrompt 供契约审计。
+ * C2（T04）：stream 只 append 候选（candidate 上下文必传，缺省拒绝绑定）；
+ * signal 在请求断开/显式取消时中止上游。
  */
 function makeStreamEngine(
   root: string,
@@ -92,6 +109,8 @@ function makeStreamEngine(
   modelPrompt: string,
   mockOutputSeed: string,
   onDelta: (text: string) => void,
+  candidate: { id: string; operationId: string; bookId: string; base: WriteBase; mode: CandidateMode; seedText?: string },
+  signal?: AbortSignal,
 ): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
   const recipe = createDraftRecipe({ proseRelPath: proseChapterPath(chapterIndex) })
@@ -114,6 +133,8 @@ function makeStreamEngine(
         provider: 'deepseek',
         mode: 'generate',
         stream: () => mockDraftStream(mockOutputSeed, onDelta),
+        candidate,
+        ...(signal === undefined ? {} : { signal }),
       }),
     )
   } else {
@@ -141,13 +162,15 @@ function makeStreamEngine(
               '你是资深中文网文作者。输入已由墨舟 Context Compiler 按当前作品正典与章节状态装配。' +
               '严格遵守其中的事实、人物知识边界、承诺与作者指令；只输出本章正文，不复述上下文。' +
               '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用。'
-            for await (const chunk of streamOpenAiChat(endpoint, modelPrompt, systemPrompt)) {
+            for await (const chunk of streamOpenAiChat(endpoint, modelPrompt, systemPrompt, signal)) {
               if (chunk.delta.length > 0) {
                 onDelta(chunk.delta)
                 yield chunk.delta
               }
             }
           })(),
+        candidate,
+        ...(signal === undefined ? {} : { signal }),
       }),
     )
   }
@@ -256,6 +279,20 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       : []
     const authorPrompt = decoratePromptWithSkills(rawPrompt, activeSkills)
 
+    // C2（T04）：候选请求字段
+    const rawMode = body['mode']
+    const mode: CandidateMode =
+      rawMode === 'replace' || rawMode === 'continue' || rawMode === 'insert' || rawMode === 'replace-selection'
+        ? rawMode
+        : 'replace'
+    const rawBase = body['base'] as { revision?: unknown; sha256?: unknown } | undefined
+    const hasClientBase = rawBase !== null && typeof rawBase === 'object'
+    const rawSelection = body['selection'] as { from?: unknown; to?: unknown; selectedTextHash?: unknown } | undefined
+    const selection =
+      rawSelection !== null && typeof rawSelection === 'object'
+        ? { from: Number(rawSelection.from), to: Number(rawSelection.to), selectedTextHash: String(rawSelection.selectedTextHash) }
+        : undefined
+
     if (root === null || chapterIndex === null || !Number.isInteger(chapterIndex) || chapterIndex < 1) {
       json(400, { ok: false, error: 'valid root and chapterIndex required' })
       return true
@@ -277,21 +314,43 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
 
     try {
       const context = await buildDraftContext({ root: safeRoot, chapterIndex, authorPrompt })
+      // base：缺省取盘面现场（旧客户端/回归脚本兼容）；sha256 与 accept 落盘校验
+      // 同源（正文 raw 文件指纹），避免规范化差异导致 accept 假冲突
+      const onDisk = readProseChapter(safeRoot, proseChapterPath(chapterIndex))
+      const rawFileHash = hashProseRaw(safeRoot, chapterIndex)
+      const base: WriteBase = {
+        revision: hasClientBase ? Number(rawBase?.revision) : onDisk.revision,
+        sha256: hasClientBase ? String(rawBase?.sha256) : rawFileHash,
+      }
+      const candidateId = createCandidateId()
+      const abortController = new AbortController()
+      res.on('close', () => abortController.abort())
       const { engine, recipe, real } = makeStreamEngine(
         safeRoot,
         chapterIndex,
         context.packet.text,
         authorPrompt,
-        (delta) => ndjson({ ok: true, event: 'delta', text: delta }),
+        (delta) => ndjson({ ok: true, event: 'delta', candidateId, text: delta }),
+        {
+          id: candidateId,
+          operationId: 'op_web_' + candidateId,
+          bookId: 'book-local',
+          base,
+          mode,
+          ...(selection === undefined ? {} : { selection }),
+        },
+        abortController.signal,
       )
 
       ndjson({
         ok: true,
         event: 'start',
+        candidateId,
         prompt: context.packet.text,
         contextMode: context.mode,
         contextTokens: context.packet.totalTokens,
         provider: real ? 'real-openai-compatible' : 'mock',
+        base,
       })
       const outcome = await runDraftStep({
         engine,
@@ -300,11 +359,71 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
         packet: context.packet,
         recipe,
       })
-      ndjson({ ok: true, event: 'done', outcome: outcome.outcome, partial: outcome.partial, chars: outcome.chars })
+      ndjson({ ok: true, event: 'done', candidateId, outcome: outcome.outcome, partial: outcome.partial, chars: outcome.chars })
       res.end()
     } catch (error) {
       ndjson({ ok: false, event: 'error', error: (error as Error).message })
       res.end()
+    }
+    return true
+  }
+
+  /* ---- C2（T04）：候选查询/取消/采纳 ---- */
+  if (path === '/api/draft.candidate') {
+    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
+    if (root === null || candidateId === null) {
+      json(400, { ok: false, error: 'root and candidateId required' })
+      return true
+    }
+    const candidate = readDraftCandidate(assertSafeBookRoot(root), candidateId)
+    if (candidate === null) {
+      json(404, { ok: false, code: 'CANDIDATE_NOT_FOUND', error: 'candidate not found' })
+      return true
+    }
+    json(200, { ok: true, candidate })
+    return true
+  }
+
+  if (path === '/api/draft.cancel') {
+    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
+    if (root === null || candidateId === null) {
+      json(400, { ok: false, error: 'root and candidateId required' })
+      return true
+    }
+    try {
+      const candidate = cancelCandidate(assertSafeBookRoot(root), candidateId)
+      json(200, { ok: true, candidateId, status: candidate.status })
+    } catch (error) {
+      json(409, { ok: false, error: (error as Error).message })
+    }
+    return true
+  }
+
+  if (path === '/api/draft.accept') {
+    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
+    const idempotencyKey = typeof body['idempotencyKey'] === 'string' ? body['idempotencyKey'] : null
+    const rawBase = body['base'] as { revision?: unknown; sha256?: unknown } | undefined
+    if (root === null || candidateId === null || idempotencyKey === null || rawBase === null || typeof rawBase !== 'object') {
+      json(400, { ok: false, error: 'root, candidateId, base and idempotencyKey required' })
+      return true
+    }
+    try {
+      const result = acceptDraft({
+        bookRoot: assertSafeBookRoot(root),
+        candidateId,
+        base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
+        idempotencyKey,
+      })
+      json(200, { ok: true, ...result })
+    } catch (error) {
+      if (error instanceof AcceptConflictError) {
+        json(409, { ok: false, code: error.code, error: error.message })
+        return true
+      }
+      json(409, { ok: false, error: (error as Error).message })
     }
     return true
   }

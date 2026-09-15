@@ -10,15 +10,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { PublishBus, RuntimeEngine, readLedger } from '@mozhou/runtime';
 import type { CapabilityRecipe } from '@mozhou/runtime';
 import type { ContextPacket } from '@mozhou/context-compiler';
-import { LocalDataPlane, createBook } from '@mozhou/data-plane';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane';
 import {
   ChapterProductionSession,
+  acceptDraft,
   loadDraftForReview,
   makeDraftProviderBinding,
   presentCandidates,
   recordCandidateDecision,
   recordUserEdit,
   runDraftStep,
+  type WriteBase,
 } from './index.js';
 
 let roots: string[] = [];
@@ -68,7 +72,7 @@ const RECIPE: CapabilityRecipe = {
   contextBudget: { hotContextBytes: 512, fixedSections: [], perChapterReads: [] },
 };
 
-function draftEngine(root: string): RuntimeEngine {
+function draftEngine(root: string): { engine: RuntimeEngine; candidate: { id: string; operationId: string; bookId: string; base: WriteBase; mode: 'replace' } } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_t17_int' });
   engine.registerCapability({
     taskType: 'CHAPTER_DRAFTING',
@@ -82,11 +86,25 @@ function draftEngine(root: string): RuntimeEngine {
     yield '集成正文第一段。';
     yield '集成正文第二段。';
   }
+  const plane = LocalDataPlane.open(root);
+  let candidate: { id: string; operationId: string; bookId: string; base: WriteBase; mode: 'replace' };
+  try {
+    const scan = plane.getProseChapter(2);
+    candidate = {
+      id: 'e0000000-0000-4000-8000-000000000001',
+      operationId: 'op_t17_int',
+      bookId: 'book-t17',
+      base: { revision: scan.revision, sha256: createHash('sha256').update(readFileSync(join(root, proseChapterPath(2)))).digest('hex') },
+      mode: 'replace',
+    };
+  } finally {
+    plane.close();
+  }
   engine.registerProviderBinding(
     'deepseek',
-    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 2, provider: 'deepseek', mode: 'generate', stream: () => stream() }),
+    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 2, provider: 'deepseek', mode: 'generate', stream: () => stream(), candidate }),
   );
-  return engine;
+  return { engine, candidate };
 }
 
 describe('T17 三步挂进十步状态机', () => {
@@ -107,19 +125,28 @@ describe('T17 三步挂进十步状态机', () => {
     expect(session.currentStep).toBe('draft');
 
     // Draft 步：engine 事件族（GenerationStarted/Finished）与 session 窗口事件族同账并存
+    const t17Ctx = draftEngine(dir);
     const outcome = await runDraftStep({
-      engine: draftEngine(dir),
+      engine: t17Ctx.engine,
       bookRoot: dir,
       chapterIndex: 2,
       packet: PACKET,
       recipe: RECIPE,
     });
     expect(outcome.outcome).toBe('succeeded');
+    acceptDraft({
+      bookRoot: dir,
+      candidateId: t17Ctx.candidate.id,
+      base: t17Ctx.candidate.base,
+      idempotencyKey: 'accept_t17_flow',
+    });
 
     // Review 步：核检入口消费 Draft 步产物（逐字节一致）
     session.advance('review');
     const reviewInput = loadDraftForReview(dir, 2);
-    expect(reviewInput.body).toBe(outcome.text);
+// C2：accept 落盘正文 = 候选文本 + 规范尾换行
+    expect(reviewInput.body).toBe(outcome.text.endsWith('\n') ? outcome.text : outcome.text + '\n');
+    expect(reviewInput.charCount).toBe(reviewInput.body.length);
 
     // Review 步落账（ADR-0025）：审查事件随会话窗口进账，pass 才放行前进口
     session.recordQualityReview({ reportId: 'rpt_t17_pass', verdict: 'pass' });
@@ -135,7 +162,8 @@ describe('T17 三步挂进十步状态机', () => {
       source: 'author',
       blocks: [{ op: 'replace', paragraphStart: 1, paragraphEnd: 1, replacementText: '作者润色后的首段。' }],
     });
-    expect(editOutcome.revisionAfter).toBe(1);
+    // C2：draft accept 已占一次修订（r0→r1），user edit 为下一次
+    expect(editOutcome.revisionAfter).toBe(2);
 
     // 多候选择优挂在同一会话窗口上（光标级分支，双路落账）
     const candDeps = { bus: new PublishBus(), bookRoot: dir, taskRef: session.taskRef, chapterIndex: 2 };

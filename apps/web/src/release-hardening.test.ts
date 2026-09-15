@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
+import { LocalDataPlane } from '@mozhou/data-plane'
 
 const servers: ReturnType<typeof createServer>[] = []
 const roots: string[] = []
@@ -183,6 +184,13 @@ describe('release hardening · core draft context', () => {
     roots.push(dir)
     const created = await jsonPost(base, '/api/book', { title: '长篇上下文之书', dir })
     const root = created.data.root as string
+    // C2（T04）：draft.stream 需要 draft 相位章（候选模式前置）
+    const plane = LocalDataPlane.open(root)
+    try {
+      plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    } finally {
+      plane.close()
+    }
 
     const response = await fetch(base + '/api/draft.stream', {
       method: 'POST',

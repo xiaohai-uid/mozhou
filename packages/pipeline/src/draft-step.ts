@@ -45,15 +45,21 @@ import type {
 import { RecoverableError, normalizeProviderError, toGenerationStartedPayload } from '@mozhou/runtime';
 import {
   ChapterPhaseError,
-  atomicReplace,
   proseChapterPath,
-  readManifest,
   readProseChapter,
-  refreshManifestEntries,
-  renderProseChapter,
-  writeManifest,
 } from '@mozhou/data-plane';
 import { readPipelineLedger } from './ledger.js';
+import {
+  CandidateError,
+  CANDIDATE_TERMINAL,
+  appendCandidateDelta,
+  cancelCandidate,
+  createDraftCandidate,
+  finishCandidate,
+  readDraftCandidate,
+  type CandidateMode,
+  type WriteBase,
+} from './draft-candidate.js';
 
 /** Draft 运行态目录：.mozhou 运行时区（非 canon、不参与对账）。 */
 export const DRAFT_STATE_DIR = '.mozhou/drafts';
@@ -89,6 +95,8 @@ export interface DraftStateFile {
   readonly chars: number;
   /** status=partial 时的归一化失败原因；其余状态键不存在（exactOptional）。 */
   readonly reason?: string;
+  /** C2（T04）：本次生成关联的候选 id；恢复/重开时回读候选文本。 */
+  readonly candidateId?: string;
 }
 
 /** 运行态文件路径与正文文件同名异扩展（第NNNN章.md ↔ 第NNNN章.json）。 */
@@ -104,6 +112,7 @@ interface DraftStateWrite {
   readonly status: DraftStatus;
   readonly chars: number;
   readonly reason?: string;
+  readonly candidateId?: string;
 }
 
 function writeDraftState(root: string, state: DraftStateWrite): void {
@@ -114,6 +123,7 @@ function writeDraftState(root: string, state: DraftStateWrite): void {
     status: state.status,
     chars: state.chars,
     ...(state.reason === undefined ? {} : { reason: state.reason }),
+    ...(state.candidateId === undefined ? {} : { candidateId: state.candidateId }),
   };
   mkdirSync(join(root, DRAFT_STATE_DIR), { recursive: true });
   writeFileSync(join(root, draftStateRelPath(state.chapterIndex)), JSON.stringify(payload, null, 2) + '\n');
@@ -137,106 +147,134 @@ export interface DraftBindingOptions {
   readonly chapterIndex: number;
   /** 归一化表的家侧判别键（deepseek/glm/claude）。 */
   readonly provider: NormalizedProviderId;
+  /** C2（T04）候选模式映射：旧 generate→replace（全量重走）、continue→continue（续写基底）。 */
   readonly mode: DraftMode;
   readonly stream: DraftStreamSource;
+  /** C2（T04）：候选上下文。未提供候选即拒绝绑定——绝无「直接正文落盘」旁路。 */
+  readonly candidate: {
+    readonly id: string;
+    readonly operationId: string;
+    readonly bookId: string;
+    readonly base: WriteBase;
+    readonly mode: CandidateMode;
+    readonly selection?: { readonly from: number; readonly to: number; readonly selectedTextHash: string };
+    /** continue 续写基底：断流半稿文本（调用方从旧候选读取传入）。 */
+    readonly seedText?: string;
+  };
+  /** 取消信号：HTTP 请求断开/显式 cancel 时中止上游流；延迟 chunk 不再写盘。 */
+  readonly signal?: AbortSignal;
 }
 
-interface ProseSnapshot {
-  readonly relPath: string;
-  readonly mozhouId: string;
-  readonly revision: number;
-  readonly chapterIndex: number;
-}
-
-function loadProseSnapshot(opts: DraftBindingOptions, mode: DraftMode): ProseSnapshot & { baseBody: string } {
-  const relPath = proseChapterPath(opts.chapterIndex);
-  const scan = readProseChapter(opts.bookRoot, relPath);
+function assertDraftPhase(bookRoot: string, chapterIndex: number): void {
+  const scan = readProseChapter(bookRoot, proseChapterPath(chapterIndex));
   if (scan.phase !== 'draft') {
     throw new ChapterPhaseError(
-      opts.chapterIndex,
+      chapterIndex,
       'draft stream requires phase=draft, got ' + scan.phase + ' — reopen the chapter first',
     );
   }
-  // generate = 全量重走（旧半稿废弃重写）；continue = 盘上半稿为续写基底（#60：落盘即真）
-  return {
-    relPath,
-    mozhouId: scan.mozhouId,
-    revision: scan.revision,
-    chapterIndex: scan.chapterIndex,
-    baseBody: mode === 'continue' ? scan.body : '',
-  };
-}
-
-/** 落盘正文的唯一规范化：非空不以换行结尾即补换行（jsonl 计行同款纪律）。 */
-function normalizeBody(body: string): string {
-  return body.length > 0 && !body.endsWith('\n') ? body + '\n' : body;
-}
-
-function persistProse(bookRoot: string, snapshot: ProseSnapshot, raw: string): string {
-  const normalized = normalizeBody(raw);
-  atomicReplace(
-    bookRoot,
-    snapshot.relPath,
-    renderProseChapter({
-      mozhouId: snapshot.mozhouId,
-      revision: snapshot.revision,
-      chapterIndex: snapshot.chapterIndex,
-      phase: 'draft',
-      body: normalized,
-    }),
-  );
-  return normalized;
-}
-
-function refreshBaseline(bookRoot: string, relPath: string): void {
-  writeManifest(bookRoot, refreshManifestEntries(readManifest(bookRoot), bookRoot, [relPath]));
 }
 
 /**
- * 构造 Draft 步的 provider 绑定：逐 delta 原子落盘（每章落盘即持久），断流时
- * 半稿保留 + 状态文件标 partial + 抛 T13 归一化分类后的错误交引擎 fallback 链。
+ * 构造 Draft 步的 provider 绑定（C2·T04）：流式 delta 只 appendCandidateDelta——
+ * 未经 Accept 的生成不触碰正文/revision/hash（I01）。断流/取消/失败保留候选文本：
+ * - 取消（外部 signal / CANDIDATE_TERMINAL）：候选标 cancelled，不再接收后续 chunk；
+ * - 断流：候选 finish partial（半稿保留可续），状态文件标 partial + 归一化原因；
+ * - 完整收尾：候选 finish ready，状态文件标 complete。
  * 组合根把它注册到 engine.registerProviderBinding(解析到的 providerId, …)。
  */
 export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBinding {
   // 绑定只消费盘面真源与流缝，不读 payload/snapshot——零参闭包即满足 ProviderBinding 形状
   return async () => {
-    const prose = loadProseSnapshot(opts, opts.mode);
-    let body = prose.baseBody;
-    // chars 恒等盘上持久化字节数（含规范化尾换行），与正文文件逐字节对账
-    let chars = normalizeBody(body).length;
+    assertDraftPhase(opts.bookRoot, opts.chapterIndex);
+    // 候选由调用方先建（HTTP/管线）；恢复场景（streaming/partial 跨进程）直接续用
+    let candidate = readDraftCandidate(opts.bookRoot, opts.candidate.id);
+    if (candidate === null) {
+      candidate = createDraftCandidate(opts.bookRoot, {
+        id: opts.candidate.id,
+        operationId: opts.candidate.operationId,
+        bookId: opts.candidate.bookId,
+        chapterIndex: opts.chapterIndex,
+        base: opts.candidate.base,
+        mode: opts.candidate.mode,
+        ...(opts.candidate.selection === undefined ? {} : { selection: opts.candidate.selection }),
+        ...(opts.candidate.seedText === undefined ? {} : { seedText: opts.candidate.seedText }),
+      });
+    }
+    const relPath = proseChapterPath(opts.chapterIndex);
     writeDraftState(opts.bookRoot, {
-      chapterIndex: prose.chapterIndex,
-      proseRelPath: prose.relPath,
+      chapterIndex: opts.chapterIndex,
+      proseRelPath: relPath,
       status: 'streaming',
-      chars,
+      chars: candidate.text.length,
+      candidateId: candidate.id,
     });
+    const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
     try {
-      for await (const delta of opts.stream()) {
-        if (delta.length === 0) continue;
-        body += delta;
-        chars = persistProse(opts.bookRoot, prose, body).length;
+      if (aborted()) {
+        cancelCandidate(opts.bookRoot, candidate.id);
+        return candidate.text;
       }
-    } catch (error) {
-      // 半稿已在盘上（逐 delta 落盘）；此处补 partial 标记并按 T13 表归类上抛
-      const classified = classifyStreamFailure(error, opts.provider);
+      for await (const delta of opts.stream()) {
+        if (aborted()) {
+          // 取消后的延迟 chunk 不写盘、不继续付费重试
+          cancelCandidate(opts.bookRoot, candidate.id);
+          break;
+        }
+        if (delta.length === 0) continue;
+        candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta);
+      }
+      if (aborted()) {
+        writeDraftState(opts.bookRoot, {
+          chapterIndex: opts.chapterIndex,
+          proseRelPath: relPath,
+          status: 'partial',
+          chars: candidate.text.length,
+          candidateId: candidate.id,
+        });
+        return candidate.text;
+      }
+      // 流完整结束（含完成帧）：ready
+      const finalCandidate = finishCandidate(opts.bookRoot, candidate.id, 'ready');
       writeDraftState(opts.bookRoot, {
-        chapterIndex: prose.chapterIndex,
-        proseRelPath: prose.relPath,
+        chapterIndex: opts.chapterIndex,
+        proseRelPath: relPath,
+        status: 'complete',
+        chars: finalCandidate.text.length,
+        candidateId: finalCandidate.id,
+      });
+      return finalCandidate.text;
+    } catch (error) {
+      // 取消竞态：他人已终态化候选（CANDIDATE_TERMINAL）——半稿保留，不再写盘
+      if (error instanceof CandidateError && error.code === CANDIDATE_TERMINAL) {
+        writeDraftState(opts.bookRoot, {
+          chapterIndex: opts.chapterIndex,
+          proseRelPath: relPath,
+          status: 'partial',
+          chars: candidate.text.length,
+          candidateId: candidate.id,
+        });
+        return candidate.text;
+      }
+      // 断流：候选半稿保留（partial），状态文件标 partial + T13 归一化原因
+      const classified = classifyStreamFailure(error, opts.provider);
+      try {
+        if (candidate.status === 'streaming') {
+          finishCandidate(opts.bookRoot, candidate.id, 'partial');
+        }
+      } catch {
+        // 终态冲突时保留现场即可
+      }
+      writeDraftState(opts.bookRoot, {
+        chapterIndex: opts.chapterIndex,
+        proseRelPath: relPath,
         status: 'partial',
-        chars,
+        chars: candidate.text.length,
+        candidateId: candidate.id,
         reason: classified.message,
       });
       throw classified;
     }
-    const finalBody = normalizeBody(body);
-    writeDraftState(opts.bookRoot, {
-      chapterIndex: prose.chapterIndex,
-      proseRelPath: prose.relPath,
-      status: 'complete',
-      chars: finalBody.length,
-    });
-    refreshBaseline(opts.bookRoot, prose.relPath);
-    return finalBody;
   };
 }
 
@@ -360,12 +398,15 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
   );
 
   const proseRelPath = proseChapterPath(request.chapterIndex);
-  const onDisk = readProseChapter(request.bookRoot, proseRelPath);
   const state = readDraftState(request.bookRoot, request.chapterIndex);
+  // C2（T04）：生成结果从候选读取，不再从正文取——正文只能经 accept 落盘（I01）
+  const candidate =
+    state?.candidateId === undefined ? null : readDraftCandidate(request.bookRoot, state.candidateId);
+  const candidateText = candidate === null ? '' : candidate.text;
   const text =
     result.outcome === 'succeeded' && typeof result.value === 'string'
       ? result.value
-      : onDisk.body;
+      : candidateText;
 
   if (result.outcome !== 'succeeded') {
     const hint =
@@ -398,6 +439,6 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
     proseRelPath,
     text,
     chars: text.length,
-    partial: false,
+    partial: candidate?.status === 'partial',
   };
 }

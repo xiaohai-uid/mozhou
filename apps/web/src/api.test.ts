@@ -15,7 +15,7 @@ import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readPros
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
-import { ChapterProductionSession, recordUserEdit } from '@mozhou/pipeline'
+import { ChapterProductionSession, readDraftCandidate, recordUserEdit } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 
 let servers: ReturnType<typeof createServer>[] = []
@@ -805,10 +805,15 @@ describe('T44 中栏对话流 API 契约', () => {
       const deltas = frames.filter((frame) => frame.event === 'delta').map((frame) => frame.text ?? '').join('')
       expect(deltas).toContain('夜雨敲窗')
       expect(deltas).toContain('他推门而入')
-      // 落盘即真：正文 draft 文件含流式产物
+      // C2（T04）：候选即真——正文保持原文，候选文本含流式产物（I01）
       const scan = readProseChapter(dir, proseChapterPath(1))
       expect(scan.phase).toBe('draft')
-      expect(scan.body).toContain('夜雨敲窗')
+      expect(scan.body).not.toContain('夜雨敲窗')
+      const candidateId = frames[0]?.candidateId as string | undefined
+      expect(candidateId).toBeTruthy()
+      const candidate = candidateId === undefined ? null : readDraftCandidate(dir, candidateId)
+      expect(candidate?.status).toBe('ready')
+      expect(candidate?.text).toContain('夜雨敲窗')
     } finally {
       delete process.env['MOZHOU_DRAFT_PROVIDER']
     }

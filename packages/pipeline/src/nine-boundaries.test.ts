@@ -6,6 +6,7 @@
  * 断言）/ Record 后 FlywheelRecorded 与 Commit 同事务序 + usage 异步可回灌。
  * 零时钟零外部服务：手工行 id + 注入时钟/凭证；恢复判定读盘两次独立运行逐字段相等。
  */
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,6 +41,7 @@ import {
   makeDraftProviderBinding,
   prepareChapterInputs,
   projectSession,
+  readDraftCandidate,
   readDraftState,
   readPipelineLedger,
   readUsageProjection,
@@ -209,7 +211,7 @@ const RECIPE: CapabilityRecipe = {
   contextBudget: { hotContextBytes: 512, fixedSections: [], perChapterReads: [] },
 };
 
-function failingStreamEngine(root: string): RuntimeEngine {
+function failingStreamEngine(root: string): { engine: RuntimeEngine; candidateId: string } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_nb3' });
   engine.registerCapability({
     taskType: 'CHAPTER_DRAFTING',
@@ -222,30 +224,51 @@ function failingStreamEngine(root: string): RuntimeEngine {
     yield '半稿第一段。';
     throw new Error('传输中断（模拟断流）');
   }
-  engine.registerProviderBinding(
-    'deepseek',
-    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 2, provider: 'deepseek', mode: 'generate', stream: () => stream() }),
-  );
-  return engine;
+  const candidateId = 'c0000000-0000-4000-8000-000000000001';
+  const plane = LocalDataPlane.open(root);
+  try {
+    const scan = plane.getProseChapter(2);
+    const candidate = {
+      id: candidateId,
+      operationId: 'op_nb3',
+      bookId: 'book-nb3',
+      base: {
+        revision: scan.revision,
+        sha256: createHash('sha256').update(readFileSync(join(root, proseChapterPath(2)))).digest('hex'),
+      },
+      mode: 'replace' as const,
+    };
+    engine.registerProviderBinding(
+      'deepseek',
+      makeDraftProviderBinding({ bookRoot: root, chapterIndex: 2, provider: 'deepseek', mode: 'generate', stream: () => stream(), candidate }),
+    );
+    return { engine, candidateId };
+  } finally {
+    plane.close();
+  }
 }
 
-describe('S8 行3 Draft 中：partial 半稿持久', () => {
-  it('断流后半稿留在正文文件、状态文件标 partial；跨重启重读两次独立运行逐字段相等', async () => {
+describe('S8 行3 Draft 中：partial 半稿持久（候选语义）', () => {
+  it('断流后半稿留在候选文件、状态文件标 partial；跨重启重读两次独立运行逐字段相等', async () => {
     const dir = mk('mozhou-nb3-');
+    const ctx = failingStreamEngine(dir);
     const outcome = await runDraftStep({
-      engine: failingStreamEngine(dir),
+      engine: ctx.engine,
       bookRoot: dir,
       chapterIndex: 2,
       packet: PACKET,
       recipe: RECIPE,
     });
-    // 断流经 T13 归一化 + fallback 链收口为 failed_terminal 结果对象（半稿已逐 delta 落盘）
+    // 断流经 T13 归一化 + fallback 链收口为 failed_terminal 结果对象（半稿已落候选）
     expect(outcome.outcome).toBe('failed_terminal');
     expect(outcome.partial).toBe(true);
     expect(outcome.reason).toContain('传输中断');
 
-    // 半稿持久保留于正文文件（phase=draft 天然可写）
-    expect(readFileSync(join(dir, proseChapterPath(2)), 'utf8')).toContain('半稿第一段。');
+    // 半稿持久保留于候选文件；正文保持原样（C2/I01）
+    expect(readFileSync(join(dir, proseChapterPath(2)), 'utf8')).not.toContain('半稿第一段。');
+    const halfCandidate = readDraftCandidate(dir, ctx.candidateId);
+    expect(halfCandidate?.status).toBe('partial');
+    expect(halfCandidate?.text).toContain('半稿第一段。');
     // 运行态文件标 partial（无时间戳，零时钟纪律）
     const state = readDraftState(dir, 2);
     expect(state?.status).toBe('partial');

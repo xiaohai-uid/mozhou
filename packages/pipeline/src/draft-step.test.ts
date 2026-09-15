@@ -23,8 +23,11 @@ import {
 import {
   ProviderTransportError,
   makeDraftProviderBinding,
+  readDraftCandidate,
   readDraftState,
   runDraftStep,
+  type DraftBindingOptions,
+  type WriteBase,
 } from './index.js';
 
 let roots: string[] = [];
@@ -47,6 +50,33 @@ function hermeticBook(): { root: string; plane: LocalDataPlane } {
   const plane = LocalDataPlane.open(dir);
   plane.createChapterDraft({ chapterIndex: 7, title: '第七章' });
   return { root: dir, plane };
+}
+
+let candidateSeq = 0;
+/** C2 候选上下文：base 取自盘面现场（revision + 正文文件 sha256），模式映射 generate→replace。 */
+function candidateContext(root: string, chapterIndex: number, mode: 'replace' | 'continue' = 'replace', seedText?: string): DraftBindingOptions['candidate'] {
+  candidateSeq += 1;
+  const id = 'a0000000-0000-4000-8000-' + String(candidateSeq).padStart(12, '0');
+  const plane = LocalDataPlane.open(root);
+  try {
+    const scan = plane.getProseChapter(chapterIndex);
+    const base: WriteBase = { revision: scan.revision, sha256: sha256FileHex(join(root, proseChapterPath(chapterIndex))) };
+    return {
+      id,
+      operationId: 'op_t17_' + String(candidateSeq),
+      bookId: 'book-t17',
+      base,
+      mode,
+      ...(seedText === undefined ? {} : { seedText }),
+    };
+  } finally {
+    plane.close();
+  }
+}
+
+function readCandidateText(root: string, candidate: DraftBindingOptions['candidate']): string {
+  const c = readDraftCandidate(root, candidate.id);
+  return c === null ? '' : c.text;
 }
 
 const PACKET: ContextPacket = {
@@ -132,18 +162,23 @@ function registerDraftBinding(
   provider: 'deepseek' | 'glm' | 'claude',
   stream: ReturnType<typeof fakeStream>,
   mode: 'generate' | 'continue' = 'generate',
-): void {
+  seedText?: string,
+): { candidate: DraftBindingOptions['candidate'] } {
+  const candidate = candidateContext(root, 7, mode === 'continue' ? 'continue' : 'replace', seedText);
   engine.registerProviderBinding(
     providerId,
-    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 7, provider, mode, stream }),
+    makeDraftProviderBinding({ bookRoot: root, chapterIndex: 7, provider, mode, stream, candidate }),
   );
+  return { candidate };
 }
 
-describe('流式写入正文文件 phase=draft', () => {
-  it('多 delta 正文流逐段落盘，frontmatter 相位与身份保持，hash 基线刷新', async () => {
+describe('流式写入候选（C2：正文只能经 accept 落盘）', () => {
+  it('多 delta 只进候选：正文/相位/hash 基线零变化，候选文本完整、状态 complete', async () => {
     const { root } = hermeticBook();
     const engine = makeEngine(root);
-    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['夜雨敲窗，', '灯焰摇了三摇。', '他推门而入。']));
+    const { candidate } = registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['夜雨敲窗，', '灯焰摇了三摇。', '他推门而入。']));
+
+    const beforeHash = sha256FileHex(join(root, proseChapterPath(7)));
 
     const outcome = await runDraftStep({
       engine,
@@ -157,17 +192,25 @@ describe('流式写入正文文件 phase=draft', () => {
     expect(outcome.partial).toBe(false);
     expect(outcome.text).toContain('灯焰摇了三摇。');
 
+    // C2/I01：正文不被生成触碰——原文保持、hash 基线不变
     const rel = proseChapterPath(7);
     const scan = readProseChapter(root, rel);
     expect(scan.phase).toBe('draft');
     expect(scan.commitId).toBeUndefined();
-    expect(scan.body).toContain('夜雨敲窗，');
-    expect(scan.body).toContain('他推门而入。');
+    expect(scan.body).not.toContain('夜雨敲窗，');
+    expect(scan.body).not.toContain('他推门而入。');
+    expect(sha256FileHex(join(root, rel))).toBe(beforeHash);
 
-    // 每章落盘即持久：状态文件 complete + 基线与盘上逐字节一致（后续 commit 写前校验可过）
-    expect(readDraftState(root, 7)).toMatchObject({ status: 'complete', chars: scan.body.length });
+    // 候选是唯一持久生成区：文本完整 + 状态 complete + 与状态文件关联
+    const candidateOnDisk = readDraftCandidate(root, candidate.id);
+    expect(candidateOnDisk?.status).toBe('ready');
+    expect(candidateOnDisk?.text).toContain('夜雨敲窗，');
+    expect(candidateOnDisk?.text).toContain('他推门而入。');
+    expect(readCandidateText(root, candidate)).toBe(outcome.text);
+    expect(readDraftState(root, 7)).toMatchObject({ status: 'complete', candidateId: candidate.id });
+    // 正文 hash 基线未被刷新（manifest 与盘面仍一致）
     const manifest = readManifest(root);
-    expect(manifest.files[rel]?.sha256).toBe(sha256FileHex(join(root, rel)));
+    expect(manifest.files[rel]?.sha256).toBe(beforeHash);
   });
 
   it('payload 携带 packet 与 recipe 身份/预算字段（provider 输入契约）', async () => {
@@ -193,11 +236,11 @@ describe('流式写入正文文件 phase=draft', () => {
   });
 });
 
-describe('断流 partial 标记与半稿保留', () => {
-  it('流中断后已收 delta 在盘上、状态标 partial、半稿可续写', async () => {
+describe('断流 partial 标记与半稿保留（候选语义）', () => {
+  it('流中断后已收 delta 在候选里、状态标 partial、候选半稿可续写', async () => {
     const { root } = hermeticBook();
     const engine = makeEngine(root);
-    registerDraftBinding(
+    const { candidate } = registerDraftBinding(
       engine,
       root,
       'deepseek',
@@ -209,49 +252,68 @@ describe('断流 partial 标记与半稿保留', () => {
     expect(failed.outcome).toBe('failed_recoverable'); // 单候选穷尽 ⇒ 三级上报位
     expect(failed.partial).toBe(true);
 
-    // 半稿持久保留：两个已收 delta 都在正文文件里（phase=draft 天然可写）
+    // 半稿持久保留在候选里；正文保持原文（C2/I01）
     const halfScan = readProseChapter(root, proseChapterPath(7));
     expect(halfScan.phase).toBe('draft');
-    expect(halfScan.body).toContain('半稿上半。');
-    expect(halfScan.body).not.toContain('续写第一句。');
+    expect(halfScan.body).not.toContain('半稿上半。');
+    const halfCandidate = readDraftCandidate(root, candidate.id);
+    expect(halfCandidate?.status).toBe('partial');
+    expect(halfCandidate?.text).toContain('半稿上半。');
+    expect(halfCandidate?.text).toContain('半稿下半。');
 
     const state = readDraftState(root, 7);
     expect(state).not.toBeNull();
     expect(state!.status).toBe('partial');
+    expect(state!.candidateId).toBe(candidate.id);
     expect(state!.reason).toMatch(/rate_limit/i); // T13 归一化：429 → rate_limit
 
-    // 作者选续写：以盘上半稿为基底继续流
+    // 作者选续写：以候选半稿为基底（seedText）继续流
     const engine2 = makeEngine(root);
-    registerDraftBinding(
+    const { candidate: resumedCandidate } = registerDraftBinding(
       engine2,
       root,
       'deepseek',
       'deepseek',
       fakeStream(['续写第一句。']),
       'continue',
+      halfCandidate?.text, // 调用方从旧候选读取半稿文本作为续写 seed
     );
-    const resumed = await runDraftStep({ engine: engine2, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE, mode: 'continue' });
+    const resumed = await runDraftStep({
+      engine: engine2,
+      bookRoot: root,
+      chapterIndex: 7,
+      packet: PACKET,
+      recipe: RECIPE,
+      mode: 'continue',
+    });
     expect(resumed.outcome).toBe('succeeded');
-    const fullScan = readProseChapter(root, proseChapterPath(7));
-    expect(fullScan.body).toContain('半稿上半。');
-    expect(fullScan.body).toContain('续写第一句。');
+    const fullCandidate = readDraftCandidate(root, resumedCandidate.id);
+    expect(fullCandidate?.mode).toBe('continue');
+    expect(fullCandidate?.text).toContain('半稿上半。');
+    expect(fullCandidate?.text).toContain('续写第一句。');
+    // 正文仍未被动过
+    expect(readProseChapter(root, proseChapterPath(7)).body).not.toContain('半稿上半。');
     expect(readDraftState(root, 7)?.status).toBe('complete');
   });
 
-  it('作者选重生成：mode=generate 全量重走，旧半稿不残留', async () => {
+  it('作者选重生成：mode=generate 全量重走，新候选不残留旧半稿文本', async () => {
     const { root } = hermeticBook();
     const firstEngine = makeEngine(root);
-    registerDraftBinding(firstEngine, root, 'deepseek', 'deepseek', fakeStream(['旧稿痕迹。'], new ProviderTransportError({ status: 502 })));
+    const { candidate: firstCandidate } = registerDraftBinding(firstEngine, root, 'deepseek', 'deepseek', fakeStream(['旧稿痕迹。'], new ProviderTransportError({ status: 502 })));
 
     await runDraftStep({ engine: firstEngine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+    expect(readDraftCandidate(root, firstCandidate.id)?.status).toBe('partial');
 
     const secondEngine = makeEngine(root);
-    registerDraftBinding(secondEngine, root, 'deepseek', 'deepseek', fakeStream(['全新开篇。']));
+    const { candidate: secondCandidate } = registerDraftBinding(secondEngine, root, 'deepseek', 'deepseek', fakeStream(['全新开篇。']));
     const regenerated = await runDraftStep({ engine: secondEngine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE, mode: 'generate' });
     expect(regenerated.outcome).toBe('succeeded');
-    const scan = readProseChapter(root, proseChapterPath(7));
-    expect(scan.body).not.toContain('旧稿痕迹。');
-    expect(scan.body).toContain('全新开篇。');
+    const freshCandidate = readDraftCandidate(root, secondCandidate.id);
+    expect(freshCandidate?.mode).toBe('replace');
+    expect(freshCandidate?.text).not.toContain('旧稿痕迹。');
+    expect(freshCandidate?.text).toContain('全新开篇。');
+    // 正文仍未被生成触碰
+    expect(readProseChapter(root, proseChapterPath(7)).body).not.toContain('全新开篇。');
   });
 });
 
@@ -285,8 +347,8 @@ describe('M17 三级降级可见性接线', () => {
     expect(events.at(-1)).toMatchObject({ type: 'GenerationFinished' });
     expect(events.at(-1)!.payload).toMatchObject({ outcome: 'succeeded', providerId: 'glm' });
 
-    // 盘面真相 = 成功那次的全量重写（fallback 绑定同缝落盘）
-    expect(readProseChapter(root, proseChapterPath(7)).body).toContain('备用渠道成稿。');
+    // C2 真相 = fallback 候选成稿；正文仍未被生成触碰（I01）
+    expect(readProseChapter(root, proseChapterPath(7)).body).not.toContain('备用渠道成稿。');
     expect(outcome.text).toContain('备用渠道成稿。');
   });
 
@@ -308,10 +370,14 @@ describe('M17 三级降级可见性接线', () => {
     expect(finished.type).toBe('GenerationFinished');
     expect(finished.payload).toMatchObject({ outcome: 'failed_recoverable' });
 
-    // 最后一次 attempt 的半稿持久保留且标 partial
+    // 最后一次 attempt 的半稿持久保留在候选且标 partial；正文仍原样
     const scan = readProseChapter(root, proseChapterPath(7));
     expect(scan.phase).toBe('draft');
-    expect(scan.body).toContain('备渠道半截。');
+    expect(scan.body).not.toContain('备渠道半截。');
+    const partialCandidate = readDraftCandidate(root, readDraftState(root, 7)?.candidateId ?? '');
+    expect(partialCandidate).not.toBeNull();
+    expect(partialCandidate?.status).toBe('partial');
+    expect(partialCandidate?.text).toContain('备渠道半截。');
     expect(readDraftState(root, 7)?.status).toBe('partial');
   });
 

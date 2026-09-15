@@ -47,6 +47,8 @@ export interface DraftCandidateRequest {
   readonly base: WriteBase
   readonly mode: CandidateMode
   readonly selection?: { readonly from: number; readonly to: number; readonly selectedTextHash: string }
+  /** continue 续写基底：断流半稿（旧候选文本）作为新候选初始文本；非 continue 模式携带即拒绝。 */
+  readonly seedText?: string
 }
 
 export class CandidateError extends Error {
@@ -77,7 +79,6 @@ export function candidateRelPath(id: string): string {
   return `${CANDIDATE_DIR}/${id}.json`
 }
 
-const TERMINAL: ReadonlySet<CandidateStatus> = new Set(['ready', 'accepted', 'cancelled', 'failed'])
 const CANDIDATE_TERMINAL_MSG = 'candidate is in terminal state; append/finish/cancel rejected'
 
 export const CANDIDATE_TERMINAL = 'CANDIDATE_TERMINAL'
@@ -113,6 +114,9 @@ export function createDraftCandidate(root: string, request: DraftCandidateReques
   assertBase(request.base)
   assertMode(request.mode)
   assertSelection(request.selection)
+  if (request.seedText !== undefined && request.mode !== 'continue') {
+    throw new CandidateError('INVALID_SEED', 'INVALID_SEED: seedText only allowed for continue mode')
+  }
   const payload: DraftCandidate = {
     schemaVersion: 1,
     id: request.id,
@@ -121,7 +125,7 @@ export function createDraftCandidate(root: string, request: DraftCandidateReques
     chapterIndex: request.chapterIndex,
     base: request.base,
     mode: request.mode,
-    text: '',
+    text: request.seedText ?? '',
     status: 'streaming',
     ...(request.selection === undefined ? {} : { selection: request.selection }),
   }

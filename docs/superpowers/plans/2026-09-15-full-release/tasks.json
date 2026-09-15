@@ -169,7 +169,7 @@
     {
       "id": "T04",
       "title": "修复流式写入与采纳事务",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "T03"
       ],
@@ -183,8 +183,34 @@
       "deliverable": "共享写保护、CAS、取消、幂等intent恢复、无直写旁路",
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "按intent恢复，保留失败日志与候选",
-      "evidence": [],
-      "result": null
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T04/result.json",
+          "sourceCommit": "4b34ba6",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "pnpm test+vitest draftCandidates+回归脚本",
+          "exitCode": 0,
+          "scope": "候选流写入/采纳事务/取消/幂等全链路",
+          "limitations": [
+            "真实provider待T07",
+            "进程排他锁归T09"
+          ]
+        },
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T04/verify-stream-green.log",
+          "sourceCommit": "4b34ba6",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "node regressions/verify-stream.mjs",
+          "exitCode": 0,
+          "scope": "未采纳生成不再覆盖原文（originalLost=false）且流中外部编辑保留",
+          "limitations": [
+            "合成mock流"
+          ]
+        }
+      ],
+      "result": "流式只写候选+受控采纳事务（CAS+意图日志+幂等恢复）+取消传导；verify-stream 红转绿；draftCandidates 7 用例；workspace 740/web 320 全绿；0 循环"
     },
     {
       "id": "T05",
