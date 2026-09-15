@@ -49,7 +49,7 @@
     {
       "id": "T01",
       "title": "外部资源与部署前提",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "T00"
       ],
@@ -63,8 +63,33 @@
       "deliverable": "真实资源ready/blocked清单，不保存secret值",
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "仅移除本次探针资源",
-      "evidence": [],
-      "result": null
+      "evidence": [
+        {
+          "kind": "real-provider",
+          "path": "evidence/full-release/20260915-1/T01/result.json",
+          "sourceCommit": "2dca39a",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "env探测+官方文档curl+工具链检查",
+          "exitCode": 0,
+          "scope": "外部输入逐项 ready/blocked 判定，无 assumed-ready",
+          "limitations": [
+            "无任何 secret 值；用户云/商户账号未提供；公网发布 required 项未 ready"
+          ]
+        },
+        {
+          "kind": "filesystem",
+          "path": "evidence/full-release/20260915-1/T01/environment-report.json",
+          "sourceCommit": "2dca39a",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "curl 官方文档解析",
+          "exitCode": 0,
+          "scope": "Oracle/Supabase/微信/支付宝条款与数字",
+          "limitations": [
+            "支付宝页面乱码仅确认产品存在"
+          ]
+        }
+      ],
+      "result": "探测完成：12项外部输入实查缺失(blocked)已逐项登记缺项；Windows工具链部分ready；官方条款已检索落案(environment-report.json)；不构成发布授权"
     },
     {
       "id": "T02",
