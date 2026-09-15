@@ -1,5 +1,23 @@
 /** @mozhou/pipeline — 十步事务管线编排（T16 · #40：ChapterProductionSession + Prepare/Compile 衔接）。 */
 
+/** C2 候选契约（T03）：未经 Accept 只写候选区；WriteBase 唯一领域定义。 */
+export {
+  CandidateError,
+  CANDIDATE_DIR,
+  CANDIDATE_TERMINAL,
+  acceptDraftCandidate,
+  appendCandidateDelta,
+  cancelCandidate,
+  candidateRelPath,
+  createCandidateId,
+  createDraftCandidate,
+  finishCandidate,
+  isServerGeneratedCandidateId,
+  listDraftCandidates,
+  readDraftCandidate,
+} from './draft-candidate.js';
+export type { CandidateMode, CandidateStatus, DraftCandidate, DraftCandidateRequest, WriteBase } from './draft-candidate.js';
+
 /** 十步步进词表与序关系。 */
 export { PIPELINE_STEPS, isPipelineStep, nextStepOf, stepIndex } from './steps.js';
 export type { PipelineStep } from './steps.js';

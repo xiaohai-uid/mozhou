@@ -125,7 +125,7 @@
     {
       "id": "T03",
       "title": "候选契约和失败测试",
-      "status": "pending",
+      "status": "verified",
       "depends_on": [
         "T00"
       ],
@@ -138,8 +138,33 @@
       "deliverable": "candidate状态和原文不变的red-green回归",
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "保留旧正文及新候选记录",
-      "evidence": [],
-      "result": null
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T03/result.json",
+          "sourceCommit": "618a444",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "vitest draft-candidate.test.ts + workspace 全套",
+          "exitCode": 0,
+          "scope": "candidate 契约与 I01 语义（未采纳零变化）",
+          "limitations": [
+            "流式直写正文待 T04 封闭"
+          ]
+        },
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T03/verify-stream-red.log",
+          "sourceCommit": "618a444",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "node regressions/verify-stream.mjs",
+          "exitCode": 1,
+          "scope": "bug 证据：未采纳生成覆盖原文、外部编辑丢失、staleSave 200",
+          "limitations": [
+            "合成模型流，非真实供应商"
+          ]
+        }
+      ],
+      "result": "候选契约落地：draft-candidate.ts（C2 全套校验+状态迁移+跨进程持久）+ 8 测试红转绿；verify-stream 阻断证据存档（originalLost=true）；verify-manual-save 保持绿；workspace 740 全绿"
     },
     {
       "id": "T04",
