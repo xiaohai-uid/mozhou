@@ -247,7 +247,7 @@
     {
       "id": "T08",
       "title": "账号与设备登录",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T00"
       ],
@@ -262,12 +262,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "撤销新会话，不复活旧token",
       "evidence": [],
-      "result": null
+      "result": "T01 实查：无 Supabase 项目/回调/真实邮件（EXTERNAL-INPUTS auth_project_and_live_email=missing）；无已验证 principal 则账号/设备登录无法实现"
     },
     {
       "id": "T09",
       "title": "全路由租户隔离",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T08"
       ],
@@ -282,12 +282,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "未通过隔离保持hosted关闭",
       "evidence": [],
-      "result": null
+      "result": "依赖 T08 已验证 principal 与 hosted 模式激活条件；无公网部署（T16 blocked）则隔离矩阵无 hosted 目标可验；本地 root 迁移窗口状态保持"
     },
     {
       "id": "T07",
       "title": "模型设置与可靠传输",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T04",
         "T09"
@@ -303,12 +303,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "回到前一有效配置",
       "evidence": [],
-      "result": null
+      "result": "T01 实查：env 无 MODEL_KEY/BASE/NAME（FINNHUB/SENSENOVA 与墨舟无关）；商业用途模型与费用预算未由用户提供；按 START-HERE 缺真实凭据只标 blocked，不伪造通过"
     },
     {
       "id": "T06",
       "title": "十步生产与恢复",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T05",
         "T07"
@@ -325,12 +325,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "不改写旧commit和事件",
       "evidence": [],
-      "result": null
+      "result": "依赖 T07（真实模型 provider 凭据缺失，T01 实查无任何模型 Key）与 T09（身份隔离未建）；十步生产确定性部分可在 T07/T09 就绪后执行；本次未实施"
     },
     {
       "id": "T10",
       "title": "真导出与备份恢复",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T04",
         "T09"
@@ -346,12 +346,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "原书不动，仅清本次失败暂存",
       "evidence": [],
-      "result": null
+      "result": "依赖 T04（✓）+T09（blocked）；导出本体可本地实现，但 hosted 隔离/备份恢复验收缺 T09；本次未实施"
     },
     {
       "id": "T11",
       "title": "真资料检索与榜单",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T07",
         "T09"
@@ -367,12 +367,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "未接线保留诚实不可用，不恢复假数据",
       "evidence": [],
-      "result": null
+      "result": "依赖 T07（凭据缺失）+T09；书源/搜索/榜单真实凭据（search_provider）T01 实查 missing"
     },
     {
       "id": "T14",
       "title": "微信支付宝订单与回调",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T02",
         "T08",
@@ -388,12 +388,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "停新订单，保留在途回调查单退款",
       "evidence": [],
-      "result": null
+      "result": "T01 实查：无微信商户号/Native 权限/APPID、无支付宝开放平台应用；payment_test_budget 用户未授权；不得伪造真实回调或代用户付款"
     },
     {
       "id": "T15",
       "title": "权益额度和离线授权",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T14",
         "T07"
@@ -408,12 +408,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "保留预留与账本，不重复扣发",
       "evidence": [],
-      "result": null
+      "result": "依赖 T14（商户缺失）+T07；权益/额度/离线授权无订单与模型基础"
     },
     {
       "id": "T12",
       "title": "拆书文风与技能库",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T07",
         "T09",
@@ -431,12 +431,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "追加版本可回选旧版，不删除原文",
       "evidence": [],
-      "result": null
+      "result": "依赖 T07/T09/T15；真实原文锚定分析需模型通道与权益门；本次未实施"
     },
     {
       "id": "T13",
       "title": "全部导航与分镜检视",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T05",
         "T06",
@@ -456,12 +456,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "保留已保存衍生作品",
       "evidence": [],
-      "result": null
+      "result": "汇集依赖（T05✓/T06/T10/T11/T12/T09）；多数上游 blocked；本次未实施"
     },
     {
       "id": "T16",
       "title": "公网预发布与重启恢复",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T01",
         "T09",
@@ -482,12 +482,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "切旧代码保留数据，支付继续结算",
       "evidence": [],
-      "result": null
+      "result": "T01 实查：无 Oracle 主机/SSH 配置/域名/证书/备份目的地；公网发布 required 项全部未 ready；不把本机 Tunnel 当生产"
     },
     {
       "id": "T17",
       "title": "Windows完整安装包",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T05",
         "T07",
@@ -507,12 +507,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "回旧应用，数据单独恢复",
       "evidence": [],
-      "result": null
+      "result": "依赖 T05✓/T07/T09/T10/T13/T15 多数 blocked；签名证书缺失（用户证书存储 0）；Tauri CLI 可装但安装闭环无验证环境"
     },
     {
       "id": "T18",
       "title": "真实长篇成本与故障验收",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T06",
         "T07",
@@ -531,12 +531,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "暂停新任务，保留所有失败产物",
       "evidence": [],
-      "result": null
+      "result": "依赖 T06/T07/T10/T13/T15/T16/T17 多数 blocked；真实长篇验收预算（real_model_acceptance_budget_fen）未授权"
     },
     {
       "id": "T19",
       "title": "独立安全验收",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T18"
       ],
@@ -550,12 +550,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "发现问题回对应任务重验",
       "evidence": [],
-      "result": null
+      "result": "依赖 T18；且 START-HERE §7：执行者不得自己签署独立安全审查，须另一审阅者或用户核对高风险证据"
     },
     {
       "id": "T20",
       "title": "候选资产与CI发布通道",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T19"
       ],
@@ -571,12 +571,12 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "保留旧包旧部署，不raw push",
       "evidence": [],
-      "result": null
+      "result": "依赖 T19；跳过旧 release.yml 的受门禁发布通道未建；push 门禁（全局 git-push-gate）要求真实 CI；未创建任何公开/候选资产"
     },
     {
       "id": "T21",
       "title": "公开发布及外部验收",
-      "status": "pending",
+      "status": "blocked",
       "depends_on": [
         "T20"
       ],
@@ -589,7 +589,7 @@
       "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
       "rollback": "回旧版，停新订单但保留回调",
       "evidence": [],
-      "result": null
+      "result": "依赖 T20 及全部外部验收（支付/安装/公网）；禁止创建公开 Release 或开放购买"
     }
   ]
 }
