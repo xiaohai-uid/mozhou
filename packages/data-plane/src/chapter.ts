@@ -76,6 +76,19 @@ export class PendingCommitConflictError extends Error {
   }
 }
 
+/** 草稿保存冲突：盘上版本 ≠ 作者预期（双端并发/过期页面）——拒绝静默覆盖。 */
+export class ProseRevisionConflictError extends Error {
+  override readonly name = 'ProseRevisionConflictError'
+
+  constructor(
+    readonly chapterIndex: number,
+    readonly expectedRevision: number,
+    readonly currentRevision: number,
+  ) {
+    super(`prose save conflict on chapter ${chapterIndex}: expected r${expectedRevision}, disk has r${currentRevision}`)
+  }
+}
+
 export interface ProseChapterScan {
   readonly relPath: string
   /** 与章大纲节点同 id：章一体两面（规划文件 + 正文文件），watcher 按 id 归并。 */
@@ -737,6 +750,90 @@ export function reopenChapter(ctx: PlaneContext, chapterIndex: number): ChapterR
   writeManifestFor(ctx)
 
   return { chapterIndex: before.chapterIndex, reopenedFromCommitId: before.commitId, proseRelPath: proseRel }
+}
+
+/* ---------------------------------------------------------------------------
+ * 草稿保存（发布评审 R1/R2）：预期版本契约 + 写前哈希 + 定稿保护
+ * ------------------------------------------------------------------------- */
+
+export interface SaveProseDraftRequest {
+  readonly chapterIndex: number
+  /** 作者写作层文本（保存后成为该章 Active Draft 正文）。 */
+  readonly body: string
+  /**
+   * 作者实际读取的章版本；null = 新建语义（章必须不存在）。
+   * 更新时必须等于盘上 revision——服务端绝不自行读取最新版本替换预期值。
+   */
+  readonly expectedRevision: number | null
+  readonly title?: string | undefined
+  /**
+   * 作者显式确认覆盖外部修改。仅在 expectedRevision 与盘上一致且写前哈希失配
+   * （外部改盘）时被采纳；revision 不匹配时一律仍拒绝。UI 上对应
+   * 「我已核对最新内容」按钮——外部改盘后 revision 不变，无此确认位冲突永远无法解决。
+   */
+  readonly confirmExternalOverwrite?: boolean | undefined
+}
+
+export interface SaveProseDraftResult {
+  readonly chapterIndex: number
+  readonly revision: number
+  readonly phase: 'draft'
+  readonly created: boolean
+  readonly proseRelPath: string
+}
+
+/**
+ * 作者草稿落盘（Accept → Active Draft）：
+ * - committed 章：显式拒绝（ChapterPhaseError）——重开必须走 reopenChapter，绝不静默降级（R2）。
+ * - 更新路径：revision 比对（双端/过期页面 → ProseRevisionConflictError）+
+ *   写前哈希（外部改盘 → PreWriteHashMismatchError）双重守卫，冲突零磁盘变更（R1）。
+ * - 新建路径：章必须不存在（ChapterExistsError），不把并发新建伪装成覆盖。
+ * 成功即刷新哈希基线（与 createChapterDraft/reopenChapter 同纪律）。
+ */
+export function saveProseDraft(ctx: PlaneContext, request: SaveProseDraftRequest): SaveProseDraftResult {
+  const proseRel = proseChapterPath(request.chapterIndex)
+  const isNew = request.expectedRevision === null
+
+  if (isNew) {
+    // 新建语义：createChapterDraft 对已存在章抛 ChapterExistsError（不静默转覆盖）
+    createChapterDraft(ctx, { chapterIndex: request.chapterIndex, title: request.title?.trim() || `第${request.chapterIndex}章` })
+  }
+
+  const existing = readProseChapter(ctx.root, proseRel)
+  if (!isNew) {
+    if (existing.phase === 'committed') {
+      throw new ChapterPhaseError(request.chapterIndex, 'chapter is committed — explicit reopen required before editing')
+    }
+    if (existing.revision !== request.expectedRevision) {
+      throw new ProseRevisionConflictError(request.chapterIndex, request.expectedRevision, existing.revision)
+    }
+    try {
+      assertPreWriteHash(ctx, proseRel)
+    } catch (error) {
+      if (!(error instanceof PreWriteHashMismatchError) || request.confirmExternalOverwrite !== true) throw error
+      // 作者已显式确认覆盖外部修改（revision 匹配前提下）——继续写入并刷新基线
+    }
+  }
+
+  const normalizedBody = request.body.endsWith('\n') ? request.body : `${request.body}\n`
+  const content = renderProseChapter({
+    mozhouId: existing.mozhouId,
+    revision: existing.revision + 1,
+    chapterIndex: existing.chapterIndex,
+    phase: 'draft',
+    body: normalizedBody,
+  })
+  atomicReplace(ctx.root, proseRel, content)
+  ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, [proseRel])
+  writeManifestFor(ctx)
+
+  return {
+    chapterIndex: existing.chapterIndex,
+    revision: existing.revision + 1,
+    phase: 'draft',
+    created: isNew,
+    proseRelPath: proseRel,
+  }
 }
 
 /* ---------------------------------------------------------------------------

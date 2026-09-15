@@ -1,0 +1,7 @@
+请在 C:\zcode\novel-ai 执行墨舟主应用全功能收尾与双端发布。
+先完整读取 docs/superpowers/plans/2026-09-15-full-release/START-HERE.md，按其顺序读取规格、接口合同、任务文件及外部条件。
+运行 node docs/superpowers/plans/2026-09-15-full-release/check-handoff.mjs --self-test --check-targets，再从 T00 开始实际执行，不要只复述计划。
+保护现有未提交内容；单写入者；依赖满足才执行；每项保存真实证据后更新 tasks.json。修改核心符号前做 GitNexus 影响分析。
+目标：无作品同步；其余功能完成；公网可用网站和 Windows 应用同版发布；微信/支付宝；19元与39元月费。遵守 SPEC.md 的已确认范围和工程默认值。
+缺少真实商户、部署资源、模型费用预算等外部条件时，只阻塞依赖它的任务，继续其余可执行项；不得伪造通过、代用户付款、绕过 push 门禁或用旧安装包发布。
+只有实际模型、用户隔离、支付、数据恢复、干净 Windows 安装及独立复验全部通过，才执行最终发布任务。

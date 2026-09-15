@@ -75,7 +75,7 @@ export const CAPABILITY_DETAILS: Record<string, CapabilityDetail> = {
     contract: 'license=null 真实态+规划中 plans；无购买/激活假按钮（测试断言缺席）',
     landing: 'nav 17 → MembershipView',
   },
-} as Record<string, CapabilityDetail>
+}
 
 export function detailOf(
   id: string,

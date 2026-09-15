@@ -149,6 +149,36 @@ export interface WorksChapterSummary {
   readonly revision: number
 }
 
+/* ---- 章节正文（发布评审 R1/R2：预期版本契约）---- */
+
+/** POST /api/chapter.prose：作者实际读取内容的章快照。 */
+export interface ChapterProseResponse {
+  readonly ok: true
+  readonly exists: boolean
+  readonly chapterIndex: number
+  readonly revision?: number
+  readonly phase?: ChapterPhase
+  readonly commitId?: string | undefined
+  readonly body?: string
+}
+
+/** POST /api/chapter.prose.save 成功响应（phase 恒 draft）。 */
+export interface ChapterProseSaveResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly revision: number
+  readonly phase: 'draft'
+  readonly created: boolean
+}
+
+/** POST /api/chapter.reopen 成功响应。 */
+export interface ChapterReopenResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly reopenedFromCommitId: string
+  readonly proseRelPath: string
+}
+
 /* ---- 漫剧分镜（T02 契约；领域类型真源在 server/storyboard/contract.ts）---- */
 
 export interface StoryboardSourceResponse {

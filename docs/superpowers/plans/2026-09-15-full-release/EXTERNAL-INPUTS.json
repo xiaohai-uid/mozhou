@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "note": "只保存非秘密状态。null表示实际外部输入尚缺；不允许把这些字段虚填ready。",
+  "confirmed": {
+    "product": "MoZhou",
+    "targets": [
+      "hosted-web",
+      "windows-x64"
+    ],
+    "cross_device_novel_sync": false,
+    "payment_channels": [
+      "wechat",
+      "alipay"
+    ],
+    "pro_monthly_fen": 1900,
+    "max_monthly_fen": 3900,
+    "free_tier_preferred": true,
+    "automatic_paid_cloud_upgrade_authorized": false
+  },
+  "proposed_defaults": {
+    "hosting": "Oracle Cloud Always Free persistent VM after live compatibility/capacity check",
+    "auth": "Supabase Auth",
+    "edge": "Cloudflare DNS/HTTPS if available",
+    "renewal": "manual-calendar-month",
+    "devices": 3,
+    "max_model_budget_fen_per_month": 1500,
+    "managed_included_calls": "T18真实成本测量后由T02公式计算并冻结，不是竞品3500直接照搬"
+  },
+  "required": [
+    {
+      "id": "hosting",
+      "required_by": [
+        "T01",
+        "T16",
+        "T20",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "https_domain_and_deploy_identity",
+      "required_by": [
+        "T01",
+        "T08",
+        "T16",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "auth_project_and_live_email",
+      "required_by": [
+        "T01",
+        "T08"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "backup_destination_separate_failure_domain",
+      "required_by": [
+        "T01",
+        "T16"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "commercially_allowed_model_and_cost_schedule",
+      "required_by": [
+        "T01",
+        "T07",
+        "T18"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "search_provider",
+      "required_by": [
+        "T11"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "wechat_approved_merchant_and_native_product",
+      "required_by": [
+        "T01",
+        "T14",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "alipay_approved_merchant_and_payment_product",
+      "required_by": [
+        "T01",
+        "T14",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "payment_test_user_action_and_budget",
+      "required_by": [
+        "T14",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "real_model_acceptance_budget_fen",
+      "required_by": [
+        "T18"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "windows_signing_or_explicit_unsigned_choice",
+      "required_by": [
+        "T17",
+        "T20",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "release_version_and_publisher_identity",
+      "required_by": [
+        "T20",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    },
+    {
+      "id": "final_max_quota_and_price_version",
+      "required_by": [
+        "T18",
+        "T20",
+        "T21"
+      ],
+      "status": "missing",
+      "value": null,
+      "evidence": null
+    }
+  ],
+  "secret_inventory_names_only": [
+    "SUPABASE_URL",
+    "SUPABASE_PUBLIC_KEY",
+    "SUPABASE_SERVER_SECRET_REFERENCE",
+    "AUTH_SMTP_SECRET_REFERENCE",
+    "WECHAT_MCH_ID",
+    "WECHAT_APP_ID",
+    "WECHAT_API_V3_KEY_REFERENCE",
+    "WECHAT_SIGNING_KEY_REFERENCE",
+    "ALIPAY_APP_ID",
+    "ALIPAY_SIGNING_KEY_REFERENCE",
+    "MODEL_KEY_REFERENCE",
+    "MODEL_BASE_URL",
+    "MODEL_NAME",
+    "SEARCH_KEY_REFERENCE",
+    "LICENSE_SIGNING_KEY_REFERENCE",
+    "WINDOWS_SIGNING_IDENTITY_REFERENCE"
+  ]
+}

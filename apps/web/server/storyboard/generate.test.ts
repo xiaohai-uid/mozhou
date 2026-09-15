@@ -53,6 +53,8 @@ const ENDPOINT: ResolvedEndpoint = { baseUrl: 'https://example.invalid', apiKey:
 
 function fakeStream(chunks: string[], opts: { recordAbort?: (s: string) => void } = {}) {
   return async function* (): AsyncGenerator<OpenAiStreamChunk> {
+    // 桥接异步流语义（require-await）：块本身同步产出，仅保留异步迭代面
+    await Promise.resolve()
     for (const c of chunks) {
       if (c === '__ABORT__') {
         opts.recordAbort?.('abort')
@@ -96,14 +98,14 @@ function modelPayload(overrides: Record<string, unknown> = {}): string {
 
 const OPTIONS = { aspectRatio: '9:16' as const, targetDurationSeconds: 90, visualStyle: '雾港冷银蓝', language: 'zh-CN' as const }
 
-async function sourceHashOf(root: string): Promise<string> {
+function sourceHashOf(root: string): string {
   return sha256Hex(readFileSync(join(root, proseChapterPath(1))))
 }
 
 describe('generateStoryboardCandidate（注入式传输）', () => {
   it('无 provider → PROVIDER_UNAVAILABLE', async () => {
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
       resolveEndpoint: () => null,
       env: {},
@@ -116,7 +118,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
 
   it('分片 JSON 流 → 候选合法；id/revision/源/总时长服务端权威；引文锚定', async () => {
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     const payload = modelPayload()
     const chunks = [payload.slice(0, 60), payload.slice(60, 200), payload.slice(200)]
     const { document } = await generateStoryboardCandidate(root, 1, hash, OPTIONS, {
@@ -138,7 +140,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
 
   it('围栏 JSON 容忍；非法 JSON → MODEL_OUTPUT_INVALID', async () => {
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     const fenced = '```json\n' + modelPayload() + '\n```'
     const ok = await generateStoryboardCandidate(root, 1, hash, OPTIONS, {
       resolveEndpoint: resolveEndpointOk,
@@ -158,7 +160,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
 
   it('sourceQuote 改写未逐字锚定 → MODEL_OUTPUT_UNANCHORED，不产出候选', async () => {
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     const payload = modelPayload({
       shots: [{
         id: 'shot_01', sceneId: 's', order: 1, location: 'l', timeOfDay: '夜', framing: 'wide',
@@ -177,7 +179,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
 
   it('超 60 镜 → MODEL_OUTPUT_INVALID（上限明确拒绝）', async () => {
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     const baseShot = {
       id: 's', sceneId: 's', location: 'l', timeOfDay: '夜', framing: 'wide',
       cameraMovement: 'c', visual: 'v', characterIds: ['cheng_wei'],
@@ -195,7 +197,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
 
   it('输出超 262144 字节 → 立即中止（MODEL_OUTPUT_OVERSIZE）', async () => {
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     const big = 'x'.repeat(STORYBOARD_LIMITS.maxResponseBytes + 1024)
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
       resolveEndpoint: resolveEndpointOk,
@@ -217,7 +219,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
       join(root, proseChapterPath(1)),
       renderProseChapter({ mozhouId: 'chapter_01JBGZ00000000000000000000', revision: 2, chapterIndex: 1, phase: 'draft', body: long }),
     )
-    const hash2 = await sourceHashOf(root)
+    const hash2 = sourceHashOf(root)
     await expect(generateStoryboardCandidate(root, 1, hash2, OPTIONS, {
       resolveEndpoint: resolveEndpointOk,
       streamChat: fakeStream([]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
@@ -232,7 +234,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
       return
     }
     const root = makeBook()
-    const hash = await sourceHashOf(root)
+    const hash = sourceHashOf(root)
     const { document } = await generateStoryboardCandidate(root, 1, hash, OPTIONS)
     // 真机验收：结构合法 + 引文锚定 + 不写盘（人工内容核对在 evidence 记录）
     expect(document.shots.length).toBeGreaterThan(0)

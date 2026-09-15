@@ -47,7 +47,7 @@ describe('CloudSyncView（云同步与备份）', () => {
   it('快照备份：真实归档能力未上线——不提供任何可执行备份动作，只呈现诚实 unavailable', async () => {
     const fetchMock = vi.fn().mockImplementation((path: string) => {
       if (path === '/api/cloud-sync') return Promise.resolve(okJson(MOCK_SYNC))
-      return Promise.resolve({ ok: false, status: 501, json: async () => ({ ok: false, code: 'BACKUP_NOT_IMPLEMENTED', error: '未创建任何文件' }) })
+      return Promise.resolve({ ok: false, status: 501, json: () => Promise.resolve({ ok: false, code: 'BACKUP_NOT_IMPLEMENTED', error: '未创建任何文件' }) })
     })
     vi.stubGlobal('fetch', fetchMock)
     render(<CloudSyncView root="C:/tmp/book" />)

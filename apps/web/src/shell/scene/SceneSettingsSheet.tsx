@@ -15,7 +15,7 @@ import {
   updateScopedProfile,
   clearBookOverride,
 } from './scenePreference'
-import type { SceneFigureAnchor, SceneId, SceneProfile, ScenePreference } from './scenePreference'
+import type { SceneId, SceneProfile, ScenePreference } from './scenePreference'
 
 const BUILT_IN_SCENES: readonly { id: Exclude<SceneId, 'custom'>; label: string }[] = [
   { id: 'silver-atrium', label: '银白中庭' },
@@ -38,13 +38,15 @@ interface UploadError {
   readonly why: string
 }
 
-/** exactOptionalPropertyTypes：移除可选键须解构剔除，不可显式赋 undefined。 */
+/** exactOptionalPropertyTypes：移除可选键须 delete（解构剔除会产生未用变量）。 */
 function withoutCustomBg(profile: SceneProfile): SceneProfile {
-  const { customBg: _droppedBg, ...rest } = profile
+  const rest = { ...profile }
+  delete rest.customBg
   return rest
 }
 function withoutCustomFigure(profile: SceneProfile): SceneProfile {
-  const { customFigure: _droppedFigure, ...rest } = profile
+  const rest = { ...profile }
+  delete rest.customFigure
   return rest
 }
 
@@ -199,7 +201,7 @@ export function SceneSettingsSheet({
 
   return (
     <aside
-      ref={panelRef as React.RefObject<HTMLDivElement>}
+      ref={panelRef}
       className="scene-sheet mat-scene-glass"
       role="dialog"
       aria-label="墨境场景设置"
@@ -377,7 +379,7 @@ export function SceneSettingsSheet({
                       type="button"
                       className="btn"
                       aria-pressed={activeProfile.figure.anchor === anchor}
-                      onClick={() => patchFigure((figure) => ({ ...figure, anchor: anchor as SceneFigureAnchor }))}
+                      onClick={() => patchFigure((figure) => ({ ...figure, anchor: anchor }))}
                     >
                       {anchor === 'left' ? '左' : anchor === 'center' ? '中' : '右'}
                     </button>

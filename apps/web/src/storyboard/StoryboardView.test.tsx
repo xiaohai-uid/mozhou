@@ -55,17 +55,16 @@ function candidateDoc(overrides: Record<string, unknown> = {}): StoryboardDocume
     updatedAt: '2026-09-13T00:00:00.000Z',
     generation: { provider: 'openai-compatible', model: 'test-model' },
     ...overrides,
-  } as StoryboardDocument
+  }
 }
 
-function routeFetch(routes: Record<string, (body: Record<string, unknown>) => Response | Promise<Response>>): typeof fetch {
-  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = String(input)
-    const path = url.startsWith('http') ? new URL(url).pathname : url
+function routeFetch(routes: Record<string, (body: Record<string, unknown>) => Response | Promise<Response>>): unknown {
+  return vi.fn((input: string, init?: { body?: string }): Response | Promise<Response> => {
+    const path = input.startsWith('http') ? new URL(input).pathname : input
     const handler = routes[path]
     if (handler === undefined) throw new Error('unexpected fetch: ' + path)
-    const body = init?.body !== undefined ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
-    return await handler(body)
+    const body = init?.body !== undefined ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+    return handler(body)
   })
 }
 
@@ -77,8 +76,8 @@ function savedDoc(): StoryboardDocument {
 async function blobText(blob: Blob): Promise<string> {
   return await new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error)
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error ?? new Error('Blob 读取失败'))
     reader.readAsText(blob)
   })
 }
@@ -97,8 +96,8 @@ describe('StoryboardView（T04 闭环）', () => {
 
   it('生成候选 → 镜头卡呈现画面/对白/时长/提示词；背面含原文锚与改编说明', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    const fetchMock = vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: '雾从灯塔脚下漫上来…' })
@@ -113,7 +112,7 @@ describe('StoryboardView（T04 闭环）', () => {
     await user.click(screen.getByTestId('sb-generate'))
     await waitFor(() => expect(screen.getByTestId('sb-shots')).toBeTruthy())
     // U04 默认工作视图：单镜编辑器 + 场景分组序列
-    expect((screen.getByTestId('sb-f-visual') as HTMLInputElement).value).toContain('浓雾漫上礁石')
+    expect(screen.getByTestId<HTMLInputElement>('sb-f-visual').value).toContain('浓雾漫上礁石')
     expect(screen.getByTestId('sb-seq-1')).toBeTruthy()
     expect(screen.getByTestId('sb-tab-source')).toBeTruthy()
     // 切卡片视图：原文锚/背面等卡面元素
@@ -128,9 +127,10 @@ describe('StoryboardView（T04 闭环）', () => {
     expect(fetchMock).toHaveBeenCalledTimes(5) // works/capabilities/source/storyboards/generate
   })
 
-  it('U07 景别中文主显示：标题无裸英文代号，英文收进 title；景别下拉全中文', async () => {    const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+  it('U07 景别中文主显示：标题无裸英文代号，英文收进 title；景别下拉全中文', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -165,8 +165,8 @@ describe('StoryboardView（T04 闭环）', () => {
 
   it('U04 原文对照并排（sb-duo）：引文与编辑框同面板，编辑与「改编说明」标签同源同步', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -182,27 +182,27 @@ describe('StoryboardView（T04 闭环）', () => {
     const panel = screen.getByTestId('sb-panel-source')
     // 同一面板内：原文引文（左）+ 编辑框（右）
     expect(panel.textContent).toContain('原文锚')
-    const duoArea = screen.getByLabelText('改编说明（并排编辑）') as HTMLTextAreaElement
+    const duoArea = screen.getByLabelText<HTMLTextAreaElement>('改编说明（并排编辑）')
     await user.type(duoArea, '台词前置制造张力')
     expect(duoArea.value).toBe('开场定调台词前置制造张力') // fixture 原值「开场定调」+ 追加
 
     // 与「改编说明」标签同一状态源：切换后值一致
     await user.click(screen.getByTestId('sb-tab-adapt'))
-    expect((screen.getByLabelText('改编说明') as HTMLInputElement).value).toBe('开场定调台词前置制造张力')
+    expect(screen.getByLabelText<HTMLInputElement>('改编说明').value).toBe('开场定调台词前置制造张力')
   })
 
   it('编辑对白后显式保存：payload expectedRevision=null、服务端返回 r1；文本全程不被清空', async () => {
     const user = userEvent.setup()
     let savedPayload: Record<string, unknown> | null = null
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string, init?: { body?: string }) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
       if (path === '/api/storyboards') return okJson({ ok: true, items: [], skippedInvalid: 0 })
       if (path === '/api/storyboard.generate') return okJson({ ok: true, candidate: candidateDoc() })
       if (path === '/api/storyboard.save') {
-        savedPayload = init?.body !== undefined ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
+        savedPayload = init?.body !== undefined ? (JSON.parse(init.body ?? '{}') as Record<string, unknown>) : {}
         return okJson({ ok: true, id: 'sb_01JBGZ000000000000000000AA', revision: 1, sourceStale: false })
       }
       throw new Error('unexpected fetch: ' + path)
@@ -213,10 +213,10 @@ describe('StoryboardView（T04 闭环）', () => {
 
     await user.click(screen.getByTestId('sb-view-cards'))
     await user.click(screen.getByRole('button', { name: '编辑' }))
-    const lineInput = screen.getByDisplayValue('你听，潮水退下去的声音。') as HTMLInputElement
+    const lineInput = screen.getByDisplayValue('你听，潮水退下去的声音。')
     await user.clear(lineInput)
     await user.type(lineInput, '听，潮声和二十年前一样。')
-    expect((screen.getByDisplayValue(/听，潮声和二十年前一样/) as HTMLInputElement).value).toBe('听，潮声和二十年前一样。')
+    expect(screen.getByDisplayValue<HTMLInputElement>(/听，潮声和二十年前一样/).value).toBe('听，潮声和二十年前一样。')
 
     await user.click(screen.getByTestId('sb-save'))
     await waitFor(() => expect(screen.getByTestId('sb-notice')).toHaveTextContent('已保存 r1'))
@@ -224,13 +224,13 @@ describe('StoryboardView（T04 闭环）', () => {
     const expected = (savedPayload as unknown as Record<string, unknown>)['expectedRevision']
     expect(expected).toBeNull()
     // 保存成功后编辑文本仍在（错误/保存路径都不清空用户文本）
-    expect((screen.getByDisplayValue(/听，潮声和二十年前一样/) as HTMLInputElement).value).toBe('听，潮声和二十年前一样。')
+    expect(screen.getByDisplayValue<HTMLInputElement>(/听，潮声和二十年前一样/).value).toBe('听，潮声和二十年前一样。')
   })
 
   it('409 冲突：本地编辑保留 + 冲突横幅；不静默覆盖', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -253,7 +253,7 @@ describe('StoryboardView（T04 闭环）', () => {
     await user.click(screen.getByTestId('sb-save'))
     await waitFor(() => expect(screen.getByTestId('sb-conflict')).toBeTruthy())
     // 本地编辑原样保留
-    expect((screen.getByDisplayValue(/（作者补充）/) as HTMLInputElement).value).toContain('（作者补充）')
+    expect(screen.getByDisplayValue<HTMLInputElement>(/（作者补充）/).value).toContain('（作者补充）')
     expect(confirmSpy).not.toHaveBeenCalled() // 冲突不需要确认框——横幅给显式取舍
   })
 
@@ -261,8 +261,8 @@ describe('StoryboardView（T04 闭环）', () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true) // 生成后候选为 dirty：导入替换需确认（U06）
     let captured: { blob: Blob; name: string } | null = null
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -316,8 +316,8 @@ describe('StoryboardView（T04 闭环）', () => {
 
   it('切书（key 重挂载）：晚到的生成响应不应用到新书视图', async () => {
     let resolveGen: ((res: Response) => void) | null = null
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -346,8 +346,8 @@ describe('StoryboardView（T04 闭环）', () => {
 
   it('打开已保存版本：stale 如实标注', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -372,8 +372,8 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
     const saveBodies: Array<Record<string, unknown>> = []
     let saveCalls = 0
     let currentServerRevision = 1
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string, init?: { body?: string }) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -381,7 +381,7 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
       if (path === '/api/storyboard.generate') return okJson({ ok: true, candidate: candidateDoc() })
       if (path === '/api/storyboard.save') {
         saveCalls += 1
-        saveBodies.push(init?.body !== undefined ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {})
+        saveBodies.push(init?.body !== undefined ? (JSON.parse(init.body ?? '{}') as Record<string, unknown>) : {})
         if (saveCalls === 1) {
           currentServerRevision = 2 // 模拟客户端 A 抢先存了 r2
           return new Response(JSON.stringify({ ok: false, code: 'STORYBOARD_REVISION_CONFLICT', error: 'revision 冲突', storedRevision: 2 }), { status: 409 })
@@ -404,20 +404,20 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
     await user.click(screen.getByTestId('sb-save'))
     const conflict = await screen.findByTestId('sb-conflict')
     expect(conflict).toHaveTextContent('服务器为 r2') // R1：读 document.revision，非 undefined
-    expect((screen.getByDisplayValue(/（B的补充）/) as HTMLInputElement).value).toContain('（B的补充）')
+    expect(screen.getByDisplayValue<HTMLInputElement>(/（B的补充）/).value).toContain('（B的补充）')
 
     await user.click(screen.getByTestId('sb-conflict-retry'))
     await waitFor(() => expect(screen.getByTestId('sb-notice')).toHaveTextContent('已保存 r3'))
     expect(saveBodies[1]?.['expectedRevision']).toBe(2) // R1：显式基线=服务器 revision，非陈旧闭包的 1
-    expect((screen.getByDisplayValue(/（B的补充）/) as HTMLInputElement).value).toContain('（B的补充）')
+    expect(screen.getByDisplayValue<HTMLInputElement>(/（B的补充）/).value).toContain('（B的补充）')
   })
 
   /** R2 验收：保存响应延迟期间的新编辑不被覆盖、不被标记已保存。 */
   it('保存进行中的编辑：成功后文本保留且保持 dirty', async () => {
     const user = userEvent.setup()
     let finishSave: ((res: Response) => void) | null = null
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -437,7 +437,7 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
     await user.click(screen.getByTestId('sb-save'))
 
     // 保存挂起期间继续编辑（对白输入框仍展开）
-    await user.type(screen.getByDisplayValue(/（保存前）/) as HTMLInputElement, '（保存中补充）')
+    await user.type(screen.getByDisplayValue(/（保存前）/), '（保存中补充）')
 
     ;(finishSave as unknown as ((res: Response) => void) | null)?.(okJson({ ok: true, id: 'sb_01JBGZ000000000000000000AA', revision: 2, sourceStale: false }))
     await waitFor(() => expect(screen.getByTestId('sb-notice')).toHaveTextContent('已保存 r2'))
@@ -452,8 +452,8 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     let finishSave: ((res: Response) => void) | null = null
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({
         ok: true,
@@ -486,8 +486,8 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
   /** R1 验收：畸形 revision 永不触发非法保存（重试按钮禁用 + 显式报错）。 */
   it('服务器 revision 未知（-1）时重试禁用', async () => {
     const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input)
+    vi.stubGlobal('fetch', vi.fn((input: string) => {
+      const path = input
       if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
       if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
       if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -505,8 +505,8 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
     await user.click(await screen.findByTestId('sb-generate'))
     await waitFor(() => expect(screen.getByTestId('sb-shots')).toBeTruthy())
     await user.click(screen.getByTestId('sb-save'))
-    const retry = await screen.findByTestId('sb-conflict-retry')
-    expect((retry as HTMLButtonElement).disabled).toBe(true)
+    const retry = await screen.findByTestId<HTMLButtonElement>('sb-conflict-retry')
+    expect(retry.disabled).toBe(true)
   })
 
   /** U05 键盘可达：软键盘弹出（visualViewport resize）时滚入当前编辑字段与底部工具栏；mobile-only。 */
@@ -528,8 +528,8 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
     Element.prototype.scrollIntoView = function scrolledIntoView(this: Element) { scrolled.push(this) }
 
     try {
-      vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-        const path = String(input)
+      vi.stubGlobal('fetch', vi.fn((input: string) => {
+        const path = input
         if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: true })
         if (path === '/api/works') return okJson({ ok: true, chapters: [{ chapterIndex: 1, title: '灯塔夜谈', phase: 'draft', wordCount: 100, revision: 3 }] })
         if (path === '/api/storyboard.source') return okJson({ ok: true, source: SOURCE, title: '灯塔夜谈', characterCount: 100, excerpt: 'x' })
@@ -544,7 +544,7 @@ describe('StoryboardView（R1/R2 保存链路）', () => {
       const toolbar = document.querySelector('[data-testid="sb-work-toolbar"]')
       expect(toolbar).not.toBeNull()
 
-      const input = screen.getByTestId('sb-f-visual') as HTMLInputElement
+      const input = screen.getByTestId('sb-f-visual')
       input.focus()
       expect(document.activeElement).toBe(input)
 

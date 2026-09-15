@@ -22,6 +22,7 @@ import {
   readProseChapter,
   recoverPendingCommit,
   reopenChapter,
+  saveProseDraft,
   splitByReconciliationSurface,
   type ChapterCommitResult,
   type ChapterDraftPaths,
@@ -30,6 +31,8 @@ import {
   type CommitChapterRequest,
   type CreateChapterDraftRequest,
   type PlaneContext,
+  type SaveProseDraftRequest,
+  type SaveProseDraftResult,
   type ProseChapterScan,
 } from './chapter.js'
 import { readCanonState, readBookRecord, scanEntityCards, type CanonState } from './canon-read.js'
@@ -195,6 +198,11 @@ export class LocalDataPlane {
   /** T3：应用内重编辑已提交章节 ⇒ 移回 draft，旧 commit 痕迹永不改写（I5）。 */
   reopenChapter(chapterIndex: number): ChapterReopenResult {
     return reopenChapter(this._ctx, chapterIndex)
+  }
+
+  /** 作者草稿落盘（Accept → Active Draft）：预期版本契约 + 写前哈希 + 定稿保护（R1/R2）。 */
+  saveProseDraft(request: SaveProseDraftRequest): SaveProseDraftResult {
+    return saveProseDraft(this._ctx, request)
   }
 
   /**

@@ -1,0 +1,14 @@
+{
+  "kind": "filesystem",
+  "path": "evidence/full-release/20260915-1/T00/result.json",
+  "sourceCommit": "fed29e32a86c47dc991da6883fe5d6cc2e4141fd",
+  "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+  "command": "git status/diff 快照 + sha256sum 逐文件指纹 + 仓库外备份回读 + git switch -c codex/mozhou-full-release-20260915 + gitnexus analyze/check + pnpm test ×2",
+  "exitCode": 0,
+  "scope": "工作树 22 项修改 + evidence/release-fixes 3 文件全部备份至仓库外并回读核对 mismatch=0；产品输入整体签名 59ab7480；执行分支 codex/mozhou-full-release-20260915 已建且未提交内容保留；图谱刷新 8947 节点 0 循环；workspace 91/732、web 41/292+1skip 全绿；交接自检 PASS",
+  "limitations": [
+    "web 1 个真实模型测试按原样跳过（无凭据），未伪造通过",
+    "没有 push 任何提交；github 远端不改动",
+    "测试基线通过不等于发布验收，外部旅程仍在 T01 起逐项探测"
+  ]
+}

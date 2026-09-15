@@ -198,7 +198,7 @@ describe('POST /api/storyboard.save（T02 独立存储）', () => {
     const id = saved.data['id'] as string
     const filePath = join(root, 'adaptations', 'storyboards', `${id}.json`)
     const bytesBefore = readFileSync(filePath)
-    const fullDoc = validDocument({ ...(doc as Record<string, unknown>), id })
+    const fullDoc = validDocument({ ...(doc), id })
 
     const staleUpdate = await post(base, '/api/storyboard.save', { root, document: fullDoc, expectedRevision: 0 })
     expect(staleUpdate.status).toBe(409)

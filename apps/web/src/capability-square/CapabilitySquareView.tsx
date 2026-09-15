@@ -10,8 +10,7 @@ import { useEffect, useState } from 'react'
 import type { CapabilitySquareResponse, CapabilityStatus } from '../../server/api'
 import { post } from '../lib/post'
 import { useSheetA11y } from '../shell/useSheetA11y'
-import { CAPABILITY_DETAILS, detailOf } from './capabilityDetails'
-import type { CapabilityDetail } from './capabilityDetails'
+import { detailOf } from './capabilityDetails'
 
 const STATUS_LABELS: Record<CapabilityStatus, string> = {
   native: '原生可用',
@@ -87,7 +86,6 @@ export function CapabilitySquareView(): JSX.Element {
                 <h2>{group.group} · {group.entries.length} 项</h2>
                 <div className="cap-wall">
                   {group.entries.map((entry) => {
-                    const detail = detailOf(entry.id, entry.status)
                     const isSelected = entry.id === selectedId
                     return (
                       <button

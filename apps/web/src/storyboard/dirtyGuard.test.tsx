@@ -49,8 +49,8 @@ function candidateDoc() {
 }
 
 function stubRoutes() {
-  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-    const path = String(input)
+  vi.stubGlobal('fetch', vi.fn((input: string) => {
+    const path = input
     if (path === '/api/capabilities') return new Response(JSON.stringify({ ok: true, capabilities: [], providerAvailable: true }), { status: 200 })
     if (path === '/api/works') return new Response(JSON.stringify({ ok: true, chapters: [{ chapterIndex: 1, title: 't', phase: 'draft', wordCount: 1, revision: 1 }] }), { status: 200 })
     if (path === '/api/storyboard.source') return new Response(JSON.stringify({ ok: true, source: { bookId: 'book_aaaa', chapterIndex: 1, revision: 1, phase: 'draft', sha256: 'a'.repeat(64) }, title: 't', characterCount: 1, excerpt: 'x' }), { status: 200 })
@@ -119,7 +119,7 @@ describe('StoryboardView 脏注册（U06 外壳联动源 · U05 徽标真源）'
 describe('MobileShell 分镜徽标三态（U05）', () => {
   it('无文档时徽标为「就绪」，不显示「已保存」', async () => {
     // 全部接口离线：分镜视图各读面走 catch 空态（不影响徽标真源）
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
+    vi.stubGlobal('fetch', vi.fn(() => { throw new Error('offline') }))
     render(<MobileShell book={BOOK} onSwitchBook={vi.fn()} />)
     await userEvent.click(screen.getByTestId('workbench-open-storyboard'))
     const badge = await screen.findByTestId('mfp-badge')

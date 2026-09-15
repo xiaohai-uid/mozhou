@@ -150,7 +150,7 @@ function stubAppFetch(): void {
 
 function ensureToolbox(): void {
   if (document.querySelector('[data-view="context-receipt"]') === null) {
-    const toggle = document.querySelector('[data-testid="nav-toolbox-toggle"]') as HTMLButtonElement | null
+    const toggle = document.querySelector('[data-testid="nav-toolbox-toggle"]')
     if (toggle !== null) fireEvent.click(toggle)
   }
 }

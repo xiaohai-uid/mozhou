@@ -20,7 +20,7 @@ describe('MobileChaptersDrawer（链 1 · 章节切换）', () => {
   it('直读 /api/works 渲染真实章节；点章回调并关闭', async () => {
     const fetchMock = vi.fn().mockImplementation((path: string) => {
       if (path === '/api/works') {
-        return Promise.resolve({ ok: true, json: async () => ({
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({
           ok: true,
           chapters: [
             { chapterIndex: 1, title: '雾灯', phase: 'committed', wordCount: 1200, revision: 2 },
@@ -78,9 +78,9 @@ describe('MobileComposer（链 4 后半 · inject 回填）', () => {
 
 describe('SystemHub 书架切书（链 2）', () => {
   it('展开书架：/api/library 真实行渲染；打开走 library.open → onSwitchBook', async () => {
-    const fetchMock = vi.fn().mockImplementation((path: string, init?: RequestInit) => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
       if (path === '/api/library') {
-        return Promise.resolve({ ok: true, json: async () => ({
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({
           ok: true,
           books: [
             { root: 'C:\\tmp\\test-book', bookId: 'bk_test', title: '假神真显灵', chapterCount: 3 },
@@ -90,9 +90,9 @@ describe('SystemHub 书架切书（链 2）', () => {
         }) })
       }
       if (path === '/api/library.open') {
-        return Promise.resolve({ ok: true, json: async () => ({ ok: true, root: 'C:\\tmp\\other-book', bookId: 'bk_other', title: '雾灯志' }) })
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, root: 'C:\\tmp\\other-book', bookId: 'bk_other', title: '雾灯志' }) })
       }
-      return Promise.resolve({ ok: true, json: async () => ({ ok: true, totalEvents: 0, totalTraversals: 0, events: [], traversals: [], license: null, plans: [] }) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, totalEvents: 0, totalTraversals: 0, events: [], traversals: [], license: null, plans: [] }) })
     })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -110,9 +110,10 @@ describe('SystemHub 书架切书（链 2）', () => {
     if (target === undefined) throw new Error('missing open button')
     fireEvent.click(target)
     await waitFor(() => {
-      const openCall = fetchMock.mock.calls.find(([p]) => p === '/api/library.open')
+      const openCall = fetchMock.mock.calls.find(([p]) => p === '/api/library.open') as [string, { body?: string }] | undefined
       expect(openCall).toBeDefined()
-      expect(JSON.parse(String(openCall?.[1]?.body)).root).toBe('C:\\tmp\\other-book')
+      const openBody = JSON.parse(openCall?.[1]?.body ?? '{}') as { root: string }
+      expect(openBody.root).toBe('C:\\tmp\\other-book')
       expect(onSwitchBook).toHaveBeenCalledWith({ root: 'C:\\tmp\\other-book', bookId: 'bk_other', title: '雾灯志' })
     })
   })

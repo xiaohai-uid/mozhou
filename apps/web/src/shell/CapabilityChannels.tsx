@@ -26,7 +26,7 @@ export function CapabilityChannels({
 }): JSX.Element {
   const primaryIds = new Set(PRIMARY_DOMAINS.map((d) => d.id))
   const toolboxGroups = NAV_GROUPS
-    .map(({ group, items }) => ({ group, items: items.filter((item) => !primaryIds.has(item.id as ViewId)) }))
+    .map(({ group, items }) => ({ group, items: items.filter((item) => !primaryIds.has(item.id)) }))
     .filter((g) => g.items.length > 0)
   const activeInToolbox = !primaryIds.has(activeView)
   const [toolboxOpen, setToolboxOpen] = useState(activeInToolbox)

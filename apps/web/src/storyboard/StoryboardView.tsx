@@ -288,10 +288,9 @@ export function StoryboardView({
     void refreshList()
   }, [refreshList])
 
-  // 初次挂载/换书后加载当前章源快照（与切章同一条服务端读取路径）。
+  // 初次挂载/换书后加载当前章源快照（与切章同一条服务端读取路径；chapterIndex 变化走 handleSelectChapter）。
   useEffect(() => {
     if (root !== null) void loadSource(chapterIndex)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root])
 
   const handleSelectChapter = (next: number): void => {
@@ -501,7 +500,9 @@ export function StoryboardView({
     const reader = new FileReader()
     reader.onload = (): void => {
       try {
-        const parsed = JSON.parse(String(reader.result)) as Record<string, unknown>
+        const raw = reader.result
+        if (typeof raw !== 'string') throw new Error('无法读取文件：内容不是文本')
+        const parsed = JSON.parse(raw) as Record<string, unknown>
         if (typeof parsed['id'] !== 'string' || !Array.isArray(parsed['shots']) || !Array.isArray(parsed['characters']) || typeof parsed['source'] !== 'object') {
           throw new Error('不是墨舟分镜 JSON（缺 id/shots/characters/source）')
         }
