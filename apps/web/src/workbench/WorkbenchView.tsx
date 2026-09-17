@@ -3,10 +3,11 @@
  * 对话区骨架 + 建书/账本 + 创作辅助工具。所有状态文案必须来自真实数据；
  * 未接入的数据指标不得以示例数值伪装成当前用户状态。
  */
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { post } from '../lib/post'
 import { DialogueStream } from './DialogueStream'
 import { ProseEditorPanel } from './editor/ProseEditorPanel'
+import { syncSha256Hex } from './lib/sha256'
 import { DesktopToolModals, type DesktopModalType } from '../shell/DesktopToolModals'
 import type { BookInfo } from '../shell/workbenchStorage'
 import type { WorksChapterSummary } from '../../server/api'
@@ -43,6 +44,28 @@ export function WorkbenchView({
   const [events, setEvents] = useState<readonly string[]>([])
   const [ledgerError, setLedgerError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<DesktopModalType>(null)
+  const [editorSelection, setEditorSelection] = useState<{
+    from: number
+    to: number
+    selectedTextHash: string
+  } | undefined>(undefined)
+
+  // 切书或切章时清空选区
+  useEffect(() => {
+    setEditorSelection(undefined)
+  }, [book?.bookId, book?.root, chapterIndex])
+
+  const handleSelectionChange = useCallback(
+    (sel: { from: number; to: number; selectedText: string } | null) => {
+      if (sel === null || sel.from >= sel.to || sel.selectedText.length === 0) {
+        setEditorSelection(undefined)
+      } else {
+        const hash = syncSha256Hex(sel.selectedText)
+        setEditorSelection({ from: sel.from, to: sel.to, selectedTextHash: hash })
+      }
+    },
+    [],
+  )
 
   const handleCreateBook = async (): Promise<void> => {
     setCreateError(null)
@@ -139,10 +162,10 @@ export function WorkbenchView({
 
       <div className="conversation">
         {/* 正文写作层（Reading Slate）：Active Draft 本地草稿，全产品最安静区域 */}
-        <ProseEditorPanel book={book} chapterIndex={chapterIndex} />
+        <ProseEditorPanel book={book} chapterIndex={chapterIndex} onSelectionChange={handleSelectionChange} />
 
         <div id="dialogue-panel" data-testid="dialogue-panel">
-          <DialogueStream book={book} chapterIndex={chapterIndex} />
+          <DialogueStream book={book} chapterIndex={chapterIndex} selection={editorSelection} />
         </div>
 
         <section className="wb-section" data-testid="create-book">

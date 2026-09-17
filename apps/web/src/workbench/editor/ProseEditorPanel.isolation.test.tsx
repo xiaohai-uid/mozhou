@@ -5,11 +5,11 @@
  *   committed 章 → 定稿横幅 + 显式重开；本地缓存为空时以服务端正文回填。
  * 与 workbenchStorage.test.ts 的函数级隔离互为表里。
  */
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProseEditorPanel } from './ProseEditorPanel'
-import { chapterDraftKey, saveDraftCache } from '../../shell/workbenchStorage'
+import { chapterDraftKey, loadDraftCache, saveDraftCache } from '../../shell/workbenchStorage'
 import type { BookInfo } from '../../shell/workbenchStorage'
 
 const BOOK_A: BookInfo = { root: 'C:/tmp/book-a', bookId: 'bk_aaaa', title: '雾港失真' }
@@ -162,5 +162,44 @@ describe('ProseEditorPanel（R1/R2 冲突保护与定稿边界）', () => {
     const accept = await waitFor(() => screen.getByTestId<HTMLButtonElement>('prose-accept-draft'))
     expect(accept.disabled).toBe(true)
     expect(screen.getByText(/章节状态不可用/)).toBeTruthy()
+  })
+
+  it('选区改变与取消：向外部触发 onSelectionChange（UTF-16 偏移与所选原文）', async () => {
+    stubApi({})
+    saveDraftCache('墨舟网文操作系统，沉浸创作。', chapterDraftKey(BOOK_A, 1))
+    const onSelectionChange = vi.fn()
+    render(<ProseEditorPanel book={BOOK_A} chapterIndex={1} onSelectionChange={onSelectionChange} />)
+
+    const textarea = screen.getByRole<HTMLTextAreaElement>('textbox')
+    expect(textarea.value).toBe('墨舟网文操作系统，沉浸创作。')
+
+    // 选中「网文操作系统」（UTF-16 偏移 [2, 8)）
+    textarea.setSelectionRange(2, 8)
+    fireEvent.select(textarea)
+
+    expect(onSelectionChange).toHaveBeenCalledWith({
+      from: 2,
+      to: 8,
+      selectedText: '网文操作系统',
+    })
+
+    // 光标折叠到位置 8（取消选区）
+    textarea.setSelectionRange(8, 8)
+    fireEvent.select(textarea)
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('中文输入即时落本地 Active Draft 缓存', async () => {
+    stubApi({})
+    const user = userEvent.setup()
+    render(<ProseEditorPanel book={BOOK_A} chapterIndex={1} />)
+
+    const textarea = screen.getByRole<HTMLTextAreaElement>('textbox')
+    await user.type(textarea, '夜幕降临，钟声在海港回荡。')
+
+    expect(textarea.value).toBe('夜幕降临，钟声在海港回荡。')
+    const cached = loadDraftCache(chapterDraftKey(BOOK_A, 1))
+    expect(cached).toBe('夜幕降临，钟声在海港回荡。')
   })
 })

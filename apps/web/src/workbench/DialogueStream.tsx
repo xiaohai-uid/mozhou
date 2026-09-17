@@ -5,7 +5,13 @@
  * 显式 unavailable（Gate 3 纪律：不静默假装可用）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { chapterDraftKey, saveDraftCache } from '../shell/workbenchStorage'
+import {
+  candidateDraftKey,
+  chapterDraftKey,
+  loadCandidateCache,
+  saveCandidateCache,
+  saveDraftCache,
+} from '../shell/workbenchStorage'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
 import type { BookInfo } from '../shell/workbenchStorage'
 
@@ -22,12 +28,14 @@ interface CandidateState {
   readonly mode: 'replace' | 'continue' | 'insert' | 'replace-selection'
 }
 
-/** 采纳前的盘面现场（Undo 一次可逆编辑的数据源）。 */
+/** 采纳前的盘面现场（Undo 一次可逆编辑的数据源）。严格绑定采纳后的版本与指纹（CAS 冲突防护）。 */
 interface AcceptUndo {
   readonly bookRoot: string
   readonly chapterIndex: number
   readonly oldText: string
   readonly oldRevision: number | null
+  readonly afterRevision: number
+  readonly afterSha256?: string | undefined
 }
 
 interface ConflictView {
@@ -61,11 +69,11 @@ export function DialogueStream({
 }: {
   book: BookInfo | null
   /** 兼容旧调用面缺省第 1 章；生产 App 始终传入当前选中章。 */
-  chapterIndex?: number
+  chapterIndex?: number | undefined
   /** C2（T05）选择插入/替换：生成开始时选区现场（from/to/selectedTextHash）。
    *  写作面（ProseEditorPanel）接入前保持诚实空态；传入后按 replace-selection 模式生成，
    *  生成期间编辑 → accept 409 → 冲突对比面板（本组件既有冲突恢复路径）。 */
-  selection?: { from: number; to: number; selectedTextHash: string }
+  selection?: { from: number; to: number; selectedTextHash: string } | undefined
 }): JSX.Element {
   const [phase, setPhase] = useState<DialoguePhase>('ask')
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse['capabilities']>([])
@@ -76,6 +84,8 @@ export function DialogueStream({
   const [error, setError] = useState<string | null>(null)
   const [providerUnavailable, setProviderUnavailable] = useState(false)
   const [sending, setSending] = useState(false)
+  const [accepting, setAccepting] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   /** start 帧证据（装配 tokens/provider）——AI CANDIDATE 的来源可追溯性。 */
   const [streamMeta, setStreamMeta] = useState<{ contextTokens?: number; provider?: string } | null>(null)
   /** 采纳进写作层的回执（Candidate → Accept → Active Draft 链）。 */
@@ -84,12 +94,17 @@ export function DialogueStream({
   const [candidate, setCandidate] = useState<CandidateState | null>(null)
   /** 冲突现场：accept 409 时保留双文本 + 最新版本供作者裁决。 */
   const [conflictView, setConflictView] = useState<ConflictView | null>(null)
-  /** Undo 一次可逆编辑（accept 前的盘面）。 */
+  /** Undo 一次可逆编辑（accept 前的盘面）。严格绑定采纳后的版本与指纹（CAS 保护）。 */
   const [undo, setUndo] = useState<AcceptUndo | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
   /** 发起流请求时的书/章现场：迟到响应与切书后身份不符时丢弃（T05 切书隔离）。 */
   const requestSiteRef = useRef<{ bookId: string; chapterIndex: number } | null>(null)
+  const requestIdRef = useRef(0)
+  const currentSiteRef = useRef({ bookId: book?.bookId ?? null, chapterIndex, root: book?.root ?? null })
 
+  useEffect(() => {
+    currentSiteRef.current = { bookId: book?.bookId ?? null, chapterIndex, root: book?.root ?? null }
+  }, [book?.bookId, book?.root, chapterIndex])
 
   useEffect(() => {
     if (book === null) return
@@ -112,6 +127,40 @@ export function DialogueStream({
     return () => { void readerRef.current?.cancel() }
   }, [])
 
+  useEffect(() => {
+    // 切书或切章：取消正在读取的流
+    void readerRef.current?.cancel()
+    readerRef.current = null
+    requestSiteRef.current = null
+
+    // 候选状态按书章恢复（仅在内存/UI展示，不覆盖服务器正文）
+    if (book !== null) {
+      const cKey = candidateDraftKey(book, chapterIndex)
+      const cached = loadCandidateCache(cKey)
+      if (cached !== null) {
+        setCandidate({ candidateId: cached.candidateId, base: cached.base, mode: cached.mode })
+        setDraftText(cached.draftText)
+        setPhase(cached.phase)
+      } else {
+        setCandidate(null)
+        setDraftText('')
+        setPhase('ask')
+      }
+    } else {
+      setCandidate(null)
+      setDraftText('')
+      setPhase('ask')
+    }
+    setStreamMeta(null)
+    setAdoptState(null)
+    setConflictView(null)
+    setUndo(null)
+    setError(null)
+    setSending(false)
+    setAccepting(false)
+    setCopyFeedback(null)
+  }, [book?.bookId, book?.root, chapterIndex])
+
   const handleSend = useCallback(async (): Promise<void> => {
     if (book === null || phase === 'drafting' || sending) return
     const prompt = answer.trim()
@@ -121,8 +170,13 @@ export function DialogueStream({
     setCandidate(null)
     setConflictView(null)
     setUndo(null)
-    // 切书/切章隔离：迟到帧只属于发起现场（T05）
-    requestSiteRef.current = { bookId: book.bookId, chapterIndex }
+    setCopyFeedback(null)
+
+    // 切书/切章隔离：递增请求 ID，捕获发起时的具体书/章现场
+    const reqId = ++requestIdRef.current
+    const site = { bookId: book.bookId, chapterIndex, root: book.root }
+    requestSiteRef.current = site
+
     try {
       const res = await fetch('/api/draft.stream', {
         method: 'POST',
@@ -133,42 +187,84 @@ export function DialogueStream({
           prompt,
           activeSkills: selectedSkills,
           ...(selection === undefined ? {} : { mode: 'replace-selection', selection }),
-          // base 缺省：服务端取盘面现场并在 start 帧回传（UI 以回传值为准）
         }),
       })
+
+      // 检查请求发起后是否已切书/切章
+      if (
+        requestIdRef.current !== reqId ||
+        currentSiteRef.current.bookId !== site.bookId ||
+        currentSiteRef.current.chapterIndex !== site.chapterIndex
+      ) {
+        setSending(false)
+        return
+      }
+
       const contentType = res.headers.get('Content-Type') ?? ''
       if (!res.ok) {
         const errorPayload = (await res.json().catch(() => null)) as { error?: string; code?: string } | null
-        setError(errorPayload?.error ?? '流式草稿请求失败（HTTP ' + res.status + '）')
-        setProviderUnavailable(errorPayload?.code === 'PROVIDER_UNAVAILABLE')
-        setPhase('error')
-        setSending(false)
+        if (
+          requestIdRef.current === reqId &&
+          currentSiteRef.current.bookId === site.bookId &&
+          currentSiteRef.current.chapterIndex === site.chapterIndex
+        ) {
+          setError(errorPayload?.error ?? '流式草稿请求失败（HTTP ' + res.status + '）')
+          setProviderUnavailable(errorPayload?.code === 'PROVIDER_UNAVAILABLE')
+          setPhase('error')
+          setSending(false)
+        }
         return
       }
       if (contentType.includes('json') && !contentType.includes('ndjson')) {
         const payload = (await res.json()) as { ok?: boolean; error?: string; code?: string }
-        if (payload.ok === false || payload.code === 'PROVIDER_UNAVAILABLE') {
-          setError(payload.error ?? '草稿生成 provider 未配置')
-          setProviderUnavailable(payload.code === 'PROVIDER_UNAVAILABLE')
-          setPhase('error')
-          setSending(false)
-          return
+        if (
+          requestIdRef.current === reqId &&
+          currentSiteRef.current.bookId === site.bookId &&
+          currentSiteRef.current.chapterIndex === site.chapterIndex
+        ) {
+          if (payload.ok === false || payload.code === 'PROVIDER_UNAVAILABLE') {
+            setError(payload.error ?? '草稿生成 provider 未配置')
+            setProviderUnavailable(payload.code === 'PROVIDER_UNAVAILABLE')
+            setPhase('error')
+            setSending(false)
+            return
+          }
         }
       }
       if (!contentType.includes('ndjson') || !res.body) {
-        setError('响应非预期（缺流式 Content-Type）')
-        setPhase('error')
-        setSending(false)
+        if (
+          requestIdRef.current === reqId &&
+          currentSiteRef.current.bookId === site.bookId &&
+          currentSiteRef.current.chapterIndex === site.chapterIndex
+        ) {
+          setError('响应非预期（缺流式 Content-Type）')
+          setPhase('error')
+          setSending(false)
+        }
         return
       }
+
       setPhase('drafting')
       const reader = res.body.getReader()
       readerRef.current = reader
       const decoder = new TextDecoder()
       let buffer = ''
+      let accumulatedDraftText = ''
+      let currentCandidateState: CandidateState | null = null
+
       for (;;) {
         const { done, value } = await reader.read()
+        // 读取帧后重查现场
+        if (
+          requestIdRef.current !== reqId ||
+          currentSiteRef.current.bookId !== site.bookId ||
+          currentSiteRef.current.chapterIndex !== site.chapterIndex
+        ) {
+          void reader.cancel()
+          break
+        }
         if (done) break
+
         buffer += decoder.decode(value, { stream: true })
         let nl: number
         while ((nl = buffer.indexOf('\n')) >= 0) {
@@ -176,34 +272,72 @@ export function DialogueStream({
           buffer = buffer.slice(nl + 1)
           if (line.trim().length === 0) continue
           const frame = JSON.parse(line) as DraftStreamFrame
-          // 迟到响应隔离：发起现场与当前书/章不符 → 丢弃该帧（不写入当前新书）
-          const site = requestSiteRef.current
-          if (book === null || site === null || site.bookId !== book.bookId || site.chapterIndex !== chapterIndex) {
-            continue
+
+          // 迟到帧与切书隔离
+          if (
+            requestIdRef.current !== reqId ||
+            currentSiteRef.current.bookId !== site.bookId ||
+            currentSiteRef.current.chapterIndex !== site.chapterIndex
+          ) {
+            void reader.cancel()
+            break
           }
+
           if (frame.event === 'start') {
             setStreamMeta({
               ...(frame.contextTokens !== undefined ? { contextTokens: frame.contextTokens } : {}),
               ...(frame.provider !== undefined ? { provider: frame.provider } : {}),
             })
             if (typeof frame.candidateId === 'string' && frame.base !== undefined) {
-              setCandidate({ candidateId: frame.candidateId, base: frame.base, mode: selection === undefined ? 'replace' : 'replace-selection' })
+              const candState: CandidateState = {
+                candidateId: frame.candidateId,
+                base: frame.base,
+                mode: selection === undefined ? 'replace' : 'replace-selection',
+              }
+              currentCandidateState = candState
+              setCandidate(candState)
             }
           } else if (frame.event === 'delta' && typeof frame.text === 'string') {
+            accumulatedDraftText += frame.text
             setDraftText((prev) => prev + frame.text)
           } else if (frame.event === 'done') {
             setPhase('draft_done')
+            // 将就绪候选保存到本地缓存（按书章恢复）
+            if (currentCandidateState !== null) {
+              saveCandidateCache(
+                {
+                  candidateId: currentCandidateState.candidateId,
+                  base: currentCandidateState.base,
+                  mode: currentCandidateState.mode,
+                  draftText: accumulatedDraftText,
+                  phase: 'draft_done',
+                },
+                candidateDraftKey(site, site.chapterIndex),
+              )
+            }
           } else if (frame.event === 'error' || frame.ok === false) {
             setError(frame.error ?? '草稿流中断')
             setPhase('error')
           }
         }
       }
-      setSending(false)
+      if (
+        requestIdRef.current === reqId &&
+        currentSiteRef.current.bookId === site.bookId &&
+        currentSiteRef.current.chapterIndex === site.chapterIndex
+      ) {
+        setSending(false)
+      }
     } catch (cause) {
-      setError((cause as Error).message)
-      setPhase('error')
-      setSending(false)
+      if (
+        requestIdRef.current === reqId &&
+        currentSiteRef.current.bookId === site.bookId &&
+        currentSiteRef.current.chapterIndex === site.chapterIndex
+      ) {
+        setError((cause as Error).message)
+        setPhase('error')
+        setSending(false)
+      }
     }
   }, [answer, book, chapterIndex, phase, selectedSkills, sending, selection])
 
@@ -212,6 +346,9 @@ export function DialogueStream({
   }
 
   const handleNewDraft = (): void => {
+    if (book !== null) {
+      saveCandidateCache(null, candidateDraftKey(book, chapterIndex))
+    }
     setPhase('ask')
     setDraftText('')
     setError(null)
@@ -221,6 +358,7 @@ export function DialogueStream({
     setCandidate(null)
     setConflictView(null)
     setUndo(null)
+    setCopyFeedback(null)
     requestSiteRef.current = null
   }
 
@@ -240,16 +378,28 @@ export function DialogueStream({
    *  成功 → 刷新章快照到本地写作缓存 + 通知 Reading Slate + 记录一次可逆 Undo；
    *  409 冲突 → 保留两份文本（候选 vs 最新盘面），交作者裁决。 */
   const handleAccept = useCallback(async (): Promise<void> => {
-    if (book === null || candidate === null) return
+    if (book === null || candidate === null || accepting) return
+    const site = { bookId: book.bookId, chapterIndex, root: book.root }
     setError(null)
     setAdoptState(null)
+    setAccepting(true)
     let oldSnapshot: { body: string; revision: number | null }
     try {
       oldSnapshot = await loadSnapshot(book)
     } catch (cause) {
       setError((cause as Error).message)
+      setAccepting(false)
       return
     }
+    // await 之后重查现场：若已切书/切章，丢弃后续操作
+    if (
+      currentSiteRef.current.bookId !== site.bookId ||
+      currentSiteRef.current.chapterIndex !== site.chapterIndex
+    ) {
+      setAccepting(false)
+      return
+    }
+
     try {
       const res = await fetch('/api/draft.accept', {
         method: 'POST',
@@ -261,6 +411,16 @@ export function DialogueStream({
           idempotencyKey: 'ui_accept_' + candidate.candidateId,
         }),
       })
+
+      // 再次重查现场
+      if (
+        currentSiteRef.current.bookId !== site.bookId ||
+        currentSiteRef.current.chapterIndex !== site.chapterIndex
+      ) {
+        setAccepting(false)
+        return
+      }
+
       const data = (await res.json()) as {
         ok?: boolean
         revision?: number
@@ -269,12 +429,41 @@ export function DialogueStream({
         code?: string
         error?: string
       }
+
+      if (
+        currentSiteRef.current.bookId !== site.bookId ||
+        currentSiteRef.current.chapterIndex !== site.chapterIndex
+      ) {
+        setAccepting(false)
+        return
+      }
+
       if (res.ok && data.ok === true) {
-        // 成功后以服务端回读正文刷新写作层缓存（采纳后盘上正文为准）
+        // 成功后以服务端回读正文刷新写作层草稿缓存
         const readback = await loadSnapshot(book)
+        if (
+          currentSiteRef.current.bookId !== site.bookId ||
+          currentSiteRef.current.chapterIndex !== site.chapterIndex
+        ) {
+          setAccepting(false)
+          return
+        }
         saveDraftCache(readback.body, chapterDraftKey(book, chapterIndex))
+        saveCandidateCache(null, candidateDraftKey(book, chapterIndex))
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
-        setUndo({ bookRoot: book.root, chapterIndex, oldText: oldSnapshot.body, oldRevision: oldSnapshot.revision })
+
+        // 处理幂等与连续采纳：避免第二次采纳（alreadyApplied: true）把 Undo 基底变成已采纳正文
+        if (data.alreadyApplied !== true || undo === null) {
+          setUndo({
+            bookRoot: book.root,
+            chapterIndex,
+            oldText: oldSnapshot.body,
+            oldRevision: oldSnapshot.revision,
+            afterRevision: data.revision!,
+            afterSha256: data.sha256,
+          })
+        }
+
         setAdoptState(
           data.alreadyApplied === true
             ? `已采纳（幂等重放命中，不重复写入）——第 ${chapterIndex} 章服务端 r${String(data.revision)}`
@@ -283,17 +472,31 @@ export function DialogueStream({
         return
       }
       if (res.status === 409) {
-        // 冲突：候选文本保留（UI 内存+服务端候选区），展示差异
+        // 冲突：保留两份文本供作者裁决
         const latest = await loadSnapshot(book)
+        if (
+          currentSiteRef.current.bookId !== site.bookId ||
+          currentSiteRef.current.chapterIndex !== site.chapterIndex
+        ) {
+          setAccepting(false)
+          return
+        }
         setConflictView({ candidateText: draftText, latestText: latest.body, latestRevision: latest.revision })
         setAdoptState(null)
         return
       }
       setError(data.error ?? '采纳失败（HTTP ' + res.status + '）')
     } catch (cause) {
-      setError((cause as Error).message)
+      if (
+        currentSiteRef.current.bookId === site.bookId &&
+        currentSiteRef.current.chapterIndex === site.chapterIndex
+      ) {
+        setError((cause as Error).message)
+      }
+    } finally {
+      setAccepting(false)
     }
-  }, [book, candidate, chapterIndex, draftText, loadSnapshot])
+  }, [accepting, book, candidate, chapterIndex, draftText, loadSnapshot, undo])
 
   /** 冲突裁决：作者读最新版并明确确认后，以最新盘面现场重新生成候选（再走 accept）。
    *  旧候选文本保留在服务端候选区，可人工复制。 */
@@ -307,16 +510,55 @@ export function DialogueStream({
     await handleSend()
   }, [book, conflictView, handleSend])
 
-  /** 冲突双文本：复制候选文本到剪贴板。 */
+  /** 冲突双文本：复制候选文本到剪贴板。剪贴板不可用或拒绝时不崩溃，提示明确操作。 */
   const handleCopyCandidate = useCallback(async (): Promise<void> => {
     if (conflictView === null) return
-    await navigator.clipboard.writeText(conflictView.candidateText).catch(() => undefined)
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(conflictView.candidateText)
+        setCopyFeedback('已复制候选文本到剪贴板')
+      } else {
+        setCopyFeedback('剪贴板不可用，请从下方差异视图直接选中文本复制')
+      }
+    } catch {
+      setCopyFeedback('复制失败，请从下方差异视图直接选中文本复制')
+    }
   }, [conflictView])
 
-  /** Undo：一次可逆编辑——以新 revision 保存采纳前文本（不倒退服务器历史）。 */
+  /** Undo：一次可逆编辑——以新 revision 保存采纳前文本（严格绑定采纳后的版本 CAS 保护）。 */
   const handleUndoAccept = useCallback(async (): Promise<void> => {
     if (book === null || undo === null) return
-    const latest = await loadSnapshot(book)
+    if (undo.bookRoot !== book.root || undo.chapterIndex !== chapterIndex) {
+      setError('当前书或章已变更，无法在此撤销其他章节的采纳')
+      return
+    }
+    setError(null)
+    const site = { bookId: book.bookId, chapterIndex }
+    let latest: { body: string; revision: number | null }
+    try {
+      latest = await loadSnapshot(book)
+    } catch (cause) {
+      setError((cause as Error).message)
+      return
+    }
+    if (
+      currentSiteRef.current.bookId !== site.bookId ||
+      currentSiteRef.current.chapterIndex !== site.chapterIndex
+    ) {
+      return
+    }
+
+    // 冲突保护：若盘面最新版本不等于采纳后的 afterRevision，说明采纳后有新编辑（手工/外部），拒绝覆盖
+    if (latest.revision !== undo.afterRevision) {
+      setError(`撤销被拒绝（冲突）：该章在采纳后已有新编辑（最新 r${String(latest.revision)} ≠ 采纳后 r${undo.afterRevision}）。磁盘原文与撤销文本都已保留，未覆盖新内容。`)
+      setConflictView({
+        candidateText: undo.oldText,
+        latestText: latest.body,
+        latestRevision: latest.revision,
+      })
+      return
+    }
+
     try {
       const res = await fetch('/api/chapter.prose.save', {
         method: 'POST',
@@ -325,9 +567,15 @@ export function DialogueStream({
           root: book.root,
           chapterIndex,
           body: undo.oldText,
-          expectedRevision: latest.revision,
+          expectedRevision: undo.afterRevision, // 绑定采纳后版本，拒绝覆盖后续新修改
         }),
       })
+      if (
+        currentSiteRef.current.bookId !== site.bookId ||
+        currentSiteRef.current.chapterIndex !== site.chapterIndex
+      ) {
+        return
+      }
       const data = (await res.json()) as { ok?: boolean; revision?: number; error?: string }
       if (res.ok && data.ok === true) {
         saveDraftCache(undo.oldText, chapterDraftKey(book, chapterIndex))
@@ -338,7 +586,12 @@ export function DialogueStream({
         setError(data.error ?? '撤销保存失败')
       }
     } catch (cause) {
-      setError((cause as Error).message)
+      if (
+        currentSiteRef.current.bookId === site.bookId &&
+        currentSiteRef.current.chapterIndex === site.chapterIndex
+      ) {
+        setError((cause as Error).message)
+      }
     }
   }, [book, chapterIndex, loadSnapshot, undo])
 
@@ -428,8 +681,14 @@ export function DialogueStream({
                 </p>
               )}
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-author btn-sm" data-testid="adopt-into-slate" onClick={() => { void handleAccept() }} disabled={candidate === null}>
-                  采纳进正文（Accept → Active Draft）
+                <button
+                  type="button"
+                  className="btn btn-author btn-sm"
+                  data-testid="adopt-into-slate"
+                  onClick={() => { void handleAccept() }}
+                  disabled={candidate === null || accepting}
+                >
+                  {accepting ? '采纳落盘中…' : '采纳进正文（Accept → Active Draft）'}
                 </button>
                 {undo !== null && (
                   <button type="button" className="btn btn-sm" data-testid="undo-accept" onClick={() => { void handleUndoAccept() }}>
@@ -455,13 +714,18 @@ export function DialogueStream({
                   <pre style={{ whiteSpace: 'pre-wrap', background: 'var(--bg-soft)', padding: 8, borderRadius: 6, margin: 0 }} data-testid="conflict-latest">{conflictView.latestText}</pre>
                 </div>
               </details>
-              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <button type="button" className="btn btn-sm" data-testid="conflict-regenerate" onClick={() => { void handleRetryAcceptWithLatest() }}>
                   读最新 → 以最新现场重新生成
                 </button>
                 <button type="button" className="btn btn-sm" data-testid="conflict-copy-candidate" onClick={() => { void handleCopyCandidate() }}>
                   复制候选文本
                 </button>
+                {copyFeedback !== null && (
+                  <span className="mono muted" style={{ fontSize: 11 }} data-testid="copy-feedback">
+                    {copyFeedback}
+                  </span>
+                )}
               </div>
             </div>
           )}

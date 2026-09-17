@@ -6,10 +6,12 @@ export interface NovelEditorCanvasProps {
   value: string;
   onChange: (newValue: string) => void;
   /** 选区/Slash AI 动作回调。当前无正文编辑 AI 契约——实现方应呈现诚实不可用。 */
-  onSelectionAction?: (action: string, selectedText: string) => void;
-  placeholder?: string;
-  readOnly?: boolean;
-  className?: string;
+  onSelectionAction?: ((action: string, selectedText: string) => void) | undefined;
+  /** 选区变化回调（from/to UTF-16 偏移与所选原文）。 */
+  onSelectionChange?: ((selection: { from: number; to: number; selectedText: string } | null) => void) | undefined;
+  placeholder?: string | undefined;
+  readOnly?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /** 光标行偏移估算（用于 Slash 菜单就地弹出）。 */
@@ -34,6 +36,7 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
   value,
   onChange,
   onSelectionAction,
+  onSelectionChange,
   placeholder = '在此开始构思正文...',
   readOnly = false,
   className = '',
@@ -79,20 +82,50 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
   const handleSelect = useCallback(() => {
     const textarea = textareaRef.current;
     if (textarea === null) return;
-    setSelectedText(textarea.value.slice(textarea.selectionStart, textarea.selectionEnd).trim());
-  }, []);
+    const from = textarea.selectionStart;
+    const to = textarea.selectionEnd;
+    const raw = textarea.value.slice(from, to);
+    setSelectedText(raw.trim());
+    if (from < to && raw.length > 0) {
+      onSelectionChange?.({ from, to, selectedText: raw });
+    } else {
+      onSelectionChange?.(null);
+    }
+  }, [onSelectionChange]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
     if (textarea === null) return;
-    const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd).trim();
-    if (selected.length > 0) {
+    const from = textarea.selectionStart;
+    const to = textarea.selectionEnd;
+    const raw = textarea.value.slice(from, to);
+    const selected = raw.trim();
+    if (selected.length > 0 && from < to) {
       setSelectedText(selected);
       setBubblePosition({ top: e.clientY, left: e.clientX });
+      onSelectionChange?.({ from, to, selectedText: raw });
     } else {
       setBubblePosition(null);
+      if (from === to) {
+        onSelectionChange?.(null);
+      }
     }
-  }, []);
+  }, [onSelectionChange]);
+
+  const handleKeyUp = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea === null) return;
+    const from = textarea.selectionStart;
+    const to = textarea.selectionEnd;
+    const raw = textarea.value.slice(from, to);
+    if (from < to && raw.length > 0) {
+      setSelectedText(raw.trim());
+      onSelectionChange?.({ from, to, selectedText: raw });
+    } else {
+      setSelectedText('');
+      onSelectionChange?.(null);
+    }
+  }, [onSelectionChange]);
 
   const handleFormatTypography = useCallback(() => {
     const paragraphs = value.split('\n');
@@ -178,6 +211,7 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
             handleSlashTrace();
           }}
           onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
           onSelect={handleSelect}
           onMouseUp={handleMouseUp}
           placeholder={placeholder}

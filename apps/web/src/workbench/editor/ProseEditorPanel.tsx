@@ -23,6 +23,8 @@ import type { ChapterProseResponse, ChapterProseSaveResponse } from '../../../se
 export interface ProseEditorPanelProps {
   book: BookInfo | null
   chapterIndex: number
+  /** 选区变化回调（from/to UTF-16 偏移与所选原文）。 */
+  onSelectionChange?: ((selection: { from: number; to: number; selectedText: string } | null) => void) | undefined
 }
 
 /** 服务端章快照：保存预期版本的唯一来源；不可用时拒绝不安全保存（Gate 3 纪律）。 */
@@ -32,7 +34,7 @@ type Snapshot =
   | { kind: 'ready'; revision: number; phase: 'draft' | 'committed'; commitId: string | undefined; body: string }
   | { kind: 'unavailable' }
 
-export function ProseEditorPanel({ book, chapterIndex }: ProseEditorPanelProps): JSX.Element {
+export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: ProseEditorPanelProps): JSX.Element {
   // T00：缓存键绑定书身份——切书（含同章号）必须重载对应书的草稿；未绑书不读缓存。
   const draftKey = book !== null ? chapterDraftKey(book, chapterIndex) : null
   const [text, setText] = useState(() => loadDraftCache(draftKey))
@@ -228,6 +230,7 @@ export function ProseEditorPanel({ book, chapterIndex }: ProseEditorPanelProps):
                   value={text}
                   onChange={handleChange}
                   onSelectionAction={handleSelectionAction}
+                  onSelectionChange={onSelectionChange}
                   placeholder={`第 ${chapterIndex} 章正文……（Enter 自动两全角缩进；行首 / 唤起快捷指令；选中文字浮出调优菜单）`}
                 />
               </div>

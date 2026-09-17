@@ -91,3 +91,48 @@ export function chapterDraftKey(
   const identity = book.bookId || book.root
   return identity ? `ch_${identity}_${chapterIndex}` : null
 }
+
+const CANDIDATE_CACHE_KEY = 'mozhou.candidate.cache'
+
+export interface CandidateCache {
+  readonly candidateId: string
+  readonly base: { readonly revision: number; readonly sha256: string }
+  readonly mode: 'replace' | 'continue' | 'insert' | 'replace-selection'
+  readonly draftText: string
+  readonly phase: 'draft_done' | 'drafting' | 'answered'
+}
+
+export function candidateDraftKey(
+  book: Pick<BookInfo, 'bookId' | 'root'>,
+  chapterIndex: number,
+): DraftCacheKey {
+  const identity = book.bookId || book.root
+  return identity ? `cand_${identity}_${chapterIndex}` : null
+}
+
+export function loadCandidateCache(chapterKey: DraftCacheKey): CandidateCache | null {
+  if (chapterKey === null) return null
+  try {
+    const raw = window.localStorage.getItem(`${CANDIDATE_CACHE_KEY}.${chapterKey}`)
+    if (raw === null) return null
+    const parsed = JSON.parse(raw) as CandidateCache
+    if (!parsed || typeof parsed.candidateId !== 'string' || !parsed.base) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function saveCandidateCache(candidate: CandidateCache | null, chapterKey: DraftCacheKey): void {
+  if (chapterKey === null) return
+  try {
+    if (candidate !== null) {
+      window.localStorage.setItem(`${CANDIDATE_CACHE_KEY}.${chapterKey}`, JSON.stringify(candidate))
+    } else {
+      window.localStorage.removeItem(`${CANDIDATE_CACHE_KEY}.${chapterKey}`)
+    }
+  } catch {
+    // 静默容错
+  }
+}
+
