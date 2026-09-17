@@ -32,6 +32,10 @@ export interface AcceptDraftRequest {
   readonly base: WriteBase
   /** 16–128 ASCII；同 key 同 body 幂等，不同 body 复用 409。 */
   readonly idempotencyKey: string
+  readonly bookId?: string | undefined
+  readonly chapterIndex?: number | undefined
+  readonly allowPartial?: boolean | undefined
+  readonly confirmPartial?: boolean | undefined
 }
 
 export interface AcceptDraftResult {
@@ -45,7 +49,7 @@ export interface AcceptDraftResult {
 
 export class AcceptConflictError extends Error {
   override readonly name = 'AcceptConflictError'
-  constructor(readonly code: 'BASE_STALE' | 'KEY_REUSED' | 'CANDIDATE_DONE', message: string) {
+  constructor(readonly code: 'BASE_STALE' | 'KEY_REUSED' | 'CANDIDATE_DONE' | 'INVALID_KEY' | 'IDENTITY_MISMATCH', message: string) {
     super(message)
   }
 }
@@ -123,12 +127,43 @@ export function findIntentByKey(root: string, bookId: string, idempotencyKey: st
  */
 export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
   const { bookRoot, candidateId, base, idempotencyKey } = request
+  if (!bookRoot || typeof bookRoot !== 'string') {
+    throw new CandidateError('INVALID_REQUEST', 'INVALID_REQUEST: valid bookRoot required')
+  }
+  if (!candidateId || typeof candidateId !== 'string') {
+    throw new CandidateError('INVALID_REQUEST', 'INVALID_REQUEST: valid candidateId required')
+  }
+  if (!base || typeof base !== 'object' || !Number.isInteger(base.revision) || base.revision < 0 || typeof base.sha256 !== 'string') {
+    throw new CandidateError('INVALID_REQUEST', 'INVALID_REQUEST: valid base required')
+  }
+  if (typeof idempotencyKey !== 'string' || idempotencyKey.trim().length === 0 || idempotencyKey.length > 256 || !/^[\x20-\x7E]+$/.test(idempotencyKey)) {
+    throw new AcceptConflictError('INVALID_KEY', 'INVALID_KEY: idempotencyKey must be non-empty ASCII characters up to 256')
+  }
+
   const candidate = readDraftCandidate(bookRoot, candidateId)
   if (candidate === null) {
     throw new CandidateError('CANDIDATE_NOT_FOUND', `CANDIDATE_NOT_FOUND: candidate ${candidateId} not found`)
   }
+  if (request.bookId !== undefined && request.bookId !== candidate.bookId) {
+    throw new CandidateError('IDENTITY_MISMATCH', `IDENTITY_MISMATCH: bookId ${request.bookId} does not match candidate ${candidate.bookId}`)
+  }
+  if (request.chapterIndex !== undefined && request.chapterIndex !== candidate.chapterIndex) {
+    throw new CandidateError('IDENTITY_MISMATCH', `IDENTITY_MISMATCH: chapterIndex ${request.chapterIndex} does not match candidate ${candidate.chapterIndex}`)
+  }
   if (candidate.base.revision !== base.revision || candidate.base.sha256 !== base.sha256) {
     throw new AcceptConflictError('BASE_STALE', 'BASE_STALE: client base does not match candidate base')
+  }
+
+  const bookJsonPath = join(bookRoot, 'book.json')
+  if (existsSync(bookJsonPath)) {
+    try {
+      const diskBook = JSON.parse(readFileSync(bookJsonPath, 'utf8')) as { id?: string }
+      if (diskBook.id && candidate.bookId !== 'book-local' && diskBook.id !== candidate.bookId) {
+        throw new CandidateError('IDENTITY_MISMATCH', `IDENTITY_MISMATCH: candidate bookId ${candidate.bookId} does not match book on disk ${diskBook.id}`)
+      }
+    } catch (e) {
+      if (e instanceof CandidateError) throw e
+    }
   }
 
   // 幂等：同 key 已用于其他候选 → 409；本候选 intent done → 直接返回已应用
@@ -145,6 +180,18 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
       sha256: existingIntent.after.sha256,
       alreadyApplied: true,
     }
+  }
+
+  // C2 / R01：落盘前终态与合法性校验，拒绝 streaming/cancelled/failed；partial 必须显式确认
+  if (candidate.status === 'streaming' || candidate.status === 'cancelled' || candidate.status === 'failed') {
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${candidate.status} cannot be accepted`)
+  }
+  const isPartialConfirmed = Boolean(request.allowPartial || request.confirmPartial)
+  if (candidate.status === 'partial' && !isPartialConfirmed) {
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status partial requires explicit confirmation`)
+  }
+  if (candidate.status !== 'ready' && candidate.status !== 'partial') {
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${candidate.status} cannot be accepted`)
   }
 
   const plane = LocalDataPlane.openOrRebuild(bookRoot)
@@ -192,7 +239,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
     const finalRevision = afterRevision
     const finalSha256 = proseFileSha256(bookRoot, candidate.chapterIndex)
     writeIntent(bookRoot, { ...intent, after: { revision: finalRevision, sha256: finalSha256 }, state: 'done' })
-    markAccepted(bookRoot, candidateId, finalRevision)
+    markAccepted(bookRoot, candidateId, finalRevision, isPartialConfirmed)
     return { candidateId, chapterIndex: candidate.chapterIndex, revision: finalRevision, sha256: finalSha256, alreadyApplied: false }
   } finally {
     plane.close()

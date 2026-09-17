@@ -11,13 +11,14 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../../server/api.js'
 import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane'
+import { createDraftCandidate, finishCandidate, cancelCandidate } from '@mozhou/pipeline'
 
 let servers: ReturnType<typeof createServer>[] = []
 let roots: string[] = []
@@ -268,5 +269,174 @@ describe('C2 取消与崩溃恢复', () => {
     // 候选已标记 accepted 并记录落地 revision
     const c = await post(base, '/api/draft.candidate', { root, candidateId: id1 })
     expect((c.data as { candidate: { status: string; acceptedRevision?: number } }).candidate).toMatchObject({ status: 'accepted', acceptedRevision: revAfter })
+  })
+})
+
+describe('C2 / R01: 采纳前状态校验与终态保护 (HTTP 级)', () => {
+  it('cancelled 状态候选首次 accept 返回 409，正文/版本不变，重放仍 409', async () => {
+    const base = await listen()
+    const root = makeRoot()
+    const beforeHash = proseHash(root)
+    const id1 = randomUUID()
+    createDraftCandidate(root, {
+      id: id1,
+      operationId: randomUUID(),
+      bookId: 'book-local',
+      chapterIndex: 1,
+      base: { revision: 1, sha256: beforeHash },
+      mode: 'replace',
+    })
+
+    // 取消
+    const cancelRes = await post(base, '/api/draft.cancel', { root, candidateId: id1 })
+    expect(cancelRes.status).toBe(200)
+
+    // 尝试 accept 取消候选
+    const acceptRes1 = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-cancelled-test-1234',
+    })
+    expect(acceptRes1.status).toBe(409)
+    expect(acceptRes1.data.error).toContain('CANDIDATE_NOT_ACCEPTABLE')
+
+    // 磁盘断言：正文与版本绝对未变
+    expect(proseHash(root)).toBe(beforeHash)
+    const prose = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
+    expect((prose.data as { revision?: number }).revision).toBe(1)
+
+    // 重放仍 409
+    const acceptRes2 = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-cancelled-test-1234',
+    })
+    expect(acceptRes2.status).toBe(409)
+    expect(proseHash(root)).toBe(beforeHash)
+  })
+
+  it('streaming 与 failed 候选首次 accept 返回 409，正文零变更', async () => {
+    const base = await listen()
+    const root = makeRoot()
+    const beforeHash = proseHash(root)
+
+    // 1. streaming 候选
+    const streamCandidateId = randomUUID()
+    createDraftCandidate(root, {
+      id: streamCandidateId,
+      operationId: randomUUID(),
+      bookId: 'book-local',
+      chapterIndex: 1,
+      base: { revision: 1, sha256: beforeHash },
+      mode: 'replace',
+    })
+
+    const streamAccept = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: streamCandidateId,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-stream-test-1234',
+    })
+    expect(streamAccept.status).toBe(409)
+    expect(proseHash(root)).toBe(beforeHash)
+
+    // 2. failed 候选
+    finishCandidate(root, streamCandidateId, 'failed')
+    const failedAccept = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: streamCandidateId,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-failed-test-1234',
+    })
+    expect(failedAccept.status).toBe(409)
+    expect(proseHash(root)).toBe(beforeHash)
+  })
+
+  it('partial 候选未显式确认返回 409，显式确认 allowPartial 成功', async () => {
+    const base = await listen()
+    const root = makeRoot()
+    const beforeHash = proseHash(root)
+
+    const partialId = randomUUID()
+    createDraftCandidate(root, {
+      id: partialId,
+      operationId: randomUUID(),
+      bookId: 'book-local',
+      chapterIndex: 1,
+      base: { revision: 1, sha256: beforeHash },
+      mode: 'replace',
+    })
+    finishCandidate(root, partialId, 'partial')
+
+    // 未确认 -> 409
+    const unconfirmed = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: partialId,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-partial-unconf-12',
+    })
+    expect(unconfirmed.status).toBe(409)
+    expect(proseHash(root)).toBe(beforeHash)
+
+    // 显式确认 -> 200
+    const confirmed = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: partialId,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-partial-conf-1234',
+      allowPartial: true,
+    })
+    expect(confirmed.status).toBe(200)
+    expect(confirmed.data).toMatchObject({ ok: true, revision: 2 })
+    const prose = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
+    expect((prose.data as { revision?: number }).revision).toBe(2)
+  })
+
+  it('参数非法与身份不匹配负例均返回 409 或 400', async () => {
+    const base = await listen()
+    const root = makeRoot()
+    const beforeHash = proseHash(root)
+
+    const f = await runStream(base, root, {})
+    const id1 = f[0]?.['candidateId'] as string
+
+    // 1. key 为空或非 ASCII
+    const emptyKey = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: '',
+    })
+    expect(emptyKey.status).toBe(409)
+
+    const nonAsciiKey = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: '非ASCII的键值12345678',
+    })
+    expect(nonAsciiKey.status).toBe(409)
+
+    // 2. bookId 不匹配
+    const mismatchBook = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-mismatch-book-1234',
+      bookId: 'wrong-book-id',
+    })
+    expect(mismatchBook.status).toBe(409)
+
+    // 3. chapterIndex 不匹配
+    const mismatchChapter = await post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-mismatch-ch-12345',
+      chapterIndex: 999,
+    })
+    expect(mismatchChapter.status).toBe(409)
   })
 })

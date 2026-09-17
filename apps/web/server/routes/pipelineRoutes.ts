@@ -4,6 +4,7 @@
 import type { RouteHandler } from '../router.js'
 import {
   AcceptConflictError,
+  CandidateError,
   ChapterProductionSession,
   acceptDraft,
   cancelCandidate,
@@ -410,16 +411,27 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       json(400, { ok: false, error: 'root, candidateId, base and idempotencyKey required' })
       return true
     }
+    const bookId = typeof body['bookId'] === 'string' ? body['bookId'] : undefined
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : undefined
+    const allowPartial = Boolean(body['allowPartial'] ?? body['confirmPartial'])
     try {
       const result = acceptDraft({
         bookRoot: assertSafeBookRoot(root),
         candidateId,
         base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
         idempotencyKey,
+        bookId,
+        chapterIndex,
+        allowPartial,
+        confirmPartial: allowPartial,
       })
       json(200, { ok: true, ...result })
     } catch (error) {
       if (error instanceof AcceptConflictError) {
+        json(409, { ok: false, code: error.code, error: error.message })
+        return true
+      }
+      if (error instanceof CandidateError) {
         json(409, { ok: false, code: error.code, error: error.message })
         return true
       }

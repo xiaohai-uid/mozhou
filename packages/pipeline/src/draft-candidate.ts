@@ -206,9 +206,17 @@ export function cancelCandidate(root: string, id: string): DraftCandidate {
 }
 
 /** 采纳落地（T04 事务内调用）：候选 → accepted + acceptedRevision；不在此处写正文。 */
-export function acceptDraftCandidate(root: string, id: string, acceptedRevision: number): DraftCandidate {
+export function acceptDraftCandidate(
+  root: string,
+  id: string,
+  acceptedRevision: number,
+  allowPartial = false,
+): DraftCandidate {
   const c = readOrThrow(root, id)
-  if (c.status !== 'ready' && c.status !== 'partial') {
+  if (c.status === 'partial' && !allowPartial) {
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${id} in status partial requires explicit confirmation`)
+  }
+  if (c.status !== 'ready' && !(c.status === 'partial' && allowPartial)) {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${id} in status ${c.status} cannot be accepted`)
   }
   const updated: DraftCandidate = { ...c, status: 'accepted', acceptedRevision }
