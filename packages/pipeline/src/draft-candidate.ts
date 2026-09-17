@@ -213,6 +213,10 @@ export function acceptDraftCandidate(
   allowPartial = false,
 ): DraftCandidate {
   const c = readOrThrow(root, id)
+  if (c.status === 'accepted') {
+    if (c.acceptedRevision === acceptedRevision) return c
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${id} already accepted at revision ${c.acceptedRevision}`)
+  }
   if (c.status === 'partial' && !allowPartial) {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${id} in status partial requires explicit confirmation`)
   }

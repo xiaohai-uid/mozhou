@@ -22,6 +22,7 @@ import {
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
   proseChapterPath,
+  renderProseChapter,
 } from '@mozhou/data-plane'
 import { CandidateError, acceptDraftCandidate as markAccepted, readDraftCandidate, type WriteBase } from './draft-candidate.js'
 
@@ -74,7 +75,16 @@ function intentPath(root: string, candidateId: string): string {
 function readIntent(root: string, candidateId: string): AcceptIntent | null {
   const path = intentPath(root, candidateId)
   if (!existsSync(path)) return null
-  return JSON.parse(readFileSync(path, 'utf8')) as AcceptIntent
+  try {
+    const raw = readFileSync(path, 'utf8')
+    const parsed = JSON.parse(raw) as AcceptIntent
+    if (!parsed || parsed.schemaVersion !== 1 || (parsed.state !== 'intent' && parsed.state !== 'done')) {
+      throw new Error('corrupted intent schema')
+    }
+    return parsed
+  } catch (err) {
+    throw new AcceptConflictError('BASE_STALE', `CORRUPT_INTENT: intent log for candidate ${candidateId} is damaged: ${(err as Error).message}`)
+  }
 }
 
 function writeIntent(root: string, intent: AcceptIntent): void {
@@ -173,6 +183,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
   }
   const existingIntent = readIntent(bookRoot, candidateId)
   if (existingIntent?.state === 'done') {
+    markAccepted(bookRoot, candidateId, existingIntent.after.revision, true)
     return {
       candidateId,
       chapterIndex: candidate.chapterIndex,
@@ -190,7 +201,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
   if (candidate.status === 'partial' && !isPartialConfirmed) {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status partial requires explicit confirmation`)
   }
-  if (candidate.status !== 'ready' && candidate.status !== 'partial') {
+  if (candidate.status !== 'ready' && candidate.status !== 'partial' && candidate.status !== 'accepted') {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${candidate.status} cannot be accepted`)
   }
 
@@ -200,20 +211,51 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
     if (scan.phase !== 'draft') {
       throw new ChapterPhaseError(candidate.chapterIndex, 'accept requires phase=draft, got ' + scan.phase)
     }
+    const currentHash = proseFileSha256(bookRoot, candidate.chapterIndex)
+
+    // C2 / R02：真实进程中断恢复（4 故障窗口重放处理）
+    if (existingIntent?.state === 'intent') {
+      // 窗口 2：正文已写后崩溃（disk 已是 after 状态），补齐 done intent 与 accepted 标记
+      if (scan.revision === existingIntent.after.revision && currentHash === existingIntent.after.sha256) {
+        writeIntent(bookRoot, { ...existingIntent, state: 'done' })
+        markAccepted(bookRoot, candidateId, existingIntent.after.revision, isPartialConfirmed)
+        return {
+          candidateId,
+          chapterIndex: candidate.chapterIndex,
+          revision: existingIntent.after.revision,
+          sha256: currentHash,
+          alreadyApplied: true,
+        }
+      }
+      // 窗口 1：正文写前崩溃（disk 仍是 before 状态），允许安全继续写入
+      if (scan.revision === existingIntent.before.revision && currentHash === existingIntent.before.sha256) {
+        // 盘面未变，安全继续后续正文写入流程
+      } else {
+        // 盘面被第三方修改，既非 before 也非 after，拒绝覆盖并报冲突
+        throw new AcceptConflictError('BASE_STALE', 'BASE_STALE: disk state conflict during intent recovery')
+      }
+    }
+
     if (scan.revision !== candidate.base.revision) {
       throw new ProseRevisionConflictError(candidate.chapterIndex, candidate.base.revision, scan.revision)
     }
-    if (proseFileSha256(bookRoot, candidate.chapterIndex) !== candidate.base.sha256) {
+    if (currentHash !== candidate.base.sha256) {
       // revision 相同但盘面 hash 已变：外部编辑器改盘——候选保留，拒绝静默覆盖
       throw new PreWriteHashMismatchError(proseChapterPath(candidate.chapterIndex), 'accept base.sha256 mismatch with disk')
     }
 
     const composedBody = composeBody(candidate, scan.body)
-    // after 为可预计算指纹（正文文件 sha256），供崩溃恢复比对
+    const normalizedBody = composedBody.endsWith('\n') || composedBody.length === 0 ? composedBody : composedBody + '\n'
+    // after 指纹必须包含实际落盘 frontmatter 和规范化（renderProseChapter 统一真源）
     const afterRevision = scan.revision + 1
-    const afterSha256 = createHash('sha256')
-      .update(composedBody.endsWith('\n') || composedBody.length === 0 ? composedBody : composedBody + '\n')
-      .digest('hex')
+    const predicatedContent = renderProseChapter({
+      mozhouId: scan.mozhouId,
+      revision: afterRevision,
+      chapterIndex: scan.chapterIndex,
+      phase: 'draft',
+      body: normalizedBody,
+    })
+    const afterSha256 = createHash('sha256').update(predicatedContent).digest('hex')
 
     const intent: AcceptIntent = {
       schemaVersion: 1,

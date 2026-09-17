@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -286,6 +286,141 @@ describe('draft-accept (C2 / R01): 写前校验与终态保护', () => {
           candidateId: id,
           base: { revision: base.revision + 10, sha256: base.sha256 },
           idempotencyKey: 'test_key_stale_base_1',
+        }),
+      ).toThrow(AcceptConflictError)
+    })
+  })
+
+  describe('R02 进程中断与故障窗口恢复', () => {
+    it('窗口 1：正文写入前中断，盘面为 before 状态，重放正常完成采纳', () => {
+      const { id, base } = createFixtureCandidate()
+      finishCandidate(root, id, 'ready')
+
+      // 模拟窗口 1：已写 intent，但 prose 文件尚未写入
+      const intentDir = join(root, '.mozhou', 'accept-intents')
+      mkdirSync(intentDir, { recursive: true })
+      writeFileSync(
+        join(intentDir, `${id}.json`),
+        JSON.stringify({
+          schemaVersion: 1,
+          candidateId: id,
+          idempotencyKey: 'crash-w1-key',
+          timestamp: new Date().toISOString(),
+          state: 'intent',
+          before: { revision: base.revision, sha256: base.sha256 },
+          after: { revision: base.revision + 1, sha256: 'placeholder-w1' },
+        }),
+        'utf8',
+      )
+
+      const result = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'crash-w1-key',
+      })
+
+      expect(result.alreadyApplied).toBe(false)
+      expect(result.revision).toBe(2)
+      expect(readDraftCandidate(root, id)?.status).toBe('accepted')
+      const intentAfter = JSON.parse(readFileSync(join(intentDir, `${id}.json`), 'utf8'))
+      expect(intentAfter.state).toBe('done')
+    })
+
+    it('窗口 2：正文已写入后中断，盘面已是 after 状态，重放安全对齐并返回 alreadyApplied: true', () => {
+      const { id, base } = createFixtureCandidate()
+      finishCandidate(root, id, 'ready')
+
+      // 先完成一次采纳获得 exact after sha256
+      const firstResult = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'crash-w2-key',
+      })
+      expect(firstResult.revision).toBe(2)
+
+      // 回滚 intent 文件为 state: 'intent'，模拟正文落盘后但在写入 done 前崩溃
+      const intentDir = join(root, '.mozhou', 'accept-intents')
+      writeFileSync(
+        join(intentDir, `${id}.json`),
+        JSON.stringify({
+          schemaVersion: 1,
+          candidateId: id,
+          idempotencyKey: 'crash-w2-key',
+          timestamp: new Date().toISOString(),
+          state: 'intent',
+          before: { revision: base.revision, sha256: base.sha256 },
+          after: { revision: 2, sha256: firstResult.sha256 },
+        }),
+        'utf8',
+      )
+
+      // 重放 acceptDraft
+      const replayResult = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'crash-w2-key',
+      })
+
+      expect(replayResult.alreadyApplied).toBe(true)
+      expect(replayResult.revision).toBe(2)
+      expect(replayResult.sha256).toBe(firstResult.sha256)
+      expect(readDraftCandidate(root, id)?.status).toBe('accepted')
+      const intentAfter = JSON.parse(readFileSync(join(intentDir, `${id}.json`), 'utf8'))
+      expect(intentAfter.state).toBe('done')
+    })
+
+    it('第三方并发修改盘面冲突：intent 恢复时盘面既非 before 也非 after，抛出 BASE_STALE 拒绝覆盖', () => {
+      const { id, base } = createFixtureCandidate()
+      finishCandidate(root, id, 'ready')
+
+      const intentDir = join(root, '.mozhou', 'accept-intents')
+      mkdirSync(intentDir, { recursive: true })
+      writeFileSync(
+        join(intentDir, `${id}.json`),
+        JSON.stringify({
+          schemaVersion: 1,
+          candidateId: id,
+          idempotencyKey: 'crash-drift-key',
+          timestamp: new Date().toISOString(),
+          state: 'intent',
+          before: { revision: base.revision, sha256: base.sha256 },
+          after: { revision: base.revision + 1, sha256: 'some-hash' },
+        }),
+        'utf8',
+      )
+
+      // 模拟第三方写入导致盘面变化
+      const plane = LocalDataPlane.open(root)
+      plane.saveProseDraft({ chapterIndex: 1, body: '第三方修改内容。\n', expectedRevision: base.revision })
+      plane.close()
+
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 'crash-drift-key',
+        }),
+      ).toThrow(AcceptConflictError)
+    })
+
+    it('损坏的 intent 文件抛出 AcceptConflictError', () => {
+      const { id, base } = createFixtureCandidate()
+      finishCandidate(root, id, 'ready')
+
+      const intentDir = join(root, '.mozhou', 'accept-intents')
+      mkdirSync(intentDir, { recursive: true })
+      writeFileSync(join(intentDir, `${id}.json`), '{ damaged json', 'utf8')
+
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 'corrupt-intent-key',
         }),
       ).toThrow(AcceptConflictError)
     })
