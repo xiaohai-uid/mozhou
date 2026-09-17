@@ -110,7 +110,15 @@ function makeStreamEngine(
   modelPrompt: string,
   mockOutputSeed: string,
   onDelta: (text: string) => void,
-  candidate: { id: string; operationId: string; bookId: string; base: WriteBase; mode: CandidateMode; seedText?: string },
+  candidate: {
+    id: string
+    operationId: string
+    bookId: string
+    base: WriteBase
+    mode: CandidateMode
+    seedText?: string
+    selection?: { readonly from: number; readonly to: number; readonly selectedTextHash: string }
+  },
   signal?: AbortSignal,
 ): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
@@ -299,6 +307,12 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
       return true
     }
     const safeRoot = assertSafeBookRoot(root)
+    if (mode === 'replace-selection') {
+      if (!selection || !Number.isInteger(selection.from) || !Number.isInteger(selection.to) || selection.from < 0 || selection.to < selection.from) {
+        json(400, { ok: false, error: 'replace-selection requires valid selection { from, to, selectedTextHash }' })
+        return true
+      }
+    }
 
     if (!hasDraftProvider()) {
       json(200, {

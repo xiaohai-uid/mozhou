@@ -97,17 +97,63 @@ export function proseFileSha256(root: string, chapterIndex: number): string {
   return createHash('sha256').update(readFileSync(join(root, proseChapterPath(chapterIndex)))).digest('hex')
 }
 
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff
+}
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff
+}
+
+function isBoundarySplittingSurrogate(str: string, index: number): boolean {
+  if (index <= 0 || index >= str.length) return false
+  return isHighSurrogate(str.charCodeAt(index - 1)) && isLowSurrogate(str.charCodeAt(index))
+}
+
 /** C2 模式组合：按候选模式把候选文本合成到 base 正文。 */
-function composeBody(candidate: { mode: 'replace' | 'continue' | 'insert' | 'replace-selection'; text: string; selection?: { from: number; to: number } }, baseBody: string): string {
+export function composeBody(
+  candidate: {
+    mode: 'replace' | 'continue' | 'insert' | 'replace-selection'
+    text: string
+    selection?: { from: number; to: number; selectedTextHash: string }
+  },
+  baseBody: string,
+): string {
   switch (candidate.mode) {
     case 'replace':
-    case 'replace-selection':
       return candidate.text
     case 'continue':
       return baseBody + candidate.text
     case 'insert': {
-      const at = candidate.selection?.from ?? baseBody.length
+      let at = baseBody.length
+      if (candidate.selection !== undefined) {
+        at = candidate.selection.from
+        if (!Number.isInteger(at) || at < 0 || at > baseBody.length) {
+          throw new CandidateError('INVALID_SELECTION', `INVALID_SELECTION: insert offset ${at} out of bounds [0, ${baseBody.length}]`)
+        }
+        if (isBoundarySplittingSurrogate(baseBody, at)) {
+          throw new CandidateError('INVALID_SELECTION', 'INVALID_SELECTION: insert offset splits UTF-16 surrogate pair')
+        }
+      }
       return baseBody.slice(0, at) + candidate.text + baseBody.slice(at)
+    }
+    case 'replace-selection': {
+      if (candidate.selection === undefined) {
+        throw new CandidateError('INVALID_SELECTION', 'INVALID_SELECTION: replace-selection requires selection')
+      }
+      const { from, to, selectedTextHash } = candidate.selection
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to > baseBody.length) {
+        throw new CandidateError('INVALID_SELECTION', `INVALID_SELECTION: invalid selection range [${from},${to}) for body length ${baseBody.length}`)
+      }
+      if (isBoundarySplittingSurrogate(baseBody, from) || isBoundarySplittingSurrogate(baseBody, to)) {
+        throw new CandidateError('INVALID_SELECTION', 'INVALID_SELECTION: selection offsets split UTF-16 surrogate pair')
+      }
+      const selected = baseBody.slice(from, to)
+      const actualHash = createHash('sha256').update(selected).digest('hex')
+      if (actualHash !== selectedTextHash) {
+        throw new CandidateError('INVALID_SELECTION', `INVALID_SELECTION: selectedTextHash mismatch: expected ${selectedTextHash}, got ${actualHash}`)
+      }
+      return baseBody.slice(0, from) + candidate.text + baseBody.slice(to)
     }
   }
 }

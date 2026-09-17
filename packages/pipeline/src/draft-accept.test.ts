@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane'
 import {
   createDraftCandidate,
+  appendCandidateDelta,
   finishCandidate,
   cancelCandidate,
   readDraftCandidate,
@@ -14,6 +15,7 @@ import {
 import {
   acceptDraft,
   AcceptConflictError,
+  composeBody,
   proseFileSha256,
 } from './draft-accept.js'
 
@@ -423,6 +425,302 @@ describe('draft-accept (C2 / R01): 写前校验与终态保护', () => {
           idempotencyKey: 'corrupt-intent-key',
         }),
       ).toThrow(AcceptConflictError)
+    })
+  })
+
+  describe('R03 选区语义与请求绑定', () => {
+    function sha256(str: string): string {
+      return createHash('sha256').update(str).digest('hex')
+    }
+
+    it('普通中文选区替换：精确替换 [from, to)，前后文逐字保留', () => {
+      const plane = LocalDataPlane.open(root)
+      plane.saveProseDraft({ chapterIndex: 1, body: '前文段落。待替换选区文本。后文段落。\n', expectedRevision: 1 })
+      const scan = plane.getProseChapter(1)
+      plane.close()
+
+      const base = { revision: scan.revision, sha256: proseFileSha256(root, 1) }
+      const from = 5
+      const to = 13
+      const targetText = '待替换选区文本。'
+      expect(scan.body.slice(from, to)).toBe(targetText)
+
+      const id = randomUUID()
+      createDraftCandidate(root, {
+        id,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base,
+        mode: 'replace-selection',
+        selection: { from, to, selectedTextHash: sha256(targetText) },
+      })
+      appendCandidateDelta(root, id, '【新润色对白】')
+      finishCandidate(root, id, 'ready')
+
+      const result = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'k-selection-cn-1',
+      })
+
+      expect(result.alreadyApplied).toBe(false)
+      expect(result.revision).toBe(3)
+      const planeAfter = LocalDataPlane.open(root)
+      const updatedBody = planeAfter.getProseChapter(1).body
+      planeAfter.close()
+      expect(updatedBody).toBe('前文段落。【新润色对白】后文段落。\n')
+    })
+
+    it('Emoji 与代理对安全：完整 emoji 替换成功；切断代理对偏移抛出 INVALID_SELECTION', () => {
+      const plane = LocalDataPlane.open(root)
+      // '前文👋🌟后文\n'
+      // '前文' length 2 (0, 1)
+      // '👋' length 2 (2, 3)
+      // '🌟' length 2 (4, 5)
+      // '后文\n' (6, 7, 8)
+      plane.saveProseDraft({ chapterIndex: 1, body: '前文👋🌟后文\n', expectedRevision: 1 })
+      const scan = plane.getProseChapter(1)
+      plane.close()
+      const base = { revision: scan.revision, sha256: proseFileSha256(root, 1) }
+
+      // 1. 完整覆盖两个 emoji [2, 6)
+      const selected = scan.body.slice(2, 6)
+      expect(selected).toBe('👋🌟')
+      const id1 = randomUUID()
+      createDraftCandidate(root, {
+        id: id1,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base,
+        mode: 'replace-selection',
+        selection: { from: 2, to: 6, selectedTextHash: sha256(selected) },
+      })
+      appendCandidateDelta(root, id1, '【火】')
+      finishCandidate(root, id1, 'ready')
+
+      const res1 = acceptDraft({
+        bookRoot: root,
+        candidateId: id1,
+        base,
+        idempotencyKey: 'k-emoji-ok-1',
+      })
+      expect(res1.revision).toBe(3)
+      const plane1 = LocalDataPlane.open(root)
+      expect(plane1.getProseChapter(1).body).toBe('前文【火】后文\n')
+      plane1.close()
+
+      // 2. 切断代理对：composeBody 直接检测
+      expect(() =>
+        composeBody(
+          {
+            mode: 'replace-selection',
+            text: 'x',
+            selection: { from: 3, to: 6, selectedTextHash: 'a'.repeat(64) },
+          },
+          '前文👋🌟后文\n',
+        ),
+      ).toThrow(CandidateError)
+
+      expect(() =>
+        composeBody(
+          {
+            mode: 'replace-selection',
+            text: 'x',
+            selection: { from: 2, to: 5, selectedTextHash: 'a'.repeat(64) },
+          },
+          '前文👋🌟后文\n',
+        ),
+      ).toThrow(CandidateError)
+    })
+
+    it('空选区插入：from === to 时在指定位置插入文本，周围文本逐字保留', () => {
+      const plane = LocalDataPlane.open(root)
+      const scan = plane.getProseChapter(1)
+      plane.close()
+      const base = { revision: scan.revision, sha256: proseFileSha256(root, 1) }
+
+      const id = randomUUID()
+      createDraftCandidate(root, {
+        id,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base,
+        mode: 'replace-selection',
+        selection: { from: 4, to: 4, selectedTextHash: sha256('') },
+      })
+      appendCandidateDelta(root, id, '【插入内容】')
+      finishCandidate(root, id, 'ready')
+
+      const res = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'k-empty-selection-1',
+      })
+      expect(res.revision).toBe(2)
+      const planeAfter = LocalDataPlane.open(root)
+      // 原文为 '作者正文原文。\n'，下标 4 在 '作者正文' 之后
+      expect(planeAfter.getProseChapter(1).body).toBe('作者正文【插入内容】原文。\n')
+      planeAfter.close()
+    })
+
+    it('章首与章尾边界替换正常完成', () => {
+      const plane = LocalDataPlane.open(root)
+      const scan = plane.getProseChapter(1)
+      plane.close()
+      const base = { revision: scan.revision, sha256: proseFileSha256(root, 1) }
+
+      // 1. 章首替换 [0, 2)
+      const firstTarget = scan.body.slice(0, 2)
+      const idHead = randomUUID()
+      createDraftCandidate(root, {
+        id: idHead,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base,
+        mode: 'replace-selection',
+        selection: { from: 0, to: 2, selectedTextHash: sha256(firstTarget) },
+      })
+      appendCandidateDelta(root, idHead, '编者')
+      finishCandidate(root, idHead, 'ready')
+
+      const resHead = acceptDraft({
+        bookRoot: root,
+        candidateId: idHead,
+        base,
+        idempotencyKey: 'k-head-1',
+      })
+      expect(resHead.revision).toBe(2)
+      const planeHead = LocalDataPlane.open(root)
+      expect(planeHead.getProseChapter(1).body).toBe('编者正文原文。\n')
+      planeHead.close()
+    })
+
+    it('错误 selectedTextHash / 范围越界 / 逆序 / 缺失 selection 拒绝且磁盘零变更', () => {
+      const plane = LocalDataPlane.open(root)
+      const scan = plane.getProseChapter(1)
+      const beforeRaw = readFileSync(join(root, proseChapterPath(1)), 'utf8')
+      plane.close()
+      const base = { revision: scan.revision, sha256: proseFileSha256(root, 1) }
+
+      // 1. 错误 selectedTextHash
+      const idBadHash = randomUUID()
+      createDraftCandidate(root, {
+        id: idBadHash,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base,
+        mode: 'replace-selection',
+        selection: { from: 0, to: 2, selectedTextHash: 'f'.repeat(64) },
+      })
+      appendCandidateDelta(root, idBadHash, '替换文本')
+      finishCandidate(root, idBadHash, 'ready')
+
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: idBadHash,
+          base,
+          idempotencyKey: 'k-bad-hash-1',
+        }),
+      ).toThrow(CandidateError)
+      expect(readFileSync(join(root, proseChapterPath(1)), 'utf8')).toBe(beforeRaw)
+
+      // 2. 逆序范围创建时即拒绝
+      expect(() =>
+        createDraftCandidate(root, {
+          id: randomUUID(),
+          operationId: randomUUID(),
+          bookId: 'book-local',
+          chapterIndex: 1,
+          base,
+          mode: 'replace-selection',
+          selection: { from: 5, to: 2, selectedTextHash: 'a'.repeat(64) },
+        }),
+      ).toThrow(CandidateError)
+
+      // 3. 负数范围创建时即拒绝
+      expect(() =>
+        createDraftCandidate(root, {
+          id: randomUUID(),
+          operationId: randomUUID(),
+          bookId: 'book-local',
+          chapterIndex: 1,
+          base,
+          mode: 'replace-selection',
+          selection: { from: -1, to: 2, selectedTextHash: 'a'.repeat(64) },
+        }),
+      ).toThrow(CandidateError)
+
+      // 4. replace-selection 缺少 selection 创建时即拒绝
+      expect(() =>
+        createDraftCandidate(root, {
+          id: randomUUID(),
+          operationId: randomUUID(),
+          bookId: 'book-local',
+          chapterIndex: 1,
+          base,
+          mode: 'replace-selection',
+        }),
+      ).toThrow(CandidateError)
+
+      // 5. 范围超出 baseBody 长度 composeBody 拒绝
+      expect(() =>
+        composeBody(
+          {
+            mode: 'replace-selection',
+            text: 'new',
+            selection: { from: 0, to: 9999, selectedTextHash: 'a'.repeat(64) },
+          },
+          'short',
+        ),
+      ).toThrow(CandidateError)
+    })
+
+    it('生成中外部改文导致 base 过期：accept 抛出冲突并保留正文与候选', () => {
+      const plane = LocalDataPlane.open(root)
+      const scan = plane.getProseChapter(1)
+      plane.close()
+      const base = { revision: scan.revision, sha256: proseFileSha256(root, 1) }
+
+      const id = randomUUID()
+      createDraftCandidate(root, {
+        id,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base,
+        mode: 'replace-selection',
+        selection: { from: 0, to: 2, selectedTextHash: sha256(scan.body.slice(0, 2)) },
+      })
+      appendCandidateDelta(root, id, '修改')
+      finishCandidate(root, id, 'ready')
+
+      // 模拟作者在生成过程中改文
+      const plane2 = LocalDataPlane.open(root)
+      plane2.saveProseDraft({ chapterIndex: 1, body: '作者外部新修改内容。\n', expectedRevision: base.revision })
+      plane2.close()
+
+      // acceptDraft 必须因 base stale 拒绝
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 'k-stale-selection-1',
+        }),
+      ).toThrow()
+
+      const planeAfter = LocalDataPlane.open(root)
+      expect(planeAfter.getProseChapter(1).body).toBe('作者外部新修改内容。\n')
+      planeAfter.close()
+      expect(readDraftCandidate(root, id)?.status).toBe('ready')
     })
   })
 })

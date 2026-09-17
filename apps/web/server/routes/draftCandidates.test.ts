@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../../server/api.js'
 import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane'
-import { createDraftCandidate, finishCandidate, cancelCandidate } from '@mozhou/pipeline'
+import { createDraftCandidate, appendCandidateDelta, finishCandidate, cancelCandidate } from '@mozhou/pipeline'
 
 let servers: ReturnType<typeof createServer>[] = []
 let roots: string[] = []
@@ -438,5 +438,89 @@ describe('C2 / R01: 采纳前状态校验与终态保护 (HTTP 级)', () => {
       chapterIndex: 999,
     })
     expect(mismatchChapter.status).toBe(409)
+  })
+
+  describe('C2 / R03：选区替换与请求绑定（HTTP 级）', () => {
+    it('draft.accept 选区替换仅替换目标片段，选区外文本完全保留', async () => {
+      const base = await listen()
+      const root = makeRoot()
+      const beforeHash = proseHash(root)
+
+      // 原文为 '作者原文。\n'
+      // 选取 '原文' [2, 4)，替换为 '新正文'
+      const targetText = '原文'
+      const targetHash = createHash('sha256').update(targetText).digest('hex')
+      const candId = randomUUID()
+
+      createDraftCandidate(root, {
+        id: candId,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base: { revision: 1, sha256: beforeHash },
+        mode: 'replace-selection',
+        selection: { from: 2, to: 4, selectedTextHash: targetHash },
+      })
+      appendCandidateDelta(root, candId, '新正文')
+      finishCandidate(root, candId, 'ready')
+
+      const acceptRes = await post(base, '/api/draft.accept', {
+        root,
+        candidateId: candId,
+        base: { revision: 1, sha256: beforeHash },
+        idempotencyKey: 'k-http-sel-ok-1',
+      })
+      expect(acceptRes.status).toBe(200)
+      expect(acceptRes.data).toMatchObject({ ok: true, revision: 2 })
+
+      const proseRes = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
+      expect((proseRes.data as { body?: string }).body).toBe('作者新正文。\n')
+    })
+
+    it('draft.accept 选区 hash 不匹配返回 409，正文与版本零修改', async () => {
+      const base = await listen()
+      const root = makeRoot()
+      const beforeHash = proseHash(root)
+
+      const candId = randomUUID()
+      createDraftCandidate(root, {
+        id: candId,
+        operationId: randomUUID(),
+        bookId: 'book-local',
+        chapterIndex: 1,
+        base: { revision: 1, sha256: beforeHash },
+        mode: 'replace-selection',
+        selection: { from: 2, to: 4, selectedTextHash: 'e'.repeat(64) },
+      })
+      appendCandidateDelta(root, candId, '篡改正文')
+      finishCandidate(root, candId, 'ready')
+
+      const acceptRes = await post(base, '/api/draft.accept', {
+        root,
+        candidateId: candId,
+        base: { revision: 1, sha256: beforeHash },
+        idempotencyKey: 'k-http-sel-bad-hash',
+      })
+      expect(acceptRes.status).toBe(409)
+      expect(proseHash(root)).toBe(beforeHash)
+    })
+
+    it('draft.stream 携带非法选区范围返回 400', async () => {
+      const base = await listen()
+      const root = makeRoot()
+
+      const res = await fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          root,
+          chapterIndex: 1,
+          prompt: 'test',
+          mode: 'replace-selection',
+          selection: { from: 10, to: 2, selectedTextHash: 'a'.repeat(64) },
+        }),
+      })
+      expect(res.status).toBe(400)
+    })
   })
 })

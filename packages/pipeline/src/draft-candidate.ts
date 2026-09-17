@@ -117,6 +117,9 @@ export function createDraftCandidate(root: string, request: DraftCandidateReques
   if (request.seedText !== undefined && request.mode !== 'continue') {
     throw new CandidateError('INVALID_SEED', 'INVALID_SEED: seedText only allowed for continue mode')
   }
+  if (request.mode === 'replace-selection' && request.selection === undefined) {
+    throw new CandidateError('INVALID_SELECTION', 'INVALID_SELECTION: replace-selection requires selection')
+  }
   const payload: DraftCandidate = {
     schemaVersion: 1,
     id: request.id,
