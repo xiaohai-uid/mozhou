@@ -325,7 +325,7 @@ describe('draft-accept (C2 / R01): 写前校验与终态保护', () => {
       expect(result.alreadyApplied).toBe(false)
       expect(result.revision).toBe(2)
       expect(readDraftCandidate(root, id)?.status).toBe('accepted')
-      const intentAfter = JSON.parse(readFileSync(join(intentDir, `${id}.json`), 'utf8'))
+      const intentAfter = JSON.parse(readFileSync(join(intentDir, `${id}.json`), 'utf8')) as { state?: string }
       expect(intentAfter.state).toBe('done')
     })
 
@@ -370,7 +370,7 @@ describe('draft-accept (C2 / R01): 写前校验与终态保护', () => {
       expect(replayResult.revision).toBe(2)
       expect(replayResult.sha256).toBe(firstResult.sha256)
       expect(readDraftCandidate(root, id)?.status).toBe('accepted')
-      const intentAfter = JSON.parse(readFileSync(join(intentDir, `${id}.json`), 'utf8'))
+      const intentAfter = JSON.parse(readFileSync(join(intentDir, `${id}.json`), 'utf8')) as { state?: string }
       expect(intentAfter.state).toBe('done')
     })
 

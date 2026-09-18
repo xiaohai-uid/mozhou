@@ -18,7 +18,6 @@ import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane
 import { hashProse, isQualityReviewCurrent } from '@mozhou/quality-engine';
 import { createHash } from 'node:crypto';
 import {
-  AcceptConflictError,
   ChapterProductionSession,
   ProposalPort,
   QualityReviewNotPassError,
@@ -102,7 +101,7 @@ function goldenCandidate(root: string, chapterIndex: number): { candidate: { id:
       revision: scan.revision,
       sha256: createHash('sha256').update(readFileSync(join(root, proseChapterPath(chapterIndex)))).digest('hex'),
     };
-    return { candidate: { id, operationId: 'op_golden_' + String(goldenCandidateSeq), bookId: 'book-golden', base, mode: 'replace' }, base };
+    return { candidate: { id, operationId: 'op_golden_' + String(goldenCandidateSeq), bookId: plane.book.id, base, mode: 'replace' }, base };
   } finally {
     plane.close();
   }

@@ -93,7 +93,7 @@ function draftEngine(root: string): { engine: RuntimeEngine; candidate: { id: st
     candidate = {
       id: 'e0000000-0000-4000-8000-000000000001',
       operationId: 'op_t17_int',
-      bookId: 'book-t17',
+      bookId: plane.book.id,
       base: { revision: scan.revision, sha256: createHash('sha256').update(readFileSync(join(root, proseChapterPath(2)))).digest('hex') },
       mode: 'replace',
     };

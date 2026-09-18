@@ -67,7 +67,7 @@
         {
           "kind": "real-provider",
           "path": "evidence/full-release/20260915-1/T01/result.json",
-          "sourceCommit": "2dca39a",
+          "sourceCommit": "2dca39a32833b031860e10cb0a272d7319b500e9",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "env探测+官方文档curl+工具链检查",
           "exitCode": 0,
@@ -79,7 +79,7 @@
         {
           "kind": "filesystem",
           "path": "evidence/full-release/20260915-1/T01/environment-report.json",
-          "sourceCommit": "2dca39a",
+          "sourceCommit": "2dca39a32833b031860e10cb0a272d7319b500e9",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "curl 官方文档解析",
           "exitCode": 0,
@@ -110,7 +110,7 @@
         {
           "kind": "test",
           "path": "evidence/full-release/20260915-1/T02/result.json",
-          "sourceCommit": "fb8bd71",
+          "sourceCommit": "fb8bd717822f1cba66ebab3591c89ae1f3288067",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "pnpm --filter @mozhou/web test -- server/billing/catalog.test.ts",
           "exitCode": 0,
@@ -142,7 +142,7 @@
         {
           "kind": "test",
           "path": "evidence/full-release/20260915-1/T03/result.json",
-          "sourceCommit": "618a444",
+          "sourceCommit": "618a4447aefc2674bc6b4c759a9919300e8de87b",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "vitest draft-candidate.test.ts + workspace 全套",
           "exitCode": 0,
@@ -154,7 +154,7 @@
         {
           "kind": "test",
           "path": "evidence/full-release/20260915-1/T03/verify-stream-red.log",
-          "sourceCommit": "618a444",
+          "sourceCommit": "618a4447aefc2674bc6b4c759a9919300e8de87b",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "node regressions/verify-stream.mjs",
           "exitCode": 1,
@@ -187,7 +187,7 @@
         {
           "kind": "test",
           "path": "evidence/full-release/20260915-1/T04/result.json",
-          "sourceCommit": "4b34ba6",
+          "sourceCommit": "4b34ba6650899e50d126ebbfa4f94c395060bb41",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "pnpm test+vitest draftCandidates+回归脚本",
           "exitCode": 0,
@@ -200,7 +200,7 @@
         {
           "kind": "test",
           "path": "evidence/full-release/20260915-1/T04/verify-stream-green.log",
-          "sourceCommit": "4b34ba6",
+          "sourceCommit": "4b34ba6650899e50d126ebbfa4f94c395060bb41",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "node regressions/verify-stream.mjs",
           "exitCode": 0,
@@ -210,7 +210,7 @@
           ]
         }
       ],
-      "result": "流式只写候选+受控采纳事务（CAS+意图日志+幂等恢复）+取消传导；verify-stream 红转绿；draftCandidates 7 用例；workspace 740/web 320 全绿；0 循环"
+      "result": "流式只写候选+受控采纳事务（CAS+意图日志+幂等恢复）+取消传导；经 R01/R02/R03 审计补强重验通过（写前状态校验/4故障窗口崩溃恢复/选区语义）；verify-stream/manual-save/draftCandidates/workspace/web全绿；0 循环"
     },
     {
       "id": "T05",
@@ -232,7 +232,7 @@
         {
           "kind": "test",
           "path": "evidence/full-release/20260915-1/T05/result.json",
-          "sourceCommit": "a1d6fd2",
+          "sourceCommit": "a1d6fd231b03cdb2abdb483bae6151e3ffbf50eb",
           "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
           "command": "pnpm --filter @mozhou/web test -- src/workbench",
           "exitCode": 0,
@@ -242,7 +242,7 @@
           ]
         }
       ],
-      "result": "UI 候选采纳链落地：Accept 真实事务+回读刷新+Undo+409 双文本冲突面板+迟到帧隔离+selection 运输；13 个 workbench 测试+740 workspace 全绿"
+      "result": "UI 候选采纳链落地：Accept 真实事务+回读刷新+Undo+409 双文本冲突面板+迟到帧隔离+selection 运输；经 R04/R05 真实无头 Chrome 11 步端到端旅程（含中文 IME、选区替换、CAS Undo、双窗口、进程重启回读、定稿重开）全绿验证"
     },
     {
       "id": "T08",

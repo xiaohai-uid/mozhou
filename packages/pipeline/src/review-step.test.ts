@@ -121,7 +121,7 @@ function draftEngine(root: string, chunks: readonly string[]): { engine: Runtime
     candidate = {
       id,
       operationId: 'op_review_' + String(reviewCandidateSeq),
-      bookId: 'book-review',
+      bookId: plane.book.id,
       base: { revision: scan.revision, sha256: createHash('sha256').update(readFileSync(join(root, proseChapterPath(3)))).digest('hex') },
       mode: 'replace',
     };

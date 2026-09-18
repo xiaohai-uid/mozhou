@@ -291,7 +291,7 @@ describe('DialogueStream 候选采纳与时序保护（R04）', () => {
 
   it('采纳后作者新编辑再 Undo：CAS 检测发现盘面版本已变，拒绝覆盖并提示冲突', async () => {
     let proseReadCount = 0
-    const fetchMock = vi.fn().mockImplementation(async (path: string) => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
       if (path === '/api/capabilities') return okJson(CAPS)
       if (path === '/api/draft.question') return okJson(QUESTION)
       if (path === '/api/draft.stream') {

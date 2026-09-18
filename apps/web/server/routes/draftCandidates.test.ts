@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../../server/api.js'
 import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane'
-import { createDraftCandidate, appendCandidateDelta, finishCandidate, cancelCandidate } from '@mozhou/pipeline'
+import { createDraftCandidate, appendCandidateDelta, finishCandidate } from '@mozhou/pipeline'
 
 let servers: ReturnType<typeof createServer>[] = []
 let roots: string[] = []

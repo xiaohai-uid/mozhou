@@ -248,7 +248,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status partial requires explicit confirmation`)
   }
   if (candidate.status !== 'ready' && candidate.status !== 'partial' && candidate.status !== 'accepted') {
-    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${candidate.status} cannot be accepted`)
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${String(candidate.status)} cannot be accepted`)
   }
 
   const plane = LocalDataPlane.openOrRebuild(bookRoot)

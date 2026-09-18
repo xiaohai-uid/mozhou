@@ -64,7 +64,7 @@ function candidateContext(root: string, chapterIndex: number, mode: 'replace' | 
     return {
       id,
       operationId: 'op_t17_' + String(candidateSeq),
-      bookId: 'book-t17',
+      bookId: plane.book.id,
       base,
       mode,
       ...(seedText === undefined ? {} : { seedText }),

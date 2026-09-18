@@ -164,7 +164,7 @@ describe('ProseEditorPanel（R1/R2 冲突保护与定稿边界）', () => {
     expect(screen.getByText(/章节状态不可用/)).toBeTruthy()
   })
 
-  it('选区改变与取消：向外部触发 onSelectionChange（UTF-16 偏移与所选原文）', async () => {
+  it('选区改变与取消：向外部触发 onSelectionChange（UTF-16 偏移与所选原文）', () => {
     stubApi({})
     saveDraftCache('墨舟网文操作系统，沉浸创作。', chapterDraftKey(BOOK_A, 1))
     const onSelectionChange = vi.fn()

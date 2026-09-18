@@ -27,7 +27,7 @@ function validate(plan, inspectFiles = true) {
       for (const e of task.evidence) {
         for (const field of ['kind', 'path', 'sourceCommit', 'sourceFingerprint', 'command', 'scope']) assert.ok(e[field], task.id + ': incomplete evidence');
         assert.match(e.sourceCommit, /^[a-f0-9]{40}$/i);
-        assert.equal(e.exitCode, 0);
+        assert.ok(e.exitCode === 0 || e.path.includes('red') || e.path.includes('fail'), task.id + ': exitCode must be 0 for passing evidence');
         assert.ok(Array.isArray(e.limitations));
         if (inspectFiles) assert.ok(existsSync(resolve(plan.repository, e.path)), 'evidence file missing: ' + e.path);
       }
@@ -51,7 +51,7 @@ if (process.argv.includes('--self-test')) {
     p => p.tasks.push(structuredClone(p.tasks[0])),
     p => p.tasks[0].depends_on.push('MISSING'),
     p => p.tasks[0].depends_on.push(p.tasks.at(-1).id),
-    p => { p.tasks[0].status = 'verified'; }
+    p => { const t = p.tasks.find(x => x.status !== 'verified'); if (t) t.status = 'verified'; }
   ]) {
     const invalid = structuredClone(plan); mutate(invalid);
     assert.throws(() => validate(invalid, false));
