@@ -51,12 +51,12 @@ export async function fetchQidianHotBoard(): Promise<{ ok: boolean; items: Ranki
       items.push({
         rank,
         title,
-        author: author || '知名作家',
-        category: '畅销热门',
-        hotScore: `热榜第 ${rank} 位`,
-        tags: ['热门连载', '全网畅销'],
-        goldenFinger: '前沿主线设定',
-        oneLineHook: '起点风云榜当前霸榜力作。',
+        author: author || '未知',
+        category: '畅销榜',
+        hotScore: `第 ${rank} 位`,
+        tags: ['热销'],
+        goldenFinger: '',
+        oneLineHook: '',
       })
       rank += 1
       if (items.length >= 10) break

@@ -5,6 +5,7 @@ import type { RouteHandler } from '../router.js'
 import { searchMultipleSources } from '../crawlers/multisource.js'
 import { fetchQidianHotBoard } from '../crawlers/rankings.js'
 import { smartExtractContent } from '../crawlers/crawl4ai.js'
+import { defaultSearchProvider } from '../search/provider.js'
 
 export const crawlerRoutes: RouteHandler = async (req, res, { path, body, json }) => {
   if (req.method !== 'POST') return false
@@ -170,61 +171,38 @@ export const crawlerRoutes: RouteHandler = async (req, res, { path, body, json }
 
   /* ---- 联网搜索端点 ---- */
   if (path === '/api/web-search') {
-    const query = typeof body['query'] === 'string' ? body['query'].trim() : ''
-
-    const ALL_KNOWLEDGE = [
-      {
-        id: 'kb_01',
-        title: '唐代长安城坊里制度与夜禁',
-        category: '历史制度',
-        source: '新唐书·百官志 / 考古图录',
-        snippet: '一百零八坊棋盘布局，晨钟暮鼓开闭坊门，金吾卫巡夜禁断私行。',
-        detail: '长安城以朱雀大街为中轴，东西分设万年县与长安县。入夜擂鼓八百下后闭坊门，擅行者杖刑，唯有军情与急病经文牒准许通行。',
-        tags: ['唐代', '夜禁', '长安', '巡捕'],
-      },
-      {
-        id: 'kb_02',
-        title: '上古山海经异兽：陆吾与开明兽',
-        category: '神话典籍',
-        source: '山海经·西山经',
-        snippet: '昆仑之丘，司天之九部及天之帝之囿时。虎身九尾，人面虎爪。',
-        detail: '陆吾为天帝大管家，威严神圣；开明兽身大类虎而九首皆人面，东向立昆仑九门之上，非天命至尊不可近。',
-        tags: ['山海经', '昆仑', '异兽', '玄幻'],
-      },
-      {
-        id: 'kb_03',
-        title: '克苏鲁神话体系：理智（SAN）与不可名状',
-        category: '奇幻设定',
-        source: '洛夫克拉夫特全集',
-        snippet: '人类最古老而强烈的情感是恐惧，而最强烈的恐惧是对未知的恐惧。',
-        detail: '接触超越维度认知的高维生物或隐秘知识将触发理智崩解，产生幻觉、认知颠倒或畸变异化。',
-        tags: ['克苏鲁', 'SAN值', '不可名状', '神秘学'],
-      },
-      {
-        id: 'kb_04',
-        title: '修真金丹大道九品品阶与雷劫',
-        category: '修仙体系',
-        source: '道藏·内丹秘要',
-        snippet: '一品金丹化元婴，三九天劫淬凡胎。下品金丹无缘上境。',
-        detail: '九品金丹以三品为界：下三品止步金丹，中三品可窥元婴，上三品（一品紫金神丹）方具飞升仙缘，凝丹必引三九紫霄天劫。',
-        tags: ['修仙', '金丹', '雷劫', '品阶'],
-      },
-    ]
-
-    const results = query.length === 0
-      ? ALL_KNOWLEDGE
-      : ALL_KNOWLEDGE.filter((item) =>
-          item.title.includes(query) ||
-          item.snippet.includes(query) ||
-          item.tags.some((t) => t.includes(query)),
-        )
-
+    const rawQuery = typeof body['query'] === 'string' ? body['query'].trim() : ''
     const hotQueries = ['唐代夜禁', '山海经异兽', '金丹品阶', '克苏鲁神话', '古代称谓', '官制职级']
+
+    if (rawQuery.length === 0) {
+      json(200, {
+        ok: true,
+        query: '',
+        results: [],
+        hotQueries,
+      })
+      return true
+    }
+
+    if (rawQuery.length > 200) {
+      json(400, { ok: false, code: 'INVALID_QUERY', error: 'query length must not exceed 200 characters' })
+      return true
+    }
+
+    const outcome = await defaultSearchProvider.search(rawQuery)
+    if (!outcome.ok) {
+      json(501, {
+        ok: false,
+        code: 'PROVIDER_UNAVAILABLE',
+        error: outcome.error ?? '搜索服务不可用',
+      })
+      return true
+    }
 
     json(200, {
       ok: true,
-      query,
-      results: results.length > 0 ? results : ALL_KNOWLEDGE.slice(0, 2),
+      query: rawQuery,
+      results: outcome.items,
       hotQueries,
     })
     return true
