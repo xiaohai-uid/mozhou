@@ -59,6 +59,8 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/llm/settings': 'account',
   '/api/llm/test': 'account',
   '/api/llm/settings/reset': 'account',
+  '/api/backups/download': 'account',
+  '/api/backups/restore': 'account',
 
   // ---- 3. Local-Native 本地专用路由 (hosted 下 403 拒绝) ----
   '/api/library': 'local-native',
@@ -79,6 +81,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/works': 'book',
   '/api/tasks': 'book',
   '/api/ledger': 'book',
+  '/api/backups': 'book',
   '/api/session.open': 'book',
   '/api/session.advance': 'book',
   '/api/draft.stream': 'book',

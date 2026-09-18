@@ -15,6 +15,7 @@ import { systemRoutes } from './routes/systemRoutes.js'
 import { storyboardRoutes } from './routes/storyboardRoutes.js'
 import { accountRoutes } from './routes/accountRoutes.js'
 import { providerRoutes } from './routes/providerRoutes.js'
+import { backupRoutes } from './routes/backupRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -485,6 +486,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(storyboardRoutes)
     .use(accountRoutes)
     .use(providerRoutes)
+    .use(backupRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()
