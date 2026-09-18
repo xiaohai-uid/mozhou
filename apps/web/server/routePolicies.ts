@@ -56,6 +56,9 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/cloud-sync': 'account',
   '/api/cloud-sync.backup': 'account',
   '/api/book': 'account', // 创建新作品（在 hosted 下归属当前用户）
+  '/api/llm/settings': 'account',
+  '/api/llm/test': 'account',
+  '/api/llm/settings/reset': 'account',
 
   // ---- 3. Local-Native 本地专用路由 (hosted 下 403 拒绝) ----
   '/api/library': 'local-native',

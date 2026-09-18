@@ -7,19 +7,9 @@
  */
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
-
-export interface OpenAiStreamChunk {
-  readonly delta: string
-  readonly finishReason?: string | undefined
-}
-
-/** 从 provider 解析出的真实上游端点。 */
-export interface ResolvedEndpoint {
-  readonly baseUrl: string
-  readonly apiKey: string
-  readonly model: string
-  readonly allowPrivateNetwork?: boolean | undefined
-}
+import { defaultProviderSettingsManager } from './providerSettings.js'
+import type { OpenAiStreamChunk, ResolvedEndpoint } from './types.js'
+export type { OpenAiStreamChunk, ResolvedEndpoint } from './types.js'
 
 interface LookupAddress {
   readonly address: string
@@ -129,25 +119,22 @@ export async function assertSafeRemoteTarget(
   }
 }
 
-export function resolveChatEndpoint(env: NodeJS.ProcessEnv): ResolvedEndpoint | null {
-  const apiKey = env['MOZHOU_API_KEY'] ?? env['DEEPSEEK_API_KEY'] ?? env['OPENAI_API_KEY'] ?? ''
-  const baseUrl = env['MOZHOU_API_BASE'] ?? env['DEEPSEEK_API_BASE'] ?? env['OPENAI_API_BASE'] ?? ''
-  const model = env['MOZHOU_MODEL'] ?? env['DEEPSEEK_MODEL'] ?? 'deepseek-chat'
-  const allowPrivateNetwork = env['MOZHOU_ALLOW_PRIVATE_LLM'] === '1'
+export function resolveChatEndpoint(env: NodeJS.ProcessEnv = process.env, userId?: string): ResolvedEndpoint | null {
+  const userEndpoint = defaultProviderSettingsManager.resolveEndpointForUser(userId, env)
+  if (!userEndpoint || !userEndpoint.apiKey) return null
 
-  if (!apiKey) return null
-  if (baseUrl) {
-    const target = new URL(baseUrl)
-    assertProtocol(target, allowPrivateNetwork)
+  if (userEndpoint.baseUrl) {
+    const target = new URL(userEndpoint.baseUrl)
+    assertProtocol(target, userEndpoint.allowPrivateNetwork === true)
     const hostname = normalizeAddress(target.hostname)
-    if (!allowPrivateNetwork && isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
+    if (!userEndpoint.allowPrivateNetwork && isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
       throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
     }
-    if (!allowPrivateNetwork && (hostname === 'localhost' || hostname.endsWith('.localhost'))) {
+    if (!userEndpoint.allowPrivateNetwork && (hostname === 'localhost' || hostname.endsWith('.localhost'))) {
       throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
     }
   }
-  return { baseUrl, apiKey, model, allowPrivateNetwork }
+  return userEndpoint
 }
 
 /**
@@ -168,7 +155,8 @@ export async function* streamOpenAiChat(
   await assertSafeRemoteTarget(target, undefined, endpoint.allowPrivateNetwork === true)
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60_000)
+  // T07: 180s 总时限与取消信号绑定
+  const totalTimeout = setTimeout(() => controller.abort(new Error('REQUEST_TIMEOUT: total timeout 180s exceeded')), 180_000)
   const onExternalAbort = (): void => {
     controller.abort()
   }
@@ -236,7 +224,75 @@ export async function* streamOpenAiChat(
       }
     }
   } finally {
-    clearTimeout(timeout)
+    clearTimeout(totalTimeout)
     externalSignal?.removeEventListener('abort', onExternalAbort)
+  }
+}
+
+export interface TestConnectionResult {
+  readonly ok: boolean
+  readonly model: string
+  readonly latencyMs: number
+  readonly error?: string | undefined
+}
+
+/**
+ * T07 “测试连接”：用一个最小无私密输入请求（max_tokens: 1），回显模型名/延迟/脱敏错误；
+ * 真实调用端点而非仅 ping URL。
+ */
+export async function testConnection(endpoint: ResolvedEndpoint): Promise<TestConnectionResult> {
+  const start = Date.now()
+  try {
+    const base = endpoint.baseUrl || 'https://api.deepseek.com'
+    const url = base.replace(/\/$/, '') + '/chat/completions'
+    const target = new URL(url)
+    await assertSafeRemoteTarget(target, undefined, endpoint.allowPrivateNetwork === true)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(new Error('CONNECTION_TIMEOUT: 20s exceeded')), 20_000)
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${endpoint.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: endpoint.model,
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+          stream: false,
+        }),
+        signal: controller.signal,
+        redirect: 'manual',
+      })
+
+      const latencyMs = Date.now() - start
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '')
+        return {
+          ok: false,
+          model: endpoint.model,
+          latencyMs,
+          error: `HTTP ${response.status}: ${errText.slice(0, 150)}`,
+        }
+      }
+      return {
+        ok: true,
+        model: endpoint.model,
+        latencyMs,
+      }
+    } finally {
+      clearTimeout(timeout)
+    }
+  } catch (err) {
+    const latencyMs = Date.now() - start
+    return {
+      ok: false,
+      model: endpoint.model,
+      latencyMs,
+      error: (err as Error).message.slice(0, 150),
+    }
   }
 }

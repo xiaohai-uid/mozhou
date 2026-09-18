@@ -14,8 +14,10 @@ import { crawlerRoutes } from './routes/crawlerRoutes.js'
 import { systemRoutes } from './routes/systemRoutes.js'
 import { storyboardRoutes } from './routes/storyboardRoutes.js'
 import { accountRoutes } from './routes/accountRoutes.js'
+import { providerRoutes } from './routes/providerRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
+export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
 export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory } from './routePolicies.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
@@ -482,6 +484,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(systemRoutes)
     .use(storyboardRoutes)
     .use(accountRoutes)
+    .use(providerRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()
