@@ -29,6 +29,7 @@ import type { QualityPolicy } from '@mozhou/quality-engine'
 
 export interface ApiClientConfig {
   readonly root?: string | null | undefined
+  readonly bookId?: string | null | undefined
 }
 
 export class MoZhouApiClient {
@@ -36,6 +37,20 @@ export class MoZhouApiClient {
 
   get root(): string | null {
     return this._config.root ?? null
+  }
+
+  get bookId(): string | null {
+    return this._config.bookId ?? null
+  }
+
+  private bookParams(): Record<string, unknown> {
+    const params: Record<string, unknown> = {}
+    if (this._config.bookId) params['bookId'] = this._config.bookId
+    if (this._config.root) params['root'] = this._config.root
+    if (!params['bookId'] && !params['root']) {
+      throw new Error('ApiClient: bookId or root is required for this operation')
+    }
+    return params
   }
 
   private requireRoot(): string {
@@ -50,34 +65,34 @@ export class MoZhouApiClient {
   }
 
   getBookState(): Promise<{ ok: boolean; state: unknown }> {
-    return post('/api/book.state', { root: this.requireRoot() })
+    return post('/api/book.state', { ...this.bookParams() })
   }
 
   getStoryBrainEntities(): Promise<{ ok: boolean; cards: unknown[] }> {
-    return post('/api/story-brain.entities', { root: this.requireRoot() })
+    return post('/api/story-brain.entities', { ...this.bookParams() })
   }
 
   getStoryBrainFacts(options: { entityIds?: readonly string[] } = {}): Promise<StoryBrainFactsResponse> {
     return post('/api/story-brain.facts', {
-      root: this.requireRoot(),
+      ...this.bookParams(),
       ...(options.entityIds ? { entityIds: options.entityIds } : {}),
     })
   }
 
   getReceipts(): Promise<ReceiptListResponse> {
-    return post('/api/receipts', { root: this.requireRoot() })
+    return post('/api/receipts', { ...this.bookParams() })
   }
 
   getReceipt(receiptId: string): Promise<ReceiptDetailResponse> {
-    return post('/api/receipt', { root: this.requireRoot(), receiptId })
+    return post('/api/receipt', { ...this.bookParams(), receiptId })
   }
 
   getChangeMatrix(): Promise<ChangeMatrixResponse> {
-    return post('/api/change-matrix', { root: this.requireRoot() })
+    return post('/api/change-matrix', { ...this.bookParams() })
   }
 
   rerunChangeMatrix(traversalId: string): Promise<ChangeMatrixResponse> {
-    return post('/api/change-matrix.rerun', { root: this.requireRoot(), traversalId })
+    return post('/api/change-matrix.rerun', { ...this.bookParams(), traversalId })
   }
 
   /* ---- 创作台、技能与审查 ---- */
@@ -108,19 +123,19 @@ export class MoZhouApiClient {
     mechanicalGate?: unknown
   }> {
     return post('/api/chapter.review', {
-      root: this.requireRoot(),
+      ...this.bookParams(),
       chapterIndex,
       ...(policy ? { policy } : {}),
     })
   }
 
   reworkChapter(chapterIndex: number): Promise<{ ok: boolean; currentStep: string; reworkCount: number }> {
-    return post('/api/chapter.rework', { root: this.requireRoot(), chapterIndex })
+    return post('/api/chapter.rework', { ...this.bookParams(), chapterIndex })
   }
 
   recordCorrection(chapterIndex: number, reasons: readonly string[], note?: string): Promise<{ ok: boolean; reportId: string; revision: number }> {
     return post('/api/chapter.corrections', {
-      root: this.requireRoot(),
+      ...this.bookParams(),
       chapterIndex,
       reasons,
       ...(note ? { note } : {}),
@@ -128,16 +143,16 @@ export class MoZhouApiClient {
   }
 
   getChapterQuality(chapterIndex: number): Promise<{ ok: boolean; status: string; report: unknown; current: boolean }> {
-    return post('/api/chapter.quality', { root: this.requireRoot(), chapterIndex })
+    return post('/api/chapter.quality', { ...this.bookParams(), chapterIndex })
   }
 
   /* ---- 作品、书架与任务 ---- */
   getWorks(): Promise<WorksOverviewResponse> {
-    return post('/api/works', { root: this.requireRoot() })
+    return post('/api/works', { ...this.bookParams() })
   }
 
   getTasks(): Promise<TasksResponse> {
-    return post('/api/tasks', { root: this.requireRoot() })
+    return post('/api/tasks', { ...this.bookParams() })
   }
 
   getLibrary(parentDir?: string): Promise<LibraryResponse> {
@@ -154,19 +169,21 @@ export class MoZhouApiClient {
 
   /* ---- 商业化、资源与系统 ---- */
   getStyle(): Promise<StyleDistillResponse> {
-    return post('/api/style', { root: this.requireRoot() })
+    return post('/api/style', { ...this.bookParams() })
   }
 
   distillStyle(text: string): Promise<StyleDistillResponse> {
     return post('/api/style.distill', {
       text,
       ...(this.root ? { root: this.root } : {}),
+      ...(this.bookId ? { bookId: this.bookId } : {}),
     })
   }
 
   getNovelBreakdown(sampleText?: string): Promise<NovelBreakdownResponse> {
     return post('/api/novel-breakdown', {
       ...(this.root ? { root: this.root } : {}),
+      ...(this.bookId ? { bookId: this.bookId } : {}),
       ...(sampleText ? { sampleText } : {}),
     })
   }
@@ -188,11 +205,11 @@ export class MoZhouApiClient {
   }
 
   getCloudSync(): Promise<CloudSyncResponse> {
-    return post('/api/cloud-sync', { root: this.requireRoot() })
+    return post('/api/cloud-sync', { ...this.bookParams() })
   }
 
   backupCloudSync(): Promise<BackupExportResponse> {
-    return post('/api/cloud-sync.backup', { root: this.requireRoot() })
+    return post('/api/cloud-sync.backup', { ...this.bookParams() })
   }
 
   getMembership(): Promise<MembershipResponse> {

@@ -1,9 +1,12 @@
 /**
- * apps/web · 轻量级 API 路由器与分发器 (ApiRouter / ApiDispatcher)。
- * 统一请求体解析、路径分发与异常包装。
+ * apps/web · 轻量级 API 路由器与多租户安全分发网关 (ApiRouter / ApiDispatcher · T09)。
+ * 统一请求体解析、路由策略分类、租户身份解析与跨模块边界防护。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { assertTrustedRequest, readJsonBody, RequestBoundaryError } from './security.js'
+import { getRoutePolicy, type RouteCategory } from './routePolicies.js'
+import { defaultBookAccessManager, type AuthorizedBook } from './bookAccess.js'
+import { defaultSessionManager, type VerifiedPrincipal } from './auth/session.js'
 
 export type RouteHandler = (
   req: IncomingMessage,
@@ -12,6 +15,9 @@ export type RouteHandler = (
     readonly path: string
     readonly body: Record<string, unknown>
     readonly json: (status: number, body: unknown) => void
+    readonly principal?: VerifiedPrincipal | null
+    readonly authorizedBook?: AuthorizedBook | null
+    readonly policy?: RouteCategory
   },
 ) => Promise<boolean | void> | boolean | void
 
@@ -32,9 +38,31 @@ export class ApiRouter {
     }
 
     const sendJson = (status: number, payload: unknown) => {
+      if (res.writableEnded) return
       res.statusCode = status
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
       res.end(JSON.stringify(payload))
+    }
+
+    // 1. 全路由策略检索与白名单校验（未登记路径默认拒绝）
+    const policy = getRoutePolicy(path)
+    if (!policy) {
+      sendJson(403, {
+        ok: false,
+        code: 'UNREGISTERED_ROUTE_POLICY',
+        error: `Route ${path} has no registered security policy`,
+      })
+      return true
+    }
+
+    // 2. 本地专属路由隔离：hosted 模式下禁止访问 local-native 端点
+    if (defaultBookAccessManager.isHostedMode() && policy === 'local-native') {
+      sendJson(403, {
+        ok: false,
+        code: 'LOCAL_NATIVE_ONLY',
+        error: 'Endpoint is only available in local mode',
+      })
+      return true
     }
 
     let body: Record<string, unknown>
@@ -50,7 +78,65 @@ export class ApiRouter {
       return true
     }
 
-    const context = { path, body, json: sendJson }
+    // 3. 用户主体认证解析
+    let principal: VerifiedPrincipal | null = null
+    if (policy !== 'public' && policy !== 'payment-webhook') {
+      try {
+        principal = await defaultSessionManager.verifyRequestSession(req)
+      } catch {
+        if (defaultBookAccessManager.isHostedMode()) {
+          sendJson(401, {
+            ok: false,
+            code: 'UNAUTHORIZED',
+            error: 'authentication required',
+          })
+          return true
+        }
+        // local 模式下若未登录，回退至本地单机默认主体
+        principal = { userId: 'local_user', email: 'local@mozhou.internal' }
+      }
+    } else {
+      // public 路由尝试提取可选身份
+      try {
+        principal = await defaultSessionManager.verifyRequestSession(req)
+      } catch {
+        principal = null
+      }
+    }
+
+    // 4. 作品级多租户所有权校验与沙箱解析 (Book Access Control)
+    let authorizedBook: AuthorizedBook | null = null
+    if (policy === 'book') {
+      try {
+        authorizedBook = defaultBookAccessManager.resolveAuthorizedBook(principal, body)
+        // 将沙箱解析后的唯一可信任物理根同步到 body['root']，保持下游领域路由透明消费
+        body['root'] = authorizedBook.root
+      } catch (bookErr) {
+        if (bookErr instanceof RequestBoundaryError) {
+          sendJson(bookErr.status, {
+            ok: false,
+            code: bookErr.code,
+            error: bookErr.message,
+          })
+        } else {
+          sendJson(404, {
+            ok: false,
+            code: 'BOOK_NOT_FOUND',
+            error: (bookErr as Error).message,
+          })
+        }
+        return true
+      }
+    }
+
+    const context = {
+      path,
+      body,
+      json: sendJson,
+      principal,
+      authorizedBook,
+      policy,
+    }
 
     for (const handler of this._handlers) {
       try {
@@ -64,7 +150,6 @@ export class ApiRouter {
             sendJson(error.status, { ok: false, code: error.code, error: error.message })
             return true
           }
-          // 详细异常仅进入本机日志；HTTP 响应不泄露路径、SQL、文件名或上游内部信息。
           console.error('[mozhou-api] unhandled route error', error)
           sendJson(500, {
             ok: false,

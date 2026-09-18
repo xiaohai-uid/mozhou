@@ -12,12 +12,19 @@ import { createServer, type ServerResponse } from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createMoZhouApiRouter } from './api.js'
+import { defaultBookAccessManager } from './bookAccess.js'
 
 const port = Number.parseInt(process.env['PORT'] ?? '5173', 10)
 const host = process.env['HOST'] ?? '127.0.0.1'
 const distDir = resolve(fileURLToPath(new URL('../dist/', import.meta.url)))
 const indexPath = resolve(distDir, 'index.html')
 const apiRouter = createMoZhouApiRouter()
+
+// T09 进程级排他启动锁：同一 dataRoot 禁止多实例并发争夺，争夺失败则抛错并不开始监听
+defaultBookAccessManager.lock.acquire(defaultBookAccessManager.getDataRoot())
+process.on('exit', () => { defaultBookAccessManager.lock.release() })
+process.on('SIGINT', () => { defaultBookAccessManager.lock.release(); process.exit(0) })
+process.on('SIGTERM', () => { defaultBookAccessManager.lock.release(); process.exit(0) })
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`invalid PORT: ${String(process.env['PORT'])}`)

@@ -5,14 +5,27 @@ import type { RouteHandler } from '../router.js'
 import { createBook, LocalDataPlane } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
+import { defaultBookAccessManager } from '../bookAccess.js'
 
-export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json }) => {
+export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal }) => {
   if (req.method !== 'POST') return false
 
   if (path === '/api/book') {
+    if (defaultBookAccessManager.isHostedMode()) {
+      if (typeof body['dir'] === 'string' && (body['dir'].includes('..') || body['dir'].startsWith('/') || body['dir'].startsWith('\\') || /^[A-Za-z]:/.test(body['dir']))) {
+        json(400, { ok: false, error: 'direct filesystem dir rejected in hosted mode' })
+        return true
+      }
+      const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
+      const userId = principal?.userId ?? 'local_user'
+      const book = defaultBookAccessManager.createHostedBook(userId, title)
+      json(200, { ok: true, root: book.root, bookId: book.bookId })
+      return true
+    }
     const dir = typeof body['dir'] === 'string' ? body['dir'] : '/tmp/mozhou-book-' + Date.now()
     const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
     const result = createBook({ dir, title })
+    defaultBookAccessManager.registerLocalBook(result.root, result.book.id)
     json(200, { ok: true, root: result.root, bookId: result.book.id })
     return true
   }
