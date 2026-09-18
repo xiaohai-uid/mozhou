@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'node:http'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { resolve, sep } from 'node:path'
 
@@ -188,4 +189,95 @@ export function readJsonBody(
     req.on('end', onEnd)
     req.on('error', onError)
   })
+}
+
+/* ============================================================================
+ * 本地进程 Bootstrap Token 守卫
+ * ========================================================================== */
+
+let currentBootstrapToken: string = randomBytes(32).toString('hex')
+
+export function getBootstrapToken(): string {
+  return currentBootstrapToken
+}
+
+export function rotateBootstrapToken(): string {
+  currentBootstrapToken = randomBytes(32).toString('hex')
+  return currentBootstrapToken
+}
+
+export function verifyBootstrapToken(candidate: unknown): boolean {
+  if (typeof candidate !== 'string' || candidate.length === 0) return false
+  const expected = Buffer.from(currentBootstrapToken, 'utf8')
+  const actual = Buffer.from(candidate, 'utf8')
+  if (expected.length !== actual.length) return false
+  return timingSafeEqual(expected, actual)
+}
+
+export function assertBootstrapToken(req: IncomingMessage): void {
+  const token = req.headers['x-mozhou-bootstrap-token']
+  if (!verifyBootstrapToken(token)) {
+    throw new RequestBoundaryError(403, 'UNAUTHORIZED_BOOTSTRAP', 'valid bootstrap token required')
+  }
+}
+
+/* ============================================================================
+ * Cookie 与 CSRF 令牌解析
+ * ========================================================================== */
+
+export function parseCookies(req: IncomingMessage): Record<string, string> {
+  const list: Record<string, string> = {}
+  const raw = req.headers.cookie
+  if (!raw) return list
+  for (const part of raw.split(';')) {
+    const pair = part.split('=')
+    const key = pair[0]?.trim()
+    if (key) {
+      list[key] = decodeURIComponent(pair.slice(1).join('=').trim())
+    }
+  }
+  return list
+}
+
+export function assertValidCsrfToken(req: IncomingMessage, expectedToken: string): void {
+  const headerToken = req.headers['x-csrf-token']
+  const token = typeof headerToken === 'string' ? headerToken.trim() : null
+  if (!token || token !== expectedToken) {
+    throw new RequestBoundaryError(403, 'INVALID_CSRF_TOKEN', 'CSRF token mismatch or missing')
+  }
+}
+
+/* ============================================================================
+ * 简单滑动窗口限速器 (RateLimiter)
+ * ========================================================================== */
+
+export class RateLimiter {
+  private readonly attempts = new Map<string, { count: number; resetAt: number }>()
+
+  constructor(
+    private readonly maxAttempts: number = 5,
+    private readonly windowMs: number = 60 * 1000,
+  ) {}
+
+  check(key: string): { allowed: boolean; retryAfterMs?: number } {
+    const now = Date.now()
+    const record = this.attempts.get(key)
+    if (!record || record.resetAt <= now) {
+      this.attempts.set(key, { count: 1, resetAt: now + this.windowMs })
+      return { allowed: true }
+    }
+    if (record.count >= this.maxAttempts) {
+      return { allowed: false, retryAfterMs: record.resetAt - now }
+    }
+    record.count += 1
+    return { allowed: true }
+  }
+
+  reset(key: string): void {
+    this.attempts.delete(key)
+  }
+
+  clear(): void {
+    this.attempts.clear()
+  }
 }

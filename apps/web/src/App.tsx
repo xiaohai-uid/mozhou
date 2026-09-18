@@ -34,6 +34,7 @@ import { RankScanView } from './rank-scan/RankScanView'
 import { WebSearchView } from './web-search/WebSearchView'
 import { CloudSyncView } from './cloud-sync/CloudSyncView'
 import { MembershipView } from './membership/MembershipView'
+import { AccountView } from './account/AccountView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
@@ -274,6 +275,8 @@ export function App(): JSX.Element {
           <CloudSyncView root={book?.root ?? null} />
         ) : view === 'membership' ? (
           <MembershipView />
+        ) : view === ('account' as ViewId) ? (
+          <AccountView />
         ) : (
           <PlaceholderView view={view} />
         )}

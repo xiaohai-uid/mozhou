@@ -6,8 +6,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { MembershipResponse } from '../../server/api'
 import { post } from '../lib/post'
+import { AccountView } from '../account/AccountView'
 
 export function MembershipView(): JSX.Element {
+  const [tab, setTab] = useState<'membership' | 'account'>('membership')
   const [data, setData] = useState<MembershipResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,12 +35,32 @@ export function MembershipView(): JSX.Element {
     <section className="center solo" aria-label="membership-view">
       <div className="chapterbar">
         <h1>会员与授权中心</h1>
+        <div style={{ display: 'inline-flex', gap: 8, marginLeft: 16 }}>
+          <button
+            type="button"
+            className={`btn small ${tab === 'membership' ? 'primary' : 'ghost'}`}
+            onClick={() => setTab('membership')}
+          >
+            方案与权益
+          </button>
+          <button
+            type="button"
+            className={`btn small ${tab === 'account' ? 'primary' : 'ghost'}`}
+            onClick={() => setTab('account')}
+            data-testid="tab-account"
+          >
+            账号与设备
+          </button>
+        </div>
         <span className="meta">Technical Preview · 社区免费版</span>
         <div className="save">
           <span className="cap-badge native">● 社区免费版</span>
         </div>
       </div>
 
+      {tab === 'account' ? (
+        <AccountView />
+      ) : (
       <div className="conversation">
         {busy && data === null && <p className="mono muted">正在读取版本状态…</p>}
 
@@ -136,6 +158,7 @@ export function MembershipView(): JSX.Element {
           </div>
         </section>
       </div>
+      )}
     </section>
   )
 }

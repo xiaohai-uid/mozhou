@@ -19,6 +19,7 @@ export default tseslint.config(
             'apps/web/server/routes/*.test.ts',
             'apps/web/server/storyboard/*.test.ts',
             'apps/web/server/billing/*.test.ts',
+            'apps/web/server/auth/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 30,

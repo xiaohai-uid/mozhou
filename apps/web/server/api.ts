@@ -13,6 +13,7 @@ import { truthfulPreviewRoutes } from './routes/truthfulPreviewRoutes.js'
 import { crawlerRoutes } from './routes/crawlerRoutes.js'
 import { systemRoutes } from './routes/systemRoutes.js'
 import { storyboardRoutes } from './routes/storyboardRoutes.js'
+import { accountRoutes } from './routes/accountRoutes.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
 import type { ContextReceipt } from '@mozhou/kernel'
@@ -477,6 +478,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(crawlerRoutes)
     .use(systemRoutes)
     .use(storyboardRoutes)
+    .use(accountRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()
