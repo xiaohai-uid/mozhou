@@ -36,6 +36,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "目标部署 Linux 主机（如 Oracle Cloud Always Free VM 或云服务器）及 SSH 免密访问凭据",
+      "owner": "用户",
+      "unlock_command": "ssh -o BatchMode=yes -o ConnectTimeout=5 <target-host> 'echo OK'",
+      "resume": "解锁 T16 远程部署脚本、持久卷挂载与 T20/T21 公网验证",
       "value": null,
       "evidence": null
     },
@@ -48,6 +52,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "正式公网域名、Cloudflare/Let's Encrypt HTTPS 证书与部署者身份",
+      "owner": "用户",
+      "unlock_command": "curl -fsS https://<domain>/api/health",
+      "resume": "解锁 T08 生产身份回调与 T16/T21 公网服务访问",
       "value": null,
       "evidence": null
     },
@@ -58,6 +66,10 @@
         "T08"
       ],
       "status": "missing",
+      "missing": "Supabase Auth 项目 URL/anon key/service key 与可发真实邮件的 SMTP 服务",
+      "owner": "用户",
+      "unlock_command": "node -e \"const url=process.env.SUPABASE_URL,k=process.env.SUPABASE_ANON_KEY; if(!url||!k)process.exit(1); fetch(url+'/auth/v1/health').then(r=>process.exit(r.ok?0:1))\"",
+      "resume": "解锁 T08 真实注册/重置邮件接收与系统浏览器登录回调",
       "value": null,
       "evidence": null
     },
@@ -68,6 +80,10 @@
         "T16"
       ],
       "status": "missing",
+      "missing": "异地/独立故障域备份存储（如 S3/R2/OSS Bucket 与访问凭据）",
+      "owner": "用户",
+      "unlock_command": "aws s3 ls s3://<backup-bucket> || rclone lsd <remote>:",
+      "resume": "解锁 T16 每日备份自动化与冷备恢复演练",
       "value": null,
       "evidence": null
     },
@@ -79,6 +95,10 @@
         "T18"
       ],
       "status": "missing",
+      "missing": "合规商用大模型 API 端点及 Key（如 DeepSeek/OpenAI/Claude），以及核准的每千 token 计费标准",
+      "owner": "用户",
+      "unlock_command": "node -e \"const k=process.env.DEEPSEEK_API_KEY||process.env.MOZHOU_API_KEY; process.exit(k?0:1)\"",
+      "resume": "解锁 T07 真实大模型调用链路、三通道向量/语义提取与流式生成真实端到端",
       "value": null,
       "evidence": null
     },
@@ -88,6 +108,10 @@
         "T11"
       ],
       "status": "missing",
+      "missing": "书源/榜单检索服务凭据（如 Bing / Google / SerpAPI / Bocha）",
+      "owner": "用户",
+      "unlock_command": "node -e \"process.exit(process.env.SEARCH_API_KEY?0:1)\"",
+      "resume": "解锁 T11 多源榜单/书源爬取与语义分析",
       "value": null,
       "evidence": null
     },
@@ -99,6 +123,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "微信支付已获批商户号 (MchId)、已签约 Native 支付权限、APIv3 密钥与平台证书",
+      "owner": "用户（需企业/个体工商户资质）",
+      "unlock_command": "node apps/web/server/billing/probeWechat.mjs",
+      "resume": "解锁 T14 微信扫码下单、支付通知回调与退款链路",
       "value": null,
       "evidence": null
     },
@@ -110,6 +138,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "支付宝开放平台商户应用 (AppId)、当面付/电脑网站支付签约权限及私钥证书",
+      "owner": "用户",
+      "unlock_command": "node apps/web/server/billing/probeAlipay.mjs",
+      "resume": "解锁 T14 支付宝预下单扫码与公钥验签回调",
       "value": null,
       "evidence": null
     },
@@ -120,6 +152,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "用于微信/支付宝真实支付闭环验证的测试资金授权（小额 0.01-19 元充值与退款）",
+      "owner": "用户",
+      "unlock_command": "显式确认测试付款预算与实操执行",
+      "resume": "解锁 T14/T15/T21 真实人民币支付与账单入账",
       "value": null,
       "evidence": null
     },
@@ -129,6 +165,10 @@
         "T18"
       ],
       "status": "missing",
+      "missing": "用于真实大模型 50 章完整旅程端到端生成的 API 费用预算授权（人民币分计）",
+      "owner": "用户",
+      "unlock_command": "显式确认模型消耗上限金额",
+      "resume": "解锁 T18 50 章真实连续创作压力测试与成本测量",
       "value": null,
       "evidence": null
     },
@@ -140,6 +180,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "Windows 代码签名证书（EV/OV）或经用户显式确认以无签名形式发布桌面客户端",
+      "owner": "用户",
+      "unlock_command": "signtool.exe sign /? || 显式选择无签名发布",
+      "resume": "解锁 T17/T20/T21 Windows 安装包打包、SmartScreen 规避或无签名说明文档",
       "value": null,
       "evidence": null
     },
@@ -150,6 +194,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "正式发布版本号、发布实体全称、ICP 备案与隐私政策主体联系方式",
+      "owner": "用户",
+      "unlock_command": "确认发布元数据与主体条款",
+      "resume": "解锁 T20/T21 官方发布包归档、合规展示与公共发布声明",
       "value": null,
       "evidence": null
     },
@@ -161,6 +209,10 @@
         "T21"
       ],
       "status": "missing",
+      "missing": "基于 T18 真实大模型吞吐与成本测算后的最终月度额度与定价版本冻结确认",
+      "owner": "T18 测算后与用户确认",
+      "unlock_command": "T18 完成且实测数据入账",
+      "resume": "解锁 T20/T21 最终销售目录与权益生效",
       "value": null,
       "evidence": null
     }
