@@ -205,6 +205,7 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
       <div style={{ position: 'relative', flex: 1, padding: '22px 28px', overflowY: 'auto' }}>
         <textarea
           ref={textareaRef}
+          aria-label="章节正文编辑区"
           value={value}
           onChange={(e) => {
             onChange(e.target.value);

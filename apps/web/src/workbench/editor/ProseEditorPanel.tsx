@@ -79,6 +79,25 @@ export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: Pros
     return () => { cancelled = true }
   }, [root, chapterIndex, reloadTick])
 
+  // 监听 DialogueStream 采纳/撤销正文事件，同步正文缓存并重载快照版本
+  useEffect(() => {
+    const handleProseAdopted = (e: Event) => {
+      const ce = e as CustomEvent<{ bookId?: string; chapterIndex?: number }>
+      if (ce.detail?.bookId === book?.bookId && ce.detail?.chapterIndex === chapterIndex) {
+        if (draftKey !== null) {
+          setText(loadDraftCache(draftKey))
+        }
+        setConflict(null)
+        setNotice(null)
+        setReloadTick((v) => v + 1)
+      }
+    }
+    window.addEventListener('mozhou:prose-adopted', handleProseAdopted)
+    return () => {
+      window.removeEventListener('mozhou:prose-adopted', handleProseAdopted)
+    }
+  }, [book?.bookId, chapterIndex, draftKey])
+
   // 本地缓存为空且服务端有正文：先回填显示（作者保存前必然读过所覆盖的内容）
   useEffect(() => {
     if (draftKey === null || snapshot.kind !== 'ready' || snapshot.body.trim() === '') return

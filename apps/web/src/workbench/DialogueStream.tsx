@@ -166,11 +166,13 @@ export function DialogueStream({
     const prompt = answer.trim()
     setError(null)
     setSending(true)
+    setPhase('drafting')
     setDraftText('')
     setCandidate(null)
     setConflictView(null)
     setUndo(null)
     setCopyFeedback(null)
+    setAdoptState(null)
 
     // 切书/切章隔离：递增请求 ID，捕获发起时的具体书/章现场
     const reqId = ++requestIdRef.current
@@ -582,6 +584,14 @@ export function DialogueStream({
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
         setUndo(null)
         setAdoptState('已撤销采纳（新 revision 保存，不倒退服务端历史）')
+      } else if (res.status === 409) {
+        const currentSnap = await loadSnapshot(book).catch(() => latest)
+        setError(`撤销被拒绝（冲突）：该章在采纳后已被外部修改或已存有新版本。磁盘原文与撤销文本都已保留，未覆盖新内容。`)
+        setConflictView({
+          candidateText: undo.oldText,
+          latestText: currentSnap.body,
+          latestRevision: currentSnap.revision,
+        })
       } else {
         setError(data.error ?? '撤销保存失败')
       }
