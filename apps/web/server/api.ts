@@ -17,6 +17,7 @@ import { accountRoutes } from './routes/accountRoutes.js'
 import { providerRoutes } from './routes/providerRoutes.js'
 import { backupRoutes } from './routes/backupRoutes.js'
 import { billingRoutes } from './routes/billingRoutes.js'
+import { managedModelRoutes } from './routes/managedModelRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -25,6 +26,9 @@ export { defaultBillingStore, BillingStore, type CreateOrderParams } from './bil
 export { defaultNotificationDispatcher, PaymentNotificationDispatcher, type ProcessNotificationResult } from './billing/notifications.js'
 export { defaultWechatPayVerifier, WechatPayVerifier, type WechatDecryptedTransaction } from './billing/wechat.js'
 export { defaultAlipayVerifier, AlipayVerifier, type AlipayDecodedTransaction } from './billing/alipay.js'
+export { defaultEntitlementManager, EntitlementManager, CAPABILITY_ENTITLEMENT_MAP } from './billing/entitlements.js'
+export { defaultQuotaManager, QuotaManager, type QuotaBalance, type QuotaReservation } from './billing/quota.js'
+export { defaultLicenseTicketManager, LicenseTicketManager, type SignedLicenseTicket } from './billing/license.js'
 export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory } from './routePolicies.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
@@ -494,6 +498,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(providerRoutes)
     .use(backupRoutes)
     .use(billingRoutes)
+    .use(managedModelRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

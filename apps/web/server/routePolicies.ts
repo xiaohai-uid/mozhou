@@ -64,6 +64,10 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/billing/orders': 'account',
   '/api/billing/order': 'account',
   '/api/billing/orders/refund': 'account',
+  '/api/billing/license/ticket': 'account',
+  '/api/billing/quota/status': 'account',
+  '/api/billing/quota/reserve': 'account',
+  '/api/billing/quota/settle': 'account',
 
   // ---- 3. Payment Webhook 支付异步通知 (免普通登录，验签为边界) ----
   '/api/payments/wechat/notify': 'payment-webhook',
