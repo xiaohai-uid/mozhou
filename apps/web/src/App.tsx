@@ -37,6 +37,8 @@ import { MembershipView } from './membership/MembershipView'
 import { AccountView } from './account/AccountView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
+import { CanonGraphView } from './canon-graph/CanonGraphView'
+import { GenreKitMarketplaceView } from './genre-kits/GenreKitMarketplaceView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
@@ -263,6 +265,10 @@ export function App(): JSX.Element {
           />
         ) : view === 'tasks' ? (
           <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
+        ) : view === 'genre-kits' ? (
+          <GenreKitMarketplaceView />
+        ) : view === 'canon-graph' ? (
+          <CanonGraphView />
         ) : view === 'style-distill' ? (
           <StyleDistillView root={book?.root ?? null} />
         ) : view === 'novel-breakdown' ? (

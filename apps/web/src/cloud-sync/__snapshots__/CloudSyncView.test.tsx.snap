@@ -128,7 +128,7 @@ exports[`CloudSyncView（云同步与备份） > 状态监控与存储指标渲�
             <span
               class="mono muted"
             >
-              规划能力 · 未上线
+              本地离线归档 · /api/backups
             </span>
           </div>
           <div
@@ -139,16 +139,69 @@ exports[`CloudSyncView（云同步与备份） > 状态监控与存储指标渲�
             <b
               style="color: var(--warning);"
             >
-              快照备份 · 尚未提供
+              快照备份 · 尚未提供云端自动同步
             </b>
             <br />
-            Technical Preview 尚未提供可验证的备份归档，因此这里不提供任何备份操作——不会出现「创建备份」按钮，也不会创建任何文件。
+            Technical Preview 尚未提供可验证的云端备份归档，因此这里不会出现「创建备份」按钮到云端，也不会创建任何云端文件。
             <br />
             <span
               style="color: var(--text-faint); font-size: 11px;"
             >
-              过渡方案：正文为透明明文 Markdown，可直接复制作品目录完成外部备份（见下方隐私与安全规范）。
+              本地离线备份：可使用下方本地归档引擎（/api/backups）导出完整 ZIP 备份或进行恢复。
             </span>
+          </div>
+          <div
+            style="margin-top: 16px; border-top: 1px solid var(--hairline); padding-top: 14px;"
+          >
+            <div
+              style="display: flex; align-items: center; justify-content: space-between; gap: 12px;"
+            >
+              <div>
+                <b>
+                  本地离线归档 (C5 安全 ZIP)
+                </b>
+                <p
+                  class="muted"
+                  style="font-size: 11px; margin: 2px 0px 0px;"
+                >
+                  使用底层 @mozhou/data-plane 打包全量正典、大纲、章节与元数据为标准 ZIP 压缩包。
+                </p>
+              </div>
+              <button
+                class="btn-primary"
+                style="font-size: 12px; padding: 6px 12px; white-space: nowrap;"
+                type="button"
+              >
+                生成本地归档包 (.zip)
+              </button>
+            </div>
+            <div
+              style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--hairline);"
+            >
+              <div
+                style="font-size: 12px; font-weight: 600;"
+              >
+                从现有备份恢复作品
+              </div>
+              <div
+                style="display: flex; gap: 8px; margin-top: 6px;"
+              >
+                <input
+                  placeholder="输入备份 ID (如 bup_xxx)"
+                  style="flex: 1 1 0%; padding: 4px 8px; font-size: 12px; background: var(--surface-sunken); border: 1px solid var(--hairline); border-radius: 6px; color: var(--fg-pure);"
+                  type="text"
+                  value=""
+                />
+                <button
+                  class="btn"
+                  disabled=""
+                  style="font-size: 12px; padding: 4px 12px; white-space: nowrap;"
+                  type="button"
+                >
+                  恢复作品
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

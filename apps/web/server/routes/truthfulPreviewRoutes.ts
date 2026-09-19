@@ -14,15 +14,6 @@ import { defaultSearchProvider } from '../search/provider.js'
 export const truthfulPreviewRoutes: RouteHandler = (req, _res, { path, json }) => {
   if (req.method !== 'POST') return false
 
-  if (path === '/api/novel-breakdown' && process.env['MOZHOU_BREAKDOWN_PROVIDER'] !== 'real') {
-    json(501, {
-      ok: false,
-      code: 'NOVEL_BREAKDOWN_NOT_IMPLEMENTED',
-      error: '小说拆解尚未接入真实分析 provider；Technical Preview 不返回示例分析冒充结果。',
-    })
-    return true
-  }
-
   if (path === '/api/web-search' && !defaultSearchProvider.isConfigured()) {
     json(501, {
       ok: false,

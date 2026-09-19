@@ -1080,16 +1080,24 @@ describe('风格蒸馏 API 契约', () => {
 })
 
 /* ----------------------------------------------------------------------------
- * 小说拆解 API 契约：/api/novel-breakdown（T51）。
+ * 小说拆解 API 契约：/api/novel-breakdown（T51 · 本地启发式分析兜底）。
  * ------------------------------------------------------------------------- */
 describe('小说拆解 API 契约', () => {
-  it('POST /api/novel-breakdown：真实分析 provider 未接入时显式 501', async () => {
+  it('POST /api/novel-breakdown：未传样章与书目时返回 200 且 result 为 null', async () => {
     const base = await listen()
-    const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '凡人修仙故事梗概' })
-    expect(status).toBe(501)
-    expect(data.ok).toBe(false)
-    expect(data.code).toBe('NOVEL_BREAKDOWN_NOT_IMPLEMENTED')
-    expect(data.result).toBeUndefined()
+    const { status, data } = await post(base, '/api/novel-breakdown', {})
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.result).toBeNull()
+  })
+
+  it('POST /api/novel-breakdown：传入样本文本时以本地启发式算法返回真实结构化拆解', async () => {
+    const base = await listen()
+    const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '秦三在破庙中拔剑迎敌。' })
+    expect(status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.result).toBeDefined()
+    expect(typeof data.result.storyCore.protagonist).toBe('string')
   })
 })
 

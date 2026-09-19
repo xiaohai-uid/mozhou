@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { exportCleanTxt, ChapterExportItem } from './txtCleanExporter';
-import { exportSubmissionDocxHtml } from './docxExporter';
+import { exportSubmissionDocx } from './docxExporter';
+import { exportSubmissionEpub } from './epubExporter';
 
 export interface PublicationExportModalProps {
   isOpen: boolean;
@@ -25,25 +26,25 @@ export const PublicationExportModal: React.FC<PublicationExportModalProps> = ({
   const handleExport = () => {
     setDownloading(true);
     try {
-      let content = '';
-      let mimeType = 'text/plain;charset=utf-8';
+      let blob: Blob;
       let extension = 'txt';
 
       if (format === 'txt') {
-        content = exportCleanTxt(bookTitle, chapters);
-        mimeType = 'text/plain;charset=utf-8';
+        const content = exportCleanTxt(bookTitle, chapters);
+        blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         extension = 'txt';
       } else if (format === 'docx') {
-        content = exportSubmissionDocxHtml(bookTitle, synopsis, chapters);
-        mimeType = 'application/msword;charset=utf-8';
-        extension = 'doc';
-      } else if (format === 'epub') {
-        content = exportCleanTxt(bookTitle, chapters); // Fallback to compiled text
-        mimeType = 'text/plain;charset=utf-8';
-        extension = 'txt';
+        const buf = exportSubmissionDocx(bookTitle, synopsis, chapters);
+        blob = new Blob([buf], {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+        extension = 'docx';
+      } else {
+        const buf = exportSubmissionEpub(bookTitle, '墨舟作者', chapters);
+        blob = new Blob([buf], { type: 'application/epub+zip' });
+        extension = 'epub';
       }
 
-      const blob = new Blob([content], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

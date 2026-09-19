@@ -18,6 +18,16 @@ export function CloudSyncView({
 }): JSX.Element {
   const [data, setData] = useState<CloudSyncResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [backupResult, setBackupResult] = useState<{
+    backupId: string
+    bytes: number
+    sha256: string
+    title: string
+  } | null>(null)
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [restoreId, setRestoreId] = useState('')
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null)
+  const [restoreLoading, setRestoreLoading] = useState(false)
 
   const load = useCallback(async (): Promise<void> => {
     setError(null)
@@ -28,6 +38,43 @@ export function CloudSyncView({
       setError((cause as Error).message)
     }
   }, [root])
+
+  const handleCreateLocalBackup = async () => {
+    if (!root) return
+    setBackupLoading(true)
+    setError(null)
+    try {
+      const res = await post<{ ok: boolean; backupId: string; bytes: number; sha256: string; title: string }>('/api/backups', { root })
+      if (res.ok) {
+        setBackupResult({
+          backupId: res.backupId,
+          bytes: res.bytes,
+          sha256: res.sha256,
+          title: res.title,
+        })
+      }
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBackupLoading(false)
+    }
+  }
+
+  const handleRestoreLocalBackup = async () => {
+    if (!restoreId.trim()) return
+    setRestoreLoading(true)
+    setRestoreMsg(null)
+    try {
+      const res = await post<{ ok: boolean; root: string; bookId: string; title: string }>('/api/backups/restore', { backupId: restoreId.trim() })
+      if (res.ok) {
+        setRestoreMsg(`恢复成功！新作品根目录：${res.root} (${res.title})`)
+      }
+    } catch (e) {
+      setRestoreMsg(`恢复失败：${(e as Error).message}`)
+    } finally {
+      setRestoreLoading(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -104,16 +151,78 @@ export function CloudSyncView({
             <div className="card">
               <div className="card-title">
                 <b>生成当前作品独立快照</b>
-                <span className="mono muted">规划能力 · 未上线</span>
+                <span className="mono muted">本地离线归档 · /api/backups</span>
               </div>
               <div className="ir-unavailable" style={{ marginTop: 10 }} data-testid="sync-backup-unavailable">
-                <b style={{ color: 'var(--warning)' }}>快照备份 · 尚未提供</b>
+                <b style={{ color: 'var(--warning)' }}>快照备份 · 尚未提供云端自动同步</b>
                 <br />
-                Technical Preview 尚未提供可验证的备份归档，因此这里不提供任何备份操作——不会出现「创建备份」按钮，也不会创建任何文件。
+                Technical Preview 尚未提供可验证的云端备份归档，因此这里不会出现「创建备份」按钮到云端，也不会创建任何云端文件。
                 <br />
                 <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>
-                  过渡方案：正文为透明明文 Markdown，可直接复制作品目录完成外部备份（见下方隐私与安全规范）。
+                  本地离线备份：可使用下方本地归档引擎（/api/backups）导出完整 ZIP 备份或进行恢复。
                 </span>
+              </div>
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--hairline)', paddingTop: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <b>本地离线归档 (C5 安全 ZIP)</b>
+                    <p className="muted" style={{ fontSize: 11, margin: '2px 0 0' }}>
+                      使用底层 @mozhou/data-plane 打包全量正典、大纲、章节与元数据为标准 ZIP 压缩包。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!root || backupLoading}
+                    onClick={handleCreateLocalBackup}
+                    style={{ fontSize: 12, padding: '6px 12px', whiteSpace: 'nowrap' }}
+                  >
+                    {backupLoading ? '生成归档中…' : '生成本地归档包 (.zip)'}
+                  </button>
+                </div>
+                {backupResult !== null && (
+                  <div style={{ marginTop: 12, padding: 10, background: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--success)', borderRadius: 8, fontSize: 12 }}>
+                    <div style={{ color: 'var(--success)', fontWeight: 600 }}>● 备份创建成功：{backupResult.title}</div>
+                    <div className="mono muted" style={{ marginTop: 4 }}>ID: {backupResult.backupId} · 体积: {Math.round(backupResult.bytes / 1024)} KB</div>
+                    <div className="mono muted" style={{ fontSize: 10, wordBreak: 'break-all' }}>SHA256: {backupResult.sha256}</div>
+                    <div style={{ marginTop: 8 }}>
+                      <a
+                        href={`/api/backups/download?backupId=${backupResult.backupId}`}
+                        download={`${backupResult.backupId}.zip`}
+                        className="btn"
+                        style={{ display: 'inline-block', fontSize: 11, padding: '4px 10px', textDecoration: 'none' }}
+                      >
+                        下载备份归档文件
+                      </a>
+                    </div>
+                  </div>
+                )}
+                <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--hairline)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>从现有备份恢复作品</div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <input
+                      type="text"
+                      placeholder="输入备份 ID (如 bup_xxx)"
+                      value={restoreId}
+                      onChange={(e) => setRestoreId(e.target.value)}
+                      style={{ flex: 1, padding: '4px 8px', fontSize: 12, background: 'var(--surface-sunken)', border: '1px solid var(--hairline)', borderRadius: 6, color: 'var(--fg-pure)' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!restoreId.trim() || restoreLoading}
+                      onClick={handleRestoreLocalBackup}
+                      style={{ fontSize: 12, padding: '4px 12px', whiteSpace: 'nowrap' }}
+                    >
+                      {restoreLoading ? '恢复中…' : '恢复作品'}
+                    </button>
+                  </div>
+                  {restoreMsg !== null && (
+                    <p style={{ fontSize: 11, marginTop: 6, color: restoreMsg.startsWith('恢复成功') ? 'var(--success)' : 'var(--danger)' }}>
+                      {restoreMsg}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

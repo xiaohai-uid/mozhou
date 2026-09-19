@@ -11,7 +11,7 @@ import { VIEW_COUNT, VIEW_IDS } from './views'
 const PRIMARY = ['works', 'workbench', 'storyboard', 'book-source'] as const
 
 describe('CapabilityChannels（U01 四域 + 工具箱）', () => {
-  it('四域一级直达；工具箱收纳其余全部航道（18 项均可达）', async () => {
+  it('四域一级直达；工具箱收纳其余全部航道（20 项均可达）', async () => {
     const user = userEvent.setup()
     render(<CapabilityChannels activeView="workbench" onSelect={() => {}} taskCount={0} />)
     for (const id of PRIMARY) {
@@ -24,7 +24,7 @@ describe('CapabilityChannels（U01 四域 + 工具箱）', () => {
     for (const id of VIEW_IDS) {
       expect(document.querySelector(`[data-view="${id}"]`)).not.toBeNull()
     }
-    expect(VIEW_COUNT).toBe(18)
+    expect(VIEW_COUNT).toBe(20)
   })
 
   it('当前视图在工具箱内时自动展开并高亮', () => {

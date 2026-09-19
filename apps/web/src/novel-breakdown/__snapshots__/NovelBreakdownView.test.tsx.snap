@@ -88,6 +88,22 @@ exports[`NovelBreakdownView（小说拆解） > 故事核、黄金三章与人�
         </div>
       </div>
     </section>
+    <div
+      style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"
+    >
+      <span
+        class="cap-badge native"
+        style="font-size: 11px;"
+      >
+        ● 本地离线启发式分析（非真实 LLM）
+      </span>
+      <span
+        class="mono muted"
+        style="font-size: 10px;"
+      >
+        基于确定性规则与高频词/节奏提取算法
+      </span>
+    </div>
     <section
       class="wb-section"
       data-testid="breakdown-story-core"

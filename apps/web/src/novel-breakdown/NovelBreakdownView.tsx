@@ -30,7 +30,10 @@ export function NovelBreakdownView({
     setBusy(true)
     setError(null)
     try {
-      const res = await post<NovelBreakdownResponse>('/api/novel-breakdown', { root: root ?? undefined })
+      const res = await post<NovelBreakdownResponse>('/api/novel-breakdown', {
+        root: root ?? undefined,
+        allowHeuristic: true,
+      })
       setData(res.result)
     } catch (cause) {
       setError((cause as Error).message)
@@ -47,7 +50,11 @@ export function NovelBreakdownView({
     setBusy(true)
     setError(null)
     try {
-      const res = await post<NovelBreakdownResponse>('/api/novel-breakdown', { sampleText: text, root: root ?? undefined })
+      const res = await post<NovelBreakdownResponse>('/api/novel-breakdown', {
+        sampleText: text,
+        root: root ?? undefined,
+        allowHeuristic: true,
+      })
       setData(res.result)
     } catch (cause) {
       setError((cause as Error).message)
@@ -119,6 +126,14 @@ export function NovelBreakdownView({
 
         {data !== null && (
           <>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="cap-badge native" style={{ fontSize: 11 }}>
+                ● 本地离线启发式分析（非真实 LLM）
+              </span>
+              <span className="mono muted" style={{ fontSize: 10 }}>
+                基于确定性规则与高频词/节奏提取算法
+              </span>
+            </div>
             {/* 1. 故事核 */}
             <section className="wb-section" data-testid="breakdown-story-core">
               <h2>核心故事核（Story Core）</h2>

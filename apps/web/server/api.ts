@@ -293,6 +293,7 @@ export interface StyleDistillResponse {
 }
 
 export interface NovelBreakdownResult {
+  readonly origin?: string
   readonly storyCore: {
     readonly protagonist: string
     readonly mainGoal: string

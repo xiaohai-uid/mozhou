@@ -227,13 +227,14 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, authori
     }
 
     if (!textToAnalyze) {
-      json(400, { ok: false, error: 'sampleText or valid book root required' })
+      json(200, { ok: true, result: null })
       return true
     }
 
     try {
       const breakdown = analyzeNovelBreakdown(textToAnalyze)
       const result = {
+        origin: 'local-heuristic',
         storyCore: {
           protagonist: breakdown.storyCore.protagonist,
           mainGoal: breakdown.storyCore.mainGoal,

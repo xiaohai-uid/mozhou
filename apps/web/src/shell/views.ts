@@ -23,6 +23,7 @@ export const NAV_GROUPS = [
       { id: 'workbench', label: '工作台', icon: '01' },
       { id: 'dialogue', label: '写作对话', icon: '02' },
       { id: 'works', label: '我的作品', icon: '03' },
+      { id: 'genre-kits', label: '流派工坊', icon: 'GK' },
       { id: 'storyboard', label: '漫剧分镜', icon: '06' },
       { id: 'style-distill', label: '风格蒸馏', icon: '04' },
       { id: 'novel-breakdown', label: '小说拆解', icon: '05' },
@@ -32,6 +33,7 @@ export const NAV_GROUPS = [
     group: '检视 · Novel OS',
     items: [
       { id: 'story-brain', label: 'Story Brain', icon: 'SB' },
+      { id: 'canon-graph', label: '因果图谱', icon: 'CG' },
       { id: 'context-receipt', label: '装配看板', icon: 'CR' },
       { id: 'change-matrix', label: '变更矩阵', icon: 'CM' },
       { id: 'quality-gate', label: '质量门', icon: 'QG' },
