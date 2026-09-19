@@ -1,6 +1,4 @@
-import { exportCleanTxt, type ChapterExportItem } from './txtCleanExporter'
-import { exportSubmissionDocx } from './docxExporter'
-import { exportSubmissionEpub } from './epubExporter'
+import type { ChapterExportItem } from './txtCleanExporter'
 import { post } from '../lib/post'
 import type { WorksOverviewResponse } from '../../server/api'
 
@@ -12,33 +10,33 @@ export interface ExportDownloadOptions {
   synopsis?: string
 }
 
-export function downloadNovelExport({
+export async function downloadNovelExport({
   bookTitle,
   format,
   chapters,
   author = '墨舟作者',
   synopsis = '',
-}: ExportDownloadOptions): { fileName: string } {
+}: ExportDownloadOptions): Promise<{ fileName: string }> {
   const safeTitle = bookTitle.trim() || '未命名作品'
-  let blob: Blob
-  let extension = 'txt'
 
-  if (format === 'txt') {
-    const content = exportCleanTxt(safeTitle, chapters)
-    blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    extension = 'txt'
-  } else if (format === 'docx') {
-    const buf = exportSubmissionDocx(safeTitle, synopsis, chapters)
-    blob = new Blob([buf], {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    })
-    extension = 'docx'
-  } else {
-    const buf = exportSubmissionEpub(safeTitle, author, chapters)
-    blob = new Blob([buf], { type: 'application/epub+zip' })
-    extension = 'epub'
+  const res = await fetch('/api/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookTitle: safeTitle,
+      format,
+      chapters,
+      author,
+      synopsis,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`导出请求失败 (HTTP ${res.status})`)
   }
 
+  const blob = await res.blob()
+  const extension = format === 'docx' ? 'docx' : format === 'epub' ? 'epub' : 'txt'
   const fileName = `${safeTitle}.${extension}`
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -118,7 +116,7 @@ export async function executeExportWorkflow({
     }
   }
 
-  const { fileName } = downloadNovelExport({
+  const { fileName } = await downloadNovelExport({
     bookTitle: safeTitle,
     format,
     chapters,

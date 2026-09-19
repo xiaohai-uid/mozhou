@@ -1,12 +1,12 @@
 /**
- * apps/web/src/export-suite · 真 OOXML DOCX 导出器 (T10 · Word/WPS 标准兼容)。
+ * packages/data-plane · 真 OOXML DOCX 导出器 (T10 · Word/WPS 标准兼容)。
  * 
  * 依照 reference/02-features.md T10 规格：
  * 正式 .docx 必须为标准 OOXML ZIP 包，包含 [Content_Types].xml、_rels/.rels、word/document.xml，
  * 支持宋体正文、首行缩进 2em、黑体章节标题与标准段落排版，可在 Microsoft Word、WPS Office 中直接打开。
  */
-import { packZip, type ZipEntry } from '@mozhou/data-plane'
-import type { ChapterExportItem } from './txtCleanExporter.js'
+import { packZip, type ZipEntry } from './zip-util.js'
+import type { ChapterExportItem } from './txt-clean.js'
 
 function escapeXml(str: string): string {
   return str
@@ -59,7 +59,6 @@ export function exportSubmissionDocx(
       <w:r>
         <w:rPr>
           <w:rFonts w:ascii="SimSun" w:eastAsia="SimSun"/>
-          <w:b/>
           <w:sz w:val="24"/>
         </w:rPr>
         <w:t>【内容简介】</w:t>
@@ -128,7 +127,6 @@ export function exportSubmissionDocx(
   return packZip(zipEntries)
 }
 
-/** 兼容旧版 HTML 导出（若需 .html 格式保存） */
 export function exportSubmissionDocxHtml(bookTitle: string, synopsis: string, chapters: readonly ChapterExportItem[]): string {
   let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeXml(bookTitle)}</title></head><body><h1>${escapeXml(bookTitle)}</h1>`
   for (const ch of chapters) {

@@ -1,12 +1,12 @@
 /**
- * apps/web/src/export-suite · 真 EPUB 3 电子书导出器 (T10 · 阅读器标准兼容)。
+ * packages/data-plane · 真 EPUB 3 电子书导出器 (T10 · 阅读器标准兼容)。
  * 
  * 依照 reference/02-features.md T10 规格：
  * EPUB 必须是有效 EPUB3 ZIP（首项无压缩 mimetype、META-INF/container.xml、OPF/nav/XHTML、正确 XML 转义），
  * 可以在 Apple Books、Calibre 等主流 EPUB 阅读器中直接渲染打开。
  */
-import { packZip, type ZipEntry } from '@mozhou/data-plane'
-import type { ChapterExportItem } from './txtCleanExporter.js'
+import { packZip, type ZipEntry } from './zip-util.js'
+import type { ChapterExportItem } from './txt-clean.js'
 
 function escapeXml(str: string): string {
   return str
@@ -86,9 +86,9 @@ export function exportSubmissionEpub(
     const ch = chapters[i]!
     const paras = ch.content
       .split(/\n+/)
-      .map((p) => p.trim())
+      .map((p: string) => p.trim())
       .filter(Boolean)
-      .map((p) => `<p>${escapeXml(p.replace(/^　　/, ''))}</p>`)
+      .map((p: string) => `<p>${escapeXml(p.replace(/^　　/, ''))}</p>`)
       .join('\n  ')
 
     const chapterXhtml = `<?xml version="1.0" encoding="utf-8"?>
@@ -133,10 +133,4 @@ export function exportSubmissionEpub(
   zipEntries.push({ path: 'OEBPS/content.opf', data: opfXml })
 
   return packZip(zipEntries)
-}
-
-/** 兼容旧版 XML 结构导出 */
-export function exportEpubXmlStructure(bookTitle: string, author: string, chapters: readonly ChapterExportItem[]) {
-  const buffer = exportSubmissionEpub(bookTitle, author, chapters)
-  return { buffer }
 }

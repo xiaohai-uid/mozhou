@@ -42,6 +42,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/membership': 'public',
   '/api/draft.question': 'public',
   '/api/style.distill': 'public',
+  '/api/export': 'public',
 
   // ---- 2. Account 主体级路由 ----
   '/api/account': 'account',

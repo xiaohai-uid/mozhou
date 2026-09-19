@@ -18,6 +18,7 @@ import { providerRoutes } from './routes/providerRoutes.js'
 import { backupRoutes } from './routes/backupRoutes.js'
 import { billingRoutes } from './routes/billingRoutes.js'
 import { managedModelRoutes } from './routes/managedModelRoutes.js'
+import { exportRoutes } from './routes/exportRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -510,6 +511,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(backupRoutes)
     .use(billingRoutes)
     .use(managedModelRoutes)
+    .use(exportRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

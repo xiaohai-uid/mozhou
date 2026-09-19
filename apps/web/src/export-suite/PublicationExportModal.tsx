@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { exportCleanTxt, ChapterExportItem } from './txtCleanExporter';
-import { exportSubmissionDocx } from './docxExporter';
-import { exportSubmissionEpub } from './epubExporter';
+import type { ChapterExportItem } from './txtCleanExporter';
+import { downloadNovelExport } from './exportDownload';
 
 export interface PublicationExportModalProps {
   isOpen: boolean;
@@ -20,42 +19,24 @@ export const PublicationExportModal: React.FC<PublicationExportModalProps> = ({
 }) => {
   const [format, setFormat] = useState<'txt' | 'docx' | 'epub'>('txt');
   const [downloading, setDownloading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setDownloading(true);
+    setExportError(null);
     try {
-      let blob: Blob;
-      let extension = 'txt';
-
-      if (format === 'txt') {
-        const content = exportCleanTxt(bookTitle, chapters);
-        blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        extension = 'txt';
-      } else if (format === 'docx') {
-        const buf = exportSubmissionDocx(bookTitle, synopsis, chapters);
-        blob = new Blob([buf], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-        extension = 'docx';
-      } else {
-        const buf = exportSubmissionEpub(bookTitle, '墨舟作者', chapters);
-        blob = new Blob([buf], { type: 'application/epub+zip' });
-        extension = 'epub';
-      }
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${bookTitle}_${format.toUpperCase()}.${extension}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await downloadNovelExport({
+        bookTitle,
+        format,
+        chapters,
+        synopsis,
+      });
       onClose();
     } catch (e) {
       console.error('Export error:', e);
+      setExportError((e as Error).message);
     } finally {
       setDownloading(false);
     }
@@ -101,28 +82,47 @@ export const PublicationExportModal: React.FC<PublicationExportModalProps> = ({
               </button>
             ))}
           </div>
+
+          <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 space-y-1">
+            <div className="flex justify-between text-zinc-400">
+              <span>待打包书名</span>
+              <span className="text-zinc-200 font-medium">《{bookTitle}》</span>
+            </div>
+            <div className="flex justify-between text-zinc-400">
+              <span>包含章节数</span>
+              <span className="text-zinc-200 font-medium">{chapters.length} 章</span>
+            </div>
+          </div>
+
+          {exportError && (
+            <div className="text-red-400 text-xs bg-red-950/30 border border-red-900/50 p-2 rounded-lg">
+              {exportError}
+            </div>
+          )}
         </div>
 
-        <div className="p-3 bg-zinc-950/60 rounded-xl border border-zinc-800 text-[11px] text-zinc-400 space-y-1">
-          <div>导出书目：<span className="text-zinc-200 font-medium">{bookTitle}</span></div>
-          <div>包含章节：<span className="text-indigo-400 font-medium">{chapters.length} 章</span></div>
-        </div>
-
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-800">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded-xl"
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-medium transition-colors"
           >
             取消
           </button>
           <button
             type="button"
-            disabled={downloading || chapters.length === 0}
-            onClick={handleExport}
-            className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-lg transition-all disabled:opacity-50"
+            onClick={() => void handleExport()}
+            disabled={downloading}
+            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-1.5"
           >
-            {downloading ? '正在封装...' : '立即导出'}
+            {downloading ? (
+              <>
+                <span className="animate-spin text-sm">⟳</span>
+                <span>正在打包编译...</span>
+              </>
+            ) : (
+              <span>开始下载</span>
+            )}
           </button>
         </div>
       </div>
