@@ -14,7 +14,7 @@ import { defaultSearchProvider } from '../search/provider.js'
 export const truthfulPreviewRoutes: RouteHandler = (req, _res, { path, json }) => {
   if (req.method !== 'POST') return false
 
-  if (path === '/api/novel-breakdown') {
+  if (path === '/api/novel-breakdown' && process.env['MOZHOU_BREAKDOWN_PROVIDER'] !== 'real') {
     json(501, {
       ok: false,
       code: 'NOVEL_BREAKDOWN_NOT_IMPLEMENTED',

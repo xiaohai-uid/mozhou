@@ -29,6 +29,9 @@ export { defaultAlipayVerifier, AlipayVerifier, type AlipayDecodedTransaction } 
 export { defaultEntitlementManager, EntitlementManager, CAPABILITY_ENTITLEMENT_MAP } from './billing/entitlements.js'
 export { defaultQuotaManager, QuotaManager, type QuotaBalance, type QuotaReservation } from './billing/quota.js'
 export { defaultLicenseTicketManager, LicenseTicketManager, type SignedLicenseTicket } from './billing/license.js'
+export { analyzeNovelBreakdown, type NovelBreakdownAnalysis } from './analysis/novelBreakdown.js'
+export { analyzeTextStyle, saveBookStyleProfile, loadBookStyleProfile, type StyleAnalysisResult, type BookStyleProfile } from './analysis/styleAnalysis.js'
+export { defaultSkillsCatalogManager, SkillsCatalogManager, type PromptSkillRecipe } from './skills/catalog.js'
 export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory } from './routePolicies.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'

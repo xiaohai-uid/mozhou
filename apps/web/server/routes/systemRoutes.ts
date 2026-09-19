@@ -8,6 +8,7 @@ import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { hasDraftProvider } from './pipelineRoutes.js'
 import { billingCatalog } from '../billing/catalog.js'
+import { analyzeNovelBreakdown } from '../analysis/novelBreakdown.js'
 
 const CAPABILITY_SQUARE_GROUPS = [
   {
@@ -206,89 +207,60 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 小说拆解 ---- */
   if (path === '/api/novel-breakdown') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
     const sampleText = typeof body['sampleText'] === 'string' ? body['sampleText'].trim() : ''
+    const root = typeof body['root'] === 'string' ? body['root'] : null
 
-    let protagonist = '主角（未设定）'
-    if (root !== null) {
+    let textToAnalyze = sampleText
+    if (!textToAnalyze && root !== null) {
       try {
         const canon = readCanonState(root)
-        const mainChar = canon.entityCards.find((c) => c.cardType === 'char')
-        if (mainChar !== undefined) protagonist = mainChar.name
+        const summaryParts: string[] = []
+        for (const card of canon.entityCards) {
+          summaryParts.push(`${card.name}：${card.brief || ''}`)
+        }
+        textToAnalyze = summaryParts.join('\n')
       } catch {
         /* ignore */
       }
     }
 
-    const result = {
-      storyCore: {
-        protagonist: sampleText.length > 0 ? '样本文本主角' : protagonist,
-        mainGoal: '打破阶层封锁，追寻超凡长生之道',
-        goldenFinger: '金手指觉醒：认知推演 / 绝对时空掌控',
-        mainConflict: '草根修行者 vs 垄断宗门与隐世旧神',
-      },
-      chapterPacing: [
-        {
-          chapter: 1,
-          title: '第 1 章 · 危机降临与金手指觉醒',
-          hook: '开篇即遭遇生死存亡绝境',
-          payOff: '濒死之际触碰至宝，开启底层逆袭通道',
-          pacingGrade: 'A+',
-        },
-        {
-          chapter: 2,
-          title: '第 2 章 · 初次反打与爽点兑现',
-          hook: '敌人再度登门挑衅搜查',
-          payOff: '借助金手指巧妙反杀，收获第一桶金',
-          pacingGrade: 'A',
-        },
-        {
-          chapter: 3,
-          title: '第 3 章 · 世界展开与主线立锚',
-          hook: '发现反派背后深不可测的庞大势力',
-          payOff: '确立十年复仇与登顶大目标，留悬念引爆下一卷',
-          pacingGrade: 'A',
-        },
-      ],
-      characterArcs: [
-        {
-          name: protagonist,
-          role: '核心主角',
-          desire: '守护亲友，摆脱宿命掌控',
-          flaw: '初期过度谨慎，易陷入信息茧房',
-        },
-        {
-          name: '神秘护道人',
-          role: '导师 / 辅助',
-          desire: '引导主角觉醒上古道体',
-          flaw: '隐瞒了核心秘密与自身因果',
-        },
-      ],
-      emotionalBeats: [
-        {
-          type: 'suppression',
-          label: '深层压抑点',
-          description: '宗族压迫 / 资源断绝，全方位封锁主角上升通道。',
-        },
-        {
-          type: 'twist',
-          label: '意外反转点',
-          description: '看似凶险的暗杀实为机缘指引，暗藏破局伏笔。',
-        },
-        {
-          type: 'climax',
-          label: '高潮爆发点',
-          description: '大典之日正面迎击强敌，当众展露逆天实力。',
-        },
-        {
-          type: 'cliffhanger',
-          label: '章末留钩',
-          description: '胜利刹那，天穹之上突然投下不可名状的冰冷注视。',
-        },
-      ],
+    if (!textToAnalyze) {
+      json(400, { ok: false, error: 'sampleText or valid book root required' })
+      return true
     }
 
-    json(200, { ok: true, result })
+    try {
+      const breakdown = analyzeNovelBreakdown(textToAnalyze)
+      const result = {
+        storyCore: {
+          protagonist: breakdown.storyCore.protagonist,
+          mainGoal: breakdown.storyCore.mainGoal,
+          goldenFinger: breakdown.storyCore.goldenFinger,
+          mainConflict: breakdown.storyCore.mainConflict,
+        },
+        chapterPacing: breakdown.pacing.map((p) => ({
+          chapter: p.chapterNumber,
+          title: `第 ${p.chapterNumber} 章`,
+          hook: p.hook,
+          payOff: p.payOff,
+          pacingGrade: 'A+',
+        })),
+        characterArcs: breakdown.characters.map((c) => ({
+          name: c.name,
+          role: c.role,
+          desire: c.desire,
+          flaw: c.flaw,
+        })),
+        emotionalBeats: breakdown.beats.map((b) => ({
+          type: b.type,
+          label: b.label,
+          description: b.explanation,
+        })),
+      }
+      json(200, { ok: true, result })
+    } catch (err) {
+      json(400, { ok: false, error: (err as Error).message })
+    }
     return true
   }
 
