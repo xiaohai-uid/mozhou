@@ -61,6 +61,13 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/llm/settings/reset': 'account',
   '/api/backups/download': 'account',
   '/api/backups/restore': 'account',
+  '/api/billing/orders': 'account',
+  '/api/billing/order': 'account',
+  '/api/billing/orders/refund': 'account',
+
+  // ---- 3. Payment Webhook 支付异步通知 (免普通登录，验签为边界) ----
+  '/api/payments/wechat/notify': 'payment-webhook',
+  '/api/payments/alipay/notify': 'payment-webhook',
 
   // ---- 3. Local-Native 本地专用路由 (hosted 下 403 拒绝) ----
   '/api/library': 'local-native',

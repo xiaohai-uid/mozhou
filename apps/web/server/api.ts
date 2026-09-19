@@ -16,10 +16,15 @@ import { storyboardRoutes } from './routes/storyboardRoutes.js'
 import { accountRoutes } from './routes/accountRoutes.js'
 import { providerRoutes } from './routes/providerRoutes.js'
 import { backupRoutes } from './routes/backupRoutes.js'
+import { billingRoutes } from './routes/billingRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
 export { defaultSearchProvider, ApiSearchProvider, InMemorySearchProvider, type SearchCitation, type SearchExecutionResult } from './search/provider.js'
+export { defaultBillingStore, BillingStore, type CreateOrderParams } from './billing/store.js'
+export { defaultNotificationDispatcher, PaymentNotificationDispatcher, type ProcessNotificationResult } from './billing/notifications.js'
+export { defaultWechatPayVerifier, WechatPayVerifier, type WechatDecryptedTransaction } from './billing/wechat.js'
+export { defaultAlipayVerifier, AlipayVerifier, type AlipayDecodedTransaction } from './billing/alipay.js'
 export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory } from './routePolicies.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
@@ -488,6 +493,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(accountRoutes)
     .use(providerRoutes)
     .use(backupRoutes)
+    .use(billingRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

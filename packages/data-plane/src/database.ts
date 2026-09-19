@@ -7,6 +7,8 @@ import Database from 'better-sqlite3'
  */
 export const PROJECTION_SCHEMA_VERSION = 2
 
+export type SqliteDatabase = Database.Database
+
 export interface OpenDatabaseOptions {
   readonly path: string
 }
