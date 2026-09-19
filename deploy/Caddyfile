@@ -1,0 +1,41 @@
+# 墨舟 (MoZhou Novel OS) Caddyfile
+# 生产公网 HTTPS 反向代理配置 (T16)
+
+{$MOZHOU_DOMAIN:localhost} {
+    # 自动管理 Let's Encrypt / ZeroSSL 证书
+    encode zstd gzip
+
+    # 安全响应头强化
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
+
+    # 支付通知与生成流式端点：禁用代理缓存与缓冲 (flush_interval -1)
+    @streaming {
+        path /api/draft.stream
+        path /api/payments/*
+    }
+    handle @streaming {
+        reverse_proxy 127.0.0.1:5173 {
+            flush_interval -1
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 通用反代至 Node.js 生产服务器
+    handle {
+        reverse_proxy 127.0.0.1:5173 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}

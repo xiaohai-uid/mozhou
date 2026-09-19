@@ -83,7 +83,8 @@ run('pnpm', ['--filter', '@mozhou/web', 'build'])
 requirePath(join(rootDir, 'apps/web/dist/index.html'), 'web dist')
 requirePath(join(rootDir, 'apps/web/dist-server/productionServer.js'), 'production server')
 
-rmSync(artifactsDir, { recursive: true, force: true })
+// 保留已有 release-artifacts 产物目录，只清理并准备当前版本的唯一 bundle 运行目录
+rmSync(runtimeDir, { recursive: true, force: true })
 mkdirSync(runtimeDir, { recursive: true })
 
 for (const file of [
