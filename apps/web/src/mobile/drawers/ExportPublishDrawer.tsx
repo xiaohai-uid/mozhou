@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { BookInfo } from '../../shell/workbenchStorage'
-import { downloadNovelExport, fetchBookChaptersForExport } from '../../export-suite/exportDownload'
+import { executeExportWorkflow } from '../../export-suite/exportDownload'
 
 export interface ExportPublishDrawerProps {
   book?: BookInfo | null | undefined
@@ -15,33 +15,15 @@ export function ExportPublishDrawer({ book, onClose }: ExportPublishDrawerProps)
   const [exportRealBook, setExportRealBook] = useState(Boolean(book?.root))
 
   const handleDownload = async () => {
-    try {
-      const bookTitle = title.trim() || book?.title || '未命名作品'
-      let chapters = [
-        {
-          chapterIndex: 1,
-          title: '第一章',
-          content: sampleContent.trim() || '正文草稿内容',
-        },
-      ]
-
-      if (book?.root && exportRealBook) {
-        setStatus('读取作品全量正典章节中…')
-        const realChapters = await fetchBookChaptersForExport(book.root)
-        if (realChapters.length > 0) {
-          chapters = realChapters
-        }
-      }
-
-      const { fileName } = downloadNovelExport({
-        bookTitle,
-        format,
-        chapters,
-      })
-      setStatus(`已成功下载 ${fileName}（共 ${chapters.length} 章）`)
-    } catch (e) {
-      setStatus(`导出失败：${(e as Error).message}`)
-    }
+    setStatus('正在准备导出文件…')
+    const result = await executeExportWorkflow({
+      book,
+      exportingRealBook: exportRealBook,
+      title,
+      format,
+      customSampleText: sampleContent,
+    })
+    setStatus(result.message)
   }
 
   return (

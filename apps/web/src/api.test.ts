@@ -1101,8 +1101,9 @@ describe('小说拆解 API 契约', () => {
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.result).toBeDefined()
-    expect(data.result.origin).toBe('local-heuristic')
-    expect(typeof data.result.storyCore.protagonist).toBe('string')
+    const result = data.result as { origin?: string; storyCore: { protagonist: string } }
+    expect(result.origin).toBe('local-heuristic')
+    expect(typeof result.storyCore.protagonist).toBe('string')
   })
 })
 

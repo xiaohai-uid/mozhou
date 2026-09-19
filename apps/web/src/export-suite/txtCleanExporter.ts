@@ -3,7 +3,7 @@ export interface ChapterExportItem {
   content: string;
 }
 
-export function exportCleanTxt(bookTitle: string, chapters: ChapterExportItem[]): string {
+export function exportCleanTxt(bookTitle: string, chapters: readonly ChapterExportItem[]): string {
   let output = `《${bookTitle}》\n\n`;
 
   for (const ch of chapters) {

@@ -82,6 +82,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/book.state': 'book',
   '/api/story-brain.entities': 'book',
   '/api/story-brain.facts': 'book',
+  '/api/story-brain.contract': 'book',
   '/api/chapter.prose': 'book',
   '/api/chapter.prose.save': 'book',
   '/api/chapter.reopen': 'book',

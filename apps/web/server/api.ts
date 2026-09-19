@@ -320,9 +320,15 @@ export interface NovelBreakdownResult {
   }[]
 }
 
+export interface NovelBreakdownRequest {
+  readonly root?: string | undefined
+  readonly sampleText?: string | undefined
+  readonly allowHeuristic?: boolean | undefined
+}
+
 export interface NovelBreakdownResponse {
   readonly ok: true
-  readonly result: NovelBreakdownResult
+  readonly result: NovelBreakdownResult | null
 }
 
 export type { RankBoard, RankingItem } from './crawlers/rankings.js'

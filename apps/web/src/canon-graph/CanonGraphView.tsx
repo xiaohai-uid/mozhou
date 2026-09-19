@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useCanonGraphData, GraphNode } from './useCanonGraphData';
 import { CanonNodeCard } from './CanonNodeCard';
 import { CreateContractModal } from './CreateContractModal';
+import { post } from '../lib/post';
 import type { BookInfo } from '../shell/workbenchStorage';
 
 export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = ({ book }) => {
-  const { nodes, links, isLive, addLink } = useCanonGraphData(book?.root);
+  const { nodes, links, isLive, isDemo, isEmpty, addLink } = useCanonGraphData(book?.root);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,8 +36,23 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
       contract: {
         summary: contract.summary,
         status: 'ACTIVE',
+        deadline: contract.deadline,
+        penalty: contract.penalty,
       },
     });
+    if (book?.root) {
+      void post('/api/story-brain.contract', {
+        root: book.root,
+        sourceName: selectedNode.name,
+        targetName: contractTarget.name,
+        relation: contract.relation,
+        summary: contract.summary,
+        deadline: contract.deadline,
+        penalty: contract.penalty,
+      }).catch((e: unknown) => {
+        console.error('Failed to sync contract to backend', e);
+      });
+    }
   };
 
   return (
@@ -49,7 +65,7 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
             正典关系与因果拓扑图谱 {book ? `· 《${book.title}》` : ''}
           </h2>
           <span className="text-xs text-zinc-500 bg-zinc-800/60 px-2 py-0.5 rounded-full">
-            {nodes.length} 实体 / {links.length} 关系边 {isLive ? '(实时正典)' : '(预设拓扑)'}
+            {nodes.length} 实体 / {links.length} 关系边 {isLive ? (isEmpty ? '(空正典)' : '(实时正典)') : isDemo ? '(示例演示)' : ''}
           </span>
         </div>
 
@@ -84,8 +100,19 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
         </div>
       </div>
 
-      {/* Interactive SVG Canvas */}
-      <div className="relative flex-1 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px] overflow-hidden cursor-crosshair">
+      {/* Interactive SVG Canvas or Empty State */}
+      {isEmpty ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px]">
+          <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 mb-3 text-lg">
+            📜
+          </div>
+          <b className="text-sm text-zinc-300">《{book?.title ?? '当前作品'}》尚无正典实体卡</b>
+          <p className="text-xs text-zinc-500 max-w-sm mt-1 leading-relaxed">
+            当前书库未检测到人物、势力、地点或道具设定卡。可在工作台「Story Brain」或「设定/」目录中创建卡片，拓扑图谱将自动实时呈现实体关系与因果契约。
+          </p>
+        </div>
+      ) : (
+        <div className="relative flex-1 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px] overflow-hidden cursor-crosshair">
         <svg className="w-full h-full">
           {/* Render Links */}
           {links.map((link, idx) => {
@@ -188,7 +215,8 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
             onCreateContract={handleCreateContract}
           />
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

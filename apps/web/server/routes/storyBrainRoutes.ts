@@ -6,6 +6,9 @@ import { createBook, LocalDataPlane } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
+import { appendFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { randomBytes } from 'node:crypto'
 
 export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
   if (req.method !== 'POST') return false
@@ -76,6 +79,47 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
       ok: true,
       ...overview,
     })
+    return true
+  }
+
+  if (path === '/api/story-brain.contract') {
+    const rawRoot = resolvedRoot
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const sourceName = typeof body['sourceName'] === 'string' ? body['sourceName'].trim() : ''
+    const targetName = typeof body['targetName'] === 'string' ? body['targetName'].trim() : ''
+    const relation = typeof body['relation'] === 'string' ? body['relation'].trim() : '契约约定'
+    const summary = typeof body['summary'] === 'string' ? body['summary'].trim() : ''
+    const deadline = typeof body['deadline'] === 'string' ? body['deadline'].trim() : undefined
+    const penalty = typeof body['penalty'] === 'string' ? body['penalty'].trim() : undefined
+
+    if (!sourceName || !targetName || !summary) {
+      json(400, { ok: false, error: 'sourceName, targetName, and summary required' })
+      return true
+    }
+
+    const contractId = 'contract_' + randomBytes(8).toString('hex')
+    const contractRecord = {
+      id: contractId,
+      source: sourceName,
+      target: targetName,
+      relation,
+      summary,
+      deadline,
+      penalty,
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
+    }
+
+    const trackingDir = join(root, '追踪')
+    mkdirSync(trackingDir, { recursive: true })
+    const promiseFile = join(trackingDir, '伏笔.jsonl')
+    appendFileSync(promiseFile, JSON.stringify(contractRecord) + '\n', 'utf8')
+
+    json(200, { ok: true, contractId, contract: contractRecord })
     return true
   }
 

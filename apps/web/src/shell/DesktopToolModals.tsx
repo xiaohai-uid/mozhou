@@ -15,7 +15,7 @@ import {
   getRandomPreset,
 } from '../shared/inspirationPresets'
 import { runLocalComplianceCheck } from '../shared/complianceCheck'
-import { downloadNovelExport, fetchBookChaptersForExport } from '../export-suite/exportDownload'
+import { executeExportWorkflow } from '../export-suite/exportDownload'
 
 export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'compliance'
 
@@ -77,33 +77,15 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
   }
 
   const handleTriggerExport = async () => {
-    try {
-      const title = exportTitle.trim() || book?.title || '未命名作品'
-      let chapters = [
-        {
-          chapterIndex: 1,
-          title: '第一章',
-          content: exportSampleText.trim() || '正文草稿内容',
-        },
-      ]
-
-      if (book?.root && (!exportSampleText.trim() || exportingRealBook)) {
-        setExportStatus('读取作品各章节正文中…')
-        const realChapters = await fetchBookChaptersForExport(book.root)
-        if (realChapters.length > 0) {
-          chapters = realChapters
-        }
-      }
-
-      const { fileName } = downloadNovelExport({
-        bookTitle: title,
-        format: exportFormat,
-        chapters,
-      })
-      setExportStatus(`导出成功：已下载 ${fileName}（共 ${chapters.length} 章）`)
-    } catch (e) {
-      setExportStatus(`导出失败：${(e as Error).message}`)
-    }
+    setExportStatus('正在准备导出文件…')
+    const result = await executeExportWorkflow({
+      book,
+      exportingRealBook,
+      title: exportTitle,
+      format: exportFormat,
+      customSampleText: exportSampleText,
+    })
+    setExportStatus(result.message)
   }
 
   return (

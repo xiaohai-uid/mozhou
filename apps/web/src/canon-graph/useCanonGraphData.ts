@@ -20,6 +20,8 @@ export interface GraphLink {
   contract?: {
     summary: string;
     status: 'ACTIVE' | 'FULFILLED' | 'BREACHED';
+    deadline?: string | undefined;
+    penalty?: string | undefined;
   };
 }
 
@@ -61,12 +63,16 @@ export function useCanonGraphData(bookRoot?: string | null) {
   const [nodes, setNodes] = useState<GraphNode[]>(DEFAULT_NODES);
   const [links, setLinks] = useState<GraphLink[]>(DEFAULT_LINKS);
   const [isLive, setIsLive] = useState(false);
+  const [isDemo, setIsDemo] = useState(true);
+  const [isEmpty, setIsEmpty] = useState(false);
 
   useEffect(() => {
     if (!bookRoot) {
       setNodes(DEFAULT_NODES);
       setLinks(DEFAULT_LINKS);
       setIsLive(false);
+      setIsDemo(true);
+      setIsEmpty(false);
       return;
     }
     let mounted = true;
@@ -88,9 +94,11 @@ export function useCanonGraphData(bookRoot?: string | null) {
         if (!mounted || !res.ok || !res.state || !res.state.entityCards) return;
         const cards = res.state.entityCards;
         if (cards.length === 0) {
-          setNodes(DEFAULT_NODES);
-          setLinks(DEFAULT_LINKS);
-          setIsLive(false);
+          setNodes([]);
+          setLinks([]);
+          setIsLive(true);
+          setIsDemo(false);
+          setIsEmpty(true);
           return;
         }
 
@@ -118,16 +126,47 @@ export function useCanonGraphData(bookRoot?: string | null) {
 
         const mappedLinks: GraphLink[] = [];
         if (res.state.trackingLines?.promises) {
-          for (let i = 0; i < res.state.trackingLines.promises.length; i++) {
-            const p = res.state.trackingLines.promises[i]!;
-            if (mappedNodes.length >= 2) {
+          for (const p of res.state.trackingLines.promises) {
+            let parsedSource: string | null = null;
+            let parsedTarget: string | null = null;
+            let relation = '契约约定';
+            let summary = p.payload;
+            let deadline: string | undefined = undefined;
+            let penalty: string | undefined = undefined;
+
+            try {
+              const obj = JSON.parse(p.payload);
+              if (obj && typeof obj === 'object') {
+                summary = obj.summary || p.payload;
+                relation = obj.relation || '契约约定';
+                deadline = obj.deadline;
+                penalty = obj.penalty;
+                const sNode = mappedNodes.find((n) => n.name === obj.source || n.id === obj.source);
+                const tNode = mappedNodes.find((n) => n.name === obj.target || n.id === obj.target);
+                if (sNode && tNode && sNode.id !== tNode.id) {
+                  parsedSource = sNode.id;
+                  parsedTarget = tNode.id;
+                }
+              }
+            } catch {
+              // 文本匹配：查找 payload 中提及的两个实体
+              const matched = mappedNodes.filter((n) => p.payload.includes(n.name));
+              if (matched.length >= 2) {
+                parsedSource = matched[0]!.id;
+                parsedTarget = matched[1]!.id;
+              }
+            }
+
+            if (parsedSource && parsedTarget) {
               mappedLinks.push({
-                source: mappedNodes[i % mappedNodes.length]!.id,
-                target: mappedNodes[(i + 1) % mappedNodes.length]!.id,
-                relation: '契约约定',
+                source: parsedSource,
+                target: parsedTarget,
+                relation,
                 contract: {
-                  summary: p.payload || '履行叙事承诺',
+                  summary,
                   status: 'ACTIVE',
+                  deadline,
+                  penalty,
                 },
               });
             }
@@ -137,12 +176,16 @@ export function useCanonGraphData(bookRoot?: string | null) {
         setNodes(mappedNodes);
         setLinks(mappedLinks);
         setIsLive(true);
+        setIsDemo(false);
+        setIsEmpty(false);
       })
       .catch(() => {
         if (mounted) {
-          setNodes(DEFAULT_NODES);
-          setLinks(DEFAULT_LINKS);
+          setNodes([]);
+          setLinks([]);
           setIsLive(false);
+          setIsDemo(false);
+          setIsEmpty(true);
         }
       });
 
@@ -155,6 +198,5 @@ export function useCanonGraphData(bookRoot?: string | null) {
     setLinks((prev) => [...prev, newLink]);
   };
 
-  return { nodes, links, isLive, addLink };
+  return { nodes, links, isLive, isDemo, isEmpty, addLink };
 }
-
