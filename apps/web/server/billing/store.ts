@@ -372,6 +372,49 @@ export class BillingStore {
     }
   }
 
+  listPendingOrders(olderThanMs?: number, now = Date.now()): readonly OrderSnapshot[] {
+    const db = this.getDb()
+    if (olderThanMs !== undefined && olderThanMs > 0) {
+      const cutoff = new Date(now - olderThanMs).toISOString()
+      const rows = db
+        .prepare<[string], OrderRow>(
+          "SELECT * FROM orders WHERE state IN ('created', 'pending') AND created_at <= ? ORDER BY created_at ASC",
+        )
+        .all(cutoff)
+      return rows.map((r) => this.mapOrderRow(r))
+    }
+    const rows = db
+      .prepare<[], OrderRow>("SELECT * FROM orders WHERE state IN ('created', 'pending') ORDER BY created_at ASC")
+      .all()
+    return rows.map((r) => this.mapOrderRow(r))
+  }
+
+  closeExpiredOrders(maxAgeMs = 24 * 3600 * 1000, now = Date.now()): readonly OrderSnapshot[] {
+    const db = this.getDb()
+    const cutoff = new Date(now - maxAgeMs).toISOString()
+    const nowIso = new Date(now).toISOString()
+
+    return db.transaction(() => {
+      const expired = db
+        .prepare<[string], OrderRow>(
+          "SELECT * FROM orders WHERE state IN ('created', 'pending') AND created_at <= ?",
+        )
+        .all(cutoff)
+
+      if (expired.length > 0) {
+        db.prepare(
+          "UPDATE orders SET state = 'closed', updated_at = ? WHERE state IN ('created', 'pending') AND created_at <= ?",
+        ).run(nowIso, cutoff)
+      }
+
+      return expired.map((r) => ({
+        ...this.mapOrderRow(r),
+        state: 'closed' as const,
+        updatedAt: nowIso,
+      }))
+    })()
+  }
+
   private mapOrderRow(row: OrderRow): OrderSnapshot {
     return {
       orderId: row.order_id,

@@ -3,7 +3,7 @@
  * 统一请求体解析、路由策略分类、租户身份解析与跨模块边界防护。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { assertTrustedRequest, readJsonBody, RequestBoundaryError } from './security.js'
+import { assertTrustedRequest, readRequestPayload, RequestBoundaryError, DEFAULT_MAX_JSON_BODY_BYTES } from './security.js'
 import { getRoutePolicy, type RouteCategory } from './routePolicies.js'
 import { defaultBookAccessManager, type AuthorizedBook } from './bookAccess.js'
 import { defaultSessionManager, type VerifiedPrincipal } from './auth/session.js'
@@ -14,10 +14,12 @@ export type RouteHandler = (
   context: {
     readonly path: string
     readonly body: Record<string, unknown>
+    readonly rawBuffer?: Buffer | undefined
+    readonly rawText?: string | undefined
     readonly json: (status: number, body: unknown) => void
-    readonly principal?: VerifiedPrincipal | null
-    readonly authorizedBook?: AuthorizedBook | null
-    readonly policy?: RouteCategory
+    readonly principal?: VerifiedPrincipal | null | undefined
+    readonly authorizedBook?: AuthorizedBook | null | undefined
+    readonly policy?: RouteCategory | undefined
   },
 ) => Promise<boolean | void> | boolean | void
 
@@ -66,9 +68,16 @@ export class ApiRouter {
     }
 
     let body: Record<string, unknown>
+    let rawBuffer: Buffer | undefined
+    let rawText: string | undefined
     try {
       assertTrustedRequest(req)
-      body = await readJsonBody(req)
+      // T14: 支付通知路由限制 ≤256KiB，其余使用默认最大限制
+      const maxBytes = policy === 'payment-webhook' ? 256 * 1024 : DEFAULT_MAX_JSON_BODY_BYTES
+      const payload = await readRequestPayload(req, maxBytes)
+      body = payload.body
+      rawBuffer = payload.rawBuffer
+      rawText = payload.rawText
     } catch (error) {
       if (error instanceof RequestBoundaryError) {
         sendJson(error.status, { ok: false, code: error.code, error: error.message })
@@ -109,8 +118,6 @@ export class ApiRouter {
     if (policy === 'book') {
       try {
         authorizedBook = defaultBookAccessManager.resolveAuthorizedBook(principal, body)
-        // 将沙箱解析后的唯一可信任物理根同步到 body['root']，保持下游领域路由透明消费
-        body['root'] = authorizedBook.root
       } catch (bookErr) {
         if (bookErr instanceof RequestBoundaryError) {
           sendJson(bookErr.status, {
@@ -132,6 +139,8 @@ export class ApiRouter {
     const context = {
       path,
       body,
+      rawBuffer,
+      rawText,
       json: sendJson,
       principal,
       authorizedBook,

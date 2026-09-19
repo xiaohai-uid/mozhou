@@ -28,11 +28,13 @@ function isEnoent(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT'
 }
 
-export const proseRoutes: RouteHandler = (req, res, { path, body, json }) => {
+export const proseRoutes: RouteHandler = (req, res, { path, body, json, authorizedBook }) => {
   if (req.method !== 'POST') return false
 
+  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+
   if (path === '/api/chapter.prose') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
       json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
@@ -66,7 +68,7 @@ export const proseRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/chapter.prose.save') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     const rawBody = typeof body['body'] === 'string' ? body['body'] : null
     const title = typeof body['title'] === 'string' ? body['title'] : undefined
@@ -140,7 +142,7 @@ export const proseRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/chapter.reopen') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
       json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })

@@ -23,6 +23,7 @@ export { defaultAccountStore, AccountStore, type UserProfile } from './account/s
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
 export { defaultSearchProvider, ApiSearchProvider, InMemorySearchProvider, type SearchCitation, type SearchExecutionResult } from './search/provider.js'
 export { defaultBillingStore, BillingStore, type CreateOrderParams } from './billing/store.js'
+export { pollAndReconcilePendingOrders, type IChannelOrderQuerier, type PollingSummary } from './billing/pollingWorker.js'
 export { defaultNotificationDispatcher, PaymentNotificationDispatcher, type ProcessNotificationResult } from './billing/notifications.js'
 export { defaultWechatPayVerifier, WechatPayVerifier, type WechatDecryptedTransaction } from './billing/wechat.js'
 export { defaultAlipayVerifier, AlipayVerifier, type AlipayDecodedTransaction } from './billing/alipay.js'

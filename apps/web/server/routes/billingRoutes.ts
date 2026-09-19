@@ -15,7 +15,7 @@ import type { PayChannel, PlanId } from '../billing/contracts.js'
 import { defaultWechatPayVerifier } from '../billing/wechat.js'
 import { defaultAlipayVerifier } from '../billing/alipay.js'
 
-export const billingRoutes: RouteHandler = (req, res, { path, body, json, principal }) => {
+export const billingRoutes: RouteHandler = (req, res, { path, body, rawText, rawBuffer, json, principal }) => {
   /* ---- 1. 创建订单 ---- */
   if (path === '/api/billing/orders' && req.method === 'POST') {
     const userId = principal?.userId
@@ -104,9 +104,10 @@ export const billingRoutes: RouteHandler = (req, res, { path, body, json, princi
   /* ---- 3. 微信支付异步通知回调 ---- */
   if (path === '/api/payments/wechat/notify' && req.method === 'POST') {
     try {
-      const rawBody = JSON.stringify(body)
-      defaultWechatPayVerifier.verifyAndParseNotification(req.headers, rawBody)
-      const result = defaultNotificationDispatcher.processWechatNotification(req.headers, rawBody)
+      // T14: 保留真实原始报文 bytes/string，避免重新序列化破坏加密签名验签
+      const rawPayload = rawText ?? (rawBuffer ? rawBuffer.toString('utf8') : JSON.stringify(body))
+      defaultWechatPayVerifier.verifyAndParseNotification(req.headers, rawPayload)
+      const result = defaultNotificationDispatcher.processWechatNotification(req.headers, rawPayload)
 
       if (result.success) {
         json(200, { code: 'SUCCESS', message: '成功' })
@@ -124,7 +125,8 @@ export const billingRoutes: RouteHandler = (req, res, { path, body, json, princi
     try {
       const params = body as Record<string, string>
       defaultAlipayVerifier.verifyAndParseNotification(params)
-      const result = defaultNotificationDispatcher.processAlipayNotification(params)
+      const rawPayload = rawText ?? (rawBuffer ? rawBuffer.toString('utf8') : undefined)
+      const result = defaultNotificationDispatcher.processAlipayNotification(params, rawPayload)
 
       if (result.success) {
         res.statusCode = 200

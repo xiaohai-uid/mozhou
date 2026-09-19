@@ -129,10 +129,16 @@ export function assertTrustedRequest(req: IncomingMessage): void {
   }
 }
 
-export function readJsonBody(
+export interface RequestPayload {
+  readonly body: Record<string, unknown>
+  readonly rawBuffer: Buffer
+  readonly rawText: string
+}
+
+export function readRequestPayload(
   req: IncomingMessage,
   maxBytes = DEFAULT_MAX_JSON_BODY_BYTES,
-): Promise<Record<string, unknown>> {
+): Promise<RequestPayload> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     let bytes = 0
@@ -151,7 +157,7 @@ export function readJsonBody(
     const onData = (chunk: Buffer): void => {
       bytes += chunk.length
       if (bytes > maxBytes) {
-        fail(new RequestBoundaryError(413, 'BODY_TOO_LARGE', `JSON request body exceeds ${maxBytes} bytes`))
+        fail(new RequestBoundaryError(413, 'BODY_TOO_LARGE', `request body exceeds ${maxBytes} bytes`))
         return
       }
       chunks.push(chunk)
@@ -160,18 +166,38 @@ export function readJsonBody(
     const onEnd = (): void => {
       if (settled) return
       settled = true
-      const raw = Buffer.concat(chunks).toString('utf8')
-      if (raw.trim().length === 0) {
-        resolve({})
+      const rawBuffer = Buffer.concat(chunks)
+      const rawText = rawBuffer.toString('utf8')
+      if (rawText.trim().length === 0) {
+        resolve({ body: {}, rawBuffer, rawText })
         return
       }
+
+      const contentType = req.headers['content-type'] ?? ''
+      // 支持 application/x-www-form-urlencoded
+      if (contentType.includes('application/x-www-form-urlencoded')) {
+        try {
+          const params = new URLSearchParams(rawText)
+          const formBody: Record<string, unknown> = {}
+          for (const [key, value] of params.entries()) {
+            formBody[key] = value
+          }
+          resolve({ body: formBody, rawBuffer, rawText })
+          return
+        } catch {
+          reject(new RequestBoundaryError(400, 'INVALID_FORM', 'malformed form request body'))
+          return
+        }
+      }
+
+      // 默认按 JSON 解析
       try {
-        const parsed = JSON.parse(raw) as unknown
+        const parsed = JSON.parse(rawText) as unknown
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
           reject(new RequestBoundaryError(400, 'INVALID_JSON', 'JSON request body must be an object'))
           return
         }
-        resolve(parsed as Record<string, unknown>)
+        resolve({ body: parsed as Record<string, unknown>, rawBuffer, rawText })
       } catch (error) {
         if (error instanceof RequestBoundaryError) {
           reject(error)
@@ -189,6 +215,14 @@ export function readJsonBody(
     req.on('end', onEnd)
     req.on('error', onError)
   })
+}
+
+export async function readJsonBody(
+  req: IncomingMessage,
+  maxBytes = DEFAULT_MAX_JSON_BODY_BYTES,
+): Promise<Record<string, unknown>> {
+  const payload = await readRequestPayload(req, maxBytes)
+  return payload.body
 }
 
 /* ============================================================================

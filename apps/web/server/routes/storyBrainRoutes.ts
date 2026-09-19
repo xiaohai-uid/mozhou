@@ -7,8 +7,10 @@ import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 
-export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal }) => {
+export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, authorizedBook }) => {
   if (req.method !== 'POST') return false
+
+  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
 
   if (path === '/api/book') {
     if (defaultBookAccessManager.isHostedMode()) {
@@ -31,7 +33,7 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
   }
 
   if (path === '/api/book.state') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -47,7 +49,7 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
   }
 
   if (path === '/api/story-brain.entities') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -59,7 +61,7 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
   }
 
   if (path === '/api/story-brain.facts') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true

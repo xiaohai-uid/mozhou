@@ -65,7 +65,7 @@ export class PaymentNotificationDispatcher {
   /**
    * 处理支付宝异步通知
    */
-  processAlipayNotification(params: Record<string, string>): ProcessNotificationResult {
+  processAlipayNotification(params: Record<string, string>, rawPayloadText?: string): ProcessNotificationResult {
     try {
       const tx = defaultAlipayVerifier.verifyAndParseNotification(params)
       const event: PaymentEventRecord = {
@@ -73,7 +73,7 @@ export class PaymentNotificationDispatcher {
         channel: 'alipay',
         orderId: tx.outTradeNo,
         eventType: 'TRADE_STATUS_SYNC',
-        rawPayload: JSON.stringify(params),
+        rawPayload: rawPayloadText ?? JSON.stringify(params),
         receivedAt: tx.notifyTime,
       }
 

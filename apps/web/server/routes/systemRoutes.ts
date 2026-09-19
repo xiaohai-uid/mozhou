@@ -167,12 +167,14 @@ function databaseBytes(root: string | null): number {
   }
 }
 
-export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
+export const systemRoutes: RouteHandler = (req, res, { path, body, json, authorizedBook }) => {
   if (req.method !== 'POST' && !(req.method === 'GET' && path === '/api/membership')) return false
+
+  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
 
   /* ---- 风格画像与蒸馏 ---- */
   if (path === '/api/style') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     if (root === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -189,7 +191,7 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   if (path === '/api/style.distill') {
     const text = typeof body['text'] === 'string' ? body['text'] : ''
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
 
     let currentProfiles = null
     if (root !== null) {
@@ -208,7 +210,7 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
   /* ---- 小说拆解 ---- */
   if (path === '/api/novel-breakdown') {
     const sampleText = typeof body['sampleText'] === 'string' ? body['sampleText'].trim() : ''
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
 
     let textToAnalyze = sampleText
     if (!textToAnalyze && root !== null) {
@@ -276,7 +278,7 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 本地离线状态（不伪装成云同步） ---- */
   if (path === '/api/cloud-sync') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     let fileCount = 0
     if (root !== null) {
       try {
@@ -311,7 +313,7 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/cloud-sync.backup') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     if (root === null) {
       json(400, { ok: false, error: 'root required' })
       return true

@@ -30,10 +30,10 @@ import {
   generateStoryboardCandidate,
 } from '../storyboard/generate.js'
 
-export const storyboardRoutes: RouteHandler = async (req, res, { path, body, json }) => {
+export const storyboardRoutes: RouteHandler = async (req, res, { path, body, json, authorizedBook }) => {
   if (req.method !== 'POST') return false
 
-  const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+  const rawRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
 
   if (path === '/api/storyboard.source') {
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null

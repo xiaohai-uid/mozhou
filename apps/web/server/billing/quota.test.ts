@@ -1,11 +1,11 @@
 // @vitest-environment node
 /**
- * 官方模型额度预留、并发争夺与结算测试 (T15 · QuotaManager)。
+ * 官方模型额度预留、并发争夺、日断路器与结算测试 (T15 · QuotaManager)。
  */
 import { describe, expect, it } from 'vitest'
 import { QuotaManager } from './quota.js'
 
-describe('QuotaManager 额度事务与并发测试 (T15)', () => {
+describe('QuotaManager 额度事务、断路器与并发测试 (T15)', () => {
   it('20 并发争夺余额 1：原子保证仅 1 个成功，其余 19 个抛出 QUOTA_EXHAUSTED', async () => {
     const quota = new QuotaManager()
     const userId = 'usr_tight_budget'
@@ -41,6 +41,55 @@ describe('QuotaManager 额度事务与并发测试 (T15)', () => {
 
     // 此时可用余额为 0
     expect(quota.getBalance(userId).availableUnits).toBe(0)
+  })
+
+  it('全局最大并发限制：超过最大在途预留量时抛出 CONCURRENCY_LIMIT_EXCEEDED', async () => {
+    const quota = new QuotaManager()
+    quota.setGlobalConcurrencyLimit(2) // 设定最大在途并发为 2
+
+    // 预留第 1 和第 2 个
+    await quota.reserve('user_1', 'op_concurrent_1', 1)
+    await quota.reserve('user_2', 'op_concurrent_2', 1)
+
+    // 第 3 个在途请求被并发门禁拒绝
+    await expect(quota.reserve('user_3', 'op_concurrent_3', 1)).rejects.toThrow(
+      /CONCURRENCY_LIMIT_EXCEEDED/,
+    )
+
+    // 结算其中一个后并发恢复
+    await quota.settle('user_1', 'op_concurrent_1')
+    await expect(quota.reserve('user_3', 'op_concurrent_3', 1)).resolves.toBeDefined()
+  })
+
+  it('服务全局日成本断路器：累计日费用触顶时熔断，阻断后续请求并给出次日恢复时间', async () => {
+    const quota = new QuotaManager()
+    quota.setDailyBudgetFen(100) // 设定极小日预算 100 分进行测试
+
+    // 预留并消耗 100 分
+    await quota.reserve('user_a', 'op_cost_1', 1)
+    await quota.settle('user_a', 'op_cost_1', 1000, 100)
+
+    expect(quota.isCircuitBreakerTripped()).toBe(true)
+
+    // 后续请求被全局日断路器熔断拦截
+    await expect(quota.reserve('user_b', 'op_cost_2', 1)).rejects.toThrow(
+      /CIRCUIT_BREAKER_TRIPPED/,
+    )
+  })
+
+  it('用户月度模型预算超限时拒绝并返回恢复日期', async () => {
+    const quota = new QuotaManager()
+    const userId = 'usr_monthly_spender'
+    quota.setUserMonthlyBudget(userId, 500) // 设定月度预算 500 分
+
+    // 消耗 500 分
+    await quota.reserve(userId, 'op_month_1', 1)
+    await quota.settle(userId, 'op_month_1', 5000, 500)
+
+    // 再次预留被月度预算拦截，错误信息包含 recovery date
+    await expect(quota.reserve(userId, 'op_month_2', 1)).rejects.toThrow(
+      /USER_BUDGET_EXCEEDED/,
+    )
   })
 
   it('成功结算扣减用量，取消释放保留额度', async () => {

@@ -201,11 +201,13 @@ function mockDraftStream(prompt: string, onDelta?: (text: string) => void): Asyn
   })()
 }
 
-export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json }) => {
+export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, authorizedBook }) => {
   if (req.method !== 'POST') return false
 
+  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+
   if (path === '/api/session.open') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (root === null || chapterIndex === null) {
       json(400, { ok: false, error: 'root and chapterIndex required' })
@@ -221,7 +223,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/session.advance') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (root === null || chapterIndex === null) {
       json(400, { ok: false, error: 'root and chapterIndex required' })
@@ -280,7 +282,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/draft.stream') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     const rawPrompt = typeof body['prompt'] === 'string' ? body['prompt'].trim() : ''
     const activeSkills = Array.isArray(body['activeSkills'])
@@ -385,7 +387,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
 
   /* ---- C2（T04）：候选查询/取消/采纳 ---- */
   if (path === '/api/draft.candidate') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
     if (root === null || candidateId === null) {
       json(400, { ok: false, error: 'root and candidateId required' })
@@ -401,7 +403,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/draft.cancel') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
     if (root === null || candidateId === null) {
       json(400, { ok: false, error: 'root and candidateId required' })
@@ -417,7 +419,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/draft.accept') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
     const idempotencyKey = typeof body['idempotencyKey'] === 'string' ? body['idempotencyKey'] : null
     const rawBase = body['base'] as { revision?: unknown; sha256?: unknown } | undefined
@@ -456,7 +458,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
 
   /* ---- 文学质量审查与回炉 ---- */
   if (path === '/api/chapter.review') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (root === null || chapterIndex === null) {
       json(400, { ok: false, error: 'root and chapterIndex required' })
@@ -513,7 +515,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/chapter.rework') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (root === null || chapterIndex === null) {
       json(400, { ok: false, error: 'root and chapterIndex required' })
@@ -538,7 +540,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/chapter.corrections') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     const reasons = Array.isArray(body['reasons']) ? (body['reasons'] as string[]) : []
     const note = typeof body['note'] === 'string' ? body['note'] : undefined
@@ -579,7 +581,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json 
   }
 
   if (path === '/api/chapter.quality') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
     if (rawRoot === null || chapterIndex === null) {
       json(400, { ok: false, error: 'root and chapterIndex required' })

@@ -35,12 +35,14 @@ function sanitizeDirName(title: string): string {
   return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
-export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
+export const worksRoutes: RouteHandler = (req, res, { path, body, json, authorizedBook }) => {
   if (req.method !== 'POST') return false
+
+  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
 
   /* ---- 装配看板 Receipt 读面 ---- */
   if (path === '/api/receipts') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -61,7 +63,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/receipt') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     const receiptId = typeof body['receiptId'] === 'string' ? body['receiptId'] : null
     if (rawRoot === null || receiptId === null) {
       json(400, { ok: false, error: 'root and receiptId required' })
@@ -91,7 +93,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 变更矩阵与 Traversal 影响审计 ---- */
   if (path === '/api/change-matrix') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -105,7 +107,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/change-matrix.rerun') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     const traversalId = typeof body['traversalId'] === 'string' ? body['traversalId'] : null
     if (rawRoot === null || traversalId === null) {
       json(400, { ok: false, error: 'root and traversalId required' })
@@ -135,7 +137,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 作品概览与全景目录 ---- */
   if (path === '/api/works') {
-    const rawRoot = typeof body['root'] === 'string' ? body['root'] : null
+    const rawRoot = resolvedRoot
     if (rawRoot === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -175,7 +177,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
 
   /* ---- 任务中心账本流水 ---- */
   if (path === '/api/tasks') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     if (root === null) {
       json(400, { ok: false, error: 'root required' })
       return true
@@ -230,7 +232,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
   }
 
   if (path === '/api/ledger') {
-    const root = typeof body['root'] === 'string' ? body['root'] : null
+    const root = resolvedRoot
     if (root === null) {
       json(400, { ok: false, error: 'root required' })
       return true
