@@ -168,58 +168,94 @@ export function WorkbenchView({
           <DialogueStream book={book} chapterIndex={chapterIndex} selection={editorSelection} />
         </div>
 
-        <section className="wb-section" data-testid="create-book">
-          <h2>建书</h2>
-          <div className="card-shell">
-            <div className="card">
-              <div className="card-title">
-                <b>新建作品</b>
-                {book !== null && <span className="mono muted">已建</span>}
-              </div>
-              <div className="actions">
-                <input
-                  className="control"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  disabled={createBusy}
-                  aria-label="作品名"
-                  style={{ flex: 1, minWidth: 160 }}
-                />
-                <button className="btn-primary" onClick={() => void handleCreateBook()} disabled={createBusy}>
-                  {createBusy ? '创建中…' : '创建'}
-                </button>
-              </div>
-              {book !== null && (
-                <p data-testid="created-book" className="mono muted" style={{ margin: '10px 0 0' }}>
-                  已建：根 {book.root} · 书 {book.bookId}
-                </p>
-              )}
-              {createError !== null && <p className="wb-error" role="alert">错误：{createError}</p>}
-            </div>
-          </div>
-        </section>
-
-        <section className="wb-section" data-testid="ledger">
-          <h2>账本</h2>
-          <div className="actions">
-            <button className="btn" onClick={() => void handleRefreshLedger()} disabled={book === null}>
-              刷新账本
-            </button>
-            <span className="mono muted" style={{ alignSelf: 'center' }}>
-              Phase 5 遍历 / 风格学习事件会出现在这里
-            </span>
-          </div>
-          {ledgerError !== null && <p className="wb-error" role="alert">错误：{ledgerError}</p>}
-          {events.length > 0 && (
-            <div className="card-shell" style={{ marginTop: 10 }}>
-              <div className="card">
-                <div className="mono muted" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {events.map((ev, index) => <div key={index}>• {ev}</div>)}
+        {book === null ? (
+          <section className="wb-section" data-testid="create-book">
+            <div className="card-shell" style={{ maxWidth: 580, margin: '24px auto' }}>
+              <div className="card" style={{ padding: '28px 32px', textAlign: 'center' }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #6366f1, #4f46e5)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: '#fff', fontSize: 18, boxShadow: '0 4px 16px rgba(99, 102, 241, 0.4)' }}>
+                  ✒️
                 </div>
+                <h2 style={{ fontSize: 16, fontWeight: 600, color: '#f4f4f5', margin: '0 0 6px' }}>建立您的长篇创作空间</h2>
+                <p className="muted" style={{ fontSize: 12, margin: '0 0 18px', lineHeight: 1.6 }}>
+                  墨舟为您在本地建立完全离线、具备因果状态机与文学质量门禁的正典小说。
+                </p>
+                <div className="actions" style={{ maxWidth: 420, margin: '0 auto', display: 'flex', gap: 8 }}>
+                  <input
+                    className="control"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    disabled={createBusy}
+                    aria-label="作品名"
+                    placeholder="输入小说书名 (如：假神真显灵、万道祖师...)"
+                    style={{ flex: 1, minWidth: 200, padding: '8px 12px', fontSize: 13 }}
+                  />
+                  <button className="btn-primary" onClick={() => void handleCreateBook()} disabled={createBusy} style={{ padding: '8px 18px', fontSize: 13, whiteSpace: 'nowrap' }}>
+                    {createBusy ? '创建中…' : '创建'}
+                  </button>
+                </div>
+                {createError !== null && <p className="wb-error" role="alert" style={{ marginTop: 10 }}>错误：{createError}</p>}
               </div>
             </div>
-          )}
-        </section>
+            <div data-testid="ledger" style={{ display: 'none' }}>
+              <button className="btn" onClick={() => void handleRefreshLedger()} disabled>刷新账本</button>
+            </div>
+          </section>
+        ) : (
+          <details className="card-shell" style={{ marginTop: 24, cursor: 'pointer' }}>
+            <summary style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-faint)', outline: 'none', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>作品管理与本地账本记录</span>
+              <span style={{ fontSize: 10 }}>展开 ▾</span>
+            </summary>
+            <div style={{ padding: '10px 14px' }}>
+              <section className="wb-section" data-testid="create-book" style={{ border: 'none', padding: 0 }}>
+                <div className="card" style={{ padding: 14 }}>
+                  <div className="card-title">
+                    <b>作品元数据</b>
+                    <span className="mono muted">已建</span>
+                  </div>
+                  <div className="actions">
+                    <input
+                      className="control"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      disabled={createBusy}
+                      aria-label="作品名"
+                      style={{ flex: 1, minWidth: 160 }}
+                    />
+                    <button className="btn-primary" onClick={() => void handleCreateBook()} disabled={createBusy}>
+                      {createBusy ? '创建中…' : '创建'}
+                    </button>
+                  </div>
+                  <p data-testid="created-book" className="mono muted" style={{ margin: '10px 0 0' }}>
+                    已建：根 {book.root} · 书 {book.bookId}
+                  </p>
+                  {createError !== null && <p className="wb-error" role="alert">错误：{createError}</p>}
+                </div>
+              </section>
+
+              <section className="wb-section" data-testid="ledger" style={{ border: 'none', padding: '12px 0 0' }}>
+                <div className="actions">
+                  <button className="btn" onClick={() => void handleRefreshLedger()} disabled={book === null}>
+                    刷新账本
+                  </button>
+                  <span className="mono muted" style={{ alignSelf: 'center' }}>
+                    Phase 5 遍历 / 风格学习事件会出现在这里
+                  </span>
+                </div>
+                {ledgerError !== null && <p className="wb-error" role="alert">错误：{ledgerError}</p>}
+                {events.length > 0 && (
+                  <div className="card-shell" style={{ marginTop: 10 }}>
+                    <div className="card">
+                      <div className="mono muted" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {events.map((ev, index) => <div key={index}>• {ev}</div>)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </div>
+          </details>
+        )}
       </div>
 
       <DesktopToolModals activeModal={activeModal} onClose={() => setActiveModal(null)} />

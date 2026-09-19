@@ -56,41 +56,42 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
   };
 
   return (
-    <div className="relative w-full h-full min-h-[600px] bg-zinc-950/80 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+    <div className="relative w-full h-full min-h-[600px] bg-zinc-950/90 border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl flex flex-col backdrop-blur-xl">
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-5 py-3 bg-zinc-900/60 border-b border-zinc-800/80 backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 bg-zinc-900/70 border-b border-white/[0.08] backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <span className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.6)]" />
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)]" />
           <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">
             正典关系与因果拓扑图谱 {book ? `· 《${book.title}》` : ''}
           </h2>
-          <span className="text-xs text-zinc-500 bg-zinc-800/60 px-2 py-0.5 rounded-full">
-            {nodes.length} 实体 / {links.length} 关系边 {isLive ? (isEmpty ? '(空正典)' : '(实时正典)') : isDemo ? '(示例演示)' : ''}
+          <span className="text-[11px] text-zinc-400 bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 rounded-full font-mono">
+            {nodes.length} 实体 · {links.length} 羁绊 {isLive ? (isEmpty ? '(空正典)' : '(实时正典)') : isDemo ? '(示例演示)' : ''}
           </span>
         </div>
 
         {/* Actions & Filter */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {selectedNode && (
             <button
               type="button"
               onClick={() => handleStartContract(selectedNode)}
-              className="px-2.5 py-1 bg-amber-600/80 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold shadow transition-all"
+              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-semibold shadow-lg shadow-amber-600/30 transition-all flex items-center gap-1.5 active:scale-[0.98]"
             >
-              + 与「{selectedNode.name}」建立契约
+              <span>✦</span>
+              <span>与「{selectedNode.name}」建立契约</span>
             </button>
           )}
 
-          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 p-1 rounded-lg text-xs">
+          <div className="flex items-center gap-1 bg-zinc-900/90 border border-white/[0.08] p-1 rounded-xl text-xs">
             {['all', 'character', 'faction', 'item'].map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setFilterType(t)}
-                className={`px-2.5 py-1 rounded transition-colors ${
+                className={`px-3 py-1 rounded-lg transition-all ${
                   filterType === t
-                    ? 'bg-indigo-600 text-white font-medium'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                    ? 'bg-indigo-600 text-white font-medium shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
                 }`}
               >
                 {t === 'all' ? '全部' : t === 'character' ? '人物' : t === 'faction' ? '势力' : '道具'}
@@ -102,119 +103,181 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
 
       {/* Interactive SVG Canvas or Empty State */}
       {isEmpty ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px]">
-          <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 mb-3 text-lg">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:24px_24px]">
+          <div className="w-14 h-14 rounded-2xl bg-zinc-900/80 border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-3 text-2xl shadow-xl">
             📜
           </div>
-          <b className="text-sm text-zinc-300">《{book?.title ?? '当前作品'}》尚无正典实体卡</b>
-          <p className="text-xs text-zinc-500 max-w-sm mt-1 leading-relaxed">
+          <b className="text-sm text-zinc-200">《{book?.title ?? '当前作品'}》尚无正典实体卡</b>
+          <p className="text-xs text-zinc-500 max-w-sm mt-1.5 leading-relaxed">
             当前书库未检测到人物、势力、地点或道具设定卡。可在工作台「Story Brain」或「设定/」目录中创建卡片，拓扑图谱将自动实时呈现实体关系与因果契约。
           </p>
         </div>
       ) : (
-        <div className="relative flex-1 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:16px_16px] overflow-hidden cursor-crosshair">
-        <svg className="w-full h-full">
-          {/* Render Links */}
-          {links.map((link, idx) => {
-            const sourceNode = nodes.find((n) => n.id === link.source);
-            const targetNode = nodes.find((n) => n.id === link.target);
-            if (!sourceNode || !targetNode) return null;
+        <div className="relative flex-1 bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden cursor-crosshair">
+          <svg className="w-full h-full">
+            <defs>
+              <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-indigo" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <linearGradient id="link-contract" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#d97706" stopOpacity="0.8" />
+              </linearGradient>
+              <linearGradient id="link-normal" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.5" />
+              </linearGradient>
+            </defs>
 
-            return (
-              <g key={idx}>
-                <line
-                  x1={sourceNode.x}
-                  y1={sourceNode.y}
-                  x2={targetNode.x}
-                  y2={targetNode.y}
-                  stroke={link.contract ? '#f59e0b' : '#4f46e5'}
-                  strokeWidth={link.contract ? 2 : 1.2}
-                  strokeDasharray={link.contract ? '4 2' : undefined}
-                  opacity={0.65}
-                />
-                <text
-                  x={(sourceNode.x + targetNode.x) / 2}
-                  y={(sourceNode.y + targetNode.y) / 2 - 6}
-                  fill="#a1a1aa"
-                  fontSize="10"
-                  textAnchor="middle"
-                  className="select-none font-sans"
+            {/* Render Links */}
+            {links.map((link, idx) => {
+              const sourceNode = nodes.find((n) => n.id === link.source);
+              const targetNode = nodes.find((n) => n.id === link.target);
+              if (!sourceNode || !targetNode) return null;
+
+              const isContract = Boolean(link.contract);
+              const midX = (sourceNode.x + targetNode.x) / 2;
+              const midY = (sourceNode.y + targetNode.y) / 2;
+
+              return (
+                <g key={idx}>
+                  <line
+                    x1={sourceNode.x}
+                    y1={sourceNode.y}
+                    x2={targetNode.x}
+                    y2={targetNode.y}
+                    stroke={isContract ? 'url(#link-contract)' : 'url(#link-normal)'}
+                    strokeWidth={isContract ? 2.5 : 1.4}
+                    strokeDasharray={isContract ? '5 3' : undefined}
+                    filter={isContract ? 'url(#glow-gold)' : undefined}
+                  />
+                  <rect
+                    x={midX - 32}
+                    y={midY - 14}
+                    width={64}
+                    height={18}
+                    rx={5}
+                    fill="#09090b"
+                    stroke={isContract ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.1)'}
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={midX}
+                    y={midY - 2}
+                    fill={isContract ? '#fbbf24' : '#a1a1aa'}
+                    fontSize="9.5"
+                    textAnchor="middle"
+                    className="select-none font-sans font-medium"
+                  >
+                    {link.relation}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Render Nodes */}
+            {filteredNodes.map((node) => {
+              const isSelected = selectedNode?.id === node.id;
+              const nodeColor =
+                node.type === 'character'
+                  ? '#6366f1'
+                  : node.type === 'faction'
+                  ? '#10b981'
+                  : node.type === 'location'
+                  ? '#0ea5e9'
+                  : '#f59e0b';
+
+              return (
+                <g
+                  key={node.id}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onClick={() => setSelectedNode(node)}
+                  className="cursor-pointer group"
                 >
-                  {link.relation}
-                </text>
-              </g>
-            );
-          })}
+                  {/* Outer aura ring on select */}
+                  {isSelected && (
+                    <circle
+                      r={34}
+                      fill="none"
+                      stroke={nodeColor}
+                      strokeWidth={1.5}
+                      strokeDasharray="4 2"
+                      opacity={0.7}
+                      className="animate-spin origin-center duration-1000"
+                    />
+                  )}
 
-          {/* Render Nodes */}
-          {filteredNodes.map((node) => {
-            const isSelected = selectedNode?.id === node.id;
-            return (
-              <g
-                key={node.id}
-                transform={`translate(${node.x}, ${node.y})`}
-                onClick={() => setSelectedNode(node)}
-                className="cursor-pointer group"
-              >
-                <circle
-                  r={isSelected ? 26 : 22}
-                  fill={
-                    node.type === 'character'
-                      ? '#4f46e5'
-                      : node.type === 'faction'
-                      ? '#059669'
-                      : '#d97706'
-                  }
-                  fillOpacity={0.85}
-                  stroke={isSelected ? '#ffffff' : '#27272a'}
-                  strokeWidth={isSelected ? 3 : 2}
-                  className="transition-all duration-150 group-hover:scale-110"
-                />
-                <text
-                  textAnchor="middle"
-                  dy="4"
-                  fill="#ffffff"
-                  fontSize="11"
-                  fontWeight="bold"
-                  className="select-none pointer-events-none"
-                >
-                  {node.name.slice(0, 3)}
-                </text>
-                <text
-                  textAnchor="middle"
-                  dy="38"
-                  fill="#d4d4d8"
-                  fontSize="11"
-                  className="select-none pointer-events-none font-medium"
-                >
-                  {node.name}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                  {/* Base Circle */}
+                  <circle
+                    r={isSelected ? 26 : 22}
+                    fill="#111216"
+                    stroke={nodeColor}
+                    strokeWidth={isSelected ? 3 : 2}
+                    filter={isSelected ? 'url(#glow-indigo)' : undefined}
+                    className="transition-all duration-200 group-hover:scale-110"
+                  />
+                  <circle
+                    r={isSelected ? 20 : 16}
+                    fill={nodeColor}
+                    fillOpacity={0.25}
+                    className="transition-all duration-200"
+                  />
+                  <text
+                    textAnchor="middle"
+                    dy="4"
+                    fill="#f4f4f5"
+                    fontSize="11"
+                    fontWeight="600"
+                    className="select-none pointer-events-none font-sans"
+                  >
+                    {node.name.slice(0, 3)}
+                  </text>
+                  <text
+                    textAnchor="middle"
+                    dy="40"
+                    fill="#e4e4e7"
+                    fontSize="11"
+                    className="select-none pointer-events-none font-medium tracking-wide drop-shadow"
+                  >
+                    {node.name}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
 
-        {/* Selected Node Card Overlay */}
-        {selectedNode && (
-          <CanonNodeCard
-            node={selectedNode}
-            relatedLinks={links.filter(
-              (l) => l.source === selectedNode.id || l.target === selectedNode.id
-            )}
-            onClose={() => setSelectedNode(null)}
-          />
-        )}
+          {/* Selected Node Card Overlay */}
+          {selectedNode && (
+            <CanonNodeCard
+              node={selectedNode}
+              relatedLinks={links.filter(
+                (l) => l.source === selectedNode.id || l.target === selectedNode.id,
+              )}
+              onClose={() => setSelectedNode(null)}
+            />
+          )}
 
-        {/* Create Contract Modal */}
-        {selectedNode && contractTarget && (
-          <CreateContractModal
-            isOpen={modalOpen}
-            onClose={() => setModalOpen(false)}
-            sourceName={selectedNode.name}
-            targetName={contractTarget.name}
-            onCreateContract={handleCreateContract}
-          />
-        )}
+          {/* Create Contract Modal */}
+          {selectedNode && contractTarget && (
+            <CreateContractModal
+              isOpen={modalOpen}
+              onClose={() => setModalOpen(false)}
+              sourceName={selectedNode.name}
+              targetName={contractTarget.name}
+              onCreateContract={handleCreateContract}
+            />
+          )}
         </div>
       )}
     </div>
