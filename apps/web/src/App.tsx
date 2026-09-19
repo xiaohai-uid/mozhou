@@ -266,9 +266,9 @@ export function App(): JSX.Element {
         ) : view === 'tasks' ? (
           <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
         ) : view === 'genre-kits' ? (
-          <GenreKitMarketplaceView />
+          <GenreKitMarketplaceView book={book} />
         ) : view === 'canon-graph' ? (
-          <CanonGraphView />
+          <CanonGraphView book={book} />
         ) : view === 'style-distill' ? (
           <StyleDistillView root={book?.root ?? null} />
         ) : view === 'novel-breakdown' ? (
@@ -298,7 +298,7 @@ export function App(): JSX.Element {
           onReplay={handleWizardDismiss}
         />
       )}
-      <DesktopToolModals activeModal={desktopModal} onClose={() => setDesktopModal(null)} />
+      <DesktopToolModals activeModal={desktopModal} book={book} onClose={() => setDesktopModal(null)} />
       {sceneSheetOpen && (
         <SceneSettingsSheet
           preference={scenePreference}

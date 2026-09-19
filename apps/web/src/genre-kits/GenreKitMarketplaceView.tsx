@@ -1,15 +1,35 @@
 import React, { useState } from 'react';
 import { GENRE_PRESETS, GenreKit } from './genrePresets';
+import { post } from '../lib/post';
+import type { BookInfo } from '../shell/workbenchStorage';
 
-export const GenreKitMarketplaceView: React.FC = () => {
+export const GenreKitMarketplaceView: React.FC<{
+  book?: BookInfo | null | undefined;
+}> = ({ book }) => {
   const [selectedKit, setSelectedKit] = useState<GenreKit>(GENRE_PRESETS[0]!);
   const [applied, setApplied] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [appliedDetail, setAppliedDetail] = useState<string | null>(null);
 
-  const handleApply = (kit: GenreKit) => {
-    setApplied(kit.id);
-    setTimeout(() => {
+  const handleApply = async (kit: GenreKit) => {
+    setApplyError(null);
+    setAppliedDetail(null);
+    if (!book?.root) {
+      setApplyError('当前未建立/未打开作品，请先建书后再载入流派设定。');
       setApplied(null);
-    }, 2000);
+      return;
+    }
+    try {
+      const res = await post<{ ok: boolean; appliedCount?: number }>('/api/genre-kit.apply', {
+        root: book.root,
+        kitId: kit.id,
+      });
+      setApplied(kit.id);
+      setAppliedDetail(`已注入 ${res.appliedCount ?? 0} 项流派设定到当前作品。`);
+    } catch (e) {
+      setApplyError((e as Error).message);
+      setApplied(null);
+    }
   };
 
   return (
@@ -65,7 +85,7 @@ export const GenreKitMarketplaceView: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => handleApply(selectedKit)}
+                onClick={() => void handleApply(selectedKit)}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all flex items-center gap-1.5"
               >
                 <span>🚀</span>
@@ -115,6 +135,16 @@ export const GenreKitMarketplaceView: React.FC = () => {
                 ))}
               </div>
             </div>
+            {applyError && (
+              <div style={{ fontSize: 11, color: 'var(--danger)', padding: '6px 8px', background: 'var(--surface-sunken)', borderRadius: 6 }}>
+                错误：{applyError}
+              </div>
+            )}
+            {appliedDetail && (
+              <div style={{ fontSize: 11, color: 'var(--success)', padding: '6px 8px', background: 'var(--surface-sunken)', borderRadius: 6 }}>
+                {appliedDetail}
+              </div>
+            )}
           </div>
         </div>
       </div>

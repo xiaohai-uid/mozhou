@@ -35,10 +35,10 @@ function sanitizeDirName(title: string): string {
   return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
-export const worksRoutes: RouteHandler = (req, res, { path, body, json, authorizedBook }) => {
+export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST') return false
 
-  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+  const resolvedRoot = bookRoot ?? null
 
   /* ---- 装配看板 Receipt 读面 ---- */
   if (path === '/api/receipts') {

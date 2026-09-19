@@ -11,8 +11,23 @@
 import type { RouteHandler } from '../router.js'
 import { defaultSearchProvider } from '../search/provider.js'
 
-export const truthfulPreviewRoutes: RouteHandler = (req, _res, { path, json }) => {
+export const truthfulPreviewRoutes: RouteHandler = (req, _res, { path, body, json }) => {
   if (req.method !== 'POST') return false
+
+  if (path === '/api/novel-breakdown') {
+    const hasRealKey =
+      Boolean(process.env['MOZHOU_API_KEY']) ||
+      Boolean(process.env['DEEPSEEK_API_KEY']) ||
+      Boolean(process.env['OPENAI_API_KEY'])
+    if (!hasRealKey && body['allowHeuristic'] !== true) {
+      json(501, {
+        ok: false,
+        code: 'NOVEL_BREAKDOWN_NOT_IMPLEMENTED',
+        error: 'Technical Preview 尚未接入真实拆解模型/分析引擎；未接入时不展示虚构拆书结构。',
+      })
+      return true
+    }
+  }
 
   if (path === '/api/web-search' && !defaultSearchProvider.isConfigured()) {
     json(501, {

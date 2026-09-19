@@ -149,10 +149,9 @@ describe('release hardening · truthful Technical Preview surfaces', () => {
   it('does not fabricate a novel breakdown when no real breakdown provider is wired', async () => {
     const base = await listen()
     const { response, data } = await jsonPost(base, '/api/novel-breakdown', { sampleText: '真实样本文本' })
-    expect(response.status).toBe(200)
-    expect(data.ok).toBe(true)
-    expect(data.result).toBeDefined()
-    expect((data.result as Record<string, unknown>).origin).toBe('local-heuristic')
+    expect(response.status).toBe(501)
+    expect(data.code).toBe('NOVEL_BREAKDOWN_NOT_IMPLEMENTED')
+    expect(data.result).toBeUndefined()
   })
 
   it('does not present the built-in knowledge demo as live web search', async () => {

@@ -1083,20 +1083,25 @@ describe('风格蒸馏 API 契约', () => {
  * 小说拆解 API 契约：/api/novel-breakdown（T51 · 本地启发式分析兜底）。
  * ------------------------------------------------------------------------- */
 describe('小说拆解 API 契约', () => {
-  it('POST /api/novel-breakdown：未传样章与书目时返回 200 且 result 为 null', async () => {
+  it('POST /api/novel-breakdown：未传 allowHeuristic 且无 provider 时显式 501 保护', async () => {
     const base = await listen()
-    const { status, data } = await post(base, '/api/novel-breakdown', {})
-    expect(status).toBe(200)
-    expect(data.ok).toBe(true)
-    expect(data.result).toBeNull()
+    const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '真实样本文本' })
+    expect(status).toBe(501)
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('NOVEL_BREAKDOWN_NOT_IMPLEMENTED')
+    expect(data.result).toBeUndefined()
   })
 
-  it('POST /api/novel-breakdown：传入样本文本时以本地启发式算法返回真实结构化拆解', async () => {
+  it('POST /api/novel-breakdown：传入 allowHeuristic: true 时以本地启发式算法返回真实结构化拆解', async () => {
     const base = await listen()
-    const { status, data } = await post(base, '/api/novel-breakdown', { sampleText: '秦三在破庙中拔剑迎敌。' })
+    const { status, data } = await post(base, '/api/novel-breakdown', {
+      sampleText: '秦三在破庙中拔剑迎敌。',
+      allowHeuristic: true,
+    })
     expect(status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.result).toBeDefined()
+    expect(data.result.origin).toBe('local-heuristic')
     expect(typeof data.result.storyCore.protagonist).toBe('string')
   })
 })

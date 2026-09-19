@@ -109,6 +109,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/storyboards': 'book',
   '/api/storyboard': 'book',
   '/api/style': 'book',
+  '/api/genre-kit.apply': 'book',
 })
 
 /**

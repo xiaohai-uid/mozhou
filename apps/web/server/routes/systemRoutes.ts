@@ -4,11 +4,55 @@
 import type { RouteHandler } from '../router.js'
 import { evaluateStyleMetrics } from '@mozhou/quality-engine'
 import { readCanonState, readStyleProfiles, RUNTIME_DB_PATH } from '@mozhou/data-plane'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { hasDraftProvider } from './pipelineRoutes.js'
 import { billingCatalog } from '../billing/catalog.js'
 import { analyzeNovelBreakdown } from '../analysis/novelBreakdown.js'
+
+interface GenreKitDefinition {
+  id: string
+  name: string
+  goldenFinger: string
+  coreRule: string
+  bannedTropes: string[]
+  openingBeats: string[]
+}
+
+const GENRE_KITS: GenreKitDefinition[] = [
+  {
+    id: 'fake_god_occult',
+    name: '灵异复苏 · 伪装神明流',
+    goldenFinger: '假神成真系统 / 香火愿力转化池',
+    coreRule: '凡是显灵必有代价；凡人香火越盛，石像神明复苏越深。',
+    bannedTropes: ['开局直接天下无敌', '无脑倒贴女主', '机械降神式无代价反转'],
+    openingBeats: ['破庙立身：骗子设局招摇撞骗', '初次显灵：绝症患者奇迹康复引发轰动', '神像活化：深夜石像清嗓发出老者哼声'],
+  },
+  {
+    id: 'fanqie_brainhole',
+    name: '番茄脑洞 · 概念神打脸流',
+    goldenFinger: '因果律言出法随（嘲讽即反噬）',
+    coreRule: '越离谱的嘲讽，转化出的天道神罚威力越大。',
+    bannedTropes: ['苦大仇深强行虐主', '长篇累牍解释设定', '圣母放过反派'],
+    openingBeats: ['退婚羞辱：反派当众扬言你若能筑基我当场吃翔', '概念神启动：天地变色神雷助主角原地突破', '直播兑现：全宗门围观反派履约'],
+  },
+  {
+    id: 'traditional_xianxia',
+    name: '凡人修仙 · 苟道长生流',
+    goldenFinger: '神秘造化掌天瓶（催熟天地万物）',
+    coreRule: '杀人必扬灰，凡事留三手；未有十成把握绝不出关。',
+    bannedTropes: ['为了面子强行越级拼命', '收留来历不明的绝美女子', '在闹市大肆招摇显摆宝物'],
+    openingBeats: ['深山偶得：跌落断崖意外捡到无名青铜残瓶', '暗中催熟：三年份黄龙草一夜蜕变为千年灵药', '隐忍蛰伏：用上品丹药暗中换取保命隐匿秘术'],
+  },
+  {
+    id: 'urban_detective',
+    name: '都市异能 · 特事处调查官',
+    goldenFinger: '绝对理智之眼（解析万物规则弱点）',
+    coreRule: '不可直视高维本体；遵循怪谈守则可规避必死攻击。',
+    bannedTropes: ['不讲逻辑的唯心暴种', '队友全部降智', '特事局高层全是反派内奸'],
+    openingBeats: ['凶案现场：雨夜密闭公寓里的全员消失谜案', '规则初显：电梯在不存在的十三层无故停滞', '逻辑破局：利用重力差反向卡死异化实体'],
+  },
+]
 
 const CAPABILITY_SQUARE_GROUPS = [
   {
@@ -167,10 +211,10 @@ function databaseBytes(root: string | null): number {
   }
 }
 
-export const systemRoutes: RouteHandler = (req, res, { path, body, json, authorizedBook }) => {
+export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST' && !(req.method === 'GET' && path === '/api/membership')) return false
 
-  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+  const resolvedRoot = bookRoot ?? null
 
   /* ---- 风格画像与蒸馏 ---- */
   if (path === '/api/style') {
@@ -204,6 +248,43 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, authori
 
     const sampleMetrics = evaluateStyleMetrics(text)
     json(200, { ok: true, currentProfiles, sampleMetrics })
+    return true
+  }
+
+  /* ---- 流派工坊：注入流派设定到当前作品 ---- */
+  if (path === '/api/genre-kit.apply') {
+    const root = resolvedRoot
+    const kitId = typeof body['kitId'] === 'string' ? body['kitId'] : ''
+    if (root === null || kitId === '') {
+      json(400, { ok: false, error: 'root and kitId required' })
+      return true
+    }
+    const kit = GENRE_KITS.find((k) => k.id === kitId)
+    if (!kit) {
+      json(404, { ok: false, error: `unknown genre kit: ${kitId}` })
+      return true
+    }
+    const settingsDir = join(root, '设定')
+    const worldbuildingDir = join(settingsDir, '世界观')
+    mkdirSync(worldbuildingDir, { recursive: true })
+    const written: string[] = []
+    try {
+      const goldenFingerPath = join(worldbuildingDir, '金手指预设.md')
+      writeFileSync(goldenFingerPath, `# ${kit.name} · 金手指预设\n\n${kit.goldenFinger}\n`, { encoding: 'utf8' })
+      written.push(goldenFingerPath)
+      const coreRulePath = join(worldbuildingDir, '天道核心规则.md')
+      writeFileSync(coreRulePath, `# ${kit.name} · 核心天道规则\n\n${kit.coreRule}\n`, { encoding: 'utf8' })
+      written.push(coreRulePath)
+      const beatsPath = join(settingsDir, '黄金三章节拍器.md')
+      writeFileSync(beatsPath, `# ${kit.name} · 黄金三章节拍\n\n${kit.openingBeats.map((b, i) => `${i + 1}. ${b}`).join('\n')}\n`, { encoding: 'utf8' })
+      written.push(beatsPath)
+      const bannedPath = join(settingsDir, '流派避雷禁区.md')
+      writeFileSync(bannedPath, `# ${kit.name} · 避雷词库\n\n${kit.bannedTropes.map((t) => `- ${t}`).join('\n')}\n`, { encoding: 'utf8' })
+      written.push(bannedPath)
+      json(200, { ok: true, appliedCount: written.length })
+    } catch (err) {
+      json(500, { ok: false, error: (err as Error).message })
+    }
     return true
   }
 

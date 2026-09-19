@@ -30,11 +30,11 @@ export function AuthLicenseDrawer({ onOpenLicense }: AuthLicenseDrawerProps): JS
           本地环境与授权信息
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-muted-mobile)', lineHeight: 1.6 }}>
-          • 当前模式：本地单机创作者模式（Local-First）
+          • 运行模式：本地单机创作者模式（Local-First Technical Preview）
           <br />
-          • 设备识别：本设备已获独立硬件指纹授权
+          • 设备识别：单机本地实例（未绑定云端账号）
           <br />
-          • 数据安全：创作数据存储于本地 SQLite 与 Markdown 正典中
+          • 数据安全：创作数据存储于本地 SQLite 与 Markdown 正典，零数据上报
         </div>
       </div>
 

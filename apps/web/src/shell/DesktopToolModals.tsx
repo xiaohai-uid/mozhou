@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { useSheetA11y } from './useSheetA11y'
+import type { BookInfo } from './workbenchStorage'
 import {
   INSPIRATION_CHARACTERS,
   INSPIRATION_SECTS,
@@ -13,14 +14,14 @@ import {
   INSPIRATION_CRISES,
   getRandomPreset,
 } from '../shared/inspirationPresets'
-import { exportCleanTxt } from '../export-suite/txtCleanExporter'
-import { exportSubmissionDocx } from '../export-suite/docxExporter'
-import { exportSubmissionEpub } from '../export-suite/epubExporter'
+import { runLocalComplianceCheck } from '../shared/complianceCheck'
+import { downloadNovelExport, fetchBookChaptersForExport } from '../export-suite/exportDownload'
 
 export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'compliance'
 
 export interface DesktopToolModalsProps {
   activeModal: DesktopModalType
+  book?: BookInfo | null | undefined
   onClose: () => void
 }
 
@@ -43,7 +44,7 @@ function Unavailable({ children }: { children: string }): JSX.Element {
   )
 }
 
-export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsProps): JSX.Element | null {
+export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolModalsProps): JSX.Element | null {
   const [nameResult, setNameResult] = useState('陆玄 / 顾清河 / 赵铁鹰')
   const [sectResult, setSectResult] = useState('太虚道宗 / 九曜魔门')
   const [itemResult, setItemResult] = useState('破煞法弩 / 七绝离火镜')
@@ -51,9 +52,10 @@ export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsPro
 
   // 本地导出状态
   const [exportFormat, setExportFormat] = useState<'txt' | 'docx' | 'epub'>('txt')
-  const [exportTitle, setExportTitle] = useState('我的作品')
+  const [exportTitle, setExportTitle] = useState(book?.title ?? '我的作品')
   const [exportSampleText, setExportSampleText] = useState('')
   const [exportStatus, setExportStatus] = useState<string | null>(null)
+  const [exportingRealBook, setExportingRealBook] = useState(false)
 
   // 本地合规审查状态
   const [complianceText, setComplianceText] = useState('')
@@ -71,65 +73,34 @@ export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsPro
   }
 
   const runComplianceCheck = () => {
-    const issues: string[] = []
-    if (!complianceText.trim()) {
-      setComplianceResults(['请输入需要审查的文本段落'])
-      return
-    }
-    const realOfficialNames = ['公安部', '国务院', '中纪委', '省委', '市委', '信访局']
-    for (const name of realOfficialNames) {
-      if (complianceText.includes(name)) {
-        issues.push(`发现真实官方机构名「${name}」：网文灵异/现代题材建议使用架空名称（如龙国治安局、特事处等）`)
-      }
-    }
-    if (/(?:qq|微信|vx|vx号|扣扣|群号)[\s:：]*[0-9a-zA-Z]{5,}/i.test(complianceText)) {
-      issues.push('发现疑似联系方式/社交账号引流违规表达，建议移除或改为小说内部虚拟代号')
-    }
-    const leftQuotes = (complianceText.match(/“/g) || []).length
-    const rightQuotes = (complianceText.match(/”/g) || []).length
-    if (leftQuotes !== rightQuotes) {
-      issues.push(`双引号未闭合：左引号 ${leftQuotes} 处，右引号 ${rightQuotes} 处`)
-    }
-    if (issues.length === 0) {
-      issues.push('本地基础规则审查完成：未发现真实机构冲突、未闭合引号或明显违规引流表达。')
-    }
-    setComplianceResults(issues)
+    setComplianceResults(runLocalComplianceCheck(complianceText))
   }
 
-  const handleTriggerExport = () => {
+  const handleTriggerExport = async () => {
     try {
-      const title = exportTitle.trim() || '未命名作品'
-      const chapters = [
+      const title = exportTitle.trim() || book?.title || '未命名作品'
+      let chapters = [
         {
           chapterIndex: 1,
           title: '第一章',
           content: exportSampleText.trim() || '正文草稿内容',
         },
       ]
-      let blob: Blob
-      let extension = 'txt'
-      if (exportFormat === 'txt') {
-        const txt = exportCleanTxt(title, chapters)
-        blob = new Blob([txt], { type: 'text/plain;charset=utf-8' })
-        extension = 'txt'
-      } else if (exportFormat === 'docx') {
-        const buf = exportSubmissionDocx(title, '', chapters)
-        blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
-        extension = 'docx'
-      } else {
-        const buf = exportSubmissionEpub(title, '墨舟作者', chapters)
-        blob = new Blob([buf], { type: 'application/epub+zip' })
-        extension = 'epub'
+
+      if (book?.root && (!exportSampleText.trim() || exportingRealBook)) {
+        setExportStatus('读取作品各章节正文中…')
+        const realChapters = await fetchBookChaptersForExport(book.root)
+        if (realChapters.length > 0) {
+          chapters = realChapters
+        }
       }
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${title}.${extension}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      setExportStatus(`导出成功：已下载 ${title}.${extension}`)
+
+      const { fileName } = downloadNovelExport({
+        bookTitle: title,
+        format: exportFormat,
+        chapters,
+      })
+      setExportStatus(`导出成功：已下载 ${fileName}（共 ${chapters.length} 章）`)
     } catch (e) {
       setExportStatus(`导出失败：${(e as Error).message}`)
     }
@@ -226,6 +197,18 @@ export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsPro
                 ))}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {book && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'var(--surface-sunken)', borderRadius: 6 }}>
+                    <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={exportingRealBook}
+                        onChange={(e) => setExportingRealBook(e.target.checked)}
+                      />
+                      导出当前作品全量正典章节（《{book.title}》）
+                    </label>
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="作品名称"
@@ -233,20 +216,22 @@ export function DesktopToolModals({ activeModal, onClose }: DesktopToolModalsPro
                   onChange={(e) => setExportTitle(e.target.value)}
                   style={{ padding: '6px 8px', fontSize: 12, background: 'var(--surface-sunken)', border: '1px solid var(--hairline)', borderRadius: 6, color: 'var(--fg-pure)' }}
                 />
-                <textarea
-                  rows={4}
-                  placeholder="章节或样章内容（留空则生成当前样章模板）"
-                  value={exportSampleText}
-                  onChange={(e) => setExportSampleText(e.target.value)}
-                  style={{ padding: '6px 8px', fontSize: 12, background: 'var(--surface-sunken)', border: '1px solid var(--hairline)', borderRadius: 6, color: 'var(--fg-pure)', resize: 'vertical' }}
-                />
+                {!exportingRealBook && (
+                  <textarea
+                    rows={4}
+                    placeholder="章节或样章内容（留空则生成当前样章模板）"
+                    value={exportSampleText}
+                    onChange={(e) => setExportSampleText(e.target.value)}
+                    style={{ padding: '6px 8px', fontSize: 12, background: 'var(--surface-sunken)', border: '1px solid var(--hairline)', borderRadius: 6, color: 'var(--fg-pure)', resize: 'vertical' }}
+                  />
+                )}
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={handleTriggerExport}
                   style={{ fontSize: 12, padding: '8px 12px' }}
                 >
-                  打包下载本地作品
+                  {exportingRealBook ? `打包全本《${book?.title}》并下载` : '打包下载本地作品'}
                 </button>
                 {exportStatus && (
                   <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>{exportStatus}</div>

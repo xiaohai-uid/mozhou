@@ -1,33 +1,12 @@
 import { useState } from 'react'
+import { runLocalComplianceCheck } from '../../shared/complianceCheck'
 
 export function ComplianceDrawer(): JSX.Element {
   const [text, setText] = useState('')
   const [findings, setFindings] = useState<string[]>([])
 
   const checkCompliance = () => {
-    const list: string[] = []
-    if (!text.trim()) {
-      setFindings(['请输入待审查的正文段落'])
-      return
-    }
-    const realOfficialNames = ['公安部', '国务院', '中纪委', '省委', '市委', '信访局']
-    for (const name of realOfficialNames) {
-      if (text.includes(name)) {
-        list.push(`发现真实官方机构名「${name}」：建议架空为龙国治安局、特事处等`)
-      }
-    }
-    if (/(?:qq|微信|vx|vx号|扣扣|群号)[\s:：]*[0-9a-zA-Z]{5,}/i.test(text)) {
-      list.push('发现疑似联系方式/社交账号引流违规表达，建议移除')
-    }
-    const leftQuotes = (text.match(/“/g) || []).length
-    const rightQuotes = (text.match(/”/g) || []).length
-    if (leftQuotes !== rightQuotes) {
-      list.push(`引号未闭合：左引号 ${leftQuotes} 处，右引号 ${rightQuotes} 处`)
-    }
-    if (list.length === 0) {
-      list.push('本地基础规则检查通过：未发现真实机构冲突、未闭合引号或违规引流。')
-    }
-    setFindings(list)
+    setFindings(runLocalComplianceCheck(text))
   }
 
   return (

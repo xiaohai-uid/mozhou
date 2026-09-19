@@ -201,10 +201,10 @@ function mockDraftStream(prompt: string, onDelta?: (text: string) => void): Asyn
   })()
 }
 
-export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, authorizedBook }) => {
+export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST') return false
 
-  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+  const resolvedRoot = bookRoot ?? null
 
   if (path === '/api/session.open') {
     const root = resolvedRoot

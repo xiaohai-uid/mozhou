@@ -7,10 +7,10 @@ import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 
-export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, authorizedBook }) => {
+export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
   if (req.method !== 'POST') return false
 
-  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+  const resolvedRoot = bookRoot ?? null
 
   if (path === '/api/book') {
     if (defaultBookAccessManager.isHostedMode()) {

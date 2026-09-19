@@ -28,10 +28,10 @@ function isEnoent(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT'
 }
 
-export const proseRoutes: RouteHandler = (req, res, { path, body, json, authorizedBook }) => {
+export const proseRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST') return false
 
-  const resolvedRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+  const resolvedRoot = bookRoot ?? null
 
   if (path === '/api/chapter.prose') {
     const rawRoot = resolvedRoot

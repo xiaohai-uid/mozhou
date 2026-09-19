@@ -19,6 +19,7 @@ export type RouteHandler = (
     readonly json: (status: number, body: unknown) => void
     readonly principal?: VerifiedPrincipal | null | undefined
     readonly authorizedBook?: AuthorizedBook | null | undefined
+    readonly bookRoot?: string | null | undefined
     readonly policy?: RouteCategory | undefined
   },
 ) => Promise<boolean | void> | boolean | void
@@ -136,6 +137,8 @@ export class ApiRouter {
       }
     }
 
+    const bookRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+
     const context = {
       path,
       body,
@@ -144,6 +147,7 @@ export class ApiRouter {
       json: sendJson,
       principal,
       authorizedBook,
+      bookRoot,
       policy,
     }
 

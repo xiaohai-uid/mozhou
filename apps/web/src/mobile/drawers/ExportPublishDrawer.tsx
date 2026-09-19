@@ -1,55 +1,44 @@
 import { useState } from 'react'
-import { exportCleanTxt } from '../../export-suite/txtCleanExporter'
-import { exportSubmissionDocx } from '../../export-suite/docxExporter'
-import { exportSubmissionEpub } from '../../export-suite/epubExporter'
+import type { BookInfo } from '../../shell/workbenchStorage'
+import { downloadNovelExport, fetchBookChaptersForExport } from '../../export-suite/exportDownload'
 
 export interface ExportPublishDrawerProps {
+  book?: BookInfo | null | undefined
   onClose: () => void
 }
 
-export function ExportPublishDrawer({ onClose }: ExportPublishDrawerProps): JSX.Element {
+export function ExportPublishDrawer({ book, onClose }: ExportPublishDrawerProps): JSX.Element {
   const [format, setFormat] = useState<'txt' | 'docx' | 'epub'>('txt')
-  const [title, setTitle] = useState('我的作品')
+  const [title, setTitle] = useState(book?.title ?? '我的作品')
   const [sampleContent, setSampleContent] = useState('')
   const [status, setStatus] = useState<string | null>(null)
+  const [exportRealBook, setExportRealBook] = useState(Boolean(book?.root))
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
-      const bookTitle = title.trim() || '未命名作品'
-      const chapters = [
+      const bookTitle = title.trim() || book?.title || '未命名作品'
+      let chapters = [
         {
           chapterIndex: 1,
           title: '第一章',
           content: sampleContent.trim() || '正文草稿内容',
         },
       ]
-      let blob: Blob
-      let ext = 'txt'
-      if (format === 'txt') {
-        const txt = exportCleanTxt(bookTitle, chapters)
-        blob = new Blob([txt], { type: 'text/plain;charset=utf-8' })
-        ext = 'txt'
-      } else if (format === 'docx') {
-        const buf = exportSubmissionDocx(bookTitle, '', chapters)
-        blob = new Blob([buf], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        })
-        ext = 'docx'
-      } else {
-        const buf = exportSubmissionEpub(bookTitle, '墨舟作者', chapters)
-        blob = new Blob([buf], { type: 'application/epub+zip' })
-        ext = 'epub'
+
+      if (book?.root && exportRealBook) {
+        setStatus('读取作品全量正典章节中…')
+        const realChapters = await fetchBookChaptersForExport(book.root)
+        if (realChapters.length > 0) {
+          chapters = realChapters
+        }
       }
 
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${bookTitle}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      setStatus(`已成功下载 ${bookTitle}.${ext}`)
+      const { fileName } = downloadNovelExport({
+        bookTitle,
+        format,
+        chapters,
+      })
+      setStatus(`已成功下载 ${fileName}（共 ${chapters.length} 章）`)
     } catch (e) {
       setStatus(`导出失败：${(e as Error).message}`)
     }
@@ -98,6 +87,18 @@ export function ExportPublishDrawer({ onClose }: ExportPublishDrawerProps): JSX.
             </button>
           ))}
         </div>
+
+        {book && (
+          <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--fg-muted-mobile)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={exportRealBook}
+              onChange={(e) => setExportRealBook(e.target.checked)}
+            />
+            导出当前作品全量章节 (《{book.title}》)
+          </label>
+        )}
+
         <input
           type="text"
           placeholder="作品标题"
@@ -112,28 +113,32 @@ export function ExportPublishDrawer({ onClose }: ExportPublishDrawerProps): JSX.
             color: 'var(--fg-pure-mobile)',
           }}
         />
-        <textarea
-          rows={3}
-          placeholder="输入正文段落（留空则生成默认样章模板）"
-          value={sampleContent}
-          onChange={(e) => setSampleContent(e.target.value)}
-          style={{
-            padding: '6px 8px',
-            fontSize: 12,
-            background: 'var(--surface-sunken)',
-            border: '1px solid var(--hairline)',
-            borderRadius: 6,
-            color: 'var(--fg-pure-mobile)',
-            resize: 'vertical',
-          }}
-        />
+
+        {(!book || !exportRealBook) && (
+          <textarea
+            rows={3}
+            placeholder="输入正文段落（留空则生成默认样章模板）"
+            value={sampleContent}
+            onChange={(e) => setSampleContent(e.target.value)}
+            style={{
+              padding: '6px 8px',
+              fontSize: 12,
+              background: 'var(--surface-sunken)',
+              border: '1px solid var(--hairline)',
+              borderRadius: 6,
+              color: 'var(--fg-pure-mobile)',
+              resize: 'vertical',
+            }}
+          />
+        )}
+
         <button
           type="button"
           className="mobile-action-btn"
           onClick={handleDownload}
           style={{ background: 'var(--accent-mobile, #4f46e5)', color: '#fff', fontWeight: 600 }}
         >
-          打包并下载本地文件
+          {book && exportRealBook ? `打包全本《${book.title}》并下载` : '打包并下载本地文件'}
         </button>
         {status && (
           <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 2 }}>{status}</div>

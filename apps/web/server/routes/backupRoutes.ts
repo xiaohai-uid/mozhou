@@ -15,14 +15,14 @@ import { createBookBackup, restoreBookBackup } from '@mozhou/data-plane'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { RequestBoundaryError } from '../security.js'
 
-export const backupRoutes: RouteHandler = (req, res, { path, body, json, principal, authorizedBook }) => {
+export const backupRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
   const dataRoot = defaultBookAccessManager.getDataRoot()
   const backupsDir = resolve(dataRoot, 'backups')
   mkdirSync(backupsDir, { recursive: true })
 
   /* ---- 1. 生成作品备份归档 ---- */
   if (path === '/api/backups' && req.method === 'POST') {
-    const root = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+    const root = bookRoot ?? null
     if (!root || !existsSync(root)) {
       json(404, { ok: false, code: 'BOOK_NOT_FOUND', error: 'book root not found' })
       return true

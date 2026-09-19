@@ -144,7 +144,7 @@ export function MobileShell({
             onAdopt={(text) => setComposerInject({ id: Date.now(), text })}
           />
         )}
-        {activeDrawer === 'export' && <ExportPublishDrawer onClose={handleCloseDrawer} />}
+        {activeDrawer === 'export' && <ExportPublishDrawer book={book} onClose={handleCloseDrawer} />}
         {activeDrawer === 'compliance' && <ComplianceDrawer />}
         {activeDrawer === 'chapters' && (
           <MobileChaptersDrawer
