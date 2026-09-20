@@ -4,7 +4,12 @@
 *.log
 *.tsbuildinfo
 *.patch
-.scratch/
+# .scratch 里仅 mozhou-mvp（契约/工单）与诊断报告是工程资产，保持可跟踪；
+# 其余临时草稿不入库
+.scratch/*
+!.scratch/mozhou-mvp/
+!.scratch/mozhou-diagnosis-20260822/
+!.scratch/morning-report.md
 .worktrees/
 .mimosa/
 .next/
