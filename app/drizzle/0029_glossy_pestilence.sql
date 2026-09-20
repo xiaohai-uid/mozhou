@@ -1,2 +1,0 @@
-ALTER TABLE "skill_runs" ADD COLUMN "attempt_id" integer;--> statement-breakpoint
-ALTER TABLE "skill_runs" ADD CONSTRAINT "skill_runs_attempt_id_generation_attempts_id_fk" FOREIGN KEY ("attempt_id") REFERENCES "public"."generation_attempts"("id") ON DELETE set null ON UPDATE no action;

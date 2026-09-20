@@ -1,2 +1,0 @@
-DROP INDEX "generation_jobs_novel_idempotency_idx";--> statement-breakpoint
-CREATE UNIQUE INDEX "generation_jobs_novel_idempotency_idx" ON "generation_jobs" USING btree (coalesce("novel_id", 0),"idempotency_key");

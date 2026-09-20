@@ -280,3 +280,7 @@ _Avoid_: Market report, scan markdown, crawler output
 
 新增术语：**QualityReviewReport**（版本绑定的文学审查报告值）、**QualityPolicy**（平台默认+项目覆盖的规则集，`maxAutomaticReworks` 恒为 2）、**FailurePattern**（作者结构化纠错投影出的项目级失败记忆，质量先验而非 Canon 事实）、**ReaderExperienceDelta**（压力/期待/实得/兑付/解法模式的章级诊断，Kernel 外）。
 _Avoid_: 让文学判定进入 Gate 裁决、把质量规则写进 TemporalFact、自动回炉超 2 次
+
+## 2026-09-20 遗留 app/ 移出仓库
+
+落实上节第 5 条的冻结决定：遗留 Next.js 应用 `app/`（750 个跟踪文件）整体移出仓库跟踪，本机归档于 `archive-legacy/app-v1-legacy/`（内容在 git 历史中可完整回溯）；配套删除 `.github/workflows/legacy-app.yml`。Novel OS 主线仍为 `apps/web + packages/*`，本文件术语与契约不受影响。

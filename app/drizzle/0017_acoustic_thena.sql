@@ -1,1 +1,0 @@
-ALTER TABLE "chapter_messages" ADD COLUMN "request_hash" text;
