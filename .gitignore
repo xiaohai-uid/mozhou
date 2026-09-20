@@ -5,6 +5,7 @@
 *.tsbuildinfo
 *.patch
 .scratch/
+.worktrees/
 .mimosa/
 .next/
 .zcode/
