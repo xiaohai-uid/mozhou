@@ -135,14 +135,19 @@ export function useCanonGraphData(bookRoot?: string | null) {
             let penalty: string | undefined = undefined;
 
             try {
-              const obj = JSON.parse(p.payload);
-              if (obj && typeof obj === 'object') {
-                summary = obj.summary || p.payload;
-                relation = obj.relation || '契约约定';
-                deadline = obj.deadline;
-                penalty = obj.penalty;
-                const sNode = mappedNodes.find((n) => n.name === obj.source || n.id === obj.source);
-                const tNode = mappedNodes.find((n) => n.name === obj.target || n.id === obj.target);
+              const parsed: unknown = JSON.parse(p.payload);
+              if (parsed && typeof parsed === 'object') {
+                const obj = parsed as Record<string, unknown>;
+                const s = typeof obj.summary === 'string' ? obj.summary : '';
+                summary = s || p.payload;
+                const r = typeof obj.relation === 'string' ? obj.relation : '';
+                relation = r || '契约约定';
+                deadline = typeof obj.deadline === 'string' ? obj.deadline : undefined;
+                penalty = typeof obj.penalty === 'string' ? obj.penalty : undefined;
+                const source = typeof obj.source === 'string' ? obj.source : '';
+                const target = typeof obj.target === 'string' ? obj.target : '';
+                const sNode = mappedNodes.find((n) => n.name === source || n.id === source);
+                const tNode = mappedNodes.find((n) => n.name === target || n.id === target);
                 if (sNode && tNode && sNode.id !== tNode.id) {
                   parsedSource = sNode.id;
                   parsedTarget = tNode.id;

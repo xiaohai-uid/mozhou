@@ -12,10 +12,13 @@ export const exportRoutes: RouteHandler = (req, res, { path, body, json }) => {
     const format = typeof body['format'] === 'string' ? body['format'] : 'txt'
     const rawChapters = Array.isArray(body['chapters']) ? body['chapters'] : []
 
-    const chapters: ChapterExportItem[] = rawChapters.map((ch, idx) => ({
-      title: typeof ch?.title === 'string' ? ch.title : `第 ${idx + 1} 章`,
-      content: typeof ch?.content === 'string' ? ch.content : '',
-    }))
+    const chapters: ChapterExportItem[] = rawChapters.map((entry, idx) => {
+      const ch = (entry ?? {}) as Record<string, unknown>
+      return {
+        title: typeof ch.title === 'string' ? ch.title : `第 ${idx + 1} 章`,
+        content: typeof ch.content === 'string' ? ch.content : '',
+      }
+    })
 
     if (format === 'txt') {
       const text = exportCleanTxt(bookTitle, chapters)

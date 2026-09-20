@@ -174,7 +174,7 @@ export function CloudSyncView({
                     type="button"
                     className="btn-primary"
                     disabled={!root || backupLoading}
-                    onClick={handleCreateLocalBackup}
+                    onClick={() => { void handleCreateLocalBackup() }}
                     style={{ fontSize: 12, padding: '6px 12px', whiteSpace: 'nowrap' }}
                   >
                     {backupLoading ? '生成归档中…' : '生成本地归档包 (.zip)'}
@@ -211,7 +211,7 @@ export function CloudSyncView({
                       type="button"
                       className="btn"
                       disabled={!restoreId.trim() || restoreLoading}
-                      onClick={handleRestoreLocalBackup}
+                      onClick={() => { void handleRestoreLocalBackup() }}
                       style={{ fontSize: 12, padding: '4px 12px', whiteSpace: 'nowrap' }}
                     >
                       {restoreLoading ? '恢复中…' : '恢复作品'}

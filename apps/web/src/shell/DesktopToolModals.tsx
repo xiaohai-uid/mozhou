@@ -210,7 +210,7 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
                 <button
                   type="button"
                   className="btn-primary"
-                  onClick={handleTriggerExport}
+                  onClick={() => { void handleTriggerExport() }}
                   style={{ fontSize: 12, padding: '8px 12px' }}
                 >
                   {exportingRealBook ? `打包全本《${book?.title}》并下载` : '打包下载本地作品'}

@@ -117,7 +117,7 @@ export function ExportPublishDrawer({ book, onClose }: ExportPublishDrawerProps)
         <button
           type="button"
           className="mobile-action-btn"
-          onClick={handleDownload}
+          onClick={() => { void handleDownload() }}
           style={{ background: 'var(--accent-mobile, #4f46e5)', color: '#fff', fontWeight: 600 }}
         >
           {book && exportRealBook ? `打包全本《${book.title}》并下载` : '打包并下载本地文件'}
