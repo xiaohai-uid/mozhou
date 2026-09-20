@@ -6,12 +6,12 @@ echo "  墨舟 (Novel OS) - 本地优先长篇小说 AI 创作系统"
 echo "========================================================"
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "[错误] 未检测到 Node.js 22。"
+  echo "[错误] 未检测到 Node.js。"
   exit 1
 fi
 
-if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) === 22 ? 0 : 1)"; then
-  echo "[错误] 当前 Node.js 版本为 $(node --version)，本发行版要求 Node.js 22。"
+if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 22 ? 0 : 1)"; then
+  echo "[错误] 当前 Node.js 版本为 $(node --version)，本发行版要求 Node.js 22 或更高版本。"
   exit 1
 fi
 

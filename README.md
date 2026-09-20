@@ -18,7 +18,7 @@
 ### 方式一：发布包一键启动（免繁琐配置）
 
 获取 `release-artifacts/` 目录下的对应平台安装包：
-- 🪟 **Windows**: 解压 `mozhou-v0.1.0-windows-x64.zip`，双击运行 **`启动墨舟.bat`**（或 `start.bat`）；
+- 🪟 **Windows**: 解压 `mozhou-v0.1.0-windows-x64.zip`，双击运行 **`启动墨舟.bat`**；
 - 🐧 **Linux**: 解压 `mozhou-v0.1.0-linux-x64.tar.gz`，执行 `chmod +x start.sh && ./start.sh`；
 - 🍎 **macOS**: 解压 `mozhou-v0.1.0-darwin-universal.tar.gz`，执行 `./start.sh`；
 - 服务就绪后默认自动打开浏览器：**`http://localhost:5173`**。

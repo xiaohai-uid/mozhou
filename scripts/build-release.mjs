@@ -91,7 +91,6 @@ for (const file of [
   'package.json',
   'pnpm-workspace.yaml',
   'pnpm-lock.yaml',
-  'start.bat',
   '启动墨舟.bat',
   'start.sh',
   'README.md',
@@ -117,11 +116,11 @@ for (const item of ['package.json', 'dist', 'dist-server']) {
 
 const instructions = `# 墨舟 (Novel OS) v${version} 本地发行版
 
-这是可商用部署的本地优先运行时包。它不冒充 Windows/macOS 原生安装器；当前通用包需要 Node.js 22（CI 固定 22.23.2）与 pnpm 9.15.0。
+这是可商用部署的本地优先运行时包。它不冒充 Windows/macOS 原生安装器；当前通用包需要 Node.js ≥ 22（CI 固定 22.23.2）与 pnpm 9.15.0。
 
 ## 启动
 
-- Windows：运行 \`start.bat\`（或 \`启动墨舟.bat\`）
+- Windows：运行 \`启动墨舟.bat\`
 - Linux/macOS：\`chmod +x start.sh && ./start.sh\`
 - 默认地址：\`http://127.0.0.1:5173\`
 

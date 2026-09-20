@@ -10,14 +10,14 @@ echo.
 
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Node.js 22。
+    echo [错误] 未检测到 Node.js。
     pause
     exit /b 1
 )
 
-node -e "process.exit(Number(process.versions.node.split('.')[0]) === 22 ? 0 : 1)"
+node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 22 ? 0 : 1)"
 if %errorlevel% neq 0 (
-    echo [错误] 本发行版要求 Node.js 22。当前版本：
+    echo [错误] 本发行版要求 Node.js 22 或更高版本。当前版本：
     node --version
     pause
     exit /b 1
