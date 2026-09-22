@@ -2,10 +2,20 @@
  * apps/web · 风格蒸馏、小说拆解、技能广场、云同步与会员中心路由控制器。
  */
 import type { RouteHandler } from '../router.js'
+import type { ScenarioType } from '@mozhou/kernel'
 import { evaluateStyleMetrics } from '@mozhou/quality-engine'
-import { applyGenreKitToBook, readCanonState, readStyleProfiles, RUNTIME_DB_PATH } from '@mozhou/data-plane'
+import {
+  applyGenreKitToBook,
+  readCanonState,
+  readStyleProfiles,
+  STYLE_PROFILE_PATH,
+  RUNTIME_DB_PATH,
+} from '@mozhou/data-plane'
+import { writeStyleProfiles } from '@mozhou/flywheel'
+import { PublishBus } from '@mozhou/runtime'
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { assertSafeBookRoot } from '../security.js'
 import { hasDraftProvider } from './pipelineRoutes.js'
 import { billingCatalog } from '../billing/catalog.js'
 import { analyzeNovelBreakdown } from '../analysis/novelBreakdown.js'
@@ -207,6 +217,80 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
     return true
   }
 
+  if (path === '/api/style.apply') {
+    const rawRoot = resolvedRoot
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const metrics = body['metrics'] as {
+      dialogueRatio?: number
+      sensoryDensity?: number
+      actionPacing?: number
+    } | undefined
+
+    if (!metrics || typeof metrics !== 'object') {
+      json(400, { ok: false, error: 'metrics object required' })
+      return true
+    }
+
+    try {
+      const fullPath = join(root, STYLE_PROFILE_PATH)
+      if (!existsSync(fullPath)) {
+        json(404, { ok: false, error: '文风.md 不存在' })
+        return true
+      }
+      const currentProfiles = readStyleProfiles(root)
+
+      const rawScenario = typeof body['scenario'] === 'string' ? body['scenario'] : 'dialogue'
+      const scenario: ScenarioType =
+        rawScenario === 'action' || rawScenario === 'dialogue' || rawScenario === 'romance_emotion' || rawScenario === 'exposition_worldbuilding'
+          ? rawScenario
+          : 'dialogue'
+      const prev = currentProfiles[scenario]
+
+      const boundedMetric = (value: unknown, fallback: number): number =>
+        typeof value === 'number' && Number.isFinite(value)
+          ? Math.max(0, Math.min(1, value))
+          : fallback
+
+      const updatedRow = {
+        ...prev,
+        dialogueRatio: boundedMetric(metrics.dialogueRatio, prev.dialogueRatio),
+        sensoryDensity: boundedMetric(metrics.sensoryDensity, prev.sensoryDensity),
+        actionPacing: boundedMetric(metrics.actionPacing, prev.actionPacing),
+        revision: prev.revision + 1,
+      }
+
+      const nextProfiles = {
+        ...currentProfiles,
+        [scenario]: updatedRow,
+      }
+
+      const requestedChapterIndex = body['chapterIndex']
+      const auditChapterIndex =
+        typeof requestedChapterIndex === 'number' &&
+        Number.isInteger(requestedChapterIndex) &&
+        requestedChapterIndex >= 1
+          ? requestedChapterIndex
+          : 1
+
+      writeStyleProfiles({
+        bus: new PublishBus(),
+        bookRoot: root,
+        taskRef: `style_apply_${Date.now().toString(36)}`,
+        chapterIndex: auditChapterIndex,
+        next: nextProfiles,
+      })
+
+      json(200, { ok: true, currentProfiles: nextProfiles })
+    } catch (err) {
+      json(500, { ok: false, error: (err as Error).message })
+    }
+    return true
+  }
+
   /* ---- 流派工坊：注入流派设定到当前作品 ---- */
   if (path === '/api/genre-kit.apply') {
     const root = resolvedRoot
@@ -255,6 +339,20 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
 
     try {
       const breakdown = analyzeNovelBreakdown(textToAnalyze)
+      const beatCount = breakdown.beats.length
+      const charCount = breakdown.characters.length
+      const len = breakdown.sourceLength
+      const dynamicPacingGrade =
+        len < 200 || beatCount === 0
+          ? 'C'
+          : beatCount >= 4 && charCount >= 2 && len >= 800
+            ? 'A'
+            : beatCount >= 3 && charCount >= 1
+              ? 'B+'
+              : beatCount >= 2
+                ? 'B'
+                : 'B-'
+
       const result = {
         origin: 'local-heuristic',
         storyCore: {
@@ -268,7 +366,7 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
           title: `第 ${p.chapterNumber} 章`,
           hook: p.hook,
           payOff: p.payOff,
-          pacingGrade: 'A+',
+          pacingGrade: dynamicPacingGrade,
         })),
         characterArcs: breakdown.characters.map((c) => ({
           name: c.name,

@@ -86,4 +86,28 @@ describe('WorkbenchView', () => {
     })
     expect(screen.getByTestId('ledger').textContent).toContain('style_learned')
   })
+
+  it('章节轨支持查看章节列表并点击新建下一章', async () => {
+    const onChapterIndexChange = vi.fn()
+    const mockChapters = [
+      { chapterIndex: 1, title: '风起云涌', wordCount: 2400, revision: 2, phase: 'draft' as const },
+    ]
+    render(
+      <WorkbenchView
+        book={BOOK}
+        onBookCreated={() => {}}
+        chapterIndex={1}
+        chapters={mockChapters}
+        onChapterIndexChange={onChapterIndexChange}
+      />,
+    )
+    const rail = screen.getByTestId('chapter-rail')
+    expect(rail).toBeInTheDocument()
+    expect(rail.textContent).toContain('风起云涌')
+
+    const addBtn = screen.getByRole('button', { name: '新建下一章' })
+    expect(addBtn).toBeInTheDocument()
+    await userEvent.click(addBtn)
+    expect(onChapterIndexChange).toHaveBeenCalledWith(2)
+  })
 })

@@ -7,6 +7,7 @@
  * - 读取失败显式报错（role=alert），不静默。
  */
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CapabilitySquareResponse } from '../../server/api'
 import { okJson } from '../test/http'
@@ -93,5 +94,24 @@ describe('CapabilitySquareView（技能广场）', () => {
     await waitFor(() => {
       expect(screen.getByTestId('capability-square-error').textContent).toContain('注册表读取失败')
     })
+  })
+
+  it('点击能力卡片打开详情，并支持一键启用/停用技能到写作流', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(REGISTRY)))
+    render(<CapabilitySquareView />)
+    await waitFor(() => {
+      expect(screen.getByText('工作台')).toBeInTheDocument()
+    })
+    // 点击工作台卡片展开 Sheet
+    await userEvent.click(screen.getByText('工作台'))
+    await waitFor(() => {
+      expect(screen.getByTestId('capability-square-sheet')).toBeInTheDocument()
+    })
+    const toggleBtn = screen.getByRole('button', { name: '启用此技能到写作流' })
+    expect(toggleBtn).toBeInTheDocument()
+    await userEvent.click(toggleBtn)
+
+    expect(screen.getByRole('button', { name: '停用此技能' })).toBeInTheDocument()
+    expect(localStorage.getItem('mozhou.skills.active')).toContain('workbench')
   })
 })

@@ -84,7 +84,11 @@ describe('S11 跨章并发 V1 全局单飞', () => {
     const session = ChapterProductionSession.start(deps(root, bus, 2, 'sf_done'));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
       if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_sf_pass', verdict: 'pass' });
-      session.advance(step);
+      if (step === 'continuity_gate') {
+        session.advance(step, { verdict: 'pass' });
+      } else {
+        session.advance(step);
+      }
     }
     session.recordProposal({ routed: { low: 0, medium: 0, high: 0 } });
     session.advance('commit');

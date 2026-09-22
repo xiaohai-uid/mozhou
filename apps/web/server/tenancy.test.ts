@@ -224,6 +224,7 @@ describe('全路由租户隔离与所有权策略 (T09)', () => {
       '/api/storyboard.save',
       '/api/storyboards',
       '/api/storyboard',
+      '/api/export',
     ]
 
     for (const ep of bookEndpoints) {

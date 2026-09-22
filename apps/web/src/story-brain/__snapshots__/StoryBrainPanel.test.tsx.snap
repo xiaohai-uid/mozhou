@@ -24,13 +24,24 @@ exports[`StoryBrainPanel（T41） > 三区只读渲染：实体分栏 / 大纲�
   </div>
   <div
     class="actions"
-    style="margin-top: 0px;"
+    style="margin-top: 0px; justify-content: space-between;"
   >
-    <button
-      class="btn"
+    <div
+      style="display: flex; gap: 6px;"
     >
-      刷新
-    </button>
+      <button
+        class="btn"
+      >
+        刷新
+      </button>
+      <button
+        class="btn-primary"
+        style="padding: 4px 10px; font-size: 12px;"
+        type="button"
+      >
+        + 新建设定卡
+      </button>
+    </div>
     <span
       class="mono muted"
       style="align-self: center;"

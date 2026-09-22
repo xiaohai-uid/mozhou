@@ -16,7 +16,7 @@ import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
 import { ChapterProductionSession, readDraftCandidate, recordUserEdit } from '@mozhou/pipeline'
-import { PublishBus } from '@mozhou/runtime'
+import { PublishBus, readLedger } from '@mozhou/runtime'
 
 let servers: ReturnType<typeof createServer>[] = []
 let roots: string[] = []
@@ -99,6 +99,41 @@ describe('apps/web api 中间件 · T31/T32', () => {
         aiContext: 'detected',
       }),
     ])
+  })
+
+  it('POST /api/story-brain.entity.save：保存新实体卡落地 markdown 并同步投影', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-api-entity-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { title: '实体保存书', dir })
+    const root = created.data.root as string
+
+    const saveRes = await post(base, '/api/story-brain.entity.save', {
+      root,
+      cardType: 'char',
+      name: '李火旺',
+      brief: '心素',
+      details: '迷惘心素，认知即现实。',
+    })
+    expect(saveRes.status).toBe(200)
+    expect(saveRes.data.ok).toBe(true)
+    expect(saveRes.data.card).toMatchObject({
+      name: '李火旺',
+      cardType: 'char',
+      brief: '心素',
+    })
+
+    // 读取实体卡列表确认已被正确扫描和物化
+    const { data } = await post(base, '/api/story-brain.entities', { root })
+    expect(data.cards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '李火旺',
+          cardType: 'char',
+          brief: '心素',
+        }),
+      ]),
+    )
   })
 
   it('POST /api/ledger：新建书的账本为空数组（无事件）', async () => {
@@ -1246,5 +1281,54 @@ describe('会员中心 API 契约', () => {
     const badFormat = await post(base, '/api/membership.activate', { key: 'invalid_raw_string' })
     expect(badFormat.status).toBe(501)
     expect(badFormat.data.code).toBe('LICENSE_ACTIVATION_NOT_IMPLEMENTED')
+  })
+})
+
+describe('发布阻塞回归：文风单口与完整导出', () => {
+  it('POST /api/style.apply：经 StyleProfileStore 原子写入并追加 StyleProfileUpdated 审计事件', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-style-apply-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { title: '文风审计书', dir })
+    const root = created.data.root as string
+
+    const before = readLedger({ root })
+    const result = await post(base, '/api/style.apply', {
+      root,
+      scenario: 'dialogue',
+      metrics: { dialogueRatio: 0.83, sensoryDensity: 0.61, actionPacing: 0.72 },
+    })
+
+    expect(result.status).toBe(200)
+    expect(result.data.ok).toBe(true)
+
+    const after = readLedger({ root })
+    const newEvents = after.slice(before.length).map((row) => row.event)
+    const styleEvent = newEvents.find((event) => event.type === 'StyleProfileUpdated')
+    expect(styleEvent).toBeDefined()
+    expect(styleEvent?.chapterIndex).toBe(1)
+    expect(styleEvent?.taskRef).toMatch(/^style_apply_/)
+  })
+
+  it('POST /api/export：任一章节正文为空即 409，禁止生成静默缺章文件', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-export-guard-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { title: '导出防缺章', dir })
+    const root = created.data.root as string
+
+    const result = await post(base, '/api/export', {
+      root,
+      bookTitle: '导出防缺章',
+      format: 'txt',
+      chapters: [
+        { title: '第一章', content: '第一章正文' },
+        { title: '第二章', content: '' },
+      ],
+    })
+
+    expect(result.status).toBe(409)
+    expect(result.data.ok).toBe(false)
+    expect(result.data.code).toBe('EXPORT_EMPTY_CHAPTER')
   })
 })

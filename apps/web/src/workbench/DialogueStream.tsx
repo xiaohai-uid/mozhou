@@ -80,7 +80,14 @@ export function DialogueStream({
   const [question, setQuestion] = useState<DraftQuestionResponse | null>(null)
   const [answer, setAnswer] = useState('')
   const [draftText, setDraftText] = useState('')
-  const [selectedSkills, setSelectedSkills] = useState<readonly string[]>([])
+  const [selectedSkills, setSelectedSkills] = useState<readonly string[]>(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('mozhou.skills.active') : null
+      return raw ? (JSON.parse(raw) as string[]) : []
+    } catch {
+      return []
+    }
+  })
   const [error, setError] = useState<string | null>(null)
   const [providerUnavailable, setProviderUnavailable] = useState(false)
   const [sending, setSending] = useState(false)

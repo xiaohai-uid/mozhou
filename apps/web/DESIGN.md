@@ -2,9 +2,23 @@
 
 > Project scope: `/mnt/c/zcode/novel-ai/apps/web`
 >
-> Design language: Ink Orbit / 夜墨精密仪器
+> Design language: Night Manuscript Studio / 夜墨创作台
 >
 > This document is the project-specific design contract for Novel OS 2.0. It is a design and agent specification, not a claim that every described component or state is already implemented.
+
+## 2026-09-21 approved visual overlay
+
+This section is the current visual baseline approved for the desktop product. It supersedes older visual-token and shell-geometry values later in this document where they conflict, while all domain, truthfulness, author-sovereignty, Candidate → Active Draft → Quality Gate → Chapter Commit, accessibility, and failure-state contracts remain in force.
+
+- **Product posture:** a serious AI novel-production workbench, not a generic dashboard, chat app, or image-generation studio. Runtime image generation is not part of the writing UI.
+- **Visual thesis:** deep night-ink surfaces, paper-white prose, champagne-gold author decisions, muted jade AI/system evidence, fine structural hairlines, and restrained atmospheric depth.
+- **Hierarchy:** manuscript first, real chapter dock second, compact persistent AI production rail third, Inspector evidence always available. The AI rail uses the real flow: intent → candidate → author accept → quality/commit evidence.
+- **Typography signature:** controls and navigation stay coherent sans; prose and chapter titles use serif; revisions/hashes/evidence use mono; a small number of literary signatures may use the local Kaiti stack `--literary-accent`. This selective mismatch is intentional and must remain rare.
+- **Desktop shell:** default `184px minmax(700px, 1fr) 330px`, compact desktop `170px minmax(650px, 1fr) 300px`; the Workbench itself nests a 202px chapter dock, reduced to 184px in compact desktop.
+- **Current live tokens:** `--background #080b11`, `--foreground #f1ede6`, `--accent #cda56d`, `--accent-strong #e8c58f`, `--surface #10151d`, `--surface-2 #151c26`, `--surface-3 #1a222e`, `--jade #7fb5b2`.
+- **Cost rule:** atmosphere comes from CSS, typography, layout, and bundled/local assets. Do not add runtime image-generation calls merely for visual decoration.
+- **Local code graph:** 工具箱 → 开发 · Local → 代码图谱 exposes a read-only GitNexus snapshot. Architecture/process browsing reuses the exported Community/Process data; the code-node view shows indexed file locations and directed, typed CodeRelation records with search, type filters, and incremental browsing. Aggregated community links mean shared execution flows, not direct calls. The UI explicitly labels this as a timestamped snapshot, not a live connection. Refresh using `node .gitnexus/run.cjs analyze --index-only` followed by `pnpm graph:snapshot`; the view is lazy-loaded and never shells out from the browser or gains repository write access. Node/relationship data is generated, never manually invented.
+- **Density rule:** do not surface every capability simultaneously. Keep the primary writing decision visible and move secondary capabilities into existing Inspector/toolbox structures rather than adding dashboard cards.
 
 ## Source of truth and current boundary
 

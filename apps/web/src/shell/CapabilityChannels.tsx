@@ -7,13 +7,31 @@ import { useState } from 'react'
 import { NAV_GROUPS, VIEW_COUNT } from './views'
 import type { ViewId } from './views'
 
-/** 主任务四域（设计候选确认：作品/写作/分镜/素材）。 */
-const PRIMARY_DOMAINS: readonly { id: ViewId; label: string; ico: string }[] = [
-  { id: 'works', label: '作品', ico: '📚' },
-  { id: 'workbench', label: '写作', ico: '✒️' },
-  { id: 'storyboard', label: '分镜', ico: '🎬' },
-  { id: 'book-source', label: '素材', ico: '🧰' },
+/** 主任务四域：保留既有信息架构，视觉升级不改变导航契约。 */
+const PRIMARY_DOMAINS: readonly { id: ViewId; label: string; icon: 'pen' | 'book' | 'graph' | 'kit' | 'board' | 'source' | 'task' }[] = [
+  { id: 'workbench', label: '创作', icon: 'pen' },
+  { id: 'works', label: '作品', icon: 'book' },
+  { id: 'storyboard', label: '分镜', icon: 'board' },
+  { id: 'book-source', label: '素材', icon: 'source' },
 ]
+
+const NAV_ICON_PATHS = {
+  pen: 'M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Zm9.5-12.5 3 3M12 4l1.5-1.5a2.1 2.1 0 0 1 3 3L15 7',
+  book: 'M5 4.5h8a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3V4.5Zm11 3h3v12h-3M8 8h5M8 11h5',
+  graph: 'M6 6h4v4H6zM14 14h4v4h-4zM14 5h4v4h-4zM10 8h4M8 10v4h6M16 9v5',
+  kit: 'M5 7h14v12H5zM8 7V5h8v2M9 11h6M9 15h4',
+  board: 'M4 5h16v14H4zM8 9h3v3H8zM13 9h3M13 12h3M8 15h8',
+  source: 'M4 6h7l2 2h7v10H4zM8 12h8M8 15h5',
+  task: 'M5 5h14v14H5zM8 9l1.5 1.5L12 8M13 10h3M8 14l1.5 1.5L12 13M13 15h3',
+} as const
+
+function NavGlyph({ name }: { name: keyof typeof NAV_ICON_PATHS }): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.45} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={NAV_ICON_PATHS[name]} />
+    </svg>
+  )
+}
 
 export function CapabilityChannels({
   activeView,
@@ -47,7 +65,7 @@ export function CapabilityChannels({
             aria-current={d.id === activeView ? 'page' : undefined}
             onClick={() => onSelect(d.id)}
           >
-            <i className="domain-ico">{d.ico}</i>
+            <i className="domain-ico"><NavGlyph name={d.icon} /></i>
             <span>{d.label}</span>
           </button>
         ))}

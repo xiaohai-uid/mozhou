@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { GENRE_PRESETS, GenreKit } from './genrePresets';
+import { GENRE_PRESETS } from './genrePresets';
+import type { GenreKit } from './genrePresets';
 import { post } from '../lib/post';
 import type { BookInfo } from '../shell/workbenchStorage';
+
+const CATEGORIES = ['all', ...Array.from(new Set(GENRE_PRESETS.map((kit) => kit.category)))] as const;
 
 export const GenreKitMarketplaceView: React.FC<{
   book?: BookInfo | null | undefined;
@@ -12,13 +15,11 @@ export const GenreKitMarketplaceView: React.FC<{
   const [appliedDetail, setAppliedDetail] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
-  const categories = ['all', '男频爽文', '悬疑灵异', '都市异能', '女频古言'] as const;
-
-  const filteredKits = GENRE_PRESETS.filter((k) =>
-    activeCategory === 'all' ? true : k.category === activeCategory,
+  const filteredKits = GENRE_PRESETS.filter((kit) =>
+    activeCategory === 'all' ? true : kit.category === activeCategory,
   );
 
-  const handleApply = async (kit: GenreKit) => {
+  const handleApply = async (kit: GenreKit): Promise<void> => {
     setApplyError(null);
     setAppliedDetail(null);
     if (!book?.root) {
@@ -27,194 +28,169 @@ export const GenreKitMarketplaceView: React.FC<{
       return;
     }
     try {
-      const res = await post<{ ok: boolean; appliedCount?: number }>('/api/genre-kit.apply', {
+      const result = await post<{ ok: boolean; appliedCount?: number }>('/api/genre-kit.apply', {
         root: book.root,
         kitId: kit.id,
       });
       setApplied(kit.id);
-      setAppliedDetail(`已成功注入 ${res.appliedCount ?? 0} 项流派设定与开篇大纲脚手架到《${book.title}》。`);
-    } catch (e) {
-      setApplyError((e as Error).message);
+      setAppliedDetail(`已注入 ${result.appliedCount ?? 0} 项流派设定与开篇大纲脚手架到《${book.title}》。`);
+    } catch (error) {
+      setApplyError((error as Error).message);
       setApplied(null);
     }
   };
 
   return (
-    <div className="w-full h-full min-h-[600px] flex flex-col space-y-5 p-6 overflow-y-auto">
-      {/* 1. Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
-            <h2 className="text-base font-semibold text-zinc-100 tracking-wide">
-              网文流派资产市场 · Genre Kits
+    <section className="flex h-full min-h-[600px] w-full flex-col gap-5 overflow-y-auto p-6" aria-labelledby="genre-kits-title">
+      <header className="flex flex-col gap-4 border-b border-[var(--hairline)] pb-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+            <h2 id="genre-kits-title" className="m-0 text-base font-semibold text-[var(--foreground)]">
+              网文流派资产库
             </h2>
-            <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[10px] font-mono">
-              8 大网文流派就绪
+            <span className="rounded-md bg-[var(--jade-soft)] px-2 py-1 font-mono text-[10px] text-[var(--accent-strong)]">
+              {GENRE_PRESETS.length} 套可用
             </span>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            开箱即用的热门网文世界观底座、金手指规则卡、避雷红线词库与黄金三章节拍器
+          <p className="mt-1.5 max-w-2xl text-xs leading-5 text-[var(--text-muted)]">
+            把成熟流派的世界观底座、金手指规则、避雷红线与开篇节拍注入当前作品。应用前可先完整核对内容。
           </p>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 p-1 bg-zinc-900/90 border border-white/[0.08] rounded-xl text-xs backdrop-blur-md">
-          {categories.map((cat) => (
+        <div className="flex flex-wrap items-center gap-1 rounded-lg bg-[var(--surface-2)] p-1" aria-label="流派分类筛选">
+          {CATEGORIES.map((category) => (
             <button
-              key={cat}
+              key={category}
               type="button"
-              onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-1 rounded-lg transition-all text-xs ${
-                activeCategory === cat
-                  ? 'bg-indigo-600 text-white font-medium shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+              aria-pressed={activeCategory === category}
+              onClick={() => setActiveCategory(category)}
+              className={`min-h-8 rounded-md px-2.5 text-[11px] transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${
+                activeCategory === category
+                  ? 'bg-[var(--gold-soft)] font-medium text-[var(--gold-bright)] shadow-[inset_0_0_0_1px_var(--gold-line-soft)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--foreground)]'
               }`}
             >
-              {cat === 'all' ? '全部流派' : cat}
+              {category === 'all' ? '全部流派' : category}
             </button>
           ))}
         </div>
-      </div>
+      </header>
 
-      {/* 2. Main Bento Grid: Left List + Right Detail */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
-        {/* Left Preset Cards (5 cols) */}
-        <div className="lg:col-span-5 space-y-3 overflow-y-auto max-h-[640px] pr-1.5 scrollbar-thin">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
+        <nav className="max-h-[660px] space-y-2 overflow-y-auto pr-1" aria-label="流派套件列表">
           {filteredKits.map((kit) => {
             const isSelected = selectedKit.id === kit.id;
             return (
-              <div
+              <button
                 key={kit.id}
+                type="button"
+                aria-current={isSelected ? 'true' : undefined}
                 onClick={() => setSelectedKit(kit)}
-                className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 relative overflow-hidden group ${
+                className={`w-full rounded-xl px-4 py-3.5 text-left transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.99] ${
                   isSelected
-                    ? 'bg-zinc-900/90 border-indigo-500/80 shadow-[0_8px_24px_-4px_rgba(99,102,241,0.25)] ring-1 ring-indigo-500/30'
-                    : 'bg-zinc-900/40 border-white/[0.06] hover:border-white/[0.14] hover:bg-zinc-900/60'
+                    ? 'bg-[var(--jade-soft)] shadow-[inset_0_0_0_1px_var(--jade-line)]'
+                    : 'bg-[var(--surface)] hover:bg-[var(--surface-raised)]'
                 }`}
               >
-                {isSelected && (
-                  <div className="absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 to-emerald-400" />
-                )}
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-zinc-100 group-hover:text-white transition-colors">
-                    {kit.name}
-                  </span>
-                  <span className="text-[10px] bg-white/[0.06] text-zinc-400 border border-white/[0.06] px-2 py-0.5 rounded-full font-sans">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-xs font-semibold text-[var(--foreground)]">{kit.name}</span>
+                  <span className="flex-none rounded-md bg-[var(--surface-2)] px-2 py-1 text-[9px] text-[var(--text-faint)]">
                     {kit.category}
                   </span>
                 </div>
-                <div className="text-[11px] text-indigo-400 font-medium mb-1.5 flex items-center gap-1">
-                  <span>✦</span>
-                  <span>{kit.tag}</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                <div className="mt-1.5 text-[11px] font-medium text-[var(--accent-strong)]">{kit.tag}</div>
+                <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-[var(--text-muted)]">
                   {kit.synopsis}
                 </p>
-              </div>
+              </button>
             );
           })}
-        </div>
+        </nav>
 
-        {/* Right Detail Showcase (7 cols) */}
-        <div className="lg:col-span-7 bg-zinc-900/70 border border-white/[0.08] rounded-2xl p-6 flex flex-col justify-between backdrop-blur-xl shadow-2xl space-y-5">
+        <article className="flex min-w-0 flex-col justify-between gap-5 rounded-[14px] border border-[var(--hairline-strong)] bg-[var(--surface-raised)] p-6 shadow-[0_12px_32px_rgba(32,42,53,0.07)]">
           <div className="space-y-5">
-            {/* Top Showcase Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold text-zinc-100">{selectedKit.name}</h3>
-                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">
+            <div className="flex flex-col gap-4 border-b border-[var(--hairline)] pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="m-0 text-base font-semibold text-[var(--foreground)]">{selectedKit.name}</h3>
+                  <span className="rounded-md bg-[var(--surface-2)] px-2 py-1 text-[10px] text-[var(--text-muted)]">
                     {selectedKit.category}
                   </span>
                 </div>
-                <span className="text-xs text-zinc-400 mt-1 block">
-                  核心标签：{selectedKit.tag}
-                </span>
+                <span className="mt-1 block text-xs text-[var(--text-muted)]">核心标签：{selectedKit.tag}</span>
               </div>
               <button
                 type="button"
                 onClick={() => void handleApply(selectedKit)}
-                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 shrink-0 active:scale-[0.98]"
+                className="min-h-10 flex-none rounded-lg bg-[var(--gold-bright)] px-4 text-xs font-semibold text-[var(--background)] transition-[background-color,transform] duration-150 hover:bg-[var(--gold)] active:scale-[0.96]"
               >
-                <span>🚀</span>
-                <span>{applied === selectedKit.id ? '已成功应用到当前书！' : '一键载入本项目'}</span>
+                {applied === selectedKit.id ? '已应用到当前作品' : '载入当前作品'}
               </button>
             </div>
 
-            {/* Core Golden Finger & Rules Bento */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-              <div className="p-4 bg-zinc-950/70 border border-white/[0.06] rounded-xl space-y-1.5 shadow-inner">
-                <span className="text-zinc-500 font-medium block flex items-center gap-1.5">
-                  <span className="text-indigo-400">⚡</span> 核心金手指预设
-                </span>
-                <span className="text-indigo-200 font-medium leading-relaxed block">
-                  {selectedKit.goldenFinger}
-                </span>
-              </div>
-              <div className="p-4 bg-zinc-950/70 border border-white/[0.06] rounded-xl space-y-1.5 shadow-inner">
-                <span className="text-zinc-500 font-medium block flex items-center gap-1.5">
-                  <span className="text-amber-400">📜</span> 核心天道运行规则
-                </span>
-                <span className="text-amber-200 font-medium leading-relaxed block">
-                  {selectedKit.coreRule}
-                </span>
-              </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <section className="rounded-xl bg-[var(--surface-2)] p-4" aria-labelledby="genre-kit-power">
+                <span className="mb-1.5 block font-mono text-[9px] font-bold tracking-[0.14em] text-[var(--accent-strong)]">SYSTEM</span>
+                <h4 id="genre-kit-power" className="m-0 text-xs font-semibold text-[var(--text-muted)]">核心金手指预设</h4>
+                <p className="mt-2 text-xs font-medium leading-5 text-[var(--foreground)]">{selectedKit.goldenFinger}</p>
+              </section>
+              <section className="rounded-xl bg-[var(--surface-2)] p-4" aria-labelledby="genre-kit-rule">
+                <span className="mb-1.5 block font-mono text-[9px] font-bold tracking-[0.14em] text-[var(--gold-bright)]">RULE</span>
+                <h4 id="genre-kit-rule" className="m-0 text-xs font-semibold text-[var(--text-muted)]">核心天道运行规则</h4>
+                <p className="mt-2 text-xs font-medium leading-5 text-[var(--foreground)]">{selectedKit.coreRule}</p>
+              </section>
             </div>
 
-            {/* Banned Tropes Redlines */}
-            <div className="space-y-2 text-xs">
-              <span className="text-zinc-400 font-semibold block uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <span className="text-rose-400">🚫</span> 流派避雷禁区 (De-Cliche Redlines)
-              </span>
+            <section aria-labelledby="genre-kit-redlines">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h4 id="genre-kit-redlines" className="m-0 text-[11px] font-semibold text-[var(--text-muted)]">流派避雷红线</h4>
+                <span className="text-[10px] text-[var(--text-faint)]">生成时作为约束注入</span>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {selectedKit.bannedTropes.map((trope, i) => (
+                {selectedKit.bannedTropes.map((trope) => (
                   <span
-                    key={i}
-                    className="bg-rose-950/30 text-rose-300 border border-rose-900/40 px-2.5 py-1 rounded-lg text-[11px] font-sans"
+                    key={trope}
+                    className="rounded-lg bg-[rgba(179,66,58,0.08)] px-2.5 py-1 text-[11px] text-[var(--danger)] shadow-[inset_0_0_0_1px_rgba(179,66,58,0.18)]"
                   >
-                    × {trope}
+                    {trope}
                   </span>
                 ))}
               </div>
-            </div>
+            </section>
 
-            {/* Opening Beats Sequencer */}
-            <div className="space-y-2 text-xs">
-              <span className="text-zinc-400 font-semibold block uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <span className="text-teal-400">🎯</span> 黄金三章节拍器 (Opening Beats)
-              </span>
-              <div className="space-y-2">
-                {selectedKit.openingBeats.map((beat, i) => (
-                  <div
-                    key={i}
-                    className="p-3 bg-zinc-950/60 border border-white/[0.06] rounded-xl text-zinc-300 flex items-center gap-3 text-xs"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-indigo-600/40 border border-indigo-500/50 text-[10px] flex items-center justify-center text-indigo-200 font-mono shrink-0">
-                      {i + 1}
-                    </span>
-                    <span className="leading-relaxed">{beat}</span>
-                  </div>
-                ))}
+            <section aria-labelledby="genre-kit-beats">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h4 id="genre-kit-beats" className="m-0 text-[11px] font-semibold text-[var(--text-muted)]">黄金三章节拍</h4>
+                <span className="text-[10px] text-[var(--text-faint)]">Opening beats</span>
               </div>
-            </div>
+              <ol className="space-y-2">
+                {selectedKit.openingBeats.map((beat, index) => (
+                  <li key={beat} className="flex items-start gap-3 rounded-lg bg-[var(--surface)] p-3 text-xs leading-5 text-[var(--foreground)]">
+                    <span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--jade-soft)] font-mono text-[10px] font-semibold text-[var(--accent-strong)]">
+                      {index + 1}
+                    </span>
+                    <span>{beat}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
           </div>
 
-          {/* Feedback Messages */}
-          {applyError && (
-            <div className="text-xs text-rose-400 bg-rose-950/40 border border-rose-900/50 p-3 rounded-xl flex items-center gap-2">
-              <span>⚠</span>
-              <span>{applyError}</span>
-            </div>
-          )}
-          {appliedDetail && (
-            <div className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 p-3 rounded-xl flex items-center gap-2">
-              <span>✓</span>
-              <span>{appliedDetail}</span>
-            </div>
-          )}
-        </div>
+          <div className="space-y-2">
+            {applyError && (
+              <div role="alert" className="rounded-lg bg-[rgba(179,66,58,0.08)] p-3 text-xs text-[var(--danger)] shadow-[inset_0_0_0_1px_rgba(179,66,58,0.18)]">
+                {applyError}
+              </div>
+            )}
+            {appliedDetail && (
+              <div role="status" className="rounded-lg bg-[rgba(46,125,84,0.08)] p-3 text-xs text-[var(--success)] shadow-[inset_0_0_0_1px_rgba(46,125,84,0.18)]">
+                {appliedDetail}
+              </div>
+            )}
+          </div>
+        </article>
       </div>
-    </div>
+    </section>
   );
 };

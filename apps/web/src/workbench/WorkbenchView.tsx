@@ -95,11 +95,25 @@ export function WorkbenchView({
     }
   }
 
+  const currentChapter = chapters?.find((chapter) => chapter.chapterIndex === chapterIndex)
+  const chapterWordTotal = chapters?.reduce((total, chapter) => total + chapter.wordCount, 0) ?? 0
+
   return (
     <section className="center">
       <div className="chapterbar">
-        <h1>{book === null ? '未命名之书' : `《${book.title}》`}</h1>
-        <span className="meta">{book === null ? '尚未建书' : 'BOOK ' + book.bookId.slice(0, 8)}</span>
+        <div className="chapterbar-title">
+          <span className="chapterbar-kicker">
+            {book === null ? 'NOVEL STUDIO' : currentChapter !== undefined ? `CH ${String(chapterIndex).padStart(2, '0')} · ${currentChapter.title}` : `CH ${String(chapterIndex).padStart(2, '0')}`}
+          </span>
+          <h1>{book === null ? '未命名之书' : `《${book.title}》`}</h1>
+        </div>
+        <span className="meta">
+          {book === null
+            ? 'AI 负责生成与校验，你负责方向与最终裁决'
+            : currentChapter !== undefined
+              ? `${currentChapter.wordCount} 字 · r${currentChapter.revision} · ${currentChapter.phase === 'committed' ? '已定稿' : currentChapter.phase === 'draft' ? '草稿' : '规划'}`
+              : 'BOOK ' + book.bookId.slice(0, 8)}
+        </span>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
           {book !== null && (
@@ -139,45 +153,79 @@ export function WorkbenchView({
         </div>
       </div>
 
-      {chapters !== undefined && chapters.length > 0 && (
-        <div className="chap-rail" data-testid="chapter-rail" aria-label="章节轨">
-          {chapters.map((ch) => (
-            <button
-              key={ch.chapterIndex}
-              type="button"
-              className={'chap-card' + (ch.chapterIndex === chapterIndex ? ' current' : '')}
-              aria-current={ch.chapterIndex === chapterIndex || undefined}
-              onClick={() => onChapterIndexChange?.(ch.chapterIndex)}
-            >
-              <span className="cn">CH {String(ch.chapterIndex).padStart(2, '0')}</span>
-              <span className="ct">{ch.title}</span>
-              <span className="cm">
-                r{ch.revision} · {ch.wordCount} 字 ·{' '}
-                {ch.phase === 'committed' ? '已定稿' : ch.phase === 'draft' ? '草稿' : '规划'}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="conversation studio-conversation">
+        <div className={'studio-workbench' + (book !== null ? '' : ' no-chapters')}>
+          {book !== null && (
+            <aside className="chapter-dock" aria-label="章节目录">
+              <div className="chapter-dock-head">
+                <div>
+                  <span>CHAPTERS</span>
+                  <strong>章节</strong>
+                </div>
+                <b>{chapters?.length ?? 0}</b>
+              </div>
+              <div className="chap-rail" data-testid="chapter-rail">
+                {chapters?.map((ch) => (
+                  <button
+                    key={ch.chapterIndex}
+                    type="button"
+                    className={'chap-card' + (ch.chapterIndex === chapterIndex ? ' current' : '')}
+                    aria-current={ch.chapterIndex === chapterIndex || undefined}
+                    onClick={() => onChapterIndexChange?.(ch.chapterIndex)}
+                  >
+                    <span className="cn">{String(ch.chapterIndex).padStart(2, '0')}</span>
+                    <span className="ct">{ch.title}</span>
+                    <span className="cm">
+                      {ch.wordCount} 字 · {ch.phase === 'committed' ? '已定稿' : ch.phase === 'draft' ? '草稿' : '规划'}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="chap-card chap-add"
+                  aria-label="新建下一章"
+                  onClick={() => {
+                    const maxIndex = chapters && chapters.length > 0 ? Math.max(...chapters.map((c) => c.chapterIndex)) : 0
+                    onChapterIndexChange?.(maxIndex + 1)
+                  }}
+                  style={{
+                    border: '1px dashed var(--hairline-strong)',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span className="cn">+</span>
+                  <span className="ct">新建第 {(chapters && chapters.length > 0 ? Math.max(...chapters.map((c) => c.chapterIndex)) : 0) + 1} 章</span>
+                  <span className="cm">开启新章草稿</span>
+                </button>
+              </div>
+              <div className="chapter-dock-foot">
+                <span>{chapterWordTotal.toLocaleString('zh-CN')} 字</span>
+                <span>故事仍在生长</span>
+              </div>
+            </aside>
+          )}
 
-      <div className="conversation">
-        {/* 正文写作层（Reading Slate）：Active Draft 本地草稿，全产品最安静区域 */}
-        <ProseEditorPanel book={book} chapterIndex={chapterIndex} onSelectionChange={handleSelectionChange} />
+          <div className="studio-canvas">
+            <div className="studio-editor-scroll">
+              <header className="studio-canvas-head">
+                <div>
+                  <span className="studio-eyebrow">ACTIVE DRAFT · CH {String(chapterIndex).padStart(2, '0')}</span>
+                  <h2>{currentChapter?.title ?? (book === null ? '从一个念头开始' : `第 ${chapterIndex} 章`)}</h2>
+                </div>
+                <p>正文是作品本体，AI 只在需要时进入。</p>
+              </header>
 
-        <div id="dialogue-panel" data-testid="dialogue-panel">
-          <DialogueStream book={book} chapterIndex={chapterIndex} selection={editorSelection} />
-        </div>
+              <ProseEditorPanel book={book} chapterIndex={chapterIndex} onSelectionChange={handleSelectionChange} />
 
-        {book === null ? (
-          <section className="wb-section" data-testid="create-book">
+            {book === null ? (
+              <section className="wb-section studio-create-book" data-testid="create-book">
             <div className="card-shell" style={{ maxWidth: 580, margin: '24px auto' }}>
               <div className="card" style={{ padding: '28px 32px', textAlign: 'center' }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #6366f1, #4f46e5)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: '#fff', fontSize: 18, boxShadow: '0 4px 16px rgba(99, 102, 241, 0.4)' }}>
-                  ✒️
-                </div>
-                <h2 style={{ fontSize: 16, fontWeight: 600, color: '#f4f4f5', margin: '0 0 6px' }}>建立您的长篇创作空间</h2>
+                <div className="create-book-mark" aria-hidden="true">墨</div>
+                <h2 className="create-book-title">建立 AI 长篇创作空间</h2>
                 <p className="muted" style={{ fontSize: 12, margin: '0 0 18px', lineHeight: 1.6 }}>
-                  墨舟为您在本地建立完全离线、具备因果状态机与文学质量门禁的正典小说。
+                  给出故事方向、边界与目标，墨舟负责生成候选、维护连续性与质量证据，你保留最终裁决。
                 </p>
                 <div className="actions" style={{ maxWidth: 420, margin: '0 auto', display: 'flex', gap: 8 }}>
                   <input
@@ -199,9 +247,9 @@ export function WorkbenchView({
             <div data-testid="ledger" style={{ display: 'none' }}>
               <button className="btn" onClick={() => void handleRefreshLedger()} disabled>刷新账本</button>
             </div>
-          </section>
-        ) : (
-          <details className="card-shell" style={{ marginTop: 24, cursor: 'pointer' }}>
+              </section>
+            ) : (
+              <details className="card-shell studio-ledger" style={{ marginTop: 24, cursor: 'pointer' }}>
             <summary style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-faint)', outline: 'none', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>作品管理与本地账本记录</span>
               <span style={{ fontSize: 10 }}>展开 ▾</span>
@@ -254,8 +302,29 @@ export function WorkbenchView({
                 )}
               </section>
             </div>
-          </details>
-        )}
+              </details>
+            )}
+            </div>
+
+            <section className="ai-console" aria-labelledby="ai-production-title">
+              <div className="ai-console-head">
+                <div>
+                  <span className="ai-production-kicker">MOZHOU · AI COPILOT</span>
+                  <h2 id="ai-production-title">把下一步交给墨舟</h2>
+                </div>
+                <div className="ai-production-flow" aria-label="AI 创作流程">
+                  <span>意图</span><i aria-hidden="true">→</i>
+                  <span>候选</span><i aria-hidden="true">→</i>
+                  <span>采纳</span><i aria-hidden="true">→</i>
+                  <span>质量门</span>
+                </div>
+              </div>
+              <div id="dialogue-panel" data-testid="dialogue-panel" className="ai-console-body">
+                <DialogueStream book={book} chapterIndex={chapterIndex} selection={editorSelection} />
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
 
       <DesktopToolModals activeModal={activeModal} onClose={() => setActiveModal(null)} />

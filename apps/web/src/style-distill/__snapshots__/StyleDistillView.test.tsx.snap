@@ -255,6 +255,57 @@ exports[`StyleDistillView（风格蒸馏） > 样本输入与指标渲染；契�
               </div>
             </div>
           </div>
+          <div
+            style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;"
+          >
+            <div
+              style="display: flex; align-items: center; gap: 8px;"
+            >
+              <span
+                class="mono muted"
+                style="font-size: 11px;"
+              >
+                目标场景：
+              </span>
+              <select
+                aria-label="目标场景"
+                class="control"
+                style="padding: 2px 6px; font-size: 11px;"
+              >
+                <option
+                  value="dialogue"
+                >
+                  对白交锋 (dialogue)
+                </option>
+                <option
+                  value="action"
+                >
+                  动作场面 (action)
+                </option>
+                <option
+                  value="romance_emotion"
+                >
+                  情感互动 (romance_emotion)
+                </option>
+                <option
+                  value="exposition_worldbuilding"
+                >
+                  背景交代 (exposition_worldbuilding)
+                </option>
+              </select>
+            </div>
+            <div
+              style="display: flex; align-items: center; gap: 10px;"
+            >
+              <button
+                class="btn-primary"
+                style="font-size: 11px; padding: 4px 12px;"
+                type="button"
+              >
+                应用为本书此场景文风
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

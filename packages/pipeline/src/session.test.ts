@@ -11,6 +11,8 @@ import { PublishBus, readLedger } from '@mozhou/runtime';
 import type { StoredEvent } from '@mozhou/runtime';
 import {
   ChapterProductionSession,
+  CommitNotRecordedError,
+  GateNotPassedError,
   SessionAlreadyActiveError,
   StepGuardError,
   StepTransitionError,
@@ -45,7 +47,11 @@ function walkAllTen(session: ChapterProductionSession): void {
   const order = ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const;
   for (const step of order) {
     if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_t16_pass', verdict: 'pass' });
-    session.advance(step);
+    if (step === 'continuity_gate') {
+      session.advance(step, { verdict: 'pass' });
+    } else {
+      session.advance(step);
+    }
   }
   session.recordProposal({ proposalId: 'prop_x' });
   session.advance('commit');
@@ -152,7 +158,11 @@ describe('一 session ↔ 一 commit 与重提交', () => {
     const session = ChapterProductionSession.start(makeDeps(root));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
       if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_t16_pass', verdict: 'pass' });
-      session.advance(step);
+      if (step === 'continuity_gate') {
+        session.advance(step, { verdict: 'pass' });
+      } else {
+        session.advance(step);
+      }
     }
     session.recordProposal();
     session.advance('commit');
@@ -170,7 +180,11 @@ describe('一 session ↔ 一 commit 与重提交', () => {
     const first = ChapterProductionSession.start(makeDeps(root, 0));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
       if (step === 'user_edit') first.recordQualityReview({ reportId: 'rpt_t16_first', verdict: 'pass' });
-      first.advance(step);
+      if (step === 'continuity_gate') {
+        first.advance(step, { verdict: 'pass' });
+      } else {
+        first.advance(step);
+      }
     }
     first.recordProposal();
     first.advance('commit');
@@ -192,5 +206,31 @@ describe('一 session ↔ 一 commit 与重提交', () => {
       .map((row) => row.event)
       .filter((event) => event.type === 'CanonCommitted');
     expect(commits).toHaveLength(1); // 第二届尚未走到 commit
+  });
+
+  it('门禁未通过禁止步进 canon_proposal；未提交禁止步进 flywheel_record (C3)', () => {
+    const root = hermeticRoot();
+    const session = ChapterProductionSession.start(makeDeps(root));
+    for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract'] as const) {
+      if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_t16_pass', verdict: 'pass' });
+      session.advance(step);
+    }
+    // 步进到 continuity_gate 但未记录 verdict（判据为 null）
+    session.advance('continuity_gate');
+    expect(() => session.advance('canon_proposal')).toThrowError(GateNotPassedError);
+
+    // 重新建立会话测试正常过门禁但未 markCommitted 试图步进 flywheel_record
+    const root2 = hermeticRoot();
+    const session2 = ChapterProductionSession.start(makeDeps(root2));
+    for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate'] as const) {
+      if (step === 'user_edit') session2.recordQualityReview({ reportId: 'rpt_t16_pass', verdict: 'pass' });
+      if (step === 'continuity_gate') session2.advance(step, { verdict: 'pass' });
+      else session2.advance(step);
+    }
+    session2.advance('canon_proposal');
+    session2.recordProposal();
+    session2.advance('commit');
+    // 在 markCommitted 之前试图步进 flywheel_record 必须被拦截
+    expect(() => session2.advance('flywheel_record')).toThrowError(CommitNotRecordedError);
   });
 });

@@ -80,6 +80,20 @@ export function TasksView({
     )
   }
 
+  const handleExportJsonl = (): void => {
+    if (data === null || data.events.length === 0) return
+    const content = data.events.map((ev) => JSON.stringify(ev)).join('\n')
+    const blob = new Blob([content], { type: 'application/x-ndjson;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mozhou-events-${Date.now()}.jsonl`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const filteredEvents = data === null ? [] : data.events.filter((e) => {
     if (filter === 'all') return true
     return e.category === filter
@@ -94,7 +108,18 @@ export function TasksView({
             ? `账本事件 ${data.totalEvents} 条 · 影响遍历 ${data.totalTraversals} 次`
             : '加载中…'}
         </span>
-        <div className="save">
+        <div className="save" style={{ display: 'flex', gap: 6 }}>
+          {data !== null && data.events.length > 0 && (
+            <button
+              type="button"
+              className="btn"
+              onClick={handleExportJsonl}
+              style={{ fontSize: 10, padding: '4px 8px' }}
+              aria-label="导出流水日志"
+            >
+              导出 JSONL
+            </button>
+          )}
           <button className="btn" onClick={() => { void load() }} disabled={busy} style={{ fontSize: 10, padding: '4px 8px' }}>
             {busy ? '刷新中…' : '刷新流水'}
           </button>

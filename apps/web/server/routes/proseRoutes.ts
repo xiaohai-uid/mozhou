@@ -180,5 +180,46 @@ export const proseRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
     return true
   }
 
+  if (path === '/api/chapter.commit') {
+    const rawRoot = resolvedRoot
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const summary = typeof body['summary'] === 'string' && body['summary'].trim().length > 0
+      ? body['summary'].trim()
+      : `第 ${chapterIndex} 章定稿`
+
+    if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
+      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+      return true
+    }
+
+    try {
+      const root = assertSafeBookRoot(rawRoot)
+      const plane = LocalDataPlane.openOrRebuild(root)
+      try {
+        const result = plane.commitChapter({ chapterIndex, summary })
+        json(200, {
+          ok: true,
+          commitId: result.commitId,
+          chapterIndex: result.chapterIndex,
+          contentSha256: result.contentSha256,
+          phase: 'committed',
+        })
+      } finally {
+        plane.close()
+      }
+    } catch (cause) {
+      if (cause instanceof ChapterPhaseError) {
+        json(409, { ok: false, code: 'CHAPTER_ALREADY_COMMITTED', error: (cause as Error).message })
+        return true
+      }
+      if (isEnoent(cause)) {
+        json(404, { ok: false, code: CHAPTER_MISSING, error: `chapter ${chapterIndex} not found on disk` })
+        return true
+      }
+      json(500, { ok: false, error: (cause as Error).message })
+    }
+    return true
+  }
+
   return false
 }

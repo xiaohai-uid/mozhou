@@ -37,6 +37,8 @@ export type { SessionProjection } from './projection.js';
 /** ChapterProductionSession 内存态状态机。 */
 export {
   ChapterProductionSession,
+  CommitNotRecordedError,
+  GateNotPassedError,
   GlobalSingleFlightError,
   HardConflictUnresolvedError,
   QualityReviewNotPassError,

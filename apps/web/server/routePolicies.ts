@@ -42,7 +42,6 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/membership': 'public',
   '/api/draft.question': 'public',
   '/api/style.distill': 'public',
-  '/api/export': 'public',
 
   // ---- 2. Account 主体级路由 ----
   '/api/account': 'account',
@@ -84,9 +83,11 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/story-brain.entities': 'book',
   '/api/story-brain.facts': 'book',
   '/api/story-brain.contract': 'book',
+  '/api/story-brain.entity.save': 'book',
   '/api/chapter.prose': 'book',
   '/api/chapter.prose.save': 'book',
   '/api/chapter.reopen': 'book',
+  '/api/chapter.commit': 'book',
   '/api/receipts': 'book',
   '/api/receipt': 'book',
   '/api/change-matrix': 'book',
@@ -111,7 +112,9 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/storyboards': 'book',
   '/api/storyboard': 'book',
   '/api/style': 'book',
+  '/api/style.apply': 'book',
   '/api/genre-kit.apply': 'book',
+  '/api/export': 'book',
 })
 
 /**

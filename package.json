@@ -1,7 +1,7 @@
 {
   "name": "mozhou",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -19,6 +19,7 @@
     "test": "vitest run",
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
+    "graph:snapshot": "node scripts/export-code-graph.mjs",
     "graph:check": "gitnexus check --cycles --repo mozhou"
   },
   "devDependencies": {
@@ -30,7 +31,8 @@
   },
   "pnpm": {
     "overrides": {
-      "tar": "7.5.22"
+      "tar": "7.5.22",
+      "js-yaml": "4.3.2"
     },
     "patchedDependencies": {
       "fastembed@2.1.0": "patches/fastembed@2.1.0.patch"

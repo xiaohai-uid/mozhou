@@ -8,10 +8,10 @@ on:
         required: true
         type: string
       releaseVersion:
-        description: 'Release version tag (e.g. v0.1.0)'
+        description: 'Release version tag (e.g. v0.2.0)'
         required: true
         type: string
-        default: 'v0.1.0'
+        default: 'v0.2.0'
       draft:
         description: 'Create as draft release (default true for safety)'
         required: true

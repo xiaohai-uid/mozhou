@@ -58,6 +58,24 @@ export function RankScanView(): JSX.Element {
           </p>
         )}
 
+        {data?.degraded && data.note && (
+          <div
+            className="wb-warning"
+            role="status"
+            style={{
+              padding: '8px 12px',
+              marginBottom: 12,
+              borderRadius: 6,
+              background: 'rgba(217, 166, 95, 0.1)',
+              border: '1px solid var(--warning)',
+              color: 'var(--warning)',
+              fontSize: 12,
+            }}
+          >
+            提示：{data.note}
+          </div>
+        )}
+
         {data !== null && (
           <>
             {/* 热门题材风向 */}
@@ -92,7 +110,13 @@ export function RankScanView(): JSX.Element {
 
               {currentBoard !== undefined && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="rank-items">
-                  {currentBoard.items.map((item) => (
+                  {currentBoard.items.length === 0 ? (
+                    <div className="card-shell" style={{ marginBottom: 0 }}>
+                      <div className="card" style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-muted)' }}>
+                        该榜单暂无可解析数据（实时源不可达或通道维护中）
+                      </div>
+                    </div>
+                  ) : currentBoard.items.map((item) => (
                     <div className="card-shell" key={item.rank} style={{ marginBottom: 0 }}>
                       <div className="card">
                         <div className="card-title">

@@ -21,10 +21,9 @@ const rootDir = join(__dirname, '..')
  * @returns {{ version?: string }}
  */
 function parsePkg(raw) {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return JSON.parse(raw)
 }
-const version = parsePkg(readFileSync(join(rootDir, 'package.json'), 'utf8')).version || '0.1.0'
+const version = parsePkg(readFileSync(join(rootDir, 'package.json'), 'utf8')).version || '0.2.0'
 const artifactsDir = join(rootDir, 'release-artifacts')
 const bundleName = `mozhou-v${version}`
 const runtimeDir = join(artifactsDir, bundleName)
@@ -116,7 +115,7 @@ for (const item of ['package.json', 'dist', 'dist-server']) {
 
 const instructions = `# 墨舟 (Novel OS) v${version} 本地发行版
 
-这是可商用部署的本地优先运行时包。它不冒充 Windows/macOS 原生安装器；当前通用包需要 Node.js ≥ 22（CI 固定 22.23.2）与 pnpm 9.15.0。
+这是 v${version} Technical Preview 的本地优先运行时包。它不冒充 Windows/macOS 原生安装器；当前通用包需要 Node.js ≥ 22（CI 固定 22.23.2）与 pnpm 9.15.0。
 
 ## 启动
 

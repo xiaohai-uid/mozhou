@@ -1,21 +1,60 @@
 import React, { useState } from 'react';
-import { useCanonGraphData, GraphNode } from './useCanonGraphData';
+import { useCanonGraphData } from './useCanonGraphData';
+import type { GraphNode } from './useCanonGraphData';
 import { CanonNodeCard } from './CanonNodeCard';
 import { CreateContractModal } from './CreateContractModal';
+import { CreateEntityModal } from '../story-brain/CreateEntityModal';
 import { post } from '../lib/post';
 import type { BookInfo } from '../shell/workbenchStorage';
 
+const FILTERS = [
+  ['all', '全部'],
+  ['character', '人物'],
+  ['faction', '势力'],
+  ['location', '地点'],
+  ['item', '道具'],
+] as const;
+
+function nodeTone(type: GraphNode['type']): string {
+  switch (type) {
+    case 'character':
+      return 'var(--jade)';
+    case 'faction':
+      return 'var(--success)';
+    case 'location':
+      return 'var(--text-muted)';
+    case 'item':
+      return 'var(--gold)';
+  }
+}
+
 export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = ({ book }) => {
-  const { nodes, links, isLive, isDemo, isEmpty, addLink } = useCanonGraphData(book?.root);
+  const { nodes, links, isLive, isDemo, isEmpty, addLink, reload } = useCanonGraphData(book?.root);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [contractTarget, setContractTarget] = useState<GraphNode | null>(null);
+  const [entityModalOpen, setEntityModalOpen] = useState(false);
 
-  const filteredNodes = nodes.filter((n) => (filterType === 'all' ? true : n.type === filterType));
+  const handleSaveEntity = async (entity: {
+    cardType: 'char' | 'location' | 'item' | 'faction' | 'concept';
+    name: string;
+    brief: string;
+    details: string;
+  }): Promise<void> => {
+    if (book?.root) {
+      await post('/api/story-brain.entity.save', {
+        root: book.root,
+        ...entity,
+      });
+      reload();
+    }
+  };
 
-  const handleStartContract = (source: GraphNode) => {
-    const other = nodes.find((n) => n.id !== source.id);
+  const filteredNodes = nodes.filter((node) => (filterType === 'all' ? true : node.type === filterType));
+
+  const handleStartContract = (source: GraphNode): void => {
+    const other = nodes.find((node) => node.id !== source.id);
     if (other) {
       setContractTarget(other);
       setModalOpen(true);
@@ -27,7 +66,7 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
     summary: string;
     deadline?: string;
     penalty?: string;
-  }) => {
+  }): void => {
     if (!selectedNode || !contractTarget) return;
     addLink({
       source: selectedNode.id,
@@ -49,101 +88,92 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
         summary: contract.summary,
         deadline: contract.deadline,
         penalty: contract.penalty,
-      }).catch((e: unknown) => {
-        console.error('Failed to sync contract to backend', e);
+      }).catch((error: unknown) => {
+        console.error('Failed to sync contract to backend', error);
       });
     }
   };
 
+  const statusLabel = isLive ? (isEmpty ? '空正典' : '实时正典') : isDemo ? '示例演示' : '未连接';
+
   return (
-    <div className="relative w-full h-full min-h-[600px] bg-zinc-950/90 border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl flex flex-col backdrop-blur-xl">
-      {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 bg-zinc-900/70 border-b border-white/[0.08] backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)]" />
-          <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">
-            正典关系与因果拓扑图谱 {book ? `· 《${book.title}》` : ''}
-          </h2>
-          <span className="text-[11px] text-zinc-400 bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 rounded-full font-mono">
-            {nodes.length} 实体 · {links.length} 羁绊 {isLive ? (isEmpty ? '(空正典)' : '(实时正典)') : isDemo ? '(示例演示)' : ''}
-          </span>
+    <section className="flex h-full min-h-[600px] w-full flex-col overflow-hidden border border-[var(--hairline-strong)] bg-[var(--surface-sunken)]" aria-labelledby="canon-graph-title">
+      <header className="flex flex-col gap-3 border-b border-[var(--hairline)] bg-[var(--surface)] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+            <h2 id="canon-graph-title" className="m-0 text-sm font-semibold text-[var(--foreground)]">
+              正典关系与因果拓扑 {book ? `· 《${book.title}》` : ''}
+            </h2>
+            <span className="rounded-md bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] text-[var(--text-muted)]">
+              {nodes.length} 实体 · {links.length} 关系 · {statusLabel}
+            </span>
+          </div>
+          <p className="mt-1.5 max-w-2xl text-[11.5px] leading-5 text-[var(--text-faint)]">
+            展示人物、势力、地点与道具之间的正典关系。契约属于作者裁决层，创建后同步到 Story Brain。
+          </p>
         </div>
 
-        {/* Actions & Filter */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {selectedNode && (
             <button
               type="button"
               onClick={() => handleStartContract(selectedNode)}
-              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-xs font-semibold shadow-lg shadow-amber-600/30 transition-all flex items-center gap-1.5 active:scale-[0.98]"
+              className="min-h-10 rounded-lg bg-[var(--gold-bright)] px-3.5 text-xs font-semibold text-[var(--background)] transition-[background-color,transform] duration-150 hover:bg-[var(--gold)] active:scale-[0.96]"
             >
-              <span>✦</span>
-              <span>与「{selectedNode.name}」建立契约</span>
+              与「{selectedNode.name}」建立契约
             </button>
           )}
-
-          <div className="flex items-center gap-1 bg-zinc-900/90 border border-white/[0.08] p-1 rounded-xl text-xs">
-            {['all', 'character', 'faction', 'item'].map((t) => (
+          <button
+            type="button"
+            onClick={() => setEntityModalOpen(true)}
+            className="min-h-8 rounded-md bg-[var(--gold-soft)] px-3 text-[11px] font-medium text-[var(--gold-bright)] shadow-[inset_0_0_0_1px_var(--gold-line-soft)] hover:bg-[var(--gold-line-soft)] active:scale-[0.96]"
+          >
+            + 新建设定卡
+          </button>
+          <div className="flex flex-wrap items-center gap-1 rounded-lg bg-[var(--surface-2)] p-1" aria-label="实体类型筛选">
+            {FILTERS.map(([id, label]) => (
               <button
-                key={t}
+                key={id}
                 type="button"
-                onClick={() => setFilterType(t)}
-                className={`px-3 py-1 rounded-lg transition-all ${
-                  filterType === t
-                    ? 'bg-indigo-600 text-white font-medium shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+                aria-pressed={filterType === id}
+                onClick={() => setFilterType(id)}
+                className={`min-h-8 rounded-md px-2.5 text-[11px] transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${
+                  filterType === id
+                    ? 'bg-[var(--gold-soft)] font-medium text-[var(--gold-bright)] shadow-[inset_0_0_0_1px_var(--gold-line-soft)]'
+                    : 'text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--foreground)]'
                 }`}
               >
-                {t === 'all' ? '全部' : t === 'character' ? '人物' : t === 'faction' ? '势力' : '道具'}
+                {label}
               </button>
             ))}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Interactive SVG Canvas or Empty State */}
       {isEmpty ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:24px_24px]">
-          <div className="w-14 h-14 rounded-2xl bg-zinc-900/80 border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-3 text-2xl shadow-xl">
-            📜
+        <div className="flex flex-1 flex-col items-center justify-center bg-[var(--surface-raised)] p-8 text-center">
+          <div className="mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[var(--jade-soft)] font-serif text-lg font-semibold text-[var(--accent-strong)] shadow-[inset_0_0_0_1px_var(--jade-line-soft)]" aria-hidden="true">
+            典
           </div>
-          <b className="text-sm text-zinc-200">《{book?.title ?? '当前作品'}》尚无正典实体卡</b>
-          <p className="text-xs text-zinc-500 max-w-sm mt-1.5 leading-relaxed">
-            当前书库未检测到人物、势力、地点或道具设定卡。可在工作台「Story Brain」或「设定/」目录中创建卡片，拓扑图谱将自动实时呈现实体关系与因果契约。
+          <b className="text-sm text-[var(--foreground)]">《{book?.title ?? '当前作品'}》尚无正典实体卡</b>
+          <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-[var(--text-muted)]">
+            当前书库未检测到人物、势力、地点或道具设定卡。可以直接在下方点击创建卡片，图谱会按真实数据更新。
           </p>
+          <button
+            type="button"
+            onClick={() => setEntityModalOpen(true)}
+            className="mt-4 rounded-md bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--background)] shadow-sm hover:bg-[var(--accent-strong)] active:scale-[0.96]"
+          >
+            立即创建第一张设定卡
+          </button>
         </div>
       ) : (
-        <div className="relative flex-1 bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:24px_24px] overflow-hidden cursor-crosshair">
-          <svg className="w-full h-full">
-            <defs>
-              <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-              <filter id="glow-indigo" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-              <linearGradient id="link-contract" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#d97706" stopOpacity="0.8" />
-              </linearGradient>
-              <linearGradient id="link-normal" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.5" />
-                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.5" />
-              </linearGradient>
-            </defs>
-
-            {/* Render Links */}
-            {links.map((link, idx) => {
-              const sourceNode = nodes.find((n) => n.id === link.source);
-              const targetNode = nodes.find((n) => n.id === link.target);
+        <div className="relative flex-1 overflow-hidden bg-[var(--surface-raised)]">
+          <svg className="h-full w-full" viewBox="0 0 760 520" preserveAspectRatio="xMidYMid meet" aria-label="正典实体关系图">
+            {links.map((link, index) => {
+              const sourceNode = nodes.find((node) => node.id === link.source);
+              const targetNode = nodes.find((node) => node.id === link.target);
               if (!sourceNode || !targetNode) return null;
 
               const isContract = Boolean(link.contract);
@@ -151,34 +181,33 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
               const midY = (sourceNode.y + targetNode.y) / 2;
 
               return (
-                <g key={idx}>
+                <g key={index}>
                   <line
                     x1={sourceNode.x}
                     y1={sourceNode.y}
                     x2={targetNode.x}
                     y2={targetNode.y}
-                    stroke={isContract ? 'url(#link-contract)' : 'url(#link-normal)'}
-                    strokeWidth={isContract ? 2.5 : 1.4}
-                    strokeDasharray={isContract ? '5 3' : undefined}
-                    filter={isContract ? 'url(#glow-gold)' : undefined}
+                    stroke={isContract ? 'var(--gold)' : 'var(--text-faint)'}
+                    strokeWidth={isContract ? 2 : 1.3}
+                    strokeDasharray={isContract ? '5 4' : undefined}
+                    opacity={0.8}
                   />
                   <rect
-                    x={midX - 32}
+                    x={midX - 34}
                     y={midY - 14}
-                    width={64}
+                    width={68}
                     height={18}
                     rx={5}
-                    fill="#09090b"
-                    stroke={isContract ? 'rgba(245, 158, 11, 0.4)' : 'rgba(255, 255, 255, 0.1)'}
-                    strokeWidth={1}
+                    fill="var(--surface)"
+                    stroke={isContract ? 'var(--gold-line-soft)' : 'var(--hairline-strong)'}
                   />
                   <text
                     x={midX}
                     y={midY - 2}
-                    fill={isContract ? '#fbbf24' : '#a1a1aa'}
+                    fill={isContract ? 'var(--gold-bright)' : 'var(--text-muted)'}
                     fontSize="9.5"
                     textAnchor="middle"
-                    className="select-none font-sans font-medium"
+                    className="pointer-events-none select-none"
                   >
                     {link.relation}
                   </text>
@@ -186,69 +215,60 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
               );
             })}
 
-            {/* Render Nodes */}
             {filteredNodes.map((node) => {
               const isSelected = selectedNode?.id === node.id;
-              const nodeColor =
-                node.type === 'character'
-                  ? '#6366f1'
-                  : node.type === 'faction'
-                  ? '#10b981'
-                  : node.type === 'location'
-                  ? '#0ea5e9'
-                  : '#f59e0b';
+              const tone = nodeTone(node.type);
 
               return (
                 <g
                   key={node.id}
                   transform={`translate(${node.x}, ${node.y})`}
                   onClick={() => setSelectedNode(node)}
-                  className="cursor-pointer group"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedNode(node);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`选择实体：${node.name}`}
+                  className="cursor-pointer outline-none"
                 >
-                  {/* Outer aura ring on select */}
                   {isSelected && (
                     <circle
-                      r={34}
+                      r={33}
                       fill="none"
-                      stroke={nodeColor}
+                      stroke={tone}
                       strokeWidth={1.5}
-                      strokeDasharray="4 2"
-                      opacity={0.7}
-                      className="animate-spin origin-center duration-1000"
+                      strokeDasharray="4 3"
+                      opacity={0.75}
                     />
                   )}
-
-                  {/* Base Circle */}
                   <circle
-                    r={isSelected ? 26 : 22}
-                    fill="#111216"
-                    stroke={nodeColor}
+                    r={isSelected ? 26 : 23}
+                    fill="var(--surface)"
+                    stroke={tone}
                     strokeWidth={isSelected ? 3 : 2}
-                    filter={isSelected ? 'url(#glow-indigo)' : undefined}
-                    className="transition-all duration-200 group-hover:scale-110"
                   />
-                  <circle
-                    r={isSelected ? 20 : 16}
-                    fill={nodeColor}
-                    fillOpacity={0.25}
-                    className="transition-all duration-200"
-                  />
+                  <circle r={isSelected ? 19 : 16} fill={tone} fillOpacity={0.13} />
                   <text
                     textAnchor="middle"
                     dy="4"
-                    fill="#f4f4f5"
-                    fontSize="11"
+                    fill="var(--foreground)"
+                    fontSize="10.5"
                     fontWeight="600"
-                    className="select-none pointer-events-none font-sans"
+                    className="pointer-events-none select-none"
                   >
                     {node.name.slice(0, 3)}
                   </text>
                   <text
                     textAnchor="middle"
                     dy="40"
-                    fill="#e4e4e7"
-                    fontSize="11"
-                    className="select-none pointer-events-none font-medium tracking-wide drop-shadow"
+                    fill="var(--text-muted)"
+                    fontSize="10.5"
+                    fontWeight="500"
+                    className="pointer-events-none select-none"
                   >
                     {node.name}
                   </text>
@@ -257,18 +277,16 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
             })}
           </svg>
 
-          {/* Selected Node Card Overlay */}
           {selectedNode && (
             <CanonNodeCard
               node={selectedNode}
               relatedLinks={links.filter(
-                (l) => l.source === selectedNode.id || l.target === selectedNode.id,
+                (link) => link.source === selectedNode.id || link.target === selectedNode.id,
               )}
               onClose={() => setSelectedNode(null)}
             />
           )}
 
-          {/* Create Contract Modal */}
           {selectedNode && contractTarget && (
             <CreateContractModal
               isOpen={modalOpen}
@@ -280,6 +298,12 @@ export const CanonGraphView: React.FC<{ book?: BookInfo | null | undefined }> = 
           )}
         </div>
       )}
-    </div>
+
+      <CreateEntityModal
+        isOpen={entityModalOpen}
+        onClose={() => setEntityModalOpen(false)}
+        onSave={handleSaveEntity}
+      />
+    </section>
   );
 };

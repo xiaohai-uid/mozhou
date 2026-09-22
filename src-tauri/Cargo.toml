@@ -1,6 +1,6 @@
 [package]
 name = "mozhou-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "MoZhou Novel OS 2.0 Desktop"
 authors = ["MoZhou Team"]
 edition = "2021"

@@ -1,6 +1,6 @@
 /**
  * 一级功能航道注册表（ADR-0027 · 实现票 T40）。
- * 五组 17 项，词表实测自 legacy app-shell-nav（spec #84 §3.1）；
+ * 主产品航道 + 本机开发检视面。代码图谱来自 GitNexus 只读快照；
  * 图标沿用原型 codex-ui-ink-orbit.html 的 mono 编码。
  */
 export interface ViewItem {
@@ -57,6 +57,10 @@ export const NAV_GROUPS = [
   {
     group: '账户',
     items: [{ id: 'membership', label: '会员中心', icon: '17' }],
+  },
+  {
+    group: '开发 · Local',
+    items: [{ id: 'code-graph', label: '代码图谱', icon: 'GX' }],
   },
 ] as const satisfies readonly NavGroupShape[]
 

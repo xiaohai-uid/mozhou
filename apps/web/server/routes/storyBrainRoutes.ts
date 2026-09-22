@@ -63,6 +63,52 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
     return true
   }
 
+  if (path === '/api/story-brain.entity.save') {
+    const rawRoot = resolvedRoot
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(rawRoot)
+    const name = typeof body['name'] === 'string' ? body['name'].trim() : ''
+    const cardType = typeof body['cardType'] === 'string' ? body['cardType'] : 'char'
+    const brief = typeof body['brief'] === 'string' ? body['brief'].trim() : ''
+    const details = typeof body['details'] === 'string' ? body['details'].trim() : ''
+
+    if (name.length === 0) {
+      json(400, { ok: false, error: 'name must not be empty' })
+      return true
+    }
+
+    const validPrefixes = new Set(['char', 'location', 'item', 'faction', 'concept'])
+    if (!validPrefixes.has(cardType)) {
+      json(400, { ok: false, error: `invalid cardType: ${cardType}` })
+      return true
+    }
+
+    // slug 清洗：中文或字母数字转安全 slug
+    const customSlug = typeof body['slug'] === 'string' && body['slug'].trim().length > 0 ? body['slug'].trim() : null
+    const safeSlug = customSlug ?? name.replace(/[^\w\u4e00-\u9fa5]+/g, '_').toLowerCase().slice(0, 32)
+    const ref = `${cardType}:${safeSlug}` as EntityRef
+
+    try {
+      const plane = LocalDataPlane.open(root)
+      try {
+        const card = plane.saveEntityCard(ref, {
+          name,
+          brief,
+          body: details.length > 0 ? `# ${name}\n\n${details}\n` : `# ${name}\n`,
+        })
+        json(200, { ok: true, card })
+      } finally {
+        plane.close()
+      }
+    } catch (err) {
+      json(500, { ok: false, error: (err as Error).message })
+    }
+    return true
+  }
+
   if (path === '/api/story-brain.facts') {
     const rawRoot = resolvedRoot
     if (rawRoot === null) {

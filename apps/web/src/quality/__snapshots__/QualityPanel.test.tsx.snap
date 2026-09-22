@@ -123,6 +123,55 @@ exports[`QualityPanel（初载契约修复后语义保全） > 契约快照：�
           </button>
         </div>
       </div>
+      <div
+        data-testid="canon-commit-section"
+        style="margin-top: 14px; border-top: 1px solid var(--hairline-strong); padding-top: 12px;"
+      >
+        <div
+          class="card-title"
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+        >
+          <b
+            style="font-size: 13px;"
+          >
+            正典门禁与定稿提交
+          </b>
+          <span
+            class="cap-badge pending"
+          >
+            ○ 草稿期
+          </span>
+        </div>
+        <div
+          style="display: flex; flex-direction: column; gap: 8px;"
+        >
+          <div
+            style="display: flex; gap: 6px; align-items: center;"
+          >
+            <input
+              aria-label="定稿说明"
+              class="control"
+              placeholder="定稿摘要说明（如：第一卷决战定稿）"
+              style="flex: 1 1 0%; font-size: 11px;"
+              type="text"
+              value=""
+            />
+            <button
+              class="btn-primary"
+              style="font-size: 11px; padding: 4px 10px; white-space: nowrap;"
+              type="button"
+            >
+              确认定稿入账 (Commit)
+            </button>
+          </div>
+          <p
+            class="mono muted"
+            style="font-size: 10px; margin: 0px;"
+          >
+            定稿将执行门禁终验，生成不可变提交并更新章节状态。
+          </p>
+        </div>
+      </div>
     </div>
   </section>
 </DocumentFragment>

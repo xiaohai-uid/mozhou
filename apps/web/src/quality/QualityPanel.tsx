@@ -110,11 +110,21 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const [selectedReason, setSelectedReason] = useState<string>('outline_expansion')
   const [note, setNote] = useState('')
   const [correctionSaved, setCorrectionSaved] = useState(false)
+  const [chapterPhase, setChapterPhase] = useState<'draft' | 'committed'>('draft')
+  const [commitSummary, setCommitSummary] = useState('')
+  const [commitBusy, setCommitBusy] = useState(false)
+  const [commitNotice, setCommitNotice] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setError(null)
     try {
-      const status = await post<ChapterQualityStatusResponse>('/api/chapter.quality', { root, chapterIndex })
+      const [status, prose] = await Promise.all([
+        post<ChapterQualityStatusResponse>('/api/chapter.quality', { root, chapterIndex }),
+        post<{ ok: boolean; phase?: 'draft' | 'committed' }>('/api/chapter.prose', { root, chapterIndex }).catch(() => null),
+      ])
+      if (prose?.phase) {
+        setChapterPhase(prose.phase)
+      }
       setSummary(status.status === 'no_review'
         ? { ok: true, hasReport: false, current: true }
         : reportToSummary(status.report, status.current))
@@ -122,6 +132,50 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
       setError((cause as Error).message)
     }
   }, [root, chapterIndex])
+
+  const handleCommit = async (): Promise<void> => {
+    setCommitBusy(true)
+    setError(null)
+    setCommitNotice(null)
+    try {
+      const res = await post<{ ok: boolean; commitId: string }>('/api/chapter.commit', {
+        root,
+        chapterIndex,
+        summary: commitSummary,
+      })
+      if (res.ok) {
+        setChapterPhase('committed')
+        setCommitNotice(`✓ 本章已成功定稿入账 (${res.commitId.slice(0, 12)})`)
+        setCommitSummary('')
+        window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
+      }
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setCommitBusy(false)
+    }
+  }
+
+  const handleReopen = async (): Promise<void> => {
+    setCommitBusy(true)
+    setError(null)
+    setCommitNotice(null)
+    try {
+      const res = await post<{ ok: boolean }>('/api/chapter.reopen', {
+        root,
+        chapterIndex,
+      })
+      if (res.ok) {
+        setChapterPhase('draft')
+        setCommitNotice('✓ 已重开为草稿状态')
+        window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
+      }
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setCommitBusy(false)
+    }
+  }
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -288,6 +342,67 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
             <p className="mono" style={{ margin: '8px 0 0', color: 'var(--success)' }}>
               已记录（事件+失败记忆）
             </p>
+          )}
+        </div>
+
+        {/* 正典门禁与定稿提交 (F04 十步管线终局) */}
+        <div style={{ marginTop: 14, borderTop: '1px solid var(--hairline-strong)', paddingTop: 12 }} data-testid="canon-commit-section">
+          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <b style={{ fontSize: 13 }}>正典门禁与定稿提交</b>
+            <span className={chapterPhase === 'committed' ? 'cap-badge native' : 'cap-badge pending'}>
+              {chapterPhase === 'committed' ? '● 已定稿' : '○ 草稿期'}
+            </span>
+          </div>
+
+          {commitNotice && (
+            <p className="mono" style={{ margin: '4px 0 8px', color: 'var(--success)', fontSize: 11 }}>
+              {commitNotice}
+            </p>
+          )}
+
+          {chapterPhase === 'committed' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <p className="mono muted" style={{ fontSize: 11, margin: 0 }}>
+                本章已冻结为不可变正典，正文与设定增量已并入世界观基线。
+              </p>
+              <div className="actions" style={{ marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void handleReopen()}
+                  disabled={commitBusy}
+                  style={{ fontSize: 11, padding: '4px 10px' }}
+                >
+                  {commitBusy ? '处理中…' : '显式重开草稿 (Reopen)'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  className="control"
+                  type="text"
+                  placeholder="定稿摘要说明（如：第一卷决战定稿）"
+                  value={commitSummary}
+                  onChange={(e) => setCommitSummary(e.target.value)}
+                  style={{ flex: 1, fontSize: 11 }}
+                  aria-label="定稿说明"
+                />
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void handleCommit()}
+                  disabled={commitBusy}
+                  style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                >
+                  {commitBusy ? '提交中…' : '确认定稿入账 (Commit)'}
+                </button>
+              </div>
+              <p className="mono muted" style={{ fontSize: 10, margin: 0 }}>
+                定稿将执行门禁终验，生成不可变提交并更新章节状态。
+              </p>
+            </div>
           )}
         </div>
       </div>

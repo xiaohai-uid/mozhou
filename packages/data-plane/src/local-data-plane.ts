@@ -36,6 +36,7 @@ import {
   type ProseChapterScan,
 } from './chapter.js'
 import { readCanonState, readBookRecord, scanEntityCards, type CanonState } from './canon-read.js'
+import { createEntityCard, updateEntityCard, type EntityCardInput } from './entity-cards.js'
 import { assertProjectionVersion, openDatabase, ProjectionVersionMismatchError } from './database.js'
 import { assembleChangeMatrix, type ChangeMatrix } from './impact.js'
 
@@ -256,6 +257,23 @@ export class LocalDataPlane {
    */
   getEntityCards(): ReturnType<typeof scanEntityCards> {
     return scanEntityCards(this.root)
+  }
+
+  /**
+   * 创建或更新实体卡片（人设/地点/物品/势力/概念）：
+   * 自动写入设定文件并在同一事务内同步 SQLite 投影。
+   */
+  saveEntityCard(ref: EntityRef, input: EntityCardInput): ReturnType<typeof scanEntityCards>[number] {
+    const existing = scanEntityCards(this.root).find((c) => c.ref === ref)
+    if (existing !== undefined) {
+      return updateEntityCard(this._ctx, ref, {
+        name: input.name,
+        ...(input.brief !== undefined ? { brief: input.brief } : {}),
+        ...(input.aliases !== undefined ? { aliases: input.aliases } : {}),
+        ...(input.body !== undefined ? { body: input.body } : {}),
+      })
+    }
+    return createEntityCard(this._ctx, ref, input)
   }
 
   /**

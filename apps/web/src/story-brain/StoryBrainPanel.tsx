@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CanonState, EntityCardScan, EntityRefPrefix } from '@mozhou/data-plane'
 import type { StoryBrainFactsResponse } from '../../server/api'
 import { post } from '../lib/post'
+import { CreateEntityModal } from './CreateEntityModal'
 
 const CARD_TYPE_LABEL: Record<EntityRefPrefix, string> = {
   char: '人物',
@@ -36,6 +37,20 @@ export function StoryBrainPanel({ root }: { root: string }): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [selectedRef, setSelectedRef] = useState<string | null>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  const handleSaveEntity = async (entity: {
+    cardType: 'char' | 'location' | 'item' | 'faction' | 'concept'
+    name: string
+    brief: string
+    details: string
+  }): Promise<void> => {
+    await post('/api/story-brain.entity.save', {
+      root,
+      ...entity,
+    })
+    await load()
+  }
 
   const load = useCallback(async (): Promise<void> => {
     setBusy(true)
@@ -110,10 +125,20 @@ export function StoryBrainPanel({ root }: { root: string }): JSX.Element {
         <span className="tag">{cards.length} entities</span>
       </div>
 
-      <div className="actions" style={{ marginTop: 0 }}>
-        <button className="btn" onClick={() => { void load() }} disabled={busy}>
-          {busy ? '读取中…' : '刷新'}
-        </button>
+      <div className="actions" style={{ marginTop: 0, justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn" onClick={() => { void load() }} disabled={busy}>
+            {busy ? '读取中…' : '刷新'}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setCreateModalOpen(true)}
+            style={{ padding: '4px 10px', fontSize: 12 }}
+          >
+            + 新建设定卡
+          </button>
+        </div>
         <span className="mono muted" style={{ alignSelf: 'center' }}>
           canon 按主角 POV · 认知通道 ADR-0026
         </span>
@@ -262,6 +287,12 @@ export function StoryBrainPanel({ root }: { root: string }): JSX.Element {
           )}
         </div>
       </div>
+
+      <CreateEntityModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSave={handleSaveEntity}
+      />
     </section>
   )
 }

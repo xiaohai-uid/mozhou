@@ -6,6 +6,8 @@ export interface ExportDownloadOptions {
   bookTitle: string
   format: 'txt' | 'docx' | 'epub'
   chapters: readonly ChapterExportItem[]
+  bookId?: string | undefined
+  root?: string | undefined
   author?: string
   synopsis?: string
 }
@@ -14,6 +16,8 @@ export async function downloadNovelExport({
   bookTitle,
   format,
   chapters,
+  bookId,
+  root,
   author = '墨舟作者',
   synopsis = '',
 }: ExportDownloadOptions): Promise<{ fileName: string }> {
@@ -26,6 +30,8 @@ export async function downloadNovelExport({
       bookTitle: safeTitle,
       format,
       chapters,
+      bookId,
+      root,
       author,
       synopsis,
     }),
@@ -62,22 +68,23 @@ export async function fetchBookChaptersForExport(root: string): Promise<ChapterE
         root,
         chapterIndex: ch.chapterIndex,
       })
+      if (!proseRes.body || proseRes.body.trim().length === 0) {
+        throw new Error('正文为空')
+      }
       items.push({
         title: ch.title || `第 ${ch.chapterIndex} 章`,
-        content: proseRes.ok && proseRes.body ? proseRes.body : '',
+        content: proseRes.body,
       })
-    } catch {
-      items.push({
-        title: ch.title || `第 ${ch.chapterIndex} 章`,
-        content: '',
-      })
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`第 ${ch.chapterIndex} 章正文读取失败，已取消导出：${detail}`, { cause: error })
     }
   }
   return items
 }
 
 export interface PrepareExportParams {
-  book?: { root: string; title: string } | null | undefined
+  book?: { root: string; title: string; bookId?: string } | null | undefined
   exportingRealBook: boolean
   title: string
   format: 'txt' | 'docx' | 'epub'
@@ -120,6 +127,8 @@ export async function executeExportWorkflow({
     bookTitle: safeTitle,
     format,
     chapters,
+    bookId: book?.bookId,
+    root: book?.root,
   })
 
   return {

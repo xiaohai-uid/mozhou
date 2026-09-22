@@ -31,6 +31,26 @@ export function CapabilitySquareView(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [activeSkills, setActiveSkills] = useState<string[]>(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('mozhou.skills.active') : null
+      return raw ? (JSON.parse(raw) as string[]) : []
+    } catch {
+      return []
+    }
+  })
+
+  const toggleActiveSkill = (skillId: string): void => {
+    setActiveSkills((prev) => {
+      const next = prev.includes(skillId) ? prev.filter((id) => id !== skillId) : [...prev, skillId]
+      try {
+        localStorage.setItem('mozhou.skills.active', JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -181,10 +201,17 @@ export function CapabilitySquareView(): JSX.Element {
                 </>
               )
             })()}
-            <hr style={{ border: 'none', borderTop: '1px solid var(--hairline)', margin: '14px 0' }} />
-            <p className="muted" style={{ fontSize: 11, lineHeight: 1.8, margin: 0 }}>
-              future enable/apply 只有真实 action contract 存在时才出现——当前 17 项均无，因此本 Sheet 不提供任何假按钮。
-            </p>
+            <div className="cap-kv" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+              <button
+                type="button"
+                className={activeSkills.includes(selected.id) ? 'btn-primary' : 'btn'}
+                onClick={() => toggleActiveSkill(selected.id)}
+                style={{ width: '100%', justifyContent: 'center', padding: '8px 16px', fontSize: 13 }}
+                aria-label={activeSkills.includes(selected.id) ? '停用此技能' : '启用此技能到写作流'}
+              >
+                {activeSkills.includes(selected.id) ? '✓ 已在此作品启用此技能（点击停用）' : '+ 启用此技能到写作流'}
+              </button>
+            </div>
           </div>
         </aside>
       )}

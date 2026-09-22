@@ -65,6 +65,9 @@ export function useCanonGraphData(bookRoot?: string | null) {
   const [isLive, setIsLive] = useState(false);
   const [isDemo, setIsDemo] = useState(true);
   const [isEmpty, setIsEmpty] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  const reload = () => setTick((t) => t + 1);
 
   useEffect(() => {
     if (!bookRoot) {
@@ -197,11 +200,11 @@ export function useCanonGraphData(bookRoot?: string | null) {
     return () => {
       mounted = false;
     };
-  }, [bookRoot]);
+  }, [bookRoot, tick]);
 
   const addLink = (newLink: GraphLink) => {
     setLinks((prev) => [...prev, newLink]);
   };
 
-  return { nodes, links, isLive, isDemo, isEmpty, addLink };
+  return { nodes, links, isLive, isDemo, isEmpty, addLink, reload };
 }

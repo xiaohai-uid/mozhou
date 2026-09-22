@@ -14,6 +14,7 @@
   "dependencies": {
     "@mozhou/context-compiler": "workspace:*",
     "@mozhou/data-plane": "workspace:*",
+    "@mozhou/flywheel": "workspace:*",
     "@mozhou/kernel": "workspace:*",
     "@mozhou/pipeline": "workspace:*",
     "@mozhou/quality-engine": "workspace:*",

@@ -221,4 +221,37 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
       note: '把大纲当正文写了',
     })
   })
+
+  it('正典门禁与定稿提交：草稿期可提交定稿，定稿后可显式重开草稿', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/chapter.quality') return Promise.resolve(okJson(NO_REVIEW_STATUS))
+      if (path === '/api/chapter.prose') return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision: 2 }))
+      if (path === '/api/chapter.commit') return Promise.resolve(okJson({ ok: true, commitId: 'cmit_test_123', phase: 'committed' }))
+      if (path === '/api/chapter.reopen') return Promise.resolve(okJson({ ok: true, reopenedFromCommitId: 'cmit_test_123' }))
+      return Promise.resolve(okJson({ ok: true }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('canon-commit-section')).toBeInTheDocument()
+    })
+    expect(screen.getByText('○ 草稿期')).toBeInTheDocument()
+
+    const commitBtn = screen.getByRole('button', { name: '确认定稿入账 (Commit)' })
+    await userEvent.click(commitBtn)
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/chapter.commit', expect.objectContaining({ method: 'POST' }))
+      expect(screen.getByText('● 已定稿')).toBeInTheDocument()
+    })
+
+    const reopenBtn = screen.getByRole('button', { name: '显式重开草稿 (Reopen)' })
+    await userEvent.click(reopenBtn)
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/chapter.reopen', expect.objectContaining({ method: 'POST' }))
+      expect(screen.getByText('○ 草稿期')).toBeInTheDocument()
+    })
+  })
 })

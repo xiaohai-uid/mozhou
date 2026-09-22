@@ -81,4 +81,27 @@ describe('StyleDistillView（风格蒸馏）', () => {
       expect(fetchMock).toHaveBeenCalled()
     })
   })
+
+  it('支持将提取指标应用为当前作品文风画像', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/style.apply') {
+        return okJson({ ok: true, currentProfiles: MOCK_STYLE.currentProfiles })
+      }
+      return okJson(MOCK_STYLE)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<StyleDistillView root="C:/tmp/book" />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '应用为本书此场景文风' })).toBeInTheDocument()
+    })
+    const applyBtn = screen.getByRole('button', { name: '应用为本书此场景文风' })
+    await userEvent.click(applyBtn)
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/style.apply', expect.objectContaining({
+        method: 'POST',
+      }))
+    })
+  })
 })

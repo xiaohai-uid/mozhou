@@ -1,0 +1,10 @@
+# Exact historical false positive: fixed smoke-test password from removed legacy app.
+# Keep this fingerprint-specific so all other current and historical findings remain blocking.
+4c88825ecba7d2d32d9551287340d4ca5e77ce8a:app/scripts/smoke-real-llm.mjs:generic-api-key:81
+# Deterministic test idempotency keys; never credentials.
+bc75c991a6bc1102bfabcef8d0bba34c3ec1a5eb:apps/web/server/routes/draftCandidates.test.ts:generic-api-key:437
+bc75c991a6bc1102bfabcef8d0bba34c3ec1a5eb:packages/pipeline/src/draft-accept.test.ts:generic-api-key:206
+bc75c991a6bc1102bfabcef8d0bba34c3ec1a5eb:packages/pipeline/src/draft-accept.test.ts:generic-api-key:215
+# Verification output digest and browser localStorage key; neither authenticates anything.
+fed29e32a86c47dc991da6883fe5d6cc2e4141fd:evidence/T02/verification.txt:generic-api-key:19
+cdcf2781f21c3fcca8641620ebfe2d51f6920b3b:apps/web/src/shell/scene/scenePreference.ts:generic-api-key:41

@@ -127,6 +127,39 @@ export class QualityReviewNotPassError extends Error {
 }
 
 /**
+ * 连续性门禁未通过即试图步进 canon_proposal（C3 会话收口）：出口只对
+ * verdict='pass' 开放——hard_conflict 悬置走 HardConflictUnresolvedError 的
+ * 显式回炉；verdict=null（门禁从未运行）同样是跳步，不能把未经校验的 delta
+ * 盲推进确认面。C3 契约：session.advance 不得成为跳过质量门的通道。
+ */
+export class GateNotPassedError extends Error {
+  override readonly name = 'GateNotPassedError';
+  constructor(chapterIndex: number, taskRef: string, verdict: string | null) {
+    super(
+      `chapter ${chapterIndex} session ${taskRef}: continuity gate verdict is '${verdict ?? '<none>'}' ` +
+        "— forward exit to canon_proposal requires the gate to have run and passed (C3); " +
+        'run the continuity gate and advance with its verdict before proposing canon deltas',
+    );
+  }
+}
+
+/**
+ * 正典提交未入账即试图步进 flywheel_record（C3 会话收口）：完成态的唯一
+ * 事实源是账本中的 CanonCommitted——markCommitted 之前步进飞轮，等于跳过
+ * 提交步锚把未定稿内容计入复盘。fail closed。
+ */
+export class CommitNotRecordedError extends Error {
+  override readonly name = 'CommitNotRecordedError';
+  constructor(chapterIndex: number, taskRef: string) {
+    super(
+      `chapter ${chapterIndex} session ${taskRef}: no CanonCommitted in the ledger ` +
+        '(C3) — record the commit (markCommitted) before advancing to flywheel_record; ' +
+        'completion truth lives in the ledger, not in the cursor',
+    );
+  }
+}
+
+/**
  * 文学审查回炉未被显式驱动（ADR-0025 决策 4）：requestQualityRework 只在
  * review 步且最新质量 verdict='blocking_fail' 时合法——verdict=pass/refused
  * 或尚未审查都不是「承认文学错误改文」的显式动作。
@@ -273,9 +306,19 @@ export class ChapterProductionSession {
         throw new QualityReviewNotPassError(this.#chapterIndex, this.#taskRef, verdict);
       }
     }
-    // S7 停止策略：硬冲突悬置时前进出口关闭（delta 不进确认面），只许显式回炉
-    if (to === 'canon_proposal' && this.project().lastGateVerdict === 'hard_conflict') {
-      throw new HardConflictUnresolvedError(this.#chapterIndex, this.#taskRef);
+    // S7 停止策略与 C3 会话收口：硬冲突悬置或门禁未跑时前进出口关闭
+    if (to === 'canon_proposal') {
+      const gateVerdict = this.project().lastGateVerdict;
+      if (gateVerdict === 'hard_conflict') {
+        throw new HardConflictUnresolvedError(this.#chapterIndex, this.#taskRef);
+      }
+      if (gateVerdict !== 'pass') {
+        throw new GateNotPassedError(this.#chapterIndex, this.#taskRef, gateVerdict);
+      }
+    }
+    // C3 会话收口：未入账 CanonCommitted 禁止步进飞轮复盘
+    if (to === 'flywheel_record' && !this.isCompleted()) {
+      throw new CommitNotRecordedError(this.#chapterIndex, this.#taskRef);
     }
     this.#publish({
       type: 'TaskStepTransitioned',

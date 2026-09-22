@@ -40,35 +40,35 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+      <div className="w-full max-w-md space-y-4 rounded-xl border border-[var(--hairline-strong)] bg-[var(--surface-raised)] p-6 shadow-[0_24px_64px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center justify-between border-b border-[var(--hairline)] pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
-            <h3 className="text-sm font-semibold text-zinc-100">建立因果契约 (CausalContract)</h3>
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--gold-bright)]" />
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">建立因果契约 (CausalContract)</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 text-sm px-2 py-1 rounded hover:bg-zinc-800"
+            className="rounded px-2 py-1 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
           >
             ✕
           </button>
         </div>
 
-        <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 text-xs flex items-center justify-between">
-          <span className="text-indigo-400 font-medium">{sourceName}</span>
-          <span className="text-zinc-500">━━ 建立羁绊 ━━►</span>
-          <span className="text-emerald-400 font-medium">{targetName}</span>
+        <div className="flex items-center justify-between rounded-lg border border-[var(--hairline)] bg-[var(--surface-sunken)] p-3 text-xs">
+          <span className="font-medium text-[var(--jade)]">{sourceName}</span>
+          <span className="text-[var(--text-faint)]">━━ 建立羁绊 ━━►</span>
+          <span className="font-medium text-[var(--gold-bright)]">{targetName}</span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
-            <label className="block text-zinc-400 mb-1">关系类型：</label>
+            <label className="mb-1 block text-[var(--text-muted)]">关系类型：</label>
             <select
               value={relation}
               onChange={(e) => setRelation(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-[var(--foreground)] focus:border-[var(--gold-line)] focus:outline-none"
             >
               <option value="生死盟约">生死盟约</option>
               <option value="师徒传道">师徒传道</option>
@@ -79,49 +79,49 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-zinc-400 mb-1">因果承诺内容：</label>
+            <label className="mb-1 block text-[var(--text-muted)]">因果承诺内容：</label>
             <input
               type="text"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="如：立誓三月内替对方找齐三味续命主药"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-[var(--foreground)] placeholder:text-[var(--text-faint)] focus:border-[var(--gold-line)] focus:outline-none"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-zinc-400 mb-1">履约截止期限：</label>
+              <label className="mb-1 block text-[var(--text-muted)]">履约截止期限：</label>
               <input
                 type="text"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-[var(--foreground)] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-zinc-400 mb-1">违约惩罚断言：</label>
+              <label className="mb-1 block text-[var(--text-muted)]">违约惩罚断言：</label>
               <input
                 type="text"
                 value={penalty}
                 onChange={(e) => setPenalty(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-sunken)] px-3 py-2 text-[var(--foreground)] focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--hairline)] pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-zinc-400 hover:text-zinc-200 bg-zinc-800 rounded-lg"
+              className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
             >
               取消
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium shadow-md"
+              className="rounded-lg bg-[var(--gold-bright)] px-4 py-2 font-medium text-[var(--background)] hover:bg-[var(--gold)]"
             >
               确认入典
             </button>

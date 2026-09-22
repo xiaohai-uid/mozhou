@@ -438,7 +438,11 @@ describe('S8 行9 Record 后：同事务序 + usage 可回灌', () => {
     const session = ChapterProductionSession.start({ bus, root: dir, chapterIndex: 2, newTaskRef: () => 'tsk_nb9' });
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate', 'canon_proposal'] as const) {
       if (step === 'user_edit') session.recordQualityReview({ reportId: 'rpt_nb9_pass', verdict: 'pass' });
-      session.advance(step);
+      if (step === 'continuity_gate') {
+        session.advance(step, { verdict: 'pass' });
+      } else {
+        session.advance(step);
+      }
     }
     session.recordProposal({ proposalId: 'prp_nb9' }); // 成对头：CanonCommitted 的闭合前提
     session.advance('commit');

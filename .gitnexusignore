@@ -1,0 +1,4 @@
+# Generated graph exports are outputs, not source inputs to their own index.
+apps/web/src/code-graph/codeGraphSnapshot.ts
+apps/web/src/code-graph/codeGraphData.json
+work/ui-graph-verify/

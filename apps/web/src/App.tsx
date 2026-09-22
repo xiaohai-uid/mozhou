@@ -1,7 +1,7 @@
 /**
  * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027 · 商业化双端全景）。
  */
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { CapabilityChannels } from './shell/CapabilityChannels'
 import { ChangeMatrixPanel } from './change-matrix/ChangeMatrixPanel'
 import { SceneLayer } from './shell/scene/SceneLayer'
@@ -47,6 +47,11 @@ import { StoryboardView } from './storyboard/StoryboardView'
 import { confirmStoryboardLeave } from './storyboard/dirtyGuard'
 import { MobileShell } from './mobile/MobileShell'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
+
+const CodeGraphView = lazy(async () => {
+  const module = await import('./code-graph/CodeGraphView')
+  return { default: module.CodeGraphView }
+})
 
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
@@ -212,7 +217,13 @@ export function App(): JSX.Element {
         profile={resolveSceneProfile(scenePreference, book?.bookId ?? null)}
         focus={stageToFocus(stage)}
       />
-      <div className={'app app-grain' + (view === 'storyboard' ? ' app-storyboard' : '')}>
+      <div
+        className={
+          'app app-grain' +
+          (view === 'storyboard' ? ' app-storyboard' : '') +
+          (view === 'code-graph' ? ' app-code-graph' : '')
+        }
+      >
         <TopBar
           book={book}
           onHome={() => handleSelectView('workbench')}
@@ -222,7 +233,7 @@ export function App(): JSX.Element {
         />
         <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
         {/* U01：分镜页不挂小说生产管线与质量塔（独立创作任务面） */}
-        {view !== 'storyboard' && (
+        {view !== 'storyboard' && view !== 'code-graph' && (
           <PipelineStrip activeStage={stage} onSelect={setStage} stageStates={stageStates} />
         )}
         {/* U03：写作对话并入真实写作入口——dialogue 与 workbench 同元素同 key（状态不丢），仅滚动到对话面板 */}
@@ -269,6 +280,10 @@ export function App(): JSX.Element {
           <GenreKitMarketplaceView book={book} />
         ) : view === 'canon-graph' ? (
           <CanonGraphView book={book} />
+        ) : view === 'code-graph' ? (
+          <Suspense fallback={<div className="code-graph-loading">正在载入本地代码图谱…</div>}>
+            <CodeGraphView />
+          </Suspense>
         ) : view === 'style-distill' ? (
           <StyleDistillView root={book?.root ?? null} />
         ) : view === 'novel-breakdown' ? (
@@ -287,7 +302,7 @@ export function App(): JSX.Element {
           <PlaceholderView view={view} />
         )}
         {/* U01：质量塔/检视塔在分镜页不挂载 */}
-        {view !== 'storyboard' && (
+        {view !== 'storyboard' && view !== 'code-graph' && (
           <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
         )}
       </div>

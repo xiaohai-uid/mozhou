@@ -150,6 +150,25 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
     expect(resAdv2.status).toBe(200)
     const dataAdv2 = (await resAdv2.json()) as { ok: boolean; currentStep: string }
     expect(dataAdv2.currentStep).toBe('draft')
+
+    // 步进到 review
+    const resAdv3 = await fetch(`${base}/api/session.advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+    expect(resAdv3.status).toBe(200)
+
+    // 试图从 review 盲推到 user_edit（未做文学审查）必须被 409 拒绝，无法跳向 commit
+    const resAdv4 = await fetch(`${base}/api/session.advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+    expect(resAdv4.status).toBe(409)
+    const dataAdv4 = (await resAdv4.json()) as { ok: boolean; error: string }
+    expect(dataAdv4.ok).toBe(false)
+    expect(dataAdv4.error).toContain('literary review verdict')
   })
 
   it('chapter.review 真实执行并生成带哈希锚定的审查报告', async () => {

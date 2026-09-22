@@ -36,6 +36,9 @@ export function StyleDistillView({
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [targetScenario, setTargetScenario] = useState('dialogue')
+  const [applying, setApplying] = useState(false)
+  const [appliedNotice, setAppliedNotice] = useState<string | null>(null)
 
   const load = useCallback(async (): Promise<void> => {
     if (root === null) return
@@ -50,6 +53,29 @@ export function StyleDistillView({
   useEffect(() => {
     void load()
   }, [load])
+
+  const handleApplyStyle = async (): Promise<void> => {
+    if (!root || !data?.sampleMetrics || applying) return
+    setApplying(true)
+    setAppliedNotice(null)
+    try {
+      await post('/api/style.apply', {
+        root,
+        scenario: targetScenario,
+        metrics: {
+          dialogueRatio: data.sampleMetrics.dialogueRatio,
+          sensoryDensity: data.sampleMetrics.sensoryDensity,
+          actionPacing: data.sampleMetrics.actionPacing,
+        },
+      })
+      setAppliedNotice('✓ 已成功保存到当前作品文风.md')
+      await load()
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setApplying(false)
+    }
+  }
 
   const handleDistill = async (sample: string): Promise<void> => {
     const clean = sample.trim()
@@ -212,6 +238,40 @@ export function StyleDistillView({
                     )}
                   </div>
                 )}
+
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="mono muted" style={{ fontSize: 11 }}>目标场景：</span>
+                    <select
+                      className="control"
+                      value={targetScenario}
+                      onChange={(e) => setTargetScenario(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: 11 }}
+                      aria-label="目标场景"
+                    >
+                      <option value="dialogue">对白交锋 (dialogue)</option>
+                      <option value="action">动作场面 (action)</option>
+                      <option value="romance_emotion">情感互动 (romance_emotion)</option>
+                      <option value="exposition_worldbuilding">背景交代 (exposition_worldbuilding)</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {appliedNotice && (
+                      <span className="mono" style={{ color: 'var(--success)', fontSize: 11 }}>
+                        {appliedNotice}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={applying || !root}
+                      onClick={() => void handleApplyStyle()}
+                      style={{ fontSize: 11, padding: '4px 12px' }}
+                    >
+                      {applying ? '正在应用…' : root ? '应用为本书此场景文风' : '先打开作品即可应用'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
