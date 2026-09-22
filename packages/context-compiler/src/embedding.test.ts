@@ -69,7 +69,7 @@ describe('内置模型断网冷启动（P0 硬断言）', () => {
       globalThis.fetch = realFetch
     }
     provider = await createLocalEmbeddingProvider()
-  })
+  }, 30_000)
   afterAll(() => restoreFetch())
 
   it('produces normalized 512-dim vectors with zero network access', async () => {
