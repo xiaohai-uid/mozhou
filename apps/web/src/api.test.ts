@@ -1378,6 +1378,66 @@ describe('我的作品（作品概览与章节目录）API 契约', () => {
     expect(jsonRes.data.title).toBe('夜雨江澜')
     expect((jsonRes.data.content as string)).toContain('第 1 章 · 第一章')
     expect((jsonRes.data.content as string)).toContain('第 2 章 · 迷雾重重')
+
+    // structured:true：返回章节结构化数组（供 EPUB/Docx 导出弹窗逐章打包）
+    const structRes = await post(base, '/api/book.export-txt', { root, structured: true })
+    expect(structRes.status).toBe(200)
+    expect(structRes.data.ok).toBe(true)
+    expect(structRes.data.title).toBe('夜雨江澜')
+    const chapters = structRes.data.chapters as { index: number; title: string; content: string }[]
+    expect(Array.isArray(chapters)).toBe(true)
+    expect(chapters).toHaveLength(2)
+    expect(chapters[0]).toMatchObject({ index: 1, title: '第一章', content: '第1章江水初涨，渡口无人。' })
+    expect(chapters[1]).toMatchObject({ index: 2, title: '迷雾重重', content: '第2章灯火尽灭，钟声骤响。' })
+  })
+
+  it('POST /api/lorebook.*：世界书条目 upsert/list/delete 与校验拒绝', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-lorebook-test-'))
+    roots.push(dir)
+    const created = await post(base, '/api/book', { dir, title: '世界书之试' })
+    const root = created.data.root as string
+
+    // 初始为空
+    const list0 = await post(base, '/api/lorebook.list', { root })
+    expect(list0.status, JSON.stringify(list0.data)).toBe(200)
+    expect(list0.data).toEqual({ ok: true, entries: [] })
+
+    // upsert 新条目
+    const up1 = await post(base, '/api/lorebook.upsert', {
+      root,
+      entry: { id: 'lb_entry001', title: '玄灯教铁律', keywords: ['玄灯教', '灯律'], content: '灯灭即魂销。', enabled: true },
+    })
+    expect(up1.status).toBe(200)
+    expect(up1.data.entries).toHaveLength(1)
+
+    // list 读回
+    const list1 = await post(base, '/api/lorebook.list', { root })
+    expect(list1.data.entries[0]).toMatchObject({ id: 'lb_entry001', title: '玄灯教铁律' })
+
+    // 缺关键词校验拒绝
+    const bad = await post(base, '/api/lorebook.upsert', {
+      root,
+      entry: { id: 'lb_bad', title: '坏条目', keywords: [], content: '内容', enabled: true },
+    })
+    expect(bad.status).toBe(400)
+    expect(bad.data.ok).toBe(false)
+
+    // 同 id 覆盖
+    const up2 = await post(base, '/api/lorebook.upsert', {
+      root,
+      entry: { id: 'lb_entry001', title: '玄灯教铁律（修订）', keywords: ['玄灯教'], content: '灯灭即魂销。', enabled: false },
+    })
+    expect(up2.status).toBe(200)
+    expect(up2.data.entries).toHaveLength(1)
+    expect(up2.data.entries[0]).toMatchObject({ title: '玄灯教铁律（修订）', enabled: false })
+
+    // 删除；删除不存在 id 报错
+    const del = await post(base, '/api/lorebook.delete', { root, id: 'lb_entry001' })
+    expect(del.status).toBe(200)
+    expect(del.data.entries).toEqual([])
+    const delMissing = await post(base, '/api/lorebook.delete', { root, id: 'lb_missing' })
+    expect(delMissing.status).toBe(400)
   })
 
   it('POST /api/chapter.save：支持 expectedRevision 校验，失谐时返回 409 REVISION_MISMATCH', async () => {

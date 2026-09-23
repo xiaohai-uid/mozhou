@@ -56,6 +56,8 @@ import type {
 } from '@mozhou/kernel'
 import { detectEntityMentions, isSecretPredicate } from '@mozhou/kernel'
 import type { LocalEmbeddingProvider } from './embedding.js'
+import type { LorebookScanEntry } from './lorebook.js'
+import { scanLorebookTriggers } from './lorebook.js'
 
 /* ----------------------------------------------------------------------------
  * 配置（khop-graph-recall-spec §2 默认表；入 configVersion 参与 recomputationHash）
@@ -855,6 +857,8 @@ export interface RecallPipelineInput {
    * （实体 id 直引，本就不消费别名表——entity-directory-spec §5）。缺省全卡可检。
    */
   readonly keywordScanFace?: ReadonlySet<EntityRef>
+  /** 世界书条目：关键词命中扫描文本即作为 world_rule 层候选并入（SillyTavern World Info 对应物）。 */
+  readonly lorebook?: readonly LorebookScanEntry[]
 }
 
 /** 召回管线一站式入口：keyword 快通道 + k-hop 图通道（+ 可选 embedding 兜底）合并。 */
@@ -886,6 +890,9 @@ export async function recallCandidates(input: RecallPipelineInput): Promise<Reca
     { channel: 'keyword', entries: keywordEntries, parseFailures: keyword.parseFailures },
     { channel: 'graph_khop', entries: graph.entries, exclusions: graph.exclusions },
   ]
+  if (input.lorebook !== undefined && input.lorebook.length > 0) {
+    channels.push(scanLorebookTriggers(input.lorebook, input.draftText))
+  }
   if (input.embedding !== undefined) {
     const fallback = await embeddingRecall(
       {

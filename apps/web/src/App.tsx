@@ -27,11 +27,13 @@ import { MembershipView } from './membership/MembershipView'
 import { WorksView } from './works/WorksView'
 import { TasksView } from './tasks/TasksView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
+import { LorebookPanel } from './lorebook/LorebookPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
 import type { WizardOutcome } from './wizard/WizardOverlay'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
 import { MobileShell } from './mobile/MobileShell'
 import { WorkbenchView } from './workbench/WorkbenchView'
+import { DialogueView } from './dialogue/DialogueView'
 
 function stageToFocus(stageIndex: number): number {
   return stageIndex / (PIPELINE_STAGES.length - 1)
@@ -157,6 +159,9 @@ export function App(): JSX.Element {
       ) : (
         <ChangeMatrixPanel root={book.root} />
       ),
+    lorebook: (
+      <LorebookPanel root={book?.root ?? null} />
+    ),
   }
 
   return (
@@ -193,6 +198,12 @@ export function App(): JSX.Element {
           />
         ) : view === 'capability-square' ? (
           <CapabilitySquareView />
+        ) : view === 'dialogue' ? (
+          <DialogueView
+            book={book}
+            chapterIndex={chapterIndex}
+            onGoToWorkbench={() => setView('workbench')}
+          />
         ) : view === 'works' ? (
           <WorksView
             root={book?.root ?? null}

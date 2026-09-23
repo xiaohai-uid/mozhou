@@ -10,6 +10,7 @@ export const INSPECTOR_TABS = [
   { id: 'story-brain', label: 'Story Brain' },
   { id: 'context-receipt', label: '装配看板' },
   { id: 'change-matrix', label: '变更矩阵' },
+  { id: 'lorebook', label: '世界书' },
 ] as const
 
 export type InspectorTabId = (typeof INSPECTOR_TABS)[number]['id']

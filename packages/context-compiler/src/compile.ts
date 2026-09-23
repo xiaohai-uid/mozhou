@@ -66,6 +66,7 @@ import {
   type RecallEntityCard,
 } from './recall.js'
 import type { LocalEmbeddingProvider } from './embedding.js'
+import type { LorebookScanEntry } from './lorebook.js'
 
 /* ----------------------------------------------------------------------------
  * 错误模式（AC③：失败路径确定性错误面）
@@ -124,6 +125,8 @@ export interface CompileInput {
   readonly embedding?: LocalEmbeddingProvider
   readonly config?: BudgetAssemblyConfig | undefined
   readonly recallConfig?: KhopRecallConfig | undefined
+  /** 世界书条目（data-plane LorebookEntry 结构性满足）：关键词命中 draftText 即注入 world_rule 层。 */
+  readonly lorebook?: readonly LorebookScanEntry[] | undefined
   /** 测试确定性注入：缺省铸新 ULID。 */
   readonly receiptId?: ContextReceiptId | undefined
   /** 测试确定性注入：指针事件与凭证 createdAt 时钟；缺省取当前时钟。 */
@@ -228,6 +231,7 @@ export async function compile(input: CompileInput): Promise<CompileResult> {
     scope: input.scope,
     ...(input.recallConfig === undefined ? {} : { config: input.recallConfig }),
     ...(input.embedding === undefined ? {} : { embedding: input.embedding }),
+    ...(input.lorebook === undefined ? {} : { lorebook: input.lorebook }),
     keywordScanFace: activation.keywordScanFace,
   })
   if (recall.candidates.length === 0) {

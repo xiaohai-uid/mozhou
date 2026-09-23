@@ -30,6 +30,7 @@ import type {
   ExactTokenizer,
   GraphRecallScope,
   KhopRecallConfig,
+  LorebookScanEntry,
   LocalEmbeddingProvider,
   PersistedReceiptLocation,
   StructuralSection,
@@ -52,6 +53,8 @@ export interface CompileStepRequest {
   readonly embedding?: LocalEmbeddingProvider;
   readonly config?: BudgetAssemblyConfig;
   readonly recallConfig?: KhopRecallConfig;
+  /** 世界书条目：关键词命中 draftText 即注入 world_rule 层（SillyTavern World Info 对应物）。 */
+  readonly lorebook?: readonly LorebookScanEntry[];
   /** 测试确定性注入：缺省铸新 ULID / 取当前时钟。 */
   readonly receiptId?: ContextReceiptId;
   readonly nowIso?: string;
@@ -122,6 +125,7 @@ export async function runCompileStep(
     ...(request.embedding === undefined ? {} : { embedding: request.embedding }),
     ...(request.config === undefined ? {} : { config: request.config }),
     ...(request.recallConfig === undefined ? {} : { recallConfig: request.recallConfig }),
+    ...(request.lorebook === undefined ? {} : { lorebook: request.lorebook }),
     ...(request.receiptId === undefined ? {} : { receiptId: request.receiptId }),
     ...(request.nowIso === undefined ? {} : { nowIso: request.nowIso }),
   });

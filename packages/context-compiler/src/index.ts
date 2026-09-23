@@ -96,3 +96,7 @@ export type { ReplayContentResolver, ReplayRuntime, ReplaySurface } from './rece
  *  预算装配 → 服务端 Receipt 一证一文件——compile() 端到端收口在 ContextCompiler。 */
 export { activateCards, compile, EmptyRecallError } from './compile.js'
 export type { CardActivation, CompileCard, CompileInput, CompileResult } from './compile.js'
+
+/** 世界书关键词触发通道（对标 SillyTavern World Info）：关键词命中 ⇒ world_rule 层候选。 */
+export { scanLorebookTriggers } from './lorebook.js'
+export type { LorebookScanEntry, LorebookScanOptions } from './lorebook.js'

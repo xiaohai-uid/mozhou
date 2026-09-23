@@ -346,12 +346,14 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     }
 
     const parts: string[] = [`《${book.title}》\n`]
+    const structuredChapters: { index: number; title: string; content: string }[] = []
     for (const ch of sortedChapters) {
       const relPath = proseChapterPath(ch.chapterIndex)
       try {
         const scan = readProseChapter(root, relPath)
         const cleanBody = scan.body.trim()
         parts.push(`第 ${ch.chapterIndex} 章 · ${ch.title}\n${cleanBody}\n`)
+        structuredChapters.push({ index: ch.chapterIndex, title: ch.title, content: cleanBody })
       } catch {
         // ignore missing chapter file
       }
@@ -360,6 +362,14 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json }) => {
     const fullText = parts.join('\n')
 
     if (path === '/api/book.export-txt') {
+      if (body['structured'] === true) {
+        json(200, {
+          ok: true,
+          title: book.title,
+          chapters: structuredChapters,
+        })
+        return true
+      }
       json(200, {
         ok: true,
         title: book.title,

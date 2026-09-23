@@ -5,6 +5,7 @@ import {
   parseFrontmatter,
   proseChapterPath,
   readBookRecord,
+  readLorebook,
   readNarrativeSnapshot,
   readProseChapter,
   scanEntityCards,
@@ -157,6 +158,13 @@ export async function buildDraftContext(input: {
   ]
 
   try {
+    // 世界书：读失败不阻断生成（缺文件=空；坏文件降级为无世界书并继续正式链路）。
+    let lorebook: ReturnType<typeof readLorebook> = []
+    try {
+      lorebook = readLorebook(input.root)
+    } catch {
+      lorebook = []
+    }
     const outcome = await runCompileStep(
       { chapterIndex: input.chapterIndex, staleMarker: null },
       {
@@ -169,6 +177,7 @@ export async function buildDraftContext(input: {
         scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
         structuralSections,
         storyText,
+        lorebook: [...lorebook],
         modelProfile: {
           id: 'mozhou-preview-codepoint-budget-v1',
           contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,

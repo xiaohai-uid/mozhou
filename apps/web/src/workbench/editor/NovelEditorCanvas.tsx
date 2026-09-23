@@ -1,6 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { useEditorSelection } from './useEditorSelection';
 import { EditorQualityTelemetry } from './EditorQualityTelemetry';
+import { TtsControl } from './TtsControl';
 
 export interface NovelEditorCanvasProps {
   value: string;
@@ -78,6 +79,7 @@ export const NovelEditorCanvas: React.FC<NovelEditorCanvasProps> = ({
           <span className="text-[10px] text-zinc-500 bg-zinc-800/70 px-1.5 py-0.5 rounded">标准排版</span>
         </div>
         <div className="flex items-center gap-2">
+          <TtsControl text={value} />
           <button
             type="button"
             onClick={handleFormatTypography}

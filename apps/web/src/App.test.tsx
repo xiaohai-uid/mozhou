@@ -206,7 +206,8 @@ describe('App 壳集成（T40）', () => {
     const dialogueNav = document.querySelector('[data-view="dialogue"]')
     if (dialogueNav === null) throw new Error('missing dialogue nav')
     await userEvent.click(dialogueNav)
-    expect(screen.getByTestId('placeholder-view').textContent).toContain('尚未实现')
+    // 写作对话已挂真实视图：未建书呈显式空态引导（DialogueView），不再落通用占位
+    expect(screen.getByTestId('dialogue-empty').textContent).toContain('写作对话需要先建书')
   })
 
   it('管线条点击切换激活阶段（牵引背景墨迹聚焦）', async () => {
@@ -461,7 +462,7 @@ describe('App 首次建书 Wizard（T42）', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('cloud-sync-view')).toBeInTheDocument()
     })
-    expect(screen.getByLabelText('cloud-sync-view').textContent).toContain('云同步与备份')
+    expect(screen.getByLabelText('cloud-sync-view').textContent).toContain('云同步（规划中）')
   })
 
   it('会员中心导航：点击 nav 挂载会员中心视图（许可证与权益方案）', async () => {
