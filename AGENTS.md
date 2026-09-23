@@ -53,6 +53,16 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 - 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
 - 遗留切片（V1.1 未做项，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，工单 14/15）
 
+### 8. Git 分支与提交约定（2026-09-23 起生效）
+- 本仓库采用六分支模型，完整手册见 WinClaw `knowledge/GIT-BRANCHING-AND-COMMIT-STANDARD.md`：
+  - `main` = 生产主分支（规范中 `master` 的等价映射，PRO），禁直接改码，仅由 `release`/`hotfix` 合入；
+  - `develop` = 开发联调分支（DEV），新功能一律 `feature/<module>` 基于此拉出、完成后合回；
+  - `test` = FAT 测试分支；`release` = UAT 预上线分支（发版时从 `test` 拉，惰性创建）；
+  - `hotfix/<desc>` 基于 `main`，修复后双合回 `main` + `develop`；
+  - AI 代理工作分支可用 `feature/<agent>-<module>` 前缀，但合入语义必须遵守六分支模型（功能只进 `develop`，不直接进 `main`）。
+- 提交信息：Conventional Commits 八类前缀（`feat`/`fix`/`docs`/`style`/`refactor`/`perf`/`test`/`chore`）；单次提交同一类别、问题不超过 3 个；不合规用 `git commit --amend` 修正，禁用 `git reset --hard`。
+- 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
+
 ## Agent skills
 
 ### Issue tracker
