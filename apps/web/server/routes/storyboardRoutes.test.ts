@@ -148,7 +148,9 @@ describe('POST /api/storyboard.source（T02 源快照）', () => {
     const missing = await post(base2, '/api/storyboard.source', { root: roots[1], chapterIndex: 9 })
     expect(missing.status).toBe(404)
 
-    const evil = await post(base2, '/api/storyboard.source', { root: 'C:/Windows/System32', chapterIndex: 1 })
+    const notBookDir = mkdtempSync(join(tmpdir(), 'not-a-book-'))
+    roots.push(notBookDir)
+    const evil = await post(base2, '/api/storyboard.source', { root: notBookDir, chapterIndex: 1 })
     expect(evil.status).toBe(400)
   })
 })
