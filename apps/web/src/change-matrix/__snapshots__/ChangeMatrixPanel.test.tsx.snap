@@ -1,0 +1,250 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChangeMatrixPanel（T43） > 矩阵表渲染：行=Traversal、列=章、三态格红/绿/—；契约快照 1`] = `
+<section
+  aria-label="change-matrix-panel"
+>
+  <div
+    class="panel-head"
+  >
+    <div>
+      <h2>
+        变更矩阵
+      </h2>
+      <p>
+        Traversal × 受影响章
+      </p>
+    </div>
+    <span
+      class="verdict blocking"
+    >
+      stale 
+      3
+    </span>
+  </div>
+  <div
+    class="actions"
+    style="margin-top: 0px;"
+  >
+    <button
+      class="btn"
+    >
+      刷新
+    </button>
+    <span
+      class="mono muted"
+      style="align-self: center;"
+    >
+      红=需重写 · 绿=已消解 · — 无涉
+    </span>
+  </div>
+  <div
+    class="card-shell"
+    data-testid="change-matrix"
+  >
+    <div
+      class="card"
+    >
+      <table
+        class="matrix"
+        data-testid="matrix-table"
+      >
+        <thead>
+          <tr>
+            <th>
+              上游变更
+            </th>
+            <th>
+              ch
+              17
+            </th>
+            <th>
+              ch
+              18
+            </th>
+            <th>
+              ch
+              19
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            data-traversal-id="t_1"
+          >
+            <td
+              class="rowname"
+              data-testid="matrix-rownames"
+              title="Traversal"
+            >
+              temporalFact:fact_a
+              <em
+                style="display: block; font-style: normal; color: var(--text-faint); font-size: 8px;"
+              >
+                t_1
+              </em>
+            </td>
+            <td
+              class="green"
+              data-cell="resolved"
+              data-chapter="17"
+            >
+              已消解
+            </td>
+            <td
+              class="red"
+              data-cell="needs_rework"
+              data-chapter="18"
+            >
+              需重写
+            </td>
+            <td
+              class=""
+              data-cell="not_affected"
+              data-chapter="19"
+            >
+              —
+            </td>
+          </tr>
+          <tr
+            data-traversal-id="t_2"
+          >
+            <td
+              class="rowname"
+              data-testid="matrix-rownames"
+              title="Traversal"
+            >
+              outlineNode:node_o
+              <em
+                style="display: block; font-style: normal; color: var(--text-faint); font-size: 8px;"
+              >
+                t_2
+              </em>
+            </td>
+            <td
+              class=""
+              data-cell="not_affected"
+              data-chapter="17"
+            >
+              —
+            </td>
+            <td
+              class="red"
+              data-cell="needs_rework"
+              data-chapter="18"
+            >
+              需重写
+            </td>
+            <td
+              class=""
+              data-cell="not_affected"
+              data-chapter="19"
+            >
+              —
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div
+    class="card-shell"
+  >
+    <div
+      class="card"
+    >
+      <div
+        class="card-title"
+      >
+        <b>
+          Traversal 详情
+        </b>
+        <span
+          class="mono muted"
+        >
+          2
+           rows
+        </span>
+      </div>
+      <div
+        class="receipt-row"
+        style="grid-template-columns: 1fr auto auto;"
+      >
+        <span>
+          <b>
+            t_1
+          </b>
+          <em
+            class="muted"
+            style="display: block; font-style: normal;"
+          >
+            trav_1
+             · 
+            reconciliation
+            :
+            rcln_x
+             · 
+            2026-08-28 00:00:00
+          </em>
+          <em
+            class="muted"
+            style="display: block; font-style: normal;"
+          >
+            temporalFact:fact_a
+          </em>
+        </span>
+        <code>
+          1
+           stale
+        </code>
+        <button
+          class="btn"
+          data-testid="matrix-rerun"
+          data-traversal-rerun="t_1"
+        >
+          重跑此遍历
+        </button>
+      </div>
+      <div
+        class="receipt-row"
+        style="grid-template-columns: 1fr auto auto;"
+      >
+        <span>
+          <b>
+            t_2
+          </b>
+          <em
+            class="muted"
+            style="display: block; font-style: normal;"
+          >
+            trav_2
+             · 
+            commit
+            :
+            c2
+             · 
+            2026-08-28 00:00:01
+          </em>
+          <em
+            class="muted"
+            style="display: block; font-style: normal;"
+          >
+            outlineNode:node_o
+          </em>
+        </span>
+        <code>
+          1
+           stale
+        </code>
+        <button
+          class="btn"
+          data-testid="matrix-rerun"
+          data-traversal-rerun="t_2"
+        >
+          重跑此遍历
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+`;

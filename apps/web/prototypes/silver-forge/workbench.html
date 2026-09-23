@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>银白工坊 · 工作台（T01 视觉签样）</title>
+<link rel="stylesheet" href="assets/silver.css">
+</head>
+<body>
+<div class="sf-stage">
+  <div class="sf-scene"><img src="assets/scene-silver.svg" alt=""></div>
+
+  <header class="sf-topbar sf-content">
+    <div class="sf-brand">
+      <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><g><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><path d="M60 21 v36" stroke="#56687B" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#56687B"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#56687B"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#56687B" stroke-width="3" stroke-linecap="round" opacity=".7"/><circle cx="26" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#56687B" opacity=".5"/></g></svg>
+      墨舟 · 银白工坊
+    </div>
+    <nav class="sf-nav" aria-label="原型页导航">
+      <a href="index.html">总览</a>
+      <a href="cards.html">卡牌四面</a>
+      <a href="workbench.html" aria-current="page">工作台</a>
+      <a href="storyboard.html">分镜页</a>
+    </nav>
+    <span class="sf-chip ok"><span class="dot"></span>雾港失真 · r12</span>
+  </header>
+
+  <main class="sf-workbench sf-content">
+    <!-- 左轨 -->
+    <aside class="sf-panel sf-left-rail" style="padding:10px; display:grid; gap:2px" aria-label="功能轨">
+      <div class="sf-rail-item active">✒️ 正文写作层</div>
+      <div class="sf-rail-item">💬 写作对话</div>
+      <div class="sf-rail-item">🎭 分镜（漫剧）</div>
+      <div class="sf-rail-item">📚 作品</div>
+      <div class="sf-rail-item">🧭 世界设定</div>
+      <div class="sf-rail-item">🧪 质量门</div>
+      <hr style="border:0;border-top:1px solid var(--sf-line);margin:8px 4px">
+      <div class="sf-rail-item">🎬 场景设置</div>
+      <div class="sf-rail-item">⚙️ 系统状态</div>
+    </aside>
+
+    <!-- 中栏：正文近实心，装饰不抢正文 -->
+    <section class="sf-panel" aria-label="正文写作层">
+      <div class="sf-panel-title">
+        <b>正文 · Active Draft <span class="sf-note" style="font-weight:400">第 3 章 · 灯塔夜谈</span></b>
+        <span class="sf-mono sf-note">1,842 字 · 本地缓存 ch_bk_aaaa_3</span>
+      </div>
+      <div class="sf-editor">
+        <p>雾从灯塔脚下漫上来的时候，程蔚把最后一格电池按进了录音机。</p>
+        <p>「你听，」她说，「潮水退下去的声音，和二十年前一模一样。」</p>
+        <p>老人没有接话。他望着玻璃罩里那盏已经熄灭的灯，像在望一枚被拔掉指针的表。台灯的光落在两个人之间，把影子推到墙上，一高一低，随着海风轻轻晃。</p>
+        <p>录音机的磁带转得很慢。程蔚数着秒——她在等那句她知道一定会来的话，就像等一场迟到二十年的涨潮。</p>
+        <p>「灯塔不是用来照路的。」老人终于开口，「是用来让人确认，自己还没有漂出太远。」</p>
+      </div>
+      <div style="display:flex;gap:10px;padding:0 18px 16px;flex-wrap:wrap">
+        <button type="button" class="sf-btn">落为当前章草稿</button>
+        <button type="button" class="sf-btn gold">质量门送审</button>
+        <button type="button" class="sf-btn ghost">排版</button>
+      </div>
+    </section>
+
+    <!-- 右栏：写作对话（候选→接受→写作层） -->
+    <aside class="sf-panel sf-right-panel" aria-label="写作对话">
+      <div class="sf-panel-title">
+        <b>写作对话</b>
+        <span class="sf-chip warn"><span class="dot"></span>provider 未配置</span>
+      </div>
+      <div style="padding:14px 16px 18px; display:grid; gap:12px">
+        <div class="sf-panel" style="padding:12px 14px; box-shadow:none; background:rgba(255,255,255,.6)">
+          <div class="sf-note" style="margin-bottom:6px">舟 · 候选片段</div>
+          <div style="font-family:var(--sf-font-serif); font-size:13.5px; line-height:1.85">
+            老人把一枚生锈的铜钥匙推过桌面：「灯灭的那年，我把塔门的钥匙交给了海。你猜它退潮的时候，会不会还回来？」
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button type="button" class="sf-btn" style="min-height:38px;padding:0 14px">采纳进写作层</button>
+            <button type="button" class="sf-btn ghost" style="min-height:38px;padding:0 14px">换一段</button>
+          </div>
+        </div>
+        <div class="sf-panel" style="padding:12px 14px; box-shadow:none; background:rgba(255,255,255,.45)">
+          <div class="sf-note">诚实不可用示例：AI 选区调优需正文编辑契约（后续票），当前不伪造结果。</div>
+        </div>
+        <div class="sf-note" style="font-size:11px">场景：全局银白空间 · 作品覆盖未启用 · 人物显示开</div>
+      </div>
+    </aside>
+  </main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="embSilver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7FAFD"/><stop offset=".45" stop-color="#D8E1EB"/><stop offset="1" stop-color="#8FA0B2"/></linearGradient></defs></svg>
+<script>document.querySelector('.sf-nav a[aria-current]')?.scrollIntoView({block:'nearest',inline:'center'})</script>
+</body>
+</html>

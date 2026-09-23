@@ -1,0 +1,14 @@
+{
+  "kind": "test",
+  "path": "evidence/full-release/20260915-1/T04/result.json",
+  "sourceCommit": "4b34ba6",
+  "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+  "command": "regressions/verify-stream.mjs（修复后 exit0）+ verify-manual-save.mjs（exit0）+ draftCandidates.test.ts（7）+ workspace 740 + web 320+1skip + tsc + eslint + gitnexus check",
+  "exitCode": 0,
+  "scope": "T04 完成：makeDraftProviderBinding 流只 appendCandidateDelta（无直写正文旁路）；runDraftStep 从候选读结果；draft-accept.ts 实现 C2 采纳（书相位校验+revision/hash 三重比对+意图日志+幂等恢复+KEY_REUSED/已应用）；AbortSignal 从 HTTP 断开/显式取消经 streamOpenAiChat 到底层 fetch；HTTP 新端点 draft.candidate/cancel/accept；既有管线测试迁移候选语义（draft→accept）；verify-stream 红转绿（originalLost=false/generatedPersisted=false/externalAuthorChangeLost=false）；draftCandidates 7 用例覆盖两窗口/并发生成/同 key 换 body 409/生成中保存/外部编辑/终态取消/崩溃重放",
+  "limitations": [
+    "真实 provider 端到端旅程在 T07（模型凭据缺失 blocked）；mock 流不证明上游行为",
+    "书锁为进程内 CAS（saveProseDraft 语义）；进程级排他锁归 T09",
+    "UI 候选采纳体验在 T05"
+  ]
+}

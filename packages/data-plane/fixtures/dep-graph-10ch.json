@@ -1,0 +1,274 @@
+{
+  "name": "dep-graph-10ch",
+  "description": "T30 黄金对拍固定夹具（t66 D27 定案）：直线链 ch1→…→ch9 + 跨跳 ch3→ch7 + 菱形汇点 ch5←{ch2,ch4} + 孤立章 ch10",
+  "version": 1,
+  "chapters": {
+    "1": [
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      }
+    ],
+    "2": [
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      },
+      {
+        "kind": "narrativePromise",
+        "id": "promise_alpha",
+        "revision": 1
+      }
+    ],
+    "3": [
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      },
+      {
+        "kind": "outlineNode",
+        "id": "node_beta",
+        "revision": 2
+      },
+      {
+        "kind": "temporalFact",
+        "id": "fact_gamma",
+        "revision": 1
+      }
+    ],
+    "4": [
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      },
+      {
+        "kind": "narrativePromise",
+        "id": "promise_alpha",
+        "revision": 1
+      }
+    ],
+    "5": [
+      {
+        "kind": "outlineNode",
+        "id": "node_beta",
+        "revision": 2
+      },
+      {
+        "kind": "temporalFact",
+        "id": "fact_gamma",
+        "revision": 1
+      },
+      {
+        "kind": "narrativePromise",
+        "id": "promise_alpha",
+        "revision": 1
+      }
+    ],
+    "6": [
+      {
+        "kind": "narrativePromise",
+        "id": "promise_alpha",
+        "revision": 1
+      },
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      }
+    ],
+    "7": [
+      {
+        "kind": "temporalFact",
+        "id": "fact_gamma",
+        "revision": 1
+      },
+      {
+        "kind": "outlineNode",
+        "id": "node_beta",
+        "revision": 2
+      }
+    ],
+    "8": [
+      {
+        "kind": "narrativePromise",
+        "id": "promise_alpha",
+        "revision": 1
+      },
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      }
+    ],
+    "9": [
+      {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "revision": 1
+      }
+    ],
+    "10": []
+  },
+  "sentinel": {
+    "chapterCount": 10,
+    "edgeCount": 22,
+    "maxDepth": 4
+  },
+  "cases": [
+    {
+      "id": "case-001-fact-origin-rev2",
+      "description": "改 fact_origin revision 1→2：直线链与跨跳到 fact_origin 的所有下游被标记",
+      "mutate": {
+        "kind": "temporalFact",
+        "id": "fact_origin",
+        "fromRevision": 1,
+        "toRevision": 2
+      },
+      "golden": {
+        "affectedChaptersSorted": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          8,
+          9
+        ],
+        "propagationDepth": {
+          "1": 1,
+          "2": 1,
+          "3": 1,
+          "4": 1,
+          "6": 1,
+          "8": 1,
+          "9": 1
+        },
+        "untouchedChaptersSorted": [
+          5,
+          7,
+          10
+        ]
+      }
+    },
+    {
+      "id": "case-002-node-beta-rev3",
+      "description": "改 node_beta revision 2→3：仅直接依赖它的 ch3/ch5/ch7 受影响",
+      "mutate": {
+        "kind": "outlineNode",
+        "id": "node_beta",
+        "fromRevision": 2,
+        "toRevision": 3
+      },
+      "golden": {
+        "affectedChaptersSorted": [
+          3,
+          5,
+          7
+        ],
+        "propagationDepth": {
+          "3": 1,
+          "5": 1,
+          "7": 1
+        },
+        "untouchedChaptersSorted": [
+          1,
+          2,
+          4,
+          6,
+          8,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "id": "case-003-promise-alpha-noop",
+      "description": "改 promise_alpha revision 1→2（同值语义不变）：依赖它的章 revision 击穿仍标记",
+      "mutate": {
+        "kind": "narrativePromise",
+        "id": "promise_alpha",
+        "fromRevision": 1,
+        "toRevision": 2
+      },
+      "golden": {
+        "affectedChaptersSorted": [
+          2,
+          4,
+          5,
+          6,
+          8
+        ],
+        "propagationDepth": {
+          "2": 1,
+          "4": 1,
+          "5": 1,
+          "6": 1,
+          "8": 1
+        },
+        "untouchedChaptersSorted": [
+          1,
+          3,
+          7,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "id": "case-004-fact-gamma-new-entity",
+      "description": "新增实体 fact_delta（无任何读者）：受影响集为空",
+      "mutate": {
+        "kind": "temporalFact",
+        "id": "fact_delta",
+        "fromRevision": 0,
+        "toRevision": 1
+      },
+      "golden": {
+        "affectedChaptersSorted": [],
+        "propagationDepth": {},
+        "untouchedChaptersSorted": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      }
+    },
+    {
+      "id": "case-005-isolated-chapter-touch",
+      "description": "改孤立章 ch10 内部实体（无依赖关系）：零传播",
+      "mutate": {
+        "kind": "outlineNode",
+        "id": "node_isolated",
+        "fromRevision": 1,
+        "toRevision": 2
+      },
+      "golden": {
+        "affectedChaptersSorted": [],
+        "propagationDepth": {},
+        "untouchedChaptersSorted": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      }
+    }
+  ]
+}

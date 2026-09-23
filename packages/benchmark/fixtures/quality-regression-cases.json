@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "description": "长篇文学质量回归基准夹具（ADR-0025 · 计划 Task 8）。mechanical 用例走真实管线机制；semantic 用例的 expectedVerdict 来自参考语义审查者（记录值），基准只验证聚合与管线接线，不验证 LLM 本体。",
+  "cases": [
+    {
+      "id": "stale-review-attempt",
+      "kind": "mechanical_stale_review",
+      "description": "review PASS 于 draft r3/hashA → 正文编辑至 r4/hashB → 拿旧 PASS 交付。期望：stale 判定命中（回归计数）。",
+      "attempt": { "usedStalePass": true, "delivered": false },
+      "expect": { "signal": "staleReviewPassRate", "value": 1 }
+    },
+    {
+      "id": "outline-expansion",
+      "kind": "semantic_rule",
+      "ruleId": "NARR-001",
+      "severity": "advisory",
+      "prose": "大纲拍一：林枫抵达青云宗。\n\n大纲拍二：领了外门弟子的服饰。\n\n大纲拍三：认识同门赵磊。\n\n大纲拍四：得知三日后的试炼。\n\n大纲拍五：夜里独自练剑。\n\n大纲拍六：立誓要夺回头衔。",
+      "expectedVerdict": "fail",
+      "expect": { "signal": "blockingRuleCoverage", "value": 1 }
+    },
+    {
+      "id": "tool-character",
+      "kind": "semantic_rule",
+      "ruleId": "CHAR-001",
+      "severity": "advisory",
+      "prose": "赵磊只在林枫需要时出现，告诉他试炼的规则，随即退场。他没有自己的目的，没有自己的动作，唯一功能是递送主角必须知道的信息。",
+      "expectedVerdict": "fail",
+      "expect": { "signal": "blockingRuleCoverage", "value": 1 }
+    },
+    {
+      "id": "payoff-zeroing",
+      "kind": "semantic_rule",
+      "ruleId": "PAY-004",
+      "severity": "advisory",
+      "prose": "林枫终于凝聚出灵力，下一刻长老收走了全部灵力，他连一丝主动权都没能留下，场面回到原点。",
+      "expectedVerdict": "fail",
+      "expect": { "signal": "tangibleGainRecall", "value": 0.5 }
+    },
+    {
+      "id": "false-belief-knowledge",
+      "kind": "mechanical_false_belief",
+      "description": "角色仅有 suspects 级认知，正文却把秘密写成确定性陈述。期望：suspects 不授权（ADR-0026）。",
+      "attempt": { "usedStalePass": false, "delivered": false },
+      "expect": { "signal": "staleReviewPassRate", "value": 1 }
+    },
+    {
+      "id": "repeat-correction",
+      "kind": "mechanical_repeat_correction",
+      "description": "同纠错原因（outline_expansion）在第 2 章与第 5 章先后出现且模式仍活跃。期望 repeatCorrectionRate = 0.5。",
+      "corrections": [
+        { "chapterIndex": 2, "reasons": ["outline_expansion"] },
+        { "chapterIndex": 5, "reasons": ["outline_expansion"] }
+      ],
+      "expect": { "signal": "repeatCorrectionRate", "value": 0.5 }
+    }
+  ]
+}

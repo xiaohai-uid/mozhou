@@ -1,0 +1,15 @@
+{
+  "kind": "real-provider",
+  "path": "evidence/full-release/20260915-1/T01/result.json",
+  "sourceCommit": "2dca39a",
+  "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+  "command": "env 变量名只读探测 + curl 抓取官方文档（Oracle/Supabase/微信Native/支付宝）+ 工具链版本检查（rustc/cargo/tauri/WebView2/signtool/证书存储）+ SSH/部署文件存在性检查",
+  "exitCode": 0,
+  "scope": "官方条款检索完成（Oracle 2OCPU/12GB/200GB与闲置回收、Supabase Free 50K MAU/500MB/7天暂停、微信Native需商户号+APPID绑定、支付宝扫码产品）；本机 13 项外部输入中 12 项实查缺失并登记 blocked+缺项（hosting/域名/Auth邮件/备份/模型/搜索/微信/支付宝/测试预算/签名/发布身份），Windows 工具链部分 ready（Rust1.96/WebView2/signtool 就绪；tauri CLI 可随项目装；签名证书缺失）",
+  "limitations": [
+    "未读取/保存任何 secret 值，仅登记名称与存在性",
+    "支付宝页面为 GBK 抓取乱码，只确认产品存在未做逐条核对；商户签约不存在则支付任务仍 blocked",
+    "本机探测不能证明用户侧（云账号/商户账号）有无可用资源——用户未提供任何账号凭据",
+    "公网发布所需的全部 required 项均未 ready"
+  ]
+}

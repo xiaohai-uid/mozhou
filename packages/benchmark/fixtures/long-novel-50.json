@@ -1,0 +1,33 @@
+{
+  "title": "灰潮五十章连续性基准",
+  "chapters": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50],
+  "secret": {
+    "factId": "fact_secret_lighthouse",
+    "keyword": "灯塔下封印着旧神心脏",
+    "introducedAt": 3,
+    "revealedAt": 31
+  },
+  "expiredFact": {
+    "factId": "fact_broken_arm",
+    "value": "左臂骨折未愈",
+    "validFrom": 7,
+    "validUntil": 12,
+    "probeAt": 20
+  },
+  "deadCharacter": {
+    "ref": "char:old-captain",
+    "diesAt": 18,
+    "probeAt": 27
+  },
+  "promise": {
+    "id": "prom_return_compass",
+    "introducedAt": 5,
+    "dueAt": 40,
+    "paidOffAt": 40
+  },
+  "retroactiveChange": {
+    "sourceChapter": 9,
+    "changedFact": "fact_traitor_identity",
+    "affectedChapters": [17, 28, 43]
+  }
+}

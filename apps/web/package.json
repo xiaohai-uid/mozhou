@@ -1,0 +1,39 @@
+{
+  "name": "@mozhou/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && tsc -p tsconfig.server.json",
+    "preview": "vite preview",
+    "serve": "node dist-server/productionServer.js",
+    "test": "vitest run",
+    "typecheck": "tsc -b && tsc -p tsconfig.server.json --noEmit"
+  },
+  "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/flywheel": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
+    "@mozhou/runtime": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.5.4",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.7"
+  }
+}

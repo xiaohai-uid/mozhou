@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>银白工坊 · 分镜页（T01 视觉签样）</title>
+<link rel="stylesheet" href="assets/silver.css">
+<style>
+  .sb-wrap { max-width: 1280px; margin: 0 auto; padding: 22px 28px 60px; display: grid; gap: 18px; }
+  .sb-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; }
+  .sb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 18px; }
+  .sb-option { display: grid; gap: 4px; font-size: 11.5px; color: var(--sf-muted); }
+  .sb-option select, .sb-option input {
+    min-height: 44px; border-radius: 10px; border: 1px solid var(--sf-line-strong);
+    background: rgba(255,255,255,.7); padding: 0 12px; font-size: 13px; color: var(--sf-text);
+  }
+  @media (max-width: 760px) { .sb-wrap { padding: 14px 14px 60px; } }
+</style>
+</head>
+<body>
+<div class="sf-stage">
+  <div class="sf-scene"><img src="assets/scene-silver.svg" alt=""></div>
+
+  <header class="sf-topbar sf-content">
+    <div class="sf-brand">
+      <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><g><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><path d="M60 21 v36" stroke="#56687B" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#56687B"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#56687B"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#56687B" stroke-width="3" stroke-linecap="round" opacity=".7"/><circle cx="26" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#56687B" opacity=".5"/></g></svg>
+      墨舟 · 银白工坊
+    </div>
+    <nav class="sf-nav" aria-label="原型页导航">
+      <a href="index.html">总览</a>
+      <a href="cards.html">卡牌四面</a>
+      <a href="workbench.html">工作台</a>
+      <a href="storyboard.html" aria-current="page">分镜页</a>
+    </nav>
+    <span class="sf-chip ok"><span class="dot"></span>雾港失真 · r12</span>
+  </header>
+
+  <main class="sb-wrap sf-content">
+    <!-- 源与设置 -->
+    <section class="sf-panel" style="padding:16px 18px" aria-label="分镜源与设置">
+      <div class="sb-head">
+        <div>
+          <b style="font-size:15px">漫剧分镜 · 第 3 章「灯塔夜谈」</b>
+          <div class="sf-note" style="margin-top:4px">
+            源快照 <span class="sf-mono">sha256:9f2c…a41b</span> · phase: draft · r12 ·
+            <span class="sf-state-strip ok" style="margin-left:4px">✓ 与当前正文一致</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="sf-btn">重新生成为候选</button>
+          <button type="button" class="sf-btn ghost">导出 JSON</button>
+          <button type="button" class="sf-btn ghost">导出 Markdown</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap">
+        <label class="sb-option">画幅
+          <select><option>9:16（漫剧竖屏）</option><option>16:9</option><option>1:1</option></select>
+        </label>
+        <label class="sb-option">目标总时长（估计）
+          <input value="90 秒" readonly aria-describedby="durNote">
+        </label>
+        <label class="sb-option">视觉风格
+          <input value="雾港 · 冷银蓝 · 写实微fantasy" readonly>
+        </label>
+        <span class="sf-note" id="durNote" style="align-self:end;font-size:11px;max-width:300px">
+          镜头时长均为估计值；本原型不含任何图片/视频生成。改编为独立衍生作品，不改原文。
+        </span>
+      </div>
+    </section>
+
+    <!-- 镜头卡列表 -->
+    <section class="sb-grid" aria-label="镜头列表">
+      <!-- 镜头 1（银，常态） -->
+      <article class="sf-shot-card">
+        <div class="sf-shot-head">
+          <span class="sf-shot-no">01</span>
+          <div style="flex:1">
+            <b style="font-size:13.5px">灯塔脚下 · 雾漫上来</b>
+            <div class="sf-note" style="font-size:11px">外景 · 夜 · 大远景→缓慢推近 · 约 6s（估计）</div>
+          </div>
+          <button type="button" class="sf-btn ghost" style="min-height:36px;padding:0 12px;font-size:12px" aria-label="编辑镜头 1">编辑</button>
+        </div>
+        <div class="sf-shot-body">
+          <dl style="margin:0;display:grid;gap:10px">
+            <div class="sf-shot-row"><dt>画面</dt><dd>浓雾自海面漫上礁石，灯塔黑影立在雾线之上，顶端灯室已熄。</dd></div>
+            <div class="sf-shot-row"><dt>对白</dt><dd class="dialogue"><span class="sf-speaker">程蔚</span>「你听，潮水退下去的声音，和二十年前一模一样。」</dd></div>
+            <div class="sf-shot-row"><dt>音效</dt><dd>退潮的卵石滚动声；磁带底噪。</dd></div>
+            <div class="sf-shot-row"><dt>提示词</dt><dd class="prompt">wide shot, lighthouse in fog, night, cold silver-blue, volumetric mist, static then slow push-in</dd></div>
+          </dl>
+          <div class="sf-shot-quote">原文锚：「雾从灯塔脚下漫上来的时候」</div>
+        </div>
+      </article>
+
+      <!-- 镜头 2（金=选中/当前编辑，演示选中态） -->
+      <article class="sf-shot-card" style="box-shadow: inset 0 0 0 2.5px var(--sf-focus), 0 2px 5px rgba(32,42,53,.1), 0 14px 30px rgba(32,42,53,.16)">
+        <div class="sf-shot-head">
+          <span class="sf-shot-no gold">02</span>
+          <div style="flex:1">
+            <b style="font-size:13.5px">桌前 · 铜钥匙</b>
+            <div class="sf-note" style="font-size:11px">内景 · 夜 · 特写 · 约 4s（估计）· 改编：心理描写外化</div>
+          </div>
+          <button type="button" class="sf-btn" style="min-height:36px;padding:0 12px;font-size:12px" aria-label="编辑镜头 2（当前编辑中）">编辑中</button>
+        </div>
+        <div class="sf-shot-body">
+          <dl style="margin:0;display:grid;gap:10px">
+            <div class="sf-shot-row"><dt>画面</dt><dd>生锈铜钥匙被推过木桌，在灯下拖出一道反光；两人影子在墙上一高一低。</dd></div>
+            <div class="sf-shot-row"><dt>对白</dt><dd class="dialogue"><span class="sf-speaker">老人</span>「灯灭的那年，我把塔门的钥匙交给了海。」</dd></div>
+            <div class="sf-shot-row"><dt>旁白</dt><dd>程蔚在等那句一定会来的话，像等一场迟到二十年的涨潮。</dd></div>
+            <div class="sf-shot-row"><dt>提示词</dt><dd class="prompt">close-up, rusted brass key on wooden table, warm lamplight against cold night, shallow depth of field</dd></div>
+          </dl>
+          <div class="sf-shot-quote">原文锚：「老人把一枚生锈的铜钥匙推过桌面」 · 改编说明：内心独白转旁白</div>
+        </div>
+      </article>
+
+      <!-- 镜头 3（银，不可用示例：原文缺失锚点/待补充） -->
+      <article class="sf-shot-card" style="filter:saturate(.35);opacity:.82">
+        <div class="sf-shot-head">
+          <span class="sf-shot-no">03</span>
+          <div style="flex:1">
+            <b style="font-size:13.5px">窗外 · 涨潮</b>
+            <div class="sf-note" style="font-size:11px">约 5s（估计）</div>
+          </div>
+          <span class="sf-state-strip stale">● 待人工补充画面</span>
+        </div>
+        <div class="sf-shot-body">
+          <dl style="margin:0;display:grid;gap:10px">
+            <div class="sf-shot-row"><dt>画面</dt><dd class="sf-note">（空）——需要作者补充；原型不假造画面。</dd></div>
+            <div class="sf-shot-row"><dt>提示词</dt><dd class="prompt">—</dd></div>
+          </dl>
+          <div class="sf-shot-quote" style="border-left-color:var(--sf-danger)">原文锚缺失：该镜头由改编新增，请补充说明</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- 底部诚实说明 -->
+    <section class="sf-panel" style="padding:14px 18px">
+      <div class="sf-note" style="line-height:2">
+        <b style="color:var(--sf-text)">签样范围声明：</b>本页为静态原型，演示分镜页视觉方向（镜头卡 = 画面/对白/旁白/音效/时长估计/提示词/原文锚/改编说明）。
+        真实数据闭环（生成→编辑→保存→导出）由 T02–T04 交付；此处不生成图片/视频，不调用付费服务。
+      </div>
+    </section>
+  </main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="embSilver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7FAFD"/><stop offset=".45" stop-color="#D8E1EB"/><stop offset="1" stop-color="#8FA0B2"/></linearGradient></defs></svg>
+<script>document.querySelector('.sf-nav a[aria-current]')?.scrollIntoView({block:'nearest',inline:'center'})</script>
+</body>
+</html>

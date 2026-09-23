@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 · 创作航道 — 写作对话 / 我的作品 / 风格蒸馏 / 小说拆解</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{background:#04070b}
+  .viewframe{margin:26px 0;border-radius:16px;overflow:hidden;border:1px solid var(--ir-hairline)}
+  .vf-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--ir-hairline);
+    background:linear-gradient(180deg,rgba(12,23,30,.9),rgba(8,17,23,.92));position:relative;z-index:2}
+  .vf-head h2{font:600 16px/1.3 var(--ir-serif)}
+  .vf-body{position:relative;padding:20px;min-height:220px}
+  .vf-body:before{content:"";position:absolute;inset:0;z-index:0;opacity:.5;background:inherit}
+  .vf-inner{position:relative;z-index:1}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--ir-hairline);border:1px solid var(--ir-hairline);border-radius:10px;overflow:hidden}
+  .stat-grid>div{background:var(--ir-surface-1);padding:12px 14px}
+  .stat-grid .k{font:600 10px/1 var(--ir-sans);letter-spacing:.12em;color:var(--ir-faint)}
+  .stat-grid .v{font:600 17px/1.3 var(--ir-mono);margin-top:6px}
+  .statebar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+  .pane3{display:none;border:1px dashed var(--ir-hairline-strong);border-radius:10px;padding:16px}
+  .pane3.on{display:block}
+  .metric-row{display:flex;gap:8px;flex-wrap:wrap}
+  .metric{min-width:130px;flex:1;background:var(--ir-surface-1);border:1px solid var(--ir-hairline);border-radius:9px;padding:10px 12px}
+  .metric .k{font-size:11px;color:var(--ir-faint)}
+  .metric .v{font:600 18px/1.2 var(--ir-mono);margin-top:4px}
+  .metric .v small{font-size:11px;color:var(--ir-faint);font-weight:400}
+</style>
+</head>
+<body>
+<div class="ir-scene library"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.58"></div>
+<nav class="proto-nav" style="position:relative;z-index:5">
+  <a href="index.html">总览</a><a href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a class="cur" href="04-views-creation.html">创作</a><a href="05-views-inspector.html">检视</a><a href="06-views-resources.html">资源</a><a href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a href="09-mobile.html">Mobile</a>
+</nav>
+<main class="proto-body">
+  <header class="proto-head"><h1>创作航道</h1><span class="proto-sub">写作对话（真实落点）· 我的作品 · 风格蒸馏 · 小说拆解 — 逐项对应 17 项导航 02/03/04/05</span></header>
+
+  <!-- 02 写作对话 -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">02 · dialogue</span><h2>写作对话</h2>
+      <span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span><span style="margin-left:auto" class="note">沉浸 70%</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="unavailable" style="margin-bottom:14px"><b>信息架构现状（Surface Map §2.3）</b>
+        <span class="why">顶层 dialogue 导航当前落入 PlaceholderView；真实对话流挂在工作台 DialogueStream 内。Ink Realm 设计把本入口定义为「对话工作区直达」：进入后自动聚焦工作台对话流（实现阶段重定向，不新造伪页面）。以下为未来独立页 FUTURE DATA LAYOUT——仅当独立会话契约落地时启用。</span></div>
+      <span class="spec-label">FUTURE DATA LAYOUT</span>
+      <div style="display:grid;grid-template-columns:1fr 240px;gap:12px;margin-top:10px">
+        <div class="card-system" style="padding:16px;min-height:150px">
+          <p class="note">对话时间线（轮次分组 · Jade 提问 / 中性回答 / AI CANDIDATE 流）复用工作台 DialogueStream 全协议组件——问、choices、回答、9 技能、风格轨空态、provider blocker、NDJSON 流、再来一轮。</p>
+          <div class="qblock" style="max-width:70%;margin-top:10px"><div class="qh">墨舟 · 先问</div><p style="margin:0;font-size:13px">本轮想推进哪条线？</p></div>
+          <div class="ablock" style="max-width:70%">先推进码头线。</div>
+        </div>
+        <div class="card-system" style="padding:14px">
+          <span class="kicker">本轮上下文</span>
+          <div class="row-evidence" style="padding-left:0;padding-right:0"><span>当前章</span><span class="em">CH 12</span></div>
+          <div class="row-evidence" style="padding-left:0;padding-right:0"><span>已注入技能</span><span class="em">2 / 9</span></div>
+          <div class="row-evidence" style="padding-left:0;padding-right:0"><span>provider</span><span class="em" style="color:var(--ir-jade)">Gate 3 已开</span></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 03 我的作品 -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">03 · works</span><h2>我的作品</h2>
+      <span class="badge b-pass">MOUNTED_TRUTHFUL</span><span style="margin-left:auto" class="note">沉浸 90% · 私人藏书馆</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:14px">
+        <div class="card-narrative" style="padding:20px;position:relative;overflow:hidden">
+          <div style="position:absolute;inset:0;background:radial-gradient(70% 90% at 8% 10%,rgba(214,179,106,.08),transparent 55%)"></div>
+          <div style="display:flex;gap:14px;align-items:flex-start;position:relative">
+            <div style="width:64px;height:88px;border-radius:8px;flex:none;background:radial-gradient(80% 80% at 30% 18%,rgba(114,201,196,.35),transparent 62%),linear-gradient(160deg,#12242f,#0a1620);border:1px solid var(--ir-hairline-strong);display:grid;place-items:center">
+              <span class="t-serif" style="font-size:20px;color:var(--ir-gold)">潮</span></div>
+            <div>
+              <h3 class="t-serif" style="font-size:20px">《潮汐之上》</h3>
+              <p class="note t-mono">BOOK 7f3a21c9 · 创建于 2026-08-28 · <span class="badge b-fixture" style="font-size:9px">DESIGN FIXTURE</span></p>
+              <p class="note" style="margin-top:4px">genres：服务端暂返回空 → 显示「通用网文」，不虚构标签（WorksView 兜底行为保留）。</p>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button class="btn btn-author btn-sm">前往工作台写作 →</button>
+                <button class="btn btn-ghost btn-sm">查看章节目录</button></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="stat-grid">
+            <div><div class="k">正文字数</div><div class="v">128,400</div></div>
+            <div><div class="k">已有章节</div><div class="v">32</div></div>
+            <div><div class="k">已定稿</div><div class="v" style="color:var(--ir-success)">29</div></div>
+            <div><div class="k">草稿中</div><div class="v" style="color:var(--ir-gold-bright)">3</div></div>
+            <div><div class="k">实体卡</div><div class="v">18</div></div>
+          </div>
+          <div class="card-system" style="padding:12px 14px;margin-top:12px">
+            <span class="kicker">大纲节点 · 9 个</span>
+            <div class="row-evidence"><span class="em">volume</span><span>雾灯卷</span><span class="badge b-neutral" style="margin-left:auto;font-size:9px">active</span></div>
+            <div class="row-evidence"><span class="em">arc</span><span>码头线</span><span class="badge b-neutral" style="margin-left:auto;font-size:9px">active</span></div>
+            <p class="note" style="margin:6px 0 0">0 节点时补「尚无大纲节点」空态文案（审计缺口修复）。</p>
+          </div>
+        </div>
+      </div>
+      <div class="chap-rail" style="margin-top:12px">
+        <button class="chap-card"><span class="cn">CH 10</span><span class="ct">雾灯</span><span class="cm">r3 · 4,388 字 · <span style="color:var(--ir-success)">已定稿</span></span></button>
+        <button class="chap-card"><span class="cn">CH 11</span><span class="ct">沉船名册</span><span class="cm">r2 · 3,977 字 · <span style="color:var(--ir-success)">已定稿</span></span></button>
+        <button class="chap-card current"><span class="cn">CH 12</span><span class="ct">暗潮</span><span class="cm">r3 · 4,120 字 · <span style="color:var(--ir-gold-bright)">草稿中</span></span></button>
+        <button class="chap-card"><span class="cn">CH 13</span><span class="ct">（规划中）</span><span class="cm">phase: outline</span></button>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 04 风格蒸馏 -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">04 · style-distill</span><h2>风格蒸馏 · Style Forge 文风炉</h2>
+      <span class="badge b-pass">MOUNTED_TRUTHFUL</span><span style="margin-left:auto" class="note">沉浸 60%</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <span class="kicker">INPUT SAMPLE</span>
+          <textarea class="textarea" style="height:110px;margin-top:8px;font-family:var(--ir-serif)">　　潮声在礁石背后碎成白沫。老周把烟杆磕了磕，火星子落在湿木板上，滋的一声就没了。</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <button class="btn btn-ai btn-sm">蒸馏此样本</button>
+            <span class="kicker">填入样例：</span>
+            <button class="btn btn-ghost btn-sm">样例 A</button><button class="btn btn-ghost btn-sm">样例 B</button><button class="btn btn-ghost btn-sm">样例 C</button>
+          </div>
+          <p class="note" style="margin-top:6px"><span class="badge b-neutral" style="font-size:9px">LOCAL PRESET</span> 样例按钮=范本输入（显式 SAMPLE 语义，非当前作品、非 AI 生成）；指标由服务端对真实粘贴文本计算，无伪造数字。</p>
+        </div>
+        <div>
+          <span class="kicker">SAMPLE METRICS · 真实计算</span>
+          <div class="metric-row" style="margin-top:8px">
+            <div class="metric"><div class="k">字数</div><div class="v">86</div></div>
+            <div class="metric"><div class="k">均句长</div><div class="v">14.3 <small>字</small></div></div>
+            <div class="metric"><div class="k">对白占比</div><div class="v">21%</div></div>
+          </div>
+          <div class="metric-row" style="margin-top:8px">
+            <div class="metric"><div class="k">短句比例</div><div class="v">38%</div></div>
+            <div class="metric"><div class="k">感官密度</div><div class="v">0.42</div></div>
+            <div class="metric"><div class="k">动作张力</div><div class="v">0.31</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+        <div class="card-system" style="padding:14px">
+          <span class="kicker">SEPIA NARRATIVE SCORE</span>
+          <div class="row-evidence" style="margin-top:6px"><span>Pass 1 · 叙事架构</span><span class="em" style="margin-left:auto;color:var(--ir-success)">82</span></div>
+          <div class="row-evidence"><span>Pass 2 · 语篇流动</span><span class="em" style="margin-left:auto;color:var(--ir-success)">76</span></div>
+          <div class="row-evidence"><span>Pass 3 · 表层纯净</span><span class="em" style="margin-left:auto;color:var(--ir-warning)">68</span></div>
+          <span class="kicker" style="display:block;margin-top:10px">AI TELLS</span>
+          <p class="note" style="margin:4px 0 0">· 「仿佛」出现 2 次 · 三连排比 1 处 · 空洞强调词 1 处</p>
+        </div>
+        <div class="card-system" style="padding:14px">
+          <span class="kicker">CURRENT STYLE PROFILES · 当前作品四场景</span>
+          <div class="row-evidence" style="margin-top:6px"><span class="em">action</span><span>r2 · 对白 12% · 感官 .38 · 张力 .52</span></div>
+          <div class="row-evidence"><span class="em">dialogue</span><span>r3 · 对白 41% · 感官 .22 · 张力 .18</span></div>
+          <div class="row-evidence"><span class="em">romance_emotion</span><span>r1 · 对白 33% · 感官 .47 · 张力 .12</span></div>
+          <div class="row-evidence"><span class="em">exposition_worldbuilding</span><span>r2 · 对白 9% · 感官 .51 · 张力 .08</span></div>
+          <p class="note" style="margin:6px 0 0">无画像/未建书时：引导卡「未检测到当前书的文风画像或尚未建书…四场景 StyleProfile 种子」。</p>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 05 小说拆解 -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">05 · novel-breakdown</span><h2>小说拆解</h2>
+      <span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span><span style="margin-left:auto" class="note">沉浸 60% · Truthfulness First</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="statebar">
+        <button class="btn btn-sm btn-ai" data-st="0">态 1 · 未配置 / 不可用</button>
+        <button class="btn btn-sm" data-st="1">态 2 · 为什么不可用</button>
+        <button class="btn btn-sm" data-st="2">态 3 · FUTURE DATA LAYOUT</button>
+      </div>
+      <div class="pane3 on" data-p="0">
+        <div class="unavailable"><b>小说拆解 · 尚未接入</b>　<span class="t-mono">NOVEL_BREAKDOWN_NOT_IMPLEMENTED · HTTP 501</span>
+          <span class="why">此能力由 truthfulness gate fail-closed 保护（truthfulPreviewRoutes 先于 demo 路由注册）。Technical Preview 不返回示例分析冒充结果。</span>
+          <span class="why">可执行动作：粘贴待拆解文本（仅作为未来输入预填，本地保留）· 等待真实分析 provider 接入。</span></div>
+        <textarea class="textarea" style="height:64px;margin-top:10px" placeholder="粘贴待拆解的样本文本…（SAMPLE 输入，不产生结果）"></textarea>
+      </div>
+      <div class="pane3" data-p="1">
+        <div class="card-system" style="padding:16px">
+          <b>为什么不可用（Surface Map 证据）</b>
+          <ul class="note" style="margin:8px 0 0;padding-left:18px;line-height:1.9">
+            <li>服务端路由顺序 storyBrain → pipeline → works → <b style="color:var(--ir-warning)">truthfulPreview</b> → crawler → system；gate 对 <span class="t-mono">POST /api/novel-breakdown</span> 恒答 501（truthfulPreviewRoutes.ts:13-20）。</li>
+            <li>下游 demo 生成器存在但被遮蔽（systemRoutes.ts:207-292 死代码）——设计禁止把 fallback 数据集画成实时分析。</li>
+            <li>客户端 post() 对 !ok 统一抛错 → UI 恒入 error 分支；测试仅覆盖 200（缺口）。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="pane3" data-p="2">
+        <span class="spec-label">FUTURE DATA LAYOUT — 接入真实 provider 后</span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">
+          <div class="card-system" style="padding:14px"><span class="kicker">STORY CORE</span><p class="note" style="margin-top:6px">主角 / 主目标 / 金手指 / 主冲突 四格（数据来自真实分析后才渲染）</p></div>
+          <div class="card-system" style="padding:14px"><span class="kicker">CHAPTER PACING</span><p class="note" style="margin-top:6px">章 · 钩子 · 兑付 · pacing 等级 横轨</p></div>
+          <div class="card-system" style="padding:14px"><span class="kicker">CHARACTER ARCS</span><p class="note" style="margin-top:6px">角色 · 定位 · 欲望 · 缺陷 卡列</p></div>
+          <div class="card-system" style="padding:14px"><span class="kicker">EMOTIONAL BEATS</span><p class="note" style="margin-top:6px">压抑 / 反转 / 高潮 / 断章 节拍带</p></div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+</main>
+<script>
+document.querySelectorAll('[data-st]').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('[data-st]').forEach(function(x){x.classList.remove('btn-ai')});
+  b.classList.add('btn-ai');
+  document.querySelectorAll('.pane3').forEach(function(p){p.classList.toggle('on',p.dataset.p===b.dataset.st)});
+})});
+</script>
+</body>
+</html>

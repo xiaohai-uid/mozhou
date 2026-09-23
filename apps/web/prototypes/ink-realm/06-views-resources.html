@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>06 · 工作流与资源 — 8 个能力视图</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{background:#04070b}
+  .viewframe{margin:26px 0;border-radius:16px;overflow:hidden;border:1px solid var(--ir-hairline)}
+  .vf-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--ir-hairline);
+    background:linear-gradient(180deg,rgba(12,23,30,.92),rgba(8,17,23,.94));position:relative;z-index:2;flex-wrap:wrap}
+  .vf-head h2{font:600 16px/1.3 var(--ir-serif)}
+  .vf-body{position:relative;padding:20px}
+  .vf-inner{position:relative;z-index:1}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .three{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  .capgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  .cap{padding:14px 16px}
+  .cap h4{margin:8px 0 4px;font:600 13.5px/1.4 var(--ir-sans)}
+  .cap p{margin:0 0 8px;font-size:12px;color:var(--ir-muted);line-height:1.6}
+  .src-type{font:700 9.5px/1 var(--ir-mono);letter-spacing:.14em;border-radius:4px;padding:3px 6px;display:inline-block}
+  .st-real{color:var(--ir-jade);border:1px solid rgba(114,201,196,.4)}
+  .st-crawl{color:var(--ir-gold-bright);border:1px solid rgba(214,179,106,.45)}
+  .st-preset{color:var(--ir-faint);border:1px dashed var(--ir-hairline-strong)}
+  .stateline{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="ir-scene cloud-sea"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.6"></div>
+<nav class="proto-nav" style="position:relative;z-index:5">
+  <a href="index.html">总览</a><a href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a href="04-views-creation.html">创作</a><a href="05-views-inspector.html">检视</a><a class="cur" href="06-views-resources.html">资源</a><a href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a href="09-mobile.html">Mobile</a>
+</nav>
+<main class="proto-body">
+  <header class="proto-head"><h1>工作流与资源</h1><span class="proto-sub">任务中心 · 书源搜索 · 书源书架 · 技能广场 · 网文扫榜 · 联网搜索 · 云同步 · 会员中心 — 逐项对应导航 10–17</span></header>
+
+  <!-- 10 tasks -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">10 · tasks</span><h2>任务中心</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span><span style="margin-left:auto" class="note">沉浸 30% · Evidence Row 流水</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="note t-mono">totalEvents 42 · totalTraversals 3</span>
+        <span class="pill on">全部</span><span class="pill">管线</span><span class="pill">遍历</span><span class="pill">审查</span>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto">刷新流水</button></div>
+      <div class="two" style="margin-top:12px">
+        <div class="card-system" style="padding:12px 14px">
+          <span class="kicker">EVENT STREAM · #position · type · category · timestamp</span>
+          <div class="row-evidence"><span class="em">#42</span><span>draft.step CH12</span><span class="badge b-jade" style="margin-left:auto;font-size:9px">pipeline</span></div>
+          <div class="row-evidence"><span class="em">#41</span><span>compile.step receipt 4a19</span><span class="badge b-jade" style="margin-left:auto;font-size:9px">pipeline</span></div>
+          <div class="row-evidence"><span class="em">#40</span><span>chapter.review PASS</span><span class="badge b-neutral" style="margin-left:auto;font-size:9px">review</span></div>
+          <div class="row-evidence"><span class="em">#39</span><span>traversal trv_8c2 传播</span><span class="badge b-stale" style="margin-left:auto;font-size:9px">traversal</span></div>
+          <p class="note" style="margin:6px 0 0">过滤器空态：「该过滤条件下暂无事件」。canon/system 分类为死映射（服务端不产生）——设计移除。</p>
+        </div>
+        <div class="card-system" style="padding:12px 14px">
+          <span class="kicker">TRAVERSAL AUDIT · ImpactRecord</span>
+          <div class="row-evidence"><span class="em">trv_8c2</span><span>影响 2 章</span><span class="t-mono" style="margin-left:auto">tsk_112 · fact.update:f_29 · 09-11 21:04</span></div>
+          <div class="row-evidence"><span class="em">trv_8b7</span><span>影响 1 章</span><span class="t-mono" style="margin-left:auto">tsk_109 · outline.edit:vol-1 · 09-10 18:22</span></div>
+          <p class="note" style="margin:6px 0 0">taskRef / upstreamChanges / affectedFingerprint 为契约已有、未渲染字段（设计落点）；无 root 时 empty 卡+前往工作台。</p>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 11 book-source -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">11 · book-source</span><h2>书源搜索</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span><span style="margin-left:auto" class="note">沉浸 60% · REAL / CRAWLED / PRESET 三源不混淆</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="two">
+        <div class="zone"><span class="kicker">路径 A · QUERY → 多源检索（起点+七猫并发）</span>
+          <div style="display:flex;gap:8px;margin-top:8px"><input class="input" placeholder="书名 / 关键词"><button class="btn btn-ai">检索</button></div>
+          <div class="stateline"><span class="badge b-jade">REAL SEARCH RESULT</span><span class="note">degraded 时显示服务端 notes 提示（审计缺口修复：现未读取 degraded）</span></div>
+          <div class="card-narrative" style="padding:12px 14px;margin-top:10px">
+            <div style="display:flex;gap:12px"><div style="width:44px;height:60px;border-radius:6px;background:linear-gradient(160deg,#12242f,#0a1620);border:1px solid var(--ir-hairline);flex:none"></div>
+              <div><b style="font-size:13.5px">潮汐之上（凌霄潮声）</b><p class="note t-mono" style="margin:3px 0">起点 · 都市异能 · 状态:连载 · url 真实展示</p>
+              <p class="note" style="margin:0">简介截断两行…</p>
+              <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-author btn-sm">导入本地书库</button><button class="btn btn-ghost btn-sm">查看来源 ↗</button></div></div></div>
+          </div>
+        </div>
+        <div class="zone"><span class="kicker">路径 B · URL → 端侧抓取（crawl4ai / HTTP fallback）</span>
+          <div style="display:flex;gap:8px;margin-top:8px"><input class="input" placeholder="https://…"><button class="btn btn-ai">抓取解析</button></div>
+          <div class="stateline"><span class="badge b-gold">CRAWLED WEB CONTENT</span><span class="note">channel 标注：crawl4ai 无头渲染 / HTTP 提取</span></div>
+          <div class="card-system" style="padding:12px 14px;margin-top:10px">
+            <div class="row-evidence" style="padding-left:0;padding-right:0"><span class="em">抓取预览 · 300 字摘录</span><span class="badge b-pass" style="font-size:9px;margin-left:auto">解析成功</span></div>
+            <p class="note" style="margin:6px 0 0;font-family:var(--ir-serif)">　　第一章 雾灯……（抓取正文预览）</p>
+            <p class="note" style="margin-top:6px">导入时 initialBody 写入第一章草稿（服务端真实行为）；SSRF 校验与 30x 全域重定向阻断在实现层已加固。</p></div>
+        </div>
+      </div>
+      <div class="zone" style="margin-top:12px">
+        <span class="kicker">预设书源推荐样例（第三种来源，独立分区）</span>
+        <div class="stateline"><span class="badge b-neutral">LOCAL PRESET / SAMPLE</span><span class="note">与 REAL / CRAWLED 卡片形态区分，绝不混入检索结果流</span></div>
+        <p class="note" style="margin:6px 0 0">零结果诚实态：「未返回真实书源结果——不使用内置推荐样例补位，也不伪造榜单评分或热度。」409 重名冲突显式 error。成功横幅+前往工作台。</p>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 12 bookshelf -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">12 · book-shelf</span><h2>书源书架 · 私人藏书馆</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span><span style="margin-left:auto" class="note">沉浸 90% · Narrative Card</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="note t-mono">书库根：C:\MoZhouLibrary</span>
+        <button class="btn btn-sm" style="margin-left:auto">刷新书库（扫描中… 时禁用）</button></div>
+      <div class="unavailable" style="margin-top:10px"><b>⚠ 有 2 个目录 book.json 不可读已跳过——显式提示，不静默</b>
+        <span class="why">设计增强：skipped 列表（path+reason）收进 secondary disclosure 展开（现为仅计数）。</span></div>
+      <div class="capgrid" style="margin-top:12px">
+        <div class="card-narrative selected" style="padding:16px;position:relative">
+          <span class="badge b-gold" style="position:absolute;right:12px;top:12px;font-size:9px">当前打开</span>
+          <h3 class="t-serif" style="font-size:17px">《潮汐之上》</h3>
+          <p class="note t-mono">32 章 · 2026-08-28</p>
+          <details style="margin-top:8px"><summary class="note" style="cursor:pointer">技术细节（secondary disclosure）</summary>
+            <p class="note t-mono" style="margin-top:4px;word-break:break-all">7f3a21c9-… · C:\MoZhouLibrary\chaoxi-zhishang</p></details>
+          <button class="btn btn-sm" disabled style="margin-top:10px">当前打开</button></div>
+        <div class="card-narrative" style="padding:16px">
+          <h3 class="t-serif" style="font-size:17px">《雾灯志》</h3>
+          <p class="note t-mono">12 章 · 2026-09-02</p>
+          <details style="margin-top:8px"><summary class="note" style="cursor:pointer">技术细节</summary>
+            <p class="note t-mono" style="margin-top:4px">3e91b004-… · C:\MoZhouLibrary\wudeng-zhi</p></details>
+          <button class="btn btn-author btn-sm" style="margin-top:10px">打开</button></div>
+        <div class="card-narrative" style="padding:16px;border-style:dashed;opacity:.8">
+          <h3 class="t-serif" style="font-size:15px">＋ 导入书架</h3>
+          <input class="input" style="margin-top:8px" placeholder="书源书名（零外部抓取 · 书名为输入）">
+          <button class="btn btn-sm" style="margin-top:8px">导入书架</button>
+          <p class="note" style="margin-top:6px">409 重名 → 显式冲突提示。</p></div>
+      </div>
+      <p class="note" style="margin-top:10px">无 parentDir（未建书）→ 空态卡引导「前往工作台建书」。root/bookId 从常驻裸露改为 disclosure（不丢失）。</p>
+    </div></div>
+  </section>
+
+  <!-- 13 capability square -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">13 · capability-square</span><h2>技能广场</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span>
+      <a href="10-skill-square.html" class="btn btn-author btn-sm" style="margin-left:8px">完整 17 项生态 →</a><span style="margin-left:auto" class="note">沉浸 90% · 本页为概要，完整卡牌生态见独立页</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="stateline"><span class="badge b-pass">草稿生成 provider 已配置——写作对话可流式出稿（Gate 3 已开）</span></div>
+      <div class="capgrid" style="margin-top:12px">
+        <div class="card-capability selected cap"><span class="badge b-pass">原生可用</span><h4>工作台</h4><p>建书、对话流、章节选择与账本。</p><span class="note t-mono">workbench · evidence: app 本地能力</span></div>
+        <div class="card-capability cap"><span class="badge b-jade">需 provider</span><h4>写作对话</h4><p>Draft provider 流式问答。</p><span class="note t-mono">dialogue · evidence: Gate 3</span></div>
+        <div class="card-capability cap"><span class="badge b-pass">原生可用</span><h4>sepia 就地去味</h4><p>选中文字的去 AI 腔调重写。</p><span class="note t-mono">skill:sepia-deslop · evidence: quality-engine</span></div>
+        <div class="card-capability cap"><span class="badge b-jade">需 provider</span><h4>sepia 意图重写</h4><p>按作者意图重写选段。</p><span class="note t-mono">skill:sepia-rewrite · evidence: draft provider</span></div>
+        <div class="card-capability cap"><span class="badge b-pass">原生可用</span><h4>装配看板</h4><p>Context Receipt 与预算审计。</p><span class="note t-mono">context-receipt · evidence: kernel</span></div>
+        <div class="card-capability cap"><span class="badge b-stale">需配置</span><h4>任务中心</h4><p>遍历与事件流水。</p><span class="note t-mono">tasks · evidence: 需开启任务采集配置</span></div>
+        <div class="card-capability cap"><span class="badge b-stale">需配置</span><h4>云同步</h4><p>Local-First 快照审计。</p><span class="note t-mono">cloud-sync · evidence: 云端未上线</span></div>
+        <div class="card-capability cap"><span class="badge b-error">需外部数据源</span><h4>网文扫榜</h4><p>可验证实时榜单。</p><span class="note t-mono">rank-scan · evidence: 外部源未配置</span></div>
+        <div class="card-capability cap"><span class="badge b-error">需外部数据源</span><h4>联网搜索</h4><p>真实外部搜索源。</p><span class="note t-mono">web-search · evidence: 外部源未配置</span></div>
+        <div class="card-capability cap"><span class="badge b-stale">需配置</span><h4>会员中心</h4><p>授权与商业化。</p><span class="note t-mono">membership · evidence: 支付未开放</span></div>
+      </div>
+      <p class="note" style="margin-top:10px">四态全量：native / provider_required / configuration_required / external_source_required（17 项注册表与导航一一对应；其余 8 项同构）。hover=3px lift；selected=Metal Rim 金脊；detail=右侧 Sheet（NEW_DESIGN_REQUIREMENT）；未来 enable/apply 仅在真实 action contract 存在时出现。禁：把需 provider/配置/外部源画成灰但仍像可点击的已上线技能；禁 Level/稀有度/战力等无数据数值。</p>
+    </div></div>
+  </section>
+
+  <!-- 14 rank-scan -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">14 · rank-scan</span><h2>网文扫榜</h2><span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span><span style="margin-left:auto" class="note">沉浸 45% · Truthfulness First</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="unavailable"><b>网文榜单 · 未配置</b>　<span class="t-mono">RANK_SOURCE_NOT_CONFIGURED · HTTP 501</span>
+        <span class="why">为什么：网文榜单尚未接入可验证的实时数据源；Technical Preview 不返回静态示例榜单（truthfulness gate fail-closed）。下游 demo 榜与「本地内置数据源」徽标为死代码——<b style="color:var(--ir-fg)">设计删除 501 错误态仍渲染的「本地离线样例/本地内置数据源」矛盾徽标（审计发现）</b>。</span>
+        <span class="why">恢复途径：接入真实榜单源后自动转 FUTURE DATA LAYOUT。</span></div>
+      <span class="spec-label" style="margin-top:12px">FUTURE DATA LAYOUT</span>
+      <div class="three" style="margin-top:10px">
+        <div class="card-system" style="padding:14px"><span class="kicker">TRENDING KEYWORDS</span><p class="note" style="margin-top:6px">热词 × heat 徽标墙（真实数据接入后）</p></div>
+        <div class="card-system" style="padding:14px"><span class="kicker">BOARD TABS</span><p class="note" style="margin-top:6px">多榜单切换 · Top-N · hotScore · 分类标签</p></div>
+        <div class="card-system" style="padding:14px"><span class="kicker">HOOKS</span><p class="note" style="margin-top:6px">金手指 + 一句话钩子列（真实抓取后）</p></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 15 web-search -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">15 · web-search</span><h2>联网搜索</h2><span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span><span style="margin-left:auto" class="note">沉浸 45%</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="unavailable"><b>联网搜索 · 未配置</b>　<span class="t-mono">WEB_SEARCH_NOT_CONFIGURED · HTTP 501</span>
+        <span class="why">为什么：联网搜索尚未接入真实外部搜索源；不返回内置示例冒充联网结果。摘录复制为本地功能保留；hotQueries 仅真实响应存在。`!data.ok` 分区为不可达死分支（post() 统一抛错）——设计统一走 error 态。「本地内置资料库」徽标在错误态删除（审计发现）。</span></div>
+    </div></div>
+  </section>
+
+  <!-- 16 cloud-sync -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">16 · cloud-sync</span><h2>云同步</h2><span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span><span style="margin-left:auto" class="note">沉浸 45% · Local-First 档案页</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="two">
+        <div class="card-system" style="padding:16px">
+          <span class="kicker">LOCAL-FIRST · 真实价值</span>
+          <div class="stateline"><span class="badge b-pass">● 本地离线就绪</span><span class="note">徽标改由 <span class="t-mono">localReady</span> 驱动（现为硬编码——审计修复落点）；<span class="t-mono">syncStatus: offline_ready</span> 上墙</span></div>
+          <div class="row-evidence" style="margin-top:8px"><span>本地 canon 文件</span><span class="em">218 份</span></div>
+          <div class="row-evidence"><span>数据库体积</span><span class="em">46.2 MB</span></div>
+          <div class="row-evidence"><span>待处理本地变更</span><span class="em">0 处（已全量落盘）</span></div>
+          <div class="row-evidence"><span>lastLocalSnapshotAt</span><span class="em">— / 未载入</span></div>
+          <p class="note" style="margin-top:8px">零数据上传 · 透明明文存储。不宣称：已云同步 / 已产生云备份 / backup success。syncState（服务端诚实文案「云同步尚未上线；当前仅为本地文件模式」）上墙。</p>
+        </div>
+        <div class="card-system" style="padding:16px">
+          <span class="kicker">BACKUP · cloud-sync.backup</span>
+          <div class="unavailable" style="margin-top:8px"><b>备份 · 尚未提供</b>　<span class="t-mono">BACKUP_NOT_IMPLEMENTED · HTTP 501</span>
+            <span class="why">Technical Preview 尚未提供可验证的备份归档；未创建任何文件。点击备份 → 显式 unavailable（fail-closed），绝不显示成功卡。</span></div>
+          <p class="note" style="margin-top:8px">成功横幅（snapshotId/fileCount/manifestDigest）为不可达死分支——保留设计位，仅当契约落地。</p>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 17 membership -->
+  <section class="viewframe mat-ink-glass">
+    <div class="vf-head"><span class="kicker">17 · membership</span><h2>会员中心 · 授权档案</h2><span class="badge b-stale">MOUNTED_PARTIAL_OR_BLOCKED</span><span style="margin-left:auto" class="note">沉浸 45% · 不是三塔 pricing</span></div>
+    <div class="vf-body"><div class="vf-inner">
+      <div class="card-system mat-metal-rim" style="padding:18px;max-width:520px">
+        <span class="kicker">CURRENT LICENSE</span>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+          <span class="seal" style="width:34px;height:34px;font-size:17px">免</span>
+          <div><b class="t-serif" style="font-size:17px">社区免费版</b>
+            <div class="note">Technical Preview 当前版本 · license: null（服务端恒真值）</div></div></div>
+        <p class="note" style="margin-top:10px">正式购买与激活服务尚未上线，Pro 权益不对外宣称已解锁。未来 license 存在时展示 planName/status/key/activatedAt 真实字段。</p>
+      </div>
+      <div class="three" style="margin-top:12px">
+        <div class="card-capability cap" style="border-color:rgba(214,179,106,.4)"><span class="badge b-gold">当前</span><h4>免费社区版</h4><p>全 17 能力诚实可用性 · 本地数据主权</p></div>
+        <div class="card-capability cap" style="opacity:.75"><span class="badge b-neutral">规划中</span><h4>Pro · 终身</h4><p>规划中 · 价格尚未开放</p></div>
+        <div class="card-capability cap" style="opacity:.75"><span class="badge b-neutral">尚未开放</span><h4>Studio · 团队</h4><p>规划中 · 价格尚未开放</p></div>
+      </div>
+      <div class="unavailable" style="margin-top:12px;max-width:520px"><b>购买与激活 · 尚未开放</b>
+        <span class="why">不设密钥输入、不设激活按钮（测试断言缺席）；/api/membership.activate 恒 501 且无 UI 调用。不制造激活成功结果。</span></div>
+    </div></div>
+  </section>
+
+</main>
+</body>
+</html>

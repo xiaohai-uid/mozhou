@@ -1,0 +1,187 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WebSearchView（联网搜索） > 搜索输入、热门词与结果卡片渲染；契约快照 1`] = `
+<section
+  aria-label="web-search-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      联网搜索
+    </h1>
+    <span
+      class="meta"
+    >
+      创作资料库 · 设定背景速查
+    </span>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="search-input-section"
+    >
+      <h2>
+        设定资料检索
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              输入关键词检索历史/神话/体系设定
+            </b>
+            <span
+              class="mono muted"
+            >
+              百科 · 古籍 · 设定速查
+            </span>
+          </div>
+          <div
+            class="actions"
+          >
+            <input
+              aria-label="资料检索输入"
+              class="control"
+              placeholder="搜索唐代官制、山海经、金丹品阶、克苏鲁神话…"
+              style="flex: 1 1 0%; min-width: 200px;"
+              value=""
+            />
+            <button
+              class="btn-primary"
+            >
+              搜索资料
+            </button>
+          </div>
+          <div
+            class="actions"
+            style="margin-top: 10px; align-items: center; flex-wrap: wrap; gap: 6px;"
+          >
+            <span
+              class="mono muted"
+            >
+              热门检索：
+            </span>
+            <button
+              class="btn"
+              style="font-size: 9px; padding: 2px 6px;"
+            >
+              唐代夜禁
+            </button>
+            <button
+              class="btn"
+              style="font-size: 9px; padding: 2px 6px;"
+            >
+              山海经异兽
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="search-results-section"
+    >
+      <h2>
+        检索结果 (
+        1
+        )
+      </h2>
+      <div
+        data-testid="search-results-list"
+        style="display: flex; flex-direction: column; gap: 10px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <div
+                style="display: flex; align-items: center; gap: 8px;"
+              >
+                <b
+                  style="font-size: 13px;"
+                >
+                  唐代长安城坊里制度与夜禁
+                </b>
+                <span
+                  class="tag"
+                >
+                  历史制度
+                </span>
+              </div>
+              <span
+                class="mono muted"
+              >
+                来源: 
+                新唐书·百官志
+              </span>
+            </div>
+            <p
+              class="muted"
+              style="margin: 4px 0px 0px; font-size: 11px; line-height: 1.6;"
+            >
+              一百零八坊棋盘布局，晨钟暮鼓开闭坊门。
+            </p>
+            <div
+              class="finding"
+              style="margin-top: 8px;"
+            >
+              <b>
+                📖 详尽资料：
+              </b>
+              <span
+                style="font-size: 11px; margin-left: 4px;"
+              >
+                长安城以朱雀大街为中轴，东西分设万年县与长安县。
+              </span>
+            </div>
+            <div
+              class="actions"
+              style="margin-top: 8px; justify-content: space-between; align-items: center;"
+            >
+              <div
+                style="display: flex; gap: 4px;"
+              >
+                <span
+                  class="cap-badge pending"
+                  style="font-size: 9px;"
+                >
+                  #
+                  唐代
+                </span>
+                <span
+                  class="cap-badge pending"
+                  style="font-size: 9px;"
+                >
+                  #
+                  夜禁
+                </span>
+              </div>
+              <button
+                class="btn"
+                style="font-size: 9px; padding: 3px 8px;"
+              >
+                摘录资料
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

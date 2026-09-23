@@ -1,0 +1,307 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WorksView（我的作品） > 作品概览与章节目录渲染（书名/统计/大纲节点/章节）；契约快照 1`] = `
+<section
+  aria-label="works-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      我的作品
+    </h1>
+    <span
+      class="meta"
+    >
+      假神真显灵 · 2 章 · 5200 字
+    </span>
+    <div
+      class="save"
+    >
+      <button
+        class="btn"
+        style="font-size: 10px; padding: 4px 8px;"
+      >
+        前往工作台写作 →
+      </button>
+    </div>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="works-overview"
+    >
+      <h2>
+        作品信息
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              假神真显灵
+            </b>
+            <span
+              class="mono muted"
+            >
+              ID: 
+              bk_mock_1
+            </span>
+          </div>
+          <div
+            class="actions"
+            style="margin-top: 4px; gap: 16px;"
+          >
+            <span
+              class="mono muted"
+            >
+              题材：
+              灵异 / 悬疑
+            </span>
+            <span
+              class="mono muted"
+            >
+              创建时间：
+              2026-08-31
+            </span>
+            <span
+              class="mono muted"
+            >
+              实体卡：
+              3
+               个
+            </span>
+          </div>
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; padding: 10px 0px 0px; border-top: 1px solid var(--hairline);"
+          >
+            <div>
+              <div
+                class="mono muted"
+              >
+                总字数
+              </div>
+              <b
+                style="font-size: 16px;"
+              >
+                5200
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                总章数
+              </div>
+              <b
+                style="font-size: 16px;"
+              >
+                2
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                已定稿
+              </div>
+              <b
+                style="font-size: 16px; color: var(--success);"
+              >
+                1
+              </b>
+            </div>
+            <div>
+              <div
+                class="mono muted"
+              >
+                草稿中
+              </div>
+              <b
+                style="font-size: 16px; color: var(--warning);"
+              >
+                1
+              </b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="works-outlines"
+    >
+      <h2>
+        大纲骨架
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              大纲节点
+            </b>
+            <span
+              class="mono muted"
+            >
+              2
+               个节点
+            </span>
+          </div>
+          <div
+            class="finding"
+            style="display: flex; justify-content: space-between; align-items: center;"
+          >
+            <div>
+              <b>
+                全书总纲
+              </b>
+              <span
+                class="mono muted"
+                style="margin-left: 8px;"
+              >
+                [
+                book
+                ]
+              </span>
+            </div>
+            <span
+              class="tag"
+            >
+              active
+            </span>
+          </div>
+          <div
+            class="finding"
+            style="display: flex; justify-content: space-between; align-items: center;"
+          >
+            <div>
+              <b>
+                第一卷 借假修真
+              </b>
+              <span
+                class="mono muted"
+                style="margin-left: 8px;"
+              >
+                [
+                volume
+                ]
+              </span>
+            </div>
+            <span
+              class="tag"
+            >
+              active
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="works-chapters"
+    >
+      <h2>
+        章节目录 (
+        2
+        )
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              第 
+              1
+               章 · 
+              第一章 骗子与真神
+            </b>
+            <span
+              class="cap-badge native"
+            >
+              已定稿
+            </span>
+          </div>
+          <div
+            class="actions"
+            style="margin-top: 6px;"
+          >
+            <span
+              class="mono muted"
+            >
+              字数：
+              3000
+               字
+            </span>
+            <span
+              class="mono muted"
+            >
+              修订版本：r
+              2
+            </span>
+          </div>
+        </div>
+      </div>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              第 
+              2
+               章 · 
+              第二章 庙堂惊变
+            </b>
+            <span
+              class="cap-badge pending"
+            >
+              草稿中
+            </span>
+          </div>
+          <div
+            class="actions"
+            style="margin-top: 6px;"
+          >
+            <span
+              class="mono muted"
+            >
+              字数：
+              2200
+               字
+            </span>
+            <span
+              class="mono muted"
+            >
+              修订版本：r
+              1
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

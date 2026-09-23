@@ -1,0 +1,23 @@
+=== T03 证据 2026-09-13T23:42:45+08:00 ===
+provider-key-present: false（真机冒烟 skip，BLOCKED 如实记录）
+apps/web/server/storyboard/generate.ts: 844fdb0d90ac164a
+apps/web/server/storyboard/generate.test.ts: 60e02bf711e7f8a2
+apps/web/server/routes/storyboardRoutes.ts: e5b063fd21ab8ddd
+apps/web/server/storyboard/store.ts: 87323c9555a9c4e5
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m16 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (17)[39m
+--- vitest 全量 ---
+[2m Test Files [22m [1m[32m39 passed[39m[22m[90m (39)[39m
+[2m      Tests [22m [1m[32m258 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (259)[39m
+--- tsc app ---
+server/storyboard/generate.ts(87,17): error TS18048: 'text' is possibly 'undefined'.
+server/storyboard/generate.ts(88,15): error TS18048: 'text' is possibly 'undefined'.
+server/storyboard/generate.ts(92,10): error TS18048: 'text' is possibly 'undefined'.
+--- tsc server ---
+server/storyboard/generate.ts(87,17): error TS18048: 'text' is possibly 'undefined'.
+server/storyboard/generate.ts(88,15): error TS18048: 'text' is possibly 'undefined'.
+server/storyboard/generate.ts(92,10): error TS18048: 'text' is possibly 'undefined'.
+  "status": "clean",
+  "cycleCount": 0,
+--- tsc 修复后 ---
+tsc_both_ok

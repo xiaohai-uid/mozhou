@@ -1,0 +1,255 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TasksView（任务中心） > 流水与 Traversal 审计渲染（统计/分类徽标/受影响章）；契约快照 1`] = `
+<section
+  aria-label="tasks-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      任务中心
+    </h1>
+    <span
+      class="meta"
+    >
+      账本事件 3 条 · 影响遍历 1 次
+    </span>
+    <div
+      class="save"
+      style="display: flex; gap: 6px;"
+    >
+      <button
+        aria-label="导出流水日志"
+        class="btn"
+        style="font-size: 10px; padding: 4px 8px;"
+        type="button"
+      >
+        导出 JSONL
+      </button>
+      <button
+        class="btn"
+        style="font-size: 10px; padding: 4px 8px;"
+      >
+        刷新流水
+      </button>
+    </div>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="tasks-traversals"
+    >
+      <h2>
+        影响遍历审计 (
+        1
+        )
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              Traversal: 
+              trav_demo_1
+            </b>
+            <span
+              class="cap-badge pending"
+            >
+              影响 
+              2
+               章
+            </span>
+          </div>
+          <div
+            class="actions"
+            style="margin-top: 4px;"
+          >
+            <span
+              class="mono muted"
+            >
+              触发源：
+              commit
+               (
+              cmit_01
+              )
+            </span>
+            <span
+              class="mono muted"
+            >
+              记录时间：
+              2026-08-31T11:00:00.000Z
+            </span>
+          </div>
+          <div
+            class="mono muted"
+            style="margin-top: 6px;"
+          >
+            受影响章节：
+            第1章, 第2章
+          </div>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="tasks-events"
+    >
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"
+      >
+        <h2>
+          事件流水 (
+          3
+          )
+        </h2>
+        <div
+          class="actions"
+          style="margin-top: 0px; gap: 6px;"
+        >
+          <button
+            class="btn-primary"
+            style="font-size: 9px; padding: 3px 7px;"
+          >
+            全部
+          </button>
+          <button
+            class="btn"
+            style="font-size: 9px; padding: 3px 7px;"
+          >
+            管线
+          </button>
+          <button
+            class="btn"
+            style="font-size: 9px; padding: 3px 7px;"
+          >
+            遍历
+          </button>
+          <button
+            class="btn"
+            style="font-size: 9px; padding: 3px 7px;"
+          >
+            审查
+          </button>
+        </div>
+      </div>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              QualityReviewed
+            </b>
+            <span
+              class="verdict blocking"
+            >
+              质量审查
+            </span>
+          </div>
+          <p
+            class="mono muted"
+            style="margin: 0px;"
+          >
+            #
+            3
+             · 
+            QualityReviewed (taskRef: tsk_rev_1)
+          </p>
+          <p
+            class="mono muted"
+            style="margin: 4px 0px 0px; font-size: 9px;"
+          >
+            时间：
+            2026-08-31T12:00:00.000Z
+          </p>
+        </div>
+      </div>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              TraversalFinished
+            </b>
+            <span
+              class="cap-badge pending"
+            >
+              影响遍历
+            </span>
+          </div>
+          <p
+            class="mono muted"
+            style="margin: 0px;"
+          >
+            #
+            2
+             · 
+            TraversalFinished (taskRef: tsk_trav_1)
+          </p>
+          <p
+            class="mono muted"
+            style="margin: 4px 0px 0px; font-size: 9px;"
+          >
+            时间：
+            2026-08-31T11:00:00.000Z
+          </p>
+        </div>
+      </div>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              ChapterCommitted
+            </b>
+            <span
+              class="cap-badge native"
+            >
+              管线生产
+            </span>
+          </div>
+          <p
+            class="mono muted"
+            style="margin: 0px;"
+          >
+            #
+            1
+             · 
+            ChapterCommitted (seq: 1)
+          </p>
+          <p
+            class="mono muted"
+            style="margin: 4px 0px 0px; font-size: 9px;"
+          >
+            时间：
+            2026-08-31T10:00:00.000Z
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

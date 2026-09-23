@@ -1,0 +1,226 @@
+/**
+ * 会话步投影（T16 · #40；chapter-pipeline-spec S1）。
+ *
+ * 会话态 = 投影的一种（无第三处真源）：当前步随时可从 Ledger 事件流纯折叠重建
+ * （T1 状态≠事件；折叠幂等，同一输入重复折叠逐字段相等）。折叠规则：
+ *   - TaskStarted(chapterIndex=N) 开启会话窗口；窗口内 TaskStepTransitioned 的
+ *     payload.to 即当前步；TaskFinished 收卷；
+ *   - 同章再次 TaskStarted ⇒ 新窗口取代旧窗口（重提交 = 新 session，S9）——
+ *     旧 commit 不构成新会话的完成态；
+ *   - 完成态单一事实源 = 窗口内 CanonCommitted 存在性（ANWA #90），两种行格式
+ *     均认（平铺行按 position 落在窗口内判定）；
+ *   - 窗口内 CHAPTER_DRAFTING 的 ContextCompiled 指针记录 lastReceiptId——
+ *     Compile 后崩溃恢复按 receiptId 续跑的凭据（INV-R1 先证后指针 ⇒ 指针存在
+ *     即凭证必在盘上）。
+ */
+import { EVENT_PAIRS } from '@mozhou/kernel';
+import type { ContextReceiptId } from '@mozhou/kernel';
+import type { PipelineLedgerRow } from './ledger.js';
+import { isPipelineStep, type PipelineStep } from './steps.js';
+
+export interface SessionProjection {
+  readonly chapterIndex: number;
+  /** 存在未走完的会话窗口（重提交/恢复判定的主锚）。 */
+  readonly sessionOpen: boolean;
+  readonly taskRef: string | null;
+  /** 开卷事件在账本中的 position（完成态/凭证的窗口判定基准）。 */
+  readonly openedAtPosition: number | null;
+  readonly currentStep: PipelineStep | null;
+  readonly finished: boolean;
+  /** 完成态单一事实源：本窗口内 CanonCommitted 已存在。 */
+  readonly committed: boolean;
+  /** CanonCommitted 行携带的 commitId（payload 或平铺字段；缺省 null）。 */
+  readonly commitId: string | null;
+  /** 本窗口内最近一张 CHAPTER_DRAFTING 凭证（receiptId 续跑凭据）。 */
+  readonly lastReceiptId: ContextReceiptId | null;
+  /**
+   * 本窗口内最近一次进 continuity_gate 步的 Result 字段 verdict（T19 · #43）：
+   * 'pass' | 'hard_conflict' | null（尚未走到）。回环显式驱动的判据——只有
+   * hard_conflict 悬置中的门禁才允许 requestRework（S7：每次循环由作者驱动）。
+   */
+  readonly lastGateVerdict: 'pass' | 'hard_conflict' | null;
+  /**
+   * 本窗口内最近一次 QualityReviewCompleted 的 verdict（ADR-0025）：
+   * 'pass' | 'blocking_fail' | 'refused' | null（尚未审查）。review→user_edit
+   * 前进出口的判据——只有 pass 放行；blocking_fail 走 requestQualityRework
+   * 显式回炉；refused 停给作者（无静默放行）。崩溃恢复沿账本折叠重建。
+   */
+  readonly lastQualityVerdict: 'pass' | 'blocking_fail' | 'refused' | null;
+  /** 本窗口内已发生的质量回炉次数（TaskStepTransitioned reason=quality_rework 计数）。 */
+  readonly qualityReworkCount: number;
+  /** 成对约束悬挂 head 键（head#taskRef；投影合并侧呈现，规格 §3）。 */
+  readonly openHeads: readonly string[];
+}
+
+function rowChapterIndex(row: PipelineLedgerRow): number | undefined {
+  if (row.kind === 'task') {
+    return row.event.chapterIndex;
+  }
+  const value = row.row['chapterIndex'];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function rowType(row: PipelineLedgerRow): string | undefined {
+  return row.kind === 'task' ? row.event.type : (row.row['type'] as string | undefined);
+}
+
+/** 折叠账本 → 指定章的会话步投影。纯函数、无 IO、幂等。 */
+export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex: number): SessionProjection {
+  let taskRef: string | null = null;
+  let openedAtPosition: number | null = null;
+  let currentStep: PipelineStep | null = null;
+  let finished = false;
+  let committed = false;
+  let commitId: string | null = null;
+  let lastReceiptId: ContextReceiptId | null = null;
+  let lastGateVerdict: 'pass' | 'hard_conflict' | null = null;
+  let lastQualityVerdict: 'pass' | 'blocking_fail' | 'refused' | null = null;
+  let qualityReworkCount = 0;
+  const openHeads: string[] = [];
+
+  for (const row of rows) {
+    const type = rowType(row);
+
+    /* ---- 任务族事件：仅当属于本章 ---- */
+    if (row.kind === 'task') {
+      const event = row.event;
+      if (event.chapterIndex === chapterIndex) {
+        if (type === 'TaskStarted') {
+          // 新窗口取代旧窗口（重提交 = 新 session）
+          taskRef = event.taskRef;
+          openedAtPosition = row.position;
+          currentStep = null;
+          finished = false;
+          committed = false;
+          commitId = null;
+          lastReceiptId = null;
+          lastGateVerdict = null;
+          lastQualityVerdict = null;
+          qualityReworkCount = 0;
+          openHeads.length = 0;
+          const step = event.payload?.['step'];
+          currentStep = typeof step === 'string' && isPipelineStep(step) ? step : 'prepare';
+        } else if (event.taskRef === taskRef && openedAtPosition !== null) {
+          if (type === 'TaskStepTransitioned') {
+            const to = event.payload?.['to'];
+            if (typeof to === 'string' && isPipelineStep(to)) {
+              currentStep = to;
+            }
+            // 门禁 Result 字段留痕：verdict 是回环显式驱动的机械判据（S7/S8 Gate 后行）
+            if (to === 'continuity_gate') {
+              const verdict = event.payload?.['verdict'];
+              lastGateVerdict = verdict === 'pass' || verdict === 'hard_conflict' ? verdict : lastGateVerdict;
+            }
+            // 质量回炉计数（ADR-0025）：reason=quality_rework 的 review→draft 逆向边
+            if (
+              to === 'draft' &&
+              event.payload?.['reason'] === 'quality_rework' &&
+              event.payload?.['from'] === 'review'
+            ) {
+              qualityReworkCount += 1;
+            }
+          } else if (type === 'QualityReviewCompleted') {
+            const verdict = event.payload?.['verdict'];
+            lastQualityVerdict =
+              verdict === 'pass' || verdict === 'blocking_fail' || verdict === 'refused'
+                ? verdict
+                : lastQualityVerdict;
+          } else if (type === 'TaskFinished') {
+            finished = true;
+          } else if (type === 'CanonCommitted') {
+            committed = true;
+            const payloadCommit = event.payload?.['commitId'];
+            commitId = typeof payloadCommit === 'string' ? payloadCommit : null;
+          } else if (type === 'ContextCompiled') {
+            const rid = event.payload?.['receiptId'];
+            if (typeof rid === 'string') {
+              lastReceiptId = rid as ContextReceiptId;
+            }
+          }
+        }
+      }
+
+      // 成对约束悬挂视图：窗口内、同 taskRef 才计入
+      if (openedAtPosition !== null && row.position >= openedAtPosition && event.chapterIndex === chapterIndex) {
+        const pair = EVENT_PAIRS.find(([h, t]) => h === type || t === type);
+        if (pair) {
+          const key = `${pair[0]}#${event.taskRef}`;
+          if (type === pair[0]) {
+            if (!openHeads.includes(key)) openHeads.push(key);
+          } else {
+            const idx = openHeads.indexOf(key);
+            if (idx >= 0) openHeads.splice(idx, 1);
+          }
+        }
+      }
+      continue;
+    }
+
+    /* ---- 平铺领域行：CanonCommitted / ContextCompiled 指针（无 taskRef 可归，
+     *     以 chapterIndex + position 窗口归属）---- */
+    if (openedAtPosition !== null && row.position > openedAtPosition && !finished && !committed) {
+      if (rowChapterIndex(row) !== chapterIndex) {
+        continue;
+      }
+      if (type === 'CanonCommitted') {
+        committed = true;
+        const flatCommit = row.row['commitId'];
+        commitId = typeof flatCommit === 'string' ? flatCommit : null;
+      } else if (
+        type === 'ContextCompiled' &&
+        row.row['taskType'] === 'CHAPTER_DRAFTING' &&
+        typeof row.row['receiptId'] === 'string'
+      ) {
+        lastReceiptId = row.row['receiptId'] as ContextReceiptId;
+      }
+    }
+  }
+
+  return {
+    chapterIndex,
+    sessionOpen: openedAtPosition !== null && !finished && !committed,
+    taskRef,
+    openedAtPosition,
+    currentStep,
+    finished,
+    committed,
+    commitId,
+    lastReceiptId,
+    lastGateVerdict,
+    lastQualityVerdict,
+    qualityReworkCount,
+    openHeads: [...openHeads],
+  };
+}
+
+/**
+ * 全局活动会话扫描（T19 · #43；S11 跨章并发 V1 全局单飞）：折叠全部章的窗口，
+ * 返回最新一个仍开放（已开卷、未收卷、未提交）的窗口——同一时刻至多一个；
+ * 无开放窗口返回 null。纯函数、无 IO、幂等。
+ */
+export function findOpenSessionWindow(
+  rows: readonly PipelineLedgerRow[],
+): { readonly chapterIndex: number; readonly taskRef: string } | null {
+  let active: { chapterIndex: number; taskRef: string } | null = null;
+  let finished = false;
+  let committed = false;
+
+  for (const row of rows) {
+    if (row.kind !== 'task') continue;
+    const event = row.event;
+    const chapterIndex = event.chapterIndex;
+    if (chapterIndex === undefined) continue;
+    if (event.type === 'TaskStarted') {
+      // 新开卷即当前窗口（旧窗口被取代——健康账本上旧窗口必已闭合）
+      active = { chapterIndex, taskRef: event.taskRef };
+      finished = false;
+      committed = false;
+    } else if (active !== null && event.taskRef === active.taskRef && chapterIndex === active.chapterIndex) {
+      if (event.type === 'TaskFinished') finished = true;
+      else if (event.type === 'CanonCommitted') committed = true;
+    }
+  }
+
+  if (active === null || finished || committed) return null;
+  return active;
+}

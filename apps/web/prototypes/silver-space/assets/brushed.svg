@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240">
+  <!-- 拉丝金属微纹理（叠加层用；静态） -->
+  <filter id="b">
+    <feTurbulence type="fractalNoise" baseFrequency="0.9 0.05" numOctaves="2" seed="11" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.58  0 0 0 0 0.63  0 0 0 0 0.7  0 0 0 0.5 0"/>
+  </filter>
+  <rect width="240" height="240" filter="url(#b)"/>
+</svg>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 · 技能广场 — 完整能力卡牌生态（17 项真实注册表）</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{overflow:hidden}
+  .sq-shell{position:fixed;inset:0;z-index:3;display:flex;flex-direction:column;gap:var(--ir-world-gap);padding:var(--ir-world-gap)}
+  .sq-top{display:flex;align-items:center;gap:12px;padding:0 16px;border-radius:12px;flex:none;min-height:56px}
+  .sq-body{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 388px;gap:var(--ir-world-gap);min-height:0}
+  .wall{overflow:auto;padding:18px 20px 26px;border-radius:12px}
+  .grp{margin-bottom:22px}
+  .grp-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .grp-head h2{font:600 16px/1.3 var(--ir-serif)}
+  .grp-head .rule{flex:1;height:1px;background:linear-gradient(90deg,var(--ir-hairline-strong),transparent)}
+  .cap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:12px}
+  .cap{padding:15px 16px;cursor:pointer;text-align:left;width:100%}
+  .cap h4{margin:9px 0 4px;font:600 14px/1.4 var(--ir-serif)}
+  .cap p{margin:0 0 9px;font-size:12px;color:var(--ir-muted);line-height:1.65;min-height:38px}
+  .cap .ev{display:block;font:400 10.5px/1.6 var(--ir-mono);color:var(--ir-faint);border-top:1px solid var(--ir-hairline);padding-top:7px}
+  .cap.hero{transform:translateY(-2px)}
+  .cap .statusbar{display:flex;align-items:center;gap:6px}
+  .cap .statusbar .st-ico{margin-left:auto;font:600 9px/1 var(--ir-mono);letter-spacing:.1em;color:var(--ir-faint)}
+  .sheetpanel{border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+  .sp-head{padding:14px 16px 10px;border-bottom:1px solid var(--ir-hairline)}
+  .sp-body{flex:1;overflow:auto;padding:14px 16px 20px}
+  .kv{margin:12px 0}
+  .kv .k{font:600 10px/1 var(--ir-sans);letter-spacing:.14em;color:var(--ir-faint);margin-bottom:6px}
+  .kv .v{font-size:12.5px;line-height:1.75;color:var(--ir-muted)}
+  .kv .v.mono{font-family:var(--ir-mono);font-size:11.5px}
+  .reqlist{margin:0;padding-left:16px;font-size:12.5px;color:var(--ir-muted);line-height:1.9}
+</style>
+</head>
+<body>
+<div class="ir-scene city-night"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.48"></div>
+<div class="ir-figure pos-right" style="--figure-opacity:.62;right:1%"><div class="sil"></div></div>
+
+<div class="sq-shell">
+  <header class="sq-top mat-scene-glass">
+    <span class="seal" style="width:26px;height:26px;font-size:14px">墨</span>
+    <div><b class="t-serif" style="font-size:15px">技能广场</b><div class="kicker" style="font-size:9px">CAPABILITY REGISTRY · V1 READ MODEL（T46）</div></div>
+    <span style="flex:1"></span>
+    <span class="badge b-pass">草稿生成 provider 已配置 · Gate 3 已开</span>
+    <a class="btn btn-ghost btn-sm" href="06-views-resources.html">← 返回资源组</a>
+  </header>
+
+  <div class="sq-body">
+    <!-- ======== CAPABILITY WALL：17/17 真实注册表 ======== -->
+    <main class="wall mat-ink-glass" id="wall" aria-label="能力注册表">
+      <p class="note" style="margin:0 0 4px">数据源 = <span class="t-mono">POST /api/capability-square → CAPABILITY_SQUARE_GROUPS</span>（systemRoutes.ts:11-156），17 项与一级导航一一对应；无 Level/稀有度/战力等无数据数值。点击任意卡打开右侧详情 Sheet。</p>
+
+      <section class="grp"><div class="grp-head"><h2>创作</h2><span class="note">5 项</span><span class="rule"></span></div>
+        <div class="cap-grid" data-g="创作">
+          <button class="card-capability cap" data-id="workbench"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>工作台</h4><p>建书、首章与工作台</p><span class="ev">evidence · 建书/首章/账本与中栏写作对话已接入（T40–T44）</span></button>
+          <button class="card-capability cap" data-id="dialogue"><span class="statusbar"><span class="badge b-jade">需 provider</span><span class="st-ico">PROVIDER_REQUIRED</span></span><h4>写作对话</h4><p>中栏写作对话与草稿流式生成</p><span class="ev">evidence · 草稿流式端点已接线；provider 未配时显式不可用（Gate 3）</span></button>
+          <button class="card-capability cap" data-id="works"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>我的作品</h4><p>我的作品列表</p><span class="ev">evidence · 本地书库读面已就绪（书源书架 T45）；独立作品页待迁移</span></button>
+          <button class="card-capability cap" data-id="style-distill"><span class="statusbar"><span class="badge b-jade">需 provider</span><span class="st-ico">PROVIDER_REQUIRED</span></span><h4>风格蒸馏</h4><p>风格蒸馏</p><span class="ev">evidence · 需文本模型服务；页面为显式占位</span></button>
+          <button class="card-capability cap" data-id="novel-breakdown"><span class="statusbar"><span class="badge b-jade">需 provider</span><span class="st-ico">PROVIDER_REQUIRED</span></span><h4>小说拆解</h4><p>小说拆解</p><span class="ev">evidence · 需文本模型服务；页面为显式占位</span></button>
+        </div></section>
+
+      <section class="grp"><div class="grp-head"><h2>检视 · Novel OS</h2><span class="note">4 项</span><span class="rule"></span></div>
+        <div class="cap-grid" data-g="检视 · Novel OS">
+          <button class="card-capability cap" data-id="story-brain"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>Story Brain</h4><p>Story Brain 三区面板</p><span class="ev">evidence · 实体卡/大纲树/认知三级事实（T41）</span></button>
+          <button class="card-capability cap" data-id="context-receipt"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>装配看板</h4><p>装配看板</p><span class="ev">evidence · Receipt 列表/详情 + hash 校验 + 续跑判态（T42）</span></button>
+          <button class="card-capability cap" data-id="change-matrix"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>变更矩阵</h4><p>变更矩阵</p><span class="ev">evidence · 遍历×受影响章矩阵 + 幂等重跑（T43）</span></button>
+          <button class="card-capability cap" data-id="quality-gate"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>质量门</h4><p>文学质量门</p><span class="ev">evidence · 结构规则审查 + 显式回炉/纠错；语义审查者未接入</span></button>
+        </div></section>
+
+      <section class="grp"><div class="grp-head"><h2>工作流</h2><span class="note">1 项</span><span class="rule"></span></div>
+        <div class="cap-grid" data-g="工作流">
+          <button class="card-capability cap" data-id="tasks"><span class="statusbar"><span class="badge b-stale">需配置</span><span class="st-ico">CONFIGURATION_REQUIRED</span></span><h4>任务中心</h4><p>任务中心</p><span class="ev">evidence · 任务数据源未接线（徽标恒 0，不假装有后台任务）</span></button>
+        </div></section>
+
+      <section class="grp"><div class="grp-head"><h2>资源</h2><span class="note">6 项</span><span class="rule"></span></div>
+        <div class="cap-grid" data-g="资源">
+          <button class="card-capability cap" data-id="book-source"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>书源搜索</h4><p>书源搜索</p><span class="ev">evidence · 书源导入：书名 → 本地建书落地（T45）</span></button>
+          <button class="card-capability cap" data-id="book-shelf"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>书源书架</h4><p>书源书架</p><span class="ev">evidence · 本地书库扫描/开书/切书（T45）</span></button>
+          <button class="card-capability cap" data-id="capability-square"><span class="statusbar"><span class="badge b-pass">原生可用</span><span class="st-ico">NATIVE</span></span><h4>技能广场</h4><p>技能广场</p><span class="ev">evidence · 本页：V1 能力注册表读面（T46）</span></button>
+          <button class="card-capability cap" data-id="rank-scan"><span class="statusbar"><span class="badge b-error">需外部数据源</span><span class="st-ico">EXTERNAL_SOURCE_REQUIRED</span></span><h4>网文扫榜</h4><p>网文扫榜</p><span class="ev">evidence · 外部榜单源未接入；页面为显式占位</span></button>
+          <button class="card-capability cap" data-id="web-search"><span class="statusbar"><span class="badge b-error">需外部数据源</span><span class="st-ico">EXTERNAL_SOURCE_REQUIRED</span></span><h4>联网搜索</h4><p>联网搜索</p><span class="ev">evidence · 外部搜索源未接入；页面为显式占位</span></button>
+          <button class="card-capability cap" data-id="cloud-sync"><span class="statusbar"><span class="badge b-stale">需配置</span><span class="st-ico">CONFIGURATION_REQUIRED</span></span><h4>云同步</h4><p>云同步</p><span class="ev">evidence · 云端服务/账号未接入；页面为显式占位</span></button>
+        </div></section>
+
+      <section class="grp"><div class="grp-head"><h2>账户</h2><span class="note">1 项</span><span class="rule"></span></div>
+        <div class="cap-grid" data-g="账户">
+          <button class="card-capability cap" data-id="membership"><span class="statusbar"><span class="badge b-stale">需配置</span><span class="st-ico">CONFIGURATION_REQUIRED</span></span><h4>会员中心</h4><p>会员中心</p><span class="ev">evidence · 账号/授权/计费未接入；Technical Preview 仅社区免费版</span></button>
+        </div></section>
+    </main>
+
+    <!-- ======== DETAIL SHEET（可操作） ======== -->
+    <aside class="sheetpanel mat-ink-glass" aria-label="能力详情 Sheet">
+      <div class="sp-head">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="kicker">CAPABILITY DETAIL</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" id="spClose">收起 ✕</button></div>
+        <h3 class="t-serif" id="spTitle" style="font-size:19px;margin-top:6px">写作对话</h3>
+        <div id="spBadges" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"></div>
+      </div>
+      <div class="sp-body">
+        <div class="kv"><div class="k">DESCRIPTION · 描述</div><div class="v" id="spDesc"></div></div>
+        <div class="kv"><div class="k">EVIDENCE · 注册表证据（真实字段）</div><div class="v mono" id="spEvidence"></div></div>
+        <div class="kv"><div class="k">REQUIREMENT · 启用前提</div><ul class="reqlist" id="spReq"></ul></div>
+        <div class="kv" id="spUnavailWrap"><div class="k">UNAVAILABLE REASON · 当前不可用原因（真实服务端语义）</div><div class="unavailable" style="margin-top:2px"><b id="spUnavailTitle"></b><span class="why" id="spUnavail"></span></div></div>
+        <div class="kv"><div class="k">ACTION CONTRACT · 动作契约</div><div class="v" id="spContract"></div></div>
+        <div class="kv"><div class="k">VIEW LANDING · 视图落点</div><div class="v mono" id="spLanding"></div></div>
+        <hr class="sep" style="margin:16px 0">
+        <p class="note">四态语义：native=原生可用；provider_required=需模型 provider；configuration_required=需功能配置；external_source_required=需真实外部数据源。future enable/apply 只有在真实 action contract 存在时才会出现在实现中——当前 17 项均无，因此本 Sheet 不提供任何假按钮。</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* 全部字段取自真实注册表 + 真实服务端/路由语义（Surface Map §3/§9） */
+  var DATA={
+    'workbench':{label:'工作台',group:'创作',status:'native',desc:'建书、首章与工作台',
+      evidence:'建书/首章/账本与中栏写作对话已接入（T40–T44）',
+      req:['本地数据平面（LocalDataPlane）已就绪','无需 provider'],
+      contract:'无独立动作——视图直达；建书走 POST /api/book 真实磁盘写入',
+      landing:'nav 01 → WorkbenchView（App.tsx:174）'},
+    'dialogue':{label:'写作对话',group:'创作',status:'provider_required',desc:'中栏写作对话与草稿流式生成',
+      evidence:'草稿流式端点已接线；provider 未配时显式不可用（Gate 3）',
+      req:['配置 draft provider（Gate 3 模型接入）','NDJSON /api/draft.stream 通道可用'],
+      unavail:['草稿生成 provider 未配置——中栏写作对话当前不可用（Gate 3）。','发送时服务端返回 {ok:false, code:\'PROVIDER_UNAVAILABLE\'}——结构化 blocker，而非灰掉输入框。'],
+      contract:'生成/再来一轮有真实契约；adopt/accept 契约未提供（草稿由服务端流式落章）',
+      landing:'Workbench · DialogueStream（顶层 dialogue 导航当前为占位）'},
+    'works':{label:'我的作品',group:'创作',status:'native',desc:'我的作品列表',
+      evidence:'本地书库读面已就绪（书源书架 T45）；独立作品页待迁移',
+      req:['已建至少一书（POST /api/works {root}）'],
+      contract:'无独立动作——视图直达；数据读面真实',
+      landing:'nav 03 → WorksView（POST /api/works）'},
+    'style-distill':{label:'风格蒸馏',group:'创作',status:'provider_required',desc:'风格蒸馏',
+      evidence:'需文本模型服务；页面为显式占位',
+      req:['文本模型 provider（指标计算 evaluateStyleMetrics 本地可跑，sepia 深度诊断需模型）'],
+      unavail:['sepia 叙事诊断/意图重写依赖文本模型服务；本地 metrics 与 sepia 分数当前可真实计算（/api/style.distill）。'],
+      contract:'蒸馏 POST /api/style.distill 真实可用；AI 深度诊断待 provider',
+      landing:'nav 04 → StyleDistillView'},
+    'novel-breakdown':{label:'小说拆解',group:'创作',status:'provider_required',desc:'小说拆解',
+      evidence:'需文本模型服务；页面为显式占位',
+      req:['接入真实文本分析 provider'],
+      unavail:['小说拆解尚未接入真实分析 provider；Technical Preview 不返回示例分析冒充结果。（HTTP 501 · NOVEL_BREAKDOWN_NOT_IMPLEMENTED · truthfulPreviewRoutes fail-closed）'],
+      contract:'无——下游 demo 生成器为被 gate 遮蔽的死代码，设计不提供假入口',
+      landing:'nav 05 → NovelBreakdownView（501 三态）'},
+    'story-brain':{label:'Story Brain',group:'检视 · Novel OS',status:'native',desc:'Story Brain 三区面板',
+      evidence:'实体卡/大纲树/认知三级事实（T41）',
+      req:['已建书（/api/book.state · /api/story-brain.entities · /api/story-brain.facts）'],
+      contract:'只读面板+过滤/刷新；POV/秘密门禁不可被视觉绕过（ADR-0026）',
+      landing:'InspectorTower tab / nav SB → StoryBrainPanel'},
+    'context-receipt':{label:'装配看板',group:'检视 · Novel OS',status:'native',desc:'装配看板',
+      evidence:'Receipt 列表/详情 + hash 校验 + 续跑判态（T42）',
+      req:['完成一次装配（compile）后产生 Receipt'],
+      contract:'只读+选择+回工作台；hashMatch 为服务端 sha256 复算真值（INV-R6）',
+      landing:'InspectorTower tab / nav CR → ReceiptPanel'},
+    'change-matrix':{label:'变更矩阵',group:'检视 · Novel OS',status:'native',desc:'变更矩阵',
+      evidence:'遍历×受影响章矩阵 + 幂等重跑（T43）',
+      req:['上游变更经 Traversal 传播后形成矩阵'],
+      contract:'rerun POST /api/change-matrix.rerun 仅 stale 行可用（幂等）；revisionBriefs 已在契约',
+      landing:'InspectorTower tab / nav CM → ChangeMatrixPanel'},
+    'quality-gate':{label:'质量门',group:'检视 · Novel OS',status:'native',desc:'文学质量门',
+      evidence:'结构规则审查 + 显式回炉/纠错；语义审查者未接入',
+      req:['章节处于 draft/review 会话（409 拒绝其他相位）'],
+      unavail:['语义审查提供方未接入（Gate 3）——语义判定缺席时 verdict=REFUSED，fail-closed。'],
+      contract:'review/rework（上限 2，422 QualityReworkLimitExceeded）/corrections 全真实契约',
+      landing:'InspectorTower tab / nav QG → QualityPanel'},
+    'tasks':{label:'任务中心',group:'工作流',status:'configuration_required',desc:'任务中心',
+      evidence:'任务数据源未接线（徽标恒 0，不假装有后台任务）',
+      req:['任务事件源接入注册表/配置（当前 /api/tasks 只读流水已真实）'],
+      contract:'列表/过滤/刷新真实；徽标计数待任务源接入前恒 0（诚实）',
+      landing:'nav 10 → TasksView'},
+    'book-source':{label:'书源搜索',group:'资源',status:'native',desc:'书源搜索',
+      evidence:'书源导入：书名 → 本地建书落地（T45）',
+      req:['本地书库 parentDir（已建书）','外部网络可达（起点/七猫公开源、crawl4ai 可选）'],
+      contract:'search/extract/import 真实；degraded/notes 语义已入设计',
+      landing:'nav 11 → BookSourceView'},
+    'book-shelf':{label:'书源书架',group:'资源',status:'native',desc:'书源书架',
+      evidence:'本地书库扫描/开书/切书（T45）',
+      req:['本地书库目录存在 book.json 结构'],
+      contract:'library / library.open / library.import 真实（409 重名显式冲突）',
+      landing:'nav 12 → BookshelfView'},
+    'capability-square':{label:'技能广场',group:'资源',status:'native',desc:'技能广场',
+      evidence:'本页：V1 能力注册表读面（T46）',
+      req:['无需前提——注册表随服务端常驻'],
+      contract:'只读注册表；enable/apply 无契约（不提供假按钮）',
+      landing:'nav 13 → CapabilitySquareView'},
+    'rank-scan':{label:'网文扫榜',group:'资源',status:'external_source_required',desc:'网文扫榜',
+      evidence:'外部榜单源未接入；页面为显式占位',
+      req:['接入可验证的实时榜单数据源'],
+      unavail:['网文榜单尚未接入可验证的实时数据源；Technical Preview 不返回静态示例榜单。（HTTP 501 · RANK_SOURCE_NOT_CONFIGURED）'],
+      contract:'无——demo 榜为被 gate 遮蔽死代码；FUTURE DATA LAYOUT 已设计',
+      landing:'nav 14 → RankScanView（501 三态）'},
+    'web-search':{label:'联网搜索',group:'资源',status:'external_source_required',desc:'联网搜索',
+      evidence:'外部搜索源未接入；页面为显式占位',
+      req:['接入真实外部搜索源'],
+      unavail:['联网搜索尚未接入真实外部搜索源；Technical Preview 不返回内置示例冒充联网结果。（HTTP 501 · WEB_SEARCH_NOT_CONFIGURED）'],
+      contract:'摘录复制为本地功能保留；hotQueries 仅真实响应存在',
+      landing:'nav 15 → WebSearchView（501 三态）'},
+    'cloud-sync':{label:'云同步',group:'资源',status:'configuration_required',desc:'云同步',
+      evidence:'云端服务/账号未接入；页面为显式占位',
+      req:['云端服务与账号体系上线'],
+      unavail:['云同步尚未上线；当前仅为本地文件模式（Local-First）。备份：Technical Preview 尚未提供可验证的备份归档；未创建任何文件。（HTTP 501 · BACKUP_NOT_IMPLEMENTED，fail-closed）'],
+      contract:'localReady/offline_ready/storageUsage 真实读面；不宣称 cloud-synced',
+      landing:'nav 16 → CloudSyncView'},
+    'membership':{label:'会员中心',group:'账户',status:'configuration_required',desc:'会员中心',
+      evidence:'账号/授权/计费未接入；Technical Preview 仅社区免费版',
+      req:['支付/激活/计费服务上线'],
+      unavail:['正式购买与激活服务尚未上线，Pro 权益不对外宣称已解锁。/api/membership.activate 恒 501 且无 UI 调用。'],
+      contract:'license=null 真实态+规划中 plans；无购买/激活假按钮（测试断言缺席）',
+      landing:'nav 17 → MembershipView'}
+  };
+  var BADGE={'native':'<span class="badge b-pass">原生可用</span>',
+    'provider_required':'<span class="badge b-jade">需 provider</span>',
+    'configuration_required':'<span class="badge b-stale">需配置</span>',
+    'external_source_required':'<span class="badge b-error">需外部数据源</span>'};
+  var STATUS_LABEL={'native':'NATIVE','provider_required':'PROVIDER_REQUIRED','configuration_required':'CONFIGURATION_REQUIRED','external_source_required':'EXTERNAL_SOURCE_REQUIRED'};
+  function open(id){
+    var d=DATA[id];if(!d)return;
+    document.querySelectorAll('.cap').forEach(function(c){
+      var on=c.dataset.id===id;
+      c.classList.toggle('selected',on);c.classList.toggle('hero',on);
+      c.style.borderColor=on?'rgba(214,179,106,.55)':''});
+    document.getElementById('spTitle').textContent=d.label;
+    document.getElementById('spBadges').innerHTML=BADGE[d.status]+'<span class="badge b-neutral">'+d.group+'</span><span class="badge b-neutral" style="font-family:var(--ir-mono)">'+STATUS_LABEL[d.status]+'</span>';
+    document.getElementById('spDesc').textContent=d.desc;
+    document.getElementById('spEvidence').textContent=d.evidence;
+    document.getElementById('spReq').innerHTML=d.req.map(function(r){return '<li>'+r+'</li>'}).join('');
+    var uw=document.getElementById('spUnavailWrap');
+    if(d.unavail){uw.style.display='block';
+      document.getElementById('spUnavailTitle').textContent='当前不可用 / 部分不可用的真实原因';
+      document.getElementById('spUnavail').textContent=d.unavail.join(' ');}
+    else{uw.style.display='none'}
+    document.getElementById('spContract').textContent=d.contract;
+    document.getElementById('spLanding').textContent=d.landing;
+    document.getElementById('spClose').textContent='收起 ✕';
+  }
+  document.querySelectorAll('.cap').forEach(function(c){c.addEventListener('click',function(){open(c.dataset.id)})});
+  document.getElementById('spClose').addEventListener('click',function(){
+    document.querySelectorAll('.cap').forEach(function(c){c.classList.remove('selected','hero');c.style.borderColor=''});
+  });
+  open('dialogue');
+})();
+</script>
+</body>
+</html>

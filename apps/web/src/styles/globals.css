@@ -1,0 +1,103 @@
+/*
+ * 墨舟样式底座：Night Manuscript Studio。
+ * 视觉目标不是“暗色后台”，而是作者夜间工作的长篇小说生产台。
+ * Gold=作者裁决与关键动作 · Jade=AI/系统 · Serif=正文 · Sans=操作 · Mono=证据。
+ */
+@import "tailwindcss";
+@import "./ink-orbit.css";
+@import "./ink-realm.css";
+@import "./code-graph.css";
+
+:root {
+  --background: #080b11;
+  --foreground: #f1ede6;
+  --accent: #cda56d;
+  --accent-strong: #e8c58f;
+  --accent-soft: rgba(205, 165, 109, 0.12);
+  --surface: #10151d;
+  --surface-2: #151c26;
+  --surface-3: #1a222e;
+  --surface-raised: #18212c;
+  --surface-sunken: #0a0e14;
+  --hairline: rgba(241, 237, 230, 0.085);
+  --hairline-strong: rgba(241, 237, 230, 0.15);
+  --text-muted: #a4a9b2;
+  --text-faint: #6e7682;
+  --danger: #e77f8c;
+  --success: #78c8a4;
+  --warning: #d9a65f;
+  --shadow-ink: rgba(0, 0, 0, 0.52);
+
+  /* 作者主权 / AI 系统：暖金与低饱和青灰明确分工。 */
+  --gold: #c69d63;
+  --gold-bright: #edc98e;
+  --gold-soft: rgba(198, 157, 99, 0.13);
+  --gold-line: rgba(198, 157, 99, 0.48);
+  --gold-line-soft: rgba(198, 157, 99, 0.26);
+  --gold-glow: rgba(198, 157, 99, 0.22);
+  --jade: #7fb5b2;
+  --jade-soft: rgba(127, 181, 178, 0.1);
+  --jade-line: rgba(127, 181, 178, 0.42);
+  --jade-line-soft: rgba(127, 181, 178, 0.23);
+  --jade-glow: rgba(127, 181, 178, 0.2);
+  --violet-experimental: rgba(137, 124, 201, 0.38);
+  --touch-target-min: 44px;
+  --world-gap: 8px;
+  --ir-r-md: 10px;
+  --ir-sheet-t: 0.28s;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "微软雅黑", sans-serif;
+  --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --literary-accent: "STKaiti", "KaiTi", "Kaiti SC", "Songti SC", serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* U02：文档超出首屏时页面底色跟随主题（此前露黑） */
+html, body {
+  background: var(--background);
+}
+
+@theme inline {
+  /* legacy @theme 语义槽位（--color-muted 重复定义，按 legacy 生效值取 text-muted） */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-primary: var(--accent);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--text-muted);
+  --color-muted-foreground: var(--text-muted);
+  --color-border: var(--surface-2);
+  --color-input: var(--surface-2);
+  --color-ring: var(--accent);
+  /* Ink Orbit 扩展槽位 */
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  /* 排印双轨：黑体操作信息 / 宋体文学内容 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "微软雅黑", sans-serif;
+  --font-serif: var(--serif);
+  --font-mono: var(--mono);
+}

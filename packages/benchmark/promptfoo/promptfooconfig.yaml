@@ -1,0 +1,14 @@
+description: "墨舟 (MoZhou Novel OS) 长篇连续性与设定防崩回归评测套件"
+
+prompts:
+  - "【角色视角: {{pov}} | 当前章节: 第{{chapterIndex}}章】\n【场景要求】: {{sceneGoal}}\n【写作指令】: {{prompt}}\n【要求】: 严守人设境界与伤势状态，不写AI腔调总结，不泄露视角外秘密。"
+
+providers:
+  - id: "deepseek:deepseek-v4-flash"
+    config:
+      temperature: 0.7
+  - id: "openai:gpt-4o"
+    config:
+      temperature: 0.7
+
+tests: "file://golden-scenarios.json"

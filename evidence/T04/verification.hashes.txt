@@ -1,0 +1,13 @@
+apps/web/src/storyboard/StoryboardView.tsx 47e63ecdaffcfb56
+apps/web/src/storyboard/storyboard.css 0c381c891e4dd92a
+apps/web/src/storyboard/types.ts 0789863a763007f8
+apps/web/src/storyboard/StoryboardView.test.tsx 648992e7b66f7d8f
+apps/web/server/storyboard/contract.ts 030b37f4ccd47cd1
+apps/web/server/storyboard/store.ts 87323c9555a9c4e5
+apps/web/server/storyboard/generate.ts 3bfdf7d55b243065
+apps/web/server/routes/storyboardRoutes.ts e5b063fd21ab8ddd
+apps/web/src/shell/views.ts 92faa0c42034f920
+apps/web/src/App.tsx c526c0b0c7b7d163
+apps/web/src/works/WorksView.tsx 0be8059ee19f82b2
+apps/web/src/mobile/MobileShell.tsx 86a6358662622069
+apps/web/src/mobile/hubs/WorkbenchHub.tsx f2b2d1eb8eb8ca48

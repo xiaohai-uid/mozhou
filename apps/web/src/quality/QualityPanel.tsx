@@ -1,0 +1,411 @@
+/**
+ * 文学质量审查面板（ADR-0025 · 计划 Task 9；T40 换肤为 Ink Orbit 材质）。
+ * 作者主权：pass 不触发任何自动动作；回炉只经「Apply rework」显式按钮；
+ * 纠错经「Record my correction」显式提交。无自动循环。
+ */
+import { useCallback, useEffect, useState } from 'react'
+import { post } from '../lib/post'
+
+export interface QualitySummary {
+  readonly ok: boolean
+  readonly hasReport?: boolean
+  readonly verdict?: 'pass' | 'blocking_fail' | 'refused'
+  readonly reportId?: string
+  readonly draftRevision?: number
+  readonly draftContentHash?: string
+  readonly current?: boolean
+  /** 报告与当前正文哈希是否失配（stale）。仅在有报告时有意义。 */
+  readonly stale?: boolean
+  readonly reworkCount?: number
+  readonly semanticReviewer?: 'unavailable' | 'attached'
+  readonly blockingFailures?: readonly EvaluationView[]
+  readonly advisories?: readonly EvaluationView[]
+}
+
+interface EvaluationView {
+  readonly ruleId: string
+  readonly ruleVersion: string
+  readonly verdict: string
+  readonly severity: 'blocking' | 'advisory'
+  readonly evidence: readonly { readonly ruleId: string; readonly note: string; readonly excerpt?: string }[]
+}
+
+/** GET 形状的初载读面（POST /api/chapter.quality，与 ReviewResponse 不同构）。
+ *  契约修订 2026-09：面板按 {status, report, current} 三态消费——no_review
+ *  不得伪装 stale；current 直接由落盘报告渲染完整 verdict/锚定/失败清单。 */
+interface ChapterQualityStatusResponse {
+  readonly ok: boolean
+  readonly status: 'no_review' | 'current' | 'stale'
+  readonly report: {
+    readonly reportId: string
+    readonly verdict: 'pass' | 'blocking_fail' | 'refused'
+    readonly anchor: { readonly draftRevision: number; readonly draftContentHash: string }
+    readonly evaluations: readonly {
+      readonly ruleId: string
+      readonly ruleVersion: string
+      readonly verdict: string
+      readonly severity: 'blocking' | 'advisory'
+      readonly evidence: readonly { readonly ruleId: string; readonly note: string; readonly excerpt?: string }[]
+    }[]
+  } | null
+  readonly current: boolean
+}
+
+export interface ReviewResponse extends QualitySummary {
+  readonly reportPath?: string
+}
+
+/** 与 packages/quality-engine/src/types.ts CORRECTION_REASONS 同源；
+ * 不可直引包根——policy/review 模块携 node:crypto，进浏览器包必炸。
+ * 词表漂移由 api.test.ts 的 400 未知原因契约测试兜底。 */
+const CORRECTION_REASONS = [
+  'outline_expansion',
+  'character_toolization',
+  'knowledge_overreach',
+  'payoff_zeroed',
+  'information_only_reward',
+  'repeated_solution_algorithm',
+  'forced_golden_line',
+  'memory_anchor_misuse',
+  'style_drift',
+  'other',
+] as const
+
+const VERDICT_LABEL: Record<string, string> = {
+  pass: 'PASS',
+  blocking_fail: 'NEEDS REWORK',
+  refused: 'REFUSED',
+}
+
+const VERDICT_CLASS: Record<string, string> = {
+  pass: 'verdict pass',
+  blocking_fail: 'verdict blocking',
+  refused: 'verdict refused',
+}
+
+/** 落盘报告（QualityReviewReport 子集）→ 面板摘要视图。
+ *  reworkCount 仅由 review/rework 响应提供（报告本体不含）——初载不显示该行。 */
+function reportToSummary(report: ChapterQualityStatusResponse['report'], current: boolean): QualitySummary {
+  if (report === null) {
+    return { ok: true, hasReport: false, current: true }
+  }
+  const evaluations = report.evaluations
+  return {
+    ok: true,
+    hasReport: true,
+    verdict: report.verdict,
+    reportId: report.reportId,
+    draftRevision: report.anchor.draftRevision,
+    draftContentHash: report.anchor.draftContentHash,
+    current,
+    stale: !current,
+    blockingFailures: evaluations.filter((evaluation) => evaluation.severity === 'blocking'),
+    advisories: evaluations.filter((evaluation) => evaluation.severity === 'advisory'),
+  }
+}
+
+export function QualityPanel({ root, chapterIndex }: { root: string; chapterIndex: number }) {
+  const [summary, setSummary] = useState<QualitySummary | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedReason, setSelectedReason] = useState<string>('outline_expansion')
+  const [note, setNote] = useState('')
+  const [correctionSaved, setCorrectionSaved] = useState(false)
+  const [chapterPhase, setChapterPhase] = useState<'draft' | 'committed'>('draft')
+  const [commitSummary, setCommitSummary] = useState('')
+  const [commitBusy, setCommitBusy] = useState(false)
+  const [commitNotice, setCommitNotice] = useState<string | null>(null)
+
+  const refresh = useCallback(async () => {
+    setError(null)
+    try {
+      const [status, prose] = await Promise.all([
+        post<ChapterQualityStatusResponse>('/api/chapter.quality', { root, chapterIndex }),
+        post<{ ok: boolean; phase?: 'draft' | 'committed' }>('/api/chapter.prose', { root, chapterIndex }).catch(() => null),
+      ])
+      if (prose?.phase) {
+        setChapterPhase(prose.phase)
+      }
+      setSummary(status.status === 'no_review'
+        ? { ok: true, hasReport: false, current: true }
+        : reportToSummary(status.report, status.current))
+    } catch (cause) {
+      setError((cause as Error).message)
+    }
+  }, [root, chapterIndex])
+
+  const handleCommit = async (): Promise<void> => {
+    setCommitBusy(true)
+    setError(null)
+    setCommitNotice(null)
+    try {
+      const res = await post<{ ok: boolean; commitId: string }>('/api/chapter.commit', {
+        root,
+        chapterIndex,
+        summary: commitSummary,
+      })
+      if (res.ok) {
+        setChapterPhase('committed')
+        setCommitNotice(`✓ 本章已成功定稿入账 (${res.commitId.slice(0, 12)})`)
+        setCommitSummary('')
+        window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
+      }
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setCommitBusy(false)
+    }
+  }
+
+  const handleReopen = async (): Promise<void> => {
+    setCommitBusy(true)
+    setError(null)
+    setCommitNotice(null)
+    try {
+      const res = await post<{ ok: boolean }>('/api/chapter.reopen', {
+        root,
+        chapterIndex,
+      })
+      if (res.ok) {
+        setChapterPhase('draft')
+        setCommitNotice('✓ 已重开为草稿状态')
+        window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
+      }
+    } catch (cause) {
+      setError((cause as Error).message)
+    } finally {
+      setCommitBusy(false)
+    }
+  }
+
+  useEffect(() => { void refresh() }, [refresh])
+
+  const runReview = async () => {
+    setError(null)
+    setCorrectionSaved(false)
+    try {
+      setSummary(await post<ReviewResponse>('/api/chapter.review', { root, chapterIndex }))
+    } catch (cause) {
+      setError((cause as Error).message)
+    }
+  }
+
+  const applyRework = async () => {
+    setError(null)
+    setCorrectionSaved(false)
+    try {
+      await post<{ currentStep: string; reworkCount: number }>('/api/chapter.rework', { root, chapterIndex })
+      await refresh()
+    } catch (cause) {
+      setError((cause as Error).message)
+    }
+  }
+
+  const recordCorrection = async () => {
+    setError(null)
+    try {
+      await post('/api/chapter.corrections', {
+        root,
+        chapterIndex,
+        reasons: [selectedReason],
+        ...(note === '' ? {} : { note }),
+      })
+      setCorrectionSaved(true)
+      setNote('')
+    } catch (cause) {
+      setError((cause as Error).message)
+    }
+  }
+
+  const verdict = summary?.verdict
+  const reworkCount = summary?.reworkCount ?? 0
+  const hashShort = summary?.draftContentHash === undefined ? '' : summary.draftContentHash.slice(0, 12)
+
+  return (
+    <section aria-label="literary-quality-panel" className="card-shell">
+      <div className="card">
+        <div className="card-title">
+          <b>文学质量审查</b>
+          {verdict !== undefined && (
+            <span className={VERDICT_CLASS[verdict] ?? 'verdict'}>{VERDICT_LABEL[verdict] ?? verdict}</span>
+          )}
+        </div>
+
+        {error !== null && (
+          <p role="alert" className="wb-error" style={{ marginBottom: 10 }}>
+            {error}
+          </p>
+        )}
+
+        {verdict === undefined && (
+          <p className="muted" style={{ margin: 0, fontSize: 11 }}>
+            {summary?.hasReport === false ? '本章尚未审查——运行文学审查后此处呈现报告。' : '—'}
+          </p>
+        )}
+        {summary?.stale === true && (
+          <p className="mono muted" style={{ margin: '6px 0 0' }}>
+            报告已 stale——正文在审查后变化
+          </p>
+        )}
+        {summary?.draftRevision !== undefined && (
+          <p className="mono muted" style={{ margin: '6px 0 0' }}>
+            Exact draft: revision {summary.draftRevision} · hash {hashShort}…
+          </p>
+        )}
+        {summary?.reworkCount !== undefined && (
+          <p className="mono muted" style={{ margin: '6px 0 0' }}>
+            Rework attempt {Math.min(summary.reworkCount, 2)}/2
+          </p>
+        )}
+
+        {verdict === 'pass' && (
+          <p style={{ margin: '8px 0 0', color: 'var(--success)', fontSize: 11 }}>
+            审查通过，可进入作者编辑。
+          </p>
+        )}
+        {verdict === 'refused' && (
+          <p style={{ margin: '8px 0 0', color: 'var(--text-faint)', fontSize: 11 }}>
+            语义审查提供方不可用——已显式拒绝，交作者处置。
+          </p>
+        )}
+
+        {(summary?.blockingFailures?.length ?? 0) > 0 && (
+          <div>
+            <h4 className="mono muted" style={{ margin: '12px 0 4px' }}>BLOCKING FAILURES</h4>
+            {summary?.blockingFailures?.map((evaluation) => (
+              <div className="finding" key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
+                <b>
+                  {evaluation.ruleId}（v{evaluation.ruleVersion}）
+                </b>
+                {evaluation.evidence.map((evidence, index) => (
+                  <p key={index}>
+                    {evidence.note}
+                    {evidence.excerpt !== undefined && <q> {evidence.excerpt}</q>}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        {(summary?.advisories?.length ?? 0) > 0 && (
+          <div>
+            <h4 className="mono muted" style={{ margin: '12px 0 4px' }}>ADVISORIES（建议，不阻断）</h4>
+            {summary?.advisories?.map((evaluation) => (
+              <div className="finding" key={evaluation.ruleId + ':' + evaluation.ruleVersion}>
+                <p style={{ margin: 0 }}>
+                  {evaluation.ruleId}（v{evaluation.ruleVersion}）：{evaluation.evidence[0]?.note}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+        {summary?.semanticReviewer === 'unavailable' && (
+          <p className="banner" style={{ marginTop: 10, marginBottom: 0 }}>
+            语义审查提供方未接入（Gate 3）：语义规则将使审查显式 REFUSED，而非静默放行。
+          </p>
+        )}
+
+        <div className="actions">
+          <button className="btn-primary" onClick={() => { void runReview() }}>
+            Run literary review
+          </button>
+          {verdict === 'blocking_fail' && (
+            <button className="btn" onClick={() => { void applyRework() }} disabled={reworkCount >= 2}>
+              Apply rework{reworkCount >= 2 ? '（已达上限）' : ''}
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginTop: 12, borderTop: '1px solid var(--hairline)', paddingTop: 10 }}>
+          <h4 className="mono muted" style={{ margin: '0 0 8px' }}>RECORD MY CORRECTION</h4>
+          <div className="actions" style={{ marginTop: 0, alignItems: 'center' }}>
+            <select
+              className="control"
+              value={selectedReason}
+              onChange={(event) => setSelectedReason(event.target.value)}
+              aria-label="纠错原因"
+            >
+              {CORRECTION_REASONS.map((reason) => (
+                <option key={reason} value={reason}>{reason}</option>
+              ))}
+            </select>
+            <input
+              className="control"
+              type="text"
+              placeholder="纠错附注（原文只留本机）"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              style={{ flex: 1, minWidth: 140 }}
+            />
+            <button className="btn" onClick={() => { void recordCorrection() }}>保存纠错</button>
+          </div>
+          {correctionSaved && (
+            <p className="mono" style={{ margin: '8px 0 0', color: 'var(--success)' }}>
+              已记录（事件+失败记忆）
+            </p>
+          )}
+        </div>
+
+        {/* 正典门禁与定稿提交 (F04 十步管线终局) */}
+        <div style={{ marginTop: 14, borderTop: '1px solid var(--hairline-strong)', paddingTop: 12 }} data-testid="canon-commit-section">
+          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <b style={{ fontSize: 13 }}>正典门禁与定稿提交</b>
+            <span className={chapterPhase === 'committed' ? 'cap-badge native' : 'cap-badge pending'}>
+              {chapterPhase === 'committed' ? '● 已定稿' : '○ 草稿期'}
+            </span>
+          </div>
+
+          {commitNotice && (
+            <p className="mono" style={{ margin: '4px 0 8px', color: 'var(--success)', fontSize: 11 }}>
+              {commitNotice}
+            </p>
+          )}
+
+          {chapterPhase === 'committed' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <p className="mono muted" style={{ fontSize: 11, margin: 0 }}>
+                本章已冻结为不可变正典，正文与设定增量已并入世界观基线。
+              </p>
+              <div className="actions" style={{ marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void handleReopen()}
+                  disabled={commitBusy}
+                  style={{ fontSize: 11, padding: '4px 10px' }}
+                >
+                  {commitBusy ? '处理中…' : '显式重开草稿 (Reopen)'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  className="control"
+                  type="text"
+                  placeholder="定稿摘要说明（如：第一卷决战定稿）"
+                  value={commitSummary}
+                  onChange={(e) => setCommitSummary(e.target.value)}
+                  style={{ flex: 1, fontSize: 11 }}
+                  aria-label="定稿说明"
+                />
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => void handleCommit()}
+                  disabled={commitBusy}
+                  style={{ fontSize: 11, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                >
+                  {commitBusy ? '提交中…' : '确认定稿入账 (Commit)'}
+                </button>
+              </div>
+              <p className="mono muted" style={{ fontSize: 10, margin: 0 }}>
+                定稿将执行门禁终验，生成不可变提交并更新章节状态。
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}

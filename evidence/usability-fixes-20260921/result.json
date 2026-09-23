@@ -1,0 +1,55 @@
+{
+  "timestamp": "2026-09-22T15:04:10.226Z",
+  "sandbox": "C:\\Users\\a1691\\AppData\\Local\\Temp\\mozhou-evidence-20260921-svIWYd",
+  "slices": {
+    "slice1_new_chapter": {
+      "status": "VERIFIED",
+      "chapterCount": 2,
+      "ch1File": "正文/第一卷/第0001章.md",
+      "ch1Exists": true,
+      "ch2File": "正文/第一卷/第0002章.md",
+      "ch2Exists": true,
+      "chapters": [
+        {
+          "index": 1,
+          "title": "第 1 章",
+          "phase": "draft"
+        },
+        {
+          "index": 2,
+          "title": "第 2 章",
+          "phase": "draft"
+        }
+      ]
+    },
+    "slice2_entity_card": {
+      "status": "VERIFIED",
+      "cardRef": "char:li_huowang",
+      "cardName": "李火旺",
+      "diskFile": "设定/人物/li_huowang.md",
+      "diskFileExists": true,
+      "diskContentSnippet": "---\nref: char:li_huowang\nname: 李火旺\naiContext: detected\naliases:\n- {text: 李火旺, kind: exact}\nbrief: 大齐心素，分不清虚实\n---\n# 李火旺\n\n迷惘心素，认知即现实。大千录持有者。\n",
+      "sqliteIndexed": true
+    },
+    "slice3_style_profiles": {
+      "status": "VERIFIED",
+      "styleFile": "文风.md",
+      "styleFileExists": true,
+      "revisionBefore": 0,
+      "revisionAfter": 1,
+      "dialogueRatioSaved": 0.85,
+      "sensoryDensitySaved": 0.62,
+      "actionPacingSaved": 0.77,
+      "auditEventWritten": true
+    },
+    "slice4_real_export": {
+      "status": "VERIFIED",
+      "txtLength": 164,
+      "txtSnippet": "《真实证据作品》\n\n========================\n第一章 破晓\n========================\n\n　　天边泛起鱼肚白，寒风",
+      "docxBytes": 1413,
+      "docxValidZipMagic": true,
+      "epubBytes": 2773,
+      "epubValidZipMagic": true
+    }
+  }
+}

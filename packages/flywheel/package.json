@@ -1,0 +1,22 @@
+{
+  "name": "@mozhou/flywheel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mozhou/benchmark": "workspace:*",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

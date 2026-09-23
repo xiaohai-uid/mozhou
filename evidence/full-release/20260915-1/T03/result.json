@@ -1,0 +1,14 @@
+{
+  "kind": "test",
+  "path": "evidence/full-release/20260915-1/T03/result.json",
+  "sourceCommit": "618a444",
+  "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+  "command": "regressions/verify-stream.mjs（red，exit1）+ verify-manual-save.mjs（green，exit0）+ pnpm exec vitest run packages/pipeline/src/draft-candidate.test.ts + pnpm test（740）",
+  "exitCode": 0,
+  "scope": "T03 完成：verify-stream 复现原文覆盖阻断（originalLost=true、revision不动、staleSave 200、流中外部编辑丢失）已存 red 日志；verify-manual-save 保护绿。draft-candidate.ts 实现 C2 候选契约（WriteBase 唯一领域定义、服务端 UUID id、schema/base/mode/selection 校验、终态 append 拒绝、状态迁移 streaming→ready/partial/cancelled/accepted/failed）；8 个新测试全绿：未采纳生成正文/hash/revision 零变化、跨进程重开回读、重建 projection 不丢候选、断流不写成 ready、候选属备份范围",
+  "limitations": [
+    "流式写入仍走旧 persistProse 直写正文（T04 修复）；verify-stream 在 T04 后应转绿",
+    "候选 accept 的正文落地（书锁/CAS/意图日志）属 T04",
+    "HTTP 候选端点未建（T04 的 draftCandidates.test.ts 档）"
+  ]
+}

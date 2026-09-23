@@ -53,6 +53,16 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 - 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
 - 遗留切片（V1.1 未做项，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，工单 14/15）
 
+### 8. Git 分支与提交约定（2026-09-23 起生效）
+- 本仓库采用六分支模型，完整手册见 WinClaw `knowledge/GIT-BRANCHING-AND-COMMIT-STANDARD.md`：
+  - `main` = 生产主分支（规范中 `master` 的等价映射，PRO），禁直接改码，仅由 `release`/`hotfix` 合入；
+  - `develop` = 开发联调分支（DEV），新功能一律 `feature/<module>` 基于此拉出、完成后合回；
+  - `test` = FAT 测试分支；`release` = UAT 预上线分支（发版时从 `test` 拉，惰性创建）；
+  - `hotfix/<desc>` 基于 `main`，修复后双合回 `main` + `develop`；
+  - AI 代理工作分支可用 `feature/<agent>-<module>` 前缀，但合入语义必须遵守六分支模型（功能只进 `develop`，不直接进 `main`）。
+- 提交信息：Conventional Commits 八类前缀（`feat`/`fix`/`docs`/`style`/`refactor`/`perf`/`test`/`chore`）；单次提交同一类别、问题不超过 3 个；不合规用 `git commit --amend` 修正，禁用 `git reset --hard`。
+- 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
+
 ## Agent skills
 
 ### Issue tracker
@@ -66,3 +76,67 @@ Default five canonical roles (`needs-triage`, `needs-info`, `ready-for-agent`, `
 ### Domain docs
 
 Single-context — one `CONTEXT.md` at repo root; ADRs under `docs/adr/` (created lazily). See `docs/agents/domain.md`.
+
+---
+
+# 内核线增补：Wayfinder 追踪操作
+
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical 5-role triage label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout at repo root (`CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **mozhou** (7587 symbols, 16718 relationships, 469 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+| --- | --- |
+| `gitnexus://repo/mozhou/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/mozhou/clusters` | All functional areas |
+| `gitnexus://repo/mozhou/processes` | All execution flows |
+| `gitnexus://repo/mozhou/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+| --- | --- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

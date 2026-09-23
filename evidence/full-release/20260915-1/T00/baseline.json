@@ -1,0 +1,70 @@
+{
+  "runId": "20260915-1",
+  "auditedHead": "fed29e32a86c47dc991da6883fe5d6cc2e4141fd",
+  "branch": "codex/mozhou-full-release-20260915",
+  "createdAt": "2026-09-15",
+  "auditDir": "C:/Users/a1691/AppData/Local/Temp/mozhou-full-release-20260915-1",
+  "backups": {
+    "directory": "C:/Users/a1691/AppData/Local/Temp/mozhou-full-release-20260915-1/files",
+    "count": 25,
+    "readBackVerified": true,
+    "mismatch": 0,
+    "includesHandoffDocs": "C:/Users/a1691/AppData/Local/Temp/mozhou-full-release-20260915-1/handoff-docs",
+    "restoreMethod": "单文件拷回，禁止整仓 reset；拷回后先比较 hash"
+  },
+  "productInputs": {
+    "listFile": "C:/Users/a1691/AppData/Local/Temp/mozhou-full-release-20260915-1/product-inputs.sorted",
+    "sha256": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+    "fileCount": 25,
+    "excluded": ["docs/superpowers/plans/2026-09-15-full-release/（本交接）", "evidence/full-release/（本 run 证据）", "dist", "node_modules", ".git", ".gitnexus"]
+  },
+  "statusSnapshots": {
+    "statusPorcelain": "status-porcelain.txt",
+    "revHead": "rev-head.txt",
+    "diffWorktreeBinary": "diff-worktree.bin (105740 bytes)",
+    "diffCachedBinary": "diff-cached.bin (0 bytes, 无暂存)",
+    "diffStat": "diff-stat.txt"
+  },
+  "dirtyInventory": {
+    "count": 22,
+    "categories": {
+      "R1R2_chapterSaveContract": [
+        "apps/web/server/api.ts",
+        "apps/web/server/routes/proseRoutes.ts",
+        "apps/web/server/routes/proseRoutes.test.ts",
+        "apps/web/src/workbench/editor/ProseEditorPanel.tsx",
+        "apps/web/src/workbench/editor/ProseEditorPanel.isolation.test.tsx",
+        "packages/data-plane/src/chapter.ts",
+        "packages/data-plane/src/local-data-plane.ts"
+      ],
+      "storyboardAndAdaptations": [
+        "apps/web/server/routes/storyboardRoutes.test.ts",
+        "apps/web/server/storyboard/generate.test.ts",
+        "apps/web/src/App.test.tsx",
+        "apps/web/src/capability-square/CapabilitySquareView.tsx",
+        "apps/web/src/capability-square/capabilityDetails.ts",
+        "apps/web/src/cloud-sync/CloudSyncView.test.tsx",
+        "apps/web/src/mobile/MobileChains.test.tsx",
+        "apps/web/src/shell/CapabilityChannels.tsx",
+        "apps/web/src/shell/scene/SceneSettingsSheet.tsx",
+        "apps/web/src/storyboard/StoryboardView.test.tsx",
+        "apps/web/src/storyboard/StoryboardView.tsx",
+        "apps/web/src/storyboard/dirtyGuard.test.tsx"
+      ],
+      "configAndGraphBlock": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "eslint.config.js"
+      ]
+    },
+    "untrackedKept": ["evidence/release-fixes/（3 文件，含验证脚本与真浏览器截图）", "docs/superpowers/plans/2026-09-15-full-release/（本交接）"]
+  },
+  "baselineVerification": {
+    "workspaceTests": "91 files / 732 tests passed (2026-09-15)",
+    "webTests": "41 files / 292 passed, 1 skipped (real-provider, 与 AUDIT 记录一致)",
+    "checkHandoffSelfTest": "PASS: 22 task records；四种坏记录被拒绝",
+    "graphIndex": "8947 nodes / 19713 edges / 539 clusters / 532 flows；check cycles=0 clean",
+    "graphBlockOnly": "AGENTS.md/CLAUDE.md diff 仅图谱块数字（8866 symbols 等 4 行）"
+  },
+  "decision": "22 项工作树修复全部审阅并归为 baseline（R1/R2 发布评审保存契约 + 银白/测试适配 + 配置图谱块）；baseline commit 后 T01 起在本分支按 tasks.json 推进；不 push。"
+}

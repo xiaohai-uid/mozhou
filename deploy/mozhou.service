@@ -1,0 +1,29 @@
+[Unit]
+Description=MoZhou Novel OS Production Service
+After=network.target
+
+[Service]
+Type=simple
+User=mozhou
+Group=mozhou
+WorkingDirectory=/opt/mozhou
+ExecStart=/usr/bin/node apps/web/dist-server/productionServer.js
+Restart=on-failure
+RestartSec=5s
+
+# 生产环境变量配置与代码/数据分离
+Environment=NODE_ENV=production
+Environment=PORT=5173
+Environment=HOST=127.0.0.1
+Environment=MOZHOU_HOSTED=true
+Environment=ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+EnvironmentFile=-/etc/mozhou/mozhou.env
+
+# 安全与沙箱权限加固
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

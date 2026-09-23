@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 · Wizard 世界启动仪式</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{overflow:hidden}
+  .wiz{position:fixed;inset:0;z-index:4;display:grid;place-items:center;padding:28px}
+  .wiz-card{width:min(860px,94vw);border-radius:18px;overflow:hidden;position:relative}
+  .wiz-stage{padding:34px 40px 28px;min-height:340px;display:flex;flex-direction:column}
+  .spine{display:flex;gap:6px;padding:16px 24px 0}
+  .sp{flex:1;display:flex;flex-direction:column;gap:6px;cursor:pointer;border:none;background:transparent;padding:0}
+  .sp i{height:3px;border-radius:3px;background:rgba(205,225,222,.14);display:block}
+  .sp.on i{background:linear-gradient(90deg,var(--ir-gold-bright),var(--ir-gold));box-shadow:0 0 8px rgba(214,179,106,.4)}
+  .sp.past i{background:rgba(120,199,157,.55)}
+  .sp b{font:600 10.5px/1 var(--ir-sans);letter-spacing:.1em;color:var(--ir-faint);text-align:left}
+  .sp.on b{color:var(--ir-gold-bright)}
+  .step{display:none;flex:1}
+  .step.on{display:block}
+  .step h2{font:600 24px/1.4 var(--ir-serif);margin:10px 0 6px}
+  .step .lead{color:var(--ir-muted);font-size:13.5px;max-width:56ch;line-height:1.8}
+  .biginput{font:400 19px/1.6 var(--ir-serif);padding:14px 16px;margin-top:18px}
+  .foot{display:flex;align-items:center;gap:10px;padding:16px 40px 24px}
+  .stepnum{font:600 11px/1 var(--ir-mono);letter-spacing:.16em;color:var(--ir-faint)}
+  .err{display:none;margin:10px 40px 0;padding:10px 14px;border-radius:8px;background:var(--ir-danger-soft);
+    border:1px solid rgba(217,131,131,.4);color:var(--ir-danger);font-size:12.5px}
+  .err.on{display:block}
+</style>
+</head>
+<body>
+<div class="ir-scene cloud-sea"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.6"></div>
+<div class="ir-figure pos-center" style="--figure-opacity:.42"><div class="sil" style="transform:scale(1.25)"></div></div>
+<nav class="proto-nav" style="position:fixed;z-index:6;left:0;right:0;top:0;padding:10px 18px;justify-content:center">
+  <a href="index.html">总览</a><a href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a href="04-views-creation.html">创作</a><a href="05-views-inspector.html">检视</a><a href="06-views-resources.html">资源</a><a class="cur" href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a href="09-mobile.html">Mobile</a>
+</nav>
+
+<div class="wiz">
+  <section class="wiz-card mat-scene-glass" role="dialog" aria-modal="true" aria-label="建书向导">
+    <div style="display:flex;align-items:center;padding:16px 24px 0">
+      <div><span class="kicker">WIZARD · 世界启动仪式</span>
+        <b class="t-serif" style="font-size:17px;display:block;margin-top:3px">开启一部新作品</b></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="关闭并回到工作台（Replay 入口在 Top HUD）">✕</button>
+    </div>
+
+    <div class="spine" role="tablist" aria-label="向导步骤">
+      <button class="sp on" data-s="0"><i></i><b>01 建书</b></button>
+      <button class="sp" data-s="1"><i></i><b>02 世界观</b></button>
+      <button class="sp" data-s="2"><i></i><b>03 大纲</b></button>
+      <button class="sp" data-s="3"><i></i><b>04 首章</b></button>
+      <button class="sp" data-s="4"><i></i><b>05 连写</b></button>
+    </div>
+
+    <div class="err" id="err" role="alert">建书失败示例：书名与书架现有作品重名（HTTP 409）。已就地呈现——步骤不跳转，输入保留，可改名重试。</div>
+
+    <!-- step 1 -->
+    <div class="wiz-stage">
+      <div class="step on" data-p="0">
+        <span class="kicker">STEP 01 · CREATE</span>
+        <h2>为这个世界取一个名字</h2>
+        <p class="lead">这一步会真实创建作品（磁盘目录 + book.json + 正典骨架）。唯一的后端写入发生在本步。</p>
+        <input class="input biginput" placeholder="作品名（未命名之书）" aria-label="作品名">
+      </div>
+      <div class="step" data-p="1">
+        <span class="kicker">STEP 02 · WORLD</span>
+        <h2>这个世界最不可越过的规则是什么？</h2>
+        <p class="lead">写下你的世界规则与绝对禁区。当前 Technical Preview 阶段，此输入作为<b style="color:var(--ir-fg)">启动意图被记录在你的输入中</b>；「进入 Author Intent 成为生成边界」的持久化契约在实现阶段接线——向导不会暗示它已经写入 Canon。</p>
+        <textarea class="input biginput" style="height:110px" placeholder="例：潮汐之上，凡人不可直视灯下之物……"></textarea>
+      </div>
+      <div class="step" data-p="2">
+        <span class="kicker">STEP 03 · OUTLINE</span>
+        <h2>第一卷，你向读者承诺什么？</h2>
+        <p class="lead">写下卷级承诺（读者为什么要读下去）。总纲与卷骨架将在写作过程中由管线逐步展开——向导不在此处虚构「OutlineNodeScan 已就绪」（现状文案为无据暗示，设计改为诚实表述）。</p>
+        <textarea class="input biginput" style="height:110px" placeholder="例：雾灯卷——一桩沉船名册背后的调包案，兑现三次潮水反转……"></textarea>
+      </div>
+      <div class="step" data-p="3">
+        <span class="kicker">STEP 04 · FIRST CHAPTER</span>
+        <h2>开场画面：读者睁开眼看到什么？</h2>
+        <p class="lead">一个画面、一句钩子、一个必须留下的悬念。它是首章生成的目标输入。</p>
+        <textarea class="input biginput" style="height:110px" placeholder="例：雨夜的雾灯码头，扛活的少年从死人手里接过了一枚罗盘……"></textarea>
+      </div>
+      <div class="step" data-p="4">
+        <span class="kicker">STEP 05 · CONTINUE</span>
+        <h2>首章之后，故事往哪里连？</h2>
+        <p class="lead">写下首章目标与连写方向。完成向导后直接进入工作台对话流。</p>
+        <textarea class="input biginput" style="height:110px" placeholder="例：先让巡潮司上门，再揭示罗盘会说话……"></textarea>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span class="stepnum" id="sn">STEP 01 / 05</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost" id="back">上一步</button>
+      <button class="btn btn-author" id="next">下一步</button>
+    </div>
+    <p class="note" style="padding:0 40px 20px;margin:0">Back / Close / Replay 语义保留（现状 WizardOverlay）。五步各只强调一个决策；大 Scene 背景 + 居中人物剪影（占位立绘）；reduced-motion 下静态 cross-fade。</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  var idx=0,N=5;
+  var names=['01 建书','02 世界观','03 大纲','04 首章','05 连写'];
+  function render(){
+    document.querySelectorAll('.sp').forEach(function(s,i){
+      s.classList.toggle('on',i===idx);s.classList.toggle('past',i<idx)});
+    document.querySelectorAll('.step').forEach(function(p,i){p.classList.toggle('on',i===idx)});
+    document.getElementById('sn').textContent='STEP 0'+(idx+1)+' / 05';
+    document.getElementById('back').disabled=idx===0;
+    document.getElementById('next').textContent=idx===N-1?'进入工作台（连写）':'下一步';
+  }
+  document.querySelectorAll('.sp').forEach(function(s){s.addEventListener('click',function(){idx=+s.dataset.s;render()})});
+  document.getElementById('back').addEventListener('click',function(){if(idx>0){idx--;render()}});
+  document.getElementById('next').addEventListener('click',function(){
+    if(idx===0&&document.querySelector('.biginput').value.trim()==='未触发演示'){return}
+    // 演示：第 1 步点击时展示一次「建书失败就地呈现」
+    if(idx===0&&!window.__errShown){window.__errShown=true;document.getElementById('err').classList.add('on');return}
+    if(idx===0){document.getElementById('err').classList.remove('on')}
+    if(idx<N-1){idx++;render()}
+  });
+  render();
+})();
+</script>
+</body>
+</html>

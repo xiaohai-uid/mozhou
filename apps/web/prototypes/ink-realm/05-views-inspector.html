@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>05 · 检视 · Novel OS — 中心页形态</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{background:#04070b}
+  .centerpage{margin:26px 0;border-radius:16px;border:1px solid var(--ir-hairline);overflow:hidden;position:relative}
+  .cp-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--ir-hairline);
+    background:linear-gradient(180deg,rgba(12,23,30,.92),rgba(8,17,23,.94));position:relative;z-index:2}
+  .cp-head h2{font:600 16px/1.3 var(--ir-serif)}
+  .cp-body{position:relative;padding:20px}
+  .cp-inner{position:relative;z-index:1}
+  .zone{border:1px solid var(--ir-hairline);border-radius:10px;background:rgba(8,17,23,.72);padding:14px 16px}
+  .zone+.zone{margin-top:12px}
+  .threecol{display:grid;grid-template-columns:1.1fr 1fr 1.2fr;gap:12px}
+  .ent{display:flex;flex-wrap:wrap;gap:8px}
+  .legend-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ir-muted)}
+  .legend-dot i{width:9px;height:9px;border-radius:2px;display:inline-block}
+  .qstates{display:flex;flex-direction:column;gap:12px}
+  .qcard{border:1px solid var(--ir-hairline);border-radius:10px;background:rgba(8,17,23,.75);padding:14px 16px}
+  .qcard h4{margin:0 0 6px;font:600 13px/1.4 var(--ir-sans)}
+  .no-book{border:1px dashed var(--ir-hairline-strong);border-radius:10px;padding:16px;text-align:center}
+</style>
+</head>
+<body>
+<div class="ir-scene city-night" style="opacity:.6"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.72"></div>
+<nav class="proto-nav" style="position:relative;z-index:5">
+  <a href="index.html">总览</a><a href="01-token-board.html">Token</a><a href="02-scene-system.html">场景系统</a><a href="03-desktop-shell.html">桌面壳</a><a href="04-views-creation.html">创作</a><a class="cur" href="05-views-inspector.html">检视</a><a href="06-views-resources.html">资源</a><a href="07-wizard.html">Wizard</a><a href="08-aux-latent.html">辅助/隐性</a><a href="09-mobile.html">Mobile</a>
+</nav>
+<main class="proto-body">
+  <header class="proto-head"><h1>检视 · Novel OS — 中心页形态</h1>
+    <span class="proto-sub">四域挂载事实：真实面板在 InspectorTower；导航点击同时切 tab（INSPECTOR_VIEW_TO_TAB）。中心页为塔面板的放大工作形态，强度 30%。</span></header>
+
+  <!-- Story Brain -->
+  <section class="centerpage mat-ink-glass">
+    <div class="cp-head"><span class="kicker">06 · story-brain</span><h2>Story Brain</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span>
+      <span style="margin-left:auto" class="note">沉浸 80% · POV/秘密门禁不可被视觉绕过</span></div>
+    <div class="cp-body"><div class="cp-inner">
+      <div class="threecol">
+        <div class="zone"><span class="kicker">ENTITY CARDS · 5 类 · 点击过滤（再点取消）</span>
+          <div class="ent" style="margin-top:10px">
+            <button class="card-character" style="padding:10px 12px;width:100%;text-align:left">
+              <b class="t-serif" style="font-size:14px">林守常</b><div class="note t-mono" style="margin-top:2px">char:lin-shouchang</div>
+              <div class="note" style="margin-top:4px">听潮者 · 码头扛活 · aiContext 可 enrich（brief 字段为审计新增落点）</div></button>
+            <button class="card-character" style="padding:10px 12px;width:100%;text-align:left"><b class="t-serif" style="font-size:14px">引潮罗盘</b><div class="note t-mono">item:yinchao-compass</div></button>
+            <button class="card-character" style="padding:10px 12px;width:100%;text-align:left"><b class="t-serif" style="font-size:14px">雾灯码头</b><div class="note t-mono">location:wudeng-pier</div></button>
+            <button class="card-character" style="padding:10px 12px;width:100%;text-align:left"><b class="t-serif" style="font-size:14px">巡潮司</b><div class="note t-mono">faction:xunchaosi</div></button>
+            <button class="card-character" style="padding:10px 12px;width:100%;text-align:left"><b class="t-serif" style="font-size:14px">潮契</b><div class="note t-mono">concept:chao-qi</div></button>
+          </div>
+          <p class="note" style="margin-top:10px">空态：「暂无实体卡」。`aiContext`/`aliases`/`brief`/`tags` 为服务端已回、面板未用的增信字段（设计落点）。</p>
+        </div>
+        <div class="zone"><span class="kicker">OUTLINE TREE · 总纲→卷→ARC→章</span>
+          <div class="factrow" style="margin-top:8px"><b>总纲</b> · 潮汐之上</div>
+          <div class="factrow" style="padding-left:14px"><b>卷一 · 雾灯卷</b></div>
+          <div class="factrow" style="padding-left:28px;color:var(--ir-jade)"><b>arc · 码头线</b>（数据在 outlineNodes，客户端现仅取 volume —— 审计缺口修复落点）</div>
+          <div class="factrow" style="padding-left:42px">CH10 雾灯 · 已提交</div>
+          <div class="factrow" style="padding-left:42px;background:rgba(214,179,106,.07)">CH12 暗潮 · 草稿 · <b>当前章高亮</b></div>
+          <p class="note" style="margin-top:10px">空态：「尚无正文章」。chapters 来自 facts.chapters（含 phase 草稿/已提交）。</p>
+        </div>
+        <div class="zone"><span class="kicker">FACTS · 四通道 · 7 rows · 已过滤：林守常</span>
+          <div class="factrow" style="margin-top:8px"><span class="badge b-pass" style="font-size:9px">canon</span> <b>林守常</b> 持有 → 引潮罗盘 <span class="note">（第 3 章起 · 主角 POV 授权通道）</span></div>
+          <div class="factrow"><span class="badge b-jade" style="font-size:9px">suspect</span> 罗盘纹样似与巡潮司旧档相关 —— 仅渲染 kernel presentation，秘密值零泄漏（ADR-0026，测试 StoryBrainPanel.test.tsx:182-195 背书）</div>
+          <div class="factrow"><span class="badge b-jade" style="font-size:9px">believes</span> 老船工坚信潮替人付账 —— <b>holder 视角行为设计新增</b>（数据已有，现未显示 holder）</div>
+          <div class="factrow"><span class="badge b-error" style="font-size:9px">invalid</span> 老周 · 引用已否决事实 f_31</div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <button class="btn btn-ghost btn-sm">刷新 / 读取中…</button>
+            <span class="note">subject=null 的事实条目在任何过滤下隐藏（现状），需保留可见性说明。</span></div>
+        </div>
+      </div>
+      <p class="note" style="margin-top:12px">三区并行加载失败=单一 alert（现状）；设计要求每 zone 独立 loading/empty（Issue 列于 Coverage Report）。</p>
+    </div></div>
+  </section>
+
+  <!-- Context Receipt -->
+  <section class="centerpage mat-ink-glass">
+    <div class="cp-head"><span class="kicker">07 · context-receipt</span><h2>装配看板 · Context Receipt</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span>
+      <span style="margin-left:auto" class="note">沉浸 30% · AI 飞行数据记录仪 · neutral+Jade+Mono 为主</span></div>
+    <div class="cp-body"><div class="cp-inner">
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:12px">
+        <div class="zone" style="align-self:start">
+          <span class="kicker">RECEIPT LIST</span>
+          <div class="row-evidence" style="margin-top:8px;background:rgba(114,201,196,.07);border-radius:6px"><span class="em">4a19</span><span>ch12</span><span>1,842 tok</span><span class="badge b-pass" style="margin-left:auto;font-size:9px">hash match</span></div>
+          <div class="row-evidence"><span class="em">4a02</span><span>ch11</span><span>1,790 tok</span><span class="badge b-pass" style="margin-left:auto;font-size:9px">hash match</span></div>
+          <div class="row-evidence"><span class="em">3f88</span><span>ch07</span><span>1,655 tok</span><span class="badge b-error" style="margin-left:auto;font-size:9px">mismatch</span></div>
+          <p class="note" style="margin:8px 0 0">空态：「暂无 Context Receipt——完成一次装配（compile）后…」。hashMismatch 显式红，永不静默。选中行 aria-pressed；刷新后保留选中（现状）→ 设计补「刷新即失效」提示。</p>
+        </div>
+        <div>
+          <div class="zone">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <b class="t-mono" style="font-size:13px">receipt 4a19</b><span class="badge b-pass">hash match</span>
+              <span class="note t-mono" style="margin-left:auto">ch12 · 1,842 tok · INV-R6 sha256 复算</span></div>
+            <span class="kicker" style="display:block;margin-top:12px">BUDGET · reserved / story / fixed / slack · cap 8,192</span>
+            <div class="budget" style="margin-top:6px">
+              <i style="width:22%;background:rgba(114,201,196,.75)" title="reserved = reserve+converge 402"></i>
+              <i style="width:41%;background:rgba(114,201,196,.38)" title="story = story_text 748"></i>
+              <i style="width:18%;background:rgba(205,225,222,.3)" title="fixed = structural 331"></i>
+              <i style="width:19%;background:rgba(205,225,222,.12)" title="slack 379"></i></div>
+            <p class="note t-mono" style="margin:2px 0 0">reserved 402 · story 748 · fixed 331 · slack 379 · 对账注记：recall_filter tokens 不入四段（计入 slack）——设计补脚注（审计发现）。</p>
+            <span class="kicker" style="display:block;margin-top:12px">ENTRIES · included / excluded + exclusion reason</span>
+            <div class="row-evidence" style="margin-top:4px"><span class="em">char:lin-shouchang</span><span>story_text</span><span>214 tok</span><span class="badge b-pass" style="margin-left:auto;font-size:9px">included</span></div>
+            <div class="row-evidence"><span class="em">faction:xunchaosi</span><span>recall_filter</span><span>96 tok</span><span class="badge b-stale" style="margin-left:auto;font-size:9px">excluded · 相关度低于阈值</span></div>
+            <div class="row-evidence"><span class="em">structural:book_identity</span><span>structural</span><span>88 tok</span><span class="badge b-pass" style="margin-left:auto;font-size:9px">included</span></div>
+          </div>
+          <div class="zone" style="margin-top:12px">
+            <span class="kicker">REPLAY INPUTS · 确定性重放</span>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ir-hairline);border:1px solid var(--ir-hairline);border-radius:8px;overflow:hidden;margin-top:8px">
+              <div style="background:var(--ir-ink-deep);padding:8px 10px"><div class="k">TOKENIZER</div><b class="t-mono" style="font-size:12px">v7</b></div>
+              <div style="background:var(--ir-ink-deep);padding:8px 10px"><div class="k">CONFIG</div><b class="t-mono" style="font-size:12px">c1f09a22b3…</b></div>
+              <div style="background:var(--ir-ink-deep);padding:8px 10px"><div class="k">CANDIDATES</div><b class="t-mono" style="font-size:12px">14 ordered</b></div>
+              <div style="background:var(--ir-ink-deep);padding:8px 10px"><div class="k">INPUTS DIGEST</div><b class="t-mono" style="font-size:12px">9f2c…d0e4</b></div></div>
+            <p class="note t-mono" style="margin:8px 0 0">assembledBy context-compiler · taskType chapter_prose</p>
+            <hr class="sep" style="margin:12px 0">
+            <span class="kicker">RESUME · 会话续跑</span>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
+              <span class="badge b-pass">● sessionOpen · draft 步 · last receipt 4a19</span>
+              <button class="btn btn-author btn-sm">回到工作台继续</button></div>
+            <p class="note" style="margin:8px 0 0">另两分支：<span class="badge b-committed" style="font-size:9px">committed · 已提交：本章正典已提交，无开放生产会话</span>（含 finished 语义修复）/ <span class="badge b-neutral" style="font-size:9px">无开放生产会话：该 Receipt 未与当前任何章节窗口关联</span>。</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- Change Matrix -->
+  <section class="centerpage mat-ink-glass">
+    <div class="cp-head"><span class="kicker">08 · change-matrix</span><h2>变更矩阵</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span>
+      <span style="margin-left:auto" class="note">沉浸 30% · 高密度薄网格</span></div>
+    <div class="cp-body"><div class="cp-inner">
+      <div class="zone">
+        <div style="display:flex;align-items:center;gap:10px"><span class="kicker">MATRIX · rows=Traversal × columns=chapter</span>
+          <span class="badge b-stale" style="margin-left:auto">stale 1</span></div>
+        <table class="grid-table" style="margin-top:10px">
+          <thead><tr><th>上游变更</th><th>ch07</th><th>ch11</th><th>ch12</th></tr></thead>
+          <tbody>
+            <tr><td><span class="t-mono" style="font-size:11px">fact.update:f_29</span><div class="note" style="margin:0">trv_8c2</div></td>
+              <td class="cell-na">—</td><td class="cell-resolved">已消解</td><td class="cell-needs">需重写</td></tr>
+            <tr><td><span class="t-mono" style="font-size:11px">outline.edit:vol-1</span><div class="note" style="margin:0">trv_8b7</div></td>
+              <td class="cell-resolved">已消解</td><td class="cell-na">—</td><td class="cell-na">—</td></tr>
+          </tbody></table>
+        <p class="note" style="margin-top:8px">缺 cell 默认 not_affected（现状）；resolution 判据=pin 修订版本 ≥ 上游修订版本 → <b style="color:var(--ir-fg)">upstreamChanges[].revision 应显示</b>（决定红绿的那个数，现为审计缺口）。</p>
+      </div>
+      <div class="zone" style="margin-top:12px">
+        <span class="kicker">TRAVERSAL DETAILS</span>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;align-items:center">
+          <b class="t-mono" style="font-size:13px">trv_8c2</b>
+          <span class="note t-mono">taskRef tsk_112 · trigger fact.update:f_29 · recordedAt 2026-09-11 21:04</span>
+          <span class="badge b-stale" style="margin-left:auto">stale 1</span>
+          <button class="btn btn-ai btn-sm">重跑此遍历</button></div>
+        <div class="card-system" style="padding:12px 14px;margin-top:10px">
+          <span class="kicker">REVISION BRIEFS · 每章重写任务书（服务端已算 revisionBriefs，现为最大未渲染字段）</span>
+          <p class="note" style="margin:6px 0 0">CH12 · 按新引潮罗盘规则重写第 3 场；CH11 · 已由 r2 消解（pin f_29@r4）。</p></div>
+        <p class="note" style="margin-top:8px">rerun 仅 staleCount&gt;0 行可用；全局单飞（一次一个重跑）；空态「暂无变更——上游改动经 Traversal 传播后会在这里形成影响矩阵。」</p>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- Quality Gate -->
+  <section class="centerpage mat-ink-glass">
+    <div class="cp-head"><span class="kicker">09 · quality-gate</span><h2>质量门 · Quality Gate</h2><span class="badge b-pass">MOUNTED_TRUTHFUL</span>
+      <span style="margin-left:auto" class="note">沉浸 30% · 精密仪器，不做绿色 SaaS 分数卡</span></div>
+    <div class="cp-body"><div class="cp-inner">
+      <div class="statebar">
+        <button class="btn btn-sm btn-ai" data-q="0">初载 · no_review</button>
+        <button class="btn btn-sm" data-q="1">PASS · current</button>
+        <button class="btn btn-sm" data-q="2">NEEDS REWORK · blocking</button>
+        <button class="btn btn-sm" data-q="3">REFUSED · 语义不可用</button>
+      </div>
+      <div class="qstates">
+        <div class="qcard pane3q on" data-qp="0">
+          <h4>初载态（审计修复的核心状态机）</h4>
+          <p class="note">服务端 <span class="t-mono">/api/chapter.quality</span> 实返回 <span class="t-mono">{status:'no_review'|'current'|'stale', report, current}</span>。设计按此三态建模：</p>
+          <div class="row-evidence" style="margin-top:6px"><span class="em">no_review</span><span>本章从未审查</span><span class="badge b-neutral" style="margin-left:auto;font-size:9px">（不显示 stale！）</span></div>
+          <div class="row-evidence"><span class="em">current</span><span>存在报告且正文未变 → 直接渲染完整 verdict/hash/blocking 列表（消费 report 字段）</span></div>
+          <div class="row-evidence"><span class="em">stale</span><span>正文在审查后变化 → stale 徽标 + 重新审查引导</span></div>
+          <p class="note" style="margin-top:6px">现状缺陷（DESIGN_DELTA）：面板按 QualitySummary 读 → 初载永远出不了 verdict，且 no_review 误触发「报告已 stale」；hasReport 为死分支。初载 busy 期补 in-place spinner。</p>
+        </div>
+        <div class="qcard pane3q" data-qp="1">
+          <div style="display:flex;gap:8px;align-items:center"><h4 style="margin:0">文学质量审查</h4><span class="badge b-pass">PASS</span><span class="badge b-neutral" style="margin-left:auto">current · r3 · 9f2c1a77…</span></div>
+          <p class="note t-mono" style="margin:6px 0">rework attempt 0/2 · semantic reviewer: attached · reportId qr_118（设计新增显示 + reportPath 链接）</p>
+          <div class="kicker" style="margin:8px 0 4px">ADVISORIES · 2</div>
+          <div class="advline"><span class="badge b-stale" style="font-size:9px">adv</span>对白密度低于场景基线（v4）</div>
+          <p class="note" style="margin-top:8px">PASS 不自动动作（作者主权）；mechanicalGate 摘要为设计新增证据区。</p>
+        </div>
+        <div class="qcard pane3q" data-qp="2">
+          <div style="display:flex;gap:8px;align-items:center"><h4 style="margin:0">文学质量审查</h4><span class="badge b-blocked">NEEDS REWORK</span><span class="badge b-stale" style="margin-left:auto">stale · 正文在审查后变化</span></div>
+          <p class="note t-mono" style="margin:6px 0">draft r3 · hash 9f2c1a77… · rework attempt 1/2（达 2/2 时按钮禁用+「已达上限」，服务端 422 QualityReworkLimitExceeded 兜底）</p>
+          <div class="kicker" style="margin:8px 0 4px">BLOCKING FAILURES · 2（只在状态脊暗红）</div>
+          <div class="blockline"><span class="badge b-error" style="font-size:9px">4gram_repeat(v2)</span>「湿冷的缆绳」段内 4-gram 复读 ×3 <q style="color:var(--ir-faint)">…按在湿冷的缆绳上…握紧湿冷的缆绳…</q></div>
+          <div class="blockline"><span class="badge b-error" style="font-size:9px">tier1_forbidden(v3)</span>Tier 1 必阻断词命中 1 处</div>
+          <div class="kicker" style="margin:8px 0 4px">ADVISORIES · 1</div>
+          <div class="advline"><span class="badge b-stale" style="font-size:9px">adv</span>感官描写集中于听觉（v4）</div>
+          <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-ai btn-sm">重新审查</button><button class="btn btn-author btn-sm">应用回炉（仅 blocking · 上限 2）</button></div>
+        </div>
+        <div class="qcard pane3q" data-qp="3">
+          <div style="display:flex;gap:8px;align-items:center"><h4 style="margin:0">文学质量审查</h4><span class="badge b-refused">REFUSED</span></div>
+          <p class="note" style="margin:6px 0">语义审查提供方不可用——已显式拒绝（不伪造通过）。</p>
+          <div class="unavailable"><b>语义 reviewer · Gate 3 未接入</b><span class="why">机械门禁仍可运行；语义判定缺席时 verdict=REFUSED fail-closed。恢复途径：配置语义审查 provider。</span></div>
+        </div>
+      </div>
+      <div class="zone" style="margin-top:12px">
+        <span class="kicker">RECORD MY CORRECTION · 作者纠错（10 原因 + note 只留本机）</span>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <select class="input" style="width:240px"><option>选择纠错原因</option></select>
+          <input class="input" style="flex:1;min-width:200px" placeholder="纠错附注（原文只留本机）">
+          <button class="btn btn-sm">记录纠错</button></div>
+        <p class="note" style="margin-top:6px">保存态：「已记录（事件+失败记忆）」；note 空则不发送；无书时整个域显示 InspectorEmpty「建书后可用」。</p>
+      </div>
+    </div></div>
+  </section>
+
+</main>
+<script>
+document.querySelectorAll('[data-q]').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('[data-q]').forEach(function(x){x.classList.remove('btn-ai')});b.classList.add('btn-ai');
+  document.querySelectorAll('.pane3q').forEach(function(p){p.classList.toggle('on',p.dataset.qp===b.dataset.q)});
+})});
+</script>
+</body>
+</html>

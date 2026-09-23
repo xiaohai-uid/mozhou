@@ -1,0 +1,41 @@
+{
+  "name": "mozhou",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "preinstall": "node scripts/check-install-env.mjs",
+    "build": "tsc -b",
+    "start": "node scripts/launcher.mjs",
+    "build:release": "node scripts/build-release.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "package": "node scripts/build-release.mjs",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "graph:status": "node .gitnexus/run.cjs status",
+    "graph:analyze": "node .gitnexus/run.cjs analyze",
+    "graph:snapshot": "node scripts/export-code-graph.mjs",
+    "graph:check": "gitnexus check --cycles --repo mozhou"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "eslint": "^9.17.0",
+    "typescript": "~5.5.4",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^3.2.7"
+  },
+  "pnpm": {
+    "overrides": {
+      "tar": "7.5.22",
+      "js-yaml": "4.3.2"
+    },
+    "patchedDependencies": {
+      "fastembed@2.1.0": "patches/fastembed@2.1.0.patch"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+# 墨舟仓库根忽略（app/ 内另有 .gitignore）
+# 标定产物与模型缓存不入库
+# 设计期产物与部署工作目录：不得入库
+*.log
+*.tsbuildinfo
+*.patch
+# .scratch 里仅 mozhou-mvp（契约/工单）与诊断报告是工程资产，保持可跟踪；
+# 其余临时草稿不入库
+.scratch/*
+!.scratch/mozhou-mvp/
+!.scratch/mozhou-diagnosis-20260822/
+!.scratch/morning-report.md
+.worktrees/
+.mimosa/
+.next/
+.zcode/
+.mozhou_data/
+apps/web/.mozhou_data/
+dist/
+dist-server/
+archive-legacy/
+release-artifacts/
+figma-upload/
+node_modules/
+scripts/embedding-calib/.cache/
+scripts/embedding-calib/fp32-model/
+
+# 本地凭据与私钥：商业发行仓库禁止误提交
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+bower_components/
+jspm_packages/
+__pycache__/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）

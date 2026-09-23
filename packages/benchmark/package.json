@@ -1,0 +1,24 @@
+{
+  "name": "@mozhou/benchmark",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "test:continuity": "vitest run src/continuity-assertions.test.ts"
+  },
+
+  "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

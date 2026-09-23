@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 · Scene System 墨境场景 — 交互原型</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{overflow:hidden}
+  /* preview stage uses the same L0/L1/L2 layer stack, scoped inside the stage */
+  .stage{position:fixed;inset:0;z-index:0}
+  .stage .s-scene{position:absolute;inset:0;
+    filter:brightness(var(--s-bri,1)) blur(var(--s-blur,0px));transition:filter .2s var(--ir-ease)}
+  /* focus X/Y shifts all atmosphere layers via inline background-position (JS) */
+  .stage .s-atmo{position:absolute;inset:0;pointer-events:none}
+  .stage .s-figure{position:absolute;bottom:0;pointer-events:none;opacity:var(--f-opa,.8);display:var(--f-dis,block)}
+  .stage .s-figure .sil{transform:scale(var(--f-scale,1));transform-origin:bottom center}
+  .stage .s-veil{position:absolute;inset:0;pointer-events:none;background:rgba(4,8,12,var(--veil,.55))}
+  /* HUD demo chrome above the stage */
+  .hud-top{position:fixed;top:12px;left:12px;right:400px;z-index:3;display:flex;align-items:center;gap:10px;
+    padding:9px 14px;border-radius:12px}
+  .sheet-wrap{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:94vw;z-index:6;display:flex}
+  .sheet-inner{flex:1;display:flex;flex-direction:column;transform:translateX(0);transition:transform var(--ir-t-sheet) var(--ir-ease)}
+  .sheet-inner.hidden{transform:translateX(105%)}
+  .tabs{display:flex;gap:2px;padding:10px 14px 0}
+  .tab{flex:1;text-align:center;font:600 12px/1 var(--ir-sans);color:var(--ir-faint);cursor:pointer;
+    padding:9px 4px;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none}
+  .tab.on{color:var(--ir-jade);background:rgba(114,201,196,.07);border-color:var(--ir-hairline)}
+  .tabpane{display:none;padding:14px 16px 20px;overflow:auto;flex:1;border-top:1px solid var(--ir-hairline)}
+  .tabpane.on{display:block}
+  .scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .scene-opt{position:relative;height:64px;border-radius:9px;cursor:pointer;border:1px solid var(--ir-hairline);overflow:hidden}
+  .scene-opt.on{border-color:rgba(214,179,106,.6);box-shadow:0 0 0 1px rgba(214,179,106,.35)}
+  .scene-opt em{position:absolute;left:8px;bottom:6px;font:600 10.5px/1 var(--ir-sans);color:#EDF1ED;
+    font-style:normal;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:4px}
+  .ctl{margin:14px 0}
+  .ctl .lr{display:flex;justify-content:space-between;font-size:12px;color:var(--ir-muted);margin-bottom:6px}
+  .ctl .lr b{font-family:var(--ir-mono);color:var(--ir-fg);font-weight:600}
+  .anchor-row{display:flex;gap:6px}
+  .anchor-row .btn{flex:1;justify-content:center}
+  .scope-row{display:flex;gap:8px}
+  .scope-row .btn{flex:1;justify-content:center}
+  .hud-note{position:fixed;left:12px;bottom:12px;z-index:3;max-width:420px;padding:10px 14px;font-size:11.5px;line-height:1.7}
+</style>
+</head>
+<body>
+<!-- ============ L0/L1/L2 LIVE PREVIEW ============ -->
+<div class="stage" id="stage">
+  <div class="s-scene ir-scene city-night" id="scene"></div>
+  <div class="s-atmo ir-atmosphere"></div>
+  <div class="s-figure pos-right" id="figure"><div class="sil"></div></div>
+  <div class="s-veil" id="veil"></div>
+</div>
+
+<!-- demo HUD chrome -->
+<div class="hud-top mat-scene-glass">
+  <span class="t-serif" style="font-size:16px;font-weight:600">墨舟</span>
+  <span class="kicker">NOVEL OS · 墨境</span>
+  <span style="flex:1"></span>
+  <span class="badge b-gold">《潮汐之上》</span>
+  <button class="btn btn-sm" id="reopen" style="display:none">场景 ⚙</button>
+</div>
+
+<!-- ============ RIGHT NON-BLOCKING SHEET (spec §3.5) ============ -->
+<div class="sheet-wrap">
+  <aside class="sheet-inner mat-scene-glass" id="sheet" style="border-radius:0;border-right:none" aria-label="场景设置">
+    <div class="sheet-head" style="border-bottom:none;padding-bottom:6px">
+      <div><div class="kicker">SCENE SYSTEM</div><b style="font:600 15px/1.3 var(--ir-serif)">墨境 · 场景</b></div>
+      <button class="btn btn-ghost btn-sm" id="close">收起 ✕</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab on" role="tab" aria-selected="true" data-t="scene">场景</button>
+      <button class="tab" role="tab" aria-selected="false" data-t="atmo">氛围</button>
+      <button class="tab" role="tab" aria-selected="false" data-t="figure">人物</button>
+      <button class="tab" role="tab" aria-selected="false" data-t="scope">作用域</button>
+    </div>
+
+    <div class="tabpane on" data-p="scene">
+      <span class="kicker">BUILT-IN SCENE · 内置静态场景</span>
+      <div class="scene-grid" style="margin-top:10px">
+        <div class="scene-opt on" data-s="city-night"><em>海城 · 夜</em></div>
+        <div class="scene-opt" data-s="cloud-sea"><em>云海之上</em></div>
+        <div class="scene-opt" data-s="rain-city"><em>雨夜都市</em></div>
+        <div class="scene-opt" data-s="library"><em>旧书房斋</em></div>
+      </div>
+      <div class="ctl">
+        <div class="lr"><span>Scene focus X / Y（视差焦点）</span><b id="fv">0.50 / 0.38</b></div>
+        <input type="range" id="fx" min="0" max="100" value="50" style="margin-bottom:6px">
+        <input type="range" id="fy" min="0" max="100" value="38">
+      </div>
+      <div class="ctl">
+        <div class="lr"><span>上传背景（JPG / PNG / WebP · 预算 ≤ 8MB）</span></div>
+        <button class="btn" style="width:100%;justify-content:center" id="bgPick">选择本地图片…</button>
+        <div id="bgPreview" style="display:none;align-items:center;gap:10px;margin-top:8px">
+          <img id="bgThumb" alt="背景预览" style="width:72px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--ir-hairline-strong)">
+          <div style="flex:1;min-width:0"><b style="font-size:12px" id="bgName"></b>
+            <div class="note t-mono" id="bgMeta" style="margin-top:2px"></div></div>
+          <button class="btn btn-danger btn-sm" id="bgRemove" title="移除上传背景，恢复内置场景">移除</button>
+        </div>
+        <div class="unavailable" id="bgError" style="display:none;margin-top:8px"><b id="bgErrorTitle">无法使用该图片</b><span class="why" id="bgErrorWhy"></span></div>
+        <input type="file" id="bgFile" accept="image/jpeg,image/png,image/webp" hidden>
+        <p class="note" style="margin-top:6px">上传即替换当前 Scene（实现阶段落盘为本地 UI preference；尺寸预算与 lazy decode 见主规格 §30）。</p>
+      </div>
+    </div>
+
+    <div class="tabpane" data-p="atmo">
+      <div class="ctl"><div class="lr"><span>背景亮度</span><b id="briV">108%</b></div>
+        <input type="range" id="bri" min="30" max="130" value="108"></div>
+      <div class="ctl"><div class="lr"><span>背景模糊</span><b id="blurV">0px</b></div>
+        <input type="range" id="blur" min="0" max="14" value="0"></div>
+      <div class="ctl"><div class="lr"><span>Shadow veil / 暗幕强度</span><b id="veilV">0.38</b></div>
+        <input type="range" id="veilr" min="20" max="85" value="38"></div>
+      <p class="note">氛围层只做统一可读性处理：暗幕、冷暖、暗角、颗粒、轻雾、极低频墨流。颗粒与 WebGL 恒为 pointer-events:none（主规格 §4）。</p>
+    </div>
+
+    <div class="tabpane" data-p="figure">
+      <div class="ctl" style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:13px">前景人物层</span>
+        <div class="toggle on" id="figToggle" role="switch" aria-checked="true" tabindex="0"></div>
+      </div>
+      <div class="ctl"><div class="lr"><span>锚点</span></div>
+        <div class="anchor-row">
+          <button class="btn btn-sm" data-anchor="pos-left">左</button>
+          <button class="btn btn-sm" data-anchor="pos-center">中</button>
+          <button class="btn btn-sm btn-ai" data-anchor="pos-right">右 ✓</button>
+        </div></div>
+      <div class="ctl"><div class="lr"><span>人物缩放</span><b id="fsV">1.00×</b></div>
+        <input type="range" id="fs" min="60" max="160" value="100"></div>
+      <div class="ctl"><div class="lr"><span>人物透明度</span><b id="foV">0.80</b></div>
+        <input type="range" id="fo" min="20" max="100" value="80"></div>
+      <div class="ctl">
+        <div class="lr"><span>上传替换人物（透明 PNG / WebP · 预算 ≤ 4MB）</span></div>
+        <button class="btn" style="width:100%;justify-content:center" id="figPick">选择人物立绘…</button>
+        <div id="figPreview" style="display:none;align-items:center;gap:10px;margin-top:8px">
+          <img id="figThumb" alt="人物预览" style="width:44px;height:58px;object-fit:contain;border-radius:6px;border:1px solid var(--ir-hairline-strong);background:repeating-conic-gradient(rgba(205,225,222,.08) 0 25%,rgba(8,17,23,.9) 0 50%) 0 0/12px 12px">
+          <div style="flex:1;min-width:0"><b style="font-size:12px" id="figName"></b>
+            <div class="note t-mono" id="figMeta" style="margin-top:2px"></div></div>
+          <button class="btn btn-danger btn-sm" id="figRemove" title="移除上传人物，恢复占位剪影">移除</button>
+        </div>
+        <div class="unavailable" id="figError" style="display:none;margin-top:8px"><b id="figErrorTitle">无法使用该立绘</b><span class="why" id="figErrorWhy"></span></div>
+        <input type="file" id="figFile" accept="image/png,image/webp" hidden>
+      </div>
+      <div class="unavailable" style="margin-top:12px"><b>占位剪影说明</b>
+        <span class="why">当前人物为 CSS 合成抽象剪影（占位立绘，无版权资产）。人物层与背景完全独立，可随时替换 / 隐藏 / 移动。</span></div>
+    </div>
+
+    <div class="tabpane" data-p="scope">
+      <div class="ctl"><div class="lr"><span>作用域</span></div>
+        <div class="scope-row">
+          <button class="btn btn-sm" id="scopeGlobal">全局默认</button>
+          <button class="btn btn-sm btn-author" id="scopeBook">当前作品 override ✓</button>
+        </div></div>
+      <div class="card-system" style="padding:12px 14px;margin-top:6px">
+        <div class="row-evidence"><span class="em">当前生效</span><span>BOOK OVERRIDE · 《潮汐之上》</span></div>
+        <div class="row-evidence"><span class="em">全局默认</span><span>海城 · 夜</span></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-danger btn-sm" id="resetOv">删除作品覆盖（恢复全局）</button>
+      </div>
+      <p class="note" style="margin-top:12px">Scene 是<b style="color:var(--ir-fg)">界面偏好，不是小说 Canon</b>：任何改动不触碰正典、正文、Receipt、Pipeline 状态。云同步未上线时不宣称 Scene 已云同步（主规格 §3.4）。切书时自动切换对应 Profile。</p>
+    </div>
+  </aside>
+</div>
+
+<div class="hud-note mat-ink-glass">
+  <span class="kicker">交互原型 · 主规格 §3</span><br>
+  右侧 Sheet 为 non-blocking（不夺焦点），四分区：场景 / 氛围 / 人物 / 作用域。所有滑杆实时预览。危险动作（删除作品覆盖 / 恢复默认）将弹出 L7 确认。
+</div>
+
+<script>
+(function(){
+  var scene=document.getElementById('scene'),figure=document.getElementById('figure'),
+      veil=document.getElementById('veil'),sheet=document.getElementById('sheet');
+  // tabs
+  document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');x.setAttribute('aria-selected','false')});
+    document.querySelectorAll('.tabpane').forEach(function(x){x.classList.remove('on')});
+    t.classList.add('on');t.setAttribute('aria-selected','true');
+    document.querySelector('.tabpane[data-p="'+t.dataset.t+'"]').classList.add('on');
+  })});
+  // scene select
+  document.querySelectorAll('.scene-opt').forEach(function(o){o.addEventListener('click',function(){
+    document.querySelectorAll('.scene-opt').forEach(function(x){x.classList.remove('on')});
+    o.classList.add('on');scene.className='s-scene ir-scene '+o.dataset.s;
+  })});
+  // sliders helper
+  function bind(id,fn){var el=document.getElementById(id);function up(){fn(+el.value);el.style.setProperty('--fill',((el.value-el.min)/(el.max-el.min)*100)+'%')}el.addEventListener('input',up);up()}
+  bind('bri',function(v){document.getElementById('briV').textContent=v+'%';scene.style.setProperty('--s-bri',v/100)});
+  bind('blur',function(v){document.getElementById('blurV').textContent=v+'px';scene.style.setProperty('--s-blur',v+'px')});
+  bind('veilr',function(v){document.getElementById('veilV').textContent=(v/100).toFixed(2);veil.style.setProperty('--veil',v/100)});
+  bind('fx',function(v){var y=document.getElementById('fy').value;document.getElementById('fv').textContent=(v/100).toFixed(2)+' / '+(y/100).toFixed(2);scene.style.backgroundPosition=(v+'% '+y+'%')});
+  bind('fy',function(v){var x=document.getElementById('fx').value;document.getElementById('fv').textContent=(x/100).toFixed(2)+' / '+(v/100).toFixed(2);scene.style.backgroundPosition=(x+'% '+v+'%')});
+  bind('fs',function(v){document.getElementById('fsV').textContent=(v/100).toFixed(2)+'×';figure.style.setProperty('--f-scale',v/100)});
+  bind('fo',function(v){document.getElementById('foV').textContent=(v/100).toFixed(2);figure.style.setProperty('--f-opa',v/100)});
+  // figure toggle
+  var tg=document.getElementById('figToggle');
+  function tog(){var on=tg.classList.toggle('on');tg.setAttribute('aria-checked',on);figure.style.setProperty('--f-dis',on?'block':'none')}
+  tg.addEventListener('click',tog);tg.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();tog()}});
+  // anchors
+  document.querySelectorAll('[data-anchor]').forEach(function(b){b.addEventListener('click',function(){
+    document.querySelectorAll('[data-anchor]').forEach(function(x){x.classList.remove('btn-ai')});
+    b.classList.add('btn-ai');figure.className='s-figure '+b.dataset.anchor;
+  })});
+  // scope
+  var sg=document.getElementById('scopeGlobal'),sb=document.getElementById('scopeBook');
+  sg.addEventListener('click',function(){sg.classList.add('btn-ai');sb.classList.remove('btn-author');sb.classList.add('btn-sm');sb.textContent='当前作品 override'});
+  sb.addEventListener('click',function(){sb.classList.add('btn-author');sg.classList.remove('btn-ai');sb.textContent='当前作品 override ✓'});
+  document.getElementById('resetOv').addEventListener('click',function(){
+    if(confirm('删除《潮汐之上》的场景覆盖并回退全局默认？此操作仅影响界面偏好，不触碰正典与正文。')){sg.click()}
+  });
+  // sheet open/close
+  document.getElementById('close').addEventListener('click',function(){sheet.classList.add('hidden');document.getElementById('reopen').style.display=''});
+  document.getElementById('reopen').addEventListener('click',function(){sheet.classList.remove('hidden');this.style.display='none'});
+
+  /* ---- Upload interactions: pick → validate → preview → apply/replace/remove (F 修订 2) ---- */
+  function wireUpload(opt){
+    var btn=document.getElementById(opt.btn),input=document.getElementById(opt.file),
+        prev=document.getElementById(opt.preview),thumb=document.getElementById(opt.thumb),
+        nameEl=document.getElementById(opt.name),metaEl=document.getElementById(opt.meta),
+        rmBtn=document.getElementById(opt.remove),errBox=document.getElementById(opt.error),
+        errTitle=document.getElementById(opt.errorTitle),errWhy=document.getElementById(opt.errorWhy);
+    var currentURL=null;
+    function showError(title,why){errBox.style.display='block';errTitle.textContent=title;errWhy.textContent=why}
+    function clearError(){errBox.style.display='none'}
+    function apply(url,file,w,h){
+      if(currentURL)URL.revokeObjectURL(currentURL);
+      currentURL=url;
+      opt.target.classList.add('has-upload');
+      opt.target.style.background='url("'+url+'") center bottom / '+(opt.contain?'contain':'cover')+' no-repeat';
+      prev.style.display='flex';thumb.src=url;
+      nameEl.textContent=file.name;
+      metaEl.textContent=(w+'×'+h+' px · '+(file.size/1024/1024).toFixed(2)+' MB · '+(file.type.split('/')[1]||'').toUpperCase());
+      clearError();
+    }
+    function fail(msg){if(currentURL){/* keep previous asset */} showError(opt.errorTitle0,msg)}
+    btn.addEventListener('click',function(){input.click()});
+    input.addEventListener('change',function(){
+      var file=input.files&&input.files[0];input.value='';
+      if(!file)return;
+      clearError();
+      if(opt.accept.indexOf(file.type)<0){fail('格式不支持：'+(file.type||'未知类型')+'。仅接受 '+opt.acceptLabel+'（'+(opt===figOpt?'人物层需要透明通道，背景层可为 JPG/PNG/WebP':'用于世界环境')+'）。');return}
+      if(file.size>opt.budget){fail('超出资源预算：'+(file.size/1024/1024).toFixed(1)+' MB > '+opt.budgetLabel+'（主规格 §30 尺寸预算）。请压缩后重试。');return}
+      var url=URL.createObjectURL(file);
+      var img=new Image();
+      img.onload=function(){
+        if(opt.minW&&img.naturalWidth<opt.minW){URL.revokeObjectURL(url);fail('分辨率过低：'+img.naturalWidth+'×'+img.naturalHeight+'。建议宽度 ≥ '+opt.minW+' px，否则世界层会明显发糊。');return}
+        apply(url,file,img.naturalWidth,img.naturalHeight);
+      };
+      img.onerror=function(){URL.revokeObjectURL(url);fail('图片解码失败：文件已损坏或编码不完整。')};
+      img.src=url;
+    });
+    rmBtn.addEventListener('click',function(){
+      if(currentURL)URL.revokeObjectURL(currentURL);
+      currentURL=null;
+      opt.target.classList.remove('has-upload');
+      opt.target.style.background='';
+      prev.style.display='none';
+      clearError();
+    });
+  }
+  var sceneEl=document.getElementById('scene'),figSil=document.querySelector('#figure .sil');
+  var bgOpt={btn:'bgPick',file:'bgFile',preview:'bgPreview',thumb:'bgThumb',name:'bgName',meta:'bgMeta',
+    remove:'bgRemove',error:'bgError',errorTitle:'bgErrorTitle',errorWhy:'bgErrorWhy',
+    target:sceneEl,accept:['image/jpeg','image/png','image/webp'],acceptLabel:'JPG / PNG / WebP',
+    budget:8*1024*1024,budgetLabel:'8MB',minW:1280,contain:false,errorTitle0:'无法使用该背景'};
+  var figOpt={btn:'figPick',file:'figFile',preview:'figPreview',thumb:'figThumb',name:'figName',meta:'figMeta',
+    remove:'figRemove',error:'figError',errorTitle:'figErrorTitle',errorWhy:'figErrorWhy',
+    target:figSil,accept:['image/png','image/webp'],acceptLabel:'透明 PNG / WebP',
+    budget:4*1024*1024,budgetLabel:'4MB',minW:600,contain:true,errorTitle0:'无法使用该立绘'};
+  wireUpload(bgOpt);wireUpload(figOpt);
+})();
+</script>
+</body>
+</html>

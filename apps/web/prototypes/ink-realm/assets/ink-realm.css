@@ -1,0 +1,453 @@
+/* ============================================================
+   MoZhou Ink Realm / 墨境 — Design System Tokens & Materials
+   Design-phase prototype stylesheet. ISOLATED PROTOTYPE ONLY.
+   Does NOT modify production apps/web/src. No dependencies.
+   Layer model (fixed z-axis):
+     L0 scene image / low-freq WebGL ink   (z 0)
+     L1 atmosphere vignette / grain        (z 1)  pointer-events:none
+     L2 contrast shadow veil               (z 2)  pointer-events:none
+     L3 HUD frame (top/nav/pipeline)       (z 3)
+     L4 work surfaces                      (z 4)
+     L5 text / controls / evidence         (z 5)
+     L6 popover / sheet                    (z 6)
+     L7 blocking modal / destructive       (z 7)
+   ============================================================ */
+
+:root{
+  /* ---- Canvas & surfaces (spec §5.1) ---- */
+  --ir-void:#05090D;
+  --ir-ink-deep:#081117;
+  --ir-surface-1:#0C171E;
+  --ir-surface-2:#102029;
+  --ir-surface-3:#152832;
+  /* ---- Text ---- */
+  --ir-fg:#EDF1ED;
+  --ir-muted:#A2ADA9;
+  --ir-faint:#687671;
+  /* ---- Lines ---- */
+  --ir-hairline:rgba(205,225,222,.11);
+  --ir-hairline-strong:rgba(225,239,235,.21);
+  /* ---- Semantic (color IS product meaning) ---- */
+  --ir-gold:#D6B36A;            /* author sovereignty */
+  --ir-gold-bright:#F0D18A;     /* author high-priority action */
+  --ir-gold-soft:rgba(214,179,106,.13);
+  --ir-jade:#72C9C4;            /* AI / system */
+  --ir-jade-soft:rgba(114,201,196,.12);
+  --ir-jade-line:rgba(114,201,196,.55);
+  --ir-success:#78C79D;         /* verified / committed / durable */
+  --ir-warning:#D3A765;         /* advisory / stale / needs config */
+  --ir-danger:#D98383;          /* blocking / destructive */
+  --ir-danger-soft:rgba(217,131,131,.14);
+  --ir-violet:rgba(150,120,255,.5); /* experimental/unknown ONLY */
+  /* ---- Type ---- */
+  --ir-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --ir-serif:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+  --ir-mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  /* ---- Motion (spec §28) ---- */
+  --ir-ease:cubic-bezier(0.16,1,0.3,1);
+  --ir-t-micro:200ms;
+  --ir-t-sheet:280ms;
+  /* ---- Layout ---- */
+  --ir-world-gap:10px;         /* visible world seams between HUD regions */
+  --ir-r-sm:6px; --ir-r-md:10px; --ir-r-lg:14px;
+  --ir-shadow:0 18px 50px rgba(0,0,0,.45);
+  /* Touch contract (spec §25.8): single token, no per-page inline mixing */
+  --touch-target-min:44px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ir-void);
+  color:var(--ir-fg);
+  font-family:var(--ir-sans);
+  font-size:14px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--ir-jade);text-decoration:none}
+a:hover{color:var(--ir-gold-bright)}
+
+/* ============================================================
+   L0/L1/L2 — Scene · Atmosphere · Shadow veil
+   ============================================================ */
+.ir-scene{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:#0a141c center/cover no-repeat;}
+/* CSS-synthesized placeholder scenes (stand-in for user-uploaded image).
+   Main background = full-size atmosphere layers only (safe under cover overrides);
+   horizon/skyline subject bands live in ::after so the world reads as a PLACE.
+   An uploaded image replaces the whole scene, so its subject band is hidden. */
+.ir-scene::after{content:"";position:absolute;left:0;right:0;bottom:0;pointer-events:none}
+.ir-scene.has-upload::after{display:none}
+.ir-scene.city-night{
+  background:
+    radial-gradient(13% 19% at 58% 15%, rgba(240,209,138,.98), rgba(240,209,138,.26) 55%, transparent 74%),
+    radial-gradient(44% 60% at 58% 15%, rgba(240,209,138,.3), transparent 70%),
+    radial-gradient(60% 16% at 60% 72%, rgba(240,209,138,.18), transparent 72%),
+    radial-gradient(130% 60% at 70% 112%, rgba(114,201,196,.3), transparent 55%),
+    linear-gradient(180deg,#0b1826 0%,#143044 34%,#1d4258 60%,#2a5a74 82%,#35688a 100%);
+}
+.ir-scene.city-night::after{height:26%;
+  background:
+    repeating-linear-gradient(90deg, rgba(5,12,18,.96) 0 22px, rgba(10,23,33,.92) 22px 31px, rgba(5,12,18,.97) 31px 52px, rgba(14,32,44,.9) 52px 61px, rgba(5,12,18,.96) 61px 84px),
+    repeating-linear-gradient(90deg, transparent 0 6px, rgba(240,209,138,.3) 6px 8px, transparent 8px 19px);
+  box-shadow:0 -1px 0 rgba(225,239,235,.22);}
+.ir-scene.cloud-sea{
+  background:
+    radial-gradient(10% 15% at 22% 12%, rgba(237,241,237,.9), rgba(237,241,237,.18) 55%, transparent 74%),
+    radial-gradient(80% 36% at 76% 2%, rgba(114,201,196,.22), transparent 58%),
+    linear-gradient(180deg,#0a1a28 0%,#173244 38%,#225068 70%,#2e647e 100%);
+}
+.ir-scene.cloud-sea::after{height:46%;
+  background:
+    radial-gradient(56% 46% at 18% 30%, rgba(233,240,240,.26), transparent 70%),
+    radial-gradient(72% 52% at 74% 55%, rgba(205,225,222,.22), transparent 72%),
+    radial-gradient(64% 48% at 40% 85%, rgba(233,240,240,.28), transparent 70%);
+}
+.ir-scene.rain-city{
+  background:
+    radial-gradient(9% 13% at 28% 10%, rgba(214,179,106,.95), rgba(214,179,106,.2) 55%, transparent 72%),
+    radial-gradient(130% 60% at 70% 112%, rgba(114,201,196,.16), transparent 55%),
+    repeating-linear-gradient(105deg, transparent 0 26px, rgba(205,225,222,.06) 26px 27px, transparent 27px 54px),
+    linear-gradient(180deg,#09141f 0%,#112436 40%,#1a3750 72%,#224764 100%);
+}
+.ir-scene.rain-city::after{height:30%;
+  background:
+    repeating-linear-gradient(90deg, rgba(5,12,20,.96) 0 30px, rgba(11,26,40,.92) 30px 44px, rgba(5,12,20,.96) 44px 78px),
+    repeating-linear-gradient(90deg, transparent 0 10px, rgba(114,201,196,.28) 10px 12px, transparent 12px 26px);
+  box-shadow:0 -1px 0 rgba(225,239,235,.22);}
+.ir-scene.library{
+  background:
+    radial-gradient(30% 40% at 22% 22%, rgba(240,209,138,.46), rgba(240,209,138,.1) 55%, transparent 75%),
+    radial-gradient(70% 40% at 84% 0%, rgba(114,201,196,.16), transparent 55%),
+    linear-gradient(180deg,#0b1522 0%,#132435 44%,#1c3448 76%,#24405a 100%);
+}
+.ir-scene.library::after{height:58%;
+  background:
+    repeating-linear-gradient(90deg, rgba(8,15,24,.94) 0 14px, rgba(14,28,42,.9) 14px 18px, rgba(8,15,24,.94) 18px 40px),
+    repeating-linear-gradient(0deg, rgba(4,10,16,.6) 0 2px, transparent 2px 30px),
+    radial-gradient(40% 60% at 22% 0%, rgba(240,209,138,.22), transparent 70%);
+  box-shadow:0 -1px 0 rgba(225,239,235,.18);}
+/* L1 atmosphere: vignette + grain (decorative only, never in tab order) */
+.ir-atmosphere{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(130% 100% at 50% 38%, transparent 56%, rgba(3,6,9,.4) 100%);}
+.ir-atmosphere::after{content:"";position:absolute;inset:0;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+/* L2 shadow veil: contrast protection behind work surfaces */
+.ir-veil{position:fixed;inset:0;z-index:2;pointer-events:none;
+  background:rgba(4,8,12,var(--veil-strength,.55));}
+/* L2b Foreground figure layer — independent from scene, replaceable, hideable */
+.ir-figure{position:fixed;bottom:0;z-index:2;pointer-events:none;
+  transform-origin:bottom center;opacity:var(--figure-opacity,.8);
+  filter:drop-shadow(0 0 26px rgba(5,9,13,.8));}
+.ir-figure.pos-left{left:4%}.ir-figure.pos-center{left:50%;transform:translateX(-50%)}.ir-figure.pos-right{right:4%}
+/* abstract ink-figure silhouette drawn in pure CSS (placeholder art, replaceable by upload) */
+.ir-figure .sil{width:min(240px,26vw);height:min(470px,52vh);position:relative;
+  background:
+    radial-gradient(36% 20% at 50% 8%, rgba(235,242,240,.5), transparent 72%),
+    radial-gradient(14% 10% at 50% 7%, rgba(20,30,34,.9), transparent 80%),
+    radial-gradient(46% 30% at 50% 33%, rgba(210,224,222,.24), transparent 72%),
+    radial-gradient(60% 40% at 50% 62%, rgba(180,198,196,.13), transparent 76%),
+    linear-gradient(180deg, rgba(170,188,186,.22) 0%, rgba(130,150,150,.12) 45%, transparent 80%);
+  border-radius:46% 46% 8% 8%/34% 34% 4% 4%;
+  box-shadow:inset -14px 0 22px rgba(240,209,138,.08), inset 12px 0 20px rgba(114,201,196,.07);
+  -webkit-mask-image:linear-gradient(180deg,#000 66%,transparent 97%);
+          mask-image:linear-gradient(180deg,#000 66%,transparent 97%);}
+
+/* ============================================================
+   L3 HUD frame materials
+   ============================================================ */
+/* Scene Glass: can see the world; blur only on fixed/floating layers */
+.mat-scene-glass{
+  background:linear-gradient(180deg, rgba(12,23,30,.72), rgba(8,17,23,.66));
+  -webkit-backdrop-filter:blur(14px) saturate(1.05);
+          backdrop-filter:blur(14px) saturate(1.05);
+  border:1px solid var(--ir-hairline);
+  border-radius:var(--ir-r-lg);
+  box-shadow:inset 0 1px 0 rgba(225,239,235,.10), var(--ir-shadow);
+  position:relative;
+}
+.mat-scene-glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(160deg, rgba(225,239,235,.07), transparent 22%, transparent 78%, rgba(205,225,222,.05));
+  mix-blend-mode:screen;}
+/* Ink Glass: darker, steadier — inspectors, chapter rail, aux tools */
+.mat-ink-glass{
+  background:linear-gradient(180deg, rgba(8,17,23,.92), rgba(6,13,18,.9));
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  border:1px solid var(--ir-hairline);
+  border-radius:var(--ir-r-md);
+}
+/* Reading Slate: near-solid, quietest surface in the product */
+.mat-reading-slate{
+  background:linear-gradient(180deg, rgba(9,16,22,.985), rgba(7,13,19,.985));
+  border:1px solid rgba(205,225,222,.14);
+  border-radius:var(--ir-r-md);
+}
+/* Metal Rim / Double Bezel — reserved: current chapter, key skill,
+   quality core summary, current book, important selected card */
+.mat-metal-rim{
+  position:relative;border-radius:var(--ir-r-md);
+  background:linear-gradient(180deg, rgba(12,23,30,.94), rgba(8,17,23,.94));
+  border:1px solid transparent;
+  background-clip:padding-box;
+}
+.mat-metal-rim::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;
+  background:linear-gradient(135deg, rgba(214,179,106,.65), rgba(225,239,235,.28) 38%, rgba(205,225,222,.14) 62%, rgba(214,179,106,.5));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;}
+.mat-metal-rim::after{content:"";position:absolute;inset:3px;border-radius:calc(var(--ir-r-md) - 3px);
+  border:1px solid rgba(5,9,13,.9);pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(225,239,235,.06);}
+
+/* ============================================================
+   Typography: UI sans / Prose serif / Evidence mono
+   ============================================================ */
+.t-serif{font-family:var(--ir-serif)}
+.t-mono{font-family:var(--ir-mono);font-size:.92em;letter-spacing:.01em}
+h1,h2,h3{font-weight:600;margin:0}
+.kicker{font-family:var(--ir-sans);font-size:11px;letter-spacing:.16em;color:var(--ir-faint);text-transform:uppercase}
+/* prose reading: 16-18px, lh 1.85-2.0, measure 60-75 chars, no per-paragraph cards */
+.prose{font-family:var(--ir-serif);font-size:17px;line-height:1.95;color:var(--ir-fg);
+  max-width:44em;text-indent:2em;}
+.prose p{margin:0 0 1.1em}
+
+/* ============================================================
+   Buttons — semantics: Gold=author, Jade=AI, Neutral, Ghost, Danger
+   Press: immediate scale(.985) feedback (spec §27)
+   ============================================================ */
+.btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border-radius:8px;
+  font:500 13px/1 var(--ir-sans);padding:9px 14px;color:var(--ir-fg);
+  background:var(--ir-surface-3);border:1px solid var(--ir-hairline);
+  transition:transform var(--ir-t-micro) var(--ir-ease),background var(--ir-t-micro) var(--ir-ease),border-color var(--ir-t-micro) var(--ir-ease),opacity var(--ir-t-micro) var(--ir-ease);}
+.btn:active{transform:scale(.985) translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--ir-jade);outline-offset:2px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn-author{background:linear-gradient(180deg,rgba(214,179,106,.22),rgba(214,179,106,.10));
+  border-color:rgba(214,179,106,.55);color:var(--ir-gold-bright)}
+.btn-author:hover{border-color:var(--ir-gold);background:rgba(214,179,106,.26)}
+.btn-ai{background:var(--ir-jade-soft);border-color:rgba(114,201,196,.45);color:var(--ir-jade)}
+.btn-ai:hover{border-color:var(--ir-jade-line)}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--ir-muted)}
+.btn-ghost:hover{color:var(--ir-fg);background:rgba(205,225,222,.06)}
+.btn-danger{background:var(--ir-danger-soft);border-color:rgba(217,131,131,.5);color:var(--ir-danger)}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+
+/* ============================================================
+   Status badges — text label ALWAYS (a11y: never color-only)
+   ============================================================ */
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;
+  font:600 10.5px/1 var(--ir-sans);letter-spacing:.08em;padding:4px 9px;white-space:nowrap}
+.badge::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.b-pass{color:var(--ir-success);background:rgba(120,199,157,.12);border:1px solid rgba(120,199,157,.4)}
+.b-committed{color:var(--ir-success);background:rgba(120,199,157,.12);border:1px solid rgba(120,199,157,.4)}
+.b-stale{color:var(--ir-warning);background:rgba(211,167,101,.12);border:1px solid rgba(211,167,101,.4)}
+.b-blocked,.b-error{color:var(--ir-danger);background:var(--ir-danger-soft);border:1px solid rgba(217,131,131,.45)}
+.b-refused{color:var(--ir-danger);background:transparent;border:1px dashed rgba(217,131,131,.55)}
+.b-gold{color:var(--ir-gold-bright);background:var(--ir-gold-soft);border:1px solid rgba(214,179,106,.45)}
+.b-jade{color:var(--ir-jade);background:var(--ir-jade-soft);border:1px solid rgba(114,201,196,.4)}
+.b-neutral{color:var(--ir-muted);background:rgba(205,225,222,.06);border:1px solid var(--ir-hairline)}
+.b-exp{color:var(--ir-violet);background:rgba(150,120,255,.08);border:1px solid rgba(150,120,255,.35)}
+.b-fixture{color:var(--ir-faint);background:transparent;border:1px dashed var(--ir-hairline-strong)}
+
+/* unavailable / blocked honest card */
+.unavailable{border:1px dashed rgba(211,167,101,.4);border-radius:var(--ir-r-md);
+  background:rgba(211,167,101,.05);padding:14px 16px;color:var(--ir-muted);font-size:13px}
+.unavailable b{color:var(--ir-warning);font-weight:600}
+.unavailable .why{display:block;margin-top:5px;color:var(--ir-faint);font-size:12px}
+
+/* ============================================================
+   Card taxonomy (spec §26) — NOT one .card for everything
+   ============================================================ */
+.card{border-radius:var(--ir-r-md)}
+.card-narrative{ /* works, chapters, worldview summaries */
+  background:linear-gradient(175deg, rgba(16,32,41,.85), rgba(10,20,27,.88));
+  border:1px solid var(--ir-hairline);border-radius:14px;
+  transition:transform var(--ir-t-micro) var(--ir-ease),border-color var(--ir-t-micro) var(--ir-ease)}
+.card-narrative:hover{transform:translateY(-2px);border-color:var(--ir-hairline-strong)}
+.card-character{ /* people, places, factions, concepts */
+  background:var(--ir-surface-1);border:1px solid var(--ir-hairline);border-radius:10px;
+  transition:border-color var(--ir-t-micro) var(--ir-ease)}
+.card-character:hover{border-color:rgba(114,201,196,.35)}
+.card-system{ /* quality, receipt, task, cloud state */
+  background:var(--ir-ink-deep);border:1px solid var(--ir-hairline);border-radius:8px}
+.card-capability{ /* skill / capability / provider */
+  background:linear-gradient(170deg, rgba(21,40,50,.9), rgba(10,20,27,.92));
+  border:1px solid var(--ir-hairline);border-radius:14px;overflow:hidden;position:relative;
+  transition:transform var(--ir-t-micro) var(--ir-ease),border-color var(--ir-t-micro) var(--ir-ease),box-shadow var(--ir-t-micro) var(--ir-ease)}
+.card-capability::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(165deg, rgba(225,239,235,.06), transparent 30%);}
+.card-capability:hover{transform:translateY(-3px);border-color:var(--ir-hairline-strong);
+  box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.card-capability.selected{border-color:rgba(214,179,106,.55)}
+.card-capability.selected::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;
+  background:linear-gradient(135deg, rgba(214,179,106,.7), transparent 45%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+/* Evidence Row — hash, revision, event, traversal, receipt entry */
+.row-evidence{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--ir-hairline);
+  font-family:var(--ir-mono);font-size:12.5px;color:var(--ir-muted)}
+.row-evidence:last-child{border-bottom:none}
+.row-evidence .em{color:var(--ir-fg)}
+
+/* ============================================================
+   Form controls
+   ============================================================ */
+.input,.textarea{background:rgba(10,20,27,.8);border:1px solid var(--ir-hairline);border-radius:8px;
+  color:var(--ir-fg);font:400 13px/1.6 var(--ir-sans);padding:9px 11px;width:100%;}
+.input:focus,.textarea:focus{outline:none;border-color:rgba(114,201,196,.55);
+  box-shadow:0 0 0 2px rgba(114,201,196,.18)}
+.input[disabled],.textarea[disabled]{opacity:.45;cursor:not-allowed}
+.label{display:block;font:600 11px/1 var(--ir-sans);letter-spacing:.1em;color:var(--ir-faint);margin:0 0 6px;text-transform:uppercase}
+
+/* pill (multi-select skill) */
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;cursor:pointer;
+  font:500 12px/1 var(--ir-sans);padding:7px 12px;color:var(--ir-muted);
+  background:rgba(205,225,222,.04);border:1px solid var(--ir-hairline);
+  transition:all var(--ir-t-micro) var(--ir-ease)}
+.pill:hover{color:var(--ir-fg);border-color:var(--ir-hairline-strong)}
+.pill.on{color:var(--ir-jade);background:var(--ir-jade-soft);border-color:rgba(114,201,196,.5)}
+.pill.on::before{content:"✓";font-size:10px}
+.pill[disabled]{opacity:.4;cursor:not-allowed}
+
+/* toggle */
+.toggle{position:relative;width:34px;height:20px;border-radius:999px;cursor:pointer;
+  background:var(--ir-surface-3);border:1px solid var(--ir-hairline);transition:background var(--ir-t-micro) var(--ir-ease)}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--ir-muted);transition:transform var(--ir-t-micro) var(--ir-ease),background var(--ir-t-micro) var(--ir-ease)}
+.toggle.on{background:rgba(214,179,106,.25);border-color:rgba(214,179,106,.5)}
+.toggle.on::after{transform:translateX(14px);background:var(--ir-gold-bright)}
+
+/* slider */
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--ir-jade) var(--fill,50%),rgba(205,225,222,.14) var(--fill,50%));outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--ir-fg);border:2px solid var(--ir-ink-deep);box-shadow:0 0 0 1px var(--ir-hairline-strong);cursor:pointer}
+
+/* ============================================================
+   AI interaction states (Candidate → Approval → Commit)
+   ============================================================ */
+.candidate{border-left:2px solid var(--ir-jade-line);background:rgba(114,201,196,.045)}
+.candidate .cand-tag{display:inline-flex;align-items:center;gap:6px;font:700 10px/1 var(--ir-sans);
+  letter-spacing:.18em;color:var(--ir-jade);margin-bottom:8px}
+.accepted-flash{border-left-color:var(--ir-gold)}
+.committed-mark{color:var(--ir-success)}
+.stream-caret::after{content:"▎";color:var(--ir-jade);animation:caret 1s steps(2) infinite}
+@keyframes caret{50%{opacity:0}}
+
+/* pipeline stages — six honest states */
+.stage{display:flex;flex-direction:column;gap:4px;align-items:center;cursor:pointer;
+  padding:8px 10px;border-radius:8px;border:1px solid transparent;position:relative;
+  transition:background var(--ir-t-micro) var(--ir-ease)}
+.stage b{font:600 11px/1 var(--ir-mono);letter-spacing:.08em;color:var(--ir-muted)}
+.stage span{font:400 12px/1 var(--ir-sans);color:var(--ir-faint)}
+.stage:hover{background:rgba(205,225,222,.04)}
+.stage.selected{background:var(--ir-jade-soft);border-color:rgba(114,201,196,.3)}
+.stage.selected b{color:var(--ir-jade)}
+.stage.selected::after{content:"";position:absolute;left:50%;bottom:-1px;width:18px;height:2px;border-radius:2px;
+  transform:translateX(-50%);background:var(--ir-jade);box-shadow:0 0 10px rgba(114,201,196,.7)}
+.stage.done span{color:var(--ir-muted)}
+.stage.done b{color:var(--ir-success)}
+.stage.done::before{content:"✓";position:absolute;top:2px;right:6px;font-size:9px;color:var(--ir-success)}
+.stage.running b{color:var(--ir-jade)}
+.stage.running span{color:var(--ir-jade)}
+.stage.running::after{content:"";position:absolute;left:50%;bottom:-1px;width:30px;height:2px;border-radius:2px;
+  transform:translateX(-50%);background:linear-gradient(90deg,transparent,var(--ir-jade),transparent);
+  animation:spine 1.4s linear infinite}
+@keyframes spine{0%{background-position:-30px 0}100%{background-position:30px 0}}
+.stage.blocked b{color:var(--ir-warning)}
+.stage.blocked{border-style:dashed;border-color:rgba(211,167,101,.35)}
+.stage.failed b{color:var(--ir-danger)}
+.stage.unavailable{opacity:.4}
+.stage.unavailable span{color:var(--ir-faint)}
+
+/* nav rail item — gold ridge selection */
+.navitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;cursor:pointer;
+  padding:8px 10px;border:none;background:transparent;border-radius:7px;color:var(--ir-muted);
+  font:400 13px/1.3 var(--ir-sans);position:relative;
+  transition:color var(--ir-t-micro) var(--ir-ease),background var(--ir-t-micro) var(--ir-ease)}
+.navitem i{font-style:normal;font:600 10px/1 var(--ir-mono);color:var(--ir-faint);width:20px;
+  letter-spacing:.04em;flex:none}
+.navitem:hover{color:var(--ir-fg);background:rgba(205,225,222,.05)}
+.navitem.active{color:var(--ir-fg);background:rgba(214,179,106,.08)}
+.navitem.active::before{content:"";position:absolute;left:-6px;top:20%;bottom:20%;width:2px;border-radius:2px;
+  background:linear-gradient(180deg,var(--ir-gold-bright),var(--ir-gold));
+  box-shadow:0 0 8px rgba(214,179,106,.55)}
+.navitem.active i{color:var(--ir-gold)}
+.navitem .ncount{margin-left:auto;font:600 10px/1 var(--ir-mono);color:var(--ir-faint)}
+
+/* inspector summary rail */
+.sumrail{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ir-hairline);
+  border:1px solid var(--ir-hairline);border-radius:10px;overflow:hidden}
+.sumrail>div{background:var(--ir-ink-deep);padding:9px 11px}
+.sumrail .k{font:600 9.5px/1 var(--ir-sans);letter-spacing:.14em;color:var(--ir-faint)}
+.sumrail .v{font:600 13px/1.4 var(--ir-mono);color:var(--ir-fg);margin-top:4px}
+.sumrail .v.dim{color:var(--ir-faint)}
+
+/* sheet (right-side non-blocking) */
+.sheet{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:92vw;z-index:6;
+  background:linear-gradient(180deg, rgba(12,23,30,.96), rgba(8,17,23,.97));
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border-left:1px solid var(--ir-hairline-strong);box-shadow:-24px 0 60px rgba(0,0,0,.5);
+  transform:translateX(0);transition:transform var(--ir-t-sheet) var(--ir-ease)}
+.sheet.hidden{transform:translateX(105%)}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--ir-hairline)}
+
+/* bottom sheet (mobile) */
+.bsheet{position:fixed;left:0;right:0;bottom:0;z-index:7;border-radius:18px 18px 0 0;
+  background:linear-gradient(180deg, rgba(12,23,30,.97), rgba(8,17,23,.98));
+  border-top:1px solid var(--ir-hairline-strong);padding:8px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:86vh;overflow:auto}
+.bsheet .handle{width:40px;height:4px;border-radius:4px;background:rgba(205,225,222,.28);margin:4px auto 12px}
+
+/* world seam layout helpers */
+.world-gap{height:var(--ir-world-gap)}
+
+/* table (change matrix / dense lists) */
+.grid-table{width:100%;border-collapse:collapse;font:400 12px/1.4 var(--ir-mono)}
+.grid-table th{font:600 10px/1 var(--ir-sans);letter-spacing:.1em;color:var(--ir-faint);
+  text-align:left;padding:7px 9px;border-bottom:1px solid var(--ir-hairline-strong)}
+.grid-table td{padding:7px 9px;border-bottom:1px solid var(--ir-hairline);color:var(--ir-muted)}
+.cell-needs{color:var(--ir-danger);background:var(--ir-danger-soft);font-weight:600}
+.cell-resolved{color:var(--ir-success);background:rgba(120,199,157,.1)}
+.cell-na{color:var(--ir-faint)}
+
+/* chapter rail */
+.chap-rail{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chap-card{flex:none;width:128px;text-align:left;cursor:pointer;border-radius:10px;padding:9px 11px;
+  background:var(--ir-surface-1);border:1px solid var(--ir-hairline);color:var(--ir-muted);
+  transition:border-color var(--ir-t-micro) var(--ir-ease),transform var(--ir-t-micro) var(--ir-ease)}
+.chap-card:hover{border-color:var(--ir-hairline-strong);transform:translateY(-1px)}
+.chap-card.current{border-color:rgba(214,179,106,.55)}
+.chap-card .cn{font:600 11px/1 var(--ir-mono);color:var(--ir-faint)}
+.chap-card .ct{font:600 13px/1.4 var(--ir-serif);color:var(--ir-fg);margin:4px 0 6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chap-card .cm{font:400 10.5px/1.5 var(--ir-mono);color:var(--ir-faint)}
+
+/* prototype page scaffolding (docs, not product UI) */
+.proto-body{position:relative;z-index:4;padding:26px clamp(16px,4vw,56px) 90px;max-width:1560px;margin:0 auto}
+.proto-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.proto-head h1{font:600 22px/1.3 var(--ir-serif);color:var(--ir-fg)}
+.proto-sub{color:var(--ir-faint);font-size:13px}
+.proto-nav{position:sticky;top:0;z-index:6;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  padding:10px 0;margin-bottom:18px}
+.proto-nav a{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--ir-hairline);
+  color:var(--ir-muted);background:rgba(8,17,23,.75);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.proto-nav a.cur{color:var(--ir-gold-bright);border-color:rgba(214,179,106,.5)}
+.demo-grid{display:grid;gap:14px}
+.note{font-size:12px;color:var(--ir-faint);line-height:1.7}
+.spec-label{font:600 10px/1 var(--ir-mono);letter-spacing:.14em;color:var(--ir-jade);
+  border:1px solid rgba(114,201,196,.35);border-radius:4px;padding:3px 7px;display:inline-block}
+.swatch{height:54px;border-radius:8px;border:1px solid var(--ir-hairline);position:relative}
+.swatch span{position:absolute;left:8px;bottom:6px;font:600 10px/1 var(--ir-mono);color:#000;background:rgba(255,255,255,.55);
+  border-radius:3px;padding:2px 5px}
+.swatch.dark span{color:#EDF1ED;background:rgba(0,0,0,.5)}
+hr.sep{border:none;border-top:1px solid var(--ir-hairline);margin:26px 0}
+
+/* reduced motion: static scene, cross-fade only (spec §28) */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
+  .ir-figure,.ir-atmosphere{opacity:.85}
+}
+@media (prefers-contrast: more){
+  :root{--ir-hairline:rgba(225,239,235,.3);--ir-faint:#93a39d}
+}

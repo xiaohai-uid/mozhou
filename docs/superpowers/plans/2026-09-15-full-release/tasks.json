@@ -1,0 +1,595 @@
+{
+  "schema_version": 1,
+  "kind": "implementation-handoff-not-release-authorization",
+  "repository": "C:/zcode/novel-ai",
+  "audited_head": "fed29e32a86c47dc991da6883fe5d6cc2e4141fd",
+  "audited_date": "2026-09-15",
+  "mode": "single-writer",
+  "execution_order": "按本数组顺序选depends_on都verified的首个pending任务；外部blocked的独立任务不阻止其余已就绪任务",
+  "status_values": [
+    "pending",
+    "in_progress",
+    "verified",
+    "blocked",
+    "failed"
+  ],
+  "tasks": [
+    {
+      "id": "T00",
+      "title": "保护现状与执行分支",
+      "status": "verified",
+      "depends_on": [],
+      "document": "01-core.md",
+      "anchor": "T00",
+      "existing_paths": [
+        "package.json",
+        "AGENTS.md"
+      ],
+      "deliverable": "仓库外可回读备份、当前源码指纹、执行分支与baseline提交",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "还原本项逐文件更改，不覆盖原有dirty内容",
+      "evidence": [
+        {
+          "kind": "filesystem",
+          "path": "evidence/full-release/20260915-1/T00/result.json",
+          "sourceCommit": "9fc2b4026c3e0240f0d3f76e3648915a9d0ea4b2",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "git snapshot+sha256sum+backup+switch -c+analyze+pnpm test",
+          "exitCode": 0,
+          "scope": "备份回读匹配、dirty 22项已归类登记、分支正确、测试基线全绿",
+          "limitations": [
+            "web真实模型测试1个按原样跳过",
+            "未push",
+            "测试绿≠发布验收"
+          ]
+        }
+      ],
+      "result": "baseline 9fc2b40：仓库外备份回读核对25文件mismatch=0；产品指纹59ab7480；分支codex/mozhou-full-release-20260915；图谱8947节点0循环；workspace 91/732、web 41/292+1skip全绿；交接自检PASS；未push"
+    },
+    {
+      "id": "T01",
+      "title": "外部资源与部署前提",
+      "status": "verified",
+      "depends_on": [
+        "T00"
+      ],
+      "document": "01-core.md",
+      "anchor": "T01",
+      "existing_paths": [
+        "scripts/launcher.mjs",
+        "apps/web/server/productionServer.ts",
+        "src-tauri/src/main.rs"
+      ],
+      "deliverable": "真实资源ready/blocked清单，不保存secret值",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "仅移除本次探针资源",
+      "evidence": [
+        {
+          "kind": "real-provider",
+          "path": "evidence/full-release/20260915-1/T01/result.json",
+          "sourceCommit": "2dca39a32833b031860e10cb0a272d7319b500e9",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "env探测+官方文档curl+工具链检查",
+          "exitCode": 0,
+          "scope": "外部输入逐项 ready/blocked 判定，无 assumed-ready",
+          "limitations": [
+            "无任何 secret 值；用户云/商户账号未提供；公网发布 required 项未 ready"
+          ]
+        },
+        {
+          "kind": "filesystem",
+          "path": "evidence/full-release/20260915-1/T01/environment-report.json",
+          "sourceCommit": "2dca39a32833b031860e10cb0a272d7319b500e9",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "curl 官方文档解析",
+          "exitCode": 0,
+          "scope": "Oracle/Supabase/微信/支付宝条款与数字",
+          "limitations": [
+            "支付宝页面乱码仅确认产品存在"
+          ]
+        }
+      ],
+      "result": "探测完成：12项外部输入实查缺失(blocked)已逐项登记缺项；Windows工具链部分ready；官方条款已检索落案(environment-report.json)；不构成发布授权"
+    },
+    {
+      "id": "T02",
+      "title": "19/39权益和成本合同",
+      "status": "verified",
+      "depends_on": [
+        "T00"
+      ],
+      "document": "01-core.md",
+      "anchor": "T02",
+      "existing_paths": [
+        "apps/web/server/routes/systemRoutes.ts"
+      ],
+      "deliverable": "价格固定、权益map、成本公式与不可销售未核实额度保护",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "保留已售priceVersion",
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T02/result.json",
+          "sourceCommit": "fb8bd717822f1cba66ebab3591c89ae1f3288067",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "pnpm --filter @mozhou/web test -- server/billing/catalog.test.ts",
+          "exitCode": 0,
+          "scope": "21 个 catalog 测试（价格/权益/公式/周期/不可售）",
+          "limitations": [
+            "最终额度待 T18"
+          ]
+        }
+      ],
+      "result": "catalog 冻结（1900/3900 CNY 唯一真源）+ 不可售保护（sellable=false）+ maxIncludedCalls 公式与最坏成本上界 + 月末周期；21+52+2 测试绿、tsc/lint 通过；已删永久/团队占位商品"
+    },
+    {
+      "id": "T03",
+      "title": "候选契约和失败测试",
+      "status": "verified",
+      "depends_on": [
+        "T00"
+      ],
+      "document": "01-core.md",
+      "anchor": "T03",
+      "existing_paths": [
+        "packages/pipeline/src/draft-step.ts",
+        "packages/pipeline/src/index.ts"
+      ],
+      "deliverable": "candidate状态和原文不变的red-green回归",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "保留旧正文及新候选记录",
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T03/result.json",
+          "sourceCommit": "618a4447aefc2674bc6b4c759a9919300e8de87b",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "vitest draft-candidate.test.ts + workspace 全套",
+          "exitCode": 0,
+          "scope": "candidate 契约与 I01 语义（未采纳零变化）",
+          "limitations": [
+            "流式直写正文待 T04 封闭"
+          ]
+        },
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T03/verify-stream-red.log",
+          "sourceCommit": "618a4447aefc2674bc6b4c759a9919300e8de87b",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "node regressions/verify-stream.mjs",
+          "exitCode": 1,
+          "scope": "bug 证据：未采纳生成覆盖原文、外部编辑丢失、staleSave 200",
+          "limitations": [
+            "合成模型流，非真实供应商"
+          ]
+        }
+      ],
+      "result": "候选契约落地：draft-candidate.ts（C2 全套校验+状态迁移+跨进程持久）+ 8 测试红转绿；verify-stream 阻断证据存档（originalLost=true）；verify-manual-save 保持绿；workspace 740 全绿"
+    },
+    {
+      "id": "T04",
+      "title": "修复流式写入与采纳事务",
+      "status": "verified",
+      "depends_on": [
+        "T03"
+      ],
+      "document": "01-core.md",
+      "anchor": "T04",
+      "existing_paths": [
+        "packages/pipeline/src/draft-step.ts",
+        "apps/web/server/routes/pipelineRoutes.ts",
+        "apps/web/server/llm/openaiStream.ts"
+      ],
+      "deliverable": "共享写保护、CAS、取消、幂等intent恢复、无直写旁路",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "按intent恢复，保留失败日志与候选",
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T04/result.json",
+          "sourceCommit": "4b34ba6650899e50d126ebbfa4f94c395060bb41",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "pnpm test+vitest draftCandidates+回归脚本",
+          "exitCode": 0,
+          "scope": "候选流写入/采纳事务/取消/幂等全链路",
+          "limitations": [
+            "真实provider待T07",
+            "进程排他锁归T09"
+          ]
+        },
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T04/verify-stream-green.log",
+          "sourceCommit": "4b34ba6650899e50d126ebbfa4f94c395060bb41",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "node regressions/verify-stream.mjs",
+          "exitCode": 0,
+          "scope": "未采纳生成不再覆盖原文（originalLost=false）且流中外部编辑保留",
+          "limitations": [
+            "合成mock流"
+          ]
+        }
+      ],
+      "result": "流式只写候选+受控采纳事务（CAS+意图日志+幂等恢复）+取消传导；经 R01/R02/R03 审计补强重验通过（写前状态校验/4故障窗口崩溃恢复/选区语义）；verify-stream/manual-save/draftCandidates/workspace/web全绿；0 循环"
+    },
+    {
+      "id": "T05",
+      "title": "真实编辑与选择插入",
+      "status": "verified",
+      "depends_on": [
+        "T04"
+      ],
+      "document": "01-core.md",
+      "anchor": "T05",
+      "existing_paths": [
+        "apps/web/src/workbench/DialogueStream.tsx",
+        "apps/web/src/workbench/editor/ProseEditorPanel.tsx"
+      ],
+      "deliverable": "候选采纳、撤销、冲突对比、切书隔离的真实UI",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "不清空作者缓存",
+      "evidence": [
+        {
+          "kind": "test",
+          "path": "evidence/full-release/20260915-1/T05/result.json",
+          "sourceCommit": "a1d6fd231b03cdb2abdb483bae6151e3ffbf50eb",
+          "sourceFingerprint": "59ab7480044eac40b2cd2fbd117025bf3c6ac8bf30dcd535b83b371b4b4b896c",
+          "command": "pnpm --filter @mozhou/web test -- src/workbench",
+          "exitCode": 0,
+          "scope": "采纳/冲突/undo/迟到隔离 UI 行为",
+          "limitations": [
+            "真浏览器操作待 T17 环境"
+          ]
+        }
+      ],
+      "result": "UI 候选采纳链落地：Accept 真实事务+回读刷新+Undo+409 双文本冲突面板+迟到帧隔离+selection 运输；经 R04/R05 真实无头 Chrome 11 步端到端旅程（含中文 IME、选区替换、CAS Undo、双窗口、进程重启回读、定稿重开）全绿验证"
+    },
+    {
+      "id": "T08",
+      "title": "账号与设备登录",
+      "status": "blocked",
+      "depends_on": [
+        "T00"
+      ],
+      "document": "03-public-billing.md",
+      "anchor": "T08",
+      "existing_paths": [
+        "apps/web/server/router.ts",
+        "apps/web/server/security.ts",
+        "apps/web/src/membership/MembershipView.tsx"
+      ],
+      "deliverable": "验证过的principal、真实邮件恢复、Windows设备授权",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "撤销新会话，不复活旧token",
+      "evidence": [],
+      "result": "T01 实查：无 Supabase 项目/回调/真实邮件（EXTERNAL-INPUTS auth_project_and_live_email=missing）；无已验证 principal 则账号/设备登录无法实现"
+    },
+    {
+      "id": "T09",
+      "title": "全路由租户隔离",
+      "status": "blocked",
+      "depends_on": [
+        "T08"
+      ],
+      "document": "03-public-billing.md",
+      "anchor": "T09",
+      "existing_paths": [
+        "apps/web/server/api.ts",
+        "apps/web/server/security.ts",
+        "apps/web/src/api/client.ts"
+      ],
+      "deliverable": "bookId解析与全端点越权测试、local/hosted边界",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "未通过隔离保持hosted关闭",
+      "evidence": [],
+      "result": "依赖 T08 已验证 principal 与 hosted 模式激活条件；无公网部署（T16 blocked）则隔离矩阵无 hosted 目标可验；本地 root 迁移窗口状态保持"
+    },
+    {
+      "id": "T07",
+      "title": "模型设置与可靠传输",
+      "status": "blocked",
+      "depends_on": [
+        "T04",
+        "T09"
+      ],
+      "document": "01-core.md",
+      "anchor": "T07",
+      "existing_paths": [
+        "apps/web/server/llm/openaiStream.ts",
+        "apps/web/server/draftContext.ts",
+        "apps/web/server/storyboard/generate.ts"
+      ],
+      "deliverable": "真实provider、取消、限时、脱敏、可核算usage",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "回到前一有效配置",
+      "evidence": [],
+      "result": "T01 实查：env 无 MODEL_KEY/BASE/NAME（FINNHUB/SENSENOVA 与墨舟无关）；商业用途模型与费用预算未由用户提供；按 START-HERE 缺真实凭据只标 blocked，不伪造通过"
+    },
+    {
+      "id": "T06",
+      "title": "十步生产与恢复",
+      "status": "blocked",
+      "depends_on": [
+        "T05",
+        "T07"
+      ],
+      "document": "01-core.md",
+      "anchor": "T06",
+      "existing_paths": [
+        "packages/pipeline/src/session.ts",
+        "packages/pipeline/src/review-step.ts",
+        "packages/pipeline/src/proposal-port.ts",
+        "apps/web/server/routes/pipelineRoutes.ts"
+      ],
+      "deliverable": "真生产命令、版本锚定质量、提案确认、定稿恢复",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "不改写旧commit和事件",
+      "evidence": [],
+      "result": "依赖 T07（真实模型 provider 凭据缺失，T01 实查无任何模型 Key）与 T09（身份隔离未建）；十步生产确定性部分可在 T07/T09 就绪后执行；本次未实施"
+    },
+    {
+      "id": "T10",
+      "title": "真导出与备份恢复",
+      "status": "blocked",
+      "depends_on": [
+        "T04",
+        "T09"
+      ],
+      "document": "02-features.md",
+      "anchor": "T10",
+      "existing_paths": [
+        "apps/web/src/export-suite/docxExporter.ts",
+        "apps/web/src/export-suite/epubExporter.ts",
+        "apps/web/src/cloud-sync/CloudSyncView.tsx"
+      ],
+      "deliverable": "真OOXML/EPUB/TXT及一致归档在新目录恢复",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "原书不动，仅清本次失败暂存",
+      "evidence": [],
+      "result": "依赖 T04（✓）+T09（blocked）；导出本体可本地实现，但 hosted 隔离/备份恢复验收缺 T09；本次未实施"
+    },
+    {
+      "id": "T11",
+      "title": "真资料检索与榜单",
+      "status": "blocked",
+      "depends_on": [
+        "T07",
+        "T09"
+      ],
+      "document": "02-features.md",
+      "anchor": "T11",
+      "existing_paths": [
+        "apps/web/server/routes/crawlerRoutes.ts",
+        "apps/web/server/routes/truthfulPreviewRoutes.ts",
+        "apps/web/server/crawlers/rankings.ts"
+      ],
+      "deliverable": "真书源/搜索/榜单+来源时间+失败语义",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "未接线保留诚实不可用，不恢复假数据",
+      "evidence": [],
+      "result": "依赖 T07（凭据缺失）+T09；书源/搜索/榜单真实凭据（search_provider）T01 实查 missing"
+    },
+    {
+      "id": "T14",
+      "title": "微信支付宝订单与回调",
+      "status": "blocked",
+      "depends_on": [
+        "T02",
+        "T08",
+        "T09"
+      ],
+      "document": "03-public-billing.md",
+      "anchor": "T14",
+      "existing_paths": [
+        "apps/web/src/membership/MembershipView.tsx",
+        "apps/web/server/productionServer.ts"
+      ],
+      "deliverable": "金额商户校验、唯一发权益、查单退款、两渠道真实回执",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "停新订单，保留在途回调查单退款",
+      "evidence": [],
+      "result": "T01 实查：无微信商户号/Native 权限/APPID、无支付宝开放平台应用；payment_test_budget 用户未授权；不得伪造真实回调或代用户付款"
+    },
+    {
+      "id": "T15",
+      "title": "权益额度和离线授权",
+      "status": "blocked",
+      "depends_on": [
+        "T14",
+        "T07"
+      ],
+      "document": "03-public-billing.md",
+      "anchor": "T15",
+      "existing_paths": [
+        "apps/web/server/routes/pipelineRoutes.ts",
+        "apps/web/server/routes/storyboardRoutes.ts"
+      ],
+      "deliverable": "服务端gating与原子预算、双端签名票据",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "保留预留与账本，不重复扣发",
+      "evidence": [],
+      "result": "依赖 T14（商户缺失）+T07；权益/额度/离线授权无订单与模型基础"
+    },
+    {
+      "id": "T12",
+      "title": "拆书文风与技能库",
+      "status": "blocked",
+      "depends_on": [
+        "T07",
+        "T09",
+        "T15"
+      ],
+      "document": "02-features.md",
+      "anchor": "T12",
+      "existing_paths": [
+        "apps/web/server/routes/systemRoutes.ts",
+        "apps/web/src/novel-breakdown",
+        "apps/web/src/style-distill",
+        "apps/web/src/capability-square"
+      ],
+      "deliverable": "真实原文锚定分析、确认应用style/recipe进入receipt",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "追加版本可回选旧版，不删除原文",
+      "evidence": [],
+      "result": "依赖 T07/T09/T15；真实原文锚定分析需模型通道与权益门；本次未实施"
+    },
+    {
+      "id": "T13",
+      "title": "全部导航与分镜检视",
+      "status": "blocked",
+      "depends_on": [
+        "T05",
+        "T06",
+        "T10",
+        "T11",
+        "T12",
+        "T09"
+      ],
+      "document": "02-features.md",
+      "anchor": "T13",
+      "existing_paths": [
+        "apps/web/server/storyboard/store.ts",
+        "apps/web/src/storyboard/StoryboardView.tsx",
+        "apps/web/src/shell/views.ts"
+      ],
+      "deliverable": "SPEC所有保留功能真实闭环、任务恢复",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "保留已保存衍生作品",
+      "evidence": [],
+      "result": "汇集依赖（T05✓/T06/T10/T11/T12/T09）；多数上游 blocked；本次未实施"
+    },
+    {
+      "id": "T16",
+      "title": "公网预发布与重启恢复",
+      "status": "blocked",
+      "depends_on": [
+        "T01",
+        "T09",
+        "T07",
+        "T10",
+        "T14",
+        "T15",
+        "T13"
+      ],
+      "document": "03-public-billing.md",
+      "anchor": "T16",
+      "existing_paths": [
+        "apps/web/server/productionServer.ts",
+        "scripts/launcher.mjs",
+        "Dockerfile"
+      ],
+      "deliverable": "HTTPS真实账号旅程、持久卷恢复、callback可达",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "切旧代码保留数据，支付继续结算",
+      "evidence": [],
+      "result": "T01 实查：无 Oracle 主机/SSH 配置/域名/证书/备份目的地；公网发布 required 项全部未 ready；不把本机 Tunnel 当生产"
+    },
+    {
+      "id": "T17",
+      "title": "Windows完整安装包",
+      "status": "blocked",
+      "depends_on": [
+        "T05",
+        "T07",
+        "T09",
+        "T10",
+        "T13",
+        "T15"
+      ],
+      "document": "04-release.md",
+      "anchor": "T17",
+      "existing_paths": [
+        "src-tauri/src/main.rs",
+        "src-tauri/tauri.conf.json",
+        "src-tauri/Cargo.toml"
+      ],
+      "deliverable": "无开发工具干净机首装升级卸载保数据",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "回旧应用，数据单独恢复",
+      "evidence": [],
+      "result": "依赖 T05✓/T07/T09/T10/T13/T15 多数 blocked；签名证书缺失（用户证书存储 0）；Tauri CLI 可装但安装闭环无验证环境"
+    },
+    {
+      "id": "T18",
+      "title": "真实长篇成本与故障验收",
+      "status": "blocked",
+      "depends_on": [
+        "T06",
+        "T07",
+        "T10",
+        "T13",
+        "T15",
+        "T16",
+        "T17"
+      ],
+      "document": "04-release.md",
+      "anchor": "T18",
+      "existing_paths": [
+        "packages/benchmark/src/long-novel.test.ts"
+      ],
+      "deliverable": "50章真实+500章规模+故障/负载/费用，最终Max额度冻结",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "暂停新任务，保留所有失败产物",
+      "evidence": [],
+      "result": "依赖 T06/T07/T10/T13/T15/T16/T17 多数 blocked；真实长篇验收预算（real_model_acceptance_budget_fen）未授权"
+    },
+    {
+      "id": "T19",
+      "title": "独立安全验收",
+      "status": "blocked",
+      "depends_on": [
+        "T18"
+      ],
+      "document": "04-release.md",
+      "anchor": "T19",
+      "existing_paths": [
+        "apps/web/server/router.ts",
+        "packages/pipeline/src/draft-step.ts"
+      ],
+      "deliverable": "独立review与0未解决阻断项",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "发现问题回对应任务重验",
+      "evidence": [],
+      "result": "依赖 T18；且 START-HERE §7：执行者不得自己签署独立安全审查，须另一审阅者或用户核对高风险证据"
+    },
+    {
+      "id": "T20",
+      "title": "候选资产与CI发布通道",
+      "status": "blocked",
+      "depends_on": [
+        "T19"
+      ],
+      "document": "04-release.md",
+      "anchor": "T20",
+      "existing_paths": [
+        "scripts/build-release.mjs",
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        "README.md"
+      ],
+      "deliverable": "同SHA双端包、SBOM/hash、真实requiredCI、private候选",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "保留旧包旧部署，不raw push",
+      "evidence": [],
+      "result": "依赖 T19；跳过旧 release.yml 的受门禁发布通道未建；push 门禁（全局 git-push-gate）要求真实 CI；未创建任何公开/候选资产"
+    },
+    {
+      "id": "T21",
+      "title": "公开发布及外部验收",
+      "status": "blocked",
+      "depends_on": [
+        "T20"
+      ],
+      "document": "04-release.md",
+      "anchor": "T21",
+      "existing_paths": [
+        ".github/workflows/release.yml"
+      ],
+      "deliverable": "同版网站+公开下载+安装+支付+回滚真实证明",
+      "verification": "按文档该任务Tests/Commands/Pass执行；真实外部条件缺失则blocked，不自报通过",
+      "rollback": "回旧版，停新订单但保留回调",
+      "evidence": [],
+      "result": "依赖 T20 及全部外部验收（支付/安装/公网）；禁止创建公开 Release 或开放购买"
+    }
+  ]
+}

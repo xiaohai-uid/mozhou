@@ -1,0 +1,177 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CapabilitySquareView（技能广场） > 分组/条目渲染（label/description/evidence + 状态徽标文字）；契约快照 1`] = `
+<section
+  aria-label="capability-square-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      技能广场
+    </h1>
+    <span
+      class="meta"
+    >
+      V1 能力注册表 · 
+      3
+       项
+    </span>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="capability-square-group"
+    >
+      <h2>
+        创作
+         · 
+        2
+         项
+      </h2>
+      <div
+        class="cap-wall"
+      >
+        <button
+          aria-pressed="false"
+          class="card-capability cap"
+          data-capability-id="workbench"
+          data-testid="capability-square-card"
+          type="button"
+        >
+          <span
+            class="cap-statusbar"
+          >
+            <span
+              class="cap-badge native"
+              data-testid="capability-square-badge"
+            >
+              原生可用
+            </span>
+            <span
+              class="cap-status-code"
+            >
+              native
+            </span>
+          </span>
+          <b
+            class="cap-label"
+          >
+            工作台
+          </b>
+          <span
+            class="cap-desc"
+          >
+            建书、首章与工作台
+          </span>
+          <span
+            class="cap-evidence"
+          >
+            workbench
+             · 
+            已接入（T40–T44）
+          </span>
+        </button>
+        <button
+          aria-pressed="false"
+          class="card-capability cap"
+          data-capability-id="dialogue"
+          data-testid="capability-square-card"
+          type="button"
+        >
+          <span
+            class="cap-statusbar"
+          >
+            <span
+              class="cap-badge pending st-provider"
+              data-testid="capability-square-badge"
+            >
+              需要模型服务
+            </span>
+            <span
+              class="cap-status-code"
+            >
+              provider_required
+            </span>
+          </span>
+          <b
+            class="cap-label"
+          >
+            写作对话
+          </b>
+          <span
+            class="cap-desc"
+          >
+            中栏写作对话与草稿流式生成
+          </span>
+          <span
+            class="cap-evidence"
+          >
+            dialogue
+             · 
+            provider 未配显式不可用（Gate 3）
+          </span>
+        </button>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="capability-square-group"
+    >
+      <h2>
+        资源
+         · 
+        1
+         项
+      </h2>
+      <div
+        class="cap-wall"
+      >
+        <button
+          aria-pressed="false"
+          class="card-capability cap"
+          data-capability-id="rank-scan"
+          data-testid="capability-square-card"
+          type="button"
+        >
+          <span
+            class="cap-statusbar"
+          >
+            <span
+              class="cap-badge pending st-external"
+              data-testid="capability-square-badge"
+            >
+              需要外部数据源
+            </span>
+            <span
+              class="cap-status-code"
+            >
+              external_source_required
+            </span>
+          </span>
+          <b
+            class="cap-label"
+          >
+            网文扫榜
+          </b>
+          <span
+            class="cap-desc"
+          >
+            网文扫榜
+          </span>
+          <span
+            class="cap-evidence"
+          >
+            rank-scan
+             · 
+            外部榜单源未接入；页面为显式占位
+          </span>
+        </button>
+      </div>
+    </section>
+  </div>
+</section>
+`;

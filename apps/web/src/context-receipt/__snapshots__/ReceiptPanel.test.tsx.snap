@@ -1,0 +1,105 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ReceiptPanel（T42） > 列表渲染：id/章/tok/hash match 徽标（含 mismatch 显式）；契约快照 1`] = `
+<section
+  aria-label="receipt-panel"
+>
+  <div
+    class="panel-head"
+  >
+    <div>
+      <h2>
+        装配看板
+      </h2>
+      <p>
+        Context Receipt · 可确定性重算
+      </p>
+    </div>
+    <span
+      class="tag"
+    >
+      2
+       receipts
+    </span>
+  </div>
+  <div
+    class="actions"
+    style="margin-top: 0px;"
+  >
+    <button
+      class="btn"
+    >
+      刷新
+    </button>
+    <span
+      class="mono muted"
+      style="align-self: center;"
+    >
+      ReadReceipt 读面 · INV-R6 hash match
+    </span>
+  </div>
+  <div
+    class="card-shell"
+    data-testid="receipt-list"
+  >
+    <div
+      class="card"
+    >
+      <div
+        class="card-title"
+      >
+        <b>
+          Receipt 列表
+        </b>
+        <span
+          class="muted"
+        >
+          点击查看详情
+        </span>
+      </div>
+      <button
+        aria-pressed="false"
+        class="receipt-row"
+        data-receipt-id="rcpt_t4201"
+        type="button"
+      >
+        <span>
+          ch1
+           · 
+          rcpt_t4201
+        </span>
+        <code>
+          5120
+           tok
+        </code>
+        <b
+          class="verdict pass"
+        >
+          hash match
+        </b>
+      </button>
+      <button
+        aria-pressed="false"
+        class="receipt-row"
+        data-receipt-id="rcpt_t4202"
+        type="button"
+      >
+        <span>
+          ch2
+           · 
+          rcpt_t4202
+        </span>
+        <code>
+          3000
+           tok
+        </code>
+        <b
+          class="verdict blocking"
+        >
+          hash mismatch
+        </b>
+      </button>
+    </div>
+  </div>
+</section>
+`;

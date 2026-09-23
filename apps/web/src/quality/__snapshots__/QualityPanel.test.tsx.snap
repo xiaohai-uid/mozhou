@@ -1,0 +1,178 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`QualityPanel（初载契约修复后语义保全） > 契约快照：初载 current 报告渲染结构 1`] = `
+<DocumentFragment>
+  <section
+    aria-label="literary-quality-panel"
+    class="card-shell"
+  >
+    <div
+      class="card"
+    >
+      <div
+        class="card-title"
+      >
+        <b>
+          文学质量审查
+        </b>
+        <span
+          class="verdict pass"
+        >
+          PASS
+        </span>
+      </div>
+      <p
+        class="mono muted"
+        style="margin: 6px 0px 0px;"
+      >
+        Exact draft: revision 3 · hash 91e4d2f0a1b2…
+      </p>
+      <p
+        style="margin: 8px 0px 0px; color: var(--success); font-size: 11px;"
+      >
+        审查通过，可进入作者编辑。
+      </p>
+      <div
+        class="actions"
+      >
+        <button
+          class="btn-primary"
+        >
+          Run literary review
+        </button>
+      </div>
+      <div
+        style="margin-top: 12px; border-top: 1px solid var(--hairline); padding-top: 10px;"
+      >
+        <h4
+          class="mono muted"
+          style="margin: 0px 0px 8px;"
+        >
+          RECORD MY CORRECTION
+        </h4>
+        <div
+          class="actions"
+          style="margin-top: 0px; align-items: center;"
+        >
+          <select
+            aria-label="纠错原因"
+            class="control"
+          >
+            <option
+              value="outline_expansion"
+            >
+              outline_expansion
+            </option>
+            <option
+              value="character_toolization"
+            >
+              character_toolization
+            </option>
+            <option
+              value="knowledge_overreach"
+            >
+              knowledge_overreach
+            </option>
+            <option
+              value="payoff_zeroed"
+            >
+              payoff_zeroed
+            </option>
+            <option
+              value="information_only_reward"
+            >
+              information_only_reward
+            </option>
+            <option
+              value="repeated_solution_algorithm"
+            >
+              repeated_solution_algorithm
+            </option>
+            <option
+              value="forced_golden_line"
+            >
+              forced_golden_line
+            </option>
+            <option
+              value="memory_anchor_misuse"
+            >
+              memory_anchor_misuse
+            </option>
+            <option
+              value="style_drift"
+            >
+              style_drift
+            </option>
+            <option
+              value="other"
+            >
+              other
+            </option>
+          </select>
+          <input
+            class="control"
+            placeholder="纠错附注（原文只留本机）"
+            style="flex: 1 1 0%; min-width: 140px;"
+            type="text"
+            value=""
+          />
+          <button
+            class="btn"
+          >
+            保存纠错
+          </button>
+        </div>
+      </div>
+      <div
+        data-testid="canon-commit-section"
+        style="margin-top: 14px; border-top: 1px solid var(--hairline-strong); padding-top: 12px;"
+      >
+        <div
+          class="card-title"
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
+        >
+          <b
+            style="font-size: 13px;"
+          >
+            正典门禁与定稿提交
+          </b>
+          <span
+            class="cap-badge pending"
+          >
+            ○ 草稿期
+          </span>
+        </div>
+        <div
+          style="display: flex; flex-direction: column; gap: 8px;"
+        >
+          <div
+            style="display: flex; gap: 6px; align-items: center;"
+          >
+            <input
+              aria-label="定稿说明"
+              class="control"
+              placeholder="定稿摘要说明（如：第一卷决战定稿）"
+              style="flex: 1 1 0%; font-size: 11px;"
+              type="text"
+              value=""
+            />
+            <button
+              class="btn-primary"
+              style="font-size: 11px; padding: 4px 10px; white-space: nowrap;"
+              type="button"
+            >
+              确认定稿入账 (Commit)
+            </button>
+          </div>
+          <p
+            class="mono muted"
+            style="font-size: 10px; margin: 0px;"
+          >
+            定稿将执行门禁终验，生成不可变提交并更新章节状态。
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</DocumentFragment>
+`;

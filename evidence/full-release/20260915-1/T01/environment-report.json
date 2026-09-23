@@ -1,0 +1,82 @@
+{
+  "probeDate": "2026-09-15",
+  "probeMethod": "本机只读探测（env 变量名/SDK/工具链）+ 官方文档 curl 抓取",
+  "officialsChecked": {
+    "oracle_always_free": {
+      "url": "https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm",
+      "fetchedAt": "2026-09-15",
+      "keyFacts": [
+        "Ampere A1 flex: 2 OCPU + 12GB memory（Always Free 租户）",
+        "200GB 总计启动卷+块卷 Always Free",
+        "E2.1.Micro: 1/8 OCPU + 1GB",
+        "闲置回收：7天内 CPU 95 分位 <20% 等条件可回收实例"
+      ],
+      "note": "SPEC 记载的 4核/24GB 为旧宣传；以本次官方页面为准"
+    },
+    "supabase_free": {
+      "url": "https://supabase.com/pricing",
+      "fetchedAt": "2026-09-15",
+      "keyFacts": [
+        "Free: $0；50000 MAU；500MB database；5GB egress；1GB file storage",
+        "闲置 1 周暂停；限 2 active projects；Community support",
+        "Pro: $25/月起，100000 MAU 后 $0.00325/MAU，8GB disk 起"
+      ],
+      "note": "免费档有闲置暂停，不承诺商业 SLA（SPEC 同述）"
+    },
+    "wechat_native": {
+      "url": "https://pay.wechatpay.cn/doc/v3/merchant/4015614538",
+      "fetchedAt": "2026-09-15",
+      "keyFacts": [
+        "Native 支付需：已获批商户号 + Native 产品权限 + APPID 授权绑定",
+        "可申请主体：个体工商户/企业/事业单位/政府机关/社会组织",
+        "需超级管理员在商户平台开通权限并配置技术负责人"
+      ],
+      "note": "本机无任何商户/AppID 配置；无签约证据 → 支付 blocked"
+    },
+    "alipay": {
+      "url": "https://open.alipay.com/paymentServicer/paymentProvider.htm",
+      "fetchedAt": "2026-09-15",
+      "fetchNote": "页面 GBK 编码中文乱码，但确认开放平台存在扫码支付产品（alipay.trade.precreate）",
+      "keyFacts": [
+        "需开放平台应用 + 已签约产品权限 + 应用私钥/支付宝公钥",
+        "扫码支付接口 alipay.trade.precreate"
+      ],
+      "note": "本机无 AppID/签约证据 → 支付 blocked"
+    }
+  },
+  "localProbe": {
+    "envSecretNames": {
+      "found": ["FINNHUB_API_KEY", "SENSENOVA_API_KEY", "SENSENOVA_IMAGE_MODEL"],
+      "relevantToMozhou": "none（无 SUPABASE/WECHAT/ALIPAY/MODEL_KEY/AUTH_SMTP 等变量存在）"
+    },
+    "sshTargetHosts": "无 ~/.ssh/config，无已配置目标主机",
+    "deployArtifacts": "无 deploy/ 目录、无 terraform/cloud-init；app/.env.example 仅为遗留示例键名（DATABASE_URL/AUTH_SECRET/ONEAPI_BASE_URL/ONEAPI_TOKEN）",
+    "modelChannel": "apps/web/server/llm/openaiStream.ts 仅支持环境变量（MOZHOU_API_KEY/DEEPSEEK_API_KEY/OPENAI_API_KEY），无 per-user 配置实现；env 中这些变量都不存在",
+    "systemRoutes_501_placeholder": 2
+  },
+  "windowsToolchain": {
+    "rustc": "1.96.0 (2026-05-25) ready",
+    "cargo": "1.96.0 ready",
+    "cargoTauriCli": "MISSING（未安装 @tauri-apps/cli；可随项目依赖安装，非外部条件）",
+    "webview2": "152.0.4191.66 installed",
+    "signtool": "Windows Kits 10.0.26100.0 ready",
+    "codeSigningCert": "MISSING（当前用户个人证书存储 0 项）",
+    "srcTauri": "version 0.1.0, productName 'MoZhou Novel OS'（T17 将核对主程序是否拉起随包 Node 后端——AUDIT 指出当前无此逻辑）"
+  },
+  "externalInputsStatus": {
+    "hosting": "blocked: 无已开通目标主机/SSH 配置（EXTERNAL-INPUTS hosting=missing 保持）",
+    "https_domain_and_deploy_identity": "blocked: 无域名/证书/部署身份",
+    "auth_project_and_live_email": "blocked: 无 Supabase 项目/真实邮件",
+    "backup_destination": "blocked: 无独立故障域备份目的地",
+    "commercially_allowed_model": "blocked: 无模型凭据；免费额度（如 DeepSeek 官方）商业条款未获用户确认",
+    "search_provider": "blocked: 无搜索凭据",
+    "wechat_merchant": "blocked: 无商户号/Native 权限/APPID",
+    "alipay_merchant": "blocked: 无开放平台应用/签约产品",
+    "payment_test_budget": "blocked: 无用户授权金额",
+    "model_acceptance_budget": "blocked: 无预算",
+    "windows_signing": "blocked: 无签名证书（无签名安装包选项待用户选择）",
+    "release_identity": "blocked: 版本号/发布者身份未定",
+    "final_max_quota": "pending: 由 T02 公式 + T18 实测"
+  },
+  "conclusion": "本机 Windows 工具链部分 ready（Rust/WebView2/signtool）；全部 13 项外部输入中 12 项真实缺失（blocked），1 项待 T18。无凭据值被读取或写入证据。"
+}

@@ -1,0 +1,188 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RankScanView（网文扫榜） > 风向词与榜单项目渲染；契约快照 1`] = `
+<section
+  aria-label="rank-scan-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      网文扫榜
+    </h1>
+    <span
+      class="meta"
+    >
+      多平台热榜透视 · 题材风向分析
+    </span>
+    <div
+      class="save"
+    >
+      <button
+        class="btn"
+        style="font-size: 10px; padding: 4px 8px;"
+      >
+        刷新榜单
+      </button>
+    </div>
+  </div>
+  <div
+    class="conversation"
+  >
+    <section
+      class="wb-section"
+      data-testid="rank-trending"
+    >
+      <h2>
+        热门题材风向词
+      </h2>
+      <div
+        class="actions"
+        style="margin-top: 6px; flex-wrap: wrap; gap: 8px;"
+      >
+        <span
+          class="cap-badge native"
+        >
+          #
+          长生苟道
+           (热度 
+          98
+          )
+        </span>
+        <span
+          class="cap-badge native"
+        >
+          #
+          规则怪谈
+           (热度 
+          95
+          )
+        </span>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="rank-boards"
+    >
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"
+      >
+        <h2>
+          主流平台热榜
+        </h2>
+        <div
+          class="actions"
+          style="margin-top: 0px; gap: 6px;"
+        >
+          <button
+            class="btn-primary"
+            style="font-size: 10px; padding: 4px 10px;"
+          >
+            番茄热读榜
+          </button>
+          <button
+            class="btn"
+            style="font-size: 10px; padding: 4px 10px;"
+          >
+            起点风云榜
+          </button>
+        </div>
+      </div>
+      <div
+        data-testid="rank-items"
+        style="display: flex; flex-direction: column; gap: 10px;"
+      >
+        <div
+          class="card-shell"
+          style="margin-bottom: 0px;"
+        >
+          <div
+            class="card"
+          >
+            <div
+              class="card-title"
+            >
+              <div
+                style="display: flex; align-items: center; gap: 8px;"
+              >
+                <span
+                  class="tag"
+                  style="background: rgba(242, 139, 155, 0.2); color: var(--danger); font-weight: 700;"
+                >
+                  Top 
+                  1
+                </span>
+                <b
+                  style="font-size: 13px;"
+                >
+                  惹金枝
+                </b>
+                <span
+                  class="mono muted"
+                >
+                  作者：
+                  青青子衿
+                </span>
+              </div>
+              <span
+                class="cap-badge pending"
+              >
+                98.5万在读
+              </span>
+            </div>
+            <div
+              class="actions"
+              style="margin-top: 4px; gap: 6px;"
+            >
+              <span
+                class="mono muted"
+              >
+                分类：
+                古言脑洞
+              </span>
+              <span
+                class="tag"
+                style="font-size: 9px; padding: 2px 5px;"
+              >
+                双洁
+              </span>
+              <span
+                class="tag"
+                style="font-size: 9px; padding: 2px 5px;"
+              >
+                真假千金
+              </span>
+            </div>
+            <div
+              class="finding"
+              style="margin-top: 8px;"
+            >
+              <b>
+                💡 金手指：
+              </b>
+              <span
+                style="font-size: 11px; margin-left: 4px;"
+              >
+                前世记忆预知
+              </span>
+            </div>
+            <div
+              class="finding"
+            >
+              <b>
+                🎯 一句话钩子：
+              </b>
+              <span
+                style="font-size: 11px; margin-left: 4px;"
+              >
+                重回替嫁当夜，她直接掀翻了喜堂。
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

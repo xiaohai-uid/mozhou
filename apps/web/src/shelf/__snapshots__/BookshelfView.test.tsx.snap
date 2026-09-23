@@ -1,0 +1,186 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BookshelfView（书架） > 书库列表渲染（书名/章数/书 id）+ 当前书高亮禁用；契约快照 1`] = `
+<section
+  aria-label="bookshelf-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      书源书架
+    </h1>
+    <span
+      class="meta"
+    >
+      本地书库 · 
+      2
+       本
+    </span>
+  </div>
+  <div
+    class="conversation"
+  >
+    <div
+      class="actions"
+      style="margin-top: 0px;"
+    >
+      <button
+        class="btn"
+      >
+        刷新书库
+      </button>
+      <span
+        class="mono muted"
+        style="align-self: center;"
+      >
+        书库根：
+        C:/tmp/lib
+      </span>
+    </div>
+    <section
+      class="wb-section"
+      data-testid="bookshelf-import"
+    >
+      <h2>
+        书源搜索导入
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              从书源建书（本地落地）
+            </b>
+            <span
+              class="mono muted"
+            >
+              零外部抓取 · 书名为输入
+            </span>
+          </div>
+          <div
+            class="actions"
+          >
+            <input
+              aria-label="书源书名"
+              class="control"
+              placeholder="输入书名或书源 URL 中识别到的书名…"
+              style="flex: 1 1 0%; min-width: 180px;"
+              value=""
+            />
+            <button
+              class="btn-primary"
+              disabled=""
+            >
+              导入书架
+            </button>
+          </div>
+          <p
+            class="mono muted"
+            style="margin: 10px 0px 0px;"
+          >
+            导入 = 在书库根新建本地书（book.json + 大纲骨架），随后可进工作台续写。
+          </p>
+        </div>
+      </div>
+    </section>
+    <section
+      class="wb-section"
+      data-testid="bookshelf-list"
+    >
+      <h2>
+        本地书库
+      </h2>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              甲书
+            </b>
+            <span
+              class="mono muted"
+            >
+              1
+               章
+            </span>
+          </div>
+          <p
+            class="mono muted"
+            style="margin: 6px 0px 0px;"
+          >
+            bk_a
+             · 
+            C:/tmp/lib/甲书
+          </p>
+          <div
+            class="actions"
+            style="margin-top: 8px;"
+          >
+            <button
+              class="btn"
+              data-root="C:/tmp/lib/甲书"
+              data-testid="bookshelf-open"
+              disabled=""
+            >
+              当前打开
+            </button>
+          </div>
+        </div>
+      </div>
+      <div
+        class="card-shell"
+      >
+        <div
+          class="card"
+        >
+          <div
+            class="card-title"
+          >
+            <b>
+              乙书
+            </b>
+            <span
+              class="mono muted"
+            >
+              0
+               章
+            </span>
+          </div>
+          <p
+            class="mono muted"
+            style="margin: 6px 0px 0px;"
+          >
+            bk_b
+             · 
+            C:/tmp/lib/乙书
+          </p>
+          <div
+            class="actions"
+            style="margin-top: 8px;"
+          >
+            <button
+              class="btn"
+              data-root="C:/tmp/lib/乙书"
+              data-testid="bookshelf-open"
+            >
+              打开
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+`;

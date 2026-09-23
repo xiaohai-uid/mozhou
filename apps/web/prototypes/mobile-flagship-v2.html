@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>墨舟 · 手机端顶级旗舰 UI v2 (High-End & Apple Fluid Redesign)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ========================================================
+       1. 顶级旗舰 Token · 黑曜石与夜墨紫 (Obsidian & Void Violet)
+       ======================================================== */
+    :root {
+      --bg-root: #040306;
+      --bg-chassis: #09080d;
+      --bezel-outer: rgba(255, 255, 255, 0.06);
+      --bezel-border: rgba(255, 255, 255, 0.12);
+      
+      --card-core: #121017;
+      --card-core-elevated: #1a1722;
+      --glass-surface: rgba(18, 16, 23, 0.78);
+      
+      --purple-vivid: #8c7aff;
+      --purple-glow: rgba(140, 122, 255, 0.38);
+      --purple-tint: rgba(140, 122, 255, 0.14);
+      --purple-border: rgba(140, 122, 255, 0.32);
+      --purple-gradient: linear-gradient(135deg, #a79aff 0%, #7058ff 100%);
+      
+      --emerald-vivid: #3dd68c;
+      --emerald-tint: rgba(61, 214, 140, 0.14);
+      --amber-vivid: #ffb443;
+      --amber-tint: rgba(255, 180, 67, 0.14);
+      --danger-vivid: #f28b9b;
+      
+      --hairline: rgba(255, 255, 255, 0.08);
+      --inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.14);
+      --inner-highlight-subtle: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+      
+      --fg-primary: #f6f3fc;
+      --fg-secondary: #aba1ba;
+      --fg-tertiary: #6b6378;
+      
+      --font-ui: "Geist", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      --font-prose: "Noto Serif SC", "Songti SC", "SimSun", serif;
+      --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
+      --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    html, body {
+      margin: 0; padding: 0; min-height: 100vh;
+      background: #020103; color: var(--fg-primary); font-family: var(--font-ui);
+      display: flex; align-items: center; justify-content: center;
+      overflow-x: hidden;
+    }
+
+    /* 桌面容器展示台架 */
+    .viewport-harness {
+      width: 100%; max-width: 440px; min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+
+    /* 物理级 CNC 黑曜石机身 (Machined Obsidian Hardware) */
+    .phone-hardware {
+      width: 390px; height: 844px; max-width: 100%;
+      background: var(--bg-chassis);
+      border-radius: 52px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 
+        0 0 0 1px rgba(0, 0, 0, 0.9),
+        0 32px 100px -10px rgba(0, 0, 0, 0.95),
+        0 0 90px -20px rgba(140, 122, 255, 0.2);
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+
+    /* 空间光晕 (Ambient Volumetric Glow) */
+    .glow-purple {
+      position: absolute; top: -100px; right: -80px; width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(140, 122, 255, 0.18) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none; z-index: 1; filter: blur(40px);
+    }
+    .glow-amber {
+      position: absolute; bottom: 80px; left: -60px; width: 240px; height: 240px;
+      background: radial-gradient(circle, rgba(255, 180, 67, 0.08) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none; z-index: 1; filter: blur(40px);
+    }
+
+    /* ========================================================
+       2. 灵动岛 (Interactive Dynamic Island)
+       ======================================================== */
+    .status-bar {
+      height: 48px; padding: 0 26px; display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; font-weight: 600; color: var(--fg-tertiary); z-index: 30; flex-shrink: 0;
+    }
+    
+    .island-pill {
+      height: 28px; background: #000; border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex; align-items: center; gap: 8px; padding: 0 10px;
+      cursor: pointer; transition: all 300ms var(--ease-spring);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .island-pill:active { transform: scale(0.96); }
+    .island-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--emerald-vivid); box-shadow: 0 0 8px var(--emerald-vivid); }
+    .island-label { font-size: 11px; font-weight: 600; color: var(--fg-primary); letter-spacing: 0.02em; }
+
+    /* ========================================================
+       3. 悬浮双层 Header (Double-Bezel Nav)
+       ======================================================== */
+    .header-outer {
+      margin: 0 16px 10px; padding: 2px;
+      border-radius: 26px;
+      background: var(--bezel-outer);
+      border: 1px solid var(--hairline);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      z-index: 20; flex-shrink: 0;
+    }
+    .header-inner {
+      background: var(--glass-surface);
+      border-radius: 24px;
+      padding: 8px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: var(--inner-highlight);
+    }
+    .book-info { display: flex; align-items: center; gap: 8px; }
+    .book-logo {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: linear-gradient(135deg, #242030 0%, #15131c 100%);
+      border: 1px solid var(--hairline);
+      display: grid; place-items: center; font-size: 13px;
+    }
+    .book-title { font-size: 14px; font-weight: 700; color: var(--fg-primary); letter-spacing: -0.01em; }
+    .chapter-tag { font-size: 10.5px; font-weight: 600; color: var(--purple-vivid); padding: 1px 7px; border-radius: 999px; background: var(--purple-tint); border: 1px solid var(--purple-border); }
+
+    .header-right { display: flex; align-items: center; gap: 6px; }
+    .icon-btn {
+      width: 32px; height: 32px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04); border: 1px solid var(--hairline);
+      display: grid; place-items: center; font-size: 13px; color: var(--fg-secondary);
+      cursor: pointer; transition: all 200ms var(--ease-apple);
+    }
+    .icon-btn:active { transform: scale(0.94); background: rgba(255, 255, 255, 0.09); }
+
+    /* ========================================================
+       4. 核心视口与小说沉浸流 (Fluid Story Stream)
+       ======================================================== */
+    .stream-viewport {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 4px 16px 150px;
+      display: flex; flex-direction: column; gap: 16px;
+      z-index: 10; scrollbar-width: none;
+    }
+    .stream-viewport::-webkit-scrollbar { display: none; }
+
+    /* 墨舟先问：Double-Bezel 智能气泡 */
+    .inquiry-outer {
+      padding: 1.5px; border-radius: 26px;
+      background: linear-gradient(135deg, rgba(140, 122, 255, 0.45) 0%, rgba(255,255,255,0.06) 100%);
+      box-shadow: 0 16px 40px -10px rgba(0,0,0,0.6), 0 0 24px rgba(140,122,255,0.1);
+    }
+    .inquiry-inner {
+      background: linear-gradient(180deg, #161320 0%, #0e0d14 100%);
+      border-radius: 24.5px; padding: 16px;
+      box-shadow: var(--inner-highlight);
+    }
+    .inquiry-meta {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    }
+    .badge-inquiry {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--purple-vivid);
+    }
+    .inquiry-text {
+      font-size: 14px; line-height: 1.65; color: #ded6ed; font-weight: 450; margin-bottom: 14px;
+    }
+
+    /* 选项按键 (Nested Glass Tiles) */
+    .choices-list { display: flex; flex-direction: column; gap: 8px; }
+    .choice-card {
+      padding: 10px 14px; border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid var(--hairline);
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; transition: all 250ms var(--ease-spring);
+      box-shadow: var(--inner-highlight-subtle);
+    }
+    .choice-card:hover, .choice-card:active {
+      background: var(--purple-tint); border-color: var(--purple-border);
+      transform: translateX(3px);
+    }
+    .choice-label { font-size: 13px; color: var(--fg-primary); font-weight: 500; }
+    .choice-pill { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--fg-secondary); }
+
+    /* 伏笔/实体感知卡片 */
+    .ledger-clue-card {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px; border-radius: 16px;
+      background: rgba(255, 180, 67, 0.06); border: 1px solid rgba(255, 180, 67, 0.2);
+      font-size: 11.5px; color: #ffd88f; box-shadow: var(--inner-highlight-subtle);
+    }
+
+    /* 小说正文排印 (High-End Variable Serif) */
+    .prose-block {
+      display: flex; flex-direction: column; gap: 16px;
+      padding: 8px 4px;
+    }
+    .prose-p {
+      font-family: var(--font-prose);
+      font-size: 16px; line-height: 1.95;
+      color: #ede7f7; letter-spacing: 0.02em;
+      text-align: justify;
+    }
+    .prose-p.dim { color: var(--fg-secondary); }
+
+    /* ========================================================
+       5. 旗舰级 Double-Bezel Composer v3 悬浮输入舱
+       ======================================================== */
+    .composer-dock {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 0 16px calc(14px + env(safe-area-inset-bottom));
+      z-index: 25;
+      background: linear-gradient(180deg, rgba(9,8,13,0) 0%, rgba(9,8,13,0.92) 35%, #09080d 100%);
+      pointer-events: none;
+    }
+
+    .composer-shell {
+      pointer-events: auto;
+      padding: 2px; border-radius: 34px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(140, 122, 255, 0.28) 100%);
+      box-shadow: 
+        0 24px 60px rgba(0,0,0,0.85),
+        0 0 35px rgba(140, 122, 255, 0.15);
+      transition: all 300ms var(--ease-spring);
+    }
+    .composer-shell:focus-within {
+      background: linear-gradient(180deg, var(--purple-vivid) 0%, rgba(255,255,255,0.45) 100%);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.85), 0 0 45px rgba(140, 122, 255, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .composer-core {
+      background: #14121a; border-radius: 32px;
+      padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      box-shadow: var(--inner-highlight);
+    }
+
+    /* 1. 上下文行 */
+    .composer-context {
+      display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    }
+    .composer-context::-webkit-scrollbar { display: none; }
+    .ctx-tag {
+      font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05); color: var(--fg-secondary);
+      border: 1px solid var(--hairline); white-space: nowrap; display: flex; align-items: center; gap: 4px;
+    }
+    .ctx-tag.active {
+      background: var(--purple-tint); color: var(--purple-vivid); border-color: var(--purple-border);
+    }
+
+    /* 2. 文本输入域 */
+    .composer-input-box { display: flex; align-items: flex-end; gap: 8px; }
+    .composer-textarea {
+      flex: 1; border: none; outline: none; background: transparent;
+      color: var(--fg-primary); font-family: var(--font-ui);
+      font-size: 14.5px; line-height: 1.5; resize: none; min-height: 44px; max-height: 110px;
+      padding: 2px 0;
+    }
+    .composer-textarea::placeholder { color: var(--fg-tertiary); }
+
+    /* 3. 动作操作行 (Button-in-Button) */
+    .composer-actions {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .tool-chips { display: flex; gap: 6px; }
+    .tool-chip {
+      height: 26px; padding: 0 10px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04); border: 1px solid var(--hairline);
+      color: var(--fg-secondary); font-size: 11px; font-weight: 500;
+      display: flex; align-items: center; gap: 4px; cursor: pointer;
+      transition: all 150ms var(--ease-apple);
+    }
+    .tool-chip:active { transform: scale(0.95); }
+
+    /* 顶级 Button-in-Button 结构 */
+    .btn-send-nested {
+      height: 36px; padding: 0 5px 0 14px; border-radius: 999px;
+      background: var(--purple-gradient); border: none;
+      color: #fff; font-size: 12.5px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      box-shadow: 0 4px 18px rgba(140, 122, 255, 0.45);
+      transition: all 200ms var(--ease-apple);
+    }
+    .btn-send-nested:active { transform: scale(0.96); }
+    .btn-send-icon {
+      width: 26px; height: 26px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+    }
+
+    /* ========================================================
+       6. 悬浮底栏导航 (Floating Glass Tabbar)
+       ======================================================== */
+    .tabbar-outer {
+      position: absolute; bottom: 8px; left: 24px; right: 24px;
+      height: 48px; border-radius: 999px;
+      background: rgba(20, 18, 26, 0.88);
+      border: 1px solid var(--hairline-bright);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+      display: none; /* 当输入框收起时可切换显示 */
+      justify-content: space-around; align-items: center;
+      z-index: 40;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="viewport-harness">
+    <div class="phone-hardware">
+      <!-- 空间光晕 -->
+      <div class="glow-purple"></div>
+      <div class="glow-amber"></div>
+
+      <!-- 顶栏状态与灵动岛 -->
+      <div class="status-bar">
+        <span>09:41</span>
+        <div class="island-pill" onclick="alert('灵动岛展开：当前处于 [草稿撰写] 阶段 · 耗时 1.2s · 848 项测试全绿')">
+          <div class="island-dot"></div>
+          <span class="island-label">质量门 98 · PASS</span>
+        </div>
+        <span>5G</span>
+      </div>
+
+      <!-- 悬浮双层 Header -->
+      <header class="header-outer">
+        <div class="header-inner">
+          <div class="book-info">
+            <div class="book-logo">📖</div>
+            <div>
+              <div class="book-title">假神真显灵</div>
+            </div>
+            <span class="chapter-tag">第 001 章</span>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" onclick="alert('展开 Story Brain 事实脑图')">🧠</button>
+            <button class="icon-btn" onclick="alert('展开章节全景目录')">📑</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- 核心内容流淌区 -->
+      <main class="stream-viewport">
+        <!-- 墨舟先问：Double-Bezel 智能气泡 -->
+        <div class="inquiry-outer">
+          <div class="inquiry-inner">
+            <div class="inquiry-meta">
+              <div class="badge-inquiry">
+                <span>✦</span>
+                <span>墨舟先问 · 情节分叉</span>
+              </div>
+              <span style="font-size:10px; color:var(--fg-tertiary);">SEPIA-002</span>
+            </div>
+            <div class="inquiry-text">
+              门外的抓挠声骤然停滞，一股腥甜潮湿的黑血顺着门槛缝隙渗透进来。主角陆沉舟袖口内暗藏的火磷丸受潮严重，此刻是假戏真做引燃残香，还是熄灭烛火借黑暗脱身？
+            </div>
+            <div class="choices-list">
+              <div class="choice-card" onclick="pickChoice(this, '假戏真做：引燃神像前残香，借碧火神光震慑门外邪祟')">
+                <span class="choice-label">借泥塑残香引燃碧火，制造「神君显圣」假象</span>
+                <span class="choice-pill">94% 爽点</span>
+              </div>
+              <div class="choice-card" onclick="pickChoice(this, '以静制动：熄灭残烛隐入神龛阴影，伺机破窗')">
+                <span class="choice-label">熄灭残烛，隐入神龛阴影以静制动</span>
+                <span class="choice-pill">86% 悬疑</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 伏笔账本即时反馈卡 -->
+        <div class="ledger-clue-card">
+          <span>⚡ 伏笔账本提示</span>
+          <span>「火磷丸受潮 30%」· 强行动用存在反噬风险</span>
+        </div>
+
+        <!-- 小说正文流淌 -->
+        <div class="prose-block">
+          <p class="prose-p">
+            夜雨如注，重重砸在破败的殿瓦上，顺着断裂的滴水兽连成一道道浑浊的水幕。殿内冷风倒灌，将香案两侧残存的白烛吹得火苗摇曳，在泥塑神像斑驳的面孔上投下狰狞扭曲的阴影。
+          </p>
+          <p class="prose-p">
+            陆沉舟屏住呼吸，后背紧紧贴在冰凉刺骨的神台基座上。他能清晰地听到自己胸膛里那颗心脏狂乱的跳动声。
+          </p>
+          <p class="prose-p dim">
+            作为靠祖传障眼法混迹市井的骗子，他曾无数次教别人如何「敬神避祸」。可直到今夜这东西真真切切地撞在门板上，他才明白……那些写在古籍里的禁忌，从来都不是戏谈。
+          </p>
+        </div>
+      </main>
+
+      <!-- 旗舰级 Double-Bezel Composer v3 悬浮输入舱 -->
+      <div class="composer-dock">
+        <div class="composer-shell">
+          <div class="composer-core">
+            <!-- 1. 上下文行 -->
+            <div class="composer-context">
+              <span class="ctx-tag active">⚡ sepia-write (叙事增强)</span>
+              <span class="ctx-tag">🎨 悬疑沉郁风</span>
+              <span class="ctx-tag">📍 破庙内堂</span>
+              <span class="ctx-tag">预算 8.4k</span>
+            </div>
+            <!-- 2. 文本输入域 -->
+            <div class="composer-input-row">
+              <textarea class="composer-textarea" rows="2" placeholder="输入续写指令、情节走向或对白批注..."></textarea>
+            </div>
+            <!-- 3. 操作行与 Button-in-Button -->
+            <div class="composer-actions">
+              <div class="tool-chips">
+                <button class="tool-chip" onclick="alert('展开 17 项技能选择抽屉')">
+                  <span>+</span><span>技能</span>
+                </button>
+                <button class="tool-chip" onclick="alert('开启去 AI 味深度重构 (De-AI)')">
+                  <span>✨</span><span>去AI味</span>
+                </button>
+              </div>
+              <button class="btn-send-nested" onclick="triggerRun(this)">
+                <span>生成草稿</span>
+                <div class="btn-send-icon">➤</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function pickChoice(el, text) {
+      document.querySelectorAll('.choice-card').forEach(c => {
+        c.style.background = 'rgba(255, 255, 255, 0.03)';
+        c.style.borderColor = 'var(--hairline)';
+      });
+      el.style.background = 'var(--purple-tint)';
+      el.style.borderColor = 'var(--purple-border)';
+      
+      const textarea = document.querySelector('.composer-textarea');
+      textarea.value = text;
+      textarea.focus();
+    }
+
+    function triggerRun(btn) {
+      btn.innerHTML = '<span>生成中...</span><div class="btn-send-icon">⏹</div>';
+      btn.style.background = 'rgba(242, 139, 155, 0.16)';
+      btn.style.color = 'var(--danger-vivid)';
+      btn.style.boxShadow = 'none';
+
+      // 模拟灵动岛状态切换
+      const island = document.querySelector('.island-pill');
+      island.innerHTML = '<div class="island-dot" style="background:var(--purple-vivid); box-shadow:0 0 8px var(--purple-vivid);"></div><span class="island-label">AI 创作中 · 24字/s</span>';
+
+      setTimeout(() => {
+        btn.innerHTML = '<span>生成草稿</span><div class="btn-send-icon">➤</div>';
+        btn.style.background = 'var(--purple-gradient)';
+        btn.style.color = '#fff';
+        btn.style.boxShadow = '0 4px 18px rgba(140, 122, 255, 0.45)';
+
+        island.innerHTML = '<div class="island-dot"></div><span class="island-label">质量门 98 · PASS</span>';
+        alert('✨ 章节段落生成完毕！通过 Continuity & Quality 校验！');
+      }, 1500);
+    }
+  </script>
+</body>
+</html>

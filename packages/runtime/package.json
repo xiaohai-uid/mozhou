@@ -1,0 +1,17 @@
+{
+  "name": "@mozhou/runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "yaml": "^2.6.1"
+  }
+}

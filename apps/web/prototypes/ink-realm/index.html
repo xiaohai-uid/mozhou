@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>墨舟 Ink Realm / 墨境 — 设计原型总览</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  .hub{position:relative;z-index:4;max-width:1060px;margin:0 auto;padding:56px 24px 80px}
+  .hub-hero{padding:38px 34px;margin-bottom:26px}
+  .hub-hero h1{font:600 34px/1.3 var(--ir-serif);letter-spacing:.04em}
+  .hub-hero .tag{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .hub-card{display:block;padding:18px 20px}
+  .hub-card h2{font:600 16px/1.4 var(--ir-serif);color:var(--ir-fg);margin:8px 0 6px}
+  .hub-card p{margin:0;font-size:12.5px;color:var(--ir-muted);line-height:1.7}
+  .hub-card .no{font:600 11px/1 var(--ir-mono);color:var(--ir-gold)}
+  .legend{margin-top:26px;padding:18px 20px}
+  .legend .row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:8px 0;font-size:12.5px;color:var(--ir-muted)}
+</style>
+</head>
+<body>
+<div class="ir-scene city-night"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.5"></div>
+<main class="hub">
+  <section class="hub-hero mat-metal-rim">
+    <div class="kicker">MOZHOU · INK REALM / 墨境 — DESIGN PROTOTYPE INDEX</div>
+    <h1>墨舟 · 墨境</h1>
+    <p class="note" style="font-size:14px;max-width:62ch;margin-top:10px">
+      东方未来主义 × 文学沉浸空间 × 精密 AI HUD × 高级卡牌信息系统。<br>
+      用户进入自己的小说世界，墨舟是一套悬浮在这个世界之上的专业创作仪器。
+    </p>
+    <div class="tag">
+      <span class="badge b-gold">GOLD = 作者主权</span>
+      <span class="badge b-jade">JADE = AI / 系统</span>
+      <span class="badge b-pass">GREEN = verified / committed</span>
+      <span class="badge b-stale">WARNING = advisory / stale</span>
+      <span class="badge b-error">RED = blocking / destructive</span>
+    </div>
+  </section>
+
+  <div class="hub-grid">
+    <a class="hub-card card-capability" href="01-token-board.html"><span class="no">01</span><h2>Token Board</h2><p>色彩语义 / 四材质 / 三轨排印 / 卡牌分类 / 按钮语义 / 状态语言 / 动效参数</p></a>
+    <a class="hub-card card-capability" href="02-scene-system.html"><span class="no">02</span><h2>Scene System 墨境场景</h2><p>Scene / Atmosphere / Foreground Figure 三层解耦；人物可换可关；右侧 non-blocking Sheet 四分区交互原型</p></a>
+    <a class="hub-card card-capability" href="03-desktop-shell.html"><span class="no">03</span><h2>Desktop Shell 1440</h2><p>Top HUD + 17 项导航 + 8 步 Pipeline 六态 + Workbench（DialogueStream 全协议）+ Evidence Tower</p></a>
+    <a class="hub-card card-capability" href="04-views-creation.html"><span class="no">04</span><h2>创作航道</h2><p>写作对话（真实落点）· 我的作品 · 风格蒸馏 · 小说拆解（501 三态）</p></a>
+    <a class="hub-card card-capability" href="05-views-inspector.html"><span class="no">05</span><h2>检视 · Novel OS</h2><p>Story Brain / 装配看板 / 变更矩阵 / 质量门 中心页形态 + summary rail</p></a>
+    <a class="hub-card card-capability" href="06-views-resources.html"><span class="no">06</span><h2>工作流与资源</h2><p>任务中心 · 书源搜索 · 书源书架 · 技能广场（概要）· 扫榜/联网（501 三态）· 云同步 · 会员中心</p></a>
+    <a class="hub-card card-capability" href="10-skill-square.html"><span class="no">10</span><h2>技能广场 · 完整生态</h2><p>17 项真实注册表全上墙 + 4 状态 + evidence + 可操作 detail Sheet（启用前提/不可用原因/动作契约）</p></a>
+    <a class="hub-card card-capability" href="07-wizard.html"><span class="no">07</span><h2>Wizard 世界启动仪式</h2><p>五步沉浸；每步一个决策；建书失败就地呈现；不暗示未发生的持久化</p></a>
+    <a class="hub-card card-capability" href="08-aux-latent.html"><span class="no">08</span><h2>辅助工具与隐性子系统</h2><p>灵感工坊（真）· 时光机/导出/合规（诚实不可用）· Advanced Editor Reading Slate · Canon Graph · Genre Kits · Export Suite</p></a>
+    <a class="hub-card card-capability" href="09-mobile.html"><span class="no">09</span><h2>Mobile 五 Hub</h2><p>创作/检视/作品/书源/设置 + 抽屉系统；Figure 默认关、veil 加重、触点 ≥44px</p></a>
+  </div>
+
+  <section class="legend mat-ink-glass">
+    <div class="kicker">原型标注图例 — 数据诚实纪律</div>
+    <div class="row"><span class="badge b-fixture">DESIGN FIXTURE</span> 版式占位样例数据，非真实用户状态</div>
+    <div class="row"><span class="badge b-neutral">LOCAL PRESET</span> 本地预设（灵感骰子/样例范本），非 AI 生成、非当前作品</div>
+    <div class="row"><span class="badge b-stale">unavailable / 501 code</span> 沿用服务端真实文案与错误码（如 RANK_SOURCE_NOT_CONFIGURED）</div>
+    <div class="row"><span class="badge b-exp">EXPERIMENTAL</span> code-present / unmounted 域（Canon Graph 等），不冒充已上线</div>
+    <div class="row"><span class="badge b-jade">FUTURE DATA LAYOUT</span> 接入真实 provider 后的未来布局（明确非当前能力）</div>
+    <div class="row" style="margin-top:12px">证据基线：<a href="INK_REALM_SURFACE_MAP.md">INK_REALM_SURFACE_MAP.md</a> · 设计系统：<a href="INK_REALM_DESIGN_SYSTEM.md">INK_REALM_DESIGN_SYSTEM.md</a> · 验收：<a href="INK_REALM_COVERAGE_REPORT.md">INK_REALM_COVERAGE_REPORT.md</a></div>
+  </section>
+</main>
+</body>
+</html>

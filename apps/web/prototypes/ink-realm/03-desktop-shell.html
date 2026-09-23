@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03 · Desktop Shell 1440 — 工作台 + 证据塔</title>
+<link rel="stylesheet" href="assets/ink-realm.css">
+<style>
+  body{overflow:hidden}
+  .shell{position:fixed;inset:0;z-index:3;display:grid;
+    grid-template-columns:236px minmax(560px,1fr) 392px;
+    grid-template-rows:58px 54px minmax(0,1fr);
+    gap:var(--ir-world-gap);padding:var(--ir-world-gap);}
+  /* Top HUD spans all columns */
+  .top{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 16px;border-radius:12px}
+  .top .brand{display:flex;align-items:center;gap:9px}
+  .seal{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+    background:linear-gradient(145deg,rgba(214,179,106,.9),rgba(150,110,60,.85));color:#0a0d08;
+    font:700 14px/1 var(--ir-serif)}
+  .bookchip{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;
+    border:1px solid var(--ir-hairline);background:rgba(205,225,222,.04)}
+  .thumb{width:22px;height:22px;border-radius:5px;background:
+    radial-gradient(80% 80% at 30% 20%, rgba(114,201,196,.5), transparent 60%),#0a1a24;border:1px solid var(--ir-hairline)}
+  .top .tools{display:flex;align-items:center;gap:2px;margin-left:auto}
+  .tool{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;border:none;background:transparent;
+    color:var(--ir-muted);font:400 12.5px/1 var(--ir-sans);cursor:pointer}
+  .tool:hover{color:var(--ir-fg);background:rgba(205,225,222,.06)}
+  .tool svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.4}
+  .quiet{opacity:.55;cursor:default}
+  /* pipeline row */
+  .pipe{grid-column:1/-1;display:flex;align-items:stretch;gap:2px;padding:6px 12px;border-radius:12px}
+  .pipe .stage{flex:1}
+  /* nav */
+  .navhud{border-radius:12px;padding:12px 10px;overflow:auto}
+  .navgroup{margin-bottom:12px}
+  .navlabel{font:600 10px/1 var(--ir-sans);letter-spacing:.14em;color:var(--ir-faint);padding:0 10px 6px}
+  /* center */
+  .center{display:flex;flex-direction:column;gap:var(--ir-world-gap);min-width:0}
+  .bookctx{padding:12px 16px}
+  .chapbar{display:flex;align-items:center;gap:12px}
+  .workarea{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 264px;gap:var(--ir-world-gap);min-height:0}
+  .convo{overflow:auto;padding:20px clamp(18px,3.4%,34px);display:flex;flex-direction:column;gap:14px}
+  .auxcol{overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+  /* dialogue blocks */
+  .qblock{padding:12px 15px;border-radius:0 10px 10px 0;border-left:2px solid var(--ir-jade-line);background:var(--ir-jade-soft)}
+  .qblock .qh{font:600 10px/1 var(--ir-sans);letter-spacing:.16em;color:var(--ir-jade);margin-bottom:6px}
+  .ablock{padding:10px 14px;border-radius:10px;background:rgba(205,225,222,.05);border:1px solid var(--ir-hairline);
+    max-width:84%;margin-left:auto;color:var(--ir-fg);font-size:13.5px;line-height:1.7}
+  .choices{display:flex;flex-wrap:wrap;gap:8px}
+  .skillrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .composer{border-radius:12px;padding:12px 14px}
+  .composer textarea{background:transparent;border:none;resize:none;color:var(--ir-fg);font:400 14px/1.7 var(--ir-sans);width:100%;height:54px;outline:none}
+  /* evidence tower */
+  .tower{border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+  .tw-head{padding:10px 12px 0}
+  .tw-tabs{display:flex;gap:2px;margin-top:8px}
+  .tw-tab{flex:1;text-align:center;font:600 11.5px/1 var(--ir-sans);color:var(--ir-faint);cursor:pointer;padding:8px 2px;
+    border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:none}
+  .tw-tab.on{color:var(--ir-fg);background:rgba(205,225,222,.06);border-color:var(--ir-hairline)}
+  .tw-pane{display:none;flex:1;overflow:auto;padding:12px;border-top:1px solid var(--ir-hairline)}
+  .tw-pane.on{display:block}
+  .blockline{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:12px;color:var(--ir-muted)}
+  .blockline:hover{background:rgba(217,131,131,.07)}
+  .advline{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:12px;color:var(--ir-muted)}
+  .factrow{padding:7px 9px;border-bottom:1px solid var(--ir-hairline);font-size:12.5px;color:var(--ir-muted)}
+  .factrow b{color:var(--ir-fg);font-weight:600}
+  .budget{display:flex;height:14px;border-radius:4px;overflow:hidden;border:1px solid var(--ir-hairline);margin:8px 0 4px}
+  .budget i{display:block;height:100%}
+  .no-book{display:none}
+  /* ---- 1280 档（P2-1）：辅助列折叠为 Sheet，右塔收窄——作者主创区优先 ---- */
+  .aux-toggle{display:none}
+  @media (max-width:1360px){
+    .shell{grid-template-columns:210px minmax(470px,1fr) 340px}
+    .workarea{grid-template-columns:minmax(0,1fr) 0}
+    .auxcol{display:none}
+    .aux-toggle{display:inline-flex}
+    .auxcol.as-sheet{display:flex;position:fixed;top:126px;right:10px;bottom:10px;width:300px;z-index:6;
+      background:linear-gradient(180deg,rgba(12,23,30,.97),rgba(8,17,23,.97));
+      -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+      border:1px solid var(--ir-hairline-strong);border-radius:12px;box-shadow:var(--ir-shadow);padding:14px}
+  }
+</style>
+</head>
+<body>
+<div class="ir-scene city-night"></div>
+<div class="ir-atmosphere"></div>
+<div class="ir-veil" style="--veil-strength:.52"></div>
+<div class="ir-figure pos-right" style="--figure-opacity:.68;right:2%"><div class="sil" style="transform:scale(.92)"></div></div>
+
+<div class="shell">
+  <!-- ================= TOP HUD (L3 · Scene Glass) ================= -->
+  <header class="top mat-scene-glass">
+    <div class="brand"><span class="seal">墨</span>
+      <div><b class="t-serif" style="font-size:15px">墨舟</b><div class="kicker" style="font-size:9px">NOVEL OS · 墨境</div></div>
+    </div>
+    <button class="bookchip" title="当前作品 · 点按重放 Wizard">
+      <span class="thumb" aria-hidden="true"></span>
+      <span style="text-align:left"><b class="t-serif" style="font-size:13.5px">《潮汐之上》</b>
+        <div class="kicker" style="font-size:9px">BOOK 7f3a21c9 · 场景：海城·夜</div></span>
+    </button>
+    <div class="tools">
+      <button class="tool quiet" title="每日码字统计尚未接入——诚实 unavailable，不伪造数字">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+        <span>今日码字 · 未接入</span></button>
+      <button class="tool" title="版本历史尚未接入"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>时光机</span></button>
+      <button class="tool" title="打开本地灵感工坊"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 15h.01M12 12h.01"/></svg><span>灵感工坊</span></button>
+      <button class="tool" title="导出尚未接入"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span>导出</span></button>
+      <button class="tool" title="合规审查尚未接入"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span>敏感词</span></button>
+      <button class="tool" id="sceneBtn" title="墨境场景设置"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M3 13l5-4 4 3 3-2 6 4"/><circle cx="9" cy="8.5" r="1"/></svg><span>场景</span></button>
+      <button class="tool quiet" title="数据平面为本地存储；云同步未接入"><span class="badge b-pass" style="font-size:10px">本地已就绪</span></button>
+    </div>
+  </header>
+
+  <!-- ================= PIPELINE SPINE (8 stages · six honest states) ================= -->
+  <nav class="pipe mat-scene-glass" aria-label="生产管线">
+    <div class="stage done"><b>prepare</b><span>准备</span></div>
+    <div class="stage done"><b>compile</b><span>装配</span></div>
+    <div class="stage running"><b>draft</b><span>草稿</span></div>
+    <div class="stage selected"><b>review</b><span>审查</span></div>
+    <div class="stage blocked" title="提取：依赖语义 provider（Gate 3 未配置时 blocked）"><b>extract</b><span>提取</span></div>
+    <div class="stage"><b>continuity</b><span>连续性</span></div>
+    <div class="stage"><b>proposal</b><span>提案</span></div>
+    <div class="stage"><b>commit</b><span>提交</span></div>
+  </nav>
+
+  <!-- ================= LEFT CAPABILITY RAIL (17 items) ================= -->
+  <aside class="navhud mat-scene-glass" aria-label="完整功能导航">
+    <div class="navgroup"><div class="navlabel">创作 · 5</div>
+      <button class="navitem active"><i>01</i>工作台</button>
+      <button class="navitem"><i>02</i>写作对话</button>
+      <button class="navitem"><i>03</i>我的作品</button>
+      <button class="navitem"><i>04</i>风格蒸馏</button>
+      <button class="navitem"><i>05</i>小说拆解</button></div>
+    <div class="navgroup"><div class="navlabel">检视 · NOVEL OS · 4</div>
+      <button class="navitem"><i>SB</i>Story Brain</button>
+      <button class="navitem"><i>CR</i>装配看板</button>
+      <button class="navitem"><i>CM</i>变更矩阵</button>
+      <button class="navitem"><i>QG</i>质量门</button></div>
+    <div class="navgroup"><div class="navlabel">工作流 · 1</div>
+      <button class="navitem"><i>10</i>任务中心<span class="ncount">—</span></button></div>
+    <div class="navgroup"><div class="navlabel">资源 · 6</div>
+      <button class="navitem"><i>11</i>书源搜索</button>
+      <button class="navitem"><i>12</i>书源书架</button>
+      <button class="navitem"><i>13</i>技能广场</button>
+      <button class="navitem"><i>14</i>网文扫榜</button>
+      <button class="navitem"><i>15</i>联网搜索</button>
+      <button class="navitem"><i>16</i>云同步</button></div>
+    <div class="navgroup"><div class="navlabel">账户 · 1</div>
+      <button class="navitem"><i>17</i>会员中心</button></div>
+  </aside>
+
+  <!-- ================= CENTER: WORKBENCH ================= -->
+  <main class="center">
+    <section class="bookctx mat-ink-glass">
+      <div class="chapbar">
+        <div><h1 class="t-serif" style="font-size:19px">《潮汐之上》</h1>
+          <div class="kicker t-mono" style="font-size:9.5px">BOOK 7f3a21c9 · 海城异闻 · <span id="chMeta">CH 12 · r3 · 4,120 字 · draft</span></div></div>
+        <span style="flex:1"></span>
+        <input class="input" style="width:86px" value="12" aria-label="快速跳章（辅助控件）" title="快速跳章">
+        <button class="btn btn-ghost btn-sm aux-toggle" id="auxToggle" title="辅助工具列（1280 档折叠为 Sheet）">辅助 ⌄</button>
+        <button class="btn btn-ghost btn-sm" data-bookstate="no">无书态示例 ⇄</button>
+      </div>
+      <div class="chap-rail" style="margin-top:10px" aria-label="章节轨">
+        <button class="chap-card"><span class="cn">CH 10</span><span class="ct">雾灯</span><span class="cm">r3 · 4,388 字 · <span style="color:var(--ir-success)">committed</span></span></button>
+        <button class="chap-card"><span class="cn">CH 11</span><span class="ct">沉船名册</span><span class="cm">r2 · 3,977 字 · <span style="color:var(--ir-success)">committed</span></span></button>
+        <button class="chap-card current"><span class="cn">CH 12</span><span class="ct">暗潮</span><span class="cm">r3 · 4,120 字 · <span style="color:var(--ir-gold-bright)">draft</span> · <span style="color:var(--ir-warning)">stale?</span></span></button>
+        <button class="chap-card"><span class="cn">CH 13</span><span class="ct">（未起草）</span><span class="cm">outline node</span></button>
+        <div class="note" style="align-self:center;padding:0 8px;flex:none">← 章节轨数据仅来自真实 draft/committed/revision/wordCount；无缩略图数据不伪造章节封面（主规格 §12.2）· <span class="badge b-fixture" style="font-size:9px">DESIGN FIXTURE</span></div>
+      </div>
+    </section>
+
+    <div class="workarea">
+      <!-- DialogueStream — full protocol -->
+      <section class="convo mat-reading-slate" aria-label="写作对话">
+        <div class="qblock">
+          <div class="qh">墨舟 · 先问</div>
+          <p style="margin:0;font-size:14px;line-height:1.75">第 12 章接在第 11 章「沉船名册」之后。这一章你希望把冲突放在<b>外部势力</b>还是<b>主角内心</b>？</p>
+          <div class="choices" style="margin-top:10px">
+            <button class="pill on">外部势力逼近</button><button class="pill">内心潮契动摇</button>
+            <button class="pill">双线并进</button><button class="pill">先压后爆</button>
+          </div>
+          <p class="note" style="margin:8px 0 0">hint：选择会作为本轮生成的约束注入。</p>
+        </div>
+        <div class="ablock">外部势力逼近——让巡潮司的人直接堵到码头上，主角先用潮契脱身。</div>
+
+        <div>
+          <div class="skillrow">
+            <span class="kicker" style="margin-right:4px">SKILLS · 已注入 2</span>
+            <button class="pill on">续写</button><button class="pill on">sepia 就地去味</button>
+            <button class="pill">sepia 架构创作</button><button class="pill">sepia 叙事诊断</button>
+            <button class="pill">sepia 意图重写</button><button class="pill">悬念调度</button>
+            <button class="pill">对白打磨</button><button class="pill">场景氛围</button><button class="pill">一致性自查</button>
+          </div>
+          <div class="skillrow" style="margin-top:8px">
+            <span class="kicker" style="margin-right:4px">STYLE RAIL</span>
+            <span class="pill" style="opacity:.45;cursor:not-allowed" title="风格胶囊数据源未到，显式空态">未接入（V1 空态）</span>
+            <span class="note" style="margin-left:auto">已注入 2 项技能 · 风格未接入 · 质量门常驻</span>
+          </div>
+        </div>
+
+        <div class="composer mat-ink-glass">
+          <textarea aria-label="作者回答">外部势力逼近——让巡潮司的人直接堵到码头上，主角先用潮契脱身，再被老船工一句话点破代价。</textarea>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+            <button class="btn btn-ai">生成草稿</button>
+            <button class="btn btn-ghost btn-sm">再来一轮</button>
+            <span class="note" style="margin-left:auto">provider：<span style="color:var(--ir-jade)">draft provider 已配置（Gate 3）</span> · NDJSON start/delta/done</span>
+          </div>
+        </div>
+
+        <article class="candidate" style="padding:14px 16px;border-radius:0 10px 10px 0">
+          <div class="cand-tag">AI CANDIDATE · <span id="candState">STREAMING</span> <span class="t-mono" style="letter-spacing:0;color:var(--ir-faint);font-weight:400">· start{contextTokens:1,842 · provider:local} · 已流式落盘为 CH12 草稿（服务端原子写入，无需手动保存）</span></div>
+          <p class="prose" style="font-size:15.5px;max-width:none">　　巡潮司的灯笼在雨幕里连成一线。林守常把手按进湿冷的缆绳，潮契在腕骨底下轻轻一跳——不是催促，是警告。他借着卸货的号子侧身让过第一盏灯，听见身后老船工把烟杆在船帮上磕了磕：「后生，潮替你付账，可账单总要有人念出来。」</p>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-author btn-sm">采纳进正文（作者主权 · contract-pending）</button>
+            <button class="btn btn-ghost btn-sm">在编辑器中修订（CODE-PRESENT / INTEGRATION PENDING）</button>
+          </div>
+        </article>
+
+        <div class="unavailable"><b>provider 不可用态示例</b>
+          <span class="why">草稿生成 provider 未配置——中栏写作对话当前不可用（Gate 3）。结构化 blocker：说明 + 恢复途径（配置 provider），而非仅灰掉输入框。发送时服务端返回 <span class="t-mono">{ok:false, code:'PROVIDER_UNAVAILABLE'}</span>。</span></div>
+
+        <!-- ledger -->
+        <div class="card-system" style="padding:12px 14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span class="kicker">PIPELINE LEDGER · 账本</span>
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto">刷新账本</button></div>
+          <div class="row-evidence"><span class="em">#42</span><span>draft.step · CH12 流式完成 · 4,120 chars</span><span style="margin-left:auto;color:var(--ir-faint)">14:32:07</span></div>
+          <div class="row-evidence"><span class="em">#41</span><span>compile.step · receipt 4a19 · hash match</span><span style="margin-left:auto;color:var(--ir-faint)">14:31:52</span></div>
+          <p class="note" style="margin:6px 0 0">Phase 5 遍历 / 风格学习事件会出现在这里。<span class="badge b-fixture" style="font-size:9px;margin-left:6px">DESIGN FIXTURE</span></p>
+        </div>
+      </section>
+
+      <!-- auxiliary column -->
+      <aside class="auxcol mat-ink-glass" aria-label="工作台辅助">
+        <div>
+          <div class="kicker" style="margin-bottom:8px">AUXILIARY</div>
+          <button class="btn" style="width:100%;justify-content:center;margin-bottom:8px">＋ 新建作品</button>
+          <button class="btn btn-ghost" style="width:100%;justify-content:center">灵感骰子（LOCAL PRESET）</button>
+        </div>
+        <div class="card-system" style="padding:12px">
+          <span class="kicker">BUILD BOOK · 建书卡</span>
+          <input class="input" style="margin-top:8px" placeholder="作品名（未命名之书）">
+          <button class="btn btn-author btn-sm" style="margin-top:8px;width:100%;justify-content:center">建书</button>
+          <p class="note" style="margin-top:6px">失败就地呈现（role=alert），不跳步。</p>
+        </div>
+        <div class="card-system" style="padding:12px">
+          <span class="kicker">EDITOR INTEGRATION</span>
+          <p class="note" style="margin-top:6px">正文编辑区（Reading Slate · 10% 沉浸）为 <span class="badge b-exp" style="font-size:9px">CODE-PRESENT / INTEGRATION PENDING</span>：NovelEditorCanvas 等 9 文件已存在未挂载。设计语言已预留（见 08 页）。</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ================= EVIDENCE TOWER (4 Inspector domains) ================= -->
+  <aside class="tower mat-ink-glass" aria-label="检视塔">
+    <div class="tw-head">
+      <div class="sumrail">
+        <div><div class="k">CURRENT CHAPTER</div><div class="v t-serif" style="font-family:var(--ir-serif)">12 · 暗潮</div></div>
+        <div><div class="k">QUALITY</div><div class="v" style="color:var(--ir-success)">PASS</div></div>
+        <div><div class="k">CANON</div><div class="v" style="color:var(--ir-success)">CURRENT</div></div>
+        <div><div class="k">CONTEXT</div><div class="v" style="color:var(--ir-success)">HASH MATCH</div></div>
+        <div><div class="k">CHANGE IMPACT</div><div class="v" style="color:var(--ir-warning)">1</div></div>
+        <div><div class="k">TOKENS · RECEIPT 4A19</div><div class="v">1,842</div></div>
+      </div>
+      <div class="tw-tabs" role="tablist">
+        <button class="tw-tab on" data-t="quality" role="tab" aria-selected="true">质量门</button>
+        <button class="tw-tab" data-t="brain" role="tab" aria-selected="false">Story Brain</button>
+        <button class="tw-tab" data-t="receipt" role="tab" aria-selected="false">装配看板</button>
+        <button class="tw-tab" data-t="matrix" role="tab" aria-selected="false">变更矩阵</button>
+      </div>
+    </div>
+
+    <div class="tw-pane on" data-p="quality">
+      <div style="display:flex;align-items:center;gap:8px"><b style="font-size:14px">文学质量审查</b><span class="badge b-pass">PASS</span><span class="badge b-neutral" style="margin-left:auto">current</span></div>
+      <p class="note t-mono" style="margin:6px 0 10px">draft r3 · hash 9f2c1a77d0e4… · rework attempt 0/2 · semantic reviewer: attached</p>
+      <div class="kicker" style="margin:10px 0 6px">BLOCKING FAILURES · 0</div>
+      <div class="kicker" style="margin:10px 0 6px">ADVISORIES（建议，不阻断）· 2</div>
+      <div class="advline"><span class="badge b-stale" style="font-size:9px">adv</span>对白密度低于场景基线（v4）</div>
+      <div class="advline"><span class="badge b-stale" style="font-size:9px">adv</span>感官描写集中于听觉（v4）</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-ai btn-sm">运行文学审查</button>
+        <button class="btn btn-sm" disabled title="仅 blocking 且未达上限时可用">应用回炉</button>
+      </div>
+      <hr class="sep" style="margin:12px 0">
+      <span class="kicker">RECORD MY CORRECTION</span>
+      <select class="input" style="margin-top:8px"><option>选择纠错原因（10 项）</option><option>误报 · 规则误伤正文</option><option>风格偏好 · 作者有意为之</option></select>
+      <input class="input" style="margin-top:8px" placeholder="纠错附注（原文只留本机）">
+      <button class="btn btn-sm" style="margin-top:8px">记录纠错</button>
+      <p class="note" style="margin-top:10px">Blocking 变体：verdict 徽标转 <span class="badge b-blocked" style="font-size:9px">NEEDS REWORK</span>、列出 ruleId(v)+证据+excerpt、「应用回炉」激活（上限 2/2）、语义不可用时显示 REFUSED banner。失败态只在状态脊暗红，不整页红。</p>
+    </div>
+
+    <div class="tw-pane" data-p="brain">
+      <div style="display:flex;align-items:center;gap:8px"><b style="font-size:14px">Story Brain</b><span class="note" style="margin-left:auto">canon 按主角 POV · 认知通道 ADR-0026</span></div>
+      <div class="kicker" style="margin:12px 0 6px">ENTITY CARDS · 5 类 · 点击过滤</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <button class="card-character" style="padding:6px 10px;font-size:12px">林守常 <span class="t-mono" style="color:var(--ir-faint)">char</span></button>
+        <button class="card-character" style="padding:6px 10px;font-size:12px">潮契 <span class="t-mono" style="color:var(--ir-faint)">concept</span></button>
+        <button class="card-character" style="padding:6px 10px;font-size:12px">雾灯码头 <span class="t-mono" style="color:var(--ir-faint)">location</span></button>
+        <button class="card-character" style="padding:6px 10px;font-size:12px">巡潮司 <span class="t-mono" style="color:var(--ir-faint)">faction</span></button>
+        <button class="card-character" style="padding:6px 10px;font-size:12px">引潮罗盘 <span class="t-mono" style="color:var(--ir-faint)">item</span></button>
+      </div>
+      <div class="kicker" style="margin:12px 0 6px">OUTLINE TREE · 总纲 → 卷 → ARC → 章</div>
+      <div class="factrow"><b>总纲</b> · 潮汐之上</div>
+      <div class="factrow" style="padding-left:16px"><b>卷一</b> · 雾灯卷</div>
+      <div class="factrow" style="padding-left:32px;color:var(--ir-jade)"><b>arc</b> · 码头线（arc 层为审计新增落点）</div>
+      <div class="factrow" style="padding-left:48px">CH11 沉船名册 · 已提交</div>
+      <div class="factrow" style="padding-left:48px;background:rgba(214,179,106,.06)">CH12 暗潮 · 草稿 · 当前章</div>
+      <div class="kicker" style="margin:12px 0 6px">FACTS · 四通道</div>
+      <div class="factrow"><span class="badge b-pass" style="font-size:9px">canon</span> <b>林守常</b> · 持有 → 引潮罗盘（主角 POV 授权）</div>
+      <div class="factrow"><span class="badge b-jade" style="font-size:9px">suspect</span> 老船工似乎认得罗盘纹样（仅渲染安全 presentation）</div>
+      <div class="factrow"><span class="badge b-jade" style="font-size:9px">believes</span> 巡潮司认为潮契失控（holder 视角行）</div>
+      <div class="factrow"><span class="badge b-error" style="font-size:9px">invalid</span> 老周 · 引用已否决事实 factId:f_31</div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-ghost btn-sm">刷新</button><span class="note">7 rows · 已过滤：林守常</span></div>
+    </div>
+
+    <div class="tw-pane" data-p="receipt">
+      <div style="display:flex;align-items:center;gap:8px"><b style="font-size:14px">装配看板 · Context Receipt</b><span class="badge b-pass" style="margin-left:auto">hash match</span></div>
+      <div class="row-evidence" style="margin-top:8px"><span class="em">receipt 4a19</span><span>ch12 · 1,842 tok</span></div>
+      <div class="row-evidence"><span class="em">receipt 4a02</span><span>ch11 · 1,790 tok</span></div>
+      <span class="kicker" style="display:block;margin:12px 0 2px">BUDGET（AI 飞行数据记录仪）</span>
+      <div class="budget">
+        <i style="width:22%;background:rgba(114,201,196,.75)" title="reserved"></i>
+        <i style="width:41%;background:rgba(114,201,196,.38)" title="story"></i>
+        <i style="width:18%;background:rgba(205,225,222,.3)" title="fixed"></i>
+        <i style="width:19%;background:rgba(205,225,222,.12)" title="slack"></i>
+      </div>
+      <p class="note t-mono" style="margin:0">cap 8,192 · reserved 402 · story 748 · fixed 331 · slack 379</p>
+      <span class="kicker" style="display:block;margin:12px 0 4px">ENTRIES · included / excluded + 原因</span>
+      <div class="row-evidence"><span class="em">char:lin-shouchang</span><span>story_text · 214</span><span class="badge b-pass" style="font-size:9px;margin-left:auto">included</span></div>
+      <div class="row-evidence"><span class="em">faction:xunchaosi</span><span>recall_filter · 96</span><span class="badge b-stale" style="font-size:9px;margin-left:auto">excluded · 相关度低于阈值</span></div>
+      <span class="kicker" style="display:block;margin:12px 0 4px">REPLAY INPUTS</span>
+      <div class="sumrail" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <div><div class="k">TOKENIZER</div><div class="v" style="font-size:11px">v7</div></div>
+        <div><div class="k">CONFIG</div><div class="v" style="font-size:11px">c1f09a…</div></div>
+        <div><div class="k">CANDIDATES</div><div class="v" style="font-size:11px">14 ordered</div></div>
+        <div><div class="k">DIGEST</div><div class="v" style="font-size:11px">9f2c…d0e4</div></div>
+      </div>
+      <p class="note t-mono" style="margin:8px 0 0">assembledBy context-compiler · taskType chapter_prose</p>
+      <hr class="sep" style="margin:12px 0">
+      <span class="badge b-pass">● 可恢复：会话在 draft 步（last receipt 4a19）</span>
+      <button class="btn btn-author btn-sm" style="margin-top:10px;width:100%;justify-content:center">回到工作台继续</button>
+      <p class="note" style="margin-top:8px">committed 分支显示「已提交：本章正典已提交」；无会话分支显示「无开放生产会话」。resume.finished 为审计新增落点。</p>
+    </div>
+
+    <div class="tw-pane" data-p="matrix">
+      <div style="display:flex;align-items:center;gap:8px"><b style="font-size:14px">变更矩阵</b><span class="badge b-stale" style="margin-left:auto">stale 1</span></div>
+      <table class="grid-table" style="margin-top:10px">
+        <thead><tr><th>上游变更</th><th>ch11</th><th>ch12</th></tr></thead>
+        <tbody>
+          <tr><td><span class="t-mono" style="font-size:11px">fact.update:f_29</span><div style="color:var(--ir-faint)">trv_8c2</div></td>
+              <td class="cell-resolved">已消解</td><td class="cell-needs">需重写</td></tr>
+        </tbody>
+      </table>
+      <div class="card-system" style="padding:12px;margin-top:10px">
+        <b class="t-mono" style="font-size:12px">trv_8c2</b>
+        <p class="note t-mono" style="margin:4px 0">taskRef tsk_112 · trigger fact.update:f_29 · 2026-09-11 21:04</p>
+        <p class="note" style="margin:0">影响 2 章 · stale 1 · <b style="color:var(--ir-fg)">重写任务书（revisionBriefs，服务端已算）</b>：CH12 需按新引潮罗盘规则重写第 3 场。</p>
+        <button class="btn btn-ai btn-sm" style="margin-top:8px">重跑此遍历</button>
+      </div>
+      <p class="note" style="margin-top:10px">空态：「暂无变更——上游改动经 Traversal 传播后会在这里形成影响矩阵。」rerun 仅 stale 行可用；高密度薄网格，不做发光按钮矩阵。</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+// inspector tabs
+document.querySelectorAll('.tw-tab').forEach(function(t){t.addEventListener('click',function(){
+  document.querySelectorAll('.tw-tab').forEach(function(x){x.classList.remove('on');x.setAttribute('aria-selected','false')});
+  document.querySelectorAll('.tw-pane').forEach(function(x){x.classList.remove('on')});
+  t.classList.add('on');t.setAttribute('aria-selected','true');
+  document.querySelector('.tw-pane[data-p="'+t.dataset.t+'"]').classList.add('on');
+})});
+// no-book state toggle (acceptance: current book / no-book 两态)
+var noBook=false;
+document.querySelector('[data-bookstate]').addEventListener('click',function(){
+  noBook=!noBook;this.textContent=noBook?'回到有书态 ⇄':'无书态示例 ⇄';
+  document.querySelector('.bookctx .chapbar').style.opacity=noBook?.35:1;
+  var t=document.getElementById('chMeta');
+  t.innerHTML=noBook?'<span style="color:var(--ir-warning)">尚未建书 · Inspector 显示「建书后可用」空态（InspectorEmpty）</span>':'CH 12 · r3 · 4,120 字 · draft';
+  document.querySelectorAll('.stage').forEach(function(s){s.style.opacity=noBook?.45:1});
+});
+// 1280 档：辅助列 Sheet 化（P2-1）
+document.getElementById('auxToggle').addEventListener('click',function(){
+  var aux=document.querySelector('.auxcol');
+  var open=aux.classList.toggle('as-sheet');
+  this.textContent=open?'辅助 ✕':'辅助 ⌄';
+});
+</script>
+</body>
+</html>

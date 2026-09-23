@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>银白工坊 · 总览（T01 视觉签样）</title>
+<link rel="stylesheet" href="assets/silver.css">
+<style>
+  .ov-wrap { max-width: 1180px; margin: 0 auto; padding: 26px 28px 60px; display: grid; gap: 20px; }
+  .ov-hero { padding: 30px 32px; display: grid; gap: 10px; }
+  .ov-tokens { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .tok { border-radius: 12px; border: 1px solid var(--sf-line); overflow: hidden; background: #fff; }
+  .tok .sw { height: 64px; border-bottom: 1px solid var(--sf-line); }
+  .tok .lab { padding: 8px 10px; font-size: 11px; font-family: var(--sf-font-mono); color: var(--sf-muted); }
+  .ov-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .ov-links a { display: grid; gap: 6px; padding: 18px; text-decoration: none; color: var(--sf-text);
+    border-radius: 14px; border: 1px solid var(--sf-line); background: linear-gradient(165deg, rgba(255,255,255,.7), rgba(255,255,255,.35)); }
+  .ov-links a b { font-size: 14px; }
+  .ov-links a span { font-size: 12px; color: var(--sf-muted); }
+  .ov-links a:hover { box-shadow: var(--sf-panel-shadow); }
+</style>
+</head>
+<body>
+<div class="sf-stage">
+  <div class="sf-scene"><img src="assets/scene-silver.svg" alt=""></div>
+
+  <header class="sf-topbar sf-content">
+    <div class="sf-brand">
+      <svg class="sf-emblem" viewBox="0 0 120 120" aria-hidden="true"><g><rect x="8" y="8" width="104" height="104" rx="22" fill="url(#embSilver)"/><path d="M60 21 v36" stroke="#56687B" stroke-width="3.4" stroke-linecap="round"/><path d="M60 24 L41 55 h19 Z" fill="#56687B"/><path d="M26 63 Q60 82 94 63 L85 75 Q60 86 35 75 Z" fill="#56687B"/><path d="M30 91 Q45 85 60 91 T90 91" fill="none" stroke="#56687B" stroke-width="3" stroke-linecap="round" opacity=".7"/><circle cx="26" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="26" r="2.6" fill="#56687B" opacity=".5"/><circle cx="26" cy="94" r="2.6" fill="#56687B" opacity=".5"/><circle cx="94" cy="94" r="2.6" fill="#56687B" opacity=".5"/></g></svg>
+      墨舟 · 银白工坊
+    </div>
+    <nav class="sf-nav" aria-label="原型页导航">
+      <a href="index.html" aria-current="page">总览</a>
+      <a href="cards.html">卡牌四面</a>
+      <a href="workbench.html">工作台</a>
+      <a href="storyboard.html">分镜页</a>
+    </nav>
+    <span class="sf-chip"><span class="dot"></span>原型 · 待签样</span>
+  </header>
+
+  <main class="ov-wrap sf-content">
+    <section class="sf-panel ov-hero">
+      <h1 style="margin:0;font-size:20px;letter-spacing:.04em">银白工坊 · 视觉签样原型</h1>
+      <p class="sf-note" style="margin:0;max-width:72ch">
+        方向：银白现代空间、金属实体卡（银/香槟金）、浅浮雕、倒角、环境反射。
+        本原型<b>取代旧 Ink Realm 深墨/青玉默认值</b>的候选方向；签样通过前不进生产 token、不改旧 ADR（由执行者新增 superseding ADR）。
+        卡牌正面按规格原创实现（金属外框+内凹铭牌+原创示意图区），<b>正面最终参考样式待你选定</b>——未复用任何被否定的旧正面图。
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="sf-btn" href="cards.html">看卡牌四面 →</a>
+        <a class="sf-btn ghost" href="workbench.html">看工作台 →</a>
+        <a class="sf-btn ghost" href="storyboard.html">看分镜页 →</a>
+      </div>
+    </section>
+
+    <section class="sf-panel" style="padding:18px 20px">
+      <b style="font-size:14px">工程起点 token（brief.visual.tokens；签样时校准对比度）</b>
+      <div class="ov-tokens" style="margin-top:14px">
+        <div class="tok"><div class="sw" style="background:#E6ECF2"></div><div class="lab">canvas #E6ECF2</div></div>
+        <div class="tok"><div class="sw" style="background:#F1F4F7"></div><div class="lab">panel #F1F4F7</div></div>
+        <div class="tok"><div class="sw" style="background:#202A35"></div><div class="lab">text #202A35</div></div>
+        <div class="tok"><div class="sw" style="background:#526170"></div><div class="lab">muted #526170</div></div>
+        <div class="tok"><div class="sw" style="background:linear-gradient(150deg,#F7FAFD,#9AA8B8)"></div><div class="lab">silver #9AA8B8→#F7FAFD</div></div>
+        <div class="tok"><div class="sw" style="background:linear-gradient(150deg,#F5E5C9,#AC803F)"></div><div class="lab">gold #AC803F→#F5E5C9</div></div>
+      </div>
+    </section>
+
+    <section class="ov-links">
+      <a href="cards.html"><b>卡牌四面 × 状态</b><span>银/金 · 正反面 · 常态/选中/不可用 · 无封面态 · 显式翻面</span></a>
+      <a href="workbench.html"><b>工作台</b><span>三栏壳 · 银白场景 · 正文近实心 · 诚实不可用态</span></a>
+      <a href="storyboard.html"><b>分镜页</b><span>镜头卡：画面/对白/时长/提示词/原文锚 · 选中与待补态</span></a>
+    </section>
+
+    <section class="sf-panel" style="padding:16px 20px">
+      <b style="font-size:13.5px">无障碍与验收口径（本原型已内置）</b>
+      <ul class="sf-note" style="margin:8px 0 0;line-height:2">
+        <li>键盘焦点环全局可见（Tab 试遍按钮/卡牌/链接）。</li>
+        <li><code>prefers-reduced-motion</code> 下去除位移/过渡；无持续扫光动画。</li>
+        <li>触控目标 ≥44px（导航/按钮/卡牌）；390 宽移动可用。</li>
+        <li>状态语义=文字+图标，金银不代表稀有度/质量/AI 身份。</li>
+      </ul>
+    </section>
+  </main>
+</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="embSilver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7FAFD"/><stop offset=".45" stop-color="#D8E1EB"/><stop offset="1" stop-color="#8FA0B2"/></linearGradient></defs></svg>
+<script>document.querySelector('.sf-nav a[aria-current]')?.scrollIntoView({block:'nearest',inline:'center'})</script>
+</body>
+</html>

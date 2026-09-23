@@ -1,0 +1,42 @@
+# T04 证据 · 漫剧分镜真实用户闭环（2026-09-13）
+
+## 真实链路（真实 HTTP + 真实临时书磁盘）
+
+- 临时书：`C:/Users/a1691/AppData/Local/Temp/mozhou-t04-e2e-sZuRHY`（createBook 真建书，第 1 章 draft r1）
+- preview 服务：`vite preview --port 4199`（构建产物 + API 中间件）
+- 真盘保存：POST /api/storyboard.save → `adaptations/storyboards/sb_01M2DRRA56JT110EEAB7DPXA27.json` r1（磁盘文件存在，重启语义由 T02 集成测试另行覆盖）
+- bookId：`book_01M2DRRA30WDQ3VN1WZ8HTGJKG`
+
+## 浏览器走查（Playwright Chromium 149）
+
+- 桌面 1440：localStorage 种工作台状态 → 直入分镜视图 → 打开保存版本 → 三张镜头卡（画面/对白/时长/原文锚/改编说明）→ 翻面看提示词 → 点生成 → 诚实不可用横幅（provider 未配置，不伪造候选）
+- 移动 390（触控模拟）：创作 Hub「漫剧分镜」入口卡 → 全高抽屉分镜视图 → 打开保存版本 → 镜头卡滚动入镜
+
+## judge 视觉审查（三轮）
+
+1. 首轮：桌面 list pass；修复项 = 提示词英文断词（break-all→overflow-wrap）、正面常显改编说明条、移动镜头卡截图
+2. 二轮：桌面正面/翻面 pass；移动截图未入镜（滚动不足）
+3. 三轮（scroll_into_view 后）：移动镜头卡 pass（01/02/03 字段齐备、金色改编卡区分明确、无破版）
+
+## 截图清单
+
+- t04-storyboard-1440-list.png / -shots.png / -back.png / -no-provider.png
+- t04-mobile-390-hub.png / -storyboard-top.png / -storyboard.png / -shots.png
+
+## 回归（全量，2026-09-13 末轮）
+
+- vitest：40 文件全过，265 passed + 1 skipped（真机模型冒烟，本机无 key 如实跳过）
+- tsc --noEmit tsconfig.json / tsconfig.server.json：双绿
+- build（tsc -b + vite build + server tsc）：成功
+- gitnexus check --cycles：status clean, cycleCount 0
+
+## 诚实边界
+
+- 生成分镜候选的**真实模型**验收：本机未配置 MOZHU_API_KEY/DEEPSEEK_API_KEY/OPENAI_API_KEY → **BLOCKED**。
+  生成逻辑已由注入式单测覆盖（7 项：分片JSON/围栏/非法JSON/引文锚定/超限/超字节/源变更），
+  真机冒烟用例已内置（generate.test.ts skipIf 门控），配置 key 后 `pnpm -C apps/web exec vitest run server/storyboard/generate.test.ts` 即可补验。
+- 导出 JSON→导入工作区→显式保存 的回读闭环由组件测试覆盖（jsdom）；真机导出文件人工打开未另验。
+
+## 触及文件（SHA256 前 16 位，末轮）
+
+见 `verification.hashes.txt`。
