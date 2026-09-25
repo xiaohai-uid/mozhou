@@ -301,7 +301,14 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
     }
     try {
       const result = applyGenreKitToBook(root, kitId)
-      json(200, { ok: true, appliedCount: result.appliedFiles.length, kit: result.kit })
+      json(200, {
+        ok: true,
+        appliedCount: result.appliedFiles.length,
+        appliedFiles: result.appliedFiles,
+        skippedCount: result.skippedFiles.length,
+        skippedFiles: result.skippedFiles,
+        kit: result.kit,
+      })
     } catch (err) {
       const msg = (err as Error).message
       if (msg.startsWith('unknown genre kit:')) {

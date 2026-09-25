@@ -6,7 +6,7 @@
  * 格式刻意无时间戳：同 canon 状态 ⇒ 逐字节相同的 manifest，
  * 让「重建前后基线幂等」成为可机械断言的性质。
  */
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, fsyncSync, openSync, readdirSync, readFileSync, renameSync, statSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 import { isCanonRelPath, MANIFEST_PATH } from './layout.js'
 import { sha256FileHex } from './sha256.js'
@@ -30,6 +30,21 @@ export class MissingManifestError extends Error {
 
   constructor(readonly manifestPath: string) {
     super(`missing hash baseline manifest: ${manifestPath}`)
+  }
+}
+
+/**
+ * manifest 存在但无法解析（截断/半份/非 JSON）。与 MissingManifestError 分开，
+ * 因为两者的恢复语义不同：损坏可由 canon 全量吸收重建，缺失更可能是根目录指错。
+ */
+export class CorruptManifestError extends Error {
+  override readonly name = 'CorruptManifestError'
+
+  constructor(
+    readonly manifestPath: string,
+    override readonly cause: unknown,
+  ) {
+    super(`corrupt hash baseline manifest: ${manifestPath}`)
   }
 }
 
@@ -65,7 +80,17 @@ export function readManifest(root: string): HashManifest {
   if (!statSyncSafe(path)) {
     throw new MissingManifestError(path)
   }
-  return JSON.parse(readFileSync(path, 'utf8')) as HashManifest
+  let raw: string
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch (error) {
+    throw new CorruptManifestError(path, error)
+  }
+  try {
+    return JSON.parse(raw) as HashManifest
+  } catch (error) {
+    throw new CorruptManifestError(path, error)
+  }
 }
 
 function statSyncSafe(path: string): boolean {
@@ -76,8 +101,24 @@ function statSyncSafe(path: string): boolean {
   }
 }
 
+/**
+ * 基线落盘：同目录临时文件 → fsync → rename。
+ *
+ * rename 是唯一可见点，因此掉电最多丢掉本次写入，绝不会在盘上留下被截断的
+ * 半份 manifest——截断的 manifest 会让整本书经应用无法打开（可用性中断）。
+ * fsync 保证 rename 可见时内容已在介质上，而非停留在页缓存。
+ */
 export function writeManifest(root: string, manifest: HashManifest): void {
-  writeFileSync(join(root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`)
+  const absolute = join(root, MANIFEST_PATH)
+  const tmp = `${absolute}.mozhou-tmp`
+  const fd = openSync(tmp, 'w')
+  try {
+    writeSync(fd, `${JSON.stringify(manifest, null, 2)}\n`)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  renameSync(tmp, absolute)
 }
 
 /**
