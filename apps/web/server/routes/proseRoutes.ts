@@ -20,6 +20,24 @@
  *   assertion, suggestion} 原样回给作者（回炉 Final Extract 重提取），正典零写入。
  * Gate 读不到存量叙事状态时同样显式失败（500），绝不降级为「跳过门禁」——
  * 跳过门禁等于把未经核检的 delta 盲写正典。
+ *
+ * 步 8 Canon Proposal 接线（chapter-pipeline-spec §1 表第 8 行 / S6）：
+ * 通过 Gate 的 delta 不再直接进 commitChapter——先经 createCanonProposal 按
+ * riskClass 三档分流（low 入场即 confirmed；medium 队列挂起；high 必须显式确认），
+ * 再由 ProposalPort 逐条 confirm/reject/editAccept 收口，**Commit 只写已确认集**。
+ *   - 未决条目 > 0 → 409 CANON_PROPOSAL_PENDING，本章正典零写入、相位不翻转；
+ *   - 提案与正文 revision 绑定（taskRef=web_commit_ch<N>_rev<R>）：同一 revision
+ *     的重试续接同一提案（不重跑提取、不重复落提案），改文后旧提案显式拒绝
+ *     （409 CANON_PROPOSAL_STALE）而非静默丢弃作者的逐条决策；
+ *   - 无候选可路由时不落空提案（空 CanonProposalCreated 只会污染悬挂扫描）。
+ * 未决提案的盘面凭据落在 .mozhou/proposals/，跨重启待决（S8 Proposal 后行）。
+ * 成对账目：本路径**不发射 CanonCommitted**（配对尾）——配对状态活在 PublishBus
+ * 单实例内存里，提案头由 createCanonProposal 在「创建它的那个请求」的实例上开，
+ * 跨请求续接（作者确认后重提）时该实例已不存在，新实例发尾必抛
+ * PAIRING_TAIL_WITHOUT_HEAD。故 web 路径的提交凭据 = 提案记录 state=consumed +
+ * 平铺 ChapterCommitted 行；账面上 CanonProposalCreated 无配对尾即本路径真实形状
+ * （session 编排路径由 ChapterProductionSession.markCommitted 闭合，不受影响；
+ * 投影侧 openHeads 只计窗口内事件，无窗口的 web 路径不会污染会话投影）。
  */
 import type { RouteHandler } from '../router.js'
 import { assertSafeBookRoot } from '../security.js'
@@ -32,8 +50,21 @@ import {
   proseChapterPath,
   readProseChapter,
 } from '@mozhou/data-plane'
-import { runContinuityGate } from '@mozhou/pipeline'
+import {
+  ProposalPort,
+  confirmedAppendsForCommit,
+  createCanonProposal,
+  loadCanonProposal,
+  runContinuityGate,
+} from '@mozhou/pipeline'
+import { PublishBus } from '@mozhou/runtime'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
+import {
+  canonProposalView,
+  openProposalForTask,
+  openProposalsOfChapter,
+  pendingItemViewsOf,
+} from '../proposals.js'
 
 const CHAPTER_MISSING = 'CHAPTER_MISSING'
 
@@ -209,40 +240,144 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       const root = assertSafeBookRoot(rawRoot)
       const plane = LocalDataPlane.openOrRebuild(root)
       try {
-        // 步 6 Final Extract 接线：终稿 → 五族叙事状态增量。
-        // 提取失败不阻塞提交（作者的正文必须能定稿），但必须在响应里如实报出，
-        // 否则「提交后叙事层零增长」会被误读为「一切正常」。
-        const prose = readProseChapter(root, proseChapterPath(chapterIndex)).body
-        const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose)
-        const hasDelta = Object.keys(delta.appends).length > 0
-        const deltaExtraction = {
-          extractor: delta.extractor,
-          counts: delta.counts,
-          dropped: delta.dropped,
-          ...(delta.reason === undefined ? {} : { reason: delta.reason }),
+        const proseFile = readProseChapter(root, proseChapterPath(chapterIndex))
+        const prose = proseFile.body
+        // 步 8 提案与正文 revision 绑定：同一 revision 的提交重试续接同一提案
+        // （否则每次重试都重跑提取、再落一份同内容提案，且新提案的行 id 与作者
+        // 已确认的行对不上——「只写已确认集」就无从谈起）。
+        const taskRef = 'web_commit_ch' + chapterIndex + '_rev' + proseFile.revision
+        const port = new ProposalPort({ root })
+
+        let record = openProposalForTask(root, taskRef)
+        let deltaExtraction: Record<string, unknown> | null = null
+
+        if (record === null) {
+          const stale = openProposalsOfChapter(root, chapterIndex)
+          if (stale.length > 0) {
+            // 正文已改（revision 变）：盘上未决提案描述的是旧正文。既不能拿旧行写正典，
+            // 也不能静默丢弃作者的逐条决策——显式拒绝并给出收口入口。
+            json(409, {
+              ok: false,
+              code: 'CANON_PROPOSAL_STALE',
+              chapterIndex,
+              proposalId: stale[0]!.proposalId,
+              error:
+                `第 ${chapterIndex} 章存在描述旧正文的未决提案（正文 revision 已变）——` +
+                '请先 /api/proposal.discard 收口旧提案，再提交本章；本章正典零写入',
+              staleProposals: stale.map(canonProposalView),
+            })
+            return true
+          }
+
+          // 步 6 Final Extract 接线：终稿 → 五族叙事状态增量。
+          // 提取失败不阻塞提交（作者的正文必须能定稿），但必须在响应里如实报出，
+          // 否则「提交后叙事层零增长」会被误读为「一切正常」。
+          const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose)
+          deltaExtraction = {
+            extractor: delta.extractor,
+            counts: delta.counts,
+            dropped: delta.dropped,
+            ...(delta.reason === undefined ? {} : { reason: delta.reason }),
+          }
+
+          if (Object.keys(delta.appends).length === 0) {
+            // 无候选可路由：步 8 不落空提案（无内容的 CanonProposalCreated 只会污染
+            // 悬挂扫描），直接提交——叙事层零增长由 deltaExtraction 如实报出。
+            const result = plane.commitChapter({ chapterIndex, summary })
+            json(200, {
+              ok: true,
+              commitId: result.commitId,
+              chapterIndex: result.chapterIndex,
+              contentSha256: result.contentSha256,
+              phase: 'committed',
+              continuityGate: { verdict: 'pass' },
+              canonProposal: null,
+              deltaExtraction,
+            })
+            return true
+          }
+
+          // 步 7 Continuity Gate：候选 delta 写正典前过机械核检。冲突 = 硬门禁，
+          // 提案不落盘、commitChapter 一步不调（正典零写入），冲突清单经 Result 顶层
+          // hardConflicts[] 回给作者——回炉重提取是唯一出路，不许静默放行。
+          const gate = runContinuityGate({ bookRoot: root, chapterIndex, delta: delta.appends, prose })
+          if (gate.verdict === 'hard_conflict') {
+            json(409, {
+              ok: false,
+              code: 'CONTINUITY_HARD_CONFLICT',
+              chapterIndex,
+              error: `连续性门禁未通过：${gate.hardConflicts.length} 项硬冲突——本章正典零写入`,
+              hardConflicts: gate.hardConflicts,
+              deltaExtraction,
+            })
+            return true
+          }
+
+          // 步 8 Canon Proposal：riskClass 三档分流（low 入场即 confirmed，medium/high 挂起）。
+          const created = createCanonProposal({
+            bus: new PublishBus(),
+            bookRoot: root,
+            taskRef,
+            chapterIndex,
+            delta: delta.appends,
+          })
+          record = loadCanonProposal(root, created.proposalId)
+          if (record === null) {
+            // 刚落盘即读不回 = 盘面故障：绝不降级为「无提案直接提交」把未确认行写进正典
+            throw new Error('canon proposal ' + created.proposalId + ' unreadable right after persist')
+          }
         }
 
-        // 步 7 Continuity Gate：候选 delta 写正典前过机械核检。冲突 = 硬门禁，
-        // commitChapter 一步不调（正典零写入），冲突清单经 Result 顶层
-        // hardConflicts[] 回给作者——回炉重提取是唯一出路，不许静默放行。
-        const gate = runContinuityGate({ bookRoot: root, chapterIndex, delta: delta.appends, prose })
-        if (gate.verdict === 'hard_conflict') {
+        // 待决 = 挂起（S6）：medium 等队列确认、high 等显式确认——本章正典零写入、
+        // 相位不翻转；提案记录已落盘，跨重启保持待决。
+        const pending = pendingItemViewsOf(record)
+        if (pending.length > 0) {
           json(409, {
             ok: false,
-            code: 'CONTINUITY_HARD_CONFLICT',
+            code: 'CANON_PROPOSAL_PENDING',
             chapterIndex,
-            error: `连续性门禁未通过：${gate.hardConflicts.length} 项硬冲突——本章正典零写入`,
-            hardConflicts: gate.hardConflicts,
-            deltaExtraction,
+            proposalId: record.proposalId,
+            error:
+              `正典提案待确认：${pending.length} 项未决（high 必须显式确认，medium 等队列确认）` +
+              '——本章正典零写入',
+            proposal: canonProposalView(record),
+            pendingItems: pending,
+            ...(deltaExtraction === null ? {} : { deltaExtraction }),
           })
           return true
         }
 
+        // Commit 只写已确认集（S6）：confirmed + edit_accepted（含 patch 后载荷），
+        // rejected 排除在外。ProposalPort 在仍有未决条目时拒读（上方已拦）。
+        const appends = confirmedAppendsForCommit(root, record.proposalId)
+
+        // 写前门禁：续接路径的载荷可能经作者 editAccept 改动，写正典前必须重过核检
+        // （Gate 是确定性纯核检，幂等重算；此处不通过则提案保持未收口，正典零写入）。
+        const confirmedGate = runContinuityGate({ bookRoot: root, chapterIndex, delta: appends, prose })
+        if (confirmedGate.verdict === 'hard_conflict') {
+          json(409, {
+            ok: false,
+            code: 'CONTINUITY_HARD_CONFLICT',
+            chapterIndex,
+            proposalId: record.proposalId,
+            error: `连续性门禁未通过：${confirmedGate.hardConflicts.length} 项硬冲突——本章正典零写入`,
+            hardConflicts: confirmedGate.hardConflicts,
+            ...(deltaExtraction === null ? {} : { deltaExtraction }),
+          })
+          return true
+        }
+
+        const hasAppends = Object.keys(appends).length > 0
         const result = plane.commitChapter({
           chapterIndex,
           summary,
-          ...(hasDelta ? { appends: delta.appends } : {}),
+          ...(hasAppends ? { appends } : {}),
         })
+
+        // 提案收口：commitChapter 成功之后才翻 consumed——提交失败时作者的逐条决策
+        // 必须留在提案记录里供重试，收口过早等于丢弃作者劳动。
+        port.markConsumed({ port: 'pipeline', proposalId: record.proposalId })
+
         json(200, {
           ok: true,
           commitId: result.commitId,
@@ -250,7 +385,8 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           contentSha256: result.contentSha256,
           phase: 'committed',
           continuityGate: { verdict: 'pass' },
-          deltaExtraction,
+          canonProposal: canonProposalView(loadCanonProposal(root, record.proposalId) ?? record),
+          ...(deltaExtraction === null ? {} : { deltaExtraction }),
         })
       } finally {
         plane.close()

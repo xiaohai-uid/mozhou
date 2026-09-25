@@ -201,6 +201,46 @@ export interface ChapterReopenResponse {
   readonly proseRelPath: string
 }
 
+/* ---- 步 8 Canon Proposal 确认面（S6）：提案队列与提交挂起响应共用同一视图 ---- */
+
+export type {
+  CanonProposalItemView,
+  CanonProposalRoutedCounts,
+  CanonProposalView,
+} from './proposals.js'
+
+/** POST /api/proposal.list 成功响应：全书待决提案队列（跨重启待决的读取面）。 */
+export interface ProposalListResponse {
+  readonly ok: true
+  readonly proposals: readonly import('./proposals.js').CanonProposalView[]
+}
+
+/** POST /api/proposal.decide 成功响应：Port 三动词逐条落账后的待决计数。 */
+export interface ProposalDecideResponse {
+  readonly ok: true
+  readonly action: 'confirmed' | 'rejected' | 'edit_accepted'
+  readonly itemId: string
+  readonly pendingItems: number
+  readonly finalized: boolean
+  readonly proposal: import('./proposals.js').CanonProposalView | null
+}
+
+/** POST /api/proposal.discard 成功响应：整份提案显式放弃（逐条 reject + 收口）。 */
+export interface ProposalDiscardResponse {
+  readonly ok: true
+  readonly discarded: true
+  readonly proposal: import('./proposals.js').CanonProposalView | null
+}
+
+/**
+ * POST /api/chapter.commit 的提案字段：无候选可路由时为 null（不落空提案）；
+ * 挂起（409 CANON_PROPOSAL_PENDING）时作者据 proposal.pendingItems 逐条决策后重提提交。
+ */
+export interface ChapterCommitProposalField {
+  readonly proposal: import('./proposals.js').CanonProposalView
+  readonly pendingItems: readonly import('./proposals.js').CanonProposalItemView[]
+}
+
 /* ---- 漫剧分镜（T02 契约；领域类型真源在 server/storyboard/contract.ts）---- */
 
 export interface StoryboardSourceResponse {

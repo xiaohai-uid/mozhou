@@ -11,7 +11,7 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -341,6 +341,47 @@ describe('POST /api/chapter.commit · 五族增量提取接线（步 6 Final Ext
       // 追踪层保持 0 行——诚实反映「增量未提取」，而不是伪造增长
       const facts = readFileSync(join(root, '追踪', '事实.jsonl'), 'utf8').trim()
       expect(facts).toBe('')
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
+  })
+})
+
+describe('POST /api/chapter.commit · 步 8 Canon Proposal（无候选可路由）', () => {
+  it('空批不落空提案：提案仓不创建、响应 canonProposal=null，提交照常成功', async () => {
+    // 清空 provider 环境变量使本用例与开发机环境无关（确定性）
+    const saved = {
+      MOZHOU_API_KEY: process.env['MOZHOU_API_KEY'],
+      DEEPSEEK_API_KEY: process.env['DEEPSEEK_API_KEY'],
+      OPENAI_API_KEY: process.env['OPENAI_API_KEY'],
+    }
+    delete process.env['MOZHOU_API_KEY']
+    delete process.env['DEEPSEEK_API_KEY']
+    delete process.env['OPENAI_API_KEY']
+    try {
+      const { base, root } = await makeBook()
+      await post(base, '/api/chapter.prose.save', {
+        root,
+        chapterIndex: 1,
+        body: '第一章正文。',
+        expectedRevision: null,
+      })
+      const { status, data } = await post(base, '/api/chapter.commit', {
+        root,
+        chapterIndex: 1,
+        summary: '定稿',
+      })
+
+      expect(status).toBe(200)
+      expect(data.phase).toBe('committed')
+      expect(data.canonProposal).toBeNull()
+      // 无内容可路由 ⇒ 不产生 CanonProposalCreated 头（空头只会污染悬挂扫描）
+      expect(existsSync(join(root, '.mozhou', 'proposals'))).toBe(false)
+      const events = readFileSync(join(root, '.mozhou', 'events.jsonl'), 'utf8')
+      expect(events).not.toContain('"type":"CanonProposalCreated"')
     } finally {
       for (const [key, value] of Object.entries(saved)) {
         if (value === undefined) delete process.env[key]

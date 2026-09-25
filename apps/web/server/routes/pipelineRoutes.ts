@@ -1,15 +1,25 @@
 /**
  * apps/web · 创作台、流式草稿、章节审查与回炉路由控制器。
+ *
+ * 步 8 提案队列确认面（chapter-pipeline-spec §1 表第 8 行 / S6）：
+ * 管线 Canon 提案（.mozhou/proposals/prp_*.json）经 ProposalPort 统一确认面
+ * 逐条 confirm / reject / editAccept——headless 等价 panel。提交路由在待决时
+ * 以 409 挂起，作者在此逐条决毕后重提提交；Commit 只写已确认集。
+ * 三动词的语义（含 editAccept 空 patch 违例、已决条目拒改）全部归 Port，
+ * 本路由只做请求形状校验与错误码映射，不复制确认协议。
  */
 import type { RouteHandler } from '../router.js'
 import {
   AcceptConflictError,
   CandidateError,
   ChapterProductionSession,
+  ProposalPort,
+  ProposalPortError,
   acceptDraft,
   cancelCandidate,
   createCandidateId,
   executeChapterReview,
+  loadCanonProposal,
   makeDraftProviderBinding,
   nextStepOf,
   QualityReworkLimitExceededError,
@@ -35,6 +45,7 @@ import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
+import { canonProposalView } from '../proposals.js'
 
 const DIALOGUE_CAPABILITIES = [
   { id: 'continuation', label: '续写' },
@@ -616,6 +627,124 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       report: result.report,
       current: result.current,
     })
+    return true
+  }
+
+  /* ---- 步 8 提案队列确认面（S6）：ProposalPort 逐条 confirm / reject / editAccept ---- */
+
+  // 待决提案队列（恢复入口同款扫描：管线 open 记录中仍有 pending 条目的那些）。
+  // 跨重启保持待决——提案记录在 .mozhou/proposals/，本端点即「盘面凭据」的读取面。
+  if (path === '/api/proposal.list') {
+    const rawRoot = resolvedRoot
+    if (rawRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    try {
+      const root = assertSafeBookRoot(rawRoot)
+      const port = new ProposalPort({ root })
+      const proposals = port
+        .listPendingRefs()
+        .filter((ref): ref is { readonly port: 'pipeline'; readonly proposalId: string } => ref.port === 'pipeline')
+        .map((ref) => loadCanonProposal(root, ref.proposalId))
+        .filter((record): record is NonNullable<typeof record> => record !== null)
+        .map(canonProposalView)
+      json(200, { ok: true, proposals })
+    } catch (error) {
+      json(500, { ok: false, error: (error as Error).message })
+    }
+    return true
+  }
+
+  // 逐条决策：confirm = 原样入确认集；reject = 排除；editAccept = patch 顶层浅合并后入集。
+  if (path === '/api/proposal.decide') {
+    const rawRoot = resolvedRoot
+    const proposalId = typeof body['proposalId'] === 'string' ? body['proposalId'] : null
+    const itemId = typeof body['itemId'] === 'string' ? body['itemId'] : null
+    const action = body['action']
+    if (
+      rawRoot === null ||
+      proposalId === null ||
+      itemId === null ||
+      (action !== 'confirm' && action !== 'reject' && action !== 'editAccept')
+    ) {
+      json(400, {
+        ok: false,
+        error: "root, proposalId, itemId and action ('confirm'|'reject'|'editAccept') required",
+      })
+      return true
+    }
+    const rawPatch = body['patch']
+    if (action === 'editAccept') {
+      // 空 patch 是 confirm 语义违例（Port 同样拒绝）；形状错误在边界拦下，给出可读 400
+      if (
+        rawPatch === null ||
+        typeof rawPatch !== 'object' ||
+        Array.isArray(rawPatch) ||
+        Object.keys(rawPatch).length === 0
+      ) {
+        json(400, { ok: false, error: 'editAccept requires a non-empty patch object (empty patch is a confirm)' })
+        return true
+      }
+    } else if (rawPatch !== undefined) {
+      json(400, { ok: false, error: 'patch is only accepted for editAccept' })
+      return true
+    }
+
+    try {
+      const root = assertSafeBookRoot(rawRoot)
+      const port = new ProposalPort({ root })
+      const ref = { port: 'pipeline', proposalId } as const
+      const outcome =
+        action === 'confirm'
+          ? port.confirm(ref, itemId)
+          : action === 'reject'
+            ? port.reject(ref, itemId)
+            : port.editAccept(ref, itemId, rawPatch as Readonly<Record<string, unknown>>)
+      const record = loadCanonProposal(root, proposalId)
+      json(200, {
+        ok: true,
+        action: outcome.action,
+        itemId: outcome.itemId,
+        pendingItems: outcome.pendingItems,
+        finalized: outcome.finalized,
+        proposal: record === null ? null : canonProposalView(record),
+      })
+    } catch (error) {
+      if (error instanceof ProposalPortError) {
+        json(409, { ok: false, code: 'PROPOSAL_DECISION_REJECTED', error: error.message })
+        return true
+      }
+      json(500, { ok: false, error: (error as Error).message })
+    }
+    return true
+  }
+
+  // 显式放弃整份提案（正文改过 / 提取不可用时的收口出口）：逐条 reject 后收口。
+  // 放弃 ≠ 回滚：提案从未进 Commit，正典零字节触碰；账面 CanonProposalCreated
+  // 无 CanonCommitted 配对尾——如实表示「该提案从未被提交」。
+  if (path === '/api/proposal.discard') {
+    const rawRoot = resolvedRoot
+    const proposalId = typeof body['proposalId'] === 'string' ? body['proposalId'] : null
+    if (rawRoot === null || proposalId === null) {
+      json(400, { ok: false, error: 'root and proposalId required' })
+      return true
+    }
+    try {
+      const root = assertSafeBookRoot(rawRoot)
+      const port = new ProposalPort({ root })
+      const ref = { port: 'pipeline', proposalId } as const
+      for (const itemId of port.pendingItemsOf(ref)) port.reject(ref, itemId)
+      port.markConsumed(ref)
+      const record = loadCanonProposal(root, proposalId)
+      json(200, { ok: true, discarded: true, proposal: record === null ? null : canonProposalView(record) })
+    } catch (error) {
+      if (error instanceof ProposalPortError) {
+        json(409, { ok: false, code: 'PROPOSAL_DISCARD_REJECTED', error: error.message })
+        return true
+      }
+      json(500, { ok: false, error: (error as Error).message })
+    }
     return true
   }
 

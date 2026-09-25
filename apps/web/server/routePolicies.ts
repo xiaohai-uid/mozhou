@@ -106,6 +106,10 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/chapter.rework': 'book',
   '/api/chapter.corrections': 'book',
   '/api/chapter.quality': 'book',
+  // 步 8 提案队列确认面（S6）：ProposalPort 逐条 confirm/reject/editAccept
+  '/api/proposal.list': 'book',
+  '/api/proposal.decide': 'book',
+  '/api/proposal.discard': 'book',
   '/api/storyboard.source': 'book',
   '/api/storyboard.generate': 'book',
   '/api/storyboard.save': 'book',
