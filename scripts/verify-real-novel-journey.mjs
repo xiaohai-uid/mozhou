@@ -108,6 +108,15 @@ try {
   log(`小说读入: ${statSync(novelPath).size} bytes, 切分出 ${chapters.length} 回`);
   if (chapters.length === 0) throw new Error('未能切分出任何章回——请确认文本为章回体');
   const used = chapters.slice(0, chapterCount);
+  // 免费档上游按 token 限流（tpm），整回上下文可能直接 429。设 MOZHOU_NOVEL_MAX_CHARS
+  // 可截断每回正文，使本脚本在免费额度下也能跑通生成与增量提取。
+  const maxChars = Number(process.env.MOZHOU_NOVEL_MAX_CHARS ?? 0);
+  if (maxChars > 0) {
+    for (const ch of used) {
+      if (ch.body.length > maxChars) ch.body = ch.body.slice(0, maxChars);
+    }
+    log(`已按 MOZHOU_NOVEL_MAX_CHARS=${maxChars} 截断每回正文`);
+  }
   log(`本次使用前 ${used.length} 回，首回标题: ${used[0].title}, 首回字数: ${used[0].body.length}`);
   findings.push({
     item: '章节切分',
@@ -206,7 +215,6 @@ try {
       }
     }
     const start = frames.find((f) => f.event === 'start');
-    const done = frames.find((f) => f.event === 'done');
     const errFrame = frames.find((f) => f.event === 'error');
     const gen = frames.filter((f) => f.event === 'delta').map((f) => f.text ?? '').join('');
     log(`真实生成: provider=${start?.provider} contextTokens=${start?.contextTokens} chars=${gen.length}`);
@@ -240,10 +248,14 @@ try {
     });
     const commitData = await commit.json();
     log(`提交: HTTP ${commit.status} ok=${String(commitData.ok)} phase=${commitData.phase}`);
+    if (commitData.deltaExtraction) {
+      log(`增量提取: ${JSON.stringify(commitData.deltaExtraction)}`);
+    }
     findings.push({
       item: '采纳与定稿提交',
       result: accept.status === 200 && commit.status === 200 ? '成功' : `accept=${accept.status} commit=${commit.status}`,
-      detail: `commitId=${commitData.commitId ?? 'n/a'} phase=${commitData.phase ?? 'n/a'}`,
+      detail: `commitId=${commitData.commitId ?? 'n/a'} phase=${commitData.phase ?? 'n/a'}`
+        + (commitData.deltaExtraction ? `；增量提取=${JSON.stringify(commitData.deltaExtraction)}` : ''),
     });
   } else {
     log('未配置模型密钥：跳过真实生成，仅执行结构部分');
