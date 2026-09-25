@@ -1,0 +1,55 @@
+{
+  "kind": "test",
+  "status": "COMPLETED",
+  "sourceCommit": "cd9c09b",
+  "command": "node scripts/verify-real-novel-journey.mjs <novel> 8",
+  "exitCode": 0,
+  "scope": "真实长篇小说端到端：切分 → 导入 → 真实模型生成 → 采纳提交 → 落盘产物检查",
+  "novel": {
+    "bytes": 1863656,
+    "chaptersDetected": 108,
+    "chaptersUsed": 8
+  },
+  "modelConfigured": true,
+  "findings": [
+    {
+      "item": "章节切分",
+      "result": "成功切分 108 回，取前 8 回",
+      "detail": "首回「第一回：宴桃園豪傑三結義，斬黃巾英雄首立功」4926 字"
+    },
+    {
+      "item": "真实长文导入",
+      "result": "成功",
+      "detail": "8 章正文写入 正文/第一卷/，首章文件 5069 bytes（含 frontmatter）"
+    },
+    {
+      "item": "书源检索（仓库自带爬虫）",
+      "result": "可用",
+      "detail": "关键词「三国」命中 0 条；degraded=false"
+    },
+    {
+      "item": "真实长篇上下文生成",
+      "result": "异常（provider=real-openai-compatible, chars=0）",
+      "detail": "上下文 4997 tokens，生成 0 字；帧序列=start,done"
+    },
+    {
+      "item": "采纳与定稿提交",
+      "result": "accept=409 commit=200",
+      "detail": "commitId=cmit_01M3CK5SMJNSFS5T54J76EMQMR phase=committed"
+    },
+    {
+      "item": "提交后叙事状态层（五族追踪）",
+      "result": "未增长（0 行）",
+      "detail": "{\"事实.jsonl\":0,\"伏笔.jsonl\":0,\"关系.jsonl\":0,\"时间线.jsonl\":0,\"认知.jsonl\":0}"
+    },
+    {
+      "item": "其他落盘产物",
+      "result": "探针完成",
+      "detail": "{\"摘要目录\":0,\"质量目录\":\"N/A\",\"事件账本行\":3,\"receipts\":0,\"snapshots\":0,\"marketBrief\":71}"
+    }
+  ],
+  "limitations": [
+    "使用公有领域文本（Project Gutenberg）以避免版权问题；未使用商业网文站点内容。",
+    "「追踪层行数」为 0 是预期中的接线缺口证据，不是本脚本的失败。"
+  ]
+}
