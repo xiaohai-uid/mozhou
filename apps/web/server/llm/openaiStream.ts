@@ -137,6 +137,14 @@ export function resolveChatEndpoint(env: NodeJS.ProcessEnv = process.env, userId
   return userEndpoint
 }
 
+/** 把上游给的标量安全转成文本（对象走 JSON，避免 [object Object]）。 */
+function scalarText(value: unknown): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value) ?? ''
+}
+
 /**
  * 发起真实 OpenAI-compatible Chat Completions 流式请求，逐 delta 产出。
  * 仅在已配置真实 Key 且显式非 mock 时调用；网络错误按流式错误语义上抛。
@@ -209,17 +217,29 @@ export async function* streamOpenAiChat(
           controller.abort()
           return
         }
+        let chunk: {
+          choices?: { delta?: { content?: string }; finish_reason?: string }[]
+          error?: { message?: unknown; code?: unknown; type?: unknown }
+        }
         try {
-          const chunk = JSON.parse(payload) as {
-            choices?: { delta?: { content?: string }; finish_reason?: string }[]
-          }
-          const choice = chunk.choices?.[0]
-          if (choice) {
-            const delta = choice.delta?.content ?? ''
-            if (delta) yield { delta, finishReason: choice.finish_reason }
-          }
+          chunk = JSON.parse(payload) as typeof chunk
         } catch {
           // 上游 SSE 可能包含心跳/非 JSON 行；忽略单行，不放宽目标地址门禁。
+          continue
+        }
+        // 上游可能把错误塞进 HTTP 200 的 SSE 流（限流/内容拦截等）。若不显式抛出，
+        // 表现就是「零 delta 的静默空输出」——调用方无法区分「模型没说话」与
+        // 「上游拒绝」。此处必须抛，让失败可诊断。
+        if (chunk.error !== undefined && chunk.error !== null) {
+          const message = scalarText(chunk.error.message).slice(0, 200) || 'unknown upstream error'
+          const rawCode = scalarText(chunk.error.code)
+          const code = rawCode.length === 0 ? '' : ` (${rawCode})`
+          throw new Error(`上游流内错误${code}: ${message}`)
+        }
+        const choice = chunk.choices?.[0]
+        if (choice) {
+          const delta = choice.delta?.content ?? ''
+          if (delta) yield { delta, finishReason: choice.finish_reason }
         }
       }
     }
