@@ -11,6 +11,15 @@
  *     基线刷新），本路由绝不静默降级或自动重开。冲突路径零磁盘变更。
  *   语义：phase 恒 draft；Commit 仍只经管线质量门后的 commitChapter。
  * 不触碰 Protected Author Content 以外的任何正典工件。
+ *
+ * 步 7 Continuity Gate 接线（chapter-pipeline-spec §1 表第 7 行 / S5）：
+ * POST /api/chapter.commit 在步 6 提取出五族 delta 后、写正典前插入纯机械核检
+ * （四族行形状 + dependency 引用完整性 + M2 时间线单调 + POV 秘密零泄漏）。
+ *   通过 → 200，响应带 continuityGate.verdict='pass'；
+ *   冲突 → 409 CONTINUITY_HARD_CONFLICT，Result 顶层 hardConflicts[] {factId,
+ *   assertion, suggestion} 原样回给作者（回炉 Final Extract 重提取），正典零写入。
+ * Gate 读不到存量叙事状态时同样显式失败（500），绝不降级为「跳过门禁」——
+ * 跳过门禁等于把未经核检的 delta 盲写正典。
  */
 import type { RouteHandler } from '../router.js'
 import { assertSafeBookRoot } from '../security.js'
@@ -23,6 +32,7 @@ import {
   proseChapterPath,
   readProseChapter,
 } from '@mozhou/data-plane'
+import { runContinuityGate } from '@mozhou/pipeline'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
 
 const CHAPTER_MISSING = 'CHAPTER_MISSING'
@@ -205,6 +215,28 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         const prose = readProseChapter(root, proseChapterPath(chapterIndex)).body
         const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose)
         const hasDelta = Object.keys(delta.appends).length > 0
+        const deltaExtraction = {
+          extractor: delta.extractor,
+          counts: delta.counts,
+          dropped: delta.dropped,
+          ...(delta.reason === undefined ? {} : { reason: delta.reason }),
+        }
+
+        // 步 7 Continuity Gate：候选 delta 写正典前过机械核检。冲突 = 硬门禁，
+        // commitChapter 一步不调（正典零写入），冲突清单经 Result 顶层
+        // hardConflicts[] 回给作者——回炉重提取是唯一出路，不许静默放行。
+        const gate = runContinuityGate({ bookRoot: root, chapterIndex, delta: delta.appends, prose })
+        if (gate.verdict === 'hard_conflict') {
+          json(409, {
+            ok: false,
+            code: 'CONTINUITY_HARD_CONFLICT',
+            chapterIndex,
+            error: `连续性门禁未通过：${gate.hardConflicts.length} 项硬冲突——本章正典零写入`,
+            hardConflicts: gate.hardConflicts,
+            deltaExtraction,
+          })
+          return true
+        }
 
         const result = plane.commitChapter({
           chapterIndex,
@@ -217,12 +249,8 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           chapterIndex: result.chapterIndex,
           contentSha256: result.contentSha256,
           phase: 'committed',
-          deltaExtraction: {
-            extractor: delta.extractor,
-            counts: delta.counts,
-            dropped: delta.dropped,
-            ...(delta.reason === undefined ? {} : { reason: delta.reason }),
-          },
+          continuityGate: { verdict: 'pass' },
+          deltaExtraction,
         })
       } finally {
         plane.close()
