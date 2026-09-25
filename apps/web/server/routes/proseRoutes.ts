@@ -31,6 +31,13 @@
  *     （409 CANON_PROPOSAL_STALE）而非静默丢弃作者的逐条决策；
  *   - 无候选可路由时不落空提案（空 CanonProposalCreated 只会污染悬挂扫描）。
  * 未决提案的盘面凭据落在 .mozhou/proposals/，跨重启待决（S8 Proposal 后行）。
+ *
+ * D06 依赖钉版消费（change-impact-engine-spec §2 D06 / ADR-0003 §2.1）：
+ * 本章生成时编译步已把「真正入包的版本化实体」暂存于 .mozhou/dependency-manifests/；
+ * 本路由在 commitChapter 前按章回读并原样钉进 ChapterCommitted 事件行——
+ * 上游变更据此经 findReaders 圈定受影响章（依赖图生产侧数据源）。
+ * 无暂存 = 本章未经编译（手写章 / 结构层降级）⇒ 不带清单提交；暂存形状非法则
+ * 显式 500 失败，绝不静默丢弃钉版让影响分析失明。
  * 成对账目：本路径**不发射 CanonCommitted**（配对尾）——配对状态活在 PublishBus
  * 单实例内存里，提案头由 createCanonProposal 在「创建它的那个请求」的实例上开，
  * 跨请求续接（作者确认后重提）时该实例已不存在，新实例发尾必抛
@@ -55,6 +62,7 @@ import {
   confirmedAppendsForCommit,
   createCanonProposal,
   loadCanonProposal,
+  readPendingDependencyManifest,
   runContinuityGate,
 } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
@@ -242,6 +250,11 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       try {
         const proseFile = readProseChapter(root, proseChapterPath(chapterIndex))
         const prose = proseFile.body
+        // D06 依赖钉版消费侧：本章生成时编译入包的实体钉版随 ChapterCommitted 行落账，
+        // 上游重算据此圈定受影响章。无暂存 = 本章未经编译（手写/结构层降级）⇒ 不带清单，
+        // 如实声明「本章不钉任何上游版本」；暂存存在但形状非法则由回读显式抛错（绝不静默丢钉版）。
+        const pendingManifest = readPendingDependencyManifest(root, chapterIndex)
+        const dependencyManifestFields = pendingManifest === null ? {} : { dependencyManifest: pendingManifest }
         // 步 8 提案与正文 revision 绑定：同一 revision 的提交重试续接同一提案
         // （否则每次重试都重跑提取、再落一份同内容提案，且新提案的行 id 与作者
         // 已确认的行对不上——「只写已确认集」就无从谈起）。
@@ -283,7 +296,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           if (Object.keys(delta.appends).length === 0) {
             // 无候选可路由：步 8 不落空提案（无内容的 CanonProposalCreated 只会污染
             // 悬挂扫描），直接提交——叙事层零增长由 deltaExtraction 如实报出。
-            const result = plane.commitChapter({ chapterIndex, summary })
+            const result = plane.commitChapter({ chapterIndex, summary, ...dependencyManifestFields })
             json(200, {
               ok: true,
               commitId: result.commitId,
@@ -372,6 +385,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           chapterIndex,
           summary,
           ...(hasAppends ? { appends } : {}),
+          ...dependencyManifestFields,
         })
 
         // 提案收口：commitChapter 成功之后才翻 consumed——提交失败时作者的逐条决策

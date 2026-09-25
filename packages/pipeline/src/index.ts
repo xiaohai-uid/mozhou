@@ -139,10 +139,16 @@ export type {
   RunReviewStepRequest,
 } from './review-step.js';
 
-/** Compile 步衔接：复用 compile() 缝；stale 警告继续+Receipt 留痕；receiptId 续跑。 */
+/** Compile 步衔接：复用 compile() 缝；stale 警告继续+Receipt 留痕；receiptId 续跑；
+ *  依赖钉版产出（D06）：编译入包实体钉版暂存于 .mozhou/dependency-manifests/，提交侧回读。 */
 export {
+  PENDING_DEPENDENCY_MANIFEST_DIR,
   STALE_WARNING_SECTION,
+  buildDependencyManifest,
   loadReceiptForResume,
+  pendingDependencyManifestPath,
+  persistPendingDependencyManifest,
+  readPendingDependencyManifest,
   renderStaleWarningContent,
   runCompileStep,
 } from './compile-step.js';
