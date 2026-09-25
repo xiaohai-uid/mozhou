@@ -20,7 +20,10 @@ import {
   LocalDataPlane,
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
+  proseChapterPath,
+  readProseChapter,
 } from '@mozhou/data-plane'
+import { extractChapterDelta } from '../analysis/deltaExtractor.js'
 
 const CHAPTER_MISSING = 'CHAPTER_MISSING'
 
@@ -28,7 +31,7 @@ function isEnoent(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT'
 }
 
-export const proseRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
+export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
@@ -196,13 +199,30 @@ export const proseRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
       const root = assertSafeBookRoot(rawRoot)
       const plane = LocalDataPlane.openOrRebuild(root)
       try {
-        const result = plane.commitChapter({ chapterIndex, summary })
+        // 步 6 Final Extract 接线：终稿 → 五族叙事状态增量。
+        // 提取失败不阻塞提交（作者的正文必须能定稿），但必须在响应里如实报出，
+        // 否则「提交后叙事层零增长」会被误读为「一切正常」。
+        const prose = readProseChapter(root, proseChapterPath(chapterIndex)).body
+        const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose)
+        const hasDelta = Object.keys(delta.appends).length > 0
+
+        const result = plane.commitChapter({
+          chapterIndex,
+          summary,
+          ...(hasDelta ? { appends: delta.appends } : {}),
+        })
         json(200, {
           ok: true,
           commitId: result.commitId,
           chapterIndex: result.chapterIndex,
           contentSha256: result.contentSha256,
           phase: 'committed',
+          deltaExtraction: {
+            extractor: delta.extractor,
+            counts: delta.counts,
+            dropped: delta.dropped,
+            ...(delta.reason === undefined ? {} : { reason: delta.reason }),
+          },
         })
       } finally {
         plane.close()
