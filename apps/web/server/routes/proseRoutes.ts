@@ -45,6 +45,17 @@
  * 平铺 ChapterCommitted 行；账面上 CanonProposalCreated 无配对尾即本路径真实形状
  * （session 编排路径由 ChapterProductionSession.markCommitted 闭合，不受影响；
  * 投影侧 openHeads 只计窗口内事件，无窗口的 web 路径不会污染会话投影）。
+ *
+ * 步 10 Flywheel Record 接线（chapter-pipeline-spec §1 表第 10 行 / S12）：
+ * commitChapter 落定后（两条提交分支各自调用点）以同一 taskRef 落收尾事件
+ * FlywheelRecorded 并写 usage 投影表 .mozhou/usage.jsonl——「每完成窗口恰一条
+ * FlywheelRecorded」是 Phase 4 学习器的窗口锚，故空计量也必须落账（recordedCount=0）。
+ *   记账失败不阻断正文（S12）：投影写失败 ⇒ 事件 payload outcome=state_degraded、
+ *   正文与正典早已落定，响应 flywheelRecord 如实上报降级面（绝不静默）；
+ *   usage 事实由请求体可选携带（web 侧尚无 provider 计量，缺省 = 空数组，不造数）；
+ *   形状非法在动盘之前 400 拒绝——绝不把未校验载荷写进投影表。
+ *   窗口闭合后触发 afterRecord 钩子（T23 · #56 触发点）：StyleLearner 自读本窗口
+ *   author 编辑更新派生画像；钩子失败同样不阻断（S12 同款），但错误文本进响应。
  */
 import type { RouteHandler } from '../router.js'
 import { assertSafeBookRoot } from '../security.js'
@@ -64,8 +75,11 @@ import {
   loadCanonProposal,
   readPendingDependencyManifest,
   runContinuityGate,
+  runFlywheelRecord,
 } from '@mozhou/pipeline'
+import type { FlywheelRecordStatus, UsageFact } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
+import { runStyleLearnerForWindow } from '@mozhou/flywheel'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
 import {
   canonProposalView,
@@ -78,6 +92,66 @@ const CHAPTER_MISSING = 'CHAPTER_MISSING'
 
 function isEnoent(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT'
+}
+
+/** usage 事实的合法键集（UsageFact 冻结形状；未知键一律拒绝，不做透传）。 */
+const USAGE_FACT_KEYS: readonly string[] = [
+  'kind',
+  'provider',
+  'model',
+  'inputTokens',
+  'outputTokens',
+  'costMicros',
+]
+
+interface MutableUsageFact {
+  kind: 'usage' | 'cost'
+  provider?: string
+  model?: string
+  inputTokens?: number
+  outputTokens?: number
+  costMicros?: number
+}
+
+/**
+ * 请求体 usage 事实的形状校验：缺省/null = 无计量（合法）；形状非法返回 null
+ * 由路由 400 拒绝。计数字段只收非负整数——投影表是成本审计面，宁可拒绝也不
+ * 让负数/小数/字符串混进账。
+ */
+function parseUsageFacts(raw: unknown): UsageFact[] | null {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) return null
+  const facts: UsageFact[] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return null
+    const row = item as Record<string, unknown>
+    const kind = row['kind']
+    if (kind !== 'usage' && kind !== 'cost') return null
+    if (Object.keys(row).some((key) => !USAGE_FACT_KEYS.includes(key))) return null
+    const fact: MutableUsageFact = { kind }
+    for (const key of ['provider', 'model'] as const) {
+      const value = row[key]
+      if (value === undefined) continue
+      if (typeof value !== 'string' || value.length === 0) return null
+      fact[key] = value
+    }
+    for (const key of ['inputTokens', 'outputTokens', 'costMicros'] as const) {
+      const value = row[key]
+      if (value === undefined) continue
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null
+      fact[key] = value
+    }
+    facts.push(fact)
+  }
+  return facts
+}
+
+/** 收尾记账在响应里的呈现面（降级与钩子失败都必须可被作者看见）。 */
+interface FlywheelRecordView {
+  readonly status: FlywheelRecordStatus
+  readonly recordedCount: number
+  readonly errorDetail: string | null
+  readonly afterRecordError: string | null
 }
 
 export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
@@ -244,6 +318,19 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       return true
     }
 
+    // 步 10 的 usage 事实：形状非法在动盘之前拒绝（后续分支都已提交成功，
+    // 那时才发现形状非法只能吞掉或回滚——两者都不可接受）。
+    const usageFacts = parseUsageFacts(body['usage'])
+    if (usageFacts === null) {
+      json(400, {
+        ok: false,
+        error:
+          'usage must be an array of {kind:"usage"|"cost", provider?, model?, ' +
+          'inputTokens?, outputTokens?, costMicros?} (non-negative integers, no unknown keys)',
+      })
+      return true
+    }
+
     try {
       const root = assertSafeBookRoot(rawRoot)
       const plane = LocalDataPlane.openOrRebuild(root)
@@ -260,6 +347,38 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         // 已确认的行对不上——「只写已确认集」就无从谈起）。
         const taskRef = 'web_commit_ch' + chapterIndex + '_rev' + proseFile.revision
         const port = new ProposalPort({ root })
+
+        // 步 10 收尾记账：两条提交分支共用同一调用点语义（同一窗口恰一条
+        // FlywheelRecorded）。记账是派生面——正文与正典此刻已落定，本函数
+        // 的任何失败都只降级上报，绝不回退提交。
+        const recordFlywheel = (commitId: string): FlywheelRecordView => {
+          let afterRecordError: string | null = null
+          const outcome = runFlywheelRecord({
+            bus: new PublishBus(),
+            bookRoot: root,
+            taskRef,
+            chapterIndex,
+            commitId,
+            usage: usageFacts,
+            afterRecord: () => {
+              // 窗口闭合钩子（T23 · #56）：StyleLearner 自读本窗口 author 编辑并
+              // 更新派生画像。record-step 会吞掉钩子抛错（S12），故此处先留痕再
+              // 原样抛出——静默吞掉会让「学习器从未运行」看起来像「一切正常」。
+              try {
+                runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
+              } catch (cause) {
+                afterRecordError = (cause as Error).message
+                throw cause
+              }
+            },
+          })
+          return {
+            status: outcome.status,
+            recordedCount: outcome.recordedCount,
+            errorDetail: outcome.errorDetail,
+            afterRecordError,
+          }
+        }
 
         let record = openProposalForTask(root, taskRef)
         let deltaExtraction: Record<string, unknown> | null = null
@@ -306,6 +425,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
               continuityGate: { verdict: 'pass' },
               canonProposal: null,
               deltaExtraction,
+              flywheelRecord: recordFlywheel(result.commitId),
             })
             return true
           }
@@ -401,6 +521,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           continuityGate: { verdict: 'pass' },
           canonProposal: canonProposalView(loadCanonProposal(root, record.proposalId) ?? record),
           ...(deltaExtraction === null ? {} : { deltaExtraction }),
+          flywheelRecord: recordFlywheel(result.commitId),
         })
       } finally {
         plane.close()
