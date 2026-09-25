@@ -13,7 +13,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBook, LocalDataPlane, proseChapterPath } from '@mozhou/data-plane'
+import {
+  chapterOutlinePath,
+  createBook,
+  LocalDataPlane,
+  parseFrontmatter,
+  proseChapterPath,
+  readOutlineStaleMarker,
+} from '@mozhou/data-plane'
 import { newUlid } from '@mozhou/kernel'
 import { createMoZhouApiRouter } from '../api.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
@@ -165,6 +172,58 @@ function trackingRows(root: string, kind: string): { seq: number; payload: strin
   } finally {
     plane.close()
   }
+}
+
+interface PinnedBook {
+  readonly root: string
+  readonly factId: string
+}
+
+/**
+ * 两章各带依赖钉版：ch1 依赖 factId@0，ch2 依赖另一条事实@0（无关章对照）。
+ * 追踪流落盘序 = [factId, otherFactId]，故外部改版固定在行 0。
+ */
+function seedPinnedBook(dir: string): PinnedBook {
+  const created = createBook({ dir, title: '钉版传播书' })
+  const factId = `fact_${newUlid()}`
+  const otherFactId = `fact_${newUlid()}`
+  const plane = LocalDataPlane.open(dir)
+  try {
+    plane.createChapterDraft({ chapterIndex: 1, title: '风起' })
+    plane.createChapterDraft({ chapterIndex: 2, title: '云涌' })
+    plane.commitChapter({
+      chapterIndex: 1,
+      summary: '一章提交',
+      dependencyManifest: { entries: [{ kind: 'temporalFact', id: factId, revision: 0 }] },
+      appends: { temporalFact: [makeFactRow(created.book.id, { id: factId, value: '墨舟-0' })] },
+    })
+    plane.commitChapter({
+      chapterIndex: 2,
+      summary: '二章提交',
+      dependencyManifest: { entries: [{ kind: 'temporalFact', id: otherFactId, revision: 0 }] },
+      appends: { temporalFact: [makeFactRow(created.book.id, { id: otherFactId, value: '船坞', predicate: 'mood' })] },
+    })
+  } finally {
+    plane.close()
+  }
+  return { root: dir, factId }
+}
+
+function outlineData(root: string, chapterIndex: number): Record<string, unknown> {
+  return parseFrontmatter(readFileSync(join(root, chapterOutlinePath(chapterIndex)), 'utf8')).data as Record<
+    string,
+    unknown
+  >
+}
+
+/** 立一条追踪流提案并把提案 id 取出（所有传播用例的共同前置）。 */
+async function proposeStreamEdit(base: string, root: string, streamAbs: string): Promise<string> {
+  mutateStreamLine(streamAbs, 0, { value: '墨舟-改', revision: 1 })
+  const scan = await post(base, '/api/reconciliation.scan', { root })
+  const proposals = scan.json['openProposals'] as Record<string, unknown>[]
+  const proposal = proposals.find((candidate) => candidate['relPath'] === FACT_STREAM_REL)
+  expect(proposal, `expected a proposal for ${FACT_STREAM_REL}, got ${JSON.stringify(proposals)}`).toBeDefined()
+  return proposal!['proposalId'] as string
 }
 
 /* ========================================================================== */
@@ -440,5 +499,184 @@ describe('进程级运行期宿主（启动必检 + watcher）', () => {
     const rejected = await post(base, '/api/library.open', { root: notABook })
     expect(rejected.status).toBe(400)
     expect(getReconciliationAttachFailure(notABook)).toContain('book.json')
+  })
+})
+
+/* ==========================================================================
+ * 落定出口 → StaleMarker 传播（change-impact-engine D18/D19/D20）
+ *
+ * 接线点：两处 plane.reconciliation(...) 注入的 onSettled。覆盖成功路径
+ * （接受 → 命中章标 stale、无关章不动、正文零丢失、自身写入不被误报）与失败路径
+ * （部分拒绝 / 整份拒绝不传播；章大纲外部编辑在途时 S3 拒绝叠加且显式落 stderr）。
+ * ========================================================================== */
+
+describe('落定出口 → StaleMarker 传播（D18/D19/D20）', () => {
+  it('追踪行外部改版被接受 → 依赖章获得 stale 三要素；无关章不动；正文零丢失', async () => {
+    const dataRoot = tempDir('mozhou-rcln-stale-')
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    const { root, factId } = seedPinnedBook(join(dataRoot, 'book-s1'))
+    const base = await listen()
+
+    const proseBefore = readFileSync(join(root, proseChapterPath(1)), 'utf8')
+    const markedBefore = outlineData(root, 1)['revision'] as number
+    const untouchedBefore = outlineData(root, 2)['revision'] as number
+
+    const proposalId = await proposeStreamEdit(base, root, join(root, FACT_STREAM_REL))
+    const decided = await post(base, '/api/reconciliation.decide', {
+      root,
+      proposalId,
+      acceptedItemIds: ['whole', 'change:0'],
+    })
+    expect(decided.status).toBe(200)
+    expect((decided.json['proposal'] as Record<string, unknown>)['state']).toBe('applied')
+
+    // 命中章：带原因 / 精确上游引用 / 时间三要素齐备，revision 原地 +1
+    const marker = readOutlineStaleMarker(outlineData(root, 1) as never)
+    expect(marker?.reason).toBe('upstream_canon_changed')
+    expect(marker?.upstreamRefs).toEqual([{ kind: 'temporalFact', id: factId, revision: 1 }])
+    expect(Number.isFinite(Date.parse(marker?.markedAt ?? ''))).toBe(true)
+    expect(outlineData(root, 1)['revision']).toBe(markedBefore + 1)
+
+    // 无关章零触碰
+    expect(outlineData(root, 2)['staleReason']).toBeUndefined()
+    expect(outlineData(root, 2)['revision']).toBe(untouchedBefore)
+
+    // I1：传播是附加元数据通道，作者正文一个字节都不动
+    expect(readFileSync(join(root, proseChapterPath(1)), 'utf8')).toBe(proseBefore)
+
+    // 自己的写入自己吸收：传播后启动必检不得把自己的标记当外部修改
+    const again = await post(base, '/api/reconciliation.scan', { root })
+    expect((again.json['proposed'] as unknown[]).length).toBe(0)
+  })
+
+  it('部分接受：被拒的改版行不传播（拒绝 ≠ 上游变更），章大纲零标记', async () => {
+    const dataRoot = tempDir('mozhou-rcln-stale-partial-')
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    const { root } = seedPinnedBook(join(dataRoot, 'book-s2'))
+    const base = await listen()
+
+    const revisionBefore = outlineData(root, 1)['revision'] as number
+    const proposalId = await proposeStreamEdit(base, root, join(root, FACT_STREAM_REL))
+
+    // 只接受 'whole'（追踪流条目里它不携带行取舍）⇒ change:0 落入抑制账本
+    const decided = await post(base, '/api/reconciliation.decide', { root, proposalId, acceptedItemIds: ['whole'] })
+    expect((decided.json['proposal'] as Record<string, unknown>)['state']).toBe('partially_applied')
+
+    // 拒绝 ≠ 回滚：盘上仍是作者改后的版本
+    expect(readFileSync(join(root, FACT_STREAM_REL), 'utf8')).toContain('墨舟-改')
+    // 但投影未升格该行 ⇒ 不得有任何章被标 stale（按盘上现状传播会是误标）
+    expect(outlineData(root, 1)['staleReason']).toBeUndefined()
+    expect(outlineData(root, 1)['revision']).toBe(revisionBefore)
+  })
+
+  it('整份拒绝（dismiss）不传播：盘上带新版本，仍无章被标 stale', async () => {
+    const dataRoot = tempDir('mozhou-rcln-stale-dismiss-')
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    const { root } = seedPinnedBook(join(dataRoot, 'book-s3'))
+    const base = await listen()
+
+    const revisionBefore = outlineData(root, 1)['revision'] as number
+    const proposalId = await proposeStreamEdit(base, root, join(root, FACT_STREAM_REL))
+
+    const dismissed = await post(base, '/api/reconciliation.dismiss', { root, proposalId })
+    expect((dismissed.json['proposal'] as Record<string, unknown>)['state']).toBe('dismissed')
+
+    expect(readFileSync(join(root, FACT_STREAM_REL), 'utf8')).toContain('墨舟-改')
+    expect(outlineData(root, 1)['staleReason']).toBeUndefined()
+    expect(outlineData(root, 1)['revision']).toBe(revisionBefore)
+  })
+
+  it('正文外部改动落定不产上游变更表：零标记零噪声（无版本化实体可对齐）', async () => {
+    const dataRoot = tempDir('mozhou-rcln-stale-prose-')
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    const { root } = seedPinnedBook(join(dataRoot, 'book-s4'))
+    const base = await listen()
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const revisionBefore = outlineData(root, 1)['revision'] as number
+      const proseAbs = join(root, proseChapterPath(1))
+      writeFileSync(proseAbs, `${readFileSync(proseAbs, 'utf8')}她望向舷外。\n`, 'utf8')
+
+      const scan = await post(base, '/api/reconciliation.scan', { root })
+      const proposal = (scan.json['openProposals'] as Record<string, unknown>[])[0] as Record<string, unknown>
+      expect(proposal['relPath']).toBe(proseChapterPath(1))
+
+      const decided = await post(base, '/api/reconciliation.decide', {
+        root,
+        proposalId: proposal['proposalId'],
+        acceptedItemIds: ['whole'],
+      })
+      expect((decided.json['proposal'] as Record<string, unknown>)['state']).toBe('applied')
+
+      expect(outlineData(root, 1)['staleReason']).toBeUndefined()
+      expect(outlineData(root, 1)['revision']).toBe(revisionBefore)
+      expect(errorSpy).not.toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('章大纲外部编辑在途：传播拒绝叠加（S3）→ 显式落 stderr，作者决策照常落定', async () => {
+    const dataRoot = tempDir('mozhou-rcln-stale-s3-')
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    const { root } = seedPinnedBook(join(dataRoot, 'book-s5'))
+    const base = await listen()
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const proposalId = await proposeStreamEdit(base, root, join(root, FACT_STREAM_REL))
+      // 章大纲外部编辑在途（尚未对账）⇒ 写前 hash 校验必拒
+      const outlineAbs = join(root, chapterOutlinePath(1))
+      const outlineExternal = `${readFileSync(outlineAbs, 'utf8')}\n<!-- 外部批注 -->\n`
+      writeFileSync(outlineAbs, outlineExternal, 'utf8')
+
+      const decided = await post(base, '/api/reconciliation.decide', {
+        root,
+        proposalId,
+        acceptedItemIds: ['whole', 'change:0'],
+      })
+      // 决策本身已落定：传播失败不得伪装成 500 回滚
+      expect(decided.status).toBe(200)
+      expect((decided.json['proposal'] as Record<string, unknown>)['state']).toBe('applied')
+
+      // 宁败不脏：外部编辑原样保留，未被静默叠加标记
+      expect(readFileSync(outlineAbs, 'utf8')).toBe(outlineExternal)
+      // 失败显式可观测，绝不静默
+      const logged = errorSpy.mock.calls.map((call) => String(call[0]))
+      expect(logged.some((line) => line.includes('stale propagation failed'))).toBe(true)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('无常驻宿主时决策同样传播：回退一次性平面的落定出口也注入', async () => {
+    const dataRoot = tempDir('mozhou-rcln-stale-fallback-')
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    const { root, factId } = seedPinnedBook(join(dataRoot, 'book-s6'))
+    const streamAbs = join(root, FACT_STREAM_REL)
+    mutateStreamLine(streamAbs, 0, { value: '墨舟-改', revision: 1 })
+
+    // 一次性平面立提案后关闭（模拟上一次会话留下的未决提案）
+    const plane = LocalDataPlane.open(root)
+    let proposalId: string
+    try {
+      proposalId = plane.reconciliation().scanExternalModifications('startupScan').proposed[0]!.proposalId
+    } finally {
+      plane.close()
+    }
+    stopAllReconciliationRuntimes()
+
+    const base = await listen()
+    const decided = await post(base, '/api/reconciliation.decide', {
+      root,
+      proposalId,
+      acceptedItemIds: ['whole', 'change:0'],
+    })
+    expect(decided.status).toBe(200)
+    expect((decided.json['proposal'] as Record<string, unknown>)['state']).toBe('applied')
+    expect(readOutlineStaleMarker(outlineData(root, 1) as never)?.upstreamRefs).toEqual([
+      { kind: 'temporalFact', id: factId, revision: 1 },
+    ])
   })
 })

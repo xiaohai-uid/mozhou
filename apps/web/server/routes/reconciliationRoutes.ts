@@ -3,9 +3,10 @@
  *
  * 规格锚点：dual-plane-sync-spec Q4/Q8-Q12（启动必检 + 运行期 watcher；五态状态机；
  * 逐条取舍；拒绝 ≠ 回滚文件）与 change-impact-engine-spec §3 D18（对账终态是
- * 影响传播的两大入口信号之一）。
+ * 影响传播的两大入口信号之一）与 D19/D20（公共落定出口单点：落定 → reloadManifest
+ * → propagateStaleMarkers → 嗅探；回调注入形态、零新事件词条）。
  *
- * 本模块是 `ReconciliationService` 在生产端的唯一接线面，两件事：
+ * 本模块是 `ReconciliationService` 在生产端的唯一接线面，三件事：
  *
  * 1. **运行期宿主**（`ensureReconciliationRuntime`）：按书根挂一个进程级常驻平面 +
  *    `scanExternalModifications('startupScan')` + `startWatcher()`，使「外部修改最终
@@ -18,6 +19,11 @@
  *    book 级端点，把五态提案与作者门（逐条接受/拒绝）暴露给 UI。读端点用常驻服务；
  *    无常驻宿主时回退到一次性平面（测试/只读装配），请求结束即关闭。
  *
+ * 3. **落定出口 → StaleMarker 传播**（D19/D20）：两处 `plane.reconciliation(...)`
+ *    注入同一个 `onSettled`——终态提案里真正升格进投影的追踪行 → 上游变更表 →
+ *    `plane.propagateStaleMarkers`，命中的下游章大纲节点获得 stale 三字段。
+ *    这是「改早期章 → 下游章显式提示需复核」的唯一呈现通道；无变更表则零动作。
+ *
  * 诚实边界：`scan` 是显式检测请求，会**确保**常驻宿主已挂接（作者点「重新对账」
  * 即让检测面进入运行期）；其余读/决策端点不产生挂接触发，检测生命周期归装配层。
  * 挂接失败绝不静默：错误落 stderr 并可在 `list` 响应的 `attachError` 里读到。
@@ -25,7 +31,8 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { LocalDataPlane, ReconciliationError } from '@mozhou/data-plane'
-import type { ReconciliationService, ScanOutcome } from '@mozhou/data-plane'
+import type { ReconciliationService, ReconciliationSettledPayload, ScanOutcome } from '@mozhou/data-plane'
+import type { DependencyManifestEntry } from '@mozhou/kernel'
 import type { ApiRouter, RouteHandler } from '../router.js'
 import { assertSafeBookRoot, RequestBoundaryError } from '../security.js'
 
@@ -76,7 +83,9 @@ export function ensureReconciliationRuntime(
   const safeRoot = assertSafeBookRoot(key)
   const plane = LocalDataPlane.openOrRebuild(safeRoot)
   try {
-    const service = plane.reconciliation()
+    const service = plane.reconciliation({
+      onSettled: (payload) => propagateSettledChanges(plane, service, payload),
+    })
     const startupScan = service.scanExternalModifications('startupScan')
     const watcherIntervalMs = options.watcherIntervalMs ?? WATCHER_INTERVAL_MS
     service.startWatcher({ intervalMs: watcherIntervalMs })
@@ -108,6 +117,94 @@ export function stopReconciliationRuntime(root: string): void {
 
 export function stopAllReconciliationRuntimes(): void {
   for (const key of [...runtimes.keys()]) stopReconciliationRuntime(key)
+}
+
+/* ----------------------------------------------------------------------------
+ * 落定出口 → StaleMarker 传播（change-impact-engine-spec D18/D19/D20）
+ * ------------------------------------------------------------------------- */
+
+/**
+ * 落定载荷 → 上游变更表（DependencyManifestEntry 形状）。
+ *
+ * 只认「真正升格进投影」的条目：终态提案的抑制账本（rejectedLineChanges /
+ * rejectedLineAdditions）是被拒 delta 的补集判据——拒绝 ≠ 回滚文件，盘上仍是作者
+ * 改后的版本，故按盘上现状传播会把作者已否决的改动误报成上游变更（I2 的误标）。
+ * 对账面其余类别（正文 / 目录卡 / 规划工件 / 大纲节点）在 V1 钉版词表里没有可对齐
+ * 的版本化实体（compile-step 只钉四族叙事实体）⇒ 空表，宁缺不误标、不编造版本。
+ */
+function resolveUpstreamChanges(
+  service: ReconciliationService,
+  payload: ReconciliationSettledPayload,
+): readonly DependencyManifestEntry[] {
+  const proposal = service.getProposal(payload.proposalId)
+  const summary = proposal?.summary ?? null
+  if (proposal === null || summary === null || summary.kind !== 'trackingStream') return []
+
+  const rejectedChanges = new Set(
+    proposal.rejectedLineChanges.map((pair) => `${pair.baselineSha256}\u0000${pair.diskPayload}`),
+  )
+  const rejectedAdditions = new Set(proposal.rejectedLineAdditions)
+  const acceptedPayloads = [
+    ...summary.changes
+      .filter((change) => !rejectedChanges.has(`${change.baselineSha256}\u0000${change.diskPayload}`))
+      .map((change) => change.diskPayload),
+    ...summary.additions
+      .filter((addition) => !rejectedAdditions.has(addition.payload))
+      .map((addition) => addition.payload),
+  ]
+
+  const entries: DependencyManifestEntry[] = []
+  for (const text of acceptedPayloads) {
+    const row = parseVersionedRow(text)
+    if (row === null) continue
+    entries.push({ kind: summary.streamKind, id: row.id, revision: row.revision })
+  }
+  return entries
+}
+
+/** 追踪行的版本化读回：{id, revision} 齐备才成条目（缺失即无版本可对齐 ⇒ 弃该条）。 */
+function parseVersionedRow(text: string): { readonly id: string; readonly revision: number } | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null
+  const row = parsed as Record<string, unknown>
+  const id = row['id']
+  const revision = row['revision']
+  if (typeof id !== 'string' || id.length === 0) return null
+  if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) return null
+  return { id, revision }
+}
+
+/**
+ * 落定后传播（D19/D20 序：落定 → reloadManifest（finalize 已做）→ 本传播）。
+ * 零变更表 ⇒ 零动作（无影响面不产噪声）。传播是旁路：异常显式落 stderr 后返回，
+ * 绝不把已落盘的作者决策伪装成失败回滚——提案终态与基线吸收在 finalize 里已经完成，
+ * 这里抛出只会让 decide 以 500 回应一个其实已生效的决定（失败面仍是可观测的）。
+ */
+function propagateSettledChanges(
+  plane: LocalDataPlane,
+  service: ReconciliationService,
+  payload: ReconciliationSettledPayload,
+): void {
+  try {
+    const upstreamChanges = resolveUpstreamChanges(service, payload)
+    if (upstreamChanges.length === 0) return
+    plane.propagateStaleMarkers({
+      // V1 可映射成钉版条目的只有正典追踪流（reason 取 upstream_canon_changed）；
+      // 章大纲变更无可对齐的钉版实体，见 resolveUpstreamChanges 的取舍。
+      reason: 'upstream_canon_changed',
+      upstreamChanges,
+      markedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error(
+      `[reconciliation] stale propagation failed for ${payload.proposalId}: ${(error as Error).message}`,
+    )
+  }
 }
 
 /* ----------------------------------------------------------------------------
@@ -194,7 +291,10 @@ function resolveService(root: string): ResolvedService {
   }
   const safeRoot = assertSafeBookRoot(root)
   const plane = LocalDataPlane.openOrRebuild(safeRoot)
-  return { service: plane.reconciliation(), close: () => plane.close() }
+  const service = plane.reconciliation({
+    onSettled: (payload) => propagateSettledChanges(plane, service, payload),
+  })
+  return { service, close: () => plane.close() }
 }
 
 function sendError(json: (status: number, body: unknown) => void, error: unknown): void {
