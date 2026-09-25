@@ -27,6 +27,13 @@ export type RouteHandler = (
 export class ApiRouter {
   private readonly _handlers: RouteHandler[] = []
 
+  /**
+   * 书根解析钩子（T5 对账接线）：每次 book 级请求解析出书根后调用一次，
+   * 供装配层挂接「该书首次被使用 ⇒ 启动必检 + 运行期 watcher」。
+   * 缺省 undefined = 零行为（测试与只读装配不受影响）；回调异常绝不阻断请求。
+   */
+  onBookResolved: ((root: string) => void) | undefined = undefined
+
   use(handler: RouteHandler): this {
     this._handlers.push(handler)
     return this
@@ -138,6 +145,16 @@ export class ApiRouter {
     }
 
     const bookRoot = authorizedBook?.root ?? (typeof body['root'] === 'string' ? body['root'] : null)
+
+    // 对账自动挂接（T5）：book/local-native 面解析出的书根交给装配层。对账是旁路，
+    // 钩子异常只落 stderr，绝不影响本次业务请求的成败。
+    if (bookRoot !== null && (policy === 'book' || policy === 'local-native') && this.onBookResolved !== undefined) {
+      try {
+        this.onBookResolved(bookRoot)
+      } catch (error) {
+        console.error('[mozhou-api] onBookResolved hook failed', error)
+      }
+    }
 
     const context = {
       path,

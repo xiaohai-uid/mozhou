@@ -10,6 +10,7 @@ import { pipelineRoutes } from './routes/pipelineRoutes.js'
 import { worksRoutes } from './routes/worksRoutes.js'
 import { proseRoutes } from './routes/proseRoutes.js'
 import { truthfulPreviewRoutes } from './routes/truthfulPreviewRoutes.js'
+import { reconciliationRoutes } from './routes/reconciliationRoutes.js'
 import { crawlerRoutes } from './routes/crawlerRoutes.js'
 import { systemRoutes } from './routes/systemRoutes.js'
 import { storyboardRoutes } from './routes/storyboardRoutes.js'
@@ -543,6 +544,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(worksRoutes)
     .use(proseRoutes)
     .use(truthfulPreviewRoutes)
+    .use(reconciliationRoutes)
     .use(crawlerRoutes)
     .use(systemRoutes)
     .use(storyboardRoutes)

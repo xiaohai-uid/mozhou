@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto'
 import { createBook } from './create-book.js'
 import { newUlid } from '@mozhou/kernel'
 import {
+  MANIFEST_PATH,
   RUNTIME_EVENTS_PATH,
   STYLE_PROFILE_PATH,
   TRACKING_STREAMS,
@@ -620,6 +621,76 @@ describe('T25：公共落定出口 onSettled（D18-D20）', () => {
       const proposal = rec.scanExternalModifications('startupScan').proposed[0]
       expect(() => rec.decideItems(proposal!.proposalId, ['whole'])).not.toThrow()
     } finally {
+      plane.close()
+    }
+  })
+})
+
+describe('常驻平面接线（运行期 watcher 宿主）', () => {
+  it('其它平面 write-through 后本平面复核零提案：应用自身写入不得误报为外部修改（Q5 基线真源在文件侧）', () => {
+    const plane = newBook()
+    try {
+      seedCommittedChapter(plane)
+      const rec = plane.reconciliation()
+
+      // 第二个平面 = 同一本书的另一次应用内写入（web 端 per-request 平面）：
+      // 提交第 2 章会刷新正文、章大纲与追踪流，并 write-through 落 manifest.json
+      const second = LocalDataPlane.open(bookRoot)
+      try {
+        second.createChapterDraft({ chapterIndex: 2, title: '云涌' })
+        second.commitChapter({
+          chapterIndex: 2,
+          summary: '续章',
+          appends: { temporalFact: [makeFactRow(second)] },
+        })
+      } finally {
+        second.close()
+      }
+
+      // 常驻平面必须先重载文件侧基线再核对；否则陈旧内存基线会把应用自己的
+      // 写入整批误报成 EXTERNAL_MODIFIED。
+      expect(rec.pollOnce().proposed).toEqual([])
+      expect(plane.verifyBaseline()).toMatchObject({ modified: [], missing: [], untracked: [] })
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('watcher 单拍失败不掀翻宿主：manifest 损坏时显式落错，恢复后继续检出（承诺语义不因单点故障失效）', async () => {
+    const plane = newBook()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const { proseRel } = seedCommittedChapter(plane)
+      const rec = plane.reconciliation()
+      rec.startWatcher({ intervalMs: 20 })
+
+      const manifestAbs = join(bookRoot, MANIFEST_PATH)
+      const pristineManifest = readFileSync(manifestAbs, 'utf8')
+      writeFileSync(manifestAbs, '{ 截断的 manifest', 'utf8')
+      editExternally(proseRel, (text) => `${text}第一拍。\n`)
+
+      await vi.waitFor(
+        () => {
+          expect(
+            errorSpy.mock.calls.some((call) => String(call[0]).includes('watcher tick failed')),
+          ).toBe(true)
+        },
+        { timeout: 3000, interval: 25 },
+      )
+
+      // 单拍抛错未打断定时链：恢复基线后再来一次外部编辑仍被自动检出
+      writeFileSync(manifestAbs, pristineManifest, 'utf8')
+      editExternally(proseRel, (text) => `${text}第二拍。\n`)
+
+      await vi.waitFor(
+        () => {
+          expect(rec.listOpenProposals().length).toBeGreaterThanOrEqual(1)
+        },
+        { timeout: 3000, interval: 25 },
+      )
+      rec.stopWatcher()
+    } finally {
+      errorSpy.mockRestore()
       plane.close()
     }
   })

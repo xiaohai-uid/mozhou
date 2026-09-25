@@ -119,6 +119,14 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/style.apply': 'book',
   '/api/genre-kit.apply': 'book',
   '/api/export': 'book',
+  // T5 外部修改对账候选面（dual-plane-sync-spec Q4/Q8-Q12）：提案清单/详情、
+  // 作者门逐条取舍、整份跳过、extract_failed 重试、显式重新检测。
+  '/api/reconciliation.list': 'book',
+  '/api/reconciliation.get': 'book',
+  '/api/reconciliation.decide': 'book',
+  '/api/reconciliation.dismiss': 'book',
+  '/api/reconciliation.retry': 'book',
+  '/api/reconciliation.scan': 'book',
 })
 
 /**

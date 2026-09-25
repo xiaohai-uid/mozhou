@@ -602,6 +602,10 @@ export class ReconciliationService {
         if (this.mtimeDriftDetected()) {
           this.intakeFromBaseline('watcher')
         }
+      } catch (error) {
+        // watcher 是旁路：宿主是长驻进程时，单拍失败（如 manifest 被外部删/损坏）
+        // 绝不允许以未捕获异常掀翻进程——显式落到 stderr，下一拍继续尝试。
+        console.error('[reconciliation] watcher tick failed', error)
       } finally {
         if (!this.watcherStopped) {
           this.watcherTimer = setTimeout(tick, intervalMs)
@@ -650,6 +654,11 @@ export class ReconciliationService {
   }
 
   private intakeFromBaseline(trigger: ReconciliationTrigger): ScanOutcome {
+    // 基线真源在文件侧（Q5：manifest.json 可弃 SQLite）。本服务可能长期驻留
+    // （运行期 watcher 宿主），而同一本书的其它平面会在各自请求里 write-through
+    // 刷新 manifest.json——先重载再核对，否则应用自己的写入会被本服务陈旧的内存
+    // 基线误报成外部修改（watcher 长期开着的宿主下必然发生）。
+    this.host.reloadManifest()
     const report = this.host.verifyBaseline()
     const proposed: ReconciliationProposal[] = []
 
