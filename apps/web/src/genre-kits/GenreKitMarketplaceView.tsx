@@ -28,12 +28,22 @@ export const GenreKitMarketplaceView: React.FC<{
       return;
     }
     try {
-      const result = await post<{ ok: boolean; appliedCount?: number }>('/api/genre-kit.apply', {
+      const result = await post<{
+        ok: boolean;
+        appliedCount?: number;
+        skippedCount?: number;
+      }>('/api/genre-kit.apply', {
         root: book.root,
         kitId: kit.id,
       });
       setApplied(kit.id);
-      setAppliedDetail(`已注入 ${result.appliedCount ?? 0} 项流派设定与开篇大纲脚手架到《${book.title}》。`);
+      const appliedCount = result.appliedCount ?? 0;
+      const skippedCount = result.skippedCount ?? 0;
+      setAppliedDetail(
+        skippedCount > 0
+          ? `已注入 ${appliedCount} 项流派设定与开篇大纲脚手架到《${book.title}》；另有 ${skippedCount} 个同名文件已存在，已保留你原有内容、未做覆盖。`
+          : `已注入 ${appliedCount} 项流派设定与开篇大纲脚手架到《${book.title}》。`,
+      );
     } catch (error) {
       setApplyError((error as Error).message);
       setApplied(null);

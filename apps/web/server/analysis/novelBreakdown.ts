@@ -60,6 +60,14 @@ function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex')
 }
 
+/**
+ * 通用模板标注。本引擎只做原文锚定提取（主角名、引文 span、节拍位置），不做语义
+ * 推断；因此故事核的欲望/金手指/对立矛盾与角色弧光的欲望/缺陷是与文本无关的通用
+ * 模板。按本文件头部声明的「拒绝虚假固定模板」，这些值必须自带标注，不能被读成
+ * 对当前文本的判断。
+ */
+const TEMPLATE_SUFFIX = '（通用模板·未从本文本提取）'
+
 export function analyzeNovelBreakdown(sourceText: string): NovelBreakdownAnalysis {
   if (typeof sourceText !== 'string' || sourceText.trim().length === 0) {
     throw new RequestBoundaryError(400, 'EMPTY_SOURCE', 'sourceText must not be empty')
@@ -126,8 +134,8 @@ export function analyzeNovelBreakdown(sourceText: string): NovelBreakdownAnalysi
       return {
         name,
         role: i === 0 ? '主角' : '关键配角',
-        desire: '打破现实枷锁，求索真实之道',
-        flaw: '杀伐决断中偶有犹豫',
+        desire: `打破现实枷锁，求索真实之道${TEMPLATE_SUFFIX}`,
+        flaw: `杀伐决断中偶有犹豫${TEMPLATE_SUFFIX}`,
         quote,
         span: { start, end },
         explanation: `角色 ${name} 首次出场锚点`,
@@ -177,9 +185,9 @@ export function analyzeNovelBreakdown(sourceText: string): NovelBreakdownAnalysi
     sourceLength: trimmed.length,
     storyCore: {
       protagonist: defaultName,
-      mainGoal: '破局生存与揭示世界真相',
-      goldenFinger: '前瞻感知或特殊天赋',
-      mainConflict: '底层力量与既得利益集团的对抗',
+      mainGoal: `破局生存与揭示世界真相${TEMPLATE_SUFFIX}`,
+      goldenFinger: `前瞻感知或特殊天赋${TEMPLATE_SUFFIX}`,
+      mainConflict: `底层力量与既得利益集团的对抗${TEMPLATE_SUFFIX}`,
       evidence: primaryEvidence,
     },
     characters,

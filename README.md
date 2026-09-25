@@ -1,13 +1,13 @@
 # 🌊 墨舟 (MoZhou / Novel OS)
 
-> **定位**：长篇小说 AI 辅助创作操作系统 —— 工业级状态机 · 11 项机械门禁 · 本地数据自有 · 确定性长程因果契约
+> **定位**：长篇小说 AI 辅助创作操作系统 —— 工业级状态机 · 5 项机械门禁 · 本地数据自有 · 确定性长程因果契约
 
 ---
 
 ## 📌 版本声明与当前状态
 
 当前发布版本定位为 **技术预览版 (Technical Preview / v0.2.0)**：
-- **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、11 项机械门禁与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据平面（`@mozhou/data-plane`），以及当前 Web/桌面工作台与导出链路；
+- **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、5 项机械门禁与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据平面（`@mozhou/data-plane`），以及当前 Web/桌面工作台与导出链路；
 - **AI 模型通道**：支持 **USER_BYOK（用户自带 Key）** 的 OpenAI-compatible 真实流式调用；未配置可用 Provider 时相关生成能力会显式显示不可用，只有明确开启 Demo 数据的环境才使用演示数据；
 - **商业化状态**：当前为**社区免费技术预览版**。云同步/云备份、付费许可证激活与正式支付通道尚未作为本 Release 的可用能力发布。
 
@@ -61,6 +61,19 @@ export MOZHOU_API_BASE="https://api.deepseek.com"
 export MOZHOU_MODEL="deepseek-chat"
 ```
 
+### 验证真实生成链路（推荐首次使用前执行）
+
+```bash
+pnpm verify:real-model
+```
+
+用真实上游跑一次完整旅程（建书 → 建章 → 真实流式生成 → 采纳候选 → 定稿提交），
+并把证据写到 `evidence/real-model-journey/<时间戳>/result.json`。
+
+该脚本会校验 `start` 帧自报 `provider: 'real-openai-compatible'` 且正文不是对 prompt 的回吐，
+因此**假 provider / mock 流会被直接判失败**，不会被当成真实生成。未配置密钥时如实写
+`BLOCKED` 证据并退出 0，不伪造结果。
+
 ---
 
 ## 🏛️ 项目工程架构
@@ -73,7 +86,7 @@ mozhou/
 │   ├── kernel/            # 领域九柱、CausalContract 因果契约、SceneExitState
 │   ├── data-plane/        # 本地 SQLite WAL 数据库、Markdown 目录卡、五态对账
 │   ├── context-compiler/  # fastembed 向量模型、3通道加权 RRF、Reserved 预算装配
-│   ├── quality-engine/    # 11 项机械门禁、4-gram 审查、De-AI 工业级引擎 v2.0
+│   ├── quality-engine/    # 5 项机械门禁、4-gram 审查、De-AI 工业级引擎 v2.0
 │   ├── pipeline/          # 10 步章节生产会话状态机、回炉降级、版本追踪
 │   ├── runtime/           # 多模型运行时底座、能力注册表、Recipe 执行器
 │   ├── flywheel/          # 创作者风格画像（StyleProfile vN）、负向学习飞轮

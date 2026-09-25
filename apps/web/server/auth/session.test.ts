@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   InMemoryAuthProvider,
   SessionManager,
@@ -9,6 +9,38 @@ import {
 import type { IncomingMessage } from 'node:http'
 
 describe('Session & Auth Verification (T08)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    delete process.env['SUPABASE_SERVICE_ROLE_KEY']
+  })
+
+  it('SupabaseAuthProvider.deleteAccount 在无法删除时显式失败，绝不假成功', async () => {
+    // 未配置凭据：整体 fail-closed
+    await expect(new SupabaseAuthProvider('', '').deleteAccount('usr_1')).rejects.toThrow('not configured')
+
+    const provider = new SupabaseAuthProvider('https://proj.supabase.co', 'anon-key')
+    delete process.env['SUPABASE_SERVICE_ROLE_KEY']
+
+    // 已配置但缺 service-role key：admin delete 无法执行，必须报错而非静默返回
+    await expect(provider.deleteAccount('usr_1')).rejects.toThrow(/ACCOUNT_DELETE_UNAVAILABLE/)
+
+    // 配了 service-role key：真正调用 admin delete 端点
+    process.env['SUPABASE_SERVICE_ROLE_KEY'] = 'service-role-key'
+    const calls: { url: string; method: string }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: unknown, init?: { method?: string }) => {
+        calls.push({ url: String(url), method: init?.method ?? 'GET' })
+        return Promise.resolve({ ok: true, status: 204 } as Response)
+      }),
+    )
+
+    await expect(provider.deleteAccount('usr_1')).resolves.toBeUndefined()
+    expect(calls).toEqual([
+      { url: 'https://proj.supabase.co/auth/v1/admin/users/usr_1', method: 'DELETE' },
+    ])
+  })
+
   it('SupabaseAuthProvider fails closed when not configured', async () => {
     const unconfigured = new SupabaseAuthProvider('', '')
     expect(unconfigured.isConfigured()).toBe(false)

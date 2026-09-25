@@ -1,8 +1,10 @@
 /**
  * @mozhou/data-plane · 8 大热门网文流派资产包与开箱即用脚手架引擎 (FR-4.1 / FR-4.2)。
  */
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { atomicReplace } from './chapter.js'
+import { readManifest, refreshManifestEntries, writeManifest } from './manifest.js'
 
 export interface GenreKit {
   readonly id: string
@@ -107,50 +109,75 @@ export const GENRE_PRESETS: readonly GenreKit[] = [
   },
 ]
 
+export interface GenreKitApplyResult {
+  readonly ok: boolean
+  /** 本次真正写入的 canon 文件（书根相对 POSIX 路径）。 */
+  readonly appliedFiles: readonly string[]
+  /** 因已存在而**未写入**的文件：作者既有内容原样保留。 */
+  readonly skippedFiles: readonly string[]
+  readonly kit: GenreKit
+}
+
 /**
  * 将流派资产包完整注入作品目录，完成世界观、规则卡、避雷词库与大纲脚手架 (FR-4.2)。
+ *
+ * 非破坏性：目标文件已存在时一律跳过而非覆盖。此前本函数对四个正典文件无条件
+ * `writeFileSync`，重复应用或作者手改后再应用会静默销毁作者内容；且这些文件不进
+ * 基线，既无快照可恢复，又会被对账反复报成外部改动。现在：已存在 → 记入
+ * skippedFiles 并原样保留；不存在 → 原子写入并登记基线（只记自己写的那些）。
  */
-export function applyGenreKitToBook(
-  root: string,
-  kitId: string,
-): { ok: boolean; appliedFiles: string[]; kit: GenreKit } {
+export function applyGenreKitToBook(root: string, kitId: string): GenreKitApplyResult {
   const kit = GENRE_PRESETS.find((k) => k.id === kitId)
   if (!kit) {
     throw new Error(`unknown genre kit: ${kitId}`)
   }
 
-  const settingsDir = join(root, '设定')
-  const worldbuildingDir = join(settingsDir, '世界观')
-  const outlineDir = join(root, '大纲')
-  mkdirSync(worldbuildingDir, { recursive: true })
-  mkdirSync(outlineDir, { recursive: true })
+  // 先取基线：缺基线或基线损坏时在写盘前失败，避免留下「文件已写、基线未记」的半态
+  const manifest = readManifest(root)
+
+  mkdirSync(join(root, '设定', '世界观'), { recursive: true })
+  mkdirSync(join(root, '大纲'), { recursive: true })
 
   const appliedFiles: string[] = []
+  const skippedFiles: string[] = []
+
+  const writeIfAbsent = (relPath: string, content: string): void => {
+    if (existsSync(join(root, relPath))) {
+      skippedFiles.push(relPath)
+      return
+    }
+    atomicReplace(root, relPath, content)
+    appliedFiles.push(relPath)
+  }
 
   // 1. 金手指规则卡
-  const gfPath = join(worldbuildingDir, '金手指预设.md')
-  writeFileSync(gfPath, `# ${kit.name} · 金手指预设\n\n> 核心金手指：${kit.goldenFinger}\n\n${kit.synopsis}\n`, 'utf8')
-  appliedFiles.push(gfPath)
+  writeIfAbsent(
+    '设定/世界观/金手指预设.md',
+    `# ${kit.name} · 金手指预设\n\n> 核心金手指：${kit.goldenFinger}\n\n${kit.synopsis}\n`,
+  )
 
   // 2. 天道核心规则
-  const rulePath = join(worldbuildingDir, '天道核心规则.md')
-  writeFileSync(rulePath, `# ${kit.name} · 核心天道规则\n\n> 运行底则：${kit.coreRule}\n`, 'utf8')
-  appliedFiles.push(rulePath)
+  writeIfAbsent(
+    '设定/世界观/天道核心规则.md',
+    `# ${kit.name} · 核心天道规则\n\n> 运行底则：${kit.coreRule}\n`,
+  )
 
   // 3. 避雷禁区
-  const bannedPath = join(settingsDir, '流派避雷禁区.md')
-  writeFileSync(bannedPath, `# ${kit.name} · 避雷词库与红线\n\n${kit.bannedTropes.map((t) => `- 🚫 严禁：${t}`).join('\n')}\n`, 'utf8')
-  appliedFiles.push(bannedPath)
+  writeIfAbsent(
+    '设定/流派避雷禁区.md',
+    `# ${kit.name} · 避雷词库与红线\n\n${kit.bannedTropes.map((t) => `- 🚫 严禁：${t}`).join('\n')}\n`,
+  )
 
   // 4. 黄金三章节拍器
-  const beatsPath = join(settingsDir, '黄金三章节拍器.md')
-  writeFileSync(beatsPath, `# ${kit.name} · 黄金三章节拍\n\n${kit.openingBeats.map((b, i) => `${i + 1}. 第 ${i + 1} 章：${b}`).join('\n')}\n`, 'utf8')
-  appliedFiles.push(beatsPath)
+  writeIfAbsent(
+    '设定/黄金三章节拍器.md',
+    `# ${kit.name} · 黄金三章节拍\n\n${kit.openingBeats.map((b, i) => `${i + 1}. 第 ${i + 1} 章：${b}`).join('\n')}\n`,
+  )
 
   // 5. 大纲卷一脚手架（FR-4.2 一键建书脚手架）
-  const volumeOutlinePath = join(outlineDir, '卷一_开篇崛起篇.md')
-  if (!existsSync(volumeOutlinePath)) {
-    const outlineContent = [
+  writeIfAbsent(
+    '大纲/卷一_开篇崛起篇.md',
+    [
       `# 卷一 · 开篇崛起篇`,
       ``,
       `## 故事主线`,
@@ -162,10 +189,13 @@ export function applyGenreKitToBook(
       `## 黄金三章节拍规划`,
       ...kit.openingBeats.map((b, i) => `### 第 ${i + 1} 章：${b}`),
       ``,
-    ].join('\n')
-    writeFileSync(volumeOutlinePath, outlineContent, 'utf8')
-    appliedFiles.push(volumeOutlinePath)
+    ].join('\n'),
+  )
+
+  // 基线登记：未写入的既有文件保持「外部内容」身份，不被吸进基线
+  if (appliedFiles.length > 0) {
+    writeManifest(root, refreshManifestEntries(manifest, root, appliedFiles))
   }
 
-  return { ok: true, appliedFiles, kit }
+  return { ok: true, appliedFiles, skippedFiles, kit }
 }

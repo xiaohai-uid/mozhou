@@ -46,7 +46,7 @@ import {
   RUNTIME_DB_PATH,
 } from './layout.js'
 
-import { buildManifest, listAllFiles, readManifest, writeManifest, type HashManifest } from './manifest.js'
+import { buildManifest, CorruptManifestError, listAllFiles, readManifest, writeManifest, type HashManifest } from './manifest.js'
 import {
   queryActiveFacts as queryActiveFactsFromRoot,
   queryInvalidatedKnowledgeStates as queryInvalidatedFromRoot,
@@ -123,8 +123,11 @@ export class LocalDataPlane {
 
   /**
    * 应用组合层恢复入口：runtime.sqlite 是 ADR-0006 定义的可丢弃投影。
-   * 仅在投影缺失、版本漂移或 SQLite 明确报告物理损坏时全量从 canon 重建；
-   * 其他错误继续原样抛出，避免把权限/正典结构问题伪装成可恢复故障。
+   * 仅在投影缺失、版本漂移、SQLite 明确报告物理损坏，或 manifest 基线损坏时
+   * 全量从 canon 重建；其他错误继续原样抛出，避免把权限/正典结构问题伪装成
+   * 可恢复故障。manifest 是全树指纹，可由 canon 确定性重算（S4），故损坏可重建；
+   * 缺失（MissingManifestError）不在此列——那更可能是根目录指错，重建会把
+   * 错误目录的内容吸成基线。
    */
   static openOrRebuild(root: string): LocalDataPlane {
     try {
@@ -133,6 +136,7 @@ export class LocalDataPlane {
       const rebuildable =
         error instanceof ProjectionMissingError
         || error instanceof ProjectionVersionMismatchError
+        || error instanceof CorruptManifestError
         || isCorruptProjectionError(error)
       if (!rebuildable) throw error
       rebuildProjectionFromCanon(root)

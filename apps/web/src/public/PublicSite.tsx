@@ -63,7 +63,7 @@ export const PublicSite: React.FC = () => {
             <div className="space-y-3">
               <h1 className="text-4xl font-extrabold text-white">长篇网文操作系统</h1>
               <p className="text-neutral-400 text-lg leading-relaxed">
-                本地优先、工业级长程因果契约、11 项机械门禁与真模型流式创作工作台。
+                本地优先、工业级长程因果契约、5 项机械门禁与真模型流式创作工作台。
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
@@ -143,16 +143,19 @@ export const PublicSite: React.FC = () => {
 
         {tab === 'download' && (
           <section className="space-y-6">
-            <h2 className="text-3xl font-bold">下载 Windows 桌面版</h2>
+            <h2 className="text-3xl font-bold">桌面版与本地运行时</h2>
             <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-lg space-y-4">
               <p className="text-neutral-300">
-                当前运行环境处于 <strong>Technical Preview / 内部预发布阶段</strong>。正式官方安装包由发布流水线自动化打包并签署校验。
+                当前为 <strong>Technical Preview / 内部预发布阶段</strong>，<strong>尚未提供原生 Windows 安装包</strong>（无 .exe / .msi，未做代码签名）。
               </p>
-              <div className="inline-block bg-neutral-800 text-neutral-400 px-4 py-2 rounded text-sm font-mono border border-neutral-700">
-                MoZhou-Novel-OS-v0.1.0-Setup.exe (构建就绪中)
-              </div>
+              <p className="text-neutral-300">
+                实际可用的发行物是 GitHub Release 上的{' '}
+                <span className="font-mono">local-runtime.tar.gz</span>（Node.js 22 本地运行时，解压后运行{' '}
+                <span className="font-mono">启动墨舟.bat</span>）、<span className="font-mono">web-dist.tar.gz</span> 与{' '}
+                <span className="font-mono">docker.tar.gz</span>，并附 SPDX SBOM 与 SHA256SUMS 校验清单。
+              </p>
               <p className="text-xs text-neutral-500">
-                系统要求：Windows 10 / 11 64-bit，WebView2 运行时（系统内置），支持完全离线创作。
+                系统要求：Windows 10 / 11 64-bit，需预装 Node.js 22（本地运行时首次安装依赖需联网）。数据全部保存在本机，支持完全离线创作。
               </p>
             </div>
           </section>
@@ -170,9 +173,9 @@ export const PublicSite: React.FC = () => {
               <p>
                 使用作者自备密钥 (BYOK) 时，请求直接流向目标上游大模型提供商（如 DeepSeek/OpenAI）；密钥采用 AES-256-GCM 强加密存储，绝不向第三方泄露。
               </p>
-              <h3 className="text-base font-bold text-amber-400">三、退款政策</h3>
+              <h3 className="text-base font-bold text-amber-400">三、支付与退款</h3>
               <p>
-                订阅购买后若遇到技术故障导致服务不可用，支持有界退款。退款确认后对应会期权益与额度同步撤销，但已保存的本地作品永远保留。
+                当前 Technical Preview 为社区免费版本，<strong>尚未开放任何付费购买通道</strong>，因此不涉及订阅与退款。未来开放订阅时会同步公布完整的退款政策。
               </p>
             </div>
           </section>

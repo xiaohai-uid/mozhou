@@ -131,7 +131,7 @@ export function NovelBreakdownView({
                 ● 本地离线启发式分析（非真实 LLM）
               </span>
               <span className="mono muted" style={{ fontSize: 10 }}>
-                基于确定性规则与高频词/节奏提取算法
+                仅做原文锚定提取：主角名、引文位置、节拍分布。故事核与角色欲望/缺陷为通用模板，非本文本推断
               </span>
             </div>
             {/* 1. 故事核 */}

@@ -264,9 +264,22 @@ export const accountRoutes: RouteHandler = async (req, res, { path, body, json }
       return true
     }
     const principal = await defaultSessionManager.verifyRequestSession(req)
-    // 清理服务端账号与凭证；不触碰本机作品
+    // 先删云端账号：删除失败即整体失败，不清理本机会话，也绝不回报注销成功——
+    // 否则用户会以为账号已消失，实际云端记录仍在。
+    try {
+      await defaultSessionManager.provider.deleteAccount(principal.userId)
+    } catch (err) {
+      const boundary = err instanceof RequestBoundaryError ? err : null
+      json(boundary?.status ?? 500, {
+        ok: false,
+        code: boundary?.code ?? 'ACCOUNT_DELETE_FAILED',
+        error: (err as Error).message,
+        notice: '账号未删除；本机会话与本地作品均未改动。',
+      })
+      return true
+    }
+    // 云端已删除：清理本机会话与凭证；不触碰本机作品
     defaultSessionManager.revokeAllForUser(principal.userId)
-    await defaultSessionManager.provider.deleteAccount(principal.userId)
     res.setHeader('Set-Cookie', defaultSessionManager.createClearCookie())
     json(200, {
       ok: true,

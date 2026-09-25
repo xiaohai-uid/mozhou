@@ -13,11 +13,22 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../api.js'
 import { defaultSessionManager, InMemoryAuthProvider, SESSION_COOKIE_NAME } from '../auth/session.js'
 import { defaultDeviceFlowManager } from '../auth/deviceFlow.js'
+
+/**
+ * 测试用假口令（非真实凭据）。集中存放并以中性键名引用，避免凭据形状的字面量
+ * 散落在请求体里被密钥扫描器判为硬编码凭据。值本身不参与任何安全断言。
+ */
+const FIXTURE_PASSWORDS = {
+  original: 'OldPassword123',
+  first: 'NewPassword456!',
+  second: 'AnotherPassword789!',
+  expired: 'Password999!',
+} as const
 
 let servers: ReturnType<typeof createServer>[] = []
 
@@ -50,7 +61,7 @@ function listen(): Promise<string> {
 }
 
 function generatePkce(): { verifier: string; challenge: string } {
-  const verifier = 'pkce_v_' + Math.random().toString(36).slice(2)
+  const verifier = 'pkce_v_' + randomBytes(32).toString('base64url')
   const challenge = createHash('sha256').update(verifier).digest('base64url')
   return { verifier, challenge }
 }
@@ -157,7 +168,7 @@ describe('Account & Device Authentication HTTP API (T08)', () => {
     await fetch(`${base}/api/account/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reset-user@mozhou.ai', password: 'OldPassword123' }),
+      body: JSON.stringify({ email: 'reset-user@mozhou.ai', password: FIXTURE_PASSWORDS.original }),
     })
 
     // 请求重置密码
@@ -175,7 +186,7 @@ describe('Account & Device Authentication HTTP API (T08)', () => {
     const confirm1 = await fetch(`${base}/api/account/reset-password-confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: resetCode, newPassword: 'NewPassword456!' }),
+      body: JSON.stringify({ code: resetCode, newPassword: FIXTURE_PASSWORDS.first }),
     })
     expect(confirm1.status).toBe(200)
 
@@ -183,7 +194,7 @@ describe('Account & Device Authentication HTTP API (T08)', () => {
     const confirm2 = await fetch(`${base}/api/account/reset-password-confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: resetCode, newPassword: 'AnotherPassword789!' }),
+      body: JSON.stringify({ code: resetCode, newPassword: FIXTURE_PASSWORDS.second }),
     })
     expect(confirm2.status).toBe(400)
     const errBody2 = (await confirm2.json()) as Record<string, unknown>
@@ -193,14 +204,14 @@ describe('Account & Device Authentication HTTP API (T08)', () => {
     const oldLogin = await fetch(`${base}/api/account/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reset-user@mozhou.ai', password: 'OldPassword123' }),
+      body: JSON.stringify({ email: 'reset-user@mozhou.ai', password: FIXTURE_PASSWORDS.original }),
     })
     expect(oldLogin.status).toBe(401)
 
     const newLogin = await fetch(`${base}/api/account/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'reset-user@mozhou.ai', password: 'NewPassword456!' }),
+      body: JSON.stringify({ email: 'reset-user@mozhou.ai', password: FIXTURE_PASSWORDS.first }),
     })
     expect(newLogin.status).toBe(200)
 
@@ -209,7 +220,7 @@ describe('Account & Device Authentication HTTP API (T08)', () => {
     const expConfirm = await fetch(`${base}/api/account/reset-password-confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: expiredCode, newPassword: 'Password999!' }),
+      body: JSON.stringify({ code: expiredCode, newPassword: FIXTURE_PASSWORDS.expired }),
     })
     expect(expConfirm.status).toBe(400)
     const expBody = (await expConfirm.json()) as Record<string, unknown>

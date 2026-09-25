@@ -1,0 +1,24 @@
+{
+  "kind": "test",
+  "status": "VERIFIED",
+  "sourceCommit": "fcc51d2",
+  "command": "node scripts/verify-real-model-journey.mjs",
+  "exitCode": 0,
+  "scope": "真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 定稿提交",
+  "provider": {
+    "frame": "real-openai-compatible",
+    "base": "https://token.sensenova.cn/v1",
+    "model": "deepseek-v4-flash"
+  },
+  "result": {
+    "promptChars": 54,
+    "generatedChars": 279,
+    "generatedHead": "雾还没散尽，江面像一块未干的灰布。他站在渡口的青石板上，脚边放着一只旧藤箱，箱角缠着麻绳的手感还留在指腹上。晨风掀起他外套的下摆，带着河腥味和铁锈气。\n\n船是从雾里来的。\n\n先是一声汽笛，低沉如闷雷，震得他耳膜嗡嗡作响。然后轮廓浮现——黑色",
+    "candidateId": "393ef03d-ca4e-4328-ba67-7891e3b42d35",
+    "outcome": "succeeded",
+    "commitId": "cmit_01M3CFBV2FMYW4RFKX65HVY6BK",
+    "contentSha256": "c28c47db596b435e39e4c4b1e4f4231d1828596297c10566caa1e74076889114",
+    "proseFile": "正文/第一卷/第0001章.md"
+  },
+  "limitations": []
+}

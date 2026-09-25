@@ -254,6 +254,9 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     return true
   }
 
+  // 预设写作方向选项：本地模板提供，UI 以 choice-row 呈现为快捷回答（契约字段
+  // DraftQuestionResponse.hint 的语义即「原型 choice-row」）。本端点不调用模型，
+  // 也不按 prompt 生成追问——prompt 仅回显。
   if (path === '/api/draft.question') {
     const prompt = typeof body['prompt'] === 'string' ? body['prompt'].trim() : ''
     const defaultQuestions = [
@@ -275,6 +278,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       ok: true,
       prompt,
       question: '请先确定本段主基调与节奏方向：',
+      hint: '预设写作方向选项（本地模板，非模型生成）',
       choices: defaultQuestions[0]?.choices ?? [],
       questions: defaultQuestions,
     })

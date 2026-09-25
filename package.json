@@ -17,6 +17,7 @@
     "package": "node scripts/build-release.mjs",
     "lint": "eslint .",
     "test": "vitest run",
+    "verify:real-model": "node scripts/verify-real-model-journey.mjs",
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
     "graph:snapshot": "node scripts/export-code-graph.mjs",
