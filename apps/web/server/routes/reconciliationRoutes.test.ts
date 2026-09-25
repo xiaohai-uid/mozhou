@@ -210,10 +210,7 @@ function seedPinnedBook(dir: string): PinnedBook {
 }
 
 function outlineData(root: string, chapterIndex: number): Record<string, unknown> {
-  return parseFrontmatter(readFileSync(join(root, chapterOutlinePath(chapterIndex)), 'utf8')).data as Record<
-    string,
-    unknown
-  >
+  return parseFrontmatter(readFileSync(join(root, chapterOutlinePath(chapterIndex)), 'utf8')).data
 }
 
 /** 立一条追踪流提案并把提案 id 取出（所有传播用例的共同前置）。 */

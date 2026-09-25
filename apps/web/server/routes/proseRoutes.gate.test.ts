@@ -20,12 +20,14 @@ import { newFactId, newKnowledgeStateId, newTimelineEventId, parseKnowledgeState
 import { proseChapterPath } from '@mozhou/data-plane'
 
 /** 提取缝夹具：每个用例先设定本次「模型提取产物」，再打请求。 */
-const fixture = vi.hoisted(() => ({ result: null as unknown }))
+const fixture: { result: DeltaExtractionResult | null } = vi.hoisted(() => ({ result: null }))
 
 vi.mock('../analysis/deltaExtractor.js', () => ({
-  extractChapterDelta: async () => {
-    if (fixture.result === null) throw new Error('test fixture not set: extractor result missing')
-    return fixture.result
+  extractChapterDelta: () => {
+    if (fixture.result === null) {
+      return Promise.reject(new Error('test fixture not set: extractor result missing'))
+    }
+    return Promise.resolve(fixture.result)
   },
 }))
 
