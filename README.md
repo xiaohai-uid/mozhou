@@ -6,10 +6,17 @@
 
 ## 📌 版本声明与当前状态
 
-当前发布版本定位为 **技术预览版 (Technical Preview / v0.2.0)**：
+当前发布版本定位为 **技术预览版 (Technical Preview / v0.2.1)**：
 - **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、5 项机械门禁与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据平面（`@mozhou/data-plane`），以及当前 Web/桌面工作台与导出链路；
 - **AI 模型通道**：支持 **USER_BYOK（用户自带 Key）** 的 OpenAI-compatible 真实流式调用；未配置可用 Provider 时相关生成能力会显式显示不可用，只有明确开启 Demo 数据的环境才使用演示数据；
 - **商业化状态**：当前为**社区免费技术预览版**。云同步/云备份、付费许可证激活与正式支付通道尚未作为本 Release 的可用能力发布。
+
+### v0.2.1 修复摘要
+
+- **数据安全**：`manifest.json` 基线改为原子且持久落盘（临时文件 + fsync + rename），并在基线损坏时可由 canon 重建——此前崩溃截断会让整本书经应用永久无法打开；流派资产包改为非破坏注入，目标文件已存在即跳过、不再静默覆盖作者内容。
+- **诚实性**：注销账号在云端删除不可用或失败时显式报错，不再回报"已删除"；小说拆解不再把与输入无关的通用模板当作本文本推断结果展示；`/api/draft.question` 补回契约要求的 `hint` 字段。
+- **宣称校正**："11 项机械门禁"改为实际的 5 项；官网撤下并不存在的 `Setup.exe` 下载项与针对未开放付费通道的退款承诺。
+- **真实生成取证**：新增 `pnpm verify:real-model`，并已用真实上游完成一次端到端取证（生成 → 采纳 → 落盘 → 提交），证据见 `evidence/real-model-journey/`。此前该链路在 CI 中始终是假 provider 或 mock，从未真实验证。
 
 ---
 
@@ -17,10 +24,10 @@
 
 ### 方式一：Release 本地运行时（推荐）
 
-v0.2.0 Technical Preview 的 GitHub Release/CI 产物与 `release-artifacts/` 使用同一套命名：
-- **`mozhou-v0.2.0-local-runtime.tar.gz`**：Node.js 22 本地运行时。Windows 解压后运行 **`启动墨舟.bat`**；Linux/macOS 执行 `chmod +x start.sh && ./start.sh`；
-- **`mozhou-v0.2.0-web-dist.tar.gz`**：已构建的 Web 静态产物；
-- **`mozhou-v0.2.0-docker.tar.gz`**：本地 Docker 发行包；
+v0.2.1 Technical Preview 的 GitHub Release/CI 产物与 `release-artifacts/` 使用同一套命名：
+- **`mozhou-v0.2.1-local-runtime.tar.gz`**：Node.js 22 本地运行时。Windows 解压后运行 **`启动墨舟.bat`**；Linux/macOS 执行 `chmod +x start.sh && ./start.sh`；
+- **`mozhou-v0.2.1-web-dist.tar.gz`**：已构建的 Web 静态产物；
+- **`mozhou-v0.2.1-docker.tar.gz`**：本地 Docker 发行包；
 - Release 同时提供 **SPDX SBOM** 与 **SHA256SUMS.txt** 用于供应链校验。
 
 服务默认地址为 **`http://127.0.0.1:5173`**。当前 Release **不冒充原生 Windows/macOS 安装器**；Tauri 原生安装与代码签名仍作为独立发布面验收。
