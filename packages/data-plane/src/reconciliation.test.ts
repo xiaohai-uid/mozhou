@@ -19,6 +19,7 @@ import {
   VOLUME_ONE_OUTLINE_PATH,
 } from './layout.js'
 import { LocalDataPlane } from './local-data-plane.js'
+import { readManifest } from './manifest.js'
 import { buildDefaultExtractor as defaultExtractForTest } from './reconciliation.js'
 
 const tmpRoots: string[] = []
@@ -692,6 +693,47 @@ describe('常驻平面接线（运行期 watcher 宿主）', () => {
     } finally {
       errorSpy.mockRestore()
       plane.close()
+    }
+  })
+})
+
+describe('基线落定不覆盖其它平面写入的条目（常驻平面回归）', () => {
+  it('常驻平面落定写基线时，另一平面刚提交的条目仍在（否则自己的写会被误报为外部修改）', () => {
+    // 常驻平面：长生命周期，内存基线只在扫描/落定时才追上盘面
+    const resident = newBook()
+    try {
+      const { proseRel } = seedCommittedChapter(resident)
+      const rec = resident.reconciliation()
+
+      // 1) 常驻平面先立提案（此刻它的内存基线尚未包含第 2 章）
+      editExternally(proseRel, (text) => `${text}\n她望向舷外，云海翻涌。\n`)
+      const outcome = rec.scanExternalModifications('startupScan')
+      const ch1Proposal = outcome.proposed.find((p) => p.relPath === proseRel)
+      expect(ch1Proposal).toBeDefined()
+
+      // 2) 另一平面（每次请求的平面）提交第 2 章 → 盘上 manifest 增加第 2 章条目
+      const request = LocalDataPlane.open(bookRoot)
+      try {
+        request.createChapterDraft({ chapterIndex: 2, title: '第二章' })
+        request.commitChapter({ chapterIndex: 2, summary: '第二章定稿' })
+      } finally {
+        request.close()
+      }
+      const ch2Before = Object.keys(readManifest(bookRoot).files).filter((rel) => rel.includes('0002'))
+      expect(ch2Before.length).toBeGreaterThan(0)
+
+      // 3) 常驻平面落定 → syncBaselineForPath 写基线
+      if (ch1Proposal !== undefined) {
+        rec.decideItems(ch1Proposal.proposalId, ['whole'])
+      }
+      rec.stopWatcher()
+
+      // 落定写基线不得抹掉另一平面写入的条目——否则应用自己的提交会在下一拍
+      // 扫描里被当成 EXTERNAL_MODIFIED，正是本功能要避免的假阳性
+      const ch2After = Object.keys(readManifest(bookRoot).files).filter((rel) => rel.includes('0002'))
+      expect(ch2After).toEqual(ch2Before)
+    } finally {
+      resident.close()
     }
   })
 })

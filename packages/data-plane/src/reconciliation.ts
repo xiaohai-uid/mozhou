@@ -943,6 +943,15 @@ export class ReconciliationService {
 
   /** S4 基线纪律：按盘上现状吸收该路径（存在→刷新指纹；消失→移除键）。 */
   private syncBaselineForPath(rel: string): void {
+    // 先以盘上现状为合并底再落盘。常驻对账平面的内存基线是长生命周期的，而每次请求
+    // 的平面各自把条目写进同一个 manifest.json——若以陈旧内存基线为底覆盖写，别的
+    // 平面刚写入的条目会被整批抹掉，应用自己的提交随即在下一拍扫描里被误报为
+    // EXTERNAL_MODIFIED。写完再 reload 只能让内存追上刚写的文件，救不回被覆盖的条目。
+    // 先以盘上现状为合并底再落盘。常驻对账平面的内存基线是长生命周期的，而每次请求
+    // 的平面各自把条目写进同一个 manifest.json——若以陈旧内存基线为底覆盖写，别的
+    // 平面刚写入的条目会被整批抹掉，应用自己的提交随即在下一拍扫描里被误报为
+    // EXTERNAL_MODIFIED。写完再 reload 只能让内存追上刚写的文件，救不回被覆盖的条目。
+    this.host.reloadManifest()
     const next = refreshManifestEntries(this.host.manifest, this.host.root, [rel])
     writeManifest(this.host.root, next)
     this.host.reloadManifest()
