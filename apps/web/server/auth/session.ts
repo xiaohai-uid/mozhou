@@ -213,10 +213,37 @@ export class SupabaseAuthProvider implements IAuthProvider {
     return res.ok
   }
 
-  async deleteAccount(_userId: string): Promise<void> {
-    void _userId
-    if (!this.isConfigured()) return
-    await Promise.resolve()
+  /**
+   * 删除云端账号。Supabase Auth 的 admin delete 需要 service-role key，仅持有 anon
+   * key 无法删除，因此此处 fail-closed 抛错而不是静默返回——注销是用户权利，
+   * 在账号仍然存在时回报「已删除」会同时构成合规与事实问题。
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new RequestBoundaryError(503, 'AUTH_NOT_CONFIGURED', 'Supabase Auth credentials not configured')
+    }
+    const serviceRoleKey = process.env['SUPABASE_SERVICE_ROLE_KEY']
+    if (!serviceRoleKey) {
+      throw new RequestBoundaryError(
+        501,
+        'ACCOUNT_DELETE_UNAVAILABLE',
+        'ACCOUNT_DELETE_UNAVAILABLE: Supabase admin delete requires SUPABASE_SERVICE_ROLE_KEY; the account was NOT deleted',
+      )
+    }
+    const res = await fetch(`${this._url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+    })
+    if (!res.ok) {
+      throw new RequestBoundaryError(
+        502,
+        'ACCOUNT_DELETE_FAILED',
+        `ACCOUNT_DELETE_FAILED: Supabase admin delete returned ${res.status}`,
+      )
+    }
   }
 }
 

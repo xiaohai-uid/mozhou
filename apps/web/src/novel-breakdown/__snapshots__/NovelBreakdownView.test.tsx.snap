@@ -101,7 +101,7 @@ exports[`NovelBreakdownView（小说拆解） > 故事核、黄金三章与人�
         class="mono muted"
         style="font-size: 10px;"
       >
-        基于确定性规则与高频词/节奏提取算法
+        仅做原文锚定提取：主角名、引文位置、节拍分布。故事核与角色欲望/缺陷为通用模板，非本文本推断
       </span>
     </div>
     <section
