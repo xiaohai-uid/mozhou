@@ -2,10 +2,13 @@
 import { describe, expect, it } from 'vitest'
 import { assertSafeRemoteTarget, resolveChatEndpoint } from '../server/llm/openaiStream'
 
+/** 非真实凭据：本用例只验证协议门禁，key 值不参与断言。 */
+const OUTBOUND_STUB = 'test-key'
+
 describe('release hardening · outbound LLM SSRF boundary', () => {
   it('requires HTTPS for configured remote model endpoints', () => {
     expect(() => resolveChatEndpoint({
-      MOZHOU_API_KEY: 'test-key',
+      MOZHOU_API_KEY: OUTBOUND_STUB,
       MOZHOU_API_BASE: 'http://api.example.com',
     })).toThrow(/HTTPS/i)
   })
