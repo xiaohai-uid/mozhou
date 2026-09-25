@@ -193,7 +193,7 @@ export interface ExecuteChapterReviewRequest {
   readonly autoAbsorbCounterexamples?: boolean | undefined;
 }
 
-/** 深度章节审查统一执行产物（集结语义审查、11项机械门禁、金句收割与反例库沉淀） */
+/** 深度章节审查统一执行产物（集结语义审查、5项机械门禁、金句收割与反例库沉淀） */
 export interface ExecuteChapterReviewOutcome extends ReviewStepOutcome {
   readonly mechanicalGate: MechanicalGateReport;
   readonly harvestedQuotesCount: number;
@@ -207,7 +207,7 @@ export interface ExecuteChapterReviewOutcome extends ReviewStepOutcome {
  *
  * 聚合执行：
  * 1. 语义质量审查与报告落盘（runReviewStep）
- * 2. 11 项机械门禁算术机检（evaluateMechanicalGates）
+ * 2. 5 项机械门禁算术机检（evaluateMechanicalGates）
  * 3. 独立短金句自动收割（harvestQuotesFromProse）
  * 4. AI 味违规反例自动吸收沉淀（absorbReviewCounterexamples）
  * 5. 会话账本登记与步进推进（session.recordQualityReview）
@@ -238,7 +238,7 @@ export async function executeChapterReview(
       : {}),
   });
 
-  // 1. 运行 11 项机械门禁算术机检
+  // 1. 运行 5 项机械门禁算术机检
   const mechanicalGate = evaluateMechanicalGates(
     reviewOutcome.input.body,
     request.mechanicalOptions !== undefined

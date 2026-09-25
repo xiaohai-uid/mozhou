@@ -1,5 +1,5 @@
 /**
- * @mozhou/quality-engine · 11 项机械门禁与 4-gram 纯算术机检引擎
+ * @mozhou/quality-engine · 5 项机械门禁与 4-gram 纯算术机检引擎
  * 移植自 storyrepo/checks.py 并修复中英文引号栈嵌套悬空与跨引号边界片段误判。
  */
 
