@@ -5,26 +5,43 @@
  * 被测行为：Web 生成链路的唯一上下文入口 buildDraftContext 走正式编译时，必须把
  * 「本次真正入包的版本化实体」暂存落盘（提交路径据此钉 ChapterCommitted 行）；
  * 结构层降级（空召回）不落暂存——降级没消费任何版本化实体，不许造假钉版。
+ *
+ * 同文件第二组：Prepare 步进生产编译（chapter-pipeline-spec S2 + ADR-0025）——
+ * stale 标记与有界质量切片必须真的走到模型输入（packet.structural/text）并留痕
+ * Receipt；无标记/无质量文件不得凭空造段（零噪声不变量）。
  */
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  chapterOutlinePath,
   commitChapter,
   createBook,
   createChapterDraft,
   createEntityCard,
+  emitFrontmatter,
   openDatabase,
+  parseFrontmatter,
+  propagateStaleMarkers,
   readManifest,
   type PlaneContext,
 } from '@mozhou/data-plane'
+import { RECEIPTS_DIRNAME } from '@mozhou/context-compiler'
 import { newFactId } from '@mozhou/kernel'
 import type { BookId, EntityRef, FactId } from '@mozhou/kernel'
-import { readPendingDependencyManifest } from '@mozhou/pipeline'
+import {
+  FAILURE_MEMORY_PATH,
+  MEMORY_ANCHORS_PATH,
+  QUALITY_SECTION,
+  READER_EXPERIENCE_PATH,
+  STALE_WARNING_SECTION,
+  readPendingDependencyManifest,
+} from '@mozhou/pipeline'
 import { buildDraftContext } from './draftContext.js'
 
 const LIN = 'char:lin-xuan' as EntityRef
+const NOW = '2026-08-26T10:00:00.000Z'
 
 let roots: string[] = []
 afterEach(() => {
@@ -110,5 +127,161 @@ describe('buildDraftContext · D06 钉版落盘', () => {
 
     expect(result.mode).toBe('structural_fallback')
     expect(readPendingDependencyManifest(root, 2)).toBeNull()
+  })
+})
+
+/* ---------------------------------------------------------------------------
+ * Prepare 步进生产编译：stale 警告 + quality_memory 段
+ * ------------------------------------------------------------------------- */
+
+function structuralOf(packet: { structural: readonly { section: string; text: string }[] }, section: string): string | undefined {
+  return packet.structural.find((piece) => piece.section === section)?.text
+}
+
+/** 章 1 经真实传播链被标 stale（钉版总纲 → 总纲 revision 漂移 → propagate）。 */
+function makeBookWithStaleChapter(): string {
+  const root = mkdtempSync(join(tmpdir(), 'mozhou-web-draftctx-'))
+  roots.push(root)
+  createBook({ dir: root, title: '上游变更之书' })
+  const ctx: PlaneContext = {
+    root,
+    db: openDatabase({ path: join(root, '.mozhou', 'runtime.sqlite') }),
+    manifest: readManifest(root),
+  }
+  try {
+    createEntityCard(ctx, LIN, {
+      name: '林枫',
+      aiContext: 'detected',
+      aliases: [{ text: '枫儿', kind: 'exact' }],
+      brief: '青云宗外门弟子佩剑听雨',
+    })
+    createChapterDraft(ctx, { chapterIndex: 1, title: '夜行' })
+    const zonggangId = parseFrontmatter(readFileSync(join(root, '大纲', '总纲.md'), 'utf8')).data['mozhouId'] as string
+    commitChapter(ctx, {
+      chapterIndex: 1,
+      summary: '林枫夜行初遇',
+      dependencyManifest: { entries: [{ kind: 'outlineNode', id: zonggangId, revision: 0 }] },
+    })
+    const propagation = propagateStaleMarkers(ctx, {
+      reason: 'upstream_outline_changed',
+      upstreamChanges: [{ kind: 'outlineNode', id: zonggangId, revision: 1 }],
+      markedAt: NOW,
+    })
+    expect(propagation.markedChapters).toEqual([1])
+  } finally {
+    ctx.db.close()
+  }
+  return root
+}
+
+/** 质量/ 三文件（近窗诊断 + 活跃失败模式 + 锚点）。 */
+function writeQualityFiles(root: string): void {
+  mkdirSync(join(root, '质量'), { recursive: true })
+  writeFileSync(
+    join(root, ...READER_EXPERIENCE_PATH),
+    JSON.stringify({ chapterIndex: 1, pressureDelta: 1, expectationDelta: 2, tangibleGain: 'resource', payoff: 'advanced', solutionPattern: 'borrow_knife' }) + '\n',
+    'utf8',
+  )
+  writeFileSync(
+    join(root, ...MEMORY_ANCHORS_PATH),
+    JSON.stringify({ anchorId: 'anc_xiu', type: 'object', description: '那柄断了的绣春刀', plantedChapter: 1, lastEchoChapter: null, status: 'planted' }) + '\n',
+    'utf8',
+  )
+  writeFileSync(
+    join(root, ...FAILURE_MEMORY_PATH),
+    JSON.stringify({ code: 'outline_expansion', firstSeenChapter: 1, lastSeenChapter: 1, occurrences: 1, active: true, authorNote: '别把大纲当正文' }) + '\n' +
+      JSON.stringify({ code: 'style_drift', firstSeenChapter: 1, lastSeenChapter: 2, occurrences: 2, active: false }) + '\n',
+    'utf8',
+  )
+}
+
+describe('buildDraftContext · Prepare 步（stale + 质量切片）', () => {
+  it('stale 标记进 packet 与 Receipt：警告继续、留痕不阻塞', async () => {
+    const root = makeBookWithStaleChapter()
+
+    const result = await buildDraftContext({ root, chapterIndex: 1, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    // 警告继续：编译成功；段文本到达模型输入（packet.text 即送模型的 prompt）
+    const warning = structuralOf(result.packet, STALE_WARNING_SECTION)
+    expect(warning).toContain('reason=upstream_outline_changed')
+    expect(warning).toContain('markedAt=' + NOW)
+    expect(result.packet.text).toContain('reason=upstream_outline_changed')
+
+    // 留痕落盘：一证一文件里的 structural 条目
+    const receiptDir = join(root, ...RECEIPTS_DIRNAME.split('/'))
+    const receiptFiles = readdirSync(receiptDir).filter((name) => name.endsWith('.json'))
+    expect(receiptFiles).toHaveLength(1)
+    const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]!), 'utf8')) as {
+      entries: readonly { identifier: string; included: boolean; stage: string }[]
+    }
+    const entry = receipt.entries.find((candidate) => candidate.identifier === STALE_WARNING_SECTION)
+    expect(entry?.included).toBe(true)
+    expect(entry?.stage).toBe('structural')
+  })
+
+  it('质量切片进 packet：近窗诊断/活跃失败模式/锚点都到模型输入', async () => {
+    const { root } = makeBook(true)
+    writeQualityFiles(root)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    const quality = structuralOf(result.packet, QUALITY_SECTION)
+    expect(quality).toContain('delta ch1')
+    expect(quality).toContain('failure outline_expansion')
+    expect(quality).toContain('anchor anc_xiu')
+    // 失效模式（active=false）不入上下文
+    expect(quality).not.toContain('style_drift')
+    expect(result.packet.text).toContain('anchor anc_xiu')
+  })
+
+  it('不变量：无 stale 标记、无质量文件 ⇒ 两段都不凭空出现（零噪声）', async () => {
+    const { root } = makeBook(true)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    expect(structuralOf(result.packet, QUALITY_SECTION)).toBeUndefined()
+    expect(structuralOf(result.packet, STALE_WARNING_SECTION)).toBeUndefined()
+  })
+
+  it('失败路径：章大纲缺席即显式失败，不落钉版冒充成功', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-web-draftctx-'))
+    roots.push(root)
+    createBook({ dir: root, title: '缺章之书' })
+    const ctx: PlaneContext = {
+      root,
+      db: openDatabase({ path: join(root, '.mozhou', 'runtime.sqlite') }),
+      manifest: readManifest(root),
+    }
+    try {
+      createChapterDraft(ctx, { chapterIndex: 1, title: '第一章' })
+    } finally {
+      ctx.db.close()
+    }
+
+    await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })).rejects.toThrow()
+    expect(readPendingDependencyManifest(root, 2)).toBeNull()
+  })
+
+  it('失败路径：stale 标记三平铺字段非法即报错，不静默丢弃标记继续生成', async () => {
+    const { root } = makeBook(false)
+    const outlineRel = chapterOutlinePath(2)
+    const document = parseFrontmatter(readFileSync(join(root, outlineRel), 'utf8'))
+    writeFileSync(
+      join(root, outlineRel),
+      `${emitFrontmatter({
+        ...document.data,
+        staleReason: 'not_a_real_reason',
+        staleMarkedAt: NOW,
+        staleUpstreamRefs: [],
+      })}${document.body}`,
+      'utf8',
+    )
+
+    await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })).rejects.toThrow(
+      /malformed stale marker fields/,
+    )
   })
 })

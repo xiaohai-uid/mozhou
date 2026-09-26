@@ -3,7 +3,7 @@ import {
   readNarrativeSnapshot,
 } from '@mozhou/data-plane'
 import { EmptyRecallError, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
-import { runCompileStep } from '@mozhou/pipeline'
+import { prepareChapterInputs, qualityStructuralSections, runCompileStep } from '@mozhou/pipeline'
 
 const PREVIEW_CONTEXT_WINDOW_TOKENS = 32_000
 const MAX_RECENT_CHAPTERS = 3
@@ -101,33 +101,36 @@ export async function buildDraftContext(input: {
     const storyText = recentStoryText(plane, input.chapterIndex)
     const alwaysCards = cards.filter((card) => card.aiContext === 'always')
 
+    // Prepare 步（S2）：章查询结果集是正文生成的生产输入面——stale 标记由 Compile
+    // 追加 stale_warning 段（警告继续 + Receipt 留痕），有界质量切片（ADR-0025）
+    // 并入既有结构段通道。章大纲缺失/非法原样抛出：宁败不脏，不降级成假上下文。
+    const prepared = prepareChapterInputs(input.root, input.chapterIndex)
+
     const structuralSections = [
       {
         section: 'book_identity',
         content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
       },
+      ...qualityStructuralSections(prepared.qualitySlice),
     ]
 
     try {
-      const outcome = await runCompileStep(
-        { chapterIndex: input.chapterIndex, staleMarker: null },
-        {
-          bookRoot: input.root,
-          bookId: book.id,
-          // keyword / graph / embedding 的激活查询同时看作者指令与近期正文。
-          draftText: [input.authorPrompt, ...storyText].join('\n\n'),
-          cards,
-          snapshot,
-          scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
-          structuralSections,
-          storyText,
-          modelProfile: {
-            id: 'mozhou-preview-codepoint-budget-v1',
-            contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
-          },
-          tokenizer: previewCodepointTokenizer,
+      const outcome = await runCompileStep(prepared, {
+        bookRoot: input.root,
+        bookId: book.id,
+        // keyword / graph / embedding 的激活查询同时看作者指令与近期正文。
+        draftText: [input.authorPrompt, ...storyText].join('\n\n'),
+        cards,
+        snapshot,
+        scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
+        structuralSections,
+        storyText,
+        modelProfile: {
+          id: 'mozhou-preview-codepoint-budget-v1',
+          contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
         },
-      )
+        tokenizer: previewCodepointTokenizer,
+      })
       return { packet: outcome.packet, mode: 'compiled_receipt' }
     } catch (error) {
       if (!(error instanceof EmptyRecallError)) throw error
