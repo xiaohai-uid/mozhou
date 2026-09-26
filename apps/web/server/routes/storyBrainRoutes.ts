@@ -7,7 +7,7 @@ import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
 export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
@@ -27,7 +27,13 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
       json(200, { ok: true, root: book.root, bookId: book.bookId })
       return true
     }
-    const dir = typeof body['dir'] === 'string' ? body['dir'] : '/tmp/mozhou-book-' + Date.now()
+    const requestedDir = typeof body['dir'] === 'string' ? body['dir'].trim() : ''
+    // 本地模式未指定目录时，书必须落在数据根内（跟随 MOZHOU_DATA_ROOT / 数据卷），
+    // 而非系统临时目录：此前默认 '/tmp/mozhou-book-<ts>' 在 Windows 上落到 C:\tmp，
+    // 书脱离数据根——不在书架扫描范围、不随数据根备份、无法随卷迁移。
+    const dir = requestedDir !== ''
+      ? requestedDir
+      : resolve(defaultBookAccessManager.getDataRoot(), 'books', `book-${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`)
     const title = typeof body['title'] === 'string' ? body['title'] : '未命名之书'
     const result = createBook({ dir, title })
     defaultBookAccessManager.registerLocalBook(result.root, result.book.id)
