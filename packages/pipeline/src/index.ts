@@ -46,6 +46,7 @@ export {
   QualityReworkNotDrivenError,
   ReworkNotDrivenError,
   SessionAlreadyActiveError,
+  SessionNotAbandonableError,
   SessionNotResumableError,
   StepGuardError,
   StepTransitionError,

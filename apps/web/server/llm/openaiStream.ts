@@ -86,6 +86,32 @@ function assertProtocol(target: URL, allowPrivateNetwork: boolean): void {
 }
 
 /**
+ * 出站端点基址的**同步** SSRF 门禁：协议白名单 + 字面 IP / 本机名判定。
+ * DNS 解析结果那一半由 `assertSafeRemoteTarget` 在真正发请求前补做（发请求前必过）。
+ *
+ * 复用点（唯一一处端点校验实现，勿另写一套）：
+ *   - BYOK 端点：`resolveChatEndpoint`（本文件下方）调用本函数；
+ *   - 配置注册表端点：`llm/tierRouting.ts` 的 `resolveTierEndpoint` 调用本函数；
+ *   - 真正出站前：`streamOpenAiChat` / `testConnection` 仍调 `assertSafeRemoteTarget` 兜底。
+ * 配置来源（文件）不是可信输入，因此必须走同一门禁；`allowPrivateNetwork` 只能由
+ * 部署者环境变量（MOZHOU_ALLOW_PRIVATE_LLM）授权，配置文件本身无权设置。
+ */
+export function assertSafeEndpointUrl(baseUrl: string, allowPrivateNetwork = false): URL {
+  const target = new URL(baseUrl)
+  assertProtocol(target, allowPrivateNetwork)
+  if (allowPrivateNetwork) return target
+
+  const hostname = normalizeAddress(target.hostname)
+  if (isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
+    throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
+  }
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
+  }
+  return target
+}
+
+/**
  * 校验一个真实出站目标。默认 lookup 注入仅用于测试；生产使用 Node DNS。
  * 任何解析结果落入私有/保留地址即整体拒绝（fail closed）。
  */
@@ -124,15 +150,7 @@ export function resolveChatEndpoint(env: NodeJS.ProcessEnv = process.env, userId
   if (!userEndpoint || !userEndpoint.apiKey) return null
 
   if (userEndpoint.baseUrl) {
-    const target = new URL(userEndpoint.baseUrl)
-    assertProtocol(target, userEndpoint.allowPrivateNetwork === true)
-    const hostname = normalizeAddress(target.hostname)
-    if (!userEndpoint.allowPrivateNetwork && isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
-      throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
-    }
-    if (!userEndpoint.allowPrivateNetwork && (hostname === 'localhost' || hostname.endsWith('.localhost'))) {
-      throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
-    }
+    assertSafeEndpointUrl(userEndpoint.baseUrl, userEndpoint.allowPrivateNetwork === true)
   }
   return userEndpoint
 }

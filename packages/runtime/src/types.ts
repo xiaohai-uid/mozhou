@@ -48,9 +48,19 @@ export type NoProviderCode = 'NO_PROVIDER_TASK_TYPE' | 'NO_PROVIDER_TIER';
 export class NoProviderError extends Error {
   override name = 'NoProviderError';
   readonly code: NoProviderCode;
-  constructor(code: NoProviderCode, configKeyPath: string) {
-    super(`${code}: 配置键 ${configKeyPath} 未解析到 provider——请检查 settings.yaml 对应 tiers/providers 条目`);
+  /** 解析失败指向的具体配置键路径（ANWA #28：报错必须能直接定位到配置项）。 */
+  readonly configKeyPath: string;
+  /**
+   * detail（T14 接线增补，可选）：多候选/需人工决策时的补充说明——例如「该 task_type
+   * 下声明了多个 tier，运行时不在其中静默挑一个」。缺省与既有两参调用零差异。
+   */
+  constructor(code: NoProviderCode, configKeyPath: string, detail?: string) {
+    super(
+      `${code}: 配置键 ${configKeyPath} 未解析到 provider——请检查 settings.yaml 对应 tiers/providers 条目` +
+        (detail === undefined ? '' : `（${detail}）`),
+    );
     this.code = code;
+    this.configKeyPath = configKeyPath;
   }
 }
 

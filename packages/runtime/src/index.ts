@@ -8,5 +8,6 @@ export * from './adapter/anthropic-events.js';
 export * from './adapter/errors.js';
 export * from './structuredOutput.js';
 export * from './tierConfig.js';
+export * from './tierRouting.js';
 export * from './recipe/index.js';
 export { createDraftRecipe } from './canonical-recipes.js';

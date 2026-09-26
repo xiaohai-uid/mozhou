@@ -177,7 +177,9 @@ function databaseBytes(root: string | null): number {
   }
 }
 
-export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
+// async：/api/capability-square 的 providerAvailable 走 hasDraftProvider()，该判据要读覆盖层
+// YAML 才能回答（注册表配好、BYOK 没配时也必须报 true），故 handler 一并异步化。
+export const systemRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST' && !(req.method === 'GET' && path === '/api/membership')) return false
 
   const resolvedRoot = bookRoot ?? null
@@ -398,7 +400,7 @@ export const systemRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
   if (path === '/api/capability-square') {
     json(200, {
       ok: true,
-      providerAvailable: hasDraftProvider(),
+      providerAvailable: await hasDraftProvider(),
       groups: CAPABILITY_SQUARE_GROUPS,
     })
     return true

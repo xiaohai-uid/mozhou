@@ -101,24 +101,58 @@ structuredOutput(cap, payload):
 
 ## 6. 分级模型路由（Q1/Q2/Q9/Q10）
 
+**代码接受的形态（冻结实现 = `packages/runtime/src/tierConfig.ts`）**：
+
 ```yaml
 # ~/.mozhou/settings.yaml（V1 两级：包内默认 ← 本文件全局覆盖）
-providers:
-  deepseek:
-    apiKeyEnv: MOZHOU_DEEPSEEK_KEY      # 密钥本体永不入此文件（credentials refs 模式，DSH 八家实证形态）
-    baseURL: https://api.deepseek.com
-    models:
-      - { id: deepseek-chat, contextWindow: 131072, maxTokens: 8192 }
-tiers:
-  LONGFORM_PLANNING: { provider: deepseek, model: deepseek-reasoner }
-  STYLE_REWRITE:     { provider: deepseek, model: deepseek-chat }
-  STATE_EXTRACTION:  { provider: deepseek, model: deepseek-chat }
+# 形态：task_type → tier 名 → 路由叶子；叶子字段白名单 providerId / model / api_key_ref
+CHAPTER_DRAFTING:
+  quality:
+    providerId: deepseek
+    model: deepseek-chat
+    # api_key_ref: MOZHOU_DEEPSEEK_KEY   # 可选；引用名而非密钥本体（见下方 §6.1）
+LONGFORM_PLANNING:
+  quality:
+    providerId: deepseek
+    model: deepseek-reasoner
+STYLE_REWRITE:
+  fast:
+    providerId: deepseek
+    model: deepseek-chat
 ```
 
-- **tier 间接层**：task_type→tier 名→(provider, model) 复合键；裸模型 id 不直接出现在 task_type 绑定里（隔离市场漂移：`:free` 后缀、日期快照号）
+- 叶子字段白名单只有 `providerId` / `model` / `api_key_ref` 三个；未知字段、缺 `providerId`、缺 `model`、任意层级的明文 `apiKey` 一律解析期 fail fast，报错指向具体键路径（`tierConfig.ts:63,86-103,105-183`）。**`model` 为必填**：不存在「只声明 providerId」的叶子。
+- **tier 间接层**：task_type→tier 名→(providerId, model) 复合键；裸模型 id 不直接出现在 task_type 绑定里（隔离市场漂移：`:free` 后缀、日期快照号）
+- 一个 task_type 下可以有多个 tier 叶子（飞轮评测按叶子逐条判 incumbent，`packages/flywheel/src/evaluator/run.ts:184-189`）。运行时选哪个叶子必须显式：`selectTierRoute` 只在单叶子时自动采用，多叶子一律 `NO_PROVIDER_TIER` 并列出候选，不静默挑一个（`packages/runtime/src/tierRouting.ts`）。
 - 书内覆盖层 `<book>/.mozhou/routing.yaml` 推迟 V1.5（同格式复制即可）
 - **热加载**：配置 mtime 失效内存快照，下一次 execute 生效；运行中调用不受影响（调用期解析使热加载近乎免费）
-- 加载时机械校验：缺 env、缺模型 id 等 fail fast 并指向键路径；UI 连接测试留 Phase 6 接口预留位
+- 加载时机械校验：缺档、缺模型 id 等 fail fast 并指向键路径；UI 连接测试留 Phase 6 接口预留位
+- **生成入口接线**（T14 后续接线票）：web 正文生成入口 `POST /api/draft.stream` 在真实 provider 分支读本文件——落点缺省 `~/.mozhou/settings.yaml`，`MOZHOU_TIER_CONFIG` 仅作测试/运维覆盖；**文件不存在 ⇒ 不覆盖、完全保持既有行为**；多叶子歧义时的操作位是环境变量 `MOZHOU_DRAFT_TIER`（未设且多叶子 ⇒ fail fast，报错里给出该名字）。
+
+### 6.1 `providers:` 供应商注册表（已实现）
+
+形态（与 `tierConfig.ts` 的校验器一致，与 §6 的路由表同文件）：
+
+```yaml
+# ~/.mozhou/settings.yaml
+providers:
+  deepseek:
+    apiKeyEnv: MOZHOU_DEEPSEEK_KEY      # 密钥本体永不入此文件（credentials refs 模式）
+    baseURL: https://api.deepseek.com
+    models:                             # 可选；声明性清单，不改写出站 model
+      - { id: deepseek-chat, contextWindow: 131072, maxTokens: 8192 }
+CHAPTER_DRAFTING:
+  quality:
+    providerId: deepseek
+    model: deepseek-chat
+```
+
+- 字段白名单：`baseURL` / `apiKeyEnv` / `models?`；未知字段、缺 `baseURL`、缺 `apiKeyEnv`、任意层级的明文 `apiKey` 一律解析期 fail fast 并指向键路径（`tierConfig.ts`）。`providers` 是顶层保留键，绝不被当作 `task_type`。
+- **`providerId` 真正选端点**：tier 叶子的 `providerId` 必须在该注册表登记；出站 `baseURL` 与密钥（`apiKeyEnv` 指向的环境变量）由注册表解析（`apps/web/server/llm/tierRouting.ts` 的 `resolveTierEndpoint`）。账本 `GenerationStarted.snapshot.providerId` 与绑定键用的是**同一个** `providerId`，因此账本记录的 provider 必然就是实际服务的那一个。
+- **未登记 ⇒ 显式拒绝**（`TIER_ROUTE_PROVIDER_NOT_REGISTERED`，报错含 providerId、叶子键路径与应登记的 `providers.<id>` 键路径），**不静默回落 BYOK 端点**；`baseURL` 未过 SSRF 门禁 ⇒ `TIER_ROUTE_PROVIDER_ENDPOINT_REJECTED`；`apiKeyEnv` 指向的环境变量缺失/空白 ⇒ `TIER_ROUTE_PROVIDER_KEY_MISSING`。
+- 无覆盖层文件 ⇒ 仍走 BYOK 解析（行为与接线前一致）；叶子声明了 providerId 的配置一律以注册表为准。
+- `api_key_ref` 仍显式拒绝（`TIER_ROUTE_API_KEY_REF_UNSUPPORTED`）：密钥的唯一来源是注册表 `apiKeyEnv`，叶子再声明一层引用名会让「这份叶子用哪把密钥」出现两个互相矛盾的来源。
+- 出站 `baseURL` 的 SSRF 校验复用 `apps/web/server/llm/openaiStream.ts` 的 `assertSafeEndpointUrl`（BYOK 与注册表同一个函数；真正发请求前 `streamOpenAiChat` 再用 `assertSafeRemoteTarget` 补 DNS 解析结果那一半）。私有地址只在部署者显式 `MOZHOU_ALLOW_PRIVATE_LLM=1` 时放行，配置文件本身无权设置该开关。
 
 ## 7. 工程骨架（Q11）
 

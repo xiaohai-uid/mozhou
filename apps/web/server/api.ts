@@ -39,6 +39,7 @@ export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory }
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
 import type { ContextReceipt } from '@mozhou/kernel'
+import type { CommittedTruthAnchor, PipelineStep } from '@mozhou/pipeline'
 import type {
   EntityRef,
   KnowledgePerspectiveEntry,
@@ -209,12 +210,35 @@ export interface ChapterProseSaveResponse {
   readonly authorEditSignal: ChapterProseSaveAuthorEditSignal
 }
 
-/** POST /api/chapter.reopen 成功响应。 */
+/**
+ * 重提交开出的新会话窗口身份：resubmitSession 的**线上投影**——取自
+ * ChapterProductionSession 的 taskRef/currentStep 两个 getter（packages/pipeline/src/session.ts），
+ * 不是某个包导出类型的镜像（故按 wire 形状就地声明；真相锚则直接复用管线导出的
+ * CommittedTruthAnchor，不做第二份声明）。
+ */
+export interface ChapterResubmitSessionView {
+  readonly taskRef: string
+  readonly currentStep: PipelineStep
+}
+
+/** POST /api/chapter.reopen 成功响应（作者编辑用的可重复底层重开：不开会话窗口）。 */
 export interface ChapterReopenResponse {
   readonly ok: true
   readonly chapterIndex: number
   readonly reopenedFromCommitId: string
   readonly proseRelPath: string
+}
+
+/** POST /api/chapter.resubmit 成功响应（步 9：S9 重提交，独立于 reopen）。 */
+export interface ChapterResubmitResponse {
+  readonly ok: true
+  readonly chapterIndex: number
+  readonly reopenedFromCommitId: string
+  readonly proseRelPath: string
+  /** 重提交期间的真相锚（管线单一事实源；不读已翻回 draft 的正文文件）。 */
+  readonly truthAnchor: CommittedTruthAnchor
+  /** 新开的重提交会话窗口（单飞占用；V1 全局单飞，同时最多一个活动 session）。 */
+  readonly resubmitSession: ChapterResubmitSessionView
 }
 
 /* ---- 步 8 Canon Proposal 确认面（S6）：提案队列与提交挂起响应共用同一视图 ---- */

@@ -24,6 +24,7 @@ export default tseslint.config(
             'apps/web/server/search/*.test.ts',
             'apps/web/server/analysis/*.test.ts',
             'apps/web/server/skills/*.test.ts',
+            'apps/web/server/llm/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 50,

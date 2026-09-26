@@ -5,8 +5,10 @@
  * V2）。重提交期间读取真相 = phase=committed 的最新 commitId——latestCommittedTruth
  * 以 ChapterCommitted 事件行为锚返回最新 commit 的 commitId/contentSha256，
  * 不读已翻回 draft 的正文文件；重提交完成后真相前移到新 commit。
- * 纪律：单飞双守卫在 start() 内先于翻相位拒绝（零副作用）；open() 先跑
- * recoverPendingCommit 再动相位；零时钟零外部服务，手工 id 由调用方注入。
+ * 纪律：所有会被拒的判据（相位守卫 / 单飞双守卫 / 真相锚 / 写前哈希）都在任何
+ * 盘面写入之前出局（拒绝零副作用，不留半开状态机）；单飞判据由 assertSessionStartable
+ * 与 start() 同源提供；open() 先跑 recoverPendingCommit 再动相位；平面句柄即用即关；
+ * 零时钟零外部服务，手工 id 由调用方注入。
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,7 +18,8 @@ import {
   proseChapterPath,
   readProseChapter,
 } from '@mozhou/data-plane';
-import { ChapterProductionSession } from './session.js';
+import type { ChapterReopenResult } from '@mozhou/data-plane';
+import { ChapterProductionSession, assertSessionStartable } from './session.js';
 import type { ChapterProductionSessionDeps } from './session.js';
 
 /** 重提交前置不满足：目标章没有 committed 相位可回退（从未提交或已在重提交中）。 */
@@ -83,14 +86,22 @@ export interface ResubmitOutcome {
 }
 
 /**
- * S9 重提交入口：committed 章 → 相位移回 draft + 开新会话窗口。次序：
+ * S9 重提交入口：committed 章 → 相位移回 draft + 开新会话窗口。次序（纪律：所有
+ * **会被拒**的判据都在任何盘面写入之前出局，故拒绝路径零副作用——不留半开状态机）：
  *   1. 前置守卫——正文必须 phase=committed（否则 ResubmitNotCommittedError）；
- *   2. start() 双守卫（同章 SessionAlreadyActive / 别章 GlobalSingleFlight）
- *      在 TaskStarted 落账之前拒绝——故任何拒绝路径都零盘面副作用；
- *   3. LocalDataPlane.open（内含 pending-commit 恢复）→ reopenChapter 翻相位
+ *   2. 纯读预检 assertSessionStartable：同章 SessionAlreadyActive / 别章
+ *      GlobalSingleFlight（与 start() 同一判据，前移到 TaskStarted 落账之前）；
+ *   3. 真相锚预检 latestCommittedTruth：有相位无匹配事件行 = 账实不符，此时
+ *      抛错（相位未翻、窗口未开）；
+ *   4. LocalDataPlane.open（内含 pending-commit 恢复）→ reopenChapter 翻相位
  *      （revision+1、摘 commitId、ChapterReopened 事件行落账；旧 commit 物理
- *      痕迹——追踪流行与本事件行——永不改写，I5）。
- * 若第 3 步异常中断，新窗口已在账：走 resume/恢复入口续接，不留半开状态机。
+ *      痕迹——追踪流行与本事件行——永不改写，I5）。写前哈希失配在 reopenChapter
+ *      内、任何写入之前抛出（chapter.ts:725），故同样零副作用。句柄即用即关
+ *      （每请求一个 better-sqlite3 连接，不关会占住 runtime.sqlite/-wal/-shm）。
+ *   5. 开新会话窗口 ChapterProductionSession.start（预检已保证不会被守卫拒绝）。
+ * 次序取舍：窗口开在翻相位**之后**。进程若在第 4/5 步之间中断，留下的是
+ * 「draft 章 + 无窗口」——作者改文再定稿后可重新重提交，web 侧可达；反之
+ * window-first 留下的孤儿窗口在 web 侧没有任何路由能闭合（无会话内 commit/finish）。
  */
 export function requestResubmit(deps: ChapterProductionSessionDeps): ResubmitOutcome {
   const proseRel = proseChapterPath(deps.chapterIndex);
@@ -102,11 +113,8 @@ export function requestResubmit(deps: ChapterProductionSessionDeps): ResubmitOut
     throw new ResubmitNotCommittedError(deps.chapterIndex);
   }
 
-  const session = ChapterProductionSession.start(deps);
-
-  const plane = LocalDataPlane.open(deps.root);
-  const reopened = plane.reopenChapter(deps.chapterIndex);
-
+  // 纯读预检（第 2、3 步）：任何盘面写入之前出局。
+  assertSessionStartable(deps);
   const anchor = latestCommittedTruth(deps.root, deps.chapterIndex);
   if (anchor === null || anchor.commitId !== scan.commitId) {
     // 有相位无事件行＝账实不符：宁败不猜（真相锚是 S9 读真相的唯一凭据）
@@ -116,6 +124,16 @@ export function requestResubmit(deps: ChapterProductionSessionDeps): ResubmitOut
         ' committed phase lacks a matching ChapterCommitted anchor — ledger/prose inconsistent',
     );
   }
+
+  const plane = LocalDataPlane.open(deps.root);
+  let reopened: ChapterReopenResult;
+  try {
+    reopened = plane.reopenChapter(deps.chapterIndex);
+  } finally {
+    plane.close();
+  }
+
+  const session = ChapterProductionSession.start(deps);
 
   return {
     reopenedFromCommitId: reopened.reopenedFromCommitId,

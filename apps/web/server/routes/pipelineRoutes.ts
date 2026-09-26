@@ -38,11 +38,18 @@ import {
 } from '@mozhou/quality-engine'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { PublishBus, RuntimeEngine, createDraftRecipe } from '@mozhou/runtime'
+import { PublishBus, RuntimeEngine, createDraftRecipe, toProviderOverride } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
 import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
+import {
+  resolveTierEndpoint,
+  resolveDraftTierRoute,
+  tierConfigPath,
+  tierRouteTraceLine,
+} from '../llm/tierRouting.js'
+import type { ResolvedEndpoint } from '../llm/types.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
 import { canonProposalView } from '../proposals.js'
@@ -59,13 +66,54 @@ const DIALOGUE_CAPABILITIES = [
   { id: 'consistency', label: '一致性自查' },
 ]
 
-export function hasDraftProvider(): boolean {
-  const configured = process.env['MOZHOU_DRAFT_PROVIDER']
-  const hasRealKey =
-    Boolean(process.env['MOZHOU_API_KEY']) ||
-    Boolean(process.env['DEEPSEEK_API_KEY']) ||
-    Boolean(process.env['OPENAI_API_KEY'])
-  if (configured !== 'mock' && !hasRealKey) return false
+/** BYOK 密钥判据（与 providerSettings.resolveEndpointForUser 的候选变量同源）。 */
+function hasByokDraftKey(env: NodeJS.ProcessEnv): boolean {
+  return (
+    Boolean(env['MOZHOU_API_KEY']) ||
+    Boolean(env['DEEPSEEK_API_KEY']) ||
+    Boolean(env['OPENAI_API_KEY'])
+  )
+}
+
+/**
+ * 覆盖层能否解析出一条**可用**的 providerId → 端点路由（注册表能力独立可用的判据）。
+ * 任何失败（结构非法 / 多叶子歧义 / api_key_ref / providerId 未登记 / baseURL 未过 SSRF 门禁 /
+ * apiKeyEnv 缺失）都收敛成 false——本函数只回答「能不能生成」，病因留给真正生成时上抛。
+ */
+async function hasResolvableTierRoute(env: NodeJS.ProcessEnv): Promise<boolean> {
+  try {
+    const route = await resolveDraftTierRoute(env)
+    if (route === null) return false
+    resolveTierEndpoint(route, env)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 草稿 provider 可用性判据（`/api/capabilities`、`/api/capability-square` 的 `providerAvailable`
+ * 与 `/api/draft.stream` 前置闸共用）——回答「现在能不能真的生成」：
+ *   - `MOZHOU_DRAFT_PROVIDER=mock` ⇒ true（既有显式开关，不参与分级路由选档）；
+ *   - BYOK 密钥齐备 ⇒ true（既有语义不变）；
+ *   - 否则看覆盖层 `~/.mozhou/settings.yaml`：无该文件 ⇒ false（维持 BYOK 判据，行为不变）；
+ *     有该文件且叶子 providerId 能经 `providers:` 注册表解析出可用端点 ⇒ true。
+ *
+ * 为什么要认注册表：端点身份已由 providerId 决定（见 llm/tierRouting.ts），所以「有没有可用的
+ * 草稿 provider」的判据必须把注册表算进去——否则「只用注册表、不配 BYOK」的部署会被挡在门外，
+ * 等于注册表能力独立不可用。判据取**可解析性**而非「文件存在」：配了但解析不出来时返回 false，
+ * 不让 UI 报出与实际不符的能力声明。
+ *
+ * 同步 → 异步：判据要读 YAML 才能回答，故本函数与它的 3 个调用点一并改为 async（改动面：
+ * 本文件的 `/api/capabilities` 与 `/api/draft.stream` 前置闸，以及 `systemRoutes.ts` 的
+ * `/api/capability-square`——三处均已在 async 路由处理器内，`router.ts` 的 dispatch 会 await）。
+ */
+export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  const configured = env['MOZHOU_DRAFT_PROVIDER']
+  const hasRealKey = hasByokDraftKey(env)
+  if (configured !== 'mock' && !hasRealKey) {
+    if (!(await hasResolvableTierRoute(env))) return false
+  }
 
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root: '/' } })
   engine.registerCapability({
@@ -114,8 +162,18 @@ function hashProseRaw(root: string, chapterIndex: number): string {
  * ContextPacket 自身写回小说正文，但 start 帧仍暴露真实 modelPrompt 供契约审计。
  * C2（T04）：stream 只 append 候选（candidate 上下文必传，缺省拒绝绑定）；
  * signal 在请求断开/显式取消时中止上游。
+ *
+ * T14 接线：真实分支的 providerId/model/端点不再硬编码——先读全局覆盖层
+ * （`~/.mozhou/settings.yaml`，见 llm/tierRouting.ts）解析 CHAPTER_DRAFTING 的活动路由：
+ *   - providerId ⇒ CapabilityRegistry.setGlobalOverride（包内默认 'deepseek' 仍是注册项，
+ *     覆盖层只改解析结果，且覆盖后 GenerationStarted.snapshot.providerId 记的就是配置值）；
+ *   - 端点（baseURL + 密钥）⇒ providers 注册表按**同一个** providerId 解析
+ *     （resolveTierEndpoint）。账本 providerId 与实际出站端点因此同源，不再出现
+ *     「账本说走 X、请求发往 BYOK 端点 Y」；未登记 / baseURL 非法 / apiKeyEnv 缺失 ⇒ 显式抛错；
+ *   - 无配置文件 ⇒ 解析返回 null，本函数行为与接线前逐字节一致（BYOK 解析）。
+ * mock 是显式「不调真实 provider」开关（测试/演示），不参与分级路由选档。
  */
-function makeStreamEngine(
+async function makeStreamEngine(
   root: string,
   chapterIndex: number,
   modelPrompt: string,
@@ -131,7 +189,7 @@ function makeStreamEngine(
     selection?: { readonly from: number; readonly to: number; readonly selectedTextHash: string }
   },
   signal?: AbortSignal,
-): { engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean } {
+): Promise<{ engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean }> {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
   const recipe = createDraftRecipe({ proseRelPath: proseChapterPath(chapterIndex) })
 
@@ -158,22 +216,59 @@ function makeStreamEngine(
       }),
     )
   } else {
-    const endpoint = resolveChatEndpoint(process.env)
-    if (endpoint === null) {
-      throw new Error('PROVIDER_UNAVAILABLE: 未配置真实 LLM Key（MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）')
+    // 包内默认（规格 §6 两级：包内默认 ← 全局覆盖）。默认项始终注册，覆盖层只改解析结果。
+    const defaultProviderId = 'deepseek'
+    const providerVersion = '1.0.0'
+
+    const tierRoute = await resolveDraftTierRoute()
+    let providerId: string
+    let effectiveEndpoint: ResolvedEndpoint
+    if (tierRoute === null) {
+      // 无覆盖层文件 ⇒ 与接线前逐字节一致：BYOK 解析 + 包内默认 providerId。
+      const endpoint = resolveChatEndpoint(process.env)
+      if (endpoint === null) {
+        throw new Error('PROVIDER_UNAVAILABLE: 未配置真实 LLM Key（MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）')
+      }
+      providerId = defaultProviderId
+      effectiveEndpoint = endpoint
+    } else {
+      // 有覆盖层文件 ⇒ 端点由 providers 注册表按 providerId 解析：**同一个** providerId 既作
+      // 绑定键与账本快照（下方 registerProviderBinding + setGlobalOverride），又决定实际出站
+      // baseURL 与 apiKey（resolveTierEndpoint 查同一份注册表）。二者同源 ⇒ 账本记的
+      // providerId 就是实际服务的那一家，不存在「账本说 X、请求发 Y」。
+      // 未登记 / baseURL 未过 SSRF 门禁 / apiKeyEnv 缺失一律显式抛错，绝不回落 BYOK
+      // （见 llm/tierRouting.ts 的 TierProviderError）。
+      providerId = tierRoute.selection.route.providerId
+      effectiveEndpoint = resolveTierEndpoint(tierRoute, process.env)
+      // 不许静默生效：留痕把 providerId 与实际出站端点并排写出（注册表落地后二者强制一致）。
+      console.log(
+        tierRouteTraceLine(tierRoute, {
+          defaultProviderId,
+          endpointBaseUrl: effectiveEndpoint.baseUrl,
+        }),
+      )
     }
     real = true
+
     engine.registerCapability({
       taskType: 'CHAPTER_DRAFTING',
-      providerId: 'deepseek',
-      providerVersion: '1.0.0',
+      providerId: defaultProviderId,
+      providerVersion,
       failurePolicy: { timeoutMs: 60_000, fallbackProviderIds: [] },
     })
+    if (tierRoute !== null) {
+      engine.registry.setGlobalOverride(toProviderOverride(tierRoute.selection, providerVersion))
+    }
     engine.registerProviderBinding(
-      'deepseek',
+      providerId,
       makeDraftProviderBinding({
         bookRoot: root,
         chapterIndex,
+        // 绑定键 = 路由解析出的 providerId（账本快照同源），也是 resolveTierEndpoint 查
+        // providers 注册表用的那个 key ⇒ 绑定身份与实际出站端点由同一个字符串决定。
+        // 但 opts.provider 只作**错误分类学**选择器（draft-step.ts:260 →
+        // normalizeProviderError 三家表），本接线不改传输层知识：OpenAI-compatible 上游
+        // 沿用既有 'deepseek' 直码档。
         provider: 'deepseek',
         mode: 'generate',
         stream: () =>
@@ -182,7 +277,7 @@ function makeStreamEngine(
               '你是资深中文网文作者。输入已由墨舟 Context Compiler 按当前作品正典与章节状态装配。' +
               '严格遵守其中的事实、人物知识边界、承诺与作者指令；只输出本章正文，不复述上下文。' +
               '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用。'
-            for await (const chunk of streamOpenAiChat(endpoint, modelPrompt, systemPrompt, signal)) {
+            for await (const chunk of streamOpenAiChat(effectiveEndpoint, modelPrompt, systemPrompt, signal)) {
               if (chunk.delta.length > 0) {
                 onDelta(chunk.delta)
                 yield chunk.delta
@@ -260,8 +355,46 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     return true
   }
 
+  /**
+   * 会话窗口作废（S9 收口）：显式清掉本章挂起的活动会话窗口。
+   *
+   * 为何需要：requestResubmit / session.open 开的窗口只能由本会话第 9 步
+   * CanonCommitted 或 TaskFinished 闭合，而 web 侧没有会话内 commit/finish 路由
+   * （session.advance 也不携带门禁 verdict，故 continuity_gate→canon_proposal 恒被
+   * GateNotPassedError 拒）——窗口一旦开出就占住 V1 全局单飞，别章开卷恒 409。
+   * 作废是「放弃未完成」，与「完成」正交：发布 TaskFinished{outcome:'abandoned', reason}
+   * 闭合 TaskStarted 配对并释放单飞，**绝不发 CanonCommitted**（完成态语义不动）。
+   *
+   * 幂等：无活动窗口、或活动窗口属别章 ⇒ abandoned:false 的空操作 200（运维可重复
+   * 调用清理）；reason 落账留痕（缺省 author_abandoned），显式给空串即 400。
+   */
+  if (path === '/api/session.abandon') {
+    const root = resolvedRoot
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    if (root === null || chapterIndex === null || chapterIndex < 1) {
+      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+      return true
+    }
+    const rawReason = body['reason']
+    if (rawReason !== undefined && (typeof rawReason !== 'string' || rawReason.trim().length === 0)) {
+      json(400, { ok: false, error: 'reason must be a non-empty string when provided' })
+      return true
+    }
+    const reason = typeof rawReason === 'string' ? rawReason.trim() : 'author_abandoned'
+    try {
+      const taskRef = ChapterProductionSession.abandonOpenWindow(
+        { bus: new PublishBus(), root, chapterIndex },
+        reason,
+      )
+      json(200, { ok: true, chapterIndex, abandoned: taskRef !== null, taskRef, reason })
+    } catch (error) {
+      json(500, { ok: false, error: (error as Error).message })
+    }
+    return true
+  }
+
   if (path === '/api/capabilities') {
-    json(200, { ok: true, capabilities: DIALOGUE_CAPABILITIES, providerAvailable: hasDraftProvider() })
+    json(200, { ok: true, capabilities: DIALOGUE_CAPABILITIES, providerAvailable: await hasDraftProvider() })
     return true
   }
 
@@ -331,13 +464,18 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       }
     }
 
-    if (!hasDraftProvider()) {
-      json(200, {
-        ok: false,
-        code: 'PROVIDER_UNAVAILABLE',
-        error: 'provider unavailable: no draft provider configured',
-      })
-      return true
+    if (!(await hasDraftProvider())) {
+      // 覆盖层文件存在却判否 ⇒ 是「配了但解析不出来」，不是「没配任何 provider」。
+      // 放行进真实分支，让 resolveDraftTierRoute / resolveTierEndpoint 抛出带键路径的精确
+      // 错误（NDJSON error 帧），而不是用笼统的 PROVIDER_UNAVAILABLE 掩盖病因。
+      if (!existsSync(tierConfigPath())) {
+        json(200, {
+          ok: false,
+          code: 'PROVIDER_UNAVAILABLE',
+          error: 'provider unavailable: no draft provider configured',
+        })
+        return true
+      }
     }
 
     res.statusCode = 200
@@ -357,7 +495,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       const candidateId = createCandidateId()
       const abortController = new AbortController()
       res.on('close', () => abortController.abort())
-      const { engine, recipe, real } = makeStreamEngine(
+      const { engine, recipe, real } = await makeStreamEngine(
         safeRoot,
         chapterIndex,
         context.packet.text,

@@ -12,6 +12,33 @@
  *   语义：phase 恒 draft；Commit 仍只经管线质量门后的 commitChapter。
  * 不触碰 Protected Author Content 以外的任何正典工件。
  *
+ * 步 9 S9 重提交接线（chapter-pipeline-spec §1 表第 9 行 / S9）：
+ * 重提交**不与作者编辑用的 /api/chapter.reopen 混用**——reopen 保持它原本的语义
+ * （可重复的底层重开：写前哈希 + ChapterReopened 事件 + 基线刷新，不开会话窗口），
+ * S9 走独立入口 POST /api/chapter.resubmit → requestResubmit
+ * （packages/pipeline/src/resubmit.ts）：
+ *   1. committed 前置守卫：非 committed（草稿/从未提交）在**任何盘面副作用之前**
+ *      以 ResubmitNotCommittedError 拒绝；盘上无此章仍按契约 404 CHAPTER_MISSING。
+ *   2. 开新会话窗口：ChapterProductionSession.start 新 taskRef、光标 prepare，
+ *      V1 十步全量重走（S9）。同章已有活动窗口 / 别章占用全局单飞 → 409
+ *      RESUBMIT_SESSION_CONFLICT（守卫先于翻相位，拒绝零盘面副作用）。
+ *   3. 重提交期间的真相锚：响应 truthAnchor = 最近一次 ChapterCommitted 事件行的
+ *      {commitId, contentSha256, proseRelPath}（latestCommittedTruth 以事件行为锚，
+ *      **不读已翻回 draft 的正文文件**）；重提交完成后真相由新 commit 前移。
+ *   有相位无匹配事件行 = 账实不符：显式 500 失败（宁败不猜），绝不返回假锚。
+ *   I5：旧 commit 的物理痕迹（追踪流行 + ChapterCommitted 事件行）只增不改。
+ * 该会话窗口按 S9 设计由本会话第 9 步 CanonCommitted 或 TaskFinished 闭合。web 侧
+ * **没有**会话内 commit/finish 路由（/api/session.advance 也不携带门禁 verdict，故
+ * continuity_gate→canon_proposal 恒被 GateNotPassedError 拒），故本端点开出的窗口
+ * 不能靠「走完十步」闭合——它靠**作废**闭合（S9 收口，本分支补完）：
+ *   - 显式入口 POST /api/session.abandon（pipelineRoutes）→ ChapterProductionSession
+ *     .abandonOpenWindow，发布 TaskFinished{outcome:'abandoned'}（复用既有事件词汇，
+ *     不发 CanonCommitted——完成态语义不动）；
+ *   - 自动收口：作者经 /api/chapter.commit 重新定稿后，该章残留的活动窗口即「过时」，
+ *     提交出口就地作废它（见下方步 10 注释的 resubmitWindowCleanup）。
+ * 两条路径都在 findOpenSessionWindow 视角下真正关闭窗口并释放 V1 全局单飞；
+ * reopen 走数据平面相位机、不查会话账本，故作者编辑旅程始终不受影响。
+ *
  * 步 5 User Edit 接线（chapter-pipeline-spec §1 表第 5 行 / S4）：
  * /api/chapter.prose.save 在权威写路径（saveProseDraft：预期版本 + 写前哈希 + 定稿
  * 保护，契约不动）落定之后，把「作者这次保存改了什么」折算成结构化操作块并落
@@ -73,7 +100,16 @@
  *   形状非法在动盘之前 400 拒绝——绝不把未校验载荷写进投影表。
  *   窗口闭合后触发 afterRecord 钩子（T23 · #56 触发点）：StyleLearner 自读本窗口
  *   author 编辑更新派生画像；钩子失败同样不阻断（S12 同款），但错误文本进响应。
+ *
+ * 步 9 S9 收口（本章补完）：/api/chapter.commit 在 commitChapter 落定后（两条提交
+ * 分支各自调用点）就地作废本章残留的活动会话窗口——作者已重新提交，该窗口过时。
+ * 作废发布 TaskFinished{outcome:'abandoned', reason:'author_resubmitted'}，释放 V1
+ * 全局单飞；**绝不发 CanonCommitted**（完成态语义不动，窗口靠「作废」而非「完成」关闭）。
+ * 收口是派生面：失败不回退已落定的提交，但响应携带 resubmitWindowCleanup 如实上报
+ * （abandoned/taskRef/errorDetail，绝不静默）。被拒的提交零副作用（不触发收口）。
  */
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { RouteHandler } from '../router.js'
 import { assertSafeBookRoot } from '../security.js'
 import {
@@ -86,12 +122,17 @@ import {
   readProseChapter,
 } from '@mozhou/data-plane'
 import {
+  ChapterProductionSession,
+  GlobalSingleFlightError,
   ProposalPort,
+  ResubmitNotCommittedError,
+  SessionAlreadyActiveError,
   confirmedAppendsForCommit,
   createCanonProposal,
   loadCanonProposal,
   readPendingDependencyManifest,
   recordWholeBodyAuthorEdit,
+  requestResubmit,
   runContinuityGate,
   runFlywheelRecord,
 } from '@mozhou/pipeline'
@@ -195,6 +236,25 @@ interface FlywheelRecordView {
   readonly recordedCount: number
   readonly errorDetail: string | null
   readonly afterRecordError: string | null
+}
+
+/**
+ * 提交后「陈旧重提交窗口」清理的呈现面（S9 收口）。
+ *
+ * 背景：requestResubmit 开出的会话窗口只能由第 9 步 CanonCommitted 或 TaskFinished
+ * 闭合，而 web 提交路径不走会话（它落平铺 ChapterCommitted 行，taskRef 是
+ * web_commit_*，与会话 taskRef 不同）——于是窗口会残留、占住 V1 全局单飞。
+ * 作者经 web 重新定稿即宣告该窗口过时，故在 commitChapter 落定后就地作废它。
+ * 这是派生收口面：失败不回退已落定的提交，但必须在响应里可见（绝不静默）。
+ * 形状单一事实源在此（发射端）；提交响应在 server/api.ts 未声明类型（历史形状），
+ * 故本视图不设 api.ts 镜像。
+ */
+interface ResubmitWindowCleanupView {
+  /** 本次是否真的作废了一个活动窗口（false = 本章无残留窗口，正常路径）。 */
+  readonly abandoned: boolean
+  /** 被作废的会话 taskRef；无窗口为 null。 */
+  readonly taskRef: string | null
+  readonly errorDetail: string | null
 }
 
 export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
@@ -374,6 +434,59 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     return true
   }
 
+  if (path === '/api/chapter.resubmit') {
+    const rawRoot = resolvedRoot
+    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
+      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+      return true
+    }
+    try {
+      const root = assertSafeBookRoot(rawRoot)
+      // 盘上无此章保持 CHAPTER_MISSING 404 语义——守卫的 ResubmitNotCommittedError
+      // 分不出「无章」与「有章非 committed」，故先判存在性再进管线（只做错误码分层）。
+      if (!existsSync(join(root, proseChapterPath(chapterIndex)))) {
+        json(404, { ok: false, code: CHAPTER_MISSING, error: `chapter ${chapterIndex} not found on disk` })
+        return true
+      }
+      const outcome = requestResubmit({ bus: new PublishBus(), root, chapterIndex })
+      json(200, {
+        ok: true,
+        chapterIndex,
+        reopenedFromCommitId: outcome.reopenedFromCommitId,
+        proseRelPath: outcome.proseRelPath,
+        // 重提交期间的真相锚：事件行锚（latestCommittedTruth），不读已翻回 draft 的正文文件
+        truthAnchor: outcome.truthAnchor,
+        // 新 taskRef 新会话窗口：光标停在 prepare，V1 十步全量重走（S9）
+        resubmitSession: { taskRef: outcome.session.taskRef, currentStep: outcome.session.currentStep },
+      })
+    } catch (cause) {
+      if (cause instanceof ResubmitNotCommittedError) {
+        json(409, { ok: false, code: 'CHAPTER_NOT_COMMITTED', error: '章节不是 committed 态——无定稿可重提交' })
+        return true
+      }
+      if (cause instanceof SessionAlreadyActiveError || cause instanceof GlobalSingleFlightError) {
+        // 单飞双守卫在翻相位之前拒绝：正文相位与盘面零变更（S11）
+        json(409, { ok: false, code: 'RESUBMIT_SESSION_CONFLICT', error: (cause as Error).message })
+        return true
+      }
+      if (cause instanceof ChapterPhaseError) {
+        json(409, { ok: false, code: 'CHAPTER_NOT_COMMITTED', error: '章节不是 committed 态——无定稿可重提交' })
+        return true
+      }
+      if (cause instanceof PreWriteHashMismatchError) {
+        json(409, { ok: false, code: 'PROSE_EXTERNAL_CHANGE', error: '定稿文件已被外部修改——拒绝重提交，请先人工核对外部改动' })
+        return true
+      }
+      if (isEnoent(cause)) {
+        json(404, { ok: false, code: CHAPTER_MISSING, error: `chapter ${chapterIndex} not found on disk` })
+        return true
+      }
+      json(500, { ok: false, error: (cause as Error).message })
+    }
+    return true
+  }
+
   if (path === '/api/chapter.commit') {
     const rawRoot = resolvedRoot
     const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
@@ -448,6 +561,23 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           }
         }
 
+        // S9 收口：作者经 web 重新定稿 ⇒ 本章残留的会话窗口（requestResubmit 开的、
+        // 或 session.open 开的）已过时，就地作废。只在 commitChapter 落定之后调用
+        // （提交成功才代表窗口过时；被拒的提交必须零副作用）。作废发布
+        // TaskFinished{outcome:'abandoned'} 闭合配对并释放全局单飞，绝不发
+        // CanonCommitted（完成态语义不动）。失败不回退已落定的提交，如实上报。
+        const cleanupStaleResubmitWindow = (): ResubmitWindowCleanupView => {
+          try {
+            const taskRef = ChapterProductionSession.abandonOpenWindow(
+              { bus: new PublishBus(), root, chapterIndex },
+              'author_resubmitted',
+            )
+            return { abandoned: taskRef !== null, taskRef, errorDetail: null }
+          } catch (cause) {
+            return { abandoned: false, taskRef: null, errorDetail: (cause as Error).message }
+          }
+        }
+
         let record = openProposalForTask(root, taskRef)
         let deltaExtraction: Record<string, unknown> | null = null
 
@@ -494,6 +624,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
               canonProposal: null,
               deltaExtraction,
               flywheelRecord: recordFlywheel(result.commitId),
+              resubmitWindowCleanup: cleanupStaleResubmitWindow(),
             })
             return true
           }
@@ -590,6 +721,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           canonProposal: canonProposalView(loadCanonProposal(root, record.proposalId) ?? record),
           ...(deltaExtraction === null ? {} : { deltaExtraction }),
           flywheelRecord: recordFlywheel(result.commitId),
+          resubmitWindowCleanup: cleanupStaleResubmitWindow(),
         })
       } finally {
         plane.close()

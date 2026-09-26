@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadTierConfig, TierConfigError } from './tierConfig.js';
+import { loadTierConfig, loadTierConfigFile, TierConfigError } from './tierConfig.js';
 
 let dir: string;
 
@@ -105,6 +105,120 @@ describe('loadTierConfig（T14 规格 §6）', () => {
     expect(err).toBeInstanceOf(TierConfigError);
     expect((err as TierConfigError).code).toBe('TIER_CONFIG_PLAINTEXT_KEY');
     expect((err as TierConfigError).keyPath).toBe('STYLE_REWRITE.fast.apiKey');
+    expect((err as TierConfigError).message).not.toContain(secret);
+  });
+});
+
+/**
+ * `providers:` 注册表（规格 §6.1 落地）：providerId → { baseURL, apiKeyEnv, models? }。
+ * 覆盖的失败路径：只有注册表没有路由 / 缺 baseURL / 缺 apiKeyEnv / 未知字段 / 明文密钥 /
+ * 空注册表 / models 非法——每个出口都指向具体键路径，且 loadTierConfig 后向兼容。
+ */
+const REGISTRY_YAML = [
+  'providers:',
+  '  deepseek:',
+  '    apiKeyEnv: MOZHOU_DEEPSEEK_KEY',
+  '    baseURL: https://api.deepseek.com',
+  '    models:',
+  '      - { id: deepseek-chat, contextWindow: 131072, maxTokens: 8192 }',
+  '  glm:',
+  '    apiKeyEnv: MOZHOU_GLM_KEY',
+  '    baseURL: https://open.bigmodel.cn/api/paas/v4',
+  'CHAPTER_DRAFTING:',
+  '  quality:',
+  '    providerId: glm',
+  '    model: glm-4-plus',
+  '',
+].join('\n');
+
+describe('loadTierConfigFile（规格 §6.1 providers 注册表）', () => {
+  it('注册表与路由共存：providers 是保留键，绝不被当作 task_type', async () => {
+    const file = await writeConfig('registry.yaml', REGISTRY_YAML);
+    const config = await loadTierConfigFile(file, injected());
+
+    expect(Object.keys(config.routes)).toEqual(['CHAPTER_DRAFTING']);
+    expect(config.providers['deepseek']).toEqual({
+      baseURL: 'https://api.deepseek.com',
+      apiKeyEnv: 'MOZHOU_DEEPSEEK_KEY',
+      models: [{ id: 'deepseek-chat', contextWindow: 131072, maxTokens: 8192 }],
+    });
+    // 未声明 models ⇒ 不落该键（exactOptionalPropertyTypes）
+    expect(config.providers['glm']).toEqual({
+      baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+      apiKeyEnv: 'MOZHOU_GLM_KEY',
+    });
+    expect(config.routes['CHAPTER_DRAFTING']?.quality?.providerId).toBe('glm');
+  });
+
+  it('loadTierConfig 后向兼容：仍只返回路由表（不含 providers 键），且与 loadTierConfigFile 共享快照', async () => {
+    const file = await writeConfig('compat.yaml', REGISTRY_YAML);
+    const fileConfig = await loadTierConfigFile(file, injected());
+    const routes = await loadTierConfig(file, injected());
+    expect(routes).toBe(fileConfig.routes);
+    expect(Object.keys(routes)).not.toContain('providers');
+    expect(routes['CHAPTER_DRAFTING']?.quality?.model).toBe('glm-4-plus');
+  });
+
+  it('只有 providers 段没有路由 ⇒ TIER_CONFIG_EMPTY（不返回「解析成功但选不到叶子」的假成功）', async () => {
+    const file = await writeConfig(
+      'providers-only.yaml',
+      ['providers:', '  deepseek:', '    apiKeyEnv: MOZHOU_DEEPSEEK_KEY', '    baseURL: https://api.deepseek.com', ''].join('\n'),
+    );
+    const err = await loadTierConfigFile(file, injected()).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TierConfigError);
+    expect((err as TierConfigError).code).toBe('TIER_CONFIG_EMPTY');
+  });
+
+  it('缺 baseURL / 缺 apiKeyEnv ⇒ 报错指向 providers.<id>.<field>', async () => {
+    const noBase = await writeConfig(
+      'no-base.yaml',
+      ['providers:', '  deepseek:', '    apiKeyEnv: MOZHOU_DEEPSEEK_KEY', 'STYLE_REWRITE:', '  fast:', '    providerId: deepseek', '    model: deepseek-chat', ''].join('\n'),
+    );
+    const baseErr = await loadTierConfigFile(noBase, injected()).catch((e: unknown) => e);
+    expect((baseErr as TierConfigError).keyPath).toBe('providers.deepseek.baseURL');
+
+    const noEnv = await writeConfig(
+      'no-env.yaml',
+      ['providers:', '  deepseek:', '    baseURL: https://api.deepseek.com', 'STYLE_REWRITE:', '  fast:', '    providerId: deepseek', '    model: deepseek-chat', ''].join('\n'),
+    );
+    const envErr = await loadTierConfigFile(noEnv, injected()).catch((e: unknown) => e);
+    expect((envErr as TierConfigError).keyPath).toBe('providers.deepseek.apiKeyEnv');
+  });
+
+  it('注册表未知字段 / 空注册表 / models 非法 ⇒ 结构错误且指向键路径', async () => {
+    const unknown = await writeConfig(
+      'unknown.yaml',
+      ['providers:', '  deepseek:', '    baseURL: https://api.deepseek.com', '    apiKeyEnv: MOZHOU_DEEPSEEK_KEY', '    timeoutMs: 30', 'STYLE_REWRITE:', '  fast:', '    providerId: deepseek', '    model: deepseek-chat', ''].join('\n'),
+    );
+    const unknownErr = await loadTierConfigFile(unknown, injected()).catch((e: unknown) => e);
+    expect((unknownErr as TierConfigError).code).toBe('TIER_CONFIG_STRUCTURE_INVALID');
+    expect((unknownErr as TierConfigError).keyPath).toBe('providers.deepseek.timeoutMs');
+
+    const empty = await writeConfig(
+      'empty-registry.yaml',
+      ['providers: {}', 'STYLE_REWRITE:', '  fast:', '    providerId: deepseek', '    model: deepseek-chat', ''].join('\n'),
+    );
+    const emptyErr = await loadTierConfigFile(empty, injected()).catch((e: unknown) => e);
+    expect((emptyErr as TierConfigError).keyPath).toBe('providers');
+
+    const badModels = await writeConfig(
+      'bad-models.yaml',
+      ['providers:', '  deepseek:', '    baseURL: https://api.deepseek.com', '    apiKeyEnv: MOZHOU_DEEPSEEK_KEY', '    models:', '      - { id: "" }', 'STYLE_REWRITE:', '  fast:', '    providerId: deepseek', '    model: deepseek-chat', ''].join('\n'),
+    );
+    const modelsErr = await loadTierConfigFile(badModels, injected()).catch((e: unknown) => e);
+    expect((modelsErr as TierConfigError).keyPath).toBe('providers.deepseek.models[0].id');
+  });
+
+  it('注册表里的明文 apiKey 同样被拒（密钥本体永不入配置文件），报错不回显密钥', async () => {
+    const secret = 'sk-registry-leak';
+    const file = await writeConfig(
+      'registry-leak.yaml',
+      ['providers:', '  deepseek:', '    baseURL: https://api.deepseek.com', '    apiKeyEnv: MOZHOU_DEEPSEEK_KEY', `    apiKey: ${secret}`, 'STYLE_REWRITE:', '  fast:', '    providerId: deepseek', '    model: deepseek-chat', ''].join('\n'),
+    );
+    const err = await loadTierConfigFile(file, injected()).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TierConfigError);
+    expect((err as TierConfigError).code).toBe('TIER_CONFIG_PLAINTEXT_KEY');
+    expect((err as TierConfigError).keyPath).toBe('providers.deepseek.apiKey');
     expect((err as TierConfigError).message).not.toContain(secret);
   });
 });

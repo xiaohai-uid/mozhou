@@ -53,6 +53,19 @@ export class SessionNotResumableError extends Error {
 }
 
 /**
+ * 无「活动窗口」可作废（S9 收口）：本会话的 taskRef 已不是账本上当前开放的窗口
+ * （已收卷 / 已被新的开卷取代 / 从未开卷）。作废以 findOpenSessionWindow 的
+ * 「活动窗口」判据为准（与 assertSessionStartable 的单飞判据同源），不是内存光标；
+ * 二次作废同样落到这里（作废幂等：窗口已关即拒，不重复发 tail）。
+ */
+export class SessionNotAbandonableError extends Error {
+  override readonly name = 'SessionNotAbandonableError';
+  constructor(readonly chapterIndex: number, readonly taskRef: string, detail: string) {
+    super(`chapter ${chapterIndex} session ${taskRef} cannot be abandoned: ${detail}`);
+  }
+}
+
+/**
  * 全局单飞违例（T19 · #43；S11 跨章并发 V1）：同时最多一个活动 session——
  * 别章窗口还开着时开新卷即拒。先 resume 或走完收卷再开新章。
  */
@@ -200,6 +213,25 @@ function toDomainEvent(event: DomainEvent): DomainEvent {
   return event;
 }
 
+/**
+ * 开卷守卫的**纯读预检**（零盘面副作用）：同章已有活动会话 / 别章占用全局单飞。
+ * start() 与 requestResubmit 共用同一判据——重提交的拒绝路径必须落在 TaskStarted
+ * 落账之前，否则「被拒的调用」会在账上留下一个无人驱动的孤儿窗口（web 侧没有
+ * 会话内 commit/finish 路由可闭合它，见 S9 接线注释）。start() 仍自行复检，本函数
+ * 只是把同一判据前移到任何写入之前（判据不新增，也不放宽）。
+ */
+export function assertSessionStartable(deps: ChapterProductionSessionDeps): void {
+  const rows = readPipelineLedger(deps.root);
+  const projection = projectSession(rows, deps.chapterIndex);
+  if (projection.sessionOpen && projection.taskRef !== null) {
+    throw new SessionAlreadyActiveError(deps.chapterIndex, projection.taskRef);
+  }
+  const active = findOpenSessionWindow(rows);
+  if (active !== null && active.chapterIndex !== deps.chapterIndex) {
+    throw new GlobalSingleFlightError(deps.chapterIndex, active.chapterIndex, active.taskRef);
+  }
+}
+
 export class ChapterProductionSession {
   readonly #bus: PublishBus;
   readonly #ctx: LedgerCtx;
@@ -229,17 +261,10 @@ export class ChapterProductionSession {
 
   /** 开卷：TaskStarted(step=prepare)。同章活动会话存在即拒（重提交=新 session 的前置是旧卷已闭合）；
    *  别章活动会话存在同样即拒——V1 全局单飞，同时最多一个活动 session（S11）。守卫在
-   *  TaskStarted 落账之前，拒绝零副作用。 */
+   *  TaskStarted 落账之前，拒绝零副作用（判据由 assertSessionStartable 提供，与
+   *  requestResubmit 的纯读预检同源）。 */
   static start(deps: ChapterProductionSessionDeps): ChapterProductionSession {
-    const rows = readPipelineLedger(deps.root);
-    const projection = projectSession(rows, deps.chapterIndex);
-    if (projection.sessionOpen && projection.taskRef !== null) {
-      throw new SessionAlreadyActiveError(deps.chapterIndex, projection.taskRef);
-    }
-    const active = findOpenSessionWindow(rows);
-    if (active !== null && active.chapterIndex !== deps.chapterIndex) {
-      throw new GlobalSingleFlightError(deps.chapterIndex, active.chapterIndex, active.taskRef);
-    }
+    assertSessionStartable(deps);
     const taskRef = deps.newTaskRef ? deps.newTaskRef() : `tsk_${newUlid()}`;
     const session = new ChapterProductionSession(deps, taskRef, 'prepare');
     session.#publish({
@@ -465,5 +490,75 @@ export class ChapterProductionSession {
       chapterIndex: this.#chapterIndex,
       payload: { outcome: 'succeeded' },
     });
+  }
+
+  /**
+   * 作废（S9 收口）：把本会话窗口从「活动」变「已放弃」——发布
+   * TaskFinished{outcome:'abandoned', reason}，复用既有事件词汇（TaskFinished 即
+   * TaskStarted 的既有配对尾；不新增领域事件类型）。它存在的意义是让「开了窗口却
+   * 走不到第 9/10 步」的死锁有出路：web 侧没有会话内 commit/finish 路由，
+   * requestResubmit 开出的窗口在 web 可达路径上无法闭合，会永久占住全局单飞、
+   * 锁死全书后续开卷。
+   *
+   * 纪律：
+   *   - **无步进守卫**（与 finish() 相反）：作废必须能从十步中的任意一步调用
+   *     （prepare…flywheel_record 全程可作废）——「任意步都能放弃」正是它作为
+   *     死锁出口的意义；步进守卫只留给正常前进路径；
+   *   - 判据是 findOpenSessionWindow（活动窗口＝最后一个未闭合的 TaskStarted），
+   *     不是内存光标，也不看 projectSession.committed：web 提交路径写的是**平铺**
+   *     ChapterCommitted 行，它会落进 projectSession 的窗口区间被计为 committed，
+   *     但那行属于 web 提交路径自己的窗口键（web_commit_*），不是本会话的完成——
+   *     本会话的完成态只认本 taskRef 的 CanonCommitted 任务行（markCommitted）。
+   *     故「作者经 web 重新提交后残留的重提交窗口」正是要靠本方法作废的陈旧窗口，
+   *     绝不能被那个平铺行判成「已提交、不可作废」；
+   *   - 跨请求配对：head 只活在 PublishBus 实例内存里，本实例的 bus 可能是新请求的
+   *     新实例，故发 tail 前先 adoptOpenHeads 认领账本里仍悬挂的 TaskStarted，
+   *     否则 PAIRING_TAIL_WITHOUT_HEAD；
+   *   - 二次作废 / 已收卷 / 已被新开卷取代即拒（SessionNotAbandonableError）——
+   *     作废是「放弃未完成」，不是「抹掉完成」，也不重复发 tail（幂等）。
+   */
+  abandon(reason: string): void {
+    if (reason.trim().length === 0) {
+      throw new Error(
+        'abandon requires a non-empty reason — the ledger must record why a window was discarded',
+      );
+    }
+    const active = findOpenSessionWindow(readPipelineLedger(this.#ctx.root));
+    if (active === null || active.taskRef !== this.#taskRef || active.chapterIndex !== this.#chapterIndex) {
+      throw new SessionNotAbandonableError(
+        this.#chapterIndex,
+        this.#taskRef,
+        'no open window for this task (never started, already finished, or superseded by a newer start)',
+      );
+    }
+    this.#bus.adoptOpenHeads(this.#ctx);
+    this.#publish({
+      type: 'TaskFinished',
+      taskRef: this.#taskRef,
+      chapterIndex: this.#chapterIndex,
+      payload: { outcome: 'abandoned', reason },
+    });
+  }
+
+  /**
+   * 作废本章当前的活动会话窗口（若恰属于本章）：web 侧「作者已重新提交」的收口入口。
+   * 无活动窗口、或活动窗口属于别章（V1 全局单飞下别章窗口不该被本章动）⇒ null
+   * 空操作，幂等。返回被作废的 taskRef（无则 null）。
+   *
+   * 为何不复用 resume()：resume 要求 projectSession.sessionOpen，而 web 提交路径的
+   * 平铺 ChapterCommitted 行会让 projectSession 视窗口为已提交（sessionOpen=false），
+   * 于是 resume 恰好在这条最需要作废的路径上返回 null——故此处以 findOpenSessionWindow
+   * 为准直接认领窗口（与 assertSessionStartable 的单飞判据同源）。
+   */
+  static abandonOpenWindow(deps: ChapterProductionSessionDeps, reason: string): string | null {
+    const rows = readPipelineLedger(deps.root);
+    const active = findOpenSessionWindow(rows);
+    if (active === null || active.chapterIndex !== deps.chapterIndex) {
+      return null;
+    }
+    const step = projectSession(rows, deps.chapterIndex).currentStep ?? 'prepare';
+    const session = new ChapterProductionSession(deps, active.taskRef, step);
+    session.abandon(reason);
+    return active.taskRef;
   }
 }

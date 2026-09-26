@@ -747,6 +747,10 @@ describe('T43 变更矩阵读面 API 契约', () => {
  * /api/capabilities（技能读面 + providerAvailable）、/api/draft.question（V1 mock 先问）、
  * /api/draft.stream（NDJSON 流式草稿；provider 未配 ⇒ 显式 PROVIDER_UNAVAILABLE，
  * Gate 3 纪律；mock provider 经 MOZHOU_DRAFT_PROVIDER=mock 显式开启）。
+ * 注：providerAvailable 的判据含分级路由覆盖层（providerId 决定端点），本文件由
+ * src/test/setup.ts 把 MOZHOU_TIER_CONFIG 指向不存在的路径，使「没配任何 provider」
+ * 可确定复现（不随开发机 ~/.mozhou/settings.yaml 漂移）；注册表独立可用的正路径见
+ * server/routes/pipelineRoutes.tierRoute.test.ts。
  * ------------------------------------------------------------------------- */
 
 describe('T44 中栏对话流 API 契约', () => {

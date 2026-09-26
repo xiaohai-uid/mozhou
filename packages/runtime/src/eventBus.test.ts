@@ -70,6 +70,49 @@ describe('readLedger / 单口委托', () => {
   });
 });
 
+/**
+ * 跨请求续接配对（S9 收口前置能力）：head 只活在实例内存，窗口在上一请求的实例上
+ * 开卷后实例即销毁；本请求的新实例要发 tail 前必须据账本认领悬挂的 head。
+ */
+describe('PublishBus.adoptOpenHeads · 从账本重建未闭合 head', () => {
+  it('认领账本悬挂的 head 后，新实例可发 tail（跨请求闭合窗口）', () => {
+    const { root } = hermeticRoot();
+    // 上一请求：开卷（head 落账），实例随后销毁
+    new PublishBus().publish({ root }, { type: 'TaskStarted', taskRef: 'tsk_adopt', chapterIndex: 2 });
+
+    // 本请求：新实例的配对状态是空的
+    const bus = new PublishBus();
+    expect(bus.openHeadKeys()).toEqual([]);
+    bus.adoptOpenHeads({ root });
+    expect(bus.openHeadKeys()).toEqual(['TaskStarted#tsk_adopt']);
+    // 认领后发 tail 成功，账本闭合为两行
+    bus.publish({ root }, { type: 'TaskFinished', taskRef: 'tsk_adopt', chapterIndex: 2, payload: { outcome: 'abandoned' } });
+    expect(bus.openHeadKeys()).toEqual([]);
+    expect(readLedger({ root }).map((row) => row.event.type)).toEqual(['TaskStarted', 'TaskFinished']);
+  });
+
+  it('幂等且不复活已闭合的 head（账本 tail 出列）', () => {
+    const { root } = hermeticRoot();
+    const bus = new PublishBus();
+    bus.publish({ root }, { type: 'TaskStarted', taskRef: 'tsk_closed' });
+    bus.publish({ root }, { type: 'TaskFinished', taskRef: 'tsk_closed' });
+
+    const fresh = new PublishBus();
+    fresh.adoptOpenHeads({ root });
+    fresh.adoptOpenHeads({ root }); // 幂等
+    expect(fresh.openHeadKeys()).toEqual([]);
+    // 已闭合的 head 不被复活：再发 tail 仍被拒
+    expect(() => fresh.publish({ root }, { type: 'TaskFinished', taskRef: 'tsk_closed' })).toThrowError(PairingError);
+  });
+
+  it('空/缺失账本安全（无 head 可认领）', () => {
+    const { root } = hermeticRoot();
+    const bus = new PublishBus();
+    bus.adoptOpenHeads({ root });
+    expect(bus.openHeadKeys()).toEqual([]);
+  });
+});
+
 describe('T21 词表增补（#54 · t51:B5）', () => {
   it('StyleProfileUpdated 非成对事件：词表门放行、无配对约束、顶层 taskRef/chapterIndex 回读原样', () => {
     const { root } = hermeticRoot();

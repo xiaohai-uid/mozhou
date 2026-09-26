@@ -111,6 +111,32 @@ export class PublishBus {
     );
   }
 
+  /**
+   * 从账本重建未闭合 head 集合（跨请求续接配对状态）。
+   *
+   * 配对状态只活在实例内存里：一个会话窗口在上一请求的 PublishBus 实例上开卷
+   * （TaskStarted 落账），该实例随请求销毁；后续请求用**新实例**发 tail
+   * （TaskFinished）时新实例的 #openHeads 是空的，直接 publish 必抛
+   * PAIRING_TAIL_WITHOUT_HEAD——即使账本上这个 head 明明还悬挂着。本方法把账本
+   * 里仍悬挂的 head 认领进本实例，使「跨请求闭合一个已开的窗口」成为可能
+   * （如 S9 重提交窗口的作废）。折叠规则与 projectTasks 的 openHeads 同源
+   * （同一 EVENT_PAIRS：head 入列、tail 出列），幂等、只读、不改写任何行。
+   */
+  adoptOpenHeads(ctx: LedgerCtx): void {
+    for (const { event } of readStoredLines(ctx)) {
+      const pair = EVENT_PAIRS.find(
+        ([h, t]) => h === event.type || t === event.type,
+      );
+      if (!pair) continue;
+      const key = `${pair[0]}#${event.taskRef}`;
+      if (event.type === pair[0]) {
+        this.#openHeads.set(key, pair[0]);
+      } else {
+        this.#openHeads.delete(key);
+      }
+    }
+  }
+
   /** 测试与投影重建辅助：当前开放未闭合的 head 键集合。 */
   openHeadKeys(): string[] {
     return [...this.#openHeads.keys()];
