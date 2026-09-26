@@ -144,11 +144,16 @@ const instructions = `# 墨舟 (Novel OS) v${version} 本地发行版
 `
 writeFileSync(join(runtimeDir, 'RELEASE_INSTRUCTIONS.md'), instructions, 'utf8')
 
-const runtimeArchive = join(artifactsDir, `${bundleName}-local-runtime.tar.gz`)
-run('tar', ['-czf', runtimeArchive, bundleName], artifactsDir)
+// tar 的 -f 参数必须是相对 cwd 的文件名：GNU tar 把含盘符冒号的绝对路径
+// （C:\...\x.tar.gz）解析成「远程主机:路径」，报 "Cannot connect to C:
+// resolve failed"。cwd 已是 artifactsDir，相对名即可；Linux CI 同样适用。
+const runtimeArchiveName = `${bundleName}-local-runtime.tar.gz`
+const runtimeArchive = join(artifactsDir, runtimeArchiveName)
+run('tar', ['-czf', runtimeArchiveName, bundleName], artifactsDir)
 
-const webArchive = join(artifactsDir, `${bundleName}-web-dist.tar.gz`)
-run('tar', ['-czf', webArchive, '-C', join(rootDir, 'apps', 'web', 'dist'), '.'])
+const webArchiveName = `${bundleName}-web-dist.tar.gz`
+const webArchive = join(artifactsDir, webArchiveName)
+run('tar', ['-czf', webArchiveName, '-C', join(rootDir, 'apps', 'web', 'dist'), '.'], artifactsDir)
 
 const dockerDir = join(artifactsDir, 'docker-bundle')
 const dockerRuntimeDir = join(dockerDir, bundleName)
@@ -158,8 +163,9 @@ writeFileSync(join(dockerDir, 'Dockerfile'), `FROM node:22.23.2-bookworm-slim\nW
 writeFileSync(join(dockerDir, 'docker-compose.yml'), `services:\n  mozhou:\n    build: .\n    restart: unless-stopped\n    ports:\n      - "127.0.0.1:\${MOZHOU_PORT:-5173}:5173"\n    environment:\n      NODE_ENV: production\n      ONNXRUNTIME_NODE_INSTALL_CUDA: skip\n      PORT: 5173\n      HOST: 0.0.0.0\n      MOZHOU_DATA_ROOT: /data\n      MOZHOU_SECRET_KEY: \${MOZHOU_SECRET_KEY:?MOZHOU_SECRET_KEY is required - generate one with openssl rand -base64 48}\n      MOZHOU_API_KEY: \${MOZHOU_API_KEY:-}\n      DEEPSEEK_API_KEY: \${DEEPSEEK_API_KEY:-}\n      OPENAI_API_KEY: \${OPENAI_API_KEY:-}\n    volumes:\n      - mozhou-data:/data\n    healthcheck:\n      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n      start_period: 20s\nvolumes:\n  mozhou-data:\n`, 'utf8')
 writeFileSync(join(dockerDir, 'README.md'), '# 墨舟 Docker 本地发行包\n\n先设置必填的凭据加密主密钥，再启动：\n\n```bash\nexport MOZHOU_SECRET_KEY="$(openssl rand -base64 48)"\ndocker compose up --build -d\n```\n\n宿主端默认只监听 127.0.0.1。书稿持久化在命名卷 `mozhou-data`（挂载于容器 `/data`）；\n`docker compose down` 不会删除它，仅 `docker compose down -v` 会。\n', 'utf8')
 
-const dockerArchive = join(artifactsDir, `${bundleName}-docker.tar.gz`)
-run('tar', ['-czf', dockerArchive, 'docker-bundle'], artifactsDir)
+const dockerArchiveName = `${bundleName}-docker.tar.gz`
+const dockerArchive = join(artifactsDir, dockerArchiveName)
+run('tar', ['-czf', dockerArchiveName, 'docker-bundle'], artifactsDir)
 rmSync(dockerDir, { recursive: true, force: true })
 rmSync(runtimeDir, { recursive: true, force: true })
 
