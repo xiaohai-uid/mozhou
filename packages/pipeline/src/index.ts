@@ -113,6 +113,7 @@ export {
   applyEditBlocks,
   recordAuthorCorrection,
   recordUserEdit,
+  recordWholeBodyAuthorEdit,
 } from './user-edit-step.js';
 export type {
   AuthorCorrectionOutcome,
@@ -121,7 +122,9 @@ export type {
   EditOperationBlock,
   RecordAuthorCorrectionRequest,
   RecordUserEditRequest,
+  RecordWholeBodyAuthorEditRequest,
   UserEditOutcome,
+  WholeBodyAuthorEditOutcome,
 } from './user-edit-step.js';
 
 

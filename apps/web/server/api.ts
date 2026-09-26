@@ -185,6 +185,19 @@ export interface ChapterProseResponse {
   readonly body?: string
 }
 
+/**
+ * 保存路径的作者编辑信号落账面（步 5 User Edit 接线）。
+ * 形状单一事实源在 server/routes/proseRoutes.ts 的 AuthorEditSignalView（路由发射端）；
+ * 本接口是 UI 契约的镜像声明——派生面落账失败不阻断保存（S12 同款），但必须在响应里可见。
+ */
+export interface ChapterProseSaveAuthorEditSignal {
+  /** 本窗口没有任何编辑可落（首次保存即无改动）时为 false——零噪声不落事件。 */
+  readonly published: boolean
+  /** 本次落账的本窗口累计编辑块数（未落账为 0）。 */
+  readonly blocks: number
+  readonly errorDetail: string | null
+}
+
 /** POST /api/chapter.prose.save 成功响应（phase 恒 draft）。 */
 export interface ChapterProseSaveResponse {
   readonly ok: true
@@ -192,6 +205,8 @@ export interface ChapterProseSaveResponse {
   readonly revision: number
   readonly phase: 'draft'
   readonly created: boolean
+  /** 本次保存折算出的 UserEditRecorded 落账面（作者编辑信号，飞轮 StyleLearner 的事件源）。 */
+  readonly authorEditSignal: ChapterProseSaveAuthorEditSignal
 }
 
 /** POST /api/chapter.reopen 成功响应。 */

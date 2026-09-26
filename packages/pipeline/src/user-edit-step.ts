@@ -18,6 +18,14 @@
  *     delete/replace 块由步内盖 removedText——应用前从行数组截取、全文无截断上限
  *     （与无上限的 replacementText 保持 diff 对称性），仅及发布侧克隆块；
  *     validateBlock 镜像守卫拒调用方传入该键（宁败不猜，杜绝伪造删除侧文本）。
+ *
+ * 第二入口（web 保存路径接线）：recordWholeBodyAuthorEdit 把「整文保存」折算成同形
+ * 结构化块并落同一种 UserEditRecorded——作者写作层提交的是一整篇正文而非操作块，
+ * 故由行级 diff 推导块（发布侧盖章/deltaStats 复用本模块单一事实源）；正文的权威
+ * 落盘仍走数据平面 saveProseDraft（R1/R2 契约不动），本入口只产派生信号。
+ * payload.blocks 为**本窗口累计编辑链**（窗口键只认恰在提交 revision 上落的那一条，
+ * 详见 recordWholeBodyAuthorEdit 注释）：原样重存不丢窗口信号，多次小增量可凑够
+ * 学习器 Nmin 样本。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -37,6 +45,7 @@ import {
   writeManifest,
 } from '@mozhou/data-plane';
 import type { FrontmatterFieldValue } from '@mozhou/data-plane';
+import { readPipelineLedger } from './ledger.js';
 
 /** M16 五级动作位的 V1 实现集：只做光标+选区两级（面板/向导归后续 Phase）。 */
 export const EDIT_ACTION_LEVELS_V1 = ['cursor', 'selection'] as const;
@@ -336,6 +345,323 @@ export function recordUserEdit(request: RecordUserEditRequest): UserEditOutcome 
     revisionBefore: scan.revision,
     revisionAfter: scan.revision + 1,
   };
+}
+
+/* -------------------------------------------------------------------------
+ * 整文保存路径的编辑信号（web /api/chapter.prose.save 接线）
+ * ------------------------------------------------------------------------- */
+
+/**
+ * 行级 diff 的 DP 单元上限：超过即退化为单块（前缀/后缀裁剪）。章节正文通常
+ * 数十到数百行（单元数远低于此）；上限只防御病态大输入的内存放大，退化路径
+ * 仍是**逐字节精确**的（只是块粒度变粗，非正确性损失）。
+ */
+const LINE_DIFF_MAX_CELLS = 4_000_000;
+
+/**
+ * 正文区归一：与数据平面 saveProseDraft 同款尾换行纪律（非空正文恒以 '\n' 收尾；
+ * 空正文恒 ''）——diff 两侧同口径才能逐字节比对。
+ */
+function normalizeBody(body: string): string {
+  if (body === '') return '';
+  return body.endsWith('\n') ? body : `${body}\n`;
+}
+
+/**
+ * 行数组 → replacementText（可逆编码）：`replacementLines` 会剥掉恰好一个尾部空行，
+ * 故末行为空时补一个 '\n' 抵消——否则尾空行会在应用侧被吃掉，破坏「块必须复现正文」
+ * 的不变量（空行是作者的分段信号，不许静默丢失）。
+ */
+function encodeReplacementText(lines: readonly string[]): string {
+  const text = lines.join('\n');
+  return lines.length > 0 && lines[lines.length - 1] === '' ? `${text}\n` : text;
+}
+
+/** 单块兜底（超大输入）：公共前缀/后缀裁剪后取一段 replace/insert/delete。 */
+function singleHunkBlocks(beforeLines: readonly string[], afterLines: readonly string[]): EditOperationBlock[] {
+  const maxPrefix = Math.min(beforeLines.length, afterLines.length);
+  let prefix = 0;
+  while (prefix < maxPrefix && beforeLines[prefix] === afterLines[prefix]) prefix += 1;
+  const maxSuffix = Math.min(beforeLines.length - prefix, afterLines.length - prefix);
+  let suffix = 0;
+  while (
+    suffix < maxSuffix &&
+    beforeLines[beforeLines.length - 1 - suffix] === afterLines[afterLines.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  const removed = beforeLines.slice(prefix, beforeLines.length - suffix);
+  const added = afterLines.slice(prefix, afterLines.length - suffix);
+  if (removed.length === 0 && added.length === 0) return [];
+  const replacementText = encodeReplacementText(added);
+  if (removed.length === 0) {
+    return [{ op: 'insert', paragraphStart: prefix + 1, paragraphEnd: prefix + 1, replacementText }];
+  }
+  if (added.length === 0) {
+    return [{ op: 'delete', paragraphStart: prefix + 1, paragraphEnd: prefix + removed.length }];
+  }
+  return [{
+    op: 'replace',
+    paragraphStart: prefix + 1,
+    paragraphEnd: prefix + removed.length,
+    replacementText,
+  }];
+}
+
+/**
+ * 行级 LCS diff → 结构化操作块（同序附各块移除的原文，供发布侧 removedText 盖章）。
+ * 相邻的删/插步归并为一个 hunk：只删 = delete、只插 = insert、两者 = replace
+ * （与 recordUserEdit 的块语义同源）。纯函数、零 IO。
+ */
+function diffLinesToBlocks(
+  beforeLines: readonly string[],
+  afterLines: readonly string[],
+): { readonly blocks: EditOperationBlock[]; readonly removedTexts: (string | undefined)[] } {
+  const n = beforeLines.length;
+  const m = afterLines.length;
+  if ((n + 1) * (m + 1) > LINE_DIFF_MAX_CELLS) {
+    const blocks = singleHunkBlocks(beforeLines, afterLines);
+    return {
+      blocks,
+      removedTexts: blocks.map((block) =>
+        block.op === 'insert'
+          ? undefined
+          : beforeLines.slice(block.paragraphStart - 1, block.paragraphEnd).join('\n'),
+      ),
+    };
+  }
+
+  // 后缀 LCS 长度表：lcs[i][j] = LCS(beforeLines[i:], afterLines[j:])
+  const width = m + 1;
+  const lcs = new Int32Array((n + 1) * width);
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      lcs[i * width + j] =
+        beforeLines[i] === afterLines[j]
+          ? (lcs[(i + 1) * width + (j + 1)] as number) + 1
+          : Math.max(lcs[(i + 1) * width + j] as number, lcs[i * width + (j + 1)] as number);
+    }
+  }
+
+  const blocks: EditOperationBlock[] = [];
+  const removedTexts: (string | undefined)[] = [];
+  let i = 0;
+  let j = 0;
+  let deleted: string[] = [];
+  let inserted: string[] = [];
+  let hunkStart = 0; // 1 起行号：hunk 起点（删除段首行 / 插入点）
+  const flush = (): void => {
+    if (deleted.length === 0 && inserted.length === 0) return;
+    const removedText = deleted.join('\n');
+    if (inserted.length === 0) {
+      blocks.push({ op: 'delete', paragraphStart: hunkStart, paragraphEnd: hunkStart + deleted.length - 1 });
+      removedTexts.push(removedText);
+    } else {
+      const replacementText = encodeReplacementText(inserted);
+      if (deleted.length === 0) {
+        blocks.push({ op: 'insert', paragraphStart: hunkStart, paragraphEnd: hunkStart, replacementText });
+        removedTexts.push(undefined);
+      } else {
+        blocks.push({
+          op: 'replace',
+          paragraphStart: hunkStart,
+          paragraphEnd: hunkStart + deleted.length - 1,
+          replacementText,
+        });
+        removedTexts.push(removedText);
+      }
+    }
+    deleted = [];
+    inserted = [];
+  };
+
+  while (i < n || j < m) {
+    if (i < n && j < m && beforeLines[i] === afterLines[j]) {
+      flush();
+      i += 1;
+      j += 1;
+      continue;
+    }
+    const takeDelete = i < n && (j >= m || (lcs[(i + 1) * width + j] as number) >= (lcs[i * width + (j + 1)] as number));
+    if (deleted.length === 0 && inserted.length === 0) hunkStart = i + 1;
+    if (takeDelete) {
+      deleted.push(beforeLines[i] as string);
+      i += 1;
+    } else {
+      inserted.push(afterLines[j] as string);
+      j += 1;
+    }
+  }
+  flush();
+  return { blocks, removedTexts };
+}
+
+/** 整文保存的编辑信号产出（未落事件时 published=false、blocks 为空）。 */
+export interface WholeBodyAuthorEditOutcome {
+  /** 本窗口没有任何编辑可落（首次保存即无改动）时 false：不落事件（零噪声）。 */
+  readonly published: boolean;
+  /**
+   * 本次落账的**本窗口累计**编辑链（未落账为空数组）：可依序应用到窗口基线复现
+   * 本次保存后的正文。
+   */
+  readonly blocks: readonly EditOperationBlock[];
+  /** 事件携带的 revision（= 调用方传入的本次保存 revision）。 */
+  readonly revision: number;
+}
+
+export interface RecordWholeBodyAuthorEditRequest {
+  readonly bus: PublishBus;
+  readonly bookRoot: string;
+  /**
+   * 窗口键：必须与提交侧窗口锚（步 10 FlywheelRecorded 的 taskRef）同源，
+   * 否则 runStyleLearnerForWindow 按 taskRef 精确匹配时读不到本编辑。
+   */
+  readonly taskRef: string;
+  readonly chapterIndex: number;
+  /** 作者改动前的正文基线（新建章 = ''：建章占位标题不是作者内容）。 */
+  readonly beforeBody: string;
+  /** 本次保存落定的正文（调用方以权威写路径刚写入的内容为准）。 */
+  readonly afterBody: string;
+  /** 本次保存落定的 revision（盘上 revision）。 */
+  readonly revision: number;
+}
+
+/** 窗口终结行（提交/重开）：本窗口在此闭合，编辑信号从这里起算。 */
+const WINDOW_TERMINATOR_TYPES: readonly string[] = [
+  'ChapterCommitted',
+  'CanonCommitted',
+  'ChapterReopened',
+];
+
+/** 账本块的最小形状守卫：坏块（手改账本/撕裂）不进新事件——宁缺不假。 */
+function isReusableBlock(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const block = value as Record<string, unknown>;
+  const op = block['op'];
+  if (op !== 'insert' && op !== 'delete' && op !== 'replace') return false;
+  const start = block['paragraphStart'];
+  const end = block['paragraphEnd'];
+  if (!Number.isSafeInteger(start) || (start as number) < 1) return false;
+  if (!Number.isSafeInteger(end) || (end as number) < (start as number)) return false;
+  return op === 'delete' || typeof block['replacementText'] === 'string';
+}
+
+/**
+ * 本窗口内最近一条 author 编辑块事件的 blocks（窗口边界之后，且其 revision 恰为
+ * 本次保存的前一 revision）。返回 null = 无可续接的窗口信号（本窗口首次保存 / 链已断）。
+ *
+ * 为什么需要它：web 路径的窗口键是 `web_commit_ch<N>_rev<R>`（R = **提交时**的盘上
+ * revision，步 8 提案绑定冻结），而学习器按 taskRef 精确匹配 ⇒ 只有恰在 R 上落的那一条
+ * 事件被消费。保存每次无条件 revision+1（数据平面 chapter.ts:815-818），故「作者改完
+ * 再原样重存一次」会把前一条信号挤出窗口键，本窗口信号整体归零；多次小增量保存也会
+ * 因每次只带自己的增量而在 Nmin=10 门下判零。故每次保存都带上本窗口已累积的编辑链。
+ *
+ * 链密度守卫：本条必须恰是前一 revision，否则中间存在未落账的改动（外部改盘 / 落账
+ * 失败 / 跨窗口残留）——累积会混入陈旧块，宁缺不假（退化为本次增量）。
+ */
+function lastWindowAuthorEditBlocks(
+  bookRoot: string,
+  chapterIndex: number,
+  preSaveRevision: number,
+): readonly EditOperationBlock[] | null {
+  const rows = readPipelineLedger(bookRoot);
+  let boundary = -1;
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index]!;
+    const type = row.kind === 'task' ? row.event.type : (row.row['type'] as string | undefined);
+    if (type === undefined || !WINDOW_TERMINATOR_TYPES.includes(type)) continue;
+    const rowChapter = row.kind === 'task' ? row.event.chapterIndex : row.row['chapterIndex'];
+    if (rowChapter === chapterIndex) {
+      boundary = row.position;
+      break;
+    }
+  }
+
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index]!;
+    if (row.position <= boundary) return null;
+    if (row.kind !== 'task') continue;
+    const event = row.event;
+    if (event.type !== 'UserEditRecorded' || event.chapterIndex !== chapterIndex) continue;
+    const payload = event.payload;
+    if (payload === undefined) continue;
+    if (payload['action'] !== 'edit_blocks' || payload['source'] !== 'author') continue;
+    if (payload['revision'] !== preSaveRevision) return null;
+    const blocks = payload['blocks'];
+    if (!Array.isArray(blocks) || blocks.length === 0) return null;
+    if (!blocks.every(isReusableBlock)) return null;
+    return blocks as readonly EditOperationBlock[];
+  }
+  return null;
+}
+
+/**
+ * 整文保存 → 结构化编辑块 → UserEditRecorded（web 保存路径接线）。
+ *
+ * 作者写作层提交的是一整篇正文（非结构化块），本函数把它折算成与 recordUserEdit
+ * **同形**的块并落同一种事件：块形状校验、deltaStats 口径、removedText 发布侧盖章
+ * 全部复用本模块既有实现（web 侧不散写第二份事件形状）。
+ *
+ * payload.blocks 的语义 = **本窗口（自上次提交/重开起）累计的编辑链**：可依序应用到
+ * 窗口基线复现本次保存后的正文。之所以是累计而非本次增量——窗口键 `web_commit_ch<N>_
+ * rev<R>` 只认恰在提交 revision R 上落的那一条（见 lastWindowAuthorEditBlocks 注释）：
+ *   - 作者改完再原样重存（本次增量为空）时，累计链仍非空 ⇒ 本窗口信号随 revision
+ *     前移继续可用，不会被挤出窗口键；
+ *   - 多次小增量保存时，累计链让本窗口的样本量凑得起来（否则每次只有增量、常在
+ *     学习器 Nmin=10 门下判零）。
+ *
+ * 纪律：
+ *   - 正文的**权威落盘**仍走数据平面 saveProseDraft（预期版本 + 写前哈希 + 定稿保护，
+ *     R1/R2 契约不动）；本函数只产派生信号，不写正文文件、不做冲突判定；
+ *   - 本次增量块必须逐字节复现 afterBody（自证不变量），否则抛错——绝不落一条描述不了
+ *     盘上正文的信号；累计链的每一段都曾各自过同一不变量（本函数是唯一发射端）；
+ *   - 本窗口无任何编辑可落（首次保存即无改动）时不落事件：零噪声，且空块在块语义里
+ *     本就不合法；
+ *   - source 恒 'author'（保存入口即作者写作层），level 恒 'selection'（整文/区间改写；
+ *     'cursor' 是单点光标动作，不描述保存语义）。
+ */
+export function recordWholeBodyAuthorEdit(request: RecordWholeBodyAuthorEditRequest): WholeBodyAuthorEditOutcome {
+  const before = normalizeBody(request.beforeBody);
+  const after = normalizeBody(request.afterBody);
+  const { blocks, removedTexts } = diffLinesToBlocks(toAddressableLines(before), toAddressableLines(after));
+  if (blocks.length > 0) {
+    // 自证不变量：块应用回基线必须逐字节等于本次保存的正文（含尾空行编码口径）。
+    // 不成立 = 推导有 bug 或调用方传了不匹配的 after ⇒ 宁败不脏（事件描述不了正文）。
+    const applied = applyBlocksValidated(before, blocks).nextBody;
+    if (applied !== after) {
+      throw new EditBlockShapeError('整文保存推导的编辑块无法逐字节复现本次正文（diff 不变量破坏）');
+    }
+  }
+
+  // 发布侧克隆块盖 removedText（同 recordUserEdit 的 t52:B2 纪律：请求侧零触碰）
+  const incremental: readonly EditOperationBlock[] = blocks.map((block, index) => {
+    const removed = removedTexts[index];
+    return removed === undefined ? { ...block } : { ...block, removedText: removed };
+  });
+
+  // 保存前盘上 revision = 本次保存 revision - 1（数据平面无条件 +1）
+  const windowPrior = lastWindowAuthorEditBlocks(request.bookRoot, request.chapterIndex, request.revision - 1);
+  const publishedBlocks: readonly EditOperationBlock[] = [...(windowPrior ?? []), ...incremental];
+  if (publishedBlocks.length === 0) {
+    return { published: false, blocks: [], revision: request.revision };
+  }
+
+  const event: DomainEvent = {
+    type: 'UserEditRecorded',
+    taskRef: request.taskRef,
+    chapterIndex: request.chapterIndex,
+    payload: {
+      action: 'edit_blocks',
+      level: 'selection',
+      source: 'author',
+      blocks: publishedBlocks,
+      revision: request.revision,
+      deltaStats: computeDeltaStats(publishedBlocks),
+    },
+  };
+  request.bus.publish({ root: request.bookRoot }, event);
+
+  return { published: true, blocks: publishedBlocks, revision: request.revision };
 }
 
 /* -------------------------------------------------------------------------

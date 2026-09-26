@@ -12,6 +12,23 @@
  *   语义：phase 恒 draft；Commit 仍只经管线质量门后的 commitChapter。
  * 不触碰 Protected Author Content 以外的任何正典工件。
  *
+ * 步 5 User Edit 接线（chapter-pipeline-spec §1 表第 5 行 / S4）：
+ * /api/chapter.prose.save 在权威写路径（saveProseDraft：预期版本 + 写前哈希 + 定稿
+ * 保护，契约不动）落定之后，把「作者这次保存改了什么」折算成结构化操作块并落
+ * UserEditRecorded（recordWholeBodyAuthorEdit）——作者写作层提交的是一整篇正文，
+ * 故块由行级 diff 推导（发布侧 removedText 盖章 / deltaStats 口径复用管线单一事实源）。
+ *   - 窗口键与提交侧同源（windowTaskRef = web_commit_ch<N>_rev<R>，R = 窗口闭合时的
+ *     盘上 revision）。窗口键只认**恰在 R 上**落的那一条（学习器按 taskRef 精确匹配），
+ *     故每次保存落的是**本窗口累计编辑链**（自上次提交/重开起的全部编辑，可依序应用到
+ *     窗口基线）：作者改完再原样重存一次（revision 照常 +1）时窗口信号不会被挤出窗口键，
+ *     多次小增量保存也不会各自低于学习器 Nmin=10 而判零。此前每窗口读到零条编辑。
+ *     链密度守卫：本窗口最近一条编辑必须恰是本次保存的前一 revision，否则（外部改盘 /
+ *     落账失败 / 跨窗口残留）退化为本次增量，绝不累积陈旧块。
+ *   - 新建章基线 = ''（建章占位标题不是作者内容，不算作者删除）；
+ *   - 本窗口无任何编辑可落（首次保存即无改动）不落事件（零噪声）；
+ *   - 信号是派生面：落账失败不阻断保存（S12 同款降级），响应 authorEditSignal
+ *     如实上报（绝不静默）；块推导无法复现正文则整条信号弃用并报错，绝不落假信号。
+ *
  * 步 7 Continuity Gate 接线（chapter-pipeline-spec §1 表第 7 行 / S5）：
  * POST /api/chapter.commit 在步 6 提取出五族 delta 后、写正典前插入纯机械核检
  * （四族行形状 + dependency 引用完整性 + M2 时间线单调 + POV 秘密零泄漏）。
@@ -74,6 +91,7 @@ import {
   createCanonProposal,
   loadCanonProposal,
   readPendingDependencyManifest,
+  recordWholeBodyAuthorEdit,
   runContinuityGate,
   runFlywheelRecord,
 } from '@mozhou/pipeline'
@@ -89,6 +107,31 @@ import {
 } from '../proposals.js'
 
 const CHAPTER_MISSING = 'CHAPTER_MISSING'
+
+/**
+ * web 路径的窗口键（步 8 提案绑定 / 步 10 窗口锚 / 保存路径的编辑信号共用同一格式）：
+ * `web_commit_ch<N>_rev<R>`，R = 窗口闭合（提交）时的盘上 revision。
+ * 保存路径以**本次保存后的 revision** 落编辑信号，故「保存后即提交」的正常流下
+ * 作者编辑与本窗口对齐（runStyleLearnerForWindow 按 taskRef 精确匹配本窗口）。
+ * 两处必须同源——格式漂移会让学习器静默读到零条编辑。
+ */
+function windowTaskRef(chapterIndex: number, revision: number): string {
+  return 'web_commit_ch' + chapterIndex + '_rev' + revision
+}
+
+/**
+ * 保存路径编辑信号在响应里的呈现面（派生面失败不阻断保存，但必须可见）。
+ * 形状单一事实源在此（发射端）；UI 契约镜像见 server/api.ts 的
+ * ChapterProseSaveAuthorEditSignal（跨文件 import 会与 api.ts → proseRoutes 形成
+ * 文件级循环，故按既有 FlywheelRecordView 先例在两侧各自声明并互相指向）。
+ */
+interface AuthorEditSignalView {
+  /** 本窗口没有任何编辑可落（首次保存即无改动）时为 false——零噪声不落事件。 */
+  readonly published: boolean
+  /** 本次落账的本窗口累计编辑块数（未落账为 0）。 */
+  readonly blocks: number
+  readonly errorDetail: string | null
+}
 
 function isEnoent(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === 'ENOENT'
@@ -215,13 +258,38 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       const root = assertSafeBookRoot(rawRoot)
       const plane = LocalDataPlane.openOrRebuild(root)
       try {
+        // 作者编辑信号的基线：更新语义 = 盘上当前正文（作者读取后据以改写）；
+        // 新建语义 = ''（建章占位标题不是作者内容，作者实际从空白起笔）。
+        // 读取失败（盘上缺章）由 saveProseDraft 同款抛 ENOENT → 外层 404，零写入。
+        const beforeBody = expectedRevision === null
+          ? ''
+          : readProseChapter(root, proseChapterPath(chapterIndex)).body
         const result = plane.saveProseDraft({ chapterIndex, body: rawBody, expectedRevision, title, confirmExternalOverwrite })
+        // 步 5 User Edit 接线：保存已由受守卫的权威写路径落定，编辑信号是派生面——
+        // 落账失败不阻断保存（S12 同款降级），但必须在响应里可见（绝不静默）。
+        // taskRef 与提交侧窗口锚同源（windowTaskRef），否则 StyleLearner 读不到。
+        let authorEditSignal: AuthorEditSignalView
+        try {
+          const outcome = recordWholeBodyAuthorEdit({
+            bus: new PublishBus(),
+            bookRoot: root,
+            taskRef: windowTaskRef(chapterIndex, result.revision),
+            chapterIndex,
+            beforeBody,
+            afterBody: rawBody,
+            revision: result.revision,
+          })
+          authorEditSignal = { published: outcome.published, blocks: outcome.blocks.length, errorDetail: null }
+        } catch (cause) {
+          authorEditSignal = { published: false, blocks: 0, errorDetail: (cause as Error).message }
+        }
         json(200, {
           ok: true,
           chapterIndex: result.chapterIndex,
           revision: result.revision,
           phase: result.phase,
           created: result.created,
+          authorEditSignal,
         })
       } finally {
         plane.close()
@@ -345,7 +413,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         // 步 8 提案与正文 revision 绑定：同一 revision 的提交重试续接同一提案
         // （否则每次重试都重跑提取、再落一份同内容提案，且新提案的行 id 与作者
         // 已确认的行对不上——「只写已确认集」就无从谈起）。
-        const taskRef = 'web_commit_ch' + chapterIndex + '_rev' + proseFile.revision
+        const taskRef = windowTaskRef(chapterIndex, proseFile.revision)
         const port = new ProposalPort({ root })
 
         // 步 10 收尾记账：两条提交分支共用同一调用点语义（同一窗口恰一条
