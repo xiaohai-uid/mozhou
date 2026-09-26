@@ -3,7 +3,9 @@
  * 提供用户元数据、关联书籍引用与多租户用户数据读取。
  */
 import { resolve } from 'node:path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
+import { resolveDefaultDataRoot } from '../dataRoot.js'
 import type { AuthUserInfo } from '../auth/session.js'
 
 export interface UserProfile extends AuthUserInfo {
@@ -13,7 +15,7 @@ export interface UserProfile extends AuthUserInfo {
 }
 
 export class AccountStore {
-  private _dataRoot: string = resolve(process.cwd(), '.mozhou_data')
+  private _dataRoot: string = resolveDefaultDataRoot()
 
   setDataRoot(dir: string): void {
     this._dataRoot = resolve(dir)
@@ -37,7 +39,7 @@ export class AccountStore {
 
   saveProfile(profile: UserProfile): void {
     const path = this.userProfilePath(profile.id)
-    writeFileSync(path, JSON.stringify(profile, null, 2) + '\n', 'utf8')
+    atomicWriteFileSync(path, JSON.stringify(profile, null, 2) + '\n')
   }
 
   recordBookForUser(userId: string, bookId: string): void {

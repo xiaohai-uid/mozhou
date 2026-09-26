@@ -24,6 +24,7 @@ import { resolve, sep, basename } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { RequestBoundaryError, assertSafeBookRoot } from './security.js'
 import { createBook } from '@mozhou/data-plane'
+import { resolveDefaultDataRoot } from './dataRoot.js'
 import type { VerifiedPrincipal } from './auth/session.js'
 
 export interface AuthorizedBook {
@@ -121,7 +122,7 @@ export class BookOperationQueue {
 
 export class BookAccessManager {
   private _isHosted = false
-  private _dataRoot: string = resolve(process.cwd(), '.mozhou_data')
+  private _dataRoot: string = resolveDefaultDataRoot()
   private readonly _localRegistry = new Map<string, AuthorizedBook>() // bookId -> AuthorizedBook
   readonly lock = new DataRootProcessLock()
   readonly queue = new BookOperationQueue()

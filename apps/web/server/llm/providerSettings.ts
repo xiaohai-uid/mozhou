@@ -35,15 +35,69 @@ export interface MaskedProviderConfig {
 }
 
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
-const MASTER_KEY = scryptSync(
-  process.env['MOZHOU_SECRET_KEY'] ?? 'mozhou-default-internal-master-key-2026',
-  'mozhou-salt-fixed',
-  32,
-)
+const MASTER_KEY_SALT = 'mozhou-salt-fixed'
+const DEV_FALLBACK_SECRET = 'mozhou-default-internal-master-key-2026'
+const MIN_SECRET_KEY_LENGTH = 32
+
+/**
+ * 主密钥解析：加密 BYOK 凭据的密钥材料。
+ *
+ * 生产（NODE_ENV=production）或 hosted 模式下必须显式提供 MOZHOU_SECRET_KEY。
+ * 回退到源码可见的常量会让每个部署的凭据实际可被解密——文件就在同一数据目录里，
+ * 读到它的人用公开常量即可解开；固定盐还使跨实例彩虹攻击可行。
+ * 本地单机（非 production 且非 hosted）保留常量回退，以维持零配置启动。
+ *
+ * 密钥在模块加载时求值：缺失即在服务启动阶段抛出，而不是等到首次写入凭据才暴露。
+ */
+export function resolveMasterKey(
+  env: NodeJS.ProcessEnv = process.env,
+  hostedMode = false,
+): Buffer {
+  const secret = env['MOZHOU_SECRET_KEY']?.trim()
+  if (secret !== undefined && secret !== '') {
+    if (secret.length < MIN_SECRET_KEY_LENGTH) {
+      throw new Error(
+        `MOZHOU_SECRET_KEY must be at least ${MIN_SECRET_KEY_LENGTH} characters (got ${secret.length}). ` +
+          'Generate one with: openssl rand -base64 48',
+      )
+    }
+    return scryptSync(secret, MASTER_KEY_SALT, 32)
+  }
+
+  if (env['NODE_ENV'] === 'production' || hostedMode) {
+    throw new Error(
+      'MOZHOU_SECRET_KEY is required when NODE_ENV=production or MOZHOU_HOSTED=true: ' +
+        'refusing to encrypt provider credentials with a source-visible default key. ' +
+        'Generate one with: openssl rand -base64 48',
+    )
+  }
+
+  return scryptSync(DEV_FALLBACK_SECRET, MASTER_KEY_SALT, 32)
+}
+
+/**
+ * 启动期断言：由服务入口（productionServer）显式调用。
+ *
+ * 刻意不在模块加载时求值。`vite build` 会以 NODE_ENV=production 加载本模块
+ * （构建配置引入了服务端中间件），构建机没有也不该有运行期密钥；模块加载期抛错
+ * 会把「构建」和「运行」两件事混为一谈，直接卡死发布流水线。
+ * 求值推迟到启动断言与首次加解密，则：构建不受影响，而「生产缺密钥」仍在开始
+ * 服务之前被拒绝——不是等到作者第一次保存凭据才暴露。
+ */
+export function assertMasterKeyConfigured(): void {
+  masterKey()
+}
+
+let cachedMasterKey: Buffer | null = null
+
+function masterKey(): Buffer {
+  cachedMasterKey ??= resolveMasterKey(process.env, defaultBookAccessManager.isHostedMode())
+  return cachedMasterKey
+}
 
 function encrypt(text: string): string {
   const iv = randomBytes(12)
-  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, MASTER_KEY, iv)
+  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, masterKey(), iv)
   let encrypted = cipher.update(text, 'utf8', 'hex')
   encrypted += cipher.final('hex')
   const tag = cipher.getAuthTag()
@@ -57,7 +111,7 @@ function decrypt(cipherText: string): string {
   try {
     const iv = Buffer.from(ivHex, 'hex')
     const tag = Buffer.from(tagHex, 'hex')
-    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, MASTER_KEY, iv)
+    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, masterKey(), iv)
     decipher.setAuthTag(tag)
     let decrypted = decipher.update(dataHex, 'hex', 'utf8')
     decrypted += decipher.final('utf8')
