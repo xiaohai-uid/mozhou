@@ -48,6 +48,7 @@ HTTP 冒烟（发布包内）：`/` 200、`/api/membership` 诚实目录、`/api
 | 1 | P1 | `/api/story-brain.contract` 直写 canon 追踪流不刷基线 → 作者建契约后对账误报 EXTERNAL_MODIFIED | `LocalDataPlane.absorbAppWrite` + 路由收口 + 含反向对照的回归测试 |
 | 2 | P1 | 本地建书缺省落 `/tmp/mozhou-book-<ts>`（Windows 实际落 C:\tmp），脱离数据根、不入书架、不随卷 | 服务端默认落 `<dataRoot>/books/`，显式 dir 仍尊重；UI 级复验 |
 | 3 | P0（发布通道） | `build-release.mjs` 的 tar 用绝对路径当 `-f` 参数，GNU tar 将 `C:` 解析为远程主机 → `pnpm build:release` 在 Windows 从未成功 | `-f` 改相对 cwd 文件名，三处统一，构建实测通过 |
+| 4 | 验收脚本 | `verify-real-model-journey` 缺 S6 提案作者裁决步：medium 风险提案按设计 409 拒绝提交，旧脚本 3 连跑 2 次假失败 | 409 时经 `/api/proposal.decide` 逐项 confirm 后重试，验证路径对齐真实用户旅程；补后 L2 三连 3/3 VERIFIED |
 
 （c1b8b29 之前的会话已完成：数据卷持久化、主密钥 fail-fast、fsync 屏障、健康端点/日志/优雅停机、Dockerfile patches 缺失、部署文档对齐、版本对齐——见 git log 6feb605..1cd9a88。）
 
