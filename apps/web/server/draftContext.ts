@@ -6,6 +6,7 @@ import {
 import { EmptyRecallError, createLocalTokenizer, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
 import { assertStyleSectionsWithinBudget, renderStyleSections } from '@mozhou/flywheel'
 import { prepareChapterInputs, qualityStructuralSections, runCompileStep } from '@mozhou/pipeline'
+import { localEmbeddingProvider } from './localEmbedding.js'
 
 const PREVIEW_CONTEXT_WINDOW_TOKENS = 32_000
 const MAX_RECENT_CHAPTERS = 3
@@ -87,6 +88,10 @@ export interface DraftContextResult {
  * Web 主生成链路的唯一上下文入口。
  * 优先走正式 Context Compiler（目录卡 + NarrativeStateSnapshot + 近期正文 + Receipt）；
  * 只有全部召回通道确实为空时，才回落到可审计的 book/chapter/story 结构层，不伪造 Receipt。
+ *
+ * 三通道召回（T8b 接线）：本层注入随仓 bge-small-zh-v1.5 本地 embedding provider，
+ * 使 compile() 的兜底第三通道在生产路径真正启用（keyword + k-hop 双漏时的语义补位）；
+ * 装载失败退回双通道，见 localEmbedding.ts 的降级裁决。
  */
 export async function buildDraftContext(input: {
   readonly root: string
@@ -123,6 +128,12 @@ export async function buildDraftContext(input: {
       ...styleSections,
     ]
 
+    // 第三召回通道（T8b）：随仓 bge-small-zh-v1.5 惰性装载（24MB ONNX，进程内单例）。
+    // 装载失败返回 null ⇒ 退回 keyword+graph 双通道继续生成——降级裁决与理由见
+    // localEmbedding.ts 模块头（召回面变窄 ≠ 正确性受损，故不阻断整章生成）。
+    // 位置刻意在结构层断言之后、try 之前：章大纲/文风画像的既有失败路径不为此付装载成本。
+    const embedding = await localEmbeddingProvider()
+
     try {
       const outcome = await runCompileStep(prepared, {
         bookRoot: input.root,
@@ -139,6 +150,7 @@ export async function buildDraftContext(input: {
           contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
         },
         tokenizer: exactTokenizer(),
+        ...(embedding === null ? {} : { embedding }),
       })
       return { packet: outcome.packet, mode: 'compiled_receipt' }
     } catch (error) {

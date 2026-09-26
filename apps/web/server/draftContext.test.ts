@@ -14,10 +14,10 @@
  * 必须真的进 compile 结构层且取盘上现值（学习/手改下一章即生效）；画像缺席/损坏/
  * 超 800 token 预算一律响亮失败，不静默降级成“无文风”。
  */
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   chapterOutlinePath,
   commitChapter,
@@ -49,12 +49,16 @@ import {
   readPendingDependencyManifest,
 } from '@mozhou/pipeline'
 import { buildDraftContext } from './draftContext.js'
+import { setLocalEmbeddingLoaderForTest } from './localEmbedding.js'
 
 const LIN = 'char:lin-xuan' as EntityRef
 const NOW = '2026-08-26T10:00:00.000Z'
 
 let roots: string[] = []
 afterEach(() => {
+  // embedding 装载单例跨用例共享：恢复缺省工厂 + 清缓存，杜绝用例间互相污染。
+  setLocalEmbeddingLoaderForTest(null)
+  vi.restoreAllMocks()
   for (const root of roots) {
     try {
       rmSync(root, { recursive: true, force: true })
@@ -478,8 +482,152 @@ describe('buildDraftContext · 预算路径用精确 tokenizer（token-budget-as
     const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]!), 'utf8')) as {
       replayInputs: { tokenizerVersion: string; modelProfileId: string }
     }
-    expect(receipt.replayInputs.tokenizerVersion).toBe('mozhou-bert-wordpiece-bge-small-zh-v1.5-v1')
+      expect(receipt.replayInputs.tokenizerVersion).toBe('mozhou-bert-wordpiece-bge-small-zh-v1.5-v1')
     expect(receipt.replayInputs.tokenizerVersion).not.toBe('mozhou-preview-codepoint-budget-v1')
     expect(receipt.replayInputs.modelProfileId).toBe('mozhou-preview-wordpiece-budget-v1')
   })
+})
+
+/* ---------------------------------------------------------------------------
+ * 第三召回通道（T8b）：本地 embedding 在生成入口真正接线
+ * ------------------------------------------------------------------------- */
+
+interface ReceiptView {
+  readonly entries: readonly {
+    readonly identifier: string
+    readonly included: boolean
+    readonly stage: string
+    readonly assemblySource?: string
+  }[]
+  readonly replayInputs: {
+    readonly candidates: readonly { readonly id: string; readonly channel: string }[]
+  }
+}
+
+/** 本次编译唯一凭证（一证一文件：一次 buildDraftContext 只落一张）。 */
+function readSoleReceipt(root: string): ReceiptView {
+  const receiptDir = join(root, ...RECEIPTS_DIRNAME.split('/'))
+  const files = readdirSync(receiptDir).filter((name) => name.endsWith('.json'))
+  expect(files).toHaveLength(1)
+  return JSON.parse(readFileSync(join(receiptDir, files[0]!), 'utf8')) as ReceiptView
+}
+
+function receiptFileCount(root: string): number {
+  const receiptDir = join(root, ...RECEIPTS_DIRNAME.split('/'))
+  return existsSync(receiptDir) ? readdirSync(receiptDir).filter((name) => name.endsWith('.json')).length : 0
+}
+
+/**
+ * 只有一条语义事实、零目录卡的书写面：
+ * 无目录卡 ⇒ keyword 检测扫描面为空（零触发）；零触发 ⇒ 图通道早退（零候选）。
+ * 因此唯一可能产出候选的通道是 embedding —— 它是否真的跑起来，由本夹具的编译结果直接判定。
+ */
+function makeBookWithSemanticOnlyFact(): { root: string; factId: FactId } {
+  const root = mkdtempSync(join(tmpdir(), 'mozhou-web-embed-wiring-'))
+  roots.push(root)
+  createBook({ dir: root, title: '语义兜底之书' })
+  const ctx: PlaneContext = {
+    root,
+    db: openDatabase({ path: join(root, '.mozhou', 'runtime.sqlite') }),
+    manifest: readManifest(root),
+  }
+  const factId = newFactId()
+  try {
+    createChapterDraft(ctx, { chapterIndex: 1, title: '当表' })
+    commitChapter(ctx, {
+      chapterIndex: 1,
+      summary: '林枫当表换药钱',
+      appends: {
+        temporalFact: [
+          {
+            ...confirmedFactRow(bookIdOf(root), factId, 1),
+            predicate: '状态',
+            value: '把怀表当掉换三十两银子给妹妹抓药',
+          },
+        ],
+      },
+    })
+    createChapterDraft(ctx, { chapterIndex: 2, title: '续章' })
+  } finally {
+    ctx.db.close()
+  }
+  return { root, factId }
+}
+
+/** 与事实语义强相关（随仓 bge 实测 cosine ≈0.70 > 默认入选门 0.46）。 */
+const SEMANTIC_PROMPT = '林枫把怀表当掉，换了三十两银子给妹妹抓药治病。'
+
+describe('buildDraftContext · 第三召回通道接线（T8b）', () => {
+  it('接线：keyword+graph 双漏时 embedding 通道产出候选并进 Receipt（第三通道在生产路径启用）', async () => {
+    const { root, factId } = makeBookWithSemanticOnlyFact()
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: SEMANTIC_PROMPT })
+
+    // 前置反证：该书写面下 keyword/graph 恒零候选（无卡 ⇒ 无触发 ⇒ 图通道早退），
+    // 能编译成 Receipt 本身即说明 embedding 通道真的产出了候选。
+    expect(result.mode).toBe('compiled_receipt')
+    const receipt = readSoleReceipt(root)
+    const entry = receipt.entries.find((candidate) => candidate.identifier === factId)
+    expect(entry?.assemblySource).toBe('embedding')
+    expect(entry?.included).toBe(true)
+    expect(receipt.replayInputs.candidates.some((c) => c.id === factId && c.channel === 'embedding')).toBe(true)
+    // 事实正文真的到达模型输入，不是只过了入选门就丢段
+    expect(result.packet.text).toContain('把怀表当掉换三十两银子给妹妹抓药')
+  }, 30_000)
+
+  it('降级：embedding 装载失败 ⇒ 同一书写面三通道皆空，走可审计结构回落而非伪造凭证', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    setLocalEmbeddingLoaderForTest(() => Promise.reject(new Error('模拟模型资产缺失')))
+    const { root } = makeBookWithSemanticOnlyFact()
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: SEMANTIC_PROMPT })
+
+    // 同一书写面 A/B：装载成功 ⇒ compiled_receipt（上一用例）；装载失败 ⇒ 通道真的被关掉。
+    expect(result.mode).toBe('structural_fallback')
+    expect(spy.mock.calls.some((call) => String(call[0]).includes('[mozhou-embedding]'))).toBe(true)
+    // 降级不伪造：结构回落不落 Receipt、不落钉版
+    expect(receiptFileCount(root)).toBe(0)
+    expect(readPendingDependencyManifest(root, 2)).toBeNull()
+  }, 30_000)
+
+  it('降级不阻断生成：embedding 失败时既有通道照常产出合法 Receipt', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    setLocalEmbeddingLoaderForTest(() => Promise.reject(new Error('模拟模型资产缺失')))
+    const { root } = makeBook(true)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    const receipt = readSoleReceipt(root)
+    expect(receipt.entries.some((candidate) => candidate.assemblySource === 'embedding')).toBe(false)
+    expect(
+      receipt.entries.some(
+        (candidate) => candidate.assemblySource === 'keyword' || candidate.assemblySource === 'graph_khop',
+      ),
+    ).toBe(true)
+  }, 30_000)
+
+  it('不变量：更早的失败路径不为 24MB 装载付成本（章大纲缺席 ⇒ 零装载尝试）', async () => {
+    let loads = 0
+    setLocalEmbeddingLoaderForTest(() => {
+      loads += 1
+      return Promise.reject(new Error('不应被调用'))
+    })
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-web-embed-wiring-'))
+    roots.push(root)
+    createBook({ dir: root, title: '缺章之书' })
+    const ctx: PlaneContext = {
+      root,
+      db: openDatabase({ path: join(root, '.mozhou', 'runtime.sqlite') }),
+      manifest: readManifest(root),
+    }
+    try {
+      createChapterDraft(ctx, { chapterIndex: 1, title: '第一章' })
+    } finally {
+      ctx.db.close()
+    }
+
+    await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: SEMANTIC_PROMPT })).rejects.toThrow()
+    expect(loads).toBe(0)
+  }, 30_000)
 })
