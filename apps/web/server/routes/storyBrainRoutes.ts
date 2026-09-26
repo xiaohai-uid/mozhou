@@ -2,12 +2,12 @@
  * apps/web · Story Brain 与核心书目数据路由控制器。
  */
 import type { RouteHandler } from '../router.js'
-import { createBook, LocalDataPlane } from '@mozhou/data-plane'
+import { TRACKING_STREAMS, createBook, LocalDataPlane } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
 export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
@@ -160,10 +160,22 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
       createdAt: new Date().toISOString(),
     }
 
-    const trackingDir = join(root, '追踪')
-    mkdirSync(trackingDir, { recursive: true })
-    const promiseFile = join(trackingDir, '伏笔.jsonl')
-    appendFileSync(promiseFile, JSON.stringify(contractRecord) + '\n', 'utf8')
+    const promiseStream = TRACKING_STREAMS.find((stream) => stream.kind === 'narrativePromise')
+    if (promiseStream === undefined) {
+      json(500, { ok: false, error: 'narrativePromise tracking stream is not configured' })
+      return true
+    }
+    const promiseFile = join(root, promiseStream.path)
+    mkdirSync(dirname(promiseFile), { recursive: true })
+    appendFileSync(promiseFile, `${JSON.stringify(contractRecord)}\n`, 'utf8')
+    // 应用自己的写入必须并入基线（S4）：否则下次对账会把这行契约误判为
+    // EXTERNAL_MODIFIED，作者刚建完契约就收到一条伪冲突提案。
+    const plane = LocalDataPlane.openOrRebuild(root)
+    try {
+      plane.absorbAppWrite([promiseStream.path])
+    } finally {
+      plane.close()
+    }
 
     json(200, { ok: true, contractId, contract: contractRecord })
     return true

@@ -46,7 +46,7 @@ import {
   RUNTIME_DB_PATH,
 } from './layout.js'
 
-import { buildManifest, CorruptManifestError, listAllFiles, readManifest, writeManifest, type HashManifest } from './manifest.js'
+import { buildManifest, CorruptManifestError, listAllFiles, readManifest, refreshManifestEntries, writeManifest, type HashManifest } from './manifest.js'
 import {
   queryActiveFacts as queryActiveFactsFromRoot,
   queryInvalidatedKnowledgeStates as queryInvalidatedFromRoot,
@@ -154,6 +154,18 @@ export class LocalDataPlane {
 
   get manifest(): HashManifest {
     return this._ctx.manifest
+  }
+
+  /**
+   * 把应用自己对 canon 文件的写入并入 hash 基线（S4：基线只记应用自己的写入）。
+   *
+   * 供相位机（commit/reopen/saveProseDraft）之外的旁路写路径收口使用，例如
+   * Story Brain 的契约追加。绕过此步的写入会让基线与盘面失配，下次对账把
+   * 应用自己的产物误判为 EXTERNAL_MODIFIED，向作者弹出伪冲突提案。
+   */
+  absorbAppWrite(relPosixPaths: readonly string[]): void {
+    this._ctx.manifest = refreshManifestEntries(this._ctx.manifest, this.root, relPosixPaths)
+    writeManifest(this.root, this._ctx.manifest)
   }
 
   /**
