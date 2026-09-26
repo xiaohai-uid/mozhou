@@ -6,12 +6,21 @@
 
 ## 📌 版本声明与当前状态
 
-当前发布版本定位为 **技术预览版 (Technical Preview / v0.2.1)**：
+当前发布版本定位为 **技术预览版 (Technical Preview / v0.3.0)**（版本号以 `package.json` 为唯一事实来源）：
 - **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、5 项机械门禁与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据平面（`@mozhou/data-plane`），以及当前 Web/桌面工作台与导出链路；
 - **AI 模型通道**：支持 **USER_BYOK（用户自带 Key）** 的 OpenAI-compatible 真实流式调用；未配置可用 Provider 时相关生成能力会显式显示不可用，只有明确开启 Demo 数据的环境才使用演示数据；
 - **商业化状态**：当前为**社区免费技术预览版**。云同步/云备份、付费许可证激活与正式支付通道尚未作为本 Release 的可用能力发布。
+- **部署**：只支持单机回环部署，容器与 systemd 部署必须显式设置 `MOZHOU_DATA_ROOT` 与 `MOZHOU_SECRET_KEY`。完整清单与已知限制见 [`docs/deployment.md`](docs/deployment.md)。
 
-### v0.2.1 修复摘要
+### v0.3.0 修复摘要
+
+- **数据安全**：容器与 systemd 部署此前**不持久化数据根**——`MOZHOU_DATA_ROOT` 虽被 `docker-compose.yml` 与 `deploy/README.md` 约定，代码却从未读取，书稿落在镜像层，`docker compose down`、换镜像或重建容器即全部销毁且不报错。现已在 `apps/web/server/dataRoot.ts` 统一解析该变量，容器改为命名卷 `mozhou-data`。
+- **凭据安全**：BYOK 加密主密钥此前在 `MOZHOU_SECRET_KEY` 缺失时回退到源码可见常量 + 固定盐，而所有部署模板都没设置该变量——等于凭据可被任何读到文件的人解开。现在 `NODE_ENV=production` 或 `MOZHOU_HOSTED=true` 下缺失即拒绝启动（exit 1），本地单机保留零配置回退。
+- **掉电耐久**：章节、canon、基线等写入此前只有 `writeFileSync + rename` 而无 fsync，rename 可能先于数据刷盘，掉电后目标文件变零长度。现统一收敛到 `atomicWriteFileSync`（tmp → fsync → rename）。
+- **可运维性**：新增真实 `/api/health`（此前只在路由策略表登记、无处理器，实际返回 404）、单行 JSON 请求日志与 `X-Request-Id`、SIGTERM/SIGINT 优雅停机（排空在途请求，10 秒超时）。
+- **文档校正**：`docs/deployment.md` 此前描述的是一套不存在的 Next.js + Postgres + one-api 栈（本仓库无 `app/`、无 `drizzle/`），已重写为当前栈；`docs/production-deployment.md` 标记作废。
+
+### v0.2.1 修复摘要（历史）
 
 - **数据安全**：`manifest.json` 基线改为原子且持久落盘（临时文件 + fsync + rename），并在基线损坏时可由 canon 重建——此前崩溃截断会让整本书经应用永久无法打开；流派资产包改为非破坏注入，目标文件已存在即跳过、不再静默覆盖作者内容。
 - **诚实性**：注销账号在云端删除不可用或失败时显式报错，不再回报"已删除"；小说拆解不再把与输入无关的通用模板当作本文本推断结果展示；`/api/draft.question` 补回契约要求的 `hint` 字段。
@@ -24,10 +33,12 @@
 
 ### 方式一：Release 本地运行时（推荐）
 
-v0.2.1 Technical Preview 的 GitHub Release/CI 产物与 `release-artifacts/` 使用同一套命名：
-- **`mozhou-v0.2.1-local-runtime.tar.gz`**：Node.js 22 本地运行时。Windows 解压后运行 **`启动墨舟.bat`**；Linux/macOS 执行 `chmod +x start.sh && ./start.sh`；
-- **`mozhou-v0.2.1-web-dist.tar.gz`**：已构建的 Web 静态产物；
-- **`mozhou-v0.2.1-docker.tar.gz`**：本地 Docker 发行包；
+发布产物由 `.github/workflows/release.yml` 按 `package.json` 的版本号命名（当前即 `v0.3.0`），
+仓库内 `release-artifacts/` 只保留历史构建，**不保证与当前版本同号**：
+
+- **`mozhou-v<版本>-local-runtime.tar.gz`**：Node.js 22 本地运行时。Windows 解压后运行 **`启动墨舟.bat`**；Linux/macOS 执行 `chmod +x start.sh && ./start.sh`；
+- **`mozhou-v<版本>-web-dist.tar.gz`**：已构建的 Web 静态产物；
+- **`mozhou-v<版本>-docker.tar.gz`**：本地 Docker 发行包（解压后先设 `MOZHOU_SECRET_KEY` 再 `docker compose up`）；
 - Release 同时提供 **SPDX SBOM** 与 **SHA256SUMS.txt** 用于供应链校验。
 
 服务默认地址为 **`http://127.0.0.1:5173`**。当前 Release **不冒充原生 Windows/macOS 安装器**；Tauri 原生安装与代码签名仍作为独立发布面验收。

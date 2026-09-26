@@ -1,5 +1,17 @@
 # 墨舟 Production Deployment Runbook（V1.2 首次上线实测版）
 
+> ## ⛔ 已作废 —— 描述的栈不在本仓库中（2026-09-26 核对）
+>
+> 本文记录的 Cloud Run + Neon Postgres + Next.js `next start` + one-api 栈
+> **不属于当前交付物**。本仓库没有 `app/` 目录、没有 `drizzle/` 迁移目录，
+> 交付的是本地优先的文件 canon + SQLite 投影，入口为
+> `apps/web/dist-server/productionServer.js`。
+>
+> 照本文操作会在第 2 步即失败（找不到 `app/`）。**当前部署请用 `docs/deployment.md`。**
+>
+> 保留本文仅为归档该产品线的历史事实（V1.2 曾真实跑通的那套架构），
+> 其中的 GCP / Neon / one-api 细节与今天的墨舟无关。
+
 > 状态：**已真实跑通（2026-08-11）**。本文只记录验证过的步骤；未验证的理论步骤不写。
 
 ## 1. 架构总览

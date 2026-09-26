@@ -2,6 +2,11 @@
 
 依照 `reference/03-public-billing.md` T16 规范编写。
 
+> **状态警告（2026-09-26 核对）**：本文件描述的公网/hosted 部署路径**当前不可用**。
+> 生产 HTTP 服务器 `assertTrustedRequest` 只接受 loopback 的 `Host`/`Origin`，
+> 域名或反向代理后面每个 `/api/*` 请求都会被判为 `UNTRUSTED_HOST` 并拒绝。
+> 在放开该策略或明确下线 hosted 能力之前，请只按 `docs/deployment.md` 的单机路径部署。
+
 ## 1. 目标环境要求
 - **首选主机**：Oracle Cloud Always Free VM (Ubuntu 22.04 / 24.04 LTS 或 Debian 12，x86_64 或 ARM aarch64)。
 - **Node.js**：v22.x LTS 或 v24.x，需安装基础依赖与 sqlite3 支持。
@@ -18,7 +23,7 @@
 
 2. **解压发布运行时资产 (来自 release-artifacts)**：
    ```bash
-   tar -xzf mozhou-v0.1.0.tar.gz -C /opt/mozhou
+   tar -xzf mozhou-v0.3.0-local-runtime.tar.gz -C /opt/mozhou
    sudo chown -R mozhou:mozhou /opt/mozhou
    ```
 
@@ -29,6 +34,9 @@
    HOST=127.0.0.1
    MOZHOU_HOSTED=true
    MOZHOU_DATA_ROOT=/var/mozhou_data
+   # 必填：缺失则服务启动即失败（不再回退到源码可见的默认密钥）。
+   # 生成：openssl rand -base64 48
+   MOZHOU_SECRET_KEY=<48 字节随机串>
    SUPABASE_URL=https://<project-id>.supabase.co
    SUPABASE_ANON_KEY=<anon-key>
    ```
