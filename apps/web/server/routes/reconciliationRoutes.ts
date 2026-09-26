@@ -35,6 +35,7 @@ import type { ReconciliationService, ReconciliationSettledPayload, ScanOutcome }
 import type { DependencyManifestEntry } from '@mozhou/kernel'
 import type { ApiRouter, RouteHandler } from '../router.js'
 import { assertSafeBookRoot, RequestBoundaryError } from '../security.js'
+import { dispatchSettledSemanticAnalysis } from '../semanticSettled.js'
 
 /* ----------------------------------------------------------------------------
  * 进程级运行期宿主（一书一根，常驻）
@@ -84,7 +85,7 @@ export function ensureReconciliationRuntime(
   const plane = LocalDataPlane.openOrRebuild(safeRoot)
   try {
     const service = plane.reconciliation({
-      onSettled: (payload) => propagateSettledChanges(plane, service, payload),
+      onSettled: (payload) => propagateSettledChanges(plane, service, payload, safeRoot),
     })
     const startupScan = service.scanExternalModifications('startupScan')
     const watcherIntervalMs = options.watcherIntervalMs ?? WATCHER_INTERVAL_MS
@@ -180,25 +181,43 @@ function parseVersionedRow(text: string): { readonly id: string; readonly revisi
 }
 
 /**
- * 落定后传播（D19/D20 序：落定 → reloadManifest（finalize 已做）→ 本传播）。
+ * 落定后传播（D19/D20 序：落定 → reloadManifest（finalize 已做）→ 本传播 → 语义旁路）。
  * 零变更表 ⇒ 零动作（无影响面不产噪声）。传播是旁路：异常显式落 stderr 后返回，
  * 绝不把已落盘的作者决策伪装成失败回滚——提案终态与基线吸收在 finalize 里已经完成，
  * 这里抛出只会让 decide 以 500 回应一个其实已生效的决定（失败面仍是可观测的）。
+ *
+ * T28/T29 接线（本票）：传播命中集（markedChapters ∪ skippedByIdempotency）即受影响章，
+ * 交给 semanticSettled 的落定语义批次（advisory-only 异步旁路，真 LLM 由 BYOK 适配）。
+ * 语义面失败不影响本函数的传播结果——它是与 StaleMarker 并列的第二条旁路出口。
  */
 function propagateSettledChanges(
   plane: LocalDataPlane,
   service: ReconciliationService,
   payload: ReconciliationSettledPayload,
+  root: string,
 ): void {
   try {
     const upstreamChanges = resolveUpstreamChanges(service, payload)
     if (upstreamChanges.length === 0) return
-    plane.propagateStaleMarkers({
+    const propagation = plane.propagateStaleMarkers({
       // V1 可映射成钉版条目的只有正典追踪流（reason 取 upstream_canon_changed）；
       // 章大纲变更无可对齐的钉版实体，见 resolveUpstreamChanges 的取舍。
       reason: 'upstream_canon_changed',
       upstreamChanges,
       markedAt: new Date().toISOString(),
+    })
+
+    // 受影响章 = 传播命中集（含幂等短路命中：标记等价 ≠ 不受影响）。无命中 ⇒ 无输入，不触发。
+    const affectedChapters = [...new Set([...propagation.markedChapters, ...propagation.skippedByIdempotency])].sort(
+      (a, b) => a - b,
+    )
+    dispatchSettledSemanticAnalysis({
+      root,
+      proposalId: payload.proposalId,
+      // 逐章摘要指纹由 semanticSettled 用 kernel 的 matchStaleDependencies 算出
+      // （与本次传播同一判据），故此处只交上游变更表这一份真源。
+      upstreamChanges,
+      affectedChapters,
     })
   } catch (error) {
     console.error(
@@ -292,7 +311,7 @@ function resolveService(root: string): ResolvedService {
   const safeRoot = assertSafeBookRoot(root)
   const plane = LocalDataPlane.openOrRebuild(safeRoot)
   const service = plane.reconciliation({
-    onSettled: (payload) => propagateSettledChanges(plane, service, payload),
+    onSettled: (payload) => propagateSettledChanges(plane, service, payload, safeRoot),
   })
   return { service, close: () => plane.close() }
 }

@@ -101,6 +101,41 @@ describe('语义层骨架 · T28', () => {
     expect(countSemanticReports(other)).toBe(0) // 无静默占位文件
   })
 
+  it('异步 evaluate 接缝（生产 LLM 适配器形态）：resolve 即成功、reject 走 L2 重试后 refusal', async () => {
+    const root = hermeticRoot()
+    let asyncCalls = 0
+    const asyncDeps: AnalyzeDeps = {
+      evaluate: async () => {
+        asyncCalls += 1
+        await Promise.resolve()
+        return { verdict: 'attention' as const, findings: [], outputTokens: 120 }
+      },
+      retry: { attempts: 3, backoffMs: () => 0 },
+      sleep: async () => {},
+    }
+    const reported = await analyzeSemantic(baseInput(root), asyncDeps)
+    expect(reported.status).toBe('reported')
+    expect(reported.report?.verdict).toBe('attention')
+    expect(asyncCalls).toBe(1)
+
+    // 异步拒绝（网络错误形态）必须与同步抛错同路：重试满额 → refusal，零报告文件。
+    const other = hermeticRoot()
+    let rejectCalls = 0
+    const rejectingDeps: AnalyzeDeps = {
+      evaluate: () => {
+        rejectCalls += 1
+        return Promise.reject(new Error('upstream 500'))
+      },
+      retry: { attempts: 3, backoffMs: () => 0 },
+      sleep: async () => {},
+    }
+    const refused = await analyzeSemantic(baseInput(other), rejectingDeps)
+    expect(rejectCalls).toBe(3)
+    expect(refused.status).toBe('refused')
+    expect(refused.refusalCode).toBe('provider_unavailable')
+    expect(countSemanticReports(other)).toBe(0)
+  })
+
   it('MUST-NOT 结构约束：analyze 返回面只有报告/拒绝，零 Port/正文写面（编译层强制）', async () => {
     const root = hermeticRoot()
     const outcome = await analyzeSemantic(baseInput(root), happyDeps)

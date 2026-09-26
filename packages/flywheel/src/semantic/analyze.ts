@@ -31,12 +31,24 @@ export interface AnalyzeInput {
 }
 
 export interface AnalyzeDeps {
-  /** 真分析回调（测试注入确定性假实现）。抛错=provider 不可用。 */
-  readonly evaluate: (input: { anchor: SemanticAnalysisReport['anchor']; affectedRefs: SemanticAnalysisReport['affectedRefs'] }) => {
-    readonly verdict: SemanticVerdict;
-    readonly findings: SemanticAnalysisReport['findings'];
-    readonly outputTokens: number;
-  };
+  /**
+   * 真分析回调（测试注入确定性假实现）。抛错/拒绝=provider 不可用。
+   *
+   * 返回值允许 Promise：生产适配器（apps/web/server/llm/semanticEvaluator.ts）是真实
+   * 网络调用，同步返回不可能；同步假实现照旧可用（await 非 Promise 值零开销）。
+   * L2 重试（D13）由本模块的循环持有，故异步拒绝同样落入 3 次退避重试。
+   */
+  readonly evaluate: (input: { anchor: SemanticAnalysisReport['anchor']; affectedRefs: SemanticAnalysisReport['affectedRefs'] }) =>
+    | {
+        readonly verdict: SemanticVerdict;
+        readonly findings: SemanticAnalysisReport['findings'];
+        readonly outputTokens: number;
+      }
+    | Promise<{
+        readonly verdict: SemanticVerdict;
+        readonly findings: SemanticAnalysisReport['findings'];
+        readonly outputTokens: number;
+      }>;
   /** L2 重试：尝试次数与退避（测试注入 0 退避确定性；缺省 3 次 1s/2s/4s）。 */
   readonly retry?: { readonly attempts: number; readonly backoffMs: (attempt: number) => number } | undefined;
   readonly sleep?: (ms: number) => Promise<void>;
@@ -67,7 +79,7 @@ export async function analyzeSemantic(input: AnalyzeInput, deps: AnalyzeDeps): P
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const result = deps.evaluate({ anchor: input.anchor, affectedRefs: input.affectedRefs });
+      const result = await deps.evaluate({ anchor: input.anchor, affectedRefs: input.affectedRefs });
       if (result.outputTokens > OUTPUT_TOKEN_CAP) {
         return { report: null, relPath: null, status: 'refused', refusalCode: 'budget_exceeded' };
       }
