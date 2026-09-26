@@ -163,7 +163,7 @@
 |---|---|---|---|
 | NovelEditorCanvas.tsx | 网文沉浸 textarea 画卷；Enter 自动两全角缩进（:25-48）；一键网文排版（:51-65,76-84）；接 useEditorSelection + EditorQualityTelemetry | 无 importer | CODE_PRESENT_UNMOUNTED |
 | BlockEditorEngine.tsx | 头部自宣称「TipTap AST 块级写作引擎」（:80）**实为纯 textarea，无 TipTap 依赖**；`/` 唤起 SlashCommandMenu；插入【场景切分·POV视点】等标记（:52-71） | 无 importer；声明与实现不符 | CODE_PRESENT_UNMOUNTED |
-| EditorQualityTelemetry.tsx | `runDeAiDiagnostics`（@mozhou/quality-engine）实时：字数/段落/4-gram 复读/Tier1 必阻断/Tier2 聚集 + De-AI 正典纯净分/AI 腔调待净化分（:49-83） | 无 importer | CODE_PRESENT_UNMOUNTED |
+| EditorQualityTelemetry.tsx | `runDeAiDiagnostics`（@mozhou/quality-engine/de-ai 浏览器安全子路径）实时：字数/段落/4-gram 复读/Tier1 必阻断/Tier2 聚集 + De-AI 正典纯净分/AI 腔调待净化分 | 被 ProseEditorPanel 挂载于正文画布下方 | MOUNTED |
 | FloatingBubbleMenu.tsx | 选区弹出 4 预设（sensory_expansion/deslop_sharpen/dialogue_polish/plot_twist）+`…` 自定义指令（:21-26,70-88）；selectedText/onClose 收而不用的 props（:11-15） | 无 importer | CODE_PRESENT_UNMOUNTED |
 | InlineDiffViewer.tsx | 双栏 diff：红删除线 原始片段 vs 绿 采纳后重构（:43-59）；放弃(Esc)/采纳替换(Enter) 按钮（:30-39，**无键位接线**） | 无 importer | CODE_PRESENT_UNMOUNTED |
 | SlashCommandMenu.tsx | 5 命令：scene 场景切分/character 正典角色卡/beat 剧情节拍/rewrite AI 自动续写/deslop 即时去味（:15-21） | 无 importer | CODE_PRESENT_UNMOUNTED |
@@ -333,7 +333,7 @@ WorkbenchHub:44,95,97；InspectorHub:53；ResourcesHub:42,48,49,51；Inspiration
 实现新增的正式 surface（全部 MOUNTED，细节见 Coverage Report 实现状态块）：
 - `src/shell/scene/`（SceneLayer/SceneSettingsSheet/scenePreference）— Scene System 一等公民挂载 App/TopBar/MobileShell；
 - `src/shell/shellTelemetry.ts` + `useShellTelemetry.ts` — works/receipts/quality/matrix 四证据 → Pipeline 六态真实绑定（旧"选中之前自动 done"推导废除）+ InspectorTower 摘要轨；
-- `src/workbench/editor/ProseEditorPanel.tsx` — Reading Slate 写作层正式挂载 WorkbenchView（Canvas/Slash/Bubble 已 Ink Realm 化并接链；InlineDiff/EditorQualityTelemetry 已 token 化暂留未挂载位，后者因 quality-engine 包根 node:crypto 待安全子路径）；
+- `src/workbench/editor/ProseEditorPanel.tsx` — Reading Slate 写作层正式挂载 WorkbenchView（Canvas/Slash/Bubble 已 Ink Realm 化并接链；EditorQualityTelemetry 已挂载于正文画布下方，经 quality-engine 的 ./de-ai 浏览器安全子路径；InlineDiff 仍暂留未挂载位）；
 - `src/mobile/drawers/MobileChaptersDrawer.tsx` — 章节目录实化（/api/works 直读、点章切章）；
 - Workbench 章节轨 / DesktopToolModals→non-blocking Sheet / SystemHub 书架切书（library+library.open）/ PlotBranch·灵感→Composer inject 管道 / TensionSpark 八步词表纠正。
 截图验收：`screenshots/*.png` 8 张（headless Chrome 实拍 dev server，1440/1280/390）。

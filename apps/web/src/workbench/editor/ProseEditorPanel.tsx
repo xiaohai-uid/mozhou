@@ -10,12 +10,14 @@
  * 本地缓存为空且服务端有正文时先回填显示——作者保存前必然读过所覆盖的内容。
  * AI 选区动作（bubble 预设 / rewrite / deslop）：当前无正文编辑 AI 契约——
  * 呈现诚实不可用（需 provider/契约），不伪造调优结果。
- * 质量遥测条：@mozhou/quality-engine 包根携 node:crypto，不进浏览器包——
- * 留出插槽并诚实标注（EditorQualityTelemetry 已 Ink Realm 化，待安全子路径）。
+ * 质量遥测条（EditorQualityTelemetry）：已挂载于正文画布下方，随作者键入实时
+ * 计算字数/段落/4-gram 复读/Tier1/Tier2——数据来自 @mozhou/quality-engine/de-ai
+ * 浏览器安全子路径（零 Token、确定性），非示例值。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { post } from '../../lib/post'
 import { NovelEditorCanvas } from './NovelEditorCanvas'
+import { EditorQualityTelemetry } from './EditorQualityTelemetry'
 import { chapterDraftKey, loadDraftCache, saveDraftCache } from '../../shell/workbenchStorage'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ChapterProseResponse, ChapterProseSaveResponse } from '../../../server/api'
@@ -252,6 +254,9 @@ export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: Pros
                   onSelectionChange={onSelectionChange}
                   placeholder={`第 ${chapterIndex} 章正文……（Enter 自动两全角缩进；行首 / 唤起快捷指令；选中文字浮出调优菜单）`}
                 />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <EditorQualityTelemetry content={text} />
               </div>
               {notice !== null && (
                 <div className="ir-unavailable" style={{ marginTop: 10 }} role="status">

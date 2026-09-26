@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { runDeAiDiagnostics } from '@mozhou/quality-engine';
+import { runDeAiDiagnostics } from '@mozhou/quality-engine/de-ai';
 
 export interface EditorQualityTelemetryProps {
   content: string;
@@ -9,9 +9,10 @@ export interface EditorQualityTelemetryProps {
 
 /**
  * 编辑器质量遥测条（Ink Realm · Evidence Row 语义）。
- * 浏览器挂载注意：@mozhou/quality-engine 包根经 policy/staleness 携 node:crypto /
- * node:fs——正式接入前需提供浏览器安全子路径导出；在那之前本组件保持
- * CODE_PRESENT_UNMOUNTED，不进主包。
+ * 浏览器安全：只经 @mozhou/quality-engine/de-ai 子路径取 De-AI 机检，
+ * 该入口无 Node 依赖（包根经 policy.ts/staleness.ts 携 node:crypto/node:fs，
+ * 禁止在渲染进程导入）。不变量由 packages/quality-engine/src/de-ai.browser-safe.test.ts
+ * 与 apps/web 侧 EditorQualityTelemetry.test.tsx 双向守护。
  */
 export const EditorQualityTelemetry: React.FC<EditorQualityTelemetryProps> = ({
   content,
