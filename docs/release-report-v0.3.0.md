@@ -27,6 +27,8 @@
 - **商业 UI（004）**：TipTap 编辑器组件与遥测（组件测试 ✅）、流派工坊路由注册（`views.test.ts` ✅）+ 后端 `applyGenreKitToBook`（data-plane 测试 ✅）、正典图谱契约创建走 `/api/story-brain.contract` 真实落盘。
 - **诚实性（Spec 硬约束）**：无 Provider 时 UI 显式「Gate 3 不可用」、`verify:real-model` 无 Key 时输出 BLOCKED 拒绝伪造、会员目录 Pro/Max 显式不可购买——均实测确认。
 
+- **L2 真模型三连冒烟（ADR-0018）**：使用用户知识库提供的 SenseNova 免费通道（`deepseek-v4-flash`，密钥仅经环境变量注入，未落任何文件），`pnpm verify:real-model` **3/3 VERIFIED**（188/246/292 字真实 prose，含两次 medium 风险正典提案的作者裁决路径），证据 `evidence/real-model-journey/2026-09-26T15-2*/`。此前脚本缺 S6 提案裁决步导致 2/3 假失败，已补（见 §2.4）。
+
 ### 1.3 核心用户旅程（真实 UI + 真实 HTTP + 真实磁盘）
 
 浏览器实测（Chrome，本机 5198 端口生产构建）：首启五步向导建书 → 工作台绑定《发布验收之书》 → 编辑器实时质量遥测（字数/4-gram/De-AI 分） → Accept 落稿 → 磁盘 `正文/第一卷/第0001章.md` 带正确 frontmatter（revision/phase/originAuthor）。
@@ -59,7 +61,7 @@ HTTP 冒烟（发布包内）：`/` 200、`/api/membership` 诚实目录、`/api
 
 ## 4. 已知风险与未验证项（无 P0/P1 阻断，如实列出）
 
-1. **L2 真模型冒烟未跑**：本机无 LLM Key，`pnpm verify:real-model` 如实 BLOCKED；T18（50 章真模型长篇验收）为计划内 blocked 任务。上一次 VERIFIED 取证停留在 39 个提交之前（fcc51d2）。
+1. ~~L2 真模型冒烟未跑~~ **已收口**：知识库密钥授权后三连真实冒烟 3/3 VERIFIED（见 §1.2 末条）。T18 的 500 章/150 万字规模与 2 小时负载验收仍属计划内 blocked（需要专项预算）。
 2. **独立安全复验（T19）未做**：计划要求实施者之外的人签署；本报告不构成安全签核。
 3. **Windows 信号停机不可验证**：优雅停机已在 Linux 容器实证；Windows 原生 SIGTERM 语义受平台限制（会走 `exit` 钩子收口，但不做请求排空）。
 4. **Tauri 桌面安装包（004 SC-4 / T17）**：未发布亦未验证（Rust 工具链在本机但 Tauri CLI 未锁定为 devDependency）；README 已声明 Tauri 安装是独立发布面。

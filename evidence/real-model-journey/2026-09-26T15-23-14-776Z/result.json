@@ -1,0 +1,24 @@
+{
+  "kind": "test",
+  "status": "VERIFIED",
+  "sourceCommit": "9479de5",
+  "command": "node scripts/verify-real-model-journey.mjs",
+  "exitCode": 0,
+  "scope": "真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 正典提案作者裁决 → 定稿提交",
+  "provider": {
+    "frame": "real-openai-compatible",
+    "base": "https://token.sensenova.cn/v1",
+    "model": "deepseek-v4-flash"
+  },
+  "result": {
+    "promptChars": 54,
+    "generatedChars": 188,
+    "generatedHead": "雾还没散尽，渡口木桩上凝着一层水珠。他踩过湿漉漉的跳板，鼻尖灌满河水的腥气和铁锈味。那艘船泊在薄雾里，比他见过的任何一艘都要大——漆面剥落，船艏却描着金色纹样。\n\n铃响了，缆绳拖拽声沉闷粗重。晨光斜斜打过来，把锈迹斑斑的船舷染成暗金色，船壳",
+    "candidateId": "620a3306-8b37-48ba-a8bb-a80f4c8cc6d8",
+    "outcome": "succeeded",
+    "commitId": "cmit_01M3F53K6X9HFJJWE31CBJE6PV",
+    "contentSha256": "f46b45dca88d871073500acbafc8a8a129d0dc17687b422a198ddc0f880ae3fd",
+    "proseFile": "正文/第一卷/第0001章.md"
+  },
+  "limitations": []
+}

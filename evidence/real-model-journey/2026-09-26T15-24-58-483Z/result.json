@@ -1,0 +1,24 @@
+{
+  "kind": "test",
+  "status": "VERIFIED",
+  "sourceCommit": "9479de5",
+  "command": "node scripts/verify-real-model-journey.mjs",
+  "exitCode": 0,
+  "scope": "真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 正典提案作者裁决 → 定稿提交",
+  "provider": {
+    "frame": "real-openai-compatible",
+    "base": "https://token.sensenova.cn/v1",
+    "model": "deepseek-v4-flash"
+  },
+  "result": {
+    "promptChars": 54,
+    "generatedChars": 246,
+    "generatedHead": "# 第一章 启程\n\n晨雾压在江面上，渡口木板的苔藓被露水浸得发亮。陈屿踏下最后一级石阶时，一声汽笛闷闷地撞进耳膜，沉哑得像从水底翻涌上来。\n\n他抬眼，看到了那艘船。\n\n船身铁灰，锈迹沿焊缝蜿蜒如旧疤，吃水线以下一片黛绿。江风裹着机油和铁腥气",
+    "candidateId": "eb10fc25-f906-4cc8-a79a-510f007d8dfe",
+    "outcome": "succeeded",
+    "commitId": "cmit_01M3F55SWE1ZHNK4GHFBV6EWKB",
+    "contentSha256": "10040d00d9e72c69b4f2d94a170dc3b4d96124c83319799ce3468bfaf748d1d3",
+    "proseFile": "正文/第一卷/第0001章.md"
+  },
+  "limitations": []
+}

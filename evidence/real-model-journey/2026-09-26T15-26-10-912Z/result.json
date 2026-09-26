@@ -1,0 +1,24 @@
+{
+  "kind": "test",
+  "status": "VERIFIED",
+  "sourceCommit": "9479de5",
+  "command": "node scripts/verify-real-model-journey.mjs",
+  "exitCode": 0,
+  "scope": "真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 正典提案作者裁决 → 定稿提交",
+  "provider": {
+    "frame": "real-openai-compatible",
+    "base": "https://token.sensenova.cn/v1",
+    "model": "deepseek-v4-flash"
+  },
+  "result": {
+    "promptChars": 54,
+    "generatedChars": 292,
+    "generatedHead": "雾没有散，江面只剩下一片灰白。渡口的木桩被潮水泡得发黑，踩上去时发出沉闷的咯吱声。\n\n他站在石阶上，闻到江水混着柴油和铁锈的气味从雾里漫过来。那气味很淡，却比身后的村庄更近。\n\n然后船出现了。\n\n船头先破开雾，像一枚铁钉从灰布里刺出来。轮廓",
+    "candidateId": "93b5da9d-e632-46f4-824e-8588dab8eb92",
+    "outcome": "succeeded",
+    "commitId": "cmit_01M3F571BHW7B65DD06V094YHZ",
+    "contentSha256": "07aa5b6129bd88015406b035d4e2f7647cafc6f6184afed68fe4bcf28fd813b6",
+    "proseFile": "正文/第一卷/第0001章.md"
+  },
+  "limitations": []
+}

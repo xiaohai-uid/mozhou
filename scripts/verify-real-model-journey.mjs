@@ -254,12 +254,41 @@ try {
   }
   log('prose on disk verified to contain generated text');
 
-  // 6. 定稿提交
-  const commit = await postJson('/api/chapter.commit', {
+  // 6. 定稿提交（含 S6 提案作者裁决）
+  // LLM 提取的 medium 风险正典提案按设计必须作者逐项裁决后才能提交
+  // （409 CANON_PROPOSAL_PENDING，"本章正典零写入"）。本脚本在旅程中扮演作者：
+  // 对未决项显式 confirm 后重试提交。跳过这一步的旧版脚本只在「提取全部低风险、
+  // 路由自动确认」时才能通过，不能代表真实用户路径。
+  let commit = await postJson('/api/chapter.commit', {
     root: bookRoot,
     chapterIndex: 1,
     summary: '真实模型端到端验收 · 第 1 章定稿',
   });
+  if (commit.status === 409 && commit.data.code === 'CANON_PROPOSAL_PENDING') {
+    const proposalId = commit.data.proposalId;
+    const pendingItems = Array.isArray(commit.data.pendingItems) ? commit.data.pendingItems : [];
+    if (!proposalId || pendingItems.length === 0) {
+      throw new Error(`chapter.commit 409 CANON_PROPOSAL_PENDING without pending items: ${JSON.stringify(commit.data)}`);
+    }
+    log(`canon proposal pending: ${proposalId} · ${pendingItems.length} 项待作者裁决，逐项 confirm`);
+    for (const item of pendingItems) {
+      const decision = await postJson('/api/proposal.decide', {
+        root: bookRoot,
+        proposalId,
+        itemId: item.itemId,
+        action: 'confirm',
+      });
+      if (decision.status !== 200 || decision.data.ok !== true) {
+        throw new Error(`proposal.decide failed: HTTP ${decision.status} ${JSON.stringify(decision.data)}`);
+      }
+      log(`proposal item confirmed: ${item.itemId} (${item.family ?? 'unknown'})`);
+    }
+    commit = await postJson('/api/chapter.commit', {
+      root: bookRoot,
+      chapterIndex: 1,
+      summary: '真实模型端到端验收 · 第 1 章定稿',
+    });
+  }
   if (commit.status !== 200 || commit.data.ok !== true) {
     throw new Error(`chapter.commit failed: HTTP ${commit.status} ${JSON.stringify(commit.data)}`);
   }
@@ -271,7 +300,7 @@ try {
     sourceCommit: sourceCommit(),
     command: 'node scripts/verify-real-model-journey.mjs',
     exitCode: 0,
-    scope: '真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 定稿提交',
+    scope: '真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 正典提案作者裁决 → 定稿提交',
     provider: {
       frame: startFrame.provider,
       base: process.env.MOZHOU_API_BASE ?? 'provider default',
@@ -300,7 +329,7 @@ try {
     sourceCommit: sourceCommit(),
     command: 'node scripts/verify-real-model-journey.mjs',
     exitCode,
-    scope: '真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 定稿提交',
+    scope: '真实模型端到端旅程：建书 → 建章 → 真实流式生成 → 采纳候选 → 正典提案作者裁决 → 定稿提交',
     error: message,
     limitations,
   });
