@@ -5,6 +5,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { ApiRouter } from './router.js'
+import { healthRoutes } from './routes/healthRoutes.js'
 import { storyBrainRoutes } from './routes/storyBrainRoutes.js'
 import { pipelineRoutes } from './routes/pipelineRoutes.js'
 import { worksRoutes } from './routes/worksRoutes.js'
@@ -578,6 +579,8 @@ export interface CapabilitySquareResponse {
  */
 export function createMoZhouApiRouter(): ApiRouter {
   return new ApiRouter()
+    // 健康探针置首：路径固定、无副作用、被编排层高频轮询，不应被任何业务处理器抢答。
+    .use(healthRoutes)
     .use(storyBrainRoutes)
     .use(pipelineRoutes)
     .use(worksRoutes)

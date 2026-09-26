@@ -12,10 +12,14 @@ export default tseslint.config(
         // 服务端 *.test.ts 不在 app 工程（include: src）内；projectService 只按目录
         // 发现 tsconfig.json，tsconfig.server.json 不被自动发现——按目录扁平登记
         // （allowDefaultProject 不支持递归 glob，新 server 测试目录需在此补一行）。
+        // observability.ts 与 productionServer.ts 一样是无引用的孤儿模块，进不了任何
+        // TS program，需在此登记；dataRoot.ts 被 bookAccess.ts 引用、可被项目服务
+        // 传递发现，登记进 allowDefaultProject 反而报「重复包含」。
         projectService: {
           allowDefaultProject: [
             'scripts/*.mjs',
             'apps/web/server/productionServer.ts',
+            'apps/web/server/observability.ts',
             'apps/web/server/*.test.ts',
             'apps/web/server/routes/*.test.ts',
             'apps/web/server/storyboard/*.test.ts',
@@ -27,7 +31,9 @@ export default tseslint.config(
             'apps/web/server/llm/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 50,
+          // 2026-09-26 由 50 上调至 64：observability 模块 + 四个新测试文件
+          // （dataRoot/observability/healthRoutes/masterKey）计入默认项目。
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 64,
         },
         tsconfigRootDir: import.meta.dirname,
       },
