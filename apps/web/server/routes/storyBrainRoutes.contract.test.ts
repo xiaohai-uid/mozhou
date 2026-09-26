@@ -110,7 +110,7 @@ describe('POST /api/story-brain.contract · 追踪流基线纪律', () => {
     }
   })
 
-  it('反向对照：绕过吸收的裸追加必须被 verifyBaseline 标记（守卫有检出力）', async () => {
+  it('反向对照：绕过吸收的裸追加必须被 verifyBaseline 标记（守卫有检出力）', () => {
     const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-contract-ctl-'))
     tempDirs.push(dataRoot)
     defaultBookAccessManager.setDataRoot(dataRoot)
