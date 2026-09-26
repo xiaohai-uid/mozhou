@@ -9,6 +9,10 @@
  * 同文件第二组：Prepare 步进生产编译（chapter-pipeline-spec S2 + ADR-0025）——
  * stale 标记与有界质量切片必须真的走到模型输入（packet.structural/text）并留痕
  * Receipt；无标记/无质量文件不得凭空造段（零噪声不变量）。
+ *
+ * 同文件第三组：风格画像注入（data-flywheel-v1-spec §2.1 [B4]）——文风.md 四场景型
+ * 必须真的进 compile 结构层且取盘上现值（学习/手改下一章即生效）；画像缺席/损坏/
+ * 超 800 token 预算一律响亮失败，不静默降级成“无文风”。
  */
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -25,11 +29,17 @@ import {
   parseFrontmatter,
   propagateStaleMarkers,
   readManifest,
+  readStyleProfiles,
+  serializeStyleProfiles,
+  STYLE_PROFILE_PATH,
   type PlaneContext,
+  type StyleProfilesMap,
 } from '@mozhou/data-plane'
 import { RECEIPTS_DIRNAME } from '@mozhou/context-compiler'
+import { updateStyleProfiles, writeStyleProfiles } from '@mozhou/flywheel'
 import { newFactId } from '@mozhou/kernel'
 import type { BookId, EntityRef, FactId } from '@mozhou/kernel'
+import { PublishBus } from '@mozhou/runtime'
 import {
   FAILURE_MEMORY_PATH,
   MEMORY_ANCHORS_PATH,
@@ -283,5 +293,123 @@ describe('buildDraftContext · Prepare 步（stale + 质量切片）', () => {
     await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })).rejects.toThrow(
       /malformed stale marker fields/,
     )
+  })
+})
+
+/* ---------------------------------------------------------------------------
+ * 风格画像进生产编译：四场景型全注入（data-flywheel-v1-spec §2.1 [B4]）
+ * ------------------------------------------------------------------------- */
+
+function styleSectionOf(packet: { structural: readonly { section: string; text: string }[] }, scenarioType: string): string | undefined {
+  return structuralOf(packet, 'style_profile:' + scenarioType)
+}
+
+/** 走生产写口（StyleProfileStore 单口）落一份学习结果，供下一章生成消费。 */
+function applyLearning(root: string, next: StyleProfilesMap): void {
+  writeStyleProfiles({
+    bus: new PublishBus(),
+    bookRoot: root,
+    taskRef: 'tsk_style_wiring',
+    chapterIndex: 2,
+    next,
+  })
+}
+
+describe('buildDraftContext · 风格画像注入（t51:B4）', () => {
+  it('四场景型全注入：section 键冻结、内容到达模型输入', async () => {
+    const { root } = makeBook(true)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    const styleKeys = result.packet.structural
+      .map((piece) => piece.section)
+      .filter((section) => section.startsWith('style_profile:'))
+    // 四型全注入（否决 top-2），序 = SCENARIO_TYPES 冻结序
+    expect(styleKeys).toEqual([
+      'style_profile:action',
+      'style_profile:dialogue',
+      'style_profile:romance_emotion',
+      'style_profile:exposition_worldbuilding',
+    ])
+    // packet.text 即送模型的 prompt：画像必须真的在里面，不能只留在结构层
+    expect(result.packet.text).toContain('# action StyleProfile v0')
+    expect(result.packet.text).toContain('dialogueRatio: 0.300')
+  })
+
+  it('取盘上现值：学习后的 revision/分面下一章即进编译（不是播种常量）', async () => {
+    const { root } = makeBook(true)
+    const seed = readStyleProfiles(root)
+    const { next } = updateStyleProfiles(
+      seed,
+      Array.from({ length: 10 }, () => ({
+        scenarioType: 'action' as const,
+        chapterIndex: 2,
+        polarity: 'positive' as const,
+        dialogueRatio: 0.9,
+        sentenceLengths: [40],
+      })),
+    )
+    applyLearning(root, next)
+    const onDisk = readStyleProfiles(root)
+    expect(onDisk.action.revision).toBe(seed.action.revision + 1) // 前置：学习确实落盘
+    expect(onDisk.action.dialogueRatio).not.toBe(seed.action.dialogueRatio)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    const action = styleSectionOf(result.packet, 'action')
+    expect(action).toContain('revision: ' + onDisk.action.revision)
+    expect(action).toContain('dialogueRatio: ' + onDisk.action.dialogueRatio.toFixed(3))
+    // 反证：若读的是播种值，action 段仍是 0.300
+    expect(action).not.toContain('dialogueRatio: ' + seed.action.dialogueRatio.toFixed(3))
+  })
+
+  it('失败路径：文风.md 缺席即显式失败，不静默无文风继续、不落钉版', async () => {
+    const { root } = makeBook(true)
+    rmSync(join(root, STYLE_PROFILE_PATH))
+
+    await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })).rejects.toThrow(
+      /文风\.md/,
+    )
+    expect(readPendingDependencyManifest(root, 2)).toBeNull()
+  })
+
+  it('失败路径：文风.md 围栏损坏即报错，不吞成“无画像”', async () => {
+    const { root } = makeBook(true)
+    const raw = readFileSync(join(root, STYLE_PROFILE_PATH), 'utf8')
+    const document = parseFrontmatter(raw)
+    // 保留 frontmatter，删掉 fenced-YAML 块（模拟手改损坏的旧格式文件）
+    writeFileSync(join(root, STYLE_PROFILE_PATH), `${emitFrontmatter(document.data)}# 文风画像\n\n> 手改损坏：围栏块被删\n`, 'utf8')
+
+    await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })).rejects.toThrow(/围栏/)
+    expect(readPendingDependencyManifest(root, 2)).toBeNull()
+  })
+
+  it('失败路径：画像合计超 800 token 预算即抛错（硬断言接线，不是死代码）', async () => {
+    const { root } = makeBook(true)
+    const raw = readFileSync(join(root, STYLE_PROFILE_PATH), 'utf8')
+    const profiles = readStyleProfiles(root)
+    // 作者手改 文风.md 是权威通道（store 文档：手改走 EXTERNAL_MODIFIED 且永远赢）：
+    // 400 个句长桶即可把单段推到 800 token 预算之上。此处证明超限在生成入口响亮失败，
+    // 而不是被静默截断/丢段后照常出稿。
+    writeFileSync(
+      join(root, STYLE_PROFILE_PATH),
+      serializeStyleProfiles(raw, {
+        ...profiles,
+        action: {
+          ...profiles.action,
+          sentenceLengthDistribution: Array.from({ length: 400 }, (_, index) => ({
+            maxLengthChars: index + 1,
+            share: 0.0025,
+          })),
+        },
+      }),
+      'utf8',
+    )
+
+    await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })).rejects.toThrow(
+      /exceed token budget/,
+    )
+    expect(readPendingDependencyManifest(root, 2)).toBeNull()
   })
 })

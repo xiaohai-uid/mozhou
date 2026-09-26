@@ -1,8 +1,10 @@
 import {
   LocalDataPlane,
   readNarrativeSnapshot,
+  readStyleProfiles,
 } from '@mozhou/data-plane'
 import { EmptyRecallError, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
+import { assertStyleSectionsWithinBudget, renderStyleSections } from '@mozhou/flywheel'
 import { prepareChapterInputs, qualityStructuralSections, runCompileStep } from '@mozhou/pipeline'
 
 const PREVIEW_CONTEXT_WINDOW_TOKENS = 32_000
@@ -106,12 +108,19 @@ export async function buildDraftContext(input: {
     // 并入既有结构段通道。章大纲缺失/非法原样抛出：宁败不脏，不降级成假上下文。
     const prepared = prepareChapterInputs(input.root, input.chapterIndex)
 
+    // 风格画像（t51:B4）：文风.md 四场景型全注入 compile 结构层，section 键冻结为
+    // style_profile:<scenarioType>。每次生成重扫盘上现值——StyleLearner 学习与文风面板
+    // 改动因此下一章即生效；合计超 800 token 预算即抛错（冻结硬约束），不用泛化话术冒充文风。
+    const styleSections = renderStyleSections(readStyleProfiles(input.root))
+    assertStyleSectionsWithinBudget(styleSections)
+
     const structuralSections = [
       {
         section: 'book_identity',
         content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
       },
       ...qualityStructuralSections(prepared.qualitySlice),
+      ...styleSections,
     ]
 
     try {
