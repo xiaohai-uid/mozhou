@@ -413,3 +413,24 @@ describe('buildDraftContext · 风格画像注入（t51:B4）', () => {
     expect(readPendingDependencyManifest(root, 2)).toBeNull()
   })
 })
+
+describe('buildDraftContext · 预算路径用精确 tokenizer（token-budget-assembly-spec §3）', () => {
+  it('落盘 receipt 记录的计量器是随仓 WordPiece 词表，不是码点估算器', async () => {
+    const { root } = makeBook(true)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+    expect(result.mode).toBe('compiled_receipt')
+
+    // 规格明令估算器严禁进入预算核算路径；receipt 的 replayInputs 是「这次装配到底用了
+    // 哪个计量器」的权威记录，也是复算校验的依据（receipt-replay 会逐字比对版本）。
+    const receiptDir = join(root, ...RECEIPTS_DIRNAME.split('/'))
+    const receiptFiles = readdirSync(receiptDir).filter((name) => name.endsWith('.json'))
+    expect(receiptFiles.length).toBeGreaterThan(0)
+    const receipt = JSON.parse(readFileSync(join(receiptDir, receiptFiles[0]!), 'utf8')) as {
+      replayInputs: { tokenizerVersion: string; modelProfileId: string }
+    }
+    expect(receipt.replayInputs.tokenizerVersion).toBe('mozhou-bert-wordpiece-bge-small-zh-v1.5-v1')
+    expect(receipt.replayInputs.tokenizerVersion).not.toBe('mozhou-preview-codepoint-budget-v1')
+    expect(receipt.replayInputs.modelProfileId).toBe('mozhou-preview-wordpiece-budget-v1')
+  })
+})

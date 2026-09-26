@@ -3,7 +3,7 @@ import {
   readNarrativeSnapshot,
   readStyleProfiles,
 } from '@mozhou/data-plane'
-import { EmptyRecallError, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
+import { EmptyRecallError, createLocalTokenizer, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
 import { assertStyleSectionsWithinBudget, renderStyleSections } from '@mozhou/flywheel'
 import { prepareChapterInputs, qualityStructuralSections, runCompileStep } from '@mozhou/pipeline'
 
@@ -12,21 +12,19 @@ const MAX_RECENT_CHAPTERS = 3
 const MAX_RECENT_CHARS_PER_CHAPTER = 12_000
 
 /**
- * v0.1 Technical Preview 的确定性本地 Token 计数器。
- * 依据加固设计要求（Plan §Task 5）：采用确定性 Unicode 码点（codepoint count）计量，
- * 使中文正典与小说上下文按 1 字符 ≈ 1 Token 比例拟合大模型 Token 预算，
- * 避免直接以 UTF-8 原始字节三倍虚高导致正典过早截断。
+ * 预算路径的 Token 计量（token-budget-assembly-spec §3）。
+ *
+ * 用随仓 bge-small-zh-v1.5 WordPiece 词表真实分词。此前这里是「1 码点 ≈ 1 token」
+ * 估算器，规格明令禁止估算器进入预算核算路径——实测偏差可达百倍（'A'×150 估算 150、
+ * 实际 1 个 [UNK]；'internationalization' 估算 20、实际 4），而它直接驱动正文保底
+ * 配额与结构层截断。
+ *
+ * 惰性装载：资产缺失时让预算路径响亮失败（TokenizerAssetsError），而不是整个服务起不来。
  */
-const previewCodepointTokenizer: ExactTokenizer = {
-  version: 'mozhou-preview-codepoint-budget-v1',
-  count(text: string): number {
-    let count = 0
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for (const _char of text) {
-      count += 1
-    }
-    return count
-  },
+let tokenizerSingleton: ExactTokenizer | null = null
+function exactTokenizer(): ExactTokenizer {
+  tokenizerSingleton ??= createLocalTokenizer()
+  return tokenizerSingleton
 }
 
 function recentStoryText(plane: LocalDataPlane, chapterIndex: number): string[] {
@@ -60,7 +58,7 @@ function structuralFallback(
       section: `entity:${card.ref}`,
       text: `${card.brief ?? ''}\n`,
     })),
-  ].map((piece) => ({ ...piece, tokens: previewCodepointTokenizer.count(piece.text) }))
+  ].map((piece) => ({ ...piece, tokens: exactTokenizer().count(piece.text) }))
 
   const storyBody = storyText.join('\n\n')
   const storyRendered = storyBody.length > 0 ? storyBody + '\n' : ''
@@ -72,11 +70,11 @@ function structuralFallback(
     settings: [],
     story: {
       text: storyRendered,
-      tokens: previewCodepointTokenizer.count(storyRendered),
+      tokens: exactTokenizer().count(storyRendered),
       trimType: 'none',
     },
     text,
-    totalTokens: previewCodepointTokenizer.count(text),
+    totalTokens: exactTokenizer().count(text),
   }
 }
 
@@ -135,10 +133,10 @@ export async function buildDraftContext(input: {
         structuralSections,
         storyText,
         modelProfile: {
-          id: 'mozhou-preview-codepoint-budget-v1',
+          id: 'mozhou-preview-wordpiece-budget-v1',
           contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
         },
-        tokenizer: previewCodepointTokenizer,
+        tokenizer: exactTokenizer(),
       })
       return { packet: outcome.packet, mode: 'compiled_receipt' }
     } catch (error) {

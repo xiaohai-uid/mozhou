@@ -10,6 +10,9 @@ export {
 } from './embedding.js'
 export type { CreateLocalEmbeddingProviderOptions, LocalEmbeddingProvider } from './embedding.js'
 
+/** 精确 Token 计量（token-budget-assembly-spec §3）：随仓 WordPiece 词表真实分词，取代码点估算器。 */
+export { createLocalTokenizer, TokenizerAssetsError } from './tokenizer.js'
+
 /** 关键词 + k-hop + embedding 三通道召回（T8a #21 / T8b-2 #24）：别名/正则快通道 + POV 可见子图扩边 + cosine 兜底 + raw 分 max 合并。 */
 export {
   DEFAULT_KHOP_RECALL_CONFIG,
