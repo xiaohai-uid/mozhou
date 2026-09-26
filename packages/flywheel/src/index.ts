@@ -110,13 +110,15 @@ export type {
 export { runStyleLearnerForWindow } from './style-runner.js';
 export type { RunStyleLearnerOutcome, RunStyleLearnerRequest } from './style-runner.js';
 
-/** 注入缝：StyleProfile → compile() structuralSections（t51:B4 四场景型全注入 ≤800 token）。 */
+/** 注入缝：StyleProfile → compile() structuralSections（t51:B4 四场景型全注入 ≤800 token
+ *  精确计量——计量器由编排方注入，规格 §3 禁估算器进预算路径）。 */
 export {
   STYLE_SECTIONS_TOKEN_BUDGET,
   assertStyleSectionsWithinBudget,
-  estimateStyleSectionsTokens,
+  countStyleSectionsTokens,
   renderStyleSections,
 } from './style-sections.js';
+export type { StyleSection, StyleTokenCounter } from './style-sections.js';
 
 /** 语义层骨架（T28 · #69）：advisory-only 报告载荷 + 分析器 + 一报一文件存储。 */
 export {

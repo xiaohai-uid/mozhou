@@ -35,8 +35,8 @@ import {
   type PlaneContext,
   type StyleProfilesMap,
 } from '@mozhou/data-plane'
-import { RECEIPTS_DIRNAME } from '@mozhou/context-compiler'
-import { updateStyleProfiles, writeStyleProfiles } from '@mozhou/flywheel'
+import { RECEIPTS_DIRNAME, createLocalTokenizer } from '@mozhou/context-compiler'
+import { renderStyleSections, countStyleSectionsTokens, assertStyleSectionsWithinBudget, updateStyleProfiles, writeStyleProfiles } from '@mozhou/flywheel'
 import { newFactId } from '@mozhou/kernel'
 import type { BookId, EntityRef, FactId } from '@mozhou/kernel'
 import { PublishBus } from '@mozhou/runtime'
@@ -391,7 +391,7 @@ describe('buildDraftContext · 风格画像注入（t51:B4）', () => {
     const profiles = readStyleProfiles(root)
     // 作者手改 文风.md 是权威通道（store 文档：手改走 EXTERNAL_MODIFIED 且永远赢）：
     // 400 个句长桶即可把单段推到 800 token 预算之上。此处证明超限在生成入口响亮失败，
-    // 而不是被静默截断/丢段后照常出稿。
+    // 而不是被静默截断/丢段后照常出稿。精确计量口径下 400 桶实测 3445 token > 800。
     writeFileSync(
       join(root, STYLE_PROFILE_PATH),
       serializeStyleProfiles(raw, {
@@ -411,6 +411,55 @@ describe('buildDraftContext · 风格画像注入（t51:B4）', () => {
       /exceed token budget/,
     )
     expect(readPendingDependencyManifest(root, 2)).toBeNull()
+  })
+
+  it('生产路径回归：字符口径越限、精确口径在预算内的画像不再误杀生成（token-budget-assembly-spec §3）', async () => {
+    const { root } = makeBook(true)
+    const raw = readFileSync(join(root, STYLE_PROFILE_PATH), 'utf8')
+    const profiles = readStyleProfiles(root)
+    // 每场景型 14 个句长桶（share 归一）。旧的 chars/1.5 估算器在这里报 1012 > 800
+    // 直接抛错把整章生成阻断；随仓 WordPiece 词表实测 712 ≤ 800，本应放行。
+    // 落盘膨胀走句长桶而非禁用词：文风.md 解析器（style-profiles.ts:248）把
+    // tabooWords 子表排除在 fields 计数外，非空禁用词当前无法 round-trip（本工单范围外）。
+    const buckets = Array.from({ length: 14 }, (_, index) => ({
+      maxLengthChars: (index + 1) * 10,
+      share: 1 / 14,
+    }))
+    const inflated = Object.fromEntries(
+      Object.entries(profiles).map(([key, row]) => [key, { ...row, sentenceLengthDistribution: buckets }]),
+    ) as unknown as StyleProfilesMap
+    writeFileSync(join(root, STYLE_PROFILE_PATH), serializeStyleProfiles(raw, inflated), 'utf8')
+
+    // 前置断言：这确实是「估算器误杀」场景（字符口径超限、精确口径在预算内）
+    const sections = renderStyleSections(readStyleProfiles(root))
+    const tokenizer = createLocalTokenizer()
+    const chars = sections.reduce((sum, section) => sum + section.content.length + section.section.length, 0)
+    const exact = countStyleSectionsTokens(sections, tokenizer)
+    expect(Math.ceil(chars / 1.5)).toBeGreaterThan(800)
+    expect(exact).toBeLessThanOrEqual(800)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    // 画像真的进了模型输入（不是只过了断言就丢段）
+    expect(result.packet.text).toContain('# action StyleProfile v0')
+  })
+
+  it('反回归（ask 实测场景）：四场景型各 20 个禁用词，估算器越限而精确口径放行', () => {
+    const profiles = readStyleProfiles(makeBook(true).root)
+    const tabooWords = Array.from({ length: 20 }, (_, index) =>
+      '禁词甲乙丙丁戊己庚辛壬癸子丑寅卯'.slice(index % 8, (index % 8) + 3),
+    )
+    const sections = renderStyleSections(
+      Object.fromEntries(
+        Object.entries(profiles).map(([key, row]) => [key, { ...row, tabooWords }]),
+      ) as unknown as StyleProfilesMap,
+    )
+    const tokenizer = createLocalTokenizer()
+    const chars = sections.reduce((sum, section) => sum + section.content.length + section.section.length, 0)
+    expect(Math.ceil(chars / 1.5)).toBeGreaterThan(800) // 旧估算器在此抛错
+    expect(countStyleSectionsTokens(sections, tokenizer)).toBeLessThanOrEqual(800)
+    expect(() => assertStyleSectionsWithinBudget(sections, tokenizer)).not.toThrow()
   })
 })
 

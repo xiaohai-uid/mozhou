@@ -109,8 +109,10 @@ export async function buildDraftContext(input: {
     // 风格画像（t51:B4）：文风.md 四场景型全注入 compile 结构层，section 键冻结为
     // style_profile:<scenarioType>。每次生成重扫盘上现值——StyleLearner 学习与文风面板
     // 改动因此下一章即生效；合计超 800 token 预算即抛错（冻结硬约束），不用泛化话术冒充文风。
+    // 计量用预算路径同一个精确 tokenizer（规格 §3 禁估算器）：估算器曾把 1120 精确 token
+    // 的画像报成 1228 而误杀生成，故这里与 assemble 的结构层口径逐字对齐。
     const styleSections = renderStyleSections(readStyleProfiles(input.root))
-    assertStyleSectionsWithinBudget(styleSections)
+    assertStyleSectionsWithinBudget(styleSections, exactTokenizer())
 
     const structuralSections = [
       {
