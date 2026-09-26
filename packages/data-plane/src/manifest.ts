@@ -6,8 +6,9 @@
  * 格式刻意无时间戳：同 canon 状态 ⇒ 逐字节相同的 manifest，
  * 让「重建前后基线幂等」成为可机械断言的性质。
  */
-import { closeSync, fsyncSync, openSync, readdirSync, readFileSync, renameSync, statSync, writeSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { isCanonRelPath, MANIFEST_PATH } from './layout.js'
 import { sha256FileHex } from './sha256.js'
 
@@ -102,23 +103,14 @@ function statSyncSafe(path: string): boolean {
 }
 
 /**
- * 基线落盘：同目录临时文件 → fsync → rename。
+ * 基线落盘：同目录临时文件 → fsync → rename（见 atomicWriteFileSync）。
  *
  * rename 是唯一可见点，因此掉电最多丢掉本次写入，绝不会在盘上留下被截断的
  * 半份 manifest——截断的 manifest 会让整本书经应用无法打开（可用性中断）。
  * fsync 保证 rename 可见时内容已在介质上，而非停留在页缓存。
  */
 export function writeManifest(root: string, manifest: HashManifest): void {
-  const absolute = join(root, MANIFEST_PATH)
-  const tmp = `${absolute}.mozhou-tmp`
-  const fd = openSync(tmp, 'w')
-  try {
-    writeSync(fd, `${JSON.stringify(manifest, null, 2)}\n`)
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
-  renameSync(tmp, absolute)
+  atomicWriteFileSync(join(root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`)
 }
 
 /**

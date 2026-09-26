@@ -2,8 +2,9 @@
  * @mozhou/data-plane · AI 味反例动态吸收与金句收割引擎 (Learn Engine)
  * 移植自 storyrepo/learn.py 并消除写死目录耦合，适配墨舟 data-plane。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { atomicWriteFileSync } from './atomic-write.js'
 
 export const MAX_COUNTEREXAMPLES = 200
 export const MAX_EVIDENCE_LEN = 20
@@ -77,7 +78,7 @@ export function absorbReviewCounterexamples(
   }
 
   const content = `# 审查反例库（AI 味高危短语，机检动态合并）\n\n${entries.join('\n')}\n`
-  writeFileSync(p, content, 'utf-8')
+  atomicWriteFileSync(p, content)
 
   return newItems.length
 }
@@ -114,7 +115,7 @@ export function harvestQuotesFromProse(
   const targetFile = join(d, `${String(chapterIndex).padStart(3, '0')}.md`)
 
   const content = `# 第 ${chapterIndex} 章 摘录金句\n\n${candidates.join('\n')}\n`
-  writeFileSync(targetFile, content, 'utf-8')
+  atomicWriteFileSync(targetFile, content)
 
   return candidates
 }

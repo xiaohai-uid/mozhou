@@ -11,10 +11,11 @@
  * 预算：单次传播 ≤100ms（T26 StaleBudgetError 承载）；扫描 N=100 章/批（T25 预算）。
  * 纯机械、零 LLM；StaleMarker 停靠仍归 propagateStaleMarkers（T6，本模块只产出 impact 投影）。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type { DependencyManifest, DependencyManifestEntry } from '@mozhou/kernel'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { RUNTIME_EVENTS_PATH } from './layout.js'
 import { openPinsWindow, findReaders, assertWithinBudget } from './stale-cache.js'
 import type { PinsWindow } from './stale-cache.js'
@@ -115,14 +116,11 @@ export function runTraversal(request: TraversalRequest): TraversalOutcome {
     recordedAt: request.recordedAt,
   }
 
-  // 原子落盘：tmp + rename（借鉴 ledger 模板）
+  // 原子落盘：tmp → fsync → rename（见 atomicWriteFileSync）
   const impactDir = join(root, IMPACT_DIR_RELPATH)
   mkdirSync(impactDir, { recursive: true })
-  const relName = 'impact_' + traversalId + '.json'
-  const absolute = join(impactDir, relName)
-  const tmp = absolute + '.tmp'
-  writeFileSync(tmp, JSON.stringify(record) + '\n')
-  renameSync(tmp, absolute)
+  const relName = `impact_${traversalId}.json`
+  atomicWriteFileSync(join(impactDir, relName), `${JSON.stringify(record)}\n`)
 
   jsonlAppend(root, {
     type: 'TraversalFinished',

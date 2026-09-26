@@ -158,7 +158,10 @@ describe('L1 确定性生命周期台架（ADR-0016 · 50 章全弧）', () => {
     expect(report.compileAtFifty.detectedOffAliasActivated).toBe(false)
     expect(report.compileAtFifty.parseFailureCount).toBe(0)
     expect(report.compileAtFifty.totalTokens).toBeGreaterThan(report.compile.totalTokens)
-  })
+    // 显式护栏超时，与下方第三用例同理：vitest 默认 5000ms 只够空载，全量并行跑时
+    // CPU/IO 争用会把本用例的墙钟推过 5s（2026-09-26 实测 5025ms 超时）。行为断言
+    // 全部与时间无关，放宽护栏不放宽任何规格判据。
+  }, 60_000)
 
   it('50 章扩模的不变量与失败路径：无空洞章 / 秘密零泄漏 / 钉版豁免不越界', async () => {
     const report = await runLifecycleBench()
@@ -188,7 +191,8 @@ describe('L1 确定性生命周期台架（ADR-0016 · 50 章全弧）', () => {
     // 失败路径⑤「50 章后上下文失稳」：第二次编译必须仍然装配出非空包且零解析失败
     expect(report.compileAtFifty.totalTokens).toBeGreaterThan(0)
     expect(report.compileAtFifty.parseFailureCount).toBe(0)
-  })
+    // 同上：显式护栏，非规格判据（本用例也要完整跑一遍 50 章台架）。
+  }, 60_000)
 
   it('50 章全弧 <5s，且任意顺序可重入：两次独立运行报告逐字段一致', async () => {
     const first = await runLifecycleBench()
@@ -198,6 +202,8 @@ describe('L1 确定性生命周期台架（ADR-0016 · 50 章全弧）', () => {
     expect(stripTiming(second)).toEqual(stripTiming(first))
     // 本文件串跑三次 50 章台架（本用例两次 + 前两个用例各一次），空载约 8.7s；vitest 并行
     // 跑其它文件时 CPU 争用会把整体墙钟推过 15s，所以这里是防挂死的护栏，不是规格判据。
-    // 规格的「50 章 <5s」由上面的 durationMs 断言把守（空载实测约 1.4s，余量约 71%）。
+    // 规格的「50 章 <5s」由上面的 durationMs 断言把守。2026-09-26 起写路径统一加
+    // fsync 耐久屏障（atomicWriteFileSync，单次 +0.6ms），受控 A/B 实测全弧墙钟
+    // 3070→3625ms（+8~20%），durationMs 余量仍 >60%。
   }, 60_000)
 })

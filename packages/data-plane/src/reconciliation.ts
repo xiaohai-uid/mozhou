@@ -27,13 +27,12 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   statSync,
-  writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
 import { newUlid } from '@mozhou/kernel'
 import type Database from 'better-sqlite3'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { readProseChapter } from './chapter.js'
 import { CanonStructureError, readBookRecord, scanEntityCards } from './canon-read.js'
 import {
@@ -704,10 +703,7 @@ export class ReconciliationService {
 
   private persistProposal(proposal: ReconciliationProposal): void {
     mkdirSync(join(this.host.root, RUNTIME_RECONCILIATIONS_DIR), { recursive: true })
-    const target = this.proposalPath(proposal.proposalId)
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, `${JSON.stringify(proposal, null, 2)}\n`)
-    renameSync(tmp, target)
+    atomicWriteFileSync(this.proposalPath(proposal.proposalId), `${JSON.stringify(proposal, null, 2)}\n`)
   }
 
   private loadProposal(proposalId: string): ReconciliationProposal | null {

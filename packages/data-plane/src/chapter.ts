@@ -15,13 +15,15 @@
  * - 五族 delta 在此只做不解释的字节级追加；行语义校验与查询归 T4；
  * - EXTERNAL_MODIFIED 五态协议归 T5，此处只提供 S2 检测面分类；
  * - 快照（每次 commit 后）保留策略未定，整书快照归回滚票；
- * - 掉电级 fsync 屏障待应用壳出现后统一加固，测试注入的是进程内故障。
+ * - 掉电级 fsync 屏障已由 atomicWriteFileSync 统一承担（tmp → fsync → rename），
+ *   测试仍以进程内故障注入为主，掉电语义靠该原语保证而非测试复现。
  */
-import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, statSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, rmSync, statSync, truncateSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { newChapterCommitId, newChapterNodeId, parseDependencyManifest } from '@mozhou/kernel'
 import type { DependencyManifest } from '@mozhou/kernel'
 import type Database from 'better-sqlite3'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { CanonStructureError } from './canon-read.js'
 import { openDatabase } from './database.js'
 import {
@@ -211,12 +213,9 @@ export function renderProseChapter(fields: {
   return `${emitFrontmatter(front)}${fields.body}`
 }
 
-/** 原地替换单个文件：同目录临时文件 + rename（rename 即原子可见点）。 */
+/** 原地替换单个文件：同目录临时文件 → fsync → rename（rename 即原子可见点）。 */
 export function atomicReplace(root: string, relPath: string, content: string): void {
-  const absolute = join(root, relPath)
-  const tmp = `${absolute}.mozhou-tmp`
-  writeFileSync(tmp, content)
-  renameSync(tmp, absolute)
+  atomicWriteFileSync(join(root, relPath), content)
 }
 
 /* ---------------------------------------------------------------------------
@@ -536,11 +535,10 @@ export function createChapterDraft(ctx: PlaneContext, request: CreateChapterDraf
     originAuthor: true,
     protected: true,
   }
-  writeFileSync(
+  atomicWriteFileSync(
     join(ctx.root, outlineRel),
     `${emitFrontmatter(outlineFields)}# ${title}\n\n> 章大纲规划态：scenes 数组挂此处（Scene 一等实体，正文归 ChapterCommit）。\n`,
   )
-
   const proseContent = renderProseChapter({
     mozhouId: chapterNodeId,
     revision: 0,
@@ -548,7 +546,7 @@ export function createChapterDraft(ctx: PlaneContext, request: CreateChapterDraf
     phase: 'draft',
     body: `# ${title}\n`,
   })
-  writeFileSync(join(ctx.root, proseRel), proseContent)
+  atomicWriteFileSync(join(ctx.root, proseRel), proseContent)
 
   ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, [outlineRel, proseRel])
   writeManifestFor(ctx)

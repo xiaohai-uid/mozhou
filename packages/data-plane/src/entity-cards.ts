@@ -10,10 +10,11 @@
  *     新显示名自动入检测表、旧显示名追加为 exact 别名）。
  *   - tags 永不入投影（D4）；正文区人读自由、永不整体入包（D3）。
  */
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AiContextTier, AliasRule, EntityRef } from '@mozhou/kernel'
 import type { Database } from 'better-sqlite3'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { CanonStructureError, parseEntityRef, scanEntityCards, type EntityCardScan } from './canon-read.js'
 import {
   ENTITY_CARD_DIR_BY_PREFIX,
@@ -238,7 +239,7 @@ export function createEntityCard(
 
   const card = buildCardScan(ref, input, fileRel)
   const body = input.body ?? `# ${card.name}\n`
-  writeFileSync(join(ctx.root, fileRel), renderEntityCard(card, body))
+  atomicWriteFileSync(join(ctx.root, fileRel), renderEntityCard(card, body))
 
   ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, [fileRel])
   writeManifest(ctx.root, ctx.manifest)
@@ -305,7 +306,7 @@ export function updateEntityCard(
     fileRel: current.fileRel,
   }
 
-  writeFileSync(join(ctx.root, merged.fileRel), renderEntityCard(merged, body))
+  atomicWriteFileSync(join(ctx.root, merged.fileRel), renderEntityCard(merged, body))
 
   ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, [merged.fileRel])
   writeManifest(ctx.root, ctx.manifest)

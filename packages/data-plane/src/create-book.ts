@@ -4,7 +4,7 @@
  * → SQLite 投影初始化并写入 PROJECTION_SCHEMA_VERSION。
  * 演示 = 磁盘出现一本结构完整的书。
  */
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   newAuthorIntentId,
@@ -14,6 +14,7 @@ import {
   newVolumeNodeId,
   type BookRecord,
 } from '@mozhou/kernel'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { openDatabase } from './database.js'
 import {
   AUTHOR_INTENT_PATH,
@@ -117,16 +118,16 @@ export function createBook(options: CreateBookOptions): CreateBookResult {
   }
 
   // 容器：book.json
-  writeFileSync(join(root, BOOK_RECORD_PATH), `${JSON.stringify(book, null, 2)}\n`)
+  atomicWriteFileSync(join(root, BOOK_RECORD_PATH), `${JSON.stringify(book, null, 2)}\n`)
 
   // 大纲两层种子：总纲（BookNode 根）+ 第一卷（VolumeNode）
   const bookNodeId = newBookNodeId()
   const volumeNodeId = newVolumeNodeId()
-  writeFileSync(
+  atomicWriteFileSync(
     join(root, ZONGGANG_PATH),
     `${emitFrontmatter(outlineFrontmatter({ mozhouId: bookNodeId, nodeType: 'book', parentId: null }))}# ${title}\n\n> 全书主线总纲。层级：卷 → 幕（大纲/章节/）→ 场景（章大纲文件的 scenes 数组）。\n`,
   )
-  writeFileSync(
+  atomicWriteFileSync(
     join(root, VOLUME_ONE_OUTLINE_PATH),
     `${emitFrontmatter(
       outlineFrontmatter({ mozhouId: volumeNodeId, nodeType: 'volume', parentId: bookNodeId }),
@@ -134,24 +135,24 @@ export function createBook(options: CreateBookOptions): CreateBookResult {
   )
 
   // 宪法层与风格档案种子
-  writeFileSync(
+  atomicWriteFileSync(
     join(root, AUTHOR_INTENT_PATH),
     `${emitFrontmatter(planningFrontmatter(newAuthorIntentId(), 'authorIntent'))}# 作者意图\n\n> 宪法层：本文件整体受保护（protectedUserContent=true），自动化通道不得改写。\n\n## 核心爽点\n\n-\n\n## 主角欲望\n\n\n## 绝对禁区\n\n-\n\n## 目标结局\n\n\n## 基调偏好\n`,
   )
-  writeFileSync(
+  atomicWriteFileSync(
     join(root, STYLE_PROFILE_PATH),
     `${emitFrontmatter(planningFrontmatter(newStyleProfileId(), 'styleProfile'))}# 文风画像\n\n> StyleProfile × scenarioType（action / dialogue / romance_emotion / exposition_worldbuilding）；EMA 平滑结果算完即落盘，初始为空表。\n\n${emitStyleProfilesYaml(seedStyleProfileRows())}`,
   )
-  writeFileSync(
+  atomicWriteFileSync(
     join(root, MARKET_BRIEF_PATH),
     '# Market Brief\n\n> 市场/ 区资料永不进入生成 prompt（Research 硬隔离）；benchmarks/ 存对标数据。\n',
   )
 
   // 追踪五族空流 + 运行时区事件账本（纯审计，不承担恢复）
   for (const stream of TRACKING_STREAMS) {
-    writeFileSync(join(root, stream.path), '')
+    atomicWriteFileSync(join(root, stream.path), '')
   }
-  writeFileSync(join(root, RUNTIME_EVENTS_PATH), '')
+  atomicWriteFileSync(join(root, RUNTIME_EVENTS_PATH), '')
 
   // hash 基线最后登记（此刻全部初始 canon 文件已就位）
   writeManifest(root, buildManifest(root, book.id))
