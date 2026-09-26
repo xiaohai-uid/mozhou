@@ -3,9 +3,9 @@
  */
 import type { RouteHandler } from '../router.js'
 import { join } from 'node:path'
-import { writeFileSync } from 'node:fs'
 import {
   LocalDataPlane,
+  atomicWriteFileSync,
   createBook,
   listImpactRecords,
   proseChapterPath,
@@ -308,7 +308,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
               body: `# 第一章\n\n${initialBody}\n`,
             })
             const absPath = join(result.root, proseChapterPath(1))
-            writeFileSync(absPath, updatedContent, 'utf8')
+            atomicWriteFileSync(absPath, updatedContent)
           } finally {
             plane.close()
           }

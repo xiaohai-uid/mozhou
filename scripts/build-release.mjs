@@ -23,7 +23,7 @@ const rootDir = join(__dirname, '..')
 function parsePkg(raw) {
   return JSON.parse(raw)
 }
-const version = parsePkg(readFileSync(join(rootDir, 'package.json'), 'utf8')).version || '0.2.0'
+const version = parsePkg(readFileSync(join(rootDir, 'package.json'), 'utf8')).version || '0.3.0'
 const artifactsDir = join(rootDir, 'release-artifacts')
 const bundleName = `mozhou-v${version}`
 const runtimeDir = join(artifactsDir, bundleName)

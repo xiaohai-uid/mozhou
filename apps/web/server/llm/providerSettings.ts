@@ -8,9 +8,10 @@
  * - 响应脱敏：对外只返回掩码 Key（如 sk-****abcd），绝不外泄明文 Key；
  * - 每次配置修改自增 configVersion 并记录修改时间。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { RequestBoundaryError } from '../security.js'
 import type { ResolvedEndpoint } from './types.js'
@@ -195,7 +196,8 @@ export class ProviderSettingsManager {
 
     const path = this.getSettingsPath(userId)
     const cipherText = encrypt(JSON.stringify(config))
-    writeFileSync(path, cipherText, 'utf8')
+    // 原子写：凭据文件被截断时 getSettings 会静默返回 null，用户保存的 Key 无声丢失。
+    atomicWriteFileSync(path, cipherText)
     return config
   }
 

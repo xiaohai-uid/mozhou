@@ -11,7 +11,9 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export function log(level: LogLevel, event: string, fields: Record<string, unknown> = {}): void {
-  const line = JSON.stringify({ ts: new Date().toISOString(), level, event, ...fields })
+  // fields 先展开、保留键后置：调用方无法用同名字段覆盖 ts/level/event，
+  // 检索按 level 过滤时不会因一个写错的字段而失真。
+  const line = JSON.stringify({ ...fields, ts: new Date().toISOString(), level, event })
   // warn/error 落 stderr，其余落 stdout：便于采集器按流分流告警。
   if (level === 'warn' || level === 'error') {
     process.stderr.write(`${line}\n`)
