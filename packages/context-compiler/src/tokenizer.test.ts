@@ -5,10 +5,31 @@
  * 不是估算。核心回归意义：这批数值与「1 码点 ≈ 1 token」估算器的结果差距巨大
  * （英文尤其明显），任何退回估算器的改动都会让这些断言失败。
  */
-import { describe, expect, it } from 'vitest'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, describe, expect, it } from 'vitest'
 import { createLocalTokenizer, TokenizerAssetsError } from './tokenizer.js'
 
 const tokenizer = createLocalTokenizer()
+
+const tmpDirs: string[] = []
+afterAll(() => {
+  for (const dir of tmpDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+/** 造一个含假词表文件与指定清单的资产目录。 */
+function fakeAssetDir(manifestFiles: readonly { path: string; sha256: string; bytes: number }[]): string {
+  const dir = join(tmpdir(), `mozhou-tok-${process.pid}-${Math.random().toString(36).slice(2)}`)
+  mkdirSync(dir, { recursive: true })
+  tmpDirs.push(dir)
+  // 放一个占位词表文件，使校验走到清单比对而不是先撞「缺文件」
+  writeFileSync(join(dir, 'tokenizer.json'), '{"model":{"type":"WordPiece","vocab":{}}}', 'utf8')
+  writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ manifestVersion: 1, files: manifestFiles }), 'utf8')
+  return dir
+}
 
 describe('createLocalTokenizer · 真实 WordPiece 计量', () => {
   it('空串计 0', () => {
@@ -34,9 +55,20 @@ describe('createLocalTokenizer · 真实 WordPiece 计量', () => {
     // 恰好 100 字符仍在限内，走正常子词切分（每 token 约 2 字符）
     expect(tokenizer.count('a'.repeat(100))).toBe(50)
     expect(tokenizer.count('a'.repeat(150))).toBe(1)
-    // 大写：'A' 在词表内但续接形 '##A' 不在，于是整词落 [UNK]——
-    // 这是 WordPiece 的既定语义（任一位无法匹配则整词 UNK），不是实现缺陷
+    // 大写：该词表里没有任何大写字母词元（含大写的只有 7 个特殊 token），
+    // 故 'A' 与 '##A' 均不在词表，整词从首位就无处可切 → 1 个 [UNK]
     expect(tokenizer.count('A'.repeat(100))).toBe(1)
+  })
+
+  it('连续标点逐字符隔离（HF BertPreTokenizer 语义）', () => {
+    // 这条是复核发现并修正的真实缺陷：此前把连续标点合并成一个整词，
+    // 会让标点密集的文本系统性**少算**（欠计会让真实上下文超出窗口）
+    expect(tokenizer.count('……')).toBe(2)
+    expect(tokenizer.count('——')).toBe(2)
+    expect(tokenizer.count('（“”）')).toBe(4)
+    expect(tokenizer.count('他说：“你来了。”')).toBe(9)
+    // 单标点两侧不受影响（此前也与 HF 一致，属巧合而非语义对齐）
+    expect(tokenizer.count('你好，世界。')).toBe(6)
   })
 
   it('标点独立成段', () => {
@@ -67,5 +99,24 @@ describe('createLocalTokenizer · 真实 WordPiece 计量', () => {
     expect(() => createLocalTokenizer({ assetDir: 'C:/nonexistent-tokenizer-assets' })).toThrow(
       TokenizerAssetsError,
     )
+  })
+
+  it('装载前按清单复核：清单未登记词表即拒绝（与 embedding 同一套纪律）', () => {
+    // 词表是计量权威源，不能来自未校验的字节
+    const dir = fakeAssetDir([{ path: 'config.json', sha256: 'x', bytes: 1 }])
+    expect(() => createLocalTokenizer({ assetDir: dir })).toThrow(/资产清单未登记/)
+  })
+
+  it('装载前按清单复核：sha256/字节数不符即拒绝', () => {
+    const dir = fakeAssetDir([{ path: 'tokenizer.json', sha256: 'deadbeef', bytes: 999999 }])
+    expect(() => createLocalTokenizer({ assetDir: dir })).toThrow(/校验失败/)
+  })
+
+  it('清单缺失即拒绝', () => {
+    const dir = join(tmpdir(), `mozhou-tok-nomanifest-${process.pid}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(dir, { recursive: true })
+    tmpDirs.push(dir)
+    writeFileSync(join(dir, 'tokenizer.json'), '{"model":{"type":"WordPiece","vocab":{}}}', 'utf8')
+    expect(() => createLocalTokenizer({ assetDir: dir })).toThrow(/缺资产清单/)
   })
 })

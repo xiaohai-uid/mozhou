@@ -12,10 +12,17 @@
  *   → BertPreTokenizer（空白切分 + 标点独立）
  *   → WordPiece 贪心最长匹配（continuing prefix "##"，超长词落 [UNK]）
  *
- * 与 HuggingFace tokenizers 的 BertWordPieceTokenizer 对齐；差异只可能出现在
- * `\p{P}` 未覆盖的罕见标点上，且只会让计数偏保守（多算不会少算）。
+ * 与 HuggingFace `BertWordPieceTokenizer` 对齐。**已知偏差**（如实列出，未逐条对参考实现
+ * 逐例验证过）：
+ *   - Cf/格式字符：HF 的 `clean_text` 会删除 U+200B/200D/200E/2060/FEFF/00AD 等；
+ *     本实现把 U+FEFF 当空白归一为空格（多算 1），把 ZWJ 等当普通字符（少算）。
+ *   - 特殊 token 字面量：HF 管线由 `added_tokens` 整词命中（`[UNK]` 算 1），
+ *     本实现按普通文本切分（算 3）。这些字面量不会出现在正文预算里。
+ * 已知偏差的方向**不保证**是保守的——预算路径的欠计会让真实上下文超出窗口，
+ * 所以任何"我们只会多算"的推断都不成立，改动预分词/归一化逻辑必须重新对基准。
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ExactTokenizer } from './assemble.js'
@@ -102,23 +109,28 @@ function normalize(text: string, handleChinese: boolean): string {
   return out.join('')
 }
 
-/** BertPreTokenizer：先按空白切，再把每段按标点切成「标点/非标点」交替片段。 */
+/**
+ * BertPreTokenizer：先按空白切，再把**每个标点字符各自**切成独立片段。
+ *
+ * 必须逐字符隔离，不能把连续标点合并成一个整词——HF 的 BertPreTokenizer 就是逐字符
+ * 隔离的（`……` 是 2 个 token 不是 1 个）。合并会让标点密集的文本系统性少算，而
+ * 预算路径的欠计是危险方向（真实上下文超出窗口）。
+ */
 function preTokenize(text: string): string[] {
   const words: string[] = []
   for (const chunk of text.split(/\s+/)) {
     if (chunk.length === 0) continue
     let current = ''
-    let currentIsPunct: boolean | null = null
     for (const char of chunk) {
-      const isPunct = PUNCT_RE.test(char)
-      if (currentIsPunct === null || isPunct === currentIsPunct) {
-        current += char
-        currentIsPunct = isPunct
-      } else {
-        words.push(current)
-        current = char
-        currentIsPunct = isPunct
+      if (PUNCT_RE.test(char)) {
+        if (current.length > 0) {
+          words.push(current)
+          current = ''
+        }
+        words.push(char)
+        continue
       }
+      current += char
     }
     if (current.length > 0) words.push(current)
   }
@@ -136,6 +148,7 @@ function loadWordPiece(assetDir: string): {
   if (!existsSync(path)) {
     throw new TokenizerAssetsError(`缺 ${TOKENIZER_FILE}`)
   }
+  verifyTokenizerAsset(assetDir, path)
   let doc: WordPieceDocument
   try {
     doc = JSON.parse(readFileSync(path, 'utf-8')) as WordPieceDocument
@@ -157,6 +170,33 @@ function loadWordPiece(assetDir: string): {
     maxChars: doc.model.max_input_chars_per_word ?? MAX_INPUT_CHARS_PER_WORD,
     // normalizer 显式给 false 时才是 false（BertNormalizer 缺省为 true）
     handleChinese: doc.normalizer?.handle_chinese_chars ?? true,
+  }
+}
+
+function sha256FileHex(absolutePath: string): string {
+  return createHash('sha256').update(readFileSync(absolutePath)).digest('hex')
+}
+
+interface AssetManifest {
+  readonly files?: readonly { readonly path: string; readonly sha256: string; readonly bytes: number }[]
+}
+
+/**
+ * 装载前按清单复核 tokenizer.json（与 embedding 同一份 manifest、同一套纪律）。
+ * 清单缺失或未登记该文件即失败——词表是计量权威源，不能来自未校验的字节。
+ */
+function verifyTokenizerAsset(assetDir: string, path: string): void {
+  const manifestPath = join(assetDir, 'manifest.json')
+  if (!existsSync(manifestPath)) {
+    throw new TokenizerAssetsError(`缺资产清单 ${manifestPath}`)
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as AssetManifest
+  const entry = manifest.files?.find((file) => file.path === TOKENIZER_FILE)
+  if (entry === undefined) {
+    throw new TokenizerAssetsError(`资产清单未登记 ${TOKENIZER_FILE}`)
+  }
+  if (statSync(path).size !== entry.bytes || sha256FileHex(path) !== entry.sha256) {
+    throw new TokenizerAssetsError(`${TOKENIZER_FILE} 校验失败（字节数或 sha256 不符）`)
   }
 }
 
