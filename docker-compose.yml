@@ -16,9 +16,23 @@ services:
       - PORT=5173
       # 容器内需监听全部接口以供宿主端口转发；宿主映射仍锁定 127.0.0.1。
       - HOST=0.0.0.0
+      # 数据根必须落在挂载卷上：写镜像层时 `docker compose down`、换镜像或重建
+      # 容器都会连同全部书稿一起销毁，且不报任何错。
+      - MOZHOU_DATA_ROOT=/data
+      # 凭据加密主密钥。缺失时服务启动即失败——不再回退到源码可见的常量，
+      # 否则 BYOK 密钥实际等于明文落盘。生成：openssl rand -base64 48
+      - MOZHOU_SECRET_KEY=${MOZHOU_SECRET_KEY:?MOZHOU_SECRET_KEY is required - generate one with openssl rand -base64 48}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - MOZHOU_API_KEY=${MOZHOU_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - mozhou-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # 以下均为旧 Web/SaaS 栈兼容设施，不属于 v0.1 local-first 默认发行攻击面。
   crawl4ai:
@@ -100,5 +114,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  # 书稿与账户数据。命名卷独立于容器生命周期，`docker compose down` 不会删除它
+  # （仅 `down -v` 会）；升级镜像后原数据仍在。
+  mozhou-data:
   pgdata:
   oneapi-data:
