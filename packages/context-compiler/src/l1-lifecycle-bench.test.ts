@@ -196,5 +196,8 @@ describe('L1 确定性生命周期台架（ADR-0016 · 50 章全弧）', () => {
     expect(first.durationMs).toBeLessThan(5000)
     expect(second.durationMs).toBeLessThan(5000)
     expect(stripTiming(second)).toEqual(stripTiming(first))
-  }, 15_000)
+    // 本文件串跑三次 50 章台架（本用例两次 + 前两个用例各一次），空载约 8.7s；vitest 并行
+    // 跑其它文件时 CPU 争用会把整体墙钟推过 15s，所以这里是防挂死的护栏，不是规格判据。
+    // 规格的「50 章 <5s」由上面的 durationMs 断言把守（空载实测约 1.4s，余量约 71%）。
+  }, 60_000)
 })
