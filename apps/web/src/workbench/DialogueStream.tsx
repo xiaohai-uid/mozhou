@@ -14,6 +14,7 @@ import {
 } from '../shell/workbenchStorage'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
 import type { BookInfo } from '../shell/workbenchStorage'
+import { describeContextMode, readDraftStream } from '../draftStream'
 
 type DialoguePhase = 'ask' | 'answered' | 'drafting' | 'draft_done' | 'error'
 
@@ -44,23 +45,6 @@ interface ConflictView {
   readonly latestRevision: number | null
 }
 
-interface DraftStreamFrame {
-  readonly ok: boolean
-  readonly event?: 'start' | 'delta' | 'done' | 'error'
-  readonly text?: string
-  readonly error?: string
-  readonly outcome?: string
-  readonly partial?: boolean
-  readonly chars?: number
-  readonly code?: string
-  /** start 帧（规格 §12.3：候选证据行）。 */
-  readonly contextTokens?: number
-  readonly provider?: string
-  readonly contextMode?: string
-  /** C2（T05）：候选 id 与生成起点 base（服务端取盘面现场返回）。 */
-  readonly candidateId?: string
-  readonly base?: { readonly revision: number; readonly sha256: string }
-}
 
 export function DialogueStream({
   book,
@@ -94,7 +78,7 @@ export function DialogueStream({
   const [accepting, setAccepting] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   /** start 帧证据（装配 tokens/provider）——AI CANDIDATE 的来源可追溯性。 */
-  const [streamMeta, setStreamMeta] = useState<{ contextTokens?: number; provider?: string } | null>(null)
+  const [streamMeta, setStreamMeta] = useState<{ contextTokens?: number; provider?: string; contextMode?: string } | null>(null)
   /** 采纳进写作层的回执（Candidate → Accept → Active Draft 链）。 */
   const [adoptState, setAdoptState] = useState<string | null>(null)
   /** C2（T05）：候选状态（candidateId+base+mode），随流请求建立；切书/切章/重开即失效。 */
@@ -257,50 +241,34 @@ export function DialogueStream({
       // 走到这里说明服务端前置闸已放行 ⇒ 之前那条「provider 未配置」横幅已过期。
       // 不复位的话作者在「模型设置」填完密钥回来，输入框仍然被永久禁用。
       setProviderUnavailable(false)
-      const reader = res.body.getReader()
-      readerRef.current = reader
-      const decoder = new TextDecoder()
-      let buffer = ''
       let accumulatedDraftText = ''
       let currentCandidateState: CandidateState | null = null
 
-      for (;;) {
-        const { done, value } = await reader.read()
-        // 读取帧后重查现场
-        if (
-          requestIdRef.current !== reqId ||
-          currentSiteRef.current.bookId !== site.bookId ||
-          currentSiteRef.current.chapterIndex !== site.chapterIndex
-        ) {
-          void reader.cancel()
-          break
-        }
-        if (done) break
+      const stillOnSite = (): boolean =>
+        requestIdRef.current === reqId &&
+        currentSiteRef.current.bookId === site.bookId &&
+        currentSiteRef.current.chapterIndex === site.chapterIndex
 
-        buffer += decoder.decode(value, { stream: true })
-        let nl: number
-        while ((nl = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, nl)
-          buffer = buffer.slice(nl + 1)
-          if (line.trim().length === 0) continue
-          const frame = JSON.parse(line) as DraftStreamFrame
-
-          // 迟到帧与切书隔离
-          if (
-            requestIdRef.current !== reqId ||
-            currentSiteRef.current.bookId !== site.bookId ||
-            currentSiteRef.current.chapterIndex !== site.chapterIndex
-          ) {
-            void reader.cancel()
-            break
-          }
-
+      // 帧协议与终帧判定只有一份实现（../draftStream）。本文件此前自己解了一遍，
+      // 移动端也解了一遍；契约一变就有一侧静默漂移。
+      await readDraftStream(res, {
+        onReader: (reader) => {
+          readerRef.current = reader
+        },
+        shouldStop: () => !stillOnSite(),
+        onDelta: (chunk) => {
+          accumulatedDraftText += chunk
+          setDraftText((prev) => prev + chunk)
+        },
+        onFrame: (frame) => {
+          if (!stillOnSite()) return
           if (frame.event === 'start') {
             setStreamMeta({
               ...(frame.contextTokens !== undefined ? { contextTokens: frame.contextTokens } : {}),
               ...(frame.provider !== undefined ? { provider: frame.provider } : {}),
+              ...(frame.contextMode !== undefined ? { contextMode: frame.contextMode } : {}),
             })
-            if (typeof frame.candidateId === 'string' && frame.base !== undefined) {
+            if (frame.candidateId !== undefined && frame.base !== undefined) {
               const candState: CandidateState = {
                 candidateId: frame.candidateId,
                 base: frame.base,
@@ -309,9 +277,6 @@ export function DialogueStream({
               currentCandidateState = candState
               setCandidate(candState)
             }
-          } else if (frame.event === 'delta' && typeof frame.text === 'string') {
-            accumulatedDraftText += frame.text
-            setDraftText((prev) => prev + frame.text)
           } else if (frame.event === 'done') {
             setPhase('draft_done')
             // 将就绪候选保存到本地缓存（按书章恢复）
@@ -327,12 +292,12 @@ export function DialogueStream({
                 candidateDraftKey(site, site.chapterIndex),
               )
             }
-          } else if (frame.event === 'error' || frame.ok === false) {
-            setError(frame.error ?? '草稿流中断')
+          } else if (frame.event === 'error') {
+            setError(frame.error)
             setPhase('error')
           }
-        }
-      }
+        },
+      })
       if (
         requestIdRef.current === reqId &&
         currentSiteRef.current.bookId === site.bookId &&
@@ -689,6 +654,16 @@ export function DialogueStream({
               </span>
             )}
           </div>
+          {streamMeta?.contextMode === 'structural_fallback' && (
+            <p
+              role="status"
+              data-testid="context-degraded"
+              className="mono"
+              style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--warning, #d98b2b)' }}
+            >
+              {describeContextMode('structural_fallback')}
+            </p>
+          )}
           <p data-testid="draft-text" className={phase === 'drafting' ? 'stream-caret' : undefined}>{draftText}</p>
           {phase === 'draft_done' && (
             <>

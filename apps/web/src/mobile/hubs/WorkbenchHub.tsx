@@ -6,6 +6,7 @@ import { MobileComposer } from '../components/MobileComposer'
 import { HistoryIcon, ListIcon } from '../components/MobileIcons'
 import { post } from '../../lib/post'
 import { chapterDraftKey, loadDraftCache } from '../../shell/workbenchStorage'
+import { describeContextMode, describeDraftResult, readDraftStream } from '../../draftStream'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
 import type { DraftQuestionResponse, WorksChapterSummary } from '../../../server/api'
@@ -29,7 +30,7 @@ export function WorkbenchHub({
   const [questionData, setQuestionData] = useState<DraftQuestionResponse | null>(null)
   const [drafting, setDrafting] = useState(false)
   /** 内联反馈（规格 §25.3：alert → inline，业务语义不变）。 */
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'warn' | 'err'; text: string } | null>(null)
   /** works 真实章节元数据（阅读面 + 章切换）。 */
   const [chapterMeta, setChapterMeta] = useState<WorksChapterSummary | null>(null)
   /** 情节选择回填（本地）；与 Shell 灵感管道合并后进 Composer。 */
@@ -96,41 +97,19 @@ export function WorkbenchHub({
         }),
       })
 
-      const contentType = res.headers.get('Content-Type') ?? ''
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null
         throw new Error(payload?.error ?? `草稿请求失败（HTTP ${res.status}）`)
       }
-      if (!contentType.includes('ndjson') || res.body === null) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(payload?.error ?? '草稿服务未返回预期的流式响应')
-      }
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let completed = false
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        let newline = buffer.indexOf('\n')
-        while (newline >= 0) {
-          const line = buffer.slice(0, newline).trim()
-          buffer = buffer.slice(newline + 1)
-          if (line.length > 0) {
-            const frame = JSON.parse(line) as { ok?: boolean; event?: string; error?: string }
-            if (frame.ok === false || frame.event === 'error') {
-              throw new Error(frame.error ?? '草稿生成失败')
-            }
-            if (frame.event === 'done') completed = true
-          }
-          newline = buffer.indexOf('\n')
-        }
-      }
-
-      if (!completed) throw new Error('草稿流在完成帧之前结束')
-      setNotice({ kind: 'ok', text: '正文草稿已由真实生成链路完成并持久化——可在正文/作品视图查看。' })
+      // 帧协议与终帧判定只有一份实现（../../draftStream）。本文件此前自己解了一遍，
+      // 于是把 done(partial) 半稿也报成「已完成并持久化」——那是对作者撒谎。
+      const result = await readDraftStream(res)
+      const degraded = describeContextMode(result.contextMode)
+      setNotice({
+        kind: result.terminal === 'done' && degraded === null ? 'ok' : result.terminal === 'done' ? 'warn' : 'err',
+        text: degraded === null ? describeDraftResult(result) : describeDraftResult(result) + '\n' + degraded,
+      })
     } catch (error) {
       setNotice({ kind: 'err', text: `草稿生成失败：${(error as Error).message}` })
     } finally {

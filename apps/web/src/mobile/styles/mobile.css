@@ -407,6 +407,13 @@ button.mobile-tag {
   border: 1px solid rgba(244, 63, 94, 0.35);
   color: var(--rose-mobile);
 }
+/* 降级（生成成功但上下文被裁剪）：介于成功与失败之间，不能借用 ok 的绿色——
+   那等于把「模型这次几乎没拿到设定」画成一件好事。 */
+.mobile-inline-note.warn {
+  background: rgba(217, 139, 43, 0.12);
+  border: 1px solid rgba(217, 139, 43, 0.4);
+  color: #d98b2b;
+}
 
 /* 窄屏（≤420px）：Hub 头部动作钮图标化，防 390 顶栏裁切（复验 P2） */
 @media (max-width: 420px) {
