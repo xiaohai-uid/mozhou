@@ -10,6 +10,7 @@ import {
   readPlanningArtifact,
   readWizardAuthorIntent,
   syncPlanningArtifactRow,
+  withPlane,
   wizardAuthorIntentEquals,
   writeWizardAuthorIntent,
 } from '@mozhou/data-plane'
@@ -139,8 +140,8 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
       return true
     }
     const root = assertSafeBookRoot(rawRoot)
-    const plane = LocalDataPlane.open(root)
-    json(200, { ok: true, cards: plane.getEntityCards() })
+    const cards = withPlane(root, (plane) => plane.getEntityCards())
+    json(200, { ok: true, cards })
     return true
   }
 
@@ -200,8 +201,7 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
     const rawEntityIds = Array.isArray(body['entityIds']) ? body['entityIds'] : []
     const entityIds = rawEntityIds.filter((r): r is EntityRef => typeof r === 'string' && r.length > 0)
 
-    const plane = LocalDataPlane.open(root)
-    const overview = plane.queryStoryBrain({ entityIds })
+    const overview = withPlane(root, (plane) => plane.queryStoryBrain({ entityIds }))
     json(200, {
       ok: true,
       ...overview,

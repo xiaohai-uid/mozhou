@@ -12,7 +12,7 @@
  * 边界承担，因此步内发生的外部改动绝不打断本步；检查点每次经 LocalDataPlane.open
  * 重开平面句柄（同步盘上最新基线，长持句柄不跨步）。
  */
-import { LocalDataPlane } from '@mozhou/data-plane';
+import { withPlane } from '@mozhou/data-plane';
 import type { BaselineReport } from '@mozhou/data-plane';
 
 /** 步边界对账面非空：EXTERNAL_MODIFIED 挂起（编排方捕获后走恢复/作者确认面）。 */
@@ -39,7 +39,7 @@ export interface ReconciliationWarning {
 function verifyAtBoundary(root: string): BaselineReport {
   // 每次检查点重开平面句柄：open() 第一步即 recoverPendingCommit，随后以最新
   // 基线做盘上核对——崩溃窗口与外部改动在同一道门里被看见。
-  return LocalDataPlane.open(root).verifyBaseline();
+  return withPlane(root, (plane) => plane.verifyBaseline());
 }
 
 /**

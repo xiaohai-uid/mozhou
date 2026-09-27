@@ -5,6 +5,7 @@ import type { RouteHandler } from '../router.js'
 import { join } from 'node:path'
 import {
   LocalDataPlane,
+  withPlane,
   atomicWriteFileSync,
   createBook,
   listImpactRecords,
@@ -99,8 +100,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
       return true
     }
     const root = assertSafeBookRoot(rawRoot)
-    const plane = LocalDataPlane.open(root)
-    const matrix = plane.getChangeMatrix()
+    const matrix = withPlane(root, (plane) => plane.getChangeMatrix())
     const revisionBriefs = buildRevisionBriefsForMatrix(matrix.columns, listImpactRecords(root))
     json(200, { ok: true, matrix, revisionBriefs })
     return true
@@ -129,7 +129,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
     })
     json(200, {
       ok: true,
-      matrix: LocalDataPlane.open(root).getChangeMatrix(),
+      matrix: withPlane(root, (plane) => plane.getChangeMatrix()),
       rerunCount: 1,
     })
     return true
@@ -144,9 +144,10 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
     }
     const root = assertSafeBookRoot(rawRoot)
 
-    const plane = LocalDataPlane.open(root)
-    const overview = plane.getWorksOverview()
-    const canon = plane.getCanonState()
+    const { overview, canon } = withPlane(root, (plane) => ({
+      overview: plane.getWorksOverview(),
+      canon: plane.getCanonState(),
+    }))
 
     json(200, {
       ok: true,
