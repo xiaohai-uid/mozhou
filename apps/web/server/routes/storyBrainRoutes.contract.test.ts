@@ -234,4 +234,48 @@ describe('POST /api/story-brain.contract · 追踪流基线纪律', () => {
       plane.close()
     }
   })
+
+  it('POST /api/author-intent.save · 只吸收自身写入，无关的外部漂移仍可检出', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-author-intent-drift-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const bookDir = join(dataRoot, 'intent-drift-book')
+    createBook({ dir: bookDir, title: '外部漂移书' })
+
+    // 预先存在的、与本次保存无关的外部改动（模拟作者在应用外编辑追踪流）
+    appendFileSync(join(bookDir, promiseStream.path), '{"external":true}\n', 'utf8')
+
+    const base = await listen()
+    const res = await fetch(`${base}/api/author-intent.save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        root: bookDir,
+        worldRule: '潮汐钟遗忘的人会从书面记录消失',
+        volumePromise: '林岚必须找回一个全城不记得的人',
+        opening: '没有乘客姓名的末班船票',
+        firstChapterGoal: '让读者在 800 字内意识到记忆被篡改',
+      }),
+    })
+    expect(res.status).toBe(200)
+
+    const plane = LocalDataPlane.open(bookDir)
+    try {
+      const report = plane.verifyBaseline()
+      // 应用自己的写入已并入基线：作者意图零漂移
+      expect(report.modified).not.toContain('设定/作者意图.md')
+      expect(report.reconcileSurface).not.toContain('设定/作者意图.md')
+      // 无关的外部漂移没有被顺带吸进基线：仍留在对账面
+      expect(report.modified).toContain(promiseStream.path)
+      expect(report.reconcileSurface).toContain(promiseStream.path)
+      // 投影行同步（S1 投影=文件投影）：revision 已跟上本次写入
+      const row = plane.db
+        .prepare('SELECT revision FROM planning_artifacts WHERE kind = ?')
+        .get('authorIntent') as { revision: number } | undefined
+      expect(row?.revision).toBe(1)
+    } finally {
+      plane.close()
+    }
+  })
 })

@@ -7,8 +7,9 @@ import {
   TRACKING_STREAMS,
   createBook,
   LocalDataPlane,
+  readPlanningArtifact,
   readWizardAuthorIntent,
-  rebuildProjectionFromCanon,
+  syncPlanningArtifactRow,
   wizardAuthorIntentEquals,
   writeWizardAuthorIntent,
 } from '@mozhou/data-plane'
@@ -19,6 +20,21 @@ import { defaultBookAccessManager } from '../bookAccess.js'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
+
+/**
+ * S4 增量收口：应用自己刚写完作者意图后，只同步 planning_artifacts 投影行并把
+ * 该文件并入 hash 基线，不走 rebuildProjectionFromCanon——全量重建的 buildManifest
+ * 会把无关的外部漂移一并吸进基线，静默吞掉作者尚未审阅的外部改动。
+ */
+function absorbAuthorIntentWrite(root: string): void {
+  const plane = LocalDataPlane.openOrRebuild(root)
+  try {
+    syncPlanningArtifactRow(plane.db, readPlanningArtifact(root, AUTHOR_INTENT_PATH, 'authorIntent'))
+    plane.absorbAppWrite([AUTHOR_INTENT_PATH])
+  } finally {
+    plane.close()
+  }
+}
 
 export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, json, principal, authorizedBook, bookRoot }) => {
   if (req.method !== 'POST') return false
@@ -88,9 +104,9 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
     await defaultBookAccessManager.queue.withBookLock(bookKey, async () => {
       try {
         const revision = writeWizardAuthorIntent(root, fields)
-        // Keep the projection's planning_artifacts row and the file hash baseline
-        // aligned with the user-authored write before returning success.
-        rebuildProjectionFromCanon(root)
+        // S4 增量收口：只吸收本次应用写入的这一个文件（含 planning_artifacts 行同步），
+        // 不用 rebuildProjectionFromCanon——否则无关的外部漂移会被一并吸进基线。
+        absorbAuthorIntentWrite(root)
         json(200, { ok: true, path: AUTHOR_INTENT_PATH, revision })
       } catch (cause) {
         if ((cause as Error).name === 'AuthorIntentAlreadyInitializedError') {
@@ -98,7 +114,7 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
           // （响应丢失后客户端重试的路径）；任意不同输入必须走冲突，且原文不动。
           const stored = readWizardAuthorIntent(root)
           if (stored !== null && wizardAuthorIntentEquals(stored, fields)) {
-            rebuildProjectionFromCanon(root)
+            absorbAuthorIntentWrite(root)
             json(200, { ok: true, idempotent: true, path: AUTHOR_INTENT_PATH, stored })
             return
           }

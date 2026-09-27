@@ -16,7 +16,7 @@
  */
 import type Database from 'better-sqlite3'
 import { PROJECTION_SCHEMA_VERSION } from './database.js'
-import type { CanonState, EntityCardScan } from './canon-read.js'
+import type { CanonState, EntityCardScan, PlanningArtifactScan } from './canon-read.js'
 
 export const PROJECTION_DDL = `
 CREATE TABLE meta (
@@ -137,6 +137,14 @@ export function populateProjection(db: Database.Database, state: CanonState): vo
     }
   })
   seed()
+}
+
+/** write-through 规划工件行同步（作者意图/文风）：行形与 populateProjection 严格一致（S1 投影=文件投影）。 */
+export function syncPlanningArtifactRow(db: Database.Database, artifact: PlanningArtifactScan): void {
+  db.prepare(
+    `INSERT INTO planning_artifacts (id, kind, revision, content_sha256) VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, revision = excluded.revision, content_sha256 = excluded.content_sha256`,
+  ).run(artifact.id, artifact.kind, artifact.revision, artifact.contentSha256)
 }
 
 /** write-through 单卡行同步：行形与 populateProjection 严格一致（S1 投影=文件投影）。 */

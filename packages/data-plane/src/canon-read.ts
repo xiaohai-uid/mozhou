@@ -387,7 +387,7 @@ function readOutlineNode(root: string, relPath: string): OutlineNodeScan {
   }
 }
 
-function readPlanningArtifact(
+export function readPlanningArtifact(
   root: string,
   relPath: string,
   kind: 'authorIntent' | 'styleProfile',
