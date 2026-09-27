@@ -115,7 +115,7 @@ describe('DialogueStream（T44）', () => {
     const fetchMock = stubDialogueFetch({ providerAvailable: false })
     render(<DialogueStream book={BOOK} />)
     await waitFor(() => {
-      expect(screen.getByTestId('provider-unavailable').textContent).toContain('provider 未配置')
+      expect(screen.getByTestId('provider-unavailable').textContent).toContain('模型设置')
     })
     expect(screen.getByLabelText('写作指令')).toBeDisabled()
     expect(screen.getByLabelText('发送')).toBeDisabled()
@@ -144,7 +144,7 @@ describe('DialogueStream（T44）', () => {
     await userEvent.click(screen.getByRole('button', { name: '两者递进' }))
     await userEvent.click(screen.getByRole('button', { name: '发送' }))
     await waitFor(() => {
-      expect(screen.getByTestId('provider-unavailable').textContent).toContain('provider 未配置')
+      expect(screen.getByTestId('provider-unavailable').textContent).toContain('模型设置')
     })
     expect(screen.getByLabelText('发送')).toBeDisabled()
   })

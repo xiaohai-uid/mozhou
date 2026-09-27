@@ -524,3 +524,52 @@ describe('C2 / R01: 采纳前状态校验与终态保护 (HTTP 级)', () => {
     })
   })
 })
+
+describe('空流守卫（商业化阻断 1 · HTTP 级）', () => {
+  it('上游 200 但零 delta ⇒ 末帧是 error（不是 done），且带 EMPTY_STREAM 原因', async () => {
+    const prev = process.env.MOZHOU_DRAFT_PROVIDER
+    process.env.MOZHOU_DRAFT_PROVIDER = 'mock-empty'
+    try {
+      const base = await listen()
+      const root = makeRoot()
+      const beforeHash = proseHash(root)
+
+      const frames = await runStream(base, root, {})
+      const events = frames.map((f) => f['event'])
+
+      // 起点仍是 start；末帧必须是 error——绝不能让前端把失败读成 draft_done
+      expect(events[0]).toBe('start')
+      expect(events.at(-1)).toBe('error')
+      expect(events).not.toContain('done')
+      expect(events).not.toContain('delta')
+
+      // 原因可诊断：不是裸的「流中断」
+      const last = frames.at(-1)!
+      expect(last['ok']).toBe(false)
+      expect(String(last['error'])).toContain('EMPTY_STREAM')
+
+      // 候选不得被当成 ready（作者不会拿到一个「已成稿」的空候选）
+      const candidateId = frames[0]?.['candidateId'] as string
+      const candidate = await post(base, '/api/draft.candidate', { root, candidateId })
+      expect((candidate.data as { candidate: { status: string } }).candidate.status).not.toBe('ready')
+
+      // 正文零触碰（I01 不回归）
+      expect(proseHash(root)).toBe(beforeHash)
+    } finally {
+      process.env.MOZHOU_DRAFT_PROVIDER = prev
+    }
+  })
+
+  it('零回归：正常 mock 流末帧仍是 done + outcome=succeeded', async () => {
+    const prev = process.env.MOZHOU_DRAFT_PROVIDER
+    process.env.MOZHOU_DRAFT_PROVIDER = 'mock'
+    try {
+      const base = await listen()
+      const root = makeRoot()
+      const frames = await runStream(base, root, {})
+      expect(frames.at(-1)).toMatchObject({ ok: true, event: 'done', outcome: 'succeeded' })
+    } finally {
+      process.env.MOZHOU_DRAFT_PROVIDER = prev
+    }
+  })
+})

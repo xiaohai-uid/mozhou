@@ -254,6 +254,9 @@ export function DialogueStream({
       }
 
       setPhase('drafting')
+      // 走到这里说明服务端前置闸已放行 ⇒ 之前那条「provider 未配置」横幅已过期。
+      // 不复位的话作者在「模型设置」填完密钥回来，输入框仍然被永久禁用。
+      setProviderUnavailable(false)
       const reader = res.body.getReader()
       readerRef.current = reader
       const decoder = new TextDecoder()
@@ -636,7 +639,7 @@ export function DialogueStream({
 
       {providerUnavailable && (
         <div className="wb-error" role="alert" data-testid="provider-unavailable">
-          草稿生成 provider 未配置——中栏写作对话当前不可用（Gate 3）。配置后无需刷新即可继续。
+          尚未接入大模型，写作对话暂不可用。请到「账户 → 模型设置」填入你的 API 密钥，保存后回到这里重新生成即可。
         </div>
       )}
 

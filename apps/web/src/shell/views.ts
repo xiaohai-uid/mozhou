@@ -56,7 +56,10 @@ export const NAV_GROUPS = [
   },
   {
     group: '账户',
-    items: [{ id: 'membership', label: '会员中心', icon: '17' }],
+    items: [
+      { id: 'membership', label: '会员中心', icon: '17' },
+      { id: 'model-settings', label: '模型设置', icon: '18' },
+    ],
   },
   {
     group: '开发 · Local',

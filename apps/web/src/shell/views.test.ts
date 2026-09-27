@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest'
 import { NAV_GROUPS, isViewId, viewLabel, VIEW_COUNT, VIEW_IDS } from './views'
 
 describe('views 注册表契约', () => {
-  it('六组共 21 项，id 全局唯一，徽标仅任务中心持有', () => {
+  it('六组共 22 项，id 全局唯一，徽标仅任务中心持有', () => {
     expect(NAV_GROUPS).toHaveLength(6)
-    expect(VIEW_COUNT).toBe(21)
-    expect(new Set(VIEW_IDS).size).toBe(21)
+    expect(VIEW_COUNT).toBe(22)
+    expect(new Set(VIEW_IDS).size).toBe(22)
     expect(viewLabel('storyboard')).toBe('漫剧分镜')
     expect(viewLabel('canon-graph')).toBe('因果图谱')
     expect(viewLabel('genre-kits')).toBe('流派工坊')

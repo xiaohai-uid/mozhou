@@ -140,6 +140,7 @@ import type { FlywheelRecordStatus, UsageFact } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 import { runStyleLearnerForWindow } from '@mozhou/flywheel'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
+import { resolveChatEndpoint } from '../llm/openaiStream.js'
 import {
   canonProposalView,
   openProposalForTask,
@@ -257,7 +258,7 @@ interface ResubmitWindowCleanupView {
   readonly errorDetail: string | null
 }
 
-export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
+export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
@@ -602,7 +603,9 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           // 步 6 Final Extract 接线：终稿 → 五族叙事状态增量。
           // 提取失败不阻塞提交（作者的正文必须能定稿），但必须在响应里如实报出，
           // 否则「提交后叙事层零增长」会被误读为「一切正常」。
-          const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose)
+          const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose, {
+            resolveEndpoint: (env) => resolveChatEndpoint(env, principal?.userId),
+          })
           deltaExtraction = {
             extractor: delta.extractor,
             counts: delta.counts,

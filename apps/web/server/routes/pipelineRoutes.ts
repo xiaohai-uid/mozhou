@@ -52,6 +52,7 @@ import {
 import type { ResolvedEndpoint } from '../llm/types.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
+import { defaultProviderSettingsManager } from '../llm/providerSettings.js'
 import { canonProposalView } from '../proposals.js'
 
 const DIALOGUE_CAPABILITIES = [
@@ -95,6 +96,8 @@ async function hasResolvableTierRoute(env: NodeJS.ProcessEnv): Promise<boolean> 
  * 草稿 provider 可用性判据（`/api/capabilities`、`/api/capability-square` 的 `providerAvailable`
  * 与 `/api/draft.stream` 前置闸共用）——回答「现在能不能真的生成」：
  *   - `MOZHOU_DRAFT_PROVIDER=mock` ⇒ true（既有显式开关，不参与分级路由选档）；
+ *   - `MOZHOU_DRAFT_PROVIDER=mock-empty` ⇒ true，**但仅非生产环境**（空流回归测试缝）；
+ *   - 产品内配置的凭据（`POST /api/llm/settings` 落盘的 AES-256-GCM 配置）⇒ true，
  *   - BYOK 密钥齐备 ⇒ true（既有语义不变）；
  *   - 否则看覆盖层 `~/.mozhou/settings.yaml`：无该文件 ⇒ false（维持 BYOK 判据，行为不变）；
  *     有该文件且叶子 providerId 能经 `providers:` 注册表解析出可用端点 ⇒ true。
@@ -108,17 +111,23 @@ async function hasResolvableTierRoute(env: NodeJS.ProcessEnv): Promise<boolean> 
  * 本文件的 `/api/capabilities` 与 `/api/draft.stream` 前置闸，以及 `systemRoutes.ts` 的
  * `/api/capability-square`——三处均已在 async 路由处理器内，`router.ts` 的 dispatch 会 await）。
  */
-export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env, userId?: string): Promise<boolean> {
   const configured = env['MOZHOU_DRAFT_PROVIDER']
   const hasRealKey = hasByokDraftKey(env)
-  if (configured !== 'mock' && !hasRealKey) {
+  // mock 开关族同 makeStreamEngine：'mock' 恒成立；'mock-empty' 仅非生产成立。
+  const isMockMode = configured === 'mock' || (configured === 'mock-empty' && env['NODE_ENV'] !== 'production')
+  // 产品内配置的凭据（POST /api/llm/settings 落盘，AES-256-GCM 加密）与环境变量同权。
+  // 只问「配了没有」：这里**不能**调 resolveChatEndpoint —— 它会做 SSRF/DNS 门禁并抛异常，
+  // 而本函数是能力探针，抛出会打断整条路由（本轮曾因此让分级路由的 SSRF 拒绝帧消失）。
+  const hasPersistedKey = (defaultProviderSettingsManager.getSettings(userId)?.apiKey ?? '') !== ''
+  if (!isMockMode && !hasRealKey && !hasPersistedKey) {
     if (!(await hasResolvableTierRoute(env))) return false
   }
 
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root: '/' } })
   engine.registerCapability({
     taskType: 'CHAPTER_DRAFTING',
-    providerId: configured === 'mock' ? 'mock' : 'deepseek',
+    providerId: isMockMode ? 'mock' : 'deepseek',
     providerVersion: '1.0.0',
     failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
   })
@@ -189,11 +198,18 @@ async function makeStreamEngine(
     selection?: { readonly from: number; readonly to: number; readonly selectedTextHash: string }
   },
   signal?: AbortSignal,
+  userId?: string,
 ): Promise<{ engine: RuntimeEngine; recipe: CapabilityRecipe; real: boolean }> {
   const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_web_t44' })
   const recipe = createDraftRecipe({ proseRelPath: proseChapterPath(chapterIndex) })
 
-  const explicitMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock'
+  // mock 开关族：'mock' 回吐 prompt 切块（既有演示/测试开关）。
+  // 'mock-empty' 只在**非生产**环境成立：它模拟真实上游「HTTP 200 但零 delta」的静默空输出形态
+  // （commit 0693776 记录），供空流守卫的 HTTP 级回归测试使用。生产构建下该值不生效，
+  // 免得出现「能力探针报可用、但每次生成都失败」的假可用（AGENTS.md §4.13-4.14）。
+  const mockMode = process.env['MOZHOU_DRAFT_PROVIDER']
+  const emptyMock = mockMode === 'mock-empty' && process.env['NODE_ENV'] !== 'production'
+  const explicitMock = mockMode === 'mock' || emptyMock
   let real = false
 
   if (explicitMock) {
@@ -210,7 +226,7 @@ async function makeStreamEngine(
         chapterIndex,
         provider: 'deepseek',
         mode: 'generate',
-        stream: () => mockDraftStream(mockOutputSeed, onDelta),
+        stream: () => (emptyMock ? emptyDraftStream() : mockDraftStream(mockOutputSeed, onDelta)),
         candidate,
         ...(signal === undefined ? {} : { signal }),
       }),
@@ -225,9 +241,9 @@ async function makeStreamEngine(
     let effectiveEndpoint: ResolvedEndpoint
     if (tierRoute === null) {
       // 无覆盖层文件 ⇒ 与接线前逐字节一致：BYOK 解析 + 包内默认 providerId。
-      const endpoint = resolveChatEndpoint(process.env)
+      const endpoint = resolveChatEndpoint(process.env, userId)
       if (endpoint === null) {
-        throw new Error('PROVIDER_UNAVAILABLE: 未配置真实 LLM Key（MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）')
+        throw new Error('PROVIDER_UNAVAILABLE: 未配置真实 LLM Key（请在「模型设置」页填写，或设 MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）')
       }
       providerId = defaultProviderId
       effectiveEndpoint = endpoint
@@ -293,6 +309,13 @@ async function makeStreamEngine(
   return { engine, recipe, real }
 }
 
+/** 零增量流夹具：正常结束、一个 delta 都不发——等价于上游静默空输出。 */
+function emptyDraftStream(): AsyncIterable<string> {
+  return (async function* () {
+    await Promise.resolve()
+  })()
+}
+
 function mockDraftStream(prompt: string, onDelta?: (text: string) => void): AsyncIterable<string> {
   const base = prompt.trim().length > 0 ? prompt.trim() : '夜雨敲窗，灯焰摇了三摇。'
   const chunks = [base.slice(0, 8), base.slice(8, 18) === '' ? base : base.slice(8, 18), base.slice(18)]
@@ -307,7 +330,7 @@ function mockDraftStream(prompt: string, onDelta?: (text: string) => void): Asyn
   })()
 }
 
-export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
+export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
@@ -394,7 +417,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/capabilities') {
-    json(200, { ok: true, capabilities: DIALOGUE_CAPABILITIES, providerAvailable: await hasDraftProvider() })
+    json(200, { ok: true, capabilities: DIALOGUE_CAPABILITIES, providerAvailable: await hasDraftProvider(process.env, principal?.userId) })
     return true
   }
 
@@ -464,7 +487,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       }
     }
 
-    if (!(await hasDraftProvider())) {
+    if (!(await hasDraftProvider(process.env, principal?.userId))) {
       // 覆盖层文件存在却判否 ⇒ 是「配了但解析不出来」，不是「没配任何 provider」。
       // 放行进真实分支，让 resolveDraftTierRoute / resolveTierEndpoint 抛出带键路径的精确
       // 错误（NDJSON error 帧），而不是用笼统的 PROVIDER_UNAVAILABLE 掩盖病因。
@@ -510,6 +533,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
           ...(selection === undefined ? {} : { selection }),
         },
         abortController.signal,
+        principal?.userId,
       )
 
       ndjson({
@@ -529,7 +553,25 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         packet: context.packet,
         recipe,
       })
-      ndjson({ ok: true, event: 'done', candidateId, outcome: outcome.outcome, partial: outcome.partial, chars: outcome.chars })
+      // 判帧只看一件事：**这次到底有没有给出正文**（produced，源自本次 attempt 的
+      // 非空白追加字数），而不是笼统的 outcome。
+      //   - 没给出 ⇒ error 帧：前端置 phase='error'，作者看到失败而不是一个空候选
+      //     却被告知「生成完成」，点「采纳进正文」只会得到空白。
+      //   - 断流但已留下半稿 ⇒ 维持既有 done(partial)：半稿是真内容、已落盘、可续可采纳，
+      //     把它改判成 error 反而会把作者的 300 字困死（error 分支只给「再来一轮」）。
+      if (outcome.outcome === 'succeeded' || outcome.produced) {
+        ndjson({ ok: true, event: 'done', candidateId, outcome: outcome.outcome, partial: outcome.partial, chars: outcome.chars })
+      } else {
+        ndjson({
+          ok: false,
+          event: 'error',
+          candidateId,
+          outcome: outcome.outcome,
+          partial: outcome.partial,
+          chars: outcome.chars,
+          error: outcome.reason ?? ('草稿生成失败（' + outcome.outcome + '）'),
+        })
+      }
       res.end()
     } catch (error) {
       ndjson({ ok: false, event: 'error', error: (error as Error).message })

@@ -119,7 +119,13 @@ interface ResolvedDeps {
   readonly provider: string
 }
 
-/** 缺省适配器装配：无真实端点 ⇒ null（调用方按 L0 显式跳过收口）。 */
+/**
+ * 缺省适配器装配：无真实端点 ⇒ null（调用方按 L0 显式跳过收口）。
+ *
+ * 不传 userId：ProviderSettingsManager.getSettingsPath 只在 hosted 模式下按 userId 分目录，
+ * 本地模式恒读 local-provider-settings.enc ⇒ 这里传什么都不改变结果，传了反而是死参数。
+ * 本函数由旁路调用（propagateSettledChanges 可被自动挂载无请求地触发），本就没有 principal。
+ */
 function resolveDefaultDeps(): ResolvedDeps | null {
   const endpoint = resolveChatEndpoint(process.env)
   if (endpoint === null) return null

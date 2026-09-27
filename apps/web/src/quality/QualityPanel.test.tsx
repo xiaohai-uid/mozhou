@@ -255,3 +255,86 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
     })
   })
 })
+
+/**
+ * 商业化阻断 1 的另一半：定稿成功不等于一切正常。
+ *
+ * 缺陷：/api/chapter.commit 的响应一直带 deltaExtraction（服务端 proseRoutes.ts:606-611
+ * 如实报出「叙事层零增长」），但本面板只解构 { ok, commitId } 并恒弹
+ * 「✓ 本章已成功定稿入账」。真实模型提取失败时，作者看到的是一次「完美成功」，
+ * 而小说从此不再记住任何事——产品的核心承诺静默失效。
+ */
+describe('定稿后叙事记忆零增长必须显式可见', () => {
+  const ZERO_COUNTS = {
+    temporalFact: 0,
+    knowledgeState: 0,
+    relationshipState: 0,
+    narrativePromise: 0,
+    timelineEvent: 0,
+  }
+
+  it('五族全 0（extractor=none）⇒ 仍报定稿成功，但必须额外显式警告记忆零增长', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/chapter.quality') return Promise.resolve(okJson(NO_REVIEW_STATUS))
+      if (path === '/api/chapter.prose') return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision: 2 }))
+      if (path === '/api/chapter.commit') {
+        return Promise.resolve(okJson({
+          ok: true,
+          commitId: 'cmit_test_123',
+          phase: 'committed',
+          deltaExtraction: {
+            extractor: 'none',
+            counts: ZERO_COUNTS,
+            dropped: [],
+            reason: '模型输出不可解析：模型输出中找不到 JSON 对象',
+          },
+        }))
+      }
+      return Promise.resolve(okJson({ ok: true }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
+    await waitFor(() => expect(screen.getByTestId('canon-commit-section')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '确认定稿入账 (Commit)' }))
+
+    await waitFor(() => {
+      // 定稿本身照实报成功（作者正文必须能定稿）
+      expect(screen.getByText(/本章已成功定稿入账/)).toBeInTheDocument()
+      // 但记忆零增长必须单独、显式地告诉作者
+      const warn = screen.getByTestId('commit-memory-warning')
+      expect(warn).toBeInTheDocument()
+      expect(warn.textContent).toContain('叙事记忆零增长')
+      // 原因可诊断，不是一句空话
+      expect(warn.textContent).toContain('模型输出不可解析')
+    })
+  })
+
+  it('零回归：提取到增量的正常提交不显示该警告', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/chapter.quality') return Promise.resolve(okJson(NO_REVIEW_STATUS))
+      if (path === '/api/chapter.prose') return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision: 2 }))
+      if (path === '/api/chapter.commit') {
+        return Promise.resolve(okJson({
+          ok: true,
+          commitId: 'cmit_test_123',
+          phase: 'committed',
+          deltaExtraction: {
+            extractor: 'llm',
+            counts: { ...ZERO_COUNTS, temporalFact: 3, knowledgeState: 1 },
+            dropped: [],
+          },
+        }))
+      }
+      return Promise.resolve(okJson({ ok: true }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
+    await waitFor(() => expect(screen.getByTestId('canon-commit-section')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '确认定稿入账 (Commit)' }))
+
+    await waitFor(() => expect(screen.getByText(/本章已成功定稿入账/)).toBeInTheDocument())
+    expect(screen.queryByTestId('commit-memory-warning')).not.toBeInTheDocument()
+  })
+})

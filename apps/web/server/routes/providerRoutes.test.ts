@@ -269,3 +269,93 @@ describe('模型通道与端点设置 (T07)', () => {
     expect(defaultProviderSettingsManager.getSettings()).toBeNull()
   })
 })
+
+/**
+ * 商业化阻断 2：产品内配置的密钥必须真的接上生成链路。
+ *
+ * 缺陷：ProviderSettingsManager（加密落盘 + 掩码 + SSRF 门禁）与
+ * resolveChatEndpoint(env, userId?) 的接线都已就位，但生成路径只传
+ * process.env、从不传 userId（pipelineRoutes.ts 的 makeStreamEngine），
+ * 可用性判据 hasDraftProvider 也只读环境变量。
+ * （semanticSettled 那条旁路不在本票内：它由无请求的自动挂载触发，本就没有 principal，
+ *  且 ProviderSettingsManager 在本地模式下忽略 userId，传了也是死参数。）
+ * 结果：用户在产品里存了密钥，/api/capabilities 仍报 providerAvailable:false，
+ * /api/draft.stream 仍回 PROVIDER_UNAVAILABLE——「设置成功但仍然不能用」。
+ */
+describe('已配置的密钥必须真的可用（商业化阻断 2）', () => {
+  const ENV_KEYS = ['MOZHOU_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'MOZHOU_DRAFT_PROVIDER'] as const
+
+  function clearProviderEnv(): void {
+    for (const k of ENV_KEYS) delete process.env[k]
+  }
+
+  async function saveKey(base: string): Promise<Response> {
+    return fetch(base + '/api/llm/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: generateTestKey('wired'),
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-chat',
+      }),
+    })
+  }
+
+  it('在产品内保存密钥后（无任何环境变量），/api/capabilities 报 providerAvailable=true', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-bok-wiring-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    clearProviderEnv()
+
+    try {
+      const base = await listen()
+
+      // 前置事实：未配置时确实不可用（这就是新用户撞到的死端）
+      const before = (await (await fetch(base + '/api/capabilities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })).json()) as { providerAvailable: boolean }
+      expect(before.providerAvailable).toBe(false)
+
+      // 用户在产品内保存密钥
+      const saved = await saveKey(base)
+      expect(saved.status).toBe(200)
+
+      // 核心断言：保存后必须立刻可用
+      const after = (await (await fetch(base + '/api/capabilities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })).json()) as { providerAvailable: boolean }
+      expect(after.providerAvailable).toBe(true)
+    } finally {
+      clearProviderEnv()
+      defaultProviderSettingsManager.resetSettings()
+    }
+  })
+
+  it('已配置的密钥让 draft.stream 不再回 PROVIDER_UNAVAILABLE（走到真实上游分支）', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-bok-draft-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    clearProviderEnv()
+
+    try {
+      const base = await listen()
+      await saveKey(base)
+
+      // 缺 root/chapterIndex 才是 400；若是 PROVIDER_UNAVAILABLE 则接线仍断着
+      const res = await fetch(base + '/api/draft.stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: 'C:/definitely-not-a-book', chapterIndex: 1, prompt: 'x' }),
+      })
+      const text = await res.text()
+      expect(text).not.toContain('PROVIDER_UNAVAILABLE')
+    } finally {
+      clearProviderEnv()
+      defaultProviderSettingsManager.resetSettings()
+    }
+  })
+})

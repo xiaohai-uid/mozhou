@@ -114,9 +114,14 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const [commitSummary, setCommitSummary] = useState('')
   const [commitBusy, setCommitBusy] = useState(false)
   const [commitNotice, setCommitNotice] = useState<string | null>(null)
+  // 定稿后叙事五族零增长的显式警告（商业化阻断 1）：定稿成功 ≠ 一切正常
+  const [memoryWarning, setMemoryWarning] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setError(null)
+    // 换章/换书时上一章的告警不再成立（否则 props 变了屏幕上还挂着旧字的警告）
+    setMemoryWarning(null)
+    setCommitNotice(null)
     try {
       const [status, prose] = await Promise.all([
         post<ChapterQualityStatusResponse>('/api/chapter.quality', { root, chapterIndex }),
@@ -138,7 +143,16 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
     setError(null)
     setCommitNotice(null)
     try {
-      const res = await post<{ ok: boolean; commitId: string }>('/api/chapter.commit', {
+      const res = await post<{
+        ok: boolean
+        commitId: string
+        deltaExtraction?: {
+          extractor: 'llm' | 'none'
+          counts: Record<string, number>
+          dropped: readonly { family: string; reason: string }[]
+          reason?: string
+        }
+      }>('/api/chapter.commit', {
         root,
         chapterIndex,
         summary: commitSummary,
@@ -146,6 +160,21 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
       if (res.ok) {
         setChapterPhase('committed')
         setCommitNotice(`✓ 本章已成功定稿入账 (${res.commitId.slice(0, 12)})`)
+        // 定稿与「小说记住了本章」是两件事：五族零增长必须显式报出，
+        // 否则作者会以为记忆在正常工作，而下一章拿不到任何前情。
+        const extraction = res.deltaExtraction
+        const totalExtracted =
+          extraction === undefined
+            ? undefined
+            : Object.values(extraction.counts).reduce((sum, n) => sum + (Number.isFinite(n) ? n : 0), 0)
+        if (extraction !== undefined && totalExtracted === 0) {
+          setMemoryWarning(
+            '⚠ 本章已定稿，但叙事记忆零增长：没有从本章提取到任何实体/事实更新' +
+              (extraction.reason === undefined ? '。' : '（' + extraction.reason + '）'),
+          )
+        } else {
+          setMemoryWarning(null)
+        }
         setCommitSummary('')
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
       }
@@ -168,6 +197,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
       if (res.ok) {
         setChapterPhase('draft')
         setCommitNotice('✓ 已重开为草稿状态')
+        setMemoryWarning(null)
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
       }
     } catch (cause) {
@@ -357,6 +387,16 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
           {commitNotice && (
             <p className="mono" style={{ margin: '4px 0 8px', color: 'var(--success)', fontSize: 11 }}>
               {commitNotice}
+            </p>
+          )}
+
+          {memoryWarning && (
+            <p
+              className="mono"
+              data-testid="commit-memory-warning"
+              style={{ margin: '4px 0 8px', color: 'var(--warn, #d99b3a)', fontSize: 11, lineHeight: 1.7 }}
+            >
+              {memoryWarning}
             </p>
           )}
 

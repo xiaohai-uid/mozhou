@@ -93,6 +93,12 @@ export interface DraftStateFile {
   readonly status: DraftStatus;
   /** 已持久化正文字符数（含续写基底）。 */
   readonly chars: number;
+  /**
+   * 本次 attempt 实际追加的正文字符数（不含续写基底；纯空白增量记 0）。
+   * 判别「上游有没有真的给出正文」的机械依据：generate 模式基底为 0，
+   * continue 模式基底非 0，故 chars 无法单独回答这个问题。
+   */
+  readonly appendedChars?: number;
   /** status=partial 时的归一化失败原因；其余状态键不存在（exactOptional）。 */
   readonly reason?: string;
   /** C2（T04）：本次生成关联的候选 id；恢复/重开时回读候选文本。 */
@@ -111,6 +117,7 @@ interface DraftStateWrite {
   readonly proseRelPath: string;
   readonly status: DraftStatus;
   readonly chars: number;
+  readonly appendedChars?: number;
   readonly reason?: string;
   readonly candidateId?: string;
 }
@@ -122,6 +129,7 @@ function writeDraftState(root: string, state: DraftStateWrite): void {
     proseRelPath: state.proseRelPath,
     status: state.status,
     chars: state.chars,
+    ...(state.appendedChars === undefined ? {} : { appendedChars: state.appendedChars }),
     ...(state.reason === undefined ? {} : { reason: state.reason }),
     ...(state.candidateId === undefined ? {} : { candidateId: state.candidateId }),
   };
@@ -210,6 +218,10 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
       candidateId: candidate.id,
     });
     const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
+    // 空流守卫计数器：本次 attempt 落盘了多少**非空白**增量。零增量 ⇒ 上游没给出正文，
+    // 绝不能与「成功」同流——见 README 商业化阻断 1。纯空白帧（换行、缩进）不计入：
+    // 它们不构成可采纳的正文。声明在 try 之外，catch 里的终态写盘也要用到。
+    let appendedChars = 0;
     try {
       if (aborted()) {
         cancelCandidate(opts.bookRoot, candidate.id);
@@ -223,6 +235,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         }
         if (delta.length === 0) continue;
         candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta);
+        appendedChars += delta.trim().length;
       }
       if (aborted()) {
         writeDraftState(opts.bookRoot, {
@@ -230,9 +243,19 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
           proseRelPath: relPath,
           status: 'partial',
           chars: candidate.text.length,
+          appendedChars,
           candidateId: candidate.id,
         });
         return candidate.text;
+      }
+      // 零增量流 = 上游静默空输出。抛 RecoverableError 交引擎二级定向重生
+      // （M17），候选穷尽后随链报 failed_recoverable；由下方 catch 统一
+      // 标 partial + 写归一原因，绝不把空候选终态化成 ready。
+      if (appendedChars === 0) {
+        throw new RecoverableError(
+          'PROVIDER_EMPTY_STREAM: ' + opts.provider + ' 返回流但未产出任何正文增量（基底 ' +
+            candidate.text.length + ' 字未变，本次追加 0 字）',
+        );
       }
       // 流完整结束（含完成帧）：ready
       const finalCandidate = finishCandidate(opts.bookRoot, candidate.id, 'ready');
@@ -241,6 +264,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         proseRelPath: relPath,
         status: 'complete',
         chars: finalCandidate.text.length,
+        appendedChars,
         candidateId: finalCandidate.id,
       });
       return finalCandidate.text;
@@ -252,6 +276,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
           proseRelPath: relPath,
           status: 'partial',
           chars: candidate.text.length,
+          appendedChars,
           candidateId: candidate.id,
         });
         return candidate.text;
@@ -270,6 +295,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         proseRelPath: relPath,
         status: 'partial',
         chars: candidate.text.length,
+        appendedChars,
         candidateId: candidate.id,
         reason: classified.message,
       });
@@ -366,6 +392,13 @@ export interface DraftStepOutcome {
   readonly chars: number;
   /** 断流标记：Draft 运行态文件 status==='partial'。 */
   readonly partial: boolean;
+  /**
+   * 本次运行是否真的产出了正文（运行态文件 appendedChars > 0）。
+   * 调用方据此区分两种失败：「什么都没给」（⇒ 该报失败）与
+   * 「断了但已留下可采纳的半稿」（⇒ 维持 partial 语义，别把半稿当失败藏起来）。
+   * chars 答不了这个问题：continue 模式的基底本身就让 chars > 0。
+   */
+  readonly produced: boolean;
   /** 失败原因：优先运行态文件的归一化记录，其次引擎 reason 轨迹。 */
   readonly reason?: string;
   /** 三级上报轨迹：穷尽过的 provider 列表（人工兜底模板的输入）。 */
@@ -424,6 +457,7 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
       text,
       chars: text.length,
       partial: state?.status === 'partial',
+      produced: (state?.appendedChars ?? 0) > 0,
       ...(failureReason !== undefined ? { reason: failureReason } : {}),
       ...(result.outcome === 'failed_recoverable' && result.repairHint !== undefined
         ? { repairHint: result.repairHint }
@@ -440,5 +474,6 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
     text,
     chars: text.length,
     partial: candidate?.status === 'partial',
+    produced: (state?.appendedChars ?? 0) > 0,
   };
 }

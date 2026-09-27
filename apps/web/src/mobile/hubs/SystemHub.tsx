@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BookIcon, LockIcon, ExportIcon, SettingsIcon } from '../components/MobileIcons'
 import { post } from '../../lib/post'
+import { ProviderSettingsForm, useProviderSettings } from '../../settings/ProviderSettingsForm'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
 import type { TasksResponse, MembershipResponse, LibraryResponse } from '../../../server/api'
@@ -26,6 +27,9 @@ export function SystemHub({
   const [membership, setMembership] = useState<MembershipResponse | null>(null)
   const [library, setLibrary] = useState<LibraryResponse | null>(null)
   const [shelfOpen, setShelfOpen] = useState(false)
+  // 商业化阻断 2：移动端也必须能在产品内配密钥（桌面端见「账户 → 模型设置」）
+  const [modelSettingsOpen, setModelSettingsOpen] = useState(false)
+  const providerState = useProviderSettings()
   const [switchingRoot, setSwitchingRoot] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
 
@@ -71,6 +75,12 @@ export function SystemHub({
   }
 
   const planName = membership?.license?.planName ?? '未激活许可证 · Technical Preview'
+  const providerStatus =
+    providerState.settings === null
+      ? '读取中…'
+      : providerState.settings.configured
+        ? '已配置'
+        : '未配置'
 
   return (
     <>
@@ -98,6 +108,38 @@ export function SystemHub({
       <div className="mobile-card" style={{ padding: 0, overflow: 'hidden' }}>
         <Row onClick={() => onOpenDrawer('license')} icon={<LockIcon className="svg-icon" />} label="许可证与商业授权" value={planName} />
         <Row onClick={() => onOpenDrawer('export')} icon={<ExportIcon className="svg-icon" />} label="作品打包与平台排版" value="尚未接入" />
+        <div style={{ borderBottom: '1px solid var(--hairline-subtle-mobile)' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '14px 16px',
+              cursor: 'pointer',
+              minHeight: 'var(--touch-target-min)',
+            }}
+            role="button"
+            aria-expanded={modelSettingsOpen}
+            data-testid="mobile-model-settings-toggle"
+            onClick={() => setModelSettingsOpen((open) => !open)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <SettingsIcon className="svg-icon" />
+              <span>模型设置（API 密钥）</span>
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--fg-muted-mobile)' }}>
+              {providerStatus} {modelSettingsOpen ? '▲' : '▼'}
+            </span>
+          </div>
+          {modelSettingsOpen && (
+            <div style={{ padding: '0 16px 16px' }} data-testid="mobile-model-settings-panel">
+              <p style={{ fontSize: 11.5, color: 'var(--fg-muted-mobile)', lineHeight: 1.7, margin: '0 0 8px' }}>
+                墨舟不托管你的模型账号。填入 API 密钥后，章节生成与事实抽取才能工作。
+              </p>
+              <ProviderSettingsForm state={providerState} compact />
+            </div>
+          )}
+        </div>
         <div style={{ borderBottom: '1px solid var(--hairline-subtle-mobile)' }}>
           <div
             style={{

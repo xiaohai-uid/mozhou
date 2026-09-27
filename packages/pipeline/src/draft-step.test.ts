@@ -478,3 +478,154 @@ describe('T21 事件供给面增补（#54 · t52 B1/Q-E）', () => {
     expect(outcome.reason).not.toContain('STALE-REASON-FROM-OLD-WINDOW');
   });
 });
+
+/**
+ * 空流不得当成功（商业化阻断 1）。
+ *
+ * 缺陷：makeDraftProviderBinding 在流「正常结束但零 delta」时无条件
+ * finishCandidate(...,'ready') + status='complete'，runDraftStep 遂返回
+ * outcome:'succeeded', chars:0。真实上游把错误塞进 HTTP 200 的 SSE 流时
+ * （commit 0693776 自述「零 delta 的静默空输出」），作者会看到「生成完成、
+ * 已定稿入账」，而正文是空的、叙事五族零增长。
+ *
+ * 契约：零增量 ⇒ 抛 RecoverableError ⇒ 引擎走 fallback 链；穷尽后
+ * failed_recoverable + 归一原因，候选不落 ready。
+ */
+describe('空流不得当成功（上游 200 但零 delta）', () => {
+  it('generate 模式零 delta：判 failed_recoverable + 归一原因，候选不落 ready', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    const { candidate } = registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream([]));
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    // 核心断言：空流不得被当成成功
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.chars).toBe(0);
+    // 原因可读、可归一（不是裸 undefined）
+    expect(outcome.reason).toContain('EMPTY_STREAM');
+    // 候选不得被终态化成 ready——否则作者会拿到「已成稿」的空候选
+    expect(readDraftCandidate(root, candidate.id)?.status).not.toBe('ready');
+  });
+
+  it('零长度 delta（上游发空帧）等价于零增量：同样判失败', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['', '']));
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.reason).toContain('EMPTY_STREAM');
+  });
+
+  it('continue 模式零 delta：续写基底保留并标 partial，但仍判失败', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    const { candidate } = registerDraftBinding(
+      engine, root, 'deepseek', 'deepseek', fakeStream([]),
+      'continue', '这是上一次留下的半稿基底。',
+    );
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    // 有基底文本不代表「续写成功」——本次流零增量即失败
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.reason).toContain('EMPTY_STREAM');
+    // 基底不丢：候选保留半稿可再续，状态标 partial
+    expect(readDraftCandidate(root, candidate.id)?.status).toBe('partial');
+    expect(readDraftCandidate(root, candidate.id)?.text).toContain('半稿基底');
+    // draft 状态文件标 partial，作者看得到
+    expect(readDraftState(root, 7)?.status).toBe('partial');
+  });
+
+  it('空流可重试：首选 provider 空流后引擎回落备用 provider 并成功', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root, { fallbacks: ['glm'] });
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream([]));
+    registerDraftBinding(engine, root, 'glm', 'glm', fakeStream(['备用厂商的成稿。']));
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('succeeded');
+    expect(outcome.text).toBe('备用厂商的成稿。');
+  });
+
+  it('零回归：非空流仍走 succeeded/ready 原路径（不得误伤正常生成）', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    const { candidate } = registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['正常成稿。']));
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('succeeded');
+    expect(outcome.chars).toBeGreaterThan(0);
+    expect(outcome.partial).toBe(false);
+    expect(outcome.produced).toBe(true);
+    expect(readDraftCandidate(root, candidate.id)?.status).toBe('ready');
+  });
+});
+
+/**
+ * produced 语义：它回答「本次 attempt 有没有真的给出正文」，而不是「outcome 是不是 succeeded」。
+ *
+ * 路由（apps/web/server/routes/pipelineRoutes.ts 的 draft.stream 末帧）据此选帧：
+ *   - produced=false ⇒ error 帧（空流：不能拿一个空候选告诉作者「生成完成」）；
+ *   - produced=true  ⇒ 维持既有 done(partial)（断流但半稿已落盘、可续可采纳）。
+ * 若把判据写成 outcome !== 'succeeded'，断流的 300 字半稿会被判成失败而无人能救。
+ */
+describe('produced：本次是否真的产出正文（末帧选型的判据）', () => {
+  it('断流但已落盘半稿 ⇒ produced=true（半稿不得被当失败）', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(
+      engine,
+      root,
+      'deepseek',
+      'deepseek',
+      fakeStream(['半稿上半。', '半稿下半。'], new ProviderTransportError({ status: 429 }, 'http 429')),
+    );
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.partial).toBe(true);
+    expect(outcome.produced).toBe(true);
+  });
+
+  it('空流 ⇒ produced=false（作者必须看到失败）', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream([]));
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.produced).toBe(false);
+  });
+
+  it('continue 模式空流 ⇒ produced=false（基底不算本次产出）', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream([]), 'continue', '这是上一次留下的半稿基底。');
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('failed_recoverable');
+    // chars 因基底而 > 0，但 produced 必须为 false：本次一个字都没续出来
+    expect(outcome.chars).toBeGreaterThan(0);
+    expect(outcome.produced).toBe(false);
+  });
+
+  it('纯空白增量流 ⇒ produced=false（空白不构成可采纳正文）', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['  ', '   ', ' ']));
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.produced).toBe(false);
+  });
+});
+

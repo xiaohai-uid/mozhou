@@ -118,3 +118,76 @@ describe('SystemHub 书架切书（链 2）', () => {
     })
   })
 })
+/**
+ * 商业化阻断 2 的移动端半边：系统中心必须能配 API 密钥。
+ *
+ * 缺陷：模型设置只挂在 App.tsx 的桌面分支，MobileShell 完全够不着——
+ * 于是「从安装到拿到第一段 AI 正文」在移动端这条路上依然走不通。
+ */
+describe('SystemHub 模型设置入口（商业化阻断 2 · 移动端）', () => {
+  it('系统中心如实显示未配置，展开后能填密钥并保存', async () => {
+    const saved: Record<string, unknown>[] = []
+    const fetchMock = vi.fn().mockImplementation((path: string, init?: RequestInit) => {
+      if (path === '/api/llm/settings' && init?.method === 'POST') {
+        saved.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({
+            ok: true,
+            settings: {
+              configured: true,
+              providerId: 'deepseek',
+              baseUrl: 'https://api.deepseek.com/v1',
+              maskedKey: 'sk-****wxyz',
+              model: 'deepseek-chat',
+              configVersion: 1,
+              updatedAt: '2026-09-27T00:00:00.000Z',
+            },
+          }),
+        })
+      }
+      if (path === '/api/llm/settings') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({
+            ok: true,
+            settings: {
+              configured: false,
+              providerId: 'deepseek',
+              baseUrl: '',
+              maskedKey: '',
+              model: 'deepseek-chat',
+              configVersion: 0,
+              updatedAt: null,
+            },
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<SystemHub book={BOOK} onOpenDrawer={vi.fn()} />)
+
+    const toggle = await screen.findByTestId('mobile-model-settings-toggle')
+    await waitFor(() => expect(toggle.textContent).toContain('未配置'))
+    expect(screen.queryByTestId('mobile-model-settings-panel')).toBeNull()
+
+    fireEvent.click(toggle)
+    const panel = await screen.findByTestId('mobile-model-settings-panel')
+    const keyInput = panel.querySelector('input[type=password]') as HTMLInputElement
+    expect(keyInput).not.toBeNull()
+
+    await waitFor(() =>
+      expect(panel.querySelector('input[type=text]')?.value).toBe('https://api.deepseek.com/v1'),
+    )
+    fireEvent.change(keyInput, { target: { value: 'sk-mobile-key' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
+
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0]).toMatchObject({ apiKey: 'sk-mobile-key' })
+    expect(screen.getByTestId('provider-save-notice')).toBeDefined()
+  })
+})
