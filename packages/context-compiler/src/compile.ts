@@ -23,8 +23,8 @@
  *                   Always/Never 档在全链路中优先于检测逻辑）。
  *
  * Research 参考区硬隔离（US17）：携带 research 区 fileRel 的卡在编译入口即拒绝——
- * 确定性错误面而非静默吸收。目录值镜像 @mozhou/data-plane layout.ts RESEARCH_DIRS
- * （包边界解耦不跨包依赖；值冻结于工单 #6 Q6/#13，两侧同步漂移即实现 bug）。
+ * 确定性错误面而非静默吸收。判据取 @mozhou/data-plane layout 的单一实现
+ * （此前是镜像字面量；该包依赖已存在且无循环，加研究目录时两侧必然同步）。
  *
  * 失败路径（AC③ 一律显式异常禁止降级静默）：
  *   - 召回合并后候选集为空 ⇒ EmptyRecallError（零设定上下文的生成尝试被拒绝）；
@@ -37,6 +37,7 @@
  * 指针）。凭证身份（ULID/时钟）在本层铸造——装配纯函数纪律不被 IO 触碰；测试经
  * receiptId / nowIso 注入获得完全确定性。
  */
+import { isResearchRelPath } from '@mozhou/data-plane'
 import type {
   AiContextTier,
   AliasRule,
@@ -186,14 +187,14 @@ export function activateCards(cards: readonly CompileCard[]): CardActivation {
 }
 
 /* ----------------------------------------------------------------------------
- * Research 区硬隔离（US17；镜像 data-plane layout.ts，见文件头）
+ * Research 区硬隔离（US17）
+ *
+ * 判据直接取 @mozhou/data-plane 的 layout 单一实现：本文件此前**镜像**了一份
+ * RESEARCH_DIRS 字面量。镜像意味着「给 data-plane 加一个研究目录」这条改动
+ * 不会传导到这里，于是编译期的硬隔离闸仍按旧名单放行——研究区材料就会进入
+ * 生成 prompt，而 US17 要求永不进入。依赖已存在（package.json 声明了
+ * @mozhou/data-plane），无需为同一件事再建一个归属地。
  * -------------------------------------------------------------------------- */
-
-const RESEARCH_DIRS = ['市场'] as const
-
-function isResearchRelPath(relPosixPath: string): boolean {
-  return RESEARCH_DIRS.some((dir) => relPosixPath === dir || relPosixPath.startsWith(`${dir}/`))
-}
 
 function assertNoResearchZone(cards: readonly CompileCard[]): void {
   for (const card of cards) {

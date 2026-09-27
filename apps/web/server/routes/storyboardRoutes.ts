@@ -10,6 +10,7 @@
  * 生成分镜（该路径绑定小说写作管线）。
  */
 import type { RouteHandler } from '../router.js'
+import { CHAPTER_MISSING, PROVIDER_UNAVAILABLE } from '../routeCodes.js'
 import { assertSafeBookRoot, RequestBoundaryError } from '../security.js'
 import {
   ChapterMissingError,
@@ -156,7 +157,7 @@ function respondStoryboardError(
     return
   }
   if (cause instanceof ProviderUnavailableError) {
-    json(503, { ok: false, code: 'PROVIDER_UNAVAILABLE', error: cause.message })
+    json(503, { ok: false, code: PROVIDER_UNAVAILABLE, error: cause.message })
     return
   }
   if (cause instanceof SourceChangedError) {
@@ -198,7 +199,7 @@ function respondStoryboardError(
     return
   }
   if (cause instanceof ChapterMissingError) {
-    json(404, { ok: false, code: 'CHAPTER_MISSING', error: `第 ${cause.chapterIndex} 章在磁盘上不存在` })
+    json(404, { ok: false, code: CHAPTER_MISSING, error: `第 ${cause.chapterIndex} 章在磁盘上不存在` })
     return
   }
   if (cause instanceof StoryboardValidationError) {

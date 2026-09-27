@@ -2,6 +2,7 @@
  * apps/web · 爬虫抓取、书源检索、热榜与联网搜索路由控制器。
  */
 import type { RouteHandler } from '../router.js'
+import { PROVIDER_UNAVAILABLE } from '../routeCodes.js'
 import { searchMultipleSources } from '../crawlers/multisource.js'
 import { fetchQidianHotBoard } from '../crawlers/rankings.js'
 import { smartExtractContent } from '../crawlers/crawl4ai.js'
@@ -174,7 +175,7 @@ export const crawlerRoutes: RouteHandler = async (req, res, { path, body, json }
     if (!outcome.ok) {
       json(501, {
         ok: false,
-        code: 'PROVIDER_UNAVAILABLE',
+        code: PROVIDER_UNAVAILABLE,
         error: outcome.error ?? '搜索服务不可用',
       })
       return true

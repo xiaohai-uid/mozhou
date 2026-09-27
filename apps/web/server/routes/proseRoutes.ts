@@ -111,6 +111,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RouteHandler } from '../router.js'
+import { CHAPTER_MISSING } from '../routeCodes.js'
 import { assertSafeBookRoot } from '../security.js'
 import {
   ChapterExistsError,
@@ -147,8 +148,6 @@ import {
   openProposalsOfChapter,
   pendingItemViewsOf,
 } from '../proposals.js'
-
-const CHAPTER_MISSING = 'CHAPTER_MISSING'
 
 /**
  * web 路径的窗口键（步 8 提案绑定 / 步 10 窗口锚 / 保存路径的编辑信号共用同一格式）：

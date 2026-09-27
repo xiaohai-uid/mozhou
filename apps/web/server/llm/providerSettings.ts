@@ -35,6 +35,29 @@ export interface MaskedProviderConfig {
   readonly updatedAt: string | null
 }
 
+/**
+ * 进程环境变量 → 端点字段的**唯一**解析处。
+ *
+ * 为什么必须收口：这段候选变量链此前在 getMaskedSettings 与 resolveEndpointForUser
+ * 各写了一份，且 getMaskedSettings 那份**漏了 OPENAI_API_BASE**。后果是只配了
+ * OPENAI_* 变量的部署：设置面板把 baseUrl 显示成 https://api.deepseek.com，
+ * 而真实请求发往 OPENAI_API_BASE——面板对作者说的和系统做的是两件事。
+ * 一条链、一个来源，两种呈现方式共用。
+ */
+export interface EnvEndpointFields {
+  readonly apiKey: string
+  readonly baseUrl: string
+  readonly model: string
+}
+
+export function resolveEnvEndpoint(env: NodeJS.ProcessEnv = process.env): EnvEndpointFields {
+  return {
+    apiKey: env['MOZHOU_API_KEY'] ?? env['DEEPSEEK_API_KEY'] ?? env['OPENAI_API_KEY'] ?? '',
+    baseUrl: env['MOZHOU_API_BASE'] ?? env['DEEPSEEK_API_BASE'] ?? env['OPENAI_API_BASE'] ?? '',
+    model: env['MOZHOU_MODEL'] ?? env['DEEPSEEK_MODEL'] ?? 'deepseek-chat',
+  }
+}
+
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
 const MASTER_KEY_SALT = 'mozhou-salt-fixed'
 const DEV_FALLBACK_SECRET = 'mozhou-default-internal-master-key-2026'
@@ -201,13 +224,11 @@ export class ProviderSettingsManager {
     return config
   }
 
-  getMaskedSettings(userId?: string): MaskedProviderConfig {
+  getMaskedSettings(userId?: string, env: NodeJS.ProcessEnv = process.env): MaskedProviderConfig {
     const config = this.getSettings(userId)
     if (!config) {
-      // 检查环境变量回退
-      const envKey = process.env['MOZHOU_API_KEY'] ?? process.env['DEEPSEEK_API_KEY'] ?? process.env['OPENAI_API_KEY'] ?? ''
-      const envBase = process.env['MOZHOU_API_BASE'] ?? process.env['DEEPSEEK_API_BASE'] ?? ''
-      const envModel = process.env['MOZHOU_MODEL'] ?? process.env['DEEPSEEK_MODEL'] ?? 'deepseek-chat'
+      // 检查环境变量回退：与 resolveEndpointForUser 共用同一条链（见 resolveEnvEndpoint）
+      const { apiKey: envKey, baseUrl: envBase, model: envModel } = resolveEnvEndpoint(env)
       return {
         configured: Boolean(envKey),
         providerId: 'environment',
@@ -248,17 +269,33 @@ export class ProviderSettingsManager {
       }
     }
 
-    // 2. 回退到进程环境变量
-    const apiKey = env['MOZHOU_API_KEY'] ?? env['DEEPSEEK_API_KEY'] ?? env['OPENAI_API_KEY'] ?? ''
+    // 2. 回退到进程环境变量（与 getMaskedSettings 共用同一条链）
+    const { apiKey, baseUrl, model } = resolveEnvEndpoint(env)
     if (!apiKey) return null
-    const baseUrl = env['MOZHOU_API_BASE'] ?? env['DEEPSEEK_API_BASE'] ?? env['OPENAI_API_BASE'] ?? ''
-    const model = env['MOZHOU_MODEL'] ?? env['DEEPSEEK_MODEL'] ?? 'deepseek-chat'
     return {
       baseUrl,
       apiKey,
       model,
       allowPrivateNetwork: env['MOZHOU_ALLOW_PRIVATE_LLM'] === '1',
     }
+  }
+
+  /**
+   * 「有没有配好凭据」的单一判据：产品内配置优先，其次进程环境变量。
+   *
+   * 只回答「配了没有」，**不**做 SSRF/DNS 门禁——那是 resolveEndpointForUser 的活，
+   * 它会抛异常，而能力探针抛异常会打断整条路由。getSettings 也可能抛（getSettingsPath
+   * 会 mkdirSync：数据根 EACCES/ENOSPC），就地吞掉折成「未配置」：探针 fail-closed。
+   *
+   * 调用方（hasDraftProvider 等）此前各自重写一遍候选变量链，已漏过一次。
+   */
+  hasUsableCredentials(userId?: string, env: NodeJS.ProcessEnv = process.env): boolean {
+    try {
+      if ((this.getSettings(userId)?.apiKey ?? '') !== '') return true
+    } catch {
+      // 读配置失败 = 没配好，不是 500
+    }
+    return resolveEnvEndpoint(env).apiKey !== ''
   }
 }
 

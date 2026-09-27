@@ -9,6 +9,7 @@
  * - 每次退出或切换用户隔离生效。
  */
 import type { RouteHandler } from '../router.js'
+import { PROVIDER_UNAVAILABLE } from '../routeCodes.js'
 import { defaultProviderSettingsManager } from '../llm/providerSettings.js'
 import { testConnection } from '../llm/openaiStream.js'
 
@@ -69,7 +70,7 @@ export const providerRoutes: RouteHandler = async (req, res, { path, body, json,
     if (!endpoint || !endpoint.apiKey) {
       json(200, {
         ok: false,
-        code: 'PROVIDER_UNAVAILABLE',
+        code: PROVIDER_UNAVAILABLE,
         error: 'No API key configured for testing',
       })
       return true
