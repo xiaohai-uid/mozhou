@@ -193,8 +193,14 @@ function assertDraftPhase(bookRoot: string, chapterIndex: number): void {
  */
 export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBinding {
   // 绑定只消费盘面真源与流缝，不读 payload/snapshot——零参闭包即满足 ProviderBinding 形状
+  //
+  // 跨 attempt 累加器：引擎会定向重生，首选 attempt 已落盘的半稿是真内容、可采纳，
+  // 不能被随后备用 attempt 的空输出抹掉。若按 attempt 各自计数，后写者胜会产出
+  // produced=false，末帧把「生成过」判成「什么都没生成」，作者半稿反被 error 帧困死。
+  let producedChars = 0
   return async () => {
     assertDraftPhase(opts.bookRoot, opts.chapterIndex);
+    const producedAtStart = producedChars;
     // 候选由调用方先建（HTTP/管线）；恢复场景（streaming/partial 跨进程）直接续用
     let candidate = readDraftCandidate(opts.bookRoot, opts.candidate.id);
     if (candidate === null) {
@@ -218,10 +224,6 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
       candidateId: candidate.id,
     });
     const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
-    // 空流守卫计数器：本次 attempt 落盘了多少**非空白**增量。零增量 ⇒ 上游没给出正文，
-    // 绝不能与「成功」同流——见 README 商业化阻断 1。纯空白帧（换行、缩进）不计入：
-    // 它们不构成可采纳的正文。声明在 try 之外，catch 里的终态写盘也要用到。
-    let appendedChars = 0;
     try {
       if (aborted()) {
         cancelCandidate(opts.bookRoot, candidate.id);
@@ -235,7 +237,8 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         }
         if (delta.length === 0) continue;
         candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta);
-        appendedChars += delta.trim().length;
+        // 纯空白帧（换行、缩进）不计入：它们不构成可采纳的正文
+        producedChars += delta.trim().length;
       }
       if (aborted()) {
         writeDraftState(opts.bookRoot, {
@@ -243,7 +246,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
           proseRelPath: relPath,
           status: 'partial',
           chars: candidate.text.length,
-          appendedChars,
+          appendedChars: producedChars,
           candidateId: candidate.id,
         });
         return candidate.text;
@@ -251,7 +254,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
       // 零增量流 = 上游静默空输出。抛 RecoverableError 交引擎二级定向重生
       // （M17），候选穷尽后随链报 failed_recoverable；由下方 catch 统一
       // 标 partial + 写归一原因，绝不把空候选终态化成 ready。
-      if (appendedChars === 0) {
+      if (producedChars === producedAtStart) {
         throw new RecoverableError(
           'PROVIDER_EMPTY_STREAM: ' + opts.provider + ' 返回流但未产出任何正文增量（基底 ' +
             candidate.text.length + ' 字未变，本次追加 0 字）',
@@ -264,7 +267,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         proseRelPath: relPath,
         status: 'complete',
         chars: finalCandidate.text.length,
-        appendedChars,
+        appendedChars: producedChars,
         candidateId: finalCandidate.id,
       });
       return finalCandidate.text;
@@ -276,7 +279,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
           proseRelPath: relPath,
           status: 'partial',
           chars: candidate.text.length,
-          appendedChars,
+          appendedChars: producedChars,
           candidateId: candidate.id,
         });
         return candidate.text;
@@ -295,7 +298,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         proseRelPath: relPath,
         status: 'partial',
         chars: candidate.text.length,
-        appendedChars,
+        appendedChars: producedChars,
         candidateId: candidate.id,
         reason: classified.message,
       });

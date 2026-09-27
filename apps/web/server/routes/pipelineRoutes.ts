@@ -119,7 +119,14 @@ export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env, use
   // 产品内配置的凭据（POST /api/llm/settings 落盘，AES-256-GCM 加密）与环境变量同权。
   // 只问「配了没有」：这里**不能**调 resolveChatEndpoint —— 它会做 SSRF/DNS 门禁并抛异常，
   // 而本函数是能力探针，抛出会打断整条路由（本轮曾因此让分级路由的 SSRF 拒绝帧消失）。
-  const hasPersistedKey = (defaultProviderSettingsManager.getSettings(userId)?.apiKey ?? '') !== ''
+  // getSettings 同样可能抛（其 getSettingsPath 会 mkdirSync：数据根 EACCES/ENOSPC），
+  // 一样就地吞掉折成「未配置」——探针 fail-closed，不得把 500 泄给调用方。
+  let hasPersistedKey = false
+  try {
+    hasPersistedKey = (defaultProviderSettingsManager.getSettings(userId)?.apiKey ?? '') !== ''
+  } catch {
+    hasPersistedKey = false
+  }
   if (!isMockMode && !hasRealKey && !hasPersistedKey) {
     if (!(await hasResolvableTierRoute(env))) return false
   }

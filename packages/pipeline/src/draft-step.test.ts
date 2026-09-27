@@ -593,6 +593,34 @@ describe('produced：本次是否真的产出正文（末帧选型的判据）',
     expect(outcome.produced).toBe(true);
   });
 
+  // 回归守卫：produced 必须跨 attempt 累加，不能只看最后一次。
+  // 第一次 attempt 写了半稿后断流，引擎定向重生的第二次 attempt 静默空输出——
+  // 那半稿是真内容、真落盘、可采纳。若 produced=false，作者拿到 error 帧，
+  // 半稿被判定为「什么都没生成」而困死（error 分支只给「再来一轮」）。
+  // 形状对齐出货路径：makeStreamEngine 每次只注册一个绑定，跨 attempt 复用同一闭包。
+  it('重生 attempt 的空输出不得抹掉前一 attempt 已落盘的半稿', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root, { fallbacks: ['deepseek'] });
+    let attempt = 0;
+    const stream = () => {
+      attempt += 1;
+      return attempt === 1
+        ? fakeStream(['第一个 attempt 已经写出来的半稿。'], new ProviderTransportError({ status: 429 }, 'http 429'))()
+        : fakeStream([])();
+    };
+    const candidate = candidateContext(root, 7, 'replace', undefined);
+    engine.registerProviderBinding(
+      'deepseek',
+      makeDraftProviderBinding({ bookRoot: root, chapterIndex: 7, provider: 'deepseek', mode: 'generate', stream, candidate }),
+    );
+
+    const outcome = await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    expect(attempt).toBe(2); // 确实走到了第二次 attempt，否则本用例没测到东西
+    expect(outcome.outcome).toBe('failed_recoverable');
+    expect(outcome.produced).toBe(true);
+  });
+
   it('空流 ⇒ produced=false（作者必须看到失败）', async () => {
     const { root } = hermeticBook();
     const engine = makeEngine(root);

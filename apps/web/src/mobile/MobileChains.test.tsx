@@ -129,7 +129,7 @@ describe('SystemHub 模型设置入口（商业化阻断 2 · 移动端）', () 
     const saved: Record<string, unknown>[] = []
     const fetchMock = vi.fn().mockImplementation((path: string, init?: RequestInit) => {
       if (path === '/api/llm/settings' && init?.method === 'POST') {
-        saved.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        saved.push(JSON.parse(init.body as string) as Record<string, unknown>)
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -180,9 +180,8 @@ describe('SystemHub 模型设置入口（商业化阻断 2 · 移动端）', () 
     const keyInput = panel.querySelector('input[type=password]') as HTMLInputElement
     expect(keyInput).not.toBeNull()
 
-    await waitFor(() =>
-      expect(panel.querySelector('input[type=text]')?.value).toBe('https://api.deepseek.com/v1'),
-    )
+    const baseInput = panel.querySelector('input[type=text]') as HTMLInputElement
+    await waitFor(() => expect(baseInput.value).toBe('https://api.deepseek.com/v1'))
     fireEvent.change(keyInput, { target: { value: 'sk-mobile-key' } })
     fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
 

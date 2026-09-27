@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ModelSettingsView } from './ModelSettingsView'
 
 function okJson(value: unknown): Response {
-  return { ok: true, status: 200, json: async () => value } as unknown as Response
+  return { ok: true, status: 200, json: () => Promise.resolve(value) } as unknown as Response
 }
 
 afterEach(() => {
@@ -54,7 +54,7 @@ describe('模型设置页', () => {
     let saved: Record<string, unknown> | null = null
     const fetchMock = vi.fn().mockImplementation((path: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
-        saved = JSON.parse(String(init.body)) as Record<string, unknown>
+        saved = JSON.parse(init.body as string) as Record<string, unknown>
         return Promise.resolve(okJson({ ok: true, settings: { configured: true, providerId: 'deepseek', baseUrl: 'https://api.deepseek.com/v1', maskedKey: 'sk-****wxyz', model: 'deepseek-chat', configVersion: 1, updatedAt: '2026-09-27T00:00:00.000Z' } }))
       }
       return Promise.resolve(okJson({
@@ -102,7 +102,7 @@ describe('模型设置页', () => {
   it('保存失败时错误照实呈现，不假装成功', async () => {
     const fetchMock = vi.fn().mockImplementation((path: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
-        return Promise.resolve({ ok: false, status: 400, json: async () => ({ ok: false, code: 'SSRF_BLOCKED', error: '端点未通过安全校验' }) } as unknown as Response)
+        return Promise.resolve({ ok: false, status: 400, json: () => Promise.resolve({ ok: false, code: 'SSRF_BLOCKED', error: '端点未通过安全校验' }) } as unknown as Response)
       }
       return Promise.resolve(okJson({
         ok: true,
