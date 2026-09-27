@@ -133,11 +133,41 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
 })
 
 /**
+ * 前缀形态的策略注册表。
+ *
+ * 只有当 handler 用 startsWith 分发、路径尾部带动态段（如订单 id）时，精确表
+ * 才无法登记该路由——那类路由若漏登记，运行时只会得到 403 UNREGISTERED_ROUTE_POLICY，
+ * 且失败点在网关层，看起来与业务无关。
+ *
+ * 键必须是真实的前缀（含结尾斜杠），逐条显式登记；不提供通配语义。
+ * 查找时先精确、后最长前缀，精确项永远优先于前缀项。
+ */
+export const ROUTE_POLICY_PREFIXES: Readonly<Record<string, RouteCategory>> = Object.freeze({
+  // CONTRACTS.md:129 —— GET /api/billing/orders/<id> 脱敏查询自己订单的状态。
+  '/api/billing/orders/': 'account',
+})
+
+/**
  * 查询指定路由的安全策略分类；未注册则返回 null（触发默认拒绝）。
+ *
+ * 精确登记优先；未精确命中时按最长前缀匹配 ROUTE_POLICY_PREFIXES。
+ * 两者都未命中才返回 null —— 仍然 FAIL-CLOSED。
  */
 export function getRoutePolicy(path: string): RouteCategory | null {
   const normalized = path.split('?')[0] ?? path
-  return ROUTE_POLICIES[normalized] ?? null
+  const exact = ROUTE_POLICIES[normalized]
+  if (exact !== undefined) return exact
+
+  let bestPrefix = ''
+  let best: RouteCategory | undefined
+  for (const [prefix, category] of Object.entries(ROUTE_POLICY_PREFIXES)) {
+    if (!normalized.startsWith(prefix)) continue
+    if (prefix.length > bestPrefix.length) {
+      bestPrefix = prefix
+      best = category
+    }
+  }
+  return best ?? null
 }
 
 /**

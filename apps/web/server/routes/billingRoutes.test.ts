@@ -138,6 +138,48 @@ describe('订单与支付回调路由 (T14)', () => {
     expect(body.code).toBe('ORDER_NOT_FOUND')
   })
 
+  it('CONTRACTS.md:129 路径形态 GET /api/billing/orders/<id> 可达且做主体隔离', async () => {
+    defaultBookAccessManager.setHostedMode(true)
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-billing-path-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    defaultBillingStore.setDatabasePath(join(dataRoot, 'billing.sqlite'))
+
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user: userA } = await provider.signUp('pathA@pay.com', 'passA123')
+    const { user: userB } = await provider.signUp('pathB@pay.com', 'passB123')
+    const { cookie: cookieA } = defaultSessionManager.createSession({ userId: userA.id, email: userA.email })
+    const { cookie: cookieB } = defaultSessionManager.createSession({ userId: userB.id, email: userB.email })
+
+    const orderB = defaultBillingStore.createOrder({
+      userId: userB.id,
+      planId: 'max_monthly',
+      channel: 'alipay',
+      idempotencyKey: 'path_key_b',
+    })
+
+    // 主体 A 用路径形态查主体 B 的订单 → 404 越权拒绝（不是 403 未登记策略）
+    const resA = await fetch(`${base}/api/billing/orders/${orderB.orderId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Cookie: cookieA },
+    })
+    expect(resA.status).toBe(404)
+    const bodyA = (await resA.json()) as { ok: boolean; code: string }
+    expect(bodyA.code).toBe('ORDER_NOT_FOUND')
+
+    // 主体 B 查自己的订单 → 200 脱敏状态
+    const resB = await fetch(`${base}/api/billing/orders/${orderB.orderId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Cookie: cookieB },
+    })
+    expect(resB.status).toBe(200)
+    const bodyB = (await resB.json()) as { ok: boolean; order: { orderId: string } }
+    expect(bodyB.ok).toBe(true)
+    expect(bodyB.order.orderId).toBe(orderB.orderId)
+  })
+
   it('微信支付回调：伪造签名拒绝 (401)，有效签名入账成功 (200 SUCCESS)', async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-wx-notify-'))
     tempDirs.push(dataRoot)

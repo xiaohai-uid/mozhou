@@ -27,6 +27,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createMoZhouApiRouter } from './api.js'
@@ -99,9 +100,40 @@ function computeTreeHash(dir: string): string {
   return hash.digest('hex')
 }
 
+
+/**
+ * 扫描路由实现源码，取出真正被 dispatch 的路径字面量。
+ *
+ * 这是「所有已实现路由都在策略表登记」这条不变式唯一可信的枚举来源：
+ * 策略表自己对自己断言等于什么都没查（历史实现正是如此）。这里读的是
+ * 实际执行的 if 分支，所以新增 handler 而忘记登记时，本测试会真的失败。
+ *
+ * 只读 .ts 实现文件；.test.ts 里的 fetch 路径不是 dispatch，不参与。
+ */
+const ROUTES_DIR = fileURLToPath(new URL('./routes', import.meta.url))
+
+interface ImplementedRoutes {
+  readonly exact: ReadonlySet<string>
+  readonly prefixes: readonly { readonly prefix: string; readonly file: string }[]
+}
+
+function scanImplementedRoutes(): ImplementedRoutes {
+  const exact = new Set<string>()
+  const prefixes: { prefix: string; file: string }[] = []
+  for (const entry of readdirSync(ROUTES_DIR, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue
+    const source = readFileSync(join(ROUTES_DIR, entry.name), 'utf8')
+    for (const m of source.matchAll(/path\s*===\s*'(\/api\/[^']*)'/g)) {
+      exact.add(m[1]!)
+    }
+    for (const m of source.matchAll(/path\.startsWith\('(\/api\/[^']*)'\)/g)) {
+      prefixes.push({ prefix: m[1]!, file: entry.name })
+    }
+  }
+  return { exact, prefixes }
+}
 describe('全路由租户隔离与所有权策略 (T09)', () => {
-  it('自动化检查：当前所有注册路由均在 ROUTE_POLICIES 明确登记', () => {
-    // 策略注册表非空且分类合法
+  it('策略注册表非空、分类合法、键为 /api/ 路径', () => {
     const validCategories = new Set(['public', 'account', 'book', 'local-native', 'payment-webhook'])
     const routes = Object.entries(ROUTE_POLICIES)
     expect(routes.length).toBeGreaterThanOrEqual(30)
@@ -112,6 +144,42 @@ describe('全路由租户隔离与所有权策略 (T09)', () => {
 
     // 未登记路由 getRoutePolicy 恒返回 null（默认拒绝）
     expect(getRoutePolicy('/api/non-existent-shadow-route')).toBeNull()
+  })
+
+  it('每一个被 dispatch 的路由都在策略表登记（扫描实现，不是扫描策略表）', () => {
+    const { exact } = scanImplementedRoutes()
+
+    // 防空洞护栏：扫描器若失效（改了写法、正则失配、目录读不到），
+    // 下面两条断言会「因为扫到 0 条」而全绿——那正是本测试要防的失败模式。
+    expect(exact.size).toBeGreaterThanOrEqual(90)
+
+    const unregistered = [...exact].filter((p) => getRoutePolicy(p) === null)
+    expect(unregistered).toEqual([])
+  })
+
+  it('每一个 startsWith 命名空间都有归属：前缀策略登记，或其下路由已逐条精确登记', () => {
+    const { exact, prefixes } = scanImplementedRoutes()
+    expect(prefixes.length).toBeGreaterThanOrEqual(3)
+
+    for (const { prefix, file } of prefixes) {
+      if (getRoutePolicy(prefix + 'probe') !== null) continue
+
+      // 没有前缀策略兜底时，该命名空间下的具体路由必须逐条登记。
+      const covered = [...exact].filter((p) => p.startsWith(prefix))
+      expect({ file, prefix, covered: covered.filter((p) => getRoutePolicy(p) === null) }).toEqual({
+        file,
+        prefix,
+        covered: [],
+      })
+    }
+  })
+
+  it('扫描器本身有效：能识别未登记的新增路由（防止本组断言退化为空洞）', () => {
+    const source = "if (path === '/api/brand.new.unregistered') { return true }"
+    const found = [...source.matchAll(/path\s*===\s*'(\/api\/[^']*)'/g)].map((m) => m[1]!)
+    expect(found).toEqual(['/api/brand.new.unregistered'])
+    // 而它确实不在策略表里——即上面那条断言在同样场景下会失败
+    expect(getRoutePolicy('/api/brand.new.unregistered')).toBeNull()
   })
 
   it('未登记新路由请求 → 403 运行拒绝 (UNREGISTERED_ROUTE_POLICY)', async () => {
