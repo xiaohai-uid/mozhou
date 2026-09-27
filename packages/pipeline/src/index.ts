@@ -134,7 +134,7 @@ export type {
  * 版本绑定 QualityReviewReport（报告落 .mozhou/quality-reviews/，非 Canon）。
  * 事件落账与回炉决策由编排者经 ChapterProductionSession 显式驱动。
  */
-export { executeChapterReview, loadDraftForReview, runReviewStep } from './review-step.js';
+export { NoCompiledReceiptAnchorError, executeChapterReview, loadDraftForReview, runReviewStep } from './review-step.js';
 export type {
   ExecuteChapterReviewOutcome,
   ExecuteChapterReviewRequest,
@@ -296,4 +296,3 @@ export type {
   SceneStageRecord,
   StagedOverlay,
 } from './scene-stage.js';
-

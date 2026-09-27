@@ -11,12 +11,25 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../server/api'
-import { LocalDataPlane, createBook, entityCardFileRel, openPinsWindow, readProseChapter, proseChapterPath, runTraversal, sha256Hex } from '@mozhou/data-plane'
+import {
+  LocalDataPlane,
+  createBook,
+  entityCardFileRel,
+  openPinsWindow,
+  readNarrativeSnapshot,
+  readProseChapter,
+  proseChapterPath,
+  runTraversal,
+  scanEntityCards,
+  sha256Hex,
+} from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
-import { newFactId, newKnowledgeStateId } from '@mozhou/kernel'
+import { newFactId, newKnowledgeStateId, newUlid } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
-import { ChapterProductionSession, readDraftCandidate, recordUserEdit } from '@mozhou/pipeline'
+import { ChapterProductionSession, readDraftCandidate, recordUserEdit, runCompileStep } from '@mozhou/pipeline'
 import { PublishBus, readLedger } from '@mozhou/runtime'
+
+const charTok = { version: 'fake-char-v1', count: (text: string) => text.length }
 
 let servers: ReturnType<typeof createServer>[] = []
 let roots: string[] = []
@@ -187,7 +200,38 @@ async function makeBookAtReview(title: string): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), 'mozhou-web-quality-'))
   roots.push(dir)
   await post(base, '/api/book', { title, dir })
-  LocalDataPlane.open(dir).createChapterDraft({ chapterIndex: 1, title: '第一章' })
+  const plane = LocalDataPlane.open(dir)
+  const bookId = plane.book.id
+  try {
+    plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    // 目录卡：编译的召回通道需非空候选集，空集按 T10a AC3 拒答（拒绝静默降级）。
+    plane.saveEntityCard('char:chenque', {
+      name: '陈缺',
+      aiContext: 'detected',
+      brief: '孤城外按剑伫立的少年',
+    })
+  } finally {
+    plane.close()
+  }
+
+  // 真编译一次：产平铺 ContextCompiled 指针 + receipt 文件。评审锚点只认真编译
+  // 凭证（D10）——旧实现取不到就编一个 rcpt_web_1 落进报告。
+  await runCompileStep(
+    { chapterIndex: 1, staleMarker: null },
+    {
+      bookRoot: dir,
+      bookId: bookId,
+      draftText: '陈缺推门而入，按剑伫立，眼神坚毅。',
+      cards: scanEntityCards(dir),
+      snapshot: readNarrativeSnapshot(dir),
+      scope: { chapterIndex: 1, pov: 'protagonist' },
+      modelProfile: { id: 'api-contract-test', contextWindow: 4096 },
+      tokenizer: charTok,
+      receiptId: ('rcpt_' + newUlid()) as never,
+      nowIso: '2026-09-27T00:00:00.000Z',
+    },
+  )
+
   const session = ChapterProductionSession.start({ bus: new PublishBus(), root: dir, chapterIndex: 1, newTaskRef: () => 'tsk_web' })
   session.advance('compile')
   session.advance('draft')

@@ -9,6 +9,8 @@
  * 本路由只做请求形状校验与错误码映射，不复制确认协议。
  */
 import type { RouteHandler } from '../router.js'
+import { PROVIDER_UNAVAILABLE } from '../routeCodes.js'
+import { emptyDraftStream, mockDraftStream } from './draftStreamEmulation.js'
 import {
   AcceptConflictError,
   CandidateError,
@@ -22,6 +24,7 @@ import {
   loadCanonProposal,
   makeDraftProviderBinding,
   nextStepOf,
+  NoCompiledReceiptAnchorError,
   QualityReworkLimitExceededError,
   readDraftCandidate,
   recordAuthorCorrection,
@@ -36,6 +39,7 @@ import {
   type CorrectionReason,
   type QualityPolicy,
 } from '@mozhou/quality-engine'
+import { resolveCompiledAnchor } from '../compiledAnchor.js'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -67,14 +71,6 @@ const DIALOGUE_CAPABILITIES = [
   { id: 'consistency', label: '一致性自查' },
 ]
 
-/** BYOK 密钥判据（与 providerSettings.resolveEndpointForUser 的候选变量同源）。 */
-function hasByokDraftKey(env: NodeJS.ProcessEnv): boolean {
-  return (
-    Boolean(env['MOZHOU_API_KEY']) ||
-    Boolean(env['DEEPSEEK_API_KEY']) ||
-    Boolean(env['OPENAI_API_KEY'])
-  )
-}
 
 /**
  * 覆盖层能否解析出一条**可用**的 providerId → 端点路由（注册表能力独立可用的判据）。
@@ -113,31 +109,12 @@ async function hasResolvableTierRoute(env: NodeJS.ProcessEnv): Promise<boolean> 
  */
 export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env, userId?: string): Promise<boolean> {
   const configured = env['MOZHOU_DRAFT_PROVIDER']
-  const hasRealKey = hasByokDraftKey(env)
   // mock 开关族同 makeStreamEngine：'mock' 恒成立；'mock-empty' 仅非生产成立。
   const isMockMode = configured === 'mock' || (configured === 'mock-empty' && env['NODE_ENV'] !== 'production')
-  // 产品内配置的凭据（POST /api/llm/settings 落盘，AES-256-GCM 加密）与环境变量同权。
-  // 只问「配了没有」：这里**不能**调 resolveChatEndpoint —— 它会做 SSRF/DNS 门禁并抛异常，
-  // 而本函数是能力探针，抛出会打断整条路由（本轮曾因此让分级路由的 SSRF 拒绝帧消失）。
-  // getSettings 同样可能抛（其 getSettingsPath 会 mkdirSync：数据根 EACCES/ENOSPC），
-  // 一样就地吞掉折成「未配置」——探针 fail-closed，不得把 500 泄给调用方。
-  let hasPersistedKey = false
-  try {
-    hasPersistedKey = (defaultProviderSettingsManager.getSettings(userId)?.apiKey ?? '') !== ''
-  } catch {
-    hasPersistedKey = false
-  }
-  if (!isMockMode && !hasRealKey && !hasPersistedKey) {
-    if (!(await hasResolvableTierRoute(env))) return false
-  }
-
-  const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root: '/' } })
-  engine.registerCapability({
-    taskType: 'CHAPTER_DRAFTING',
-    providerId: isMockMode ? 'mock' : 'deepseek',
-    providerVersion: '1.0.0',
-    failurePolicy: { timeoutMs: 5_000, fallbackProviderIds: [] },
-  })
+  // 凭据判据归 ProviderSettingsManager.hasUsableCredentials（产品内配置优先，再退环境变量）
+  // ——本文件此前自己重写候选变量链，已因漏项漂移过一次。
+  const hasCredentials = defaultProviderSettingsManager.hasUsableCredentials(userId, env)
+  if (!isMockMode && !hasCredentials && !(await hasResolvableTierRoute(env))) return false
   return true
 }
 
@@ -317,25 +294,6 @@ async function makeStreamEngine(
 }
 
 /** 零增量流夹具：正常结束、一个 delta 都不发——等价于上游静默空输出。 */
-function emptyDraftStream(): AsyncIterable<string> {
-  return (async function* () {
-    await Promise.resolve()
-  })()
-}
-
-function mockDraftStream(prompt: string, onDelta?: (text: string) => void): AsyncIterable<string> {
-  const base = prompt.trim().length > 0 ? prompt.trim() : '夜雨敲窗，灯焰摇了三摇。'
-  const chunks = [base.slice(0, 8), base.slice(8, 18) === '' ? base : base.slice(8, 18), base.slice(18)]
-  return (async function* () {
-    for (const chunk of chunks) {
-      await Promise.resolve()
-      if (chunk.length > 0) {
-        onDelta?.(chunk)
-        yield chunk
-      }
-    }
-  })()
-}
 
 export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
   if (req.method !== 'POST') return false
@@ -501,7 +459,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       if (!existsSync(tierConfigPath())) {
         json(200, {
           ok: false,
-          code: 'PROVIDER_UNAVAILABLE',
+          code: PROVIDER_UNAVAILABLE,
           error: 'provider unavailable: no draft provider configured',
         })
         return true
@@ -653,6 +611,10 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         json(409, { ok: false, code: error.code, error: error.message })
         return true
       }
+      if (error instanceof NoCompiledReceiptAnchorError) {
+        json(409, { ok: false, code: error.code, error: error.message })
+        return true
+      }
       json(409, { ok: false, error: (error as Error).message })
     }
     return true
@@ -676,7 +638,20 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       json(409, { ok: false, error: 'review requires session at draft|review, got ' + session.currentStep })
       return true
     }
-    const receiptId = session.project().lastReceiptId ?? 'rcpt_web_' + String(chapterIndex)
+    // 评估锚点只有一条真源：账本平铺 ContextCompiled 行。session 投影的 lastReceiptId
+    // 只认会话窗口内指针，真实作者旅程不开窗口 ⇒ 恒为 null。此处取不到就 409，
+    // 不再编一个 rcpt_web_<n> 落进报告。
+    const compiledAnchor = resolveCompiledAnchor(root, chapterIndex)
+    if (compiledAnchor === null) {
+      json(409, {
+        ok: false,
+        code: 'NO_COMPILED_RECEIPT',
+        error:
+          '第 ' + chapterIndex + ' 章没有 Context 编译凭证，无法声明评估锚点；请先生成草稿再审查（D10 不编造锚点）',
+      })
+      return true
+    }
+    const receiptId = compiledAnchor.receiptId
     const rawPolicy = body['policy'] as QualityPolicy | undefined
     const policy =
       rawPolicy !== undefined &&

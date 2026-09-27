@@ -12,6 +12,23 @@
  * - 报告持久化于 `.mozhou/quality-reviews/chapter_<N>/report_<ULID>.json`，
  *   属运行期审计证据，不进 Canon、不参与真伪折叠。
  */
+/**
+ * 评估锚点缺失：没有编译凭证就拒绝产报告（D10）。
+ *
+ * 命名沿本包既有错误类惯例。调用方（HTTP 层）据此回 409，不落任何报告文件。
+ */
+export class NoCompiledReceiptAnchorError extends Error {
+  readonly code = 'NO_COMPILED_RECEIPT'
+  readonly chapterIndex: number
+
+  constructor(chapterIndex: number) {
+    super(
+      '第 ' + chapterIndex + ' 章没有 Context 编译凭证，无法声明评估锚点（D10 不编造锚点）',
+    )
+    this.name = 'NoCompiledReceiptAnchorError'
+    this.chapterIndex = chapterIndex
+  }
+}
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { newUlid } from '@mozhou/kernel';
@@ -215,10 +232,13 @@ export interface ExecuteChapterReviewOutcome extends ReviewStepOutcome {
 export async function executeChapterReview(
   request: ExecuteChapterReviewRequest,
 ): Promise<ExecuteChapterReviewOutcome> {
-  const receiptId =
-    request.receiptId ??
-    request.session?.project().lastReceiptId ??
-    `rcpt_rev_${String(request.chapterIndex)}`;
+  // D10：没有编译凭证就没有「评估哪版编译」可声明。此前此处取不到就编一个
+  // `rcpt_rev_<n>`，让它经 anchor.receiptId 落进 .mozhou/quality-reviews/*.json——
+  // 报告看上去有锚点，实际不可复算，比诚实地说「没有」更难发现。宁可拒答。
+  const receiptId = request.receiptId ?? request.session?.project().lastReceiptId
+  if (receiptId === undefined || receiptId === null) {
+    throw new NoCompiledReceiptAnchorError(request.chapterIndex)
+  }
   const reviewer: ReviewerBinding = request.reviewer ?? {
     providerId: 'pipeline',
     model: 'pipeline-direct',
@@ -327,5 +347,3 @@ export async function executeChapterReview(
     ...(secondaryWarnings.length > 0 ? { secondaryLifecycleWarnings: secondaryWarnings } : {}),
   };
 }
-
-

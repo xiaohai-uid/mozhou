@@ -26,10 +26,10 @@
 import { createHash } from 'node:crypto'
 import { createLocalTokenizer } from '@mozhou/context-compiler'
 import { readChapterDependencyPins } from '@mozhou/data-plane'
+import { latestCompiledReceiptIdForChapter } from './compiledAnchor.js'
 import { matchStaleDependencies, newUlid } from '@mozhou/kernel'
-import type { ContextReceiptId, DependencyManifestEntry } from '@mozhou/kernel'
+import type { DependencyManifestEntry } from '@mozhou/kernel'
 import { loadReceiptForResume, readPipelineLedger } from '@mozhou/pipeline'
-import type { PipelineLedgerRow } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 import { runSemanticBatch } from '@mozhou/flywheel'
 import type { AffectedRef, AnalyzeDeps, SemanticBatchItem, SemanticBatchOutcome } from '@mozhou/flywheel'
@@ -56,36 +56,6 @@ function changeSummaryDigestOf(entries: readonly DependencyManifestEntry[]): str
   return createHash('sha256').update(canonical).digest('hex')
 }
 
-/**
- * 该章最新编译凭证指针：扫账本**平铺** ContextCompiled 行（CHAPTER_DRAFTING + 同章号），
- * 后到者胜（行序即权威时序，沿 ledger.ts 头注）。
- *
- * 为什么不用 `projectSession(rows, chapterIndex).lastReceiptId`：那条路只认「会话窗口内」
- * 的指针——projection.ts:159-176 要求该章存在 TaskStarted（openedAtPosition !== null）
- * 且未 finished/committed，projection.ts:88-96 又在每次 TaskStarted 时把 lastReceiptId
- * 清空。而 TaskStarted 在全仓非测试代码里的唯一发射点是 session.ts:258
- * （ChapterProductionSession.start），其生产调用方只有 /api/session.open；真实作者旅程
- * （apps/web/src 内 grep 'api/session' 零命中）走
- * /api/draft.stream → buildDraftContext → runCompileStep（pipelineRoutes.ts:382 /
- * draftContext.ts:138），落平铺 ContextCompiled 行而不开窗口 ⇒ 用 projectSession 取锚点
- * 会让本批次在生产恒被短路（零报告、零上游调用）。平铺行自带 chapterIndex
- * （receipt-file.ts:106），其自身归属即权威，不需要窗口做中介。
- */
-function latestReceiptIdForChapter(rows: readonly PipelineLedgerRow[], chapterIndex: number): ContextReceiptId | null {
-  let found: ContextReceiptId | null = null
-  for (const row of rows) {
-    if (row.kind !== 'domain') continue
-    if (row.row['type'] !== 'ContextCompiled') continue
-    if (row.row['taskType'] !== 'CHAPTER_DRAFTING') continue
-    if (row.row['chapterIndex'] !== chapterIndex) continue
-    const receiptId = row.row['receiptId']
-    // 形状守卫后再断言：`rcpt_` 前缀即 ContextReceiptId 的类型契约（kernel-schema.ts:57），
-    // 不盲 cast——坏行宁可当「无凭证」跳过并留痕。
-    if (typeof receiptId === 'string' && receiptId.startsWith('rcpt_')) found = receiptId as ContextReceiptId
-  }
-  return found
-}
-
 export interface SettledSemanticRequest {
   readonly root: string
   /** 落定提案 id（幂等锚 + reconciliationRef）。 */
@@ -100,7 +70,11 @@ export interface SettledSemanticRequest {
   readonly newReportId?: (() => string) | undefined
 }
 
-export type SettledSemanticSkipReason = 'no_affected_chapters' | 'no_receipt_anchor' | 'provider_unavailable'
+export type SettledSemanticSkipReason =
+  | 'no_affected_chapters'
+  | 'no_receipt_anchor'
+  | 'provider_unavailable'
+  | 'hosted_no_principal'
 
 export interface SettledSemanticOutcome {
   readonly status: 'ran' | 'skipped'
@@ -122,11 +96,24 @@ interface ResolvedDeps {
 /**
  * 缺省适配器装配：无真实端点 ⇒ null（调用方按 L0 显式跳过收口）。
  *
- * 不传 userId：ProviderSettingsManager.getSettingsPath 只在 hosted 模式下按 userId 分目录，
- * 本地模式恒读 local-provider-settings.enc ⇒ 这里传什么都不改变结果，传了反而是死参数。
- * 本函数由旁路调用（propagateSettledChanges 可被自动挂载无请求地触发），本就没有 principal。
+ * **hosted 模式下一律返回 null，这是有意的拒答，不是偷懒。**
+ *
+ * hosted 下 ProviderSettingsManager.getSettingsPath 按 userId 分目录，凭据是**每用户**的。
+ * 而本函数由旁路调用：reconciliation runtime 是按书根常驻的进程级单例，
+ * onSettled 是长生命周期闭包，settle 事件由 watcher 定时器触发——**发生时根本没有
+ * principal**，也就没有任何可据以选凭据的主体。
+ *
+ * 曾经的写法是无条件 resolveChatEndpoint(process.env)（不传 userId），在 hosted 下
+ * 落到共享/本地那一档配置：用户的落定语义分析会用别人的 Key 去调 LLM。这是静默的
+ * 跨用户串号，而且没有任何一行日志会提示它。
+ *
+ * 两种选择：(a) 猜一个主体——那就是上面那个 bug；(b) 承认此路拿不到主体，显式拒答。
+ * 选 (b)。要真正支持，得先把 reconciliation runtime 按用户拆开，那是重设计，不在本次范围。
  */
 function resolveDefaultDeps(): ResolvedDeps | null {
+  if (process.env.MOZHOU_HOSTED === 'true') {
+    return null
+  }
   const endpoint = resolveChatEndpoint(process.env)
   if (endpoint === null) return null
   return { deps: { evaluate: createSemanticEvaluator({ endpoint, countTokens }) }, provider: endpoint.model }
@@ -146,12 +133,16 @@ export async function runSettledSemanticAnalysis(request: SettledSemanticRequest
   const deps = request.deps ?? resolved?.deps ?? null
   const provider = resolved?.provider ?? 'byok'
   if (deps === null) {
+    const hosted = process.env.MOZHOU_HOSTED === 'true'
+    const cause = hosted
+      ? 'hosted 模式且此旁路无 principal，选不出该用户的凭据（L0 显式拒答：用共享端点会跨用户串号）'
+      : '未配置真实 LLM 端点（BYOK）'
     console.warn(
-      `[semantic] 落定语义批次 ${request.proposalId} 跳过：未配置真实 LLM 端点（BYOK）——L0 显式跳过，不产报告、不静默 mock`,
+      `[semantic] 落定语义批次 ${request.proposalId} 跳过：${cause}——不产报告、不静默 mock`,
     )
     return {
       status: 'skipped',
-      reason: 'provider_unavailable',
+      reason: hosted ? 'hosted_no_principal' : 'provider_unavailable',
       batch: null,
       analyzedChapters: [],
       skippedChapters: chapters,
@@ -167,7 +158,7 @@ export async function runSettledSemanticAnalysis(request: SettledSemanticRequest
   const skippedChapters: number[] = []
 
   for (const chapterIndex of chapters) {
-    const receiptId = latestReceiptIdForChapter(rows, chapterIndex)
+    const receiptId = latestCompiledReceiptIdForChapter(rows, chapterIndex)
     if (receiptId === null) {
       // 无编译凭证 ⇒ 无「评估哪版编译」可声明（D10）；不编造锚点，记录后跳过。
       // 必须显式留痕：这是「批次看起来接通、其实零动作」的唯一可观测面。

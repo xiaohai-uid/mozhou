@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { PublishBus, RuntimeEngine } from '@mozhou/runtime';
 import type { CapabilityRecipe } from '@mozhou/runtime';
 import type { ContextPacket } from '@mozhou/context-compiler';
@@ -22,6 +22,7 @@ import { defaultPlatformRules, hashProse, isQualityReviewCurrent } from '@mozhou
 import type { QualityPolicy } from '@mozhou/quality-engine';
 import {
   ChapterProductionSession,
+  NoCompiledReceiptAnchorError,
   acceptDraft,
   executeChapterReview,
   loadDraftForReview,
@@ -327,6 +328,9 @@ describe('ADR-0025 runReviewStep：版本绑定审查报告', () => {
       bookRoot: root,
       chapterIndex: 3,
       session,
+      // 显式给锚点：本用例考的是统摄机检/金句收割/会话记录，不是锚点解析。
+      // 此前此处不传，靠 `rcpt_rev_3` 占位兜底才跑得通（同文件另外三处用例本就显式传）。
+      receiptId: 'rcpt_t25_deep',
       policy: deterministicOnlyPolicy(),
       reviewer: REVIEWER,
       mechanicalOptions: { minWords: 0 },
@@ -339,8 +343,34 @@ describe('ADR-0025 runReviewStep：版本绑定审查报告', () => {
     expect(outcome.mechanicalGate.passed).toBe(true);
     expect(outcome.harvestedQuotesCount).toBeGreaterThanOrEqual(1);
     expect(session.currentStep).toBe('review');
-    expect(session.project().lastQualityVerdict).toBe('pass');
+    expect(session.project().lastQualityVerdict).toBe('pass')
   });
-});
 
+  it('D10：没有编译凭证锚点时拒答，绝不编造 receiptId 落盘', async () => {
+    const root = hermeticBook()
+    const ctx = draftEngine(root, ['山高水长，此去经年。\n\n'])
+    await runDraftStep({
+      engine: ctx.engine,
+      bookRoot: root,
+      chapterIndex: 7,
+      packet: PACKET,
+      recipe: RECIPE,
+    })
+    acceptDraftOf(root, ctx)
+
+    // 既不传 receiptId，也不给 session（⇒ 旧实现 `rcpt_rev_7` 兜底的命中点）
+    await expect(
+      executeChapterReview({
+        bookRoot: root,
+        chapterIndex: 7,
+        policy: deterministicOnlyPolicy(),
+        reviewer: REVIEWER,
+        mechanicalOptions: { minWords: 0 },
+      }),
+    ).rejects.toBeInstanceOf(NoCompiledReceiptAnchorError)
+
+    // 且不得有任何报告文件被写出来
+    expect(existsSync(join(root, '.mozhou', 'quality-reviews', 'chapter_7'))).toBe(false)
+  })
+});
 

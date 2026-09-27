@@ -11,13 +11,23 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createMoZhouApiRouter } from '../api.js'
-import { createBook, LocalDataPlane, renderProseChapter } from '@mozhou/data-plane'
+import {
+  createBook,
+  LocalDataPlane,
+  readNarrativeSnapshot,
+  renderProseChapter,
+  scanEntityCards,
+} from '@mozhou/data-plane'
+import { runCompileStep } from '@mozhou/pipeline'
+import { newUlid } from '@mozhou/kernel'
 import { defaultBookAccessManager } from '../bookAccess.js'
+
+const charTok = { version: 'fake-char-v1', count: (text: string) => text.length }
 
 let servers: ReturnType<typeof createServer>[] = []
 let tempDirs: string[] = []
@@ -179,6 +189,7 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
 
     // 先落盘真实草稿
     const plane = LocalDataPlane.open(dir)
+    const bookId = plane.book.id
     plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
     const prose = renderProseChapter({
       mozhouId: plane.book.id,
@@ -188,7 +199,33 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
       body: '夜幕低垂，狂风卷着黄沙掠过孤城。少年按剑伫立，眼神坚毅。',
     })
     writeFileSync(join(dir, 'chapter_0001.md'), prose, 'utf8')
+    // 目录卡：编译的召回通道需要非空候选集，空集会按 T10a AC3 拒答（诚实降级）。
+    plane.saveEntityCard('char:shaonian', {
+      name: '少年',
+      aiContext: 'detected',
+      aliases: [{ text: '少年', kind: 'exact' }],
+      brief: '按剑伫立孤城边的少年剑客',
+    })
     plane.close()
+
+    // 真编译一次：产平铺 ContextCompiled 指针 + receipt 文件。
+    // 本用例考的是「审查产出带真锚点的报告」，锚点必须真的来自编译，
+    // 旧实现此处取不到就编一个 rcpt_web_1 落进报告。
+    await runCompileStep(
+      { chapterIndex: 1, staleMarker: null },
+      {
+        bookRoot: dir,
+        bookId: bookId,
+        draftText: '夜幕低垂，狂风卷着黄沙掠过孤城。少年按剑伫立，眼神坚毅。',
+        cards: scanEntityCards(dir),
+        snapshot: readNarrativeSnapshot(dir),
+        scope: { chapterIndex: 1, pov: 'protagonist' },
+        modelProfile: { id: 't06-review-test', contextWindow: 4096 },
+        tokenizer: charTok,
+        receiptId: ('rcpt_' + newUlid()) as never,
+        nowIso: '2026-09-27T00:00:00.000Z',
+      },
+    )
 
     // 打开会话并步进到 compile → draft
     await fetch(`${base}/api/session.open`, {
@@ -229,5 +266,61 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
     expect(typeof dataReview.draftRevision).toBe('number')
     expect(typeof dataReview.draftContentHash).toBe('string')
     expect(dataReview.draftContentHash.length).toBe(64)
+
+    // 锚点必须是真编译凭证，不是编出来的
+    const reportPath = join(dir, dataReview.reportPath.replace(/\\/g, '/'))
+    const report = JSON.parse(readFileSync(reportPath, 'utf8')) as { anchor: { receiptId: string } }
+    expect(report.anchor.receiptId).not.toBe('rcpt_web_1')
   })
-})
+
+  it('D10：该章无编译凭证时 chapter.review → 409 NO_COMPILED_RECEIPT 且不产报告', async () => {
+    const base = await listen()
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-t06-noanchor-'))
+    tempDirs.push(dir)
+    createBook({ dir, title: '无锚书' })
+
+    const plane = LocalDataPlane.open(dir)
+    plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    const prose = renderProseChapter({
+      mozhouId: plane.book.id,
+      revision: 1,
+      chapterIndex: 1,
+      phase: 'draft',
+      body: '夜幕低垂，狂风卷着黄沙掠过孤城。',
+    })
+    writeFileSync(join(dir, 'chapter_0001.md'), prose, 'utf8')
+    plane.close()
+
+    // 打开会话并步进到 review，但**不**跑编译 ⇒ 真的没有编译凭证
+    await fetch(`${base}/api/session.open`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+    await fetch(`${base}/api/session.advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+    await fetch(`${base}/api/session.advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+
+    const res = await fetch(`${base}/api/chapter.review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+
+    expect(res.status).toBe(409)
+    const data = (await res.json()) as { ok: boolean; code: string; error: string }
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('NO_COMPILED_RECEIPT')
+    expect(data.error).toContain('编译凭证')
+
+    // 不得有任何报告被写出来
+    expect(existsSync(join(dir, '.mozhou', 'quality-reviews', 'chapter_1'))).toBe(false)
+  })
+});
