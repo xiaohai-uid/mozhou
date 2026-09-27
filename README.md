@@ -41,9 +41,28 @@
 - **`mozhou-v<版本>-docker.tar.gz`**：本地 Docker 发行包（解压后先设 `MOZHOU_SECRET_KEY` 再 `docker compose up`）；
 - Release 同时提供 **SPDX SBOM** 与 **SHA256SUMS.txt** 用于供应链校验。
 
-服务默认地址为 **`http://127.0.0.1:5173`**。当前 Release **不冒充原生 Windows/macOS 安装器**；Tauri 原生安装与代码签名仍作为独立发布面验收。
+源码运行时服务默认地址为 **`http://127.0.0.1:5173`**。Tauri 原生安装与代码签名仍是独立发布面；普通 Windows 用户请使用下方的本地安装器。
 
-### 方式二：源码启动（开发者推荐）
+### 方式二：Windows 本地安装器（普通用户）
+
+当前工作分支已提供无需预装 Node.js、pnpm 或开发工具的 Windows x64 安装器：
+
+- 构建产物：`release-artifacts/MoZhou-0.3.0-windows-x64-setup.exe`；
+- 安装范围：当前用户的 `%LOCALAPPDATA%\Programs\MoZhou`，不需要管理员权限；
+- 用户数据：`%LOCALAPPDATA%\MoZhou`，卸载时保留；
+- 运行方式：开始菜单或桌面快捷方式启动，程序在本机启动服务并打开浏览器工作台；
+- 安装器内置 Node.js 运行时和生产依赖，启动不读取用户的 Node/pnpm PATH；
+- 本地构建包未做代码签名，Windows SmartScreen 可能显示发布者未知提示；发布前仍需独立签名与下载渠道验收。
+
+详细安装与验收记录见 [`docs/windows-local-install.md`](docs/windows-local-install.md)。
+
+在仓库中重建安装器：
+
+```powershell
+pnpm package:windows
+```
+
+### 方式三：源码启动（开发者推荐）
 
 ```bash
 # 1. 安装依赖（纯 CPU，本仓库显式禁止 onnxruntime 下载 CUDA 包）
