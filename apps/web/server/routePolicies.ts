@@ -80,6 +80,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
 
   // ---- 4. Book 作品级隔离路由 (要求 AuthorizedBook) ----
   '/api/book.state': 'book',
+  '/api/author-intent.save': 'book',
   '/api/story-brain.entities': 'book',
   '/api/story-brain.facts': 'book',
   '/api/story-brain.contract': 'book',

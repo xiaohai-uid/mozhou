@@ -4,7 +4,7 @@
  * → SQLite 投影初始化并写入 PROJECTION_SCHEMA_VERSION。
  * 演示 = 磁盘出现一本结构完整的书。
  */
-import { existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   newAuthorIntentId,
@@ -53,6 +53,99 @@ export interface CreateBookOptions {
 export interface CreateBookResult {
   readonly root: string
   readonly book: BookRecord
+}
+
+export interface WizardAuthorIntentInput {
+  readonly worldRule: string
+  readonly volumePromise: string
+  readonly opening: string
+  readonly firstChapterGoal: string
+}
+
+export class AuthorIntentAlreadyInitializedError extends Error {
+  override readonly name = 'AuthorIntentAlreadyInitializedError'
+
+  constructor(readonly path: string) {
+    super(`author intent already contains first-book inputs: ${path}`)
+  }
+}
+
+function markdownValue(value: string): string {
+  return value.trim().replace(/\r\n?/g, '\n')
+}
+
+/** 首次建书输入的段落锚（写入与回读共用；改一处即两处同步）。 */
+const WIZARD_SECTION_MARKER = '\n## 首次建书输入\n'
+/** 空字段的落盘占位；回读时还原为空串（编码/解码同源，保证同输入可判等）。 */
+const WIZARD_EMPTY_PLACEHOLDER = '（未填写）'
+const WIZARD_FIELDS = [
+  { key: 'worldRule', heading: '世界规则' },
+  { key: 'volumePromise', heading: '卷级承诺' },
+  { key: 'opening', heading: '开场画面' },
+  { key: 'firstChapterGoal', heading: '首章目标' },
+] as const
+
+function encodeWizardField(value: string): string {
+  return markdownValue(value) || WIZARD_EMPTY_PLACEHOLDER
+}
+
+/**
+ * 把首次建书向导的作者输入写入受保护的 Author Intent。
+ * 仅允许从空模板初始化一次；重放向导不会覆盖作者后来手工修改的内容。
+ * @returns 写入后的 Author Intent revision（frontmatter 现值 + 1）。
+ */
+export function writeWizardAuthorIntent(root: string, input: WizardAuthorIntentInput): number {
+  const path = join(root, AUTHOR_INTENT_PATH)
+  const raw = readFileSync(path, 'utf8')
+  if (raw.includes(WIZARD_SECTION_MARKER)) {
+    throw new AuthorIntentAlreadyInitializedError(path)
+  }
+
+  const revision = /^revision:\s*(\d+)$/m.exec(raw)
+  const nextRevision = revision === null ? 1 : Number(revision[1]) + 1
+  const body = [
+    '',
+    '## 首次建书输入',
+    '',
+    ...WIZARD_FIELDS.flatMap((field) => [`### ${field.heading}`, encodeWizardField(input[field.key]), '']),
+  ].join('\n')
+  const next = raw.replace(/^revision:\s*\d+$/m, `revision: ${nextRevision}`).trimEnd() + '\n' + body
+  atomicWriteFileSync(path, next)
+  return nextRevision
+}
+
+/**
+ * 回读首次建书输入（响应丢失后的重试判等依据）。
+ * 段落缺席或形状非法一律返回 null——宁可报冲突，也不把「读不出来」当成「已保存成功」。
+ */
+export function readWizardAuthorIntent(root: string): WizardAuthorIntentInput | null {
+  const raw = readFileSync(join(root, AUTHOR_INTENT_PATH), 'utf8')
+  const start = raw.indexOf(WIZARD_SECTION_MARKER)
+  if (start < 0) return null
+  const blocks = raw.slice(start + WIZARD_SECTION_MARKER.length).split('\n### ')
+  const values: Record<string, string> = {}
+  for (const [index, field] of WIZARD_FIELDS.entries()) {
+    const block = blocks[index + 1]
+    if (block === undefined) return null
+    const newline = block.indexOf('\n')
+    if (newline < 0 || block.slice(0, newline).trim() !== field.heading) return null
+    const value = block.slice(newline + 1).trim()
+    values[field.key] = value === WIZARD_EMPTY_PLACEHOLDER ? '' : value
+  }
+  return {
+    worldRule: values['worldRule'] ?? '',
+    volumePromise: values['volumePromise'] ?? '',
+    opening: values['opening'] ?? '',
+    firstChapterGoal: values['firstChapterGoal'] ?? '',
+  }
+}
+
+/**
+ * 两份向导输入是否等价（与落盘同一套规范化：trim + CRLF 归一，空值 ↔ 占位符同值）。
+ * 只有等价才允许把「已存在」判为幂等成功；任意不同输入必须走冲突。
+ */
+export function wizardAuthorIntentEquals(a: WizardAuthorIntentInput, b: WizardAuthorIntentInput): boolean {
+  return WIZARD_FIELDS.every((field) => encodeWizardField(a[field.key]) === encodeWizardField(b[field.key]))
 }
 
 /** 大纲节点 frontmatter（Q13 冻结字段集；orderIndex 为同父下序，0 起）。 */

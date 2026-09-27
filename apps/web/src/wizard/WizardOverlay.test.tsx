@@ -18,11 +18,22 @@ afterEach(() => {
 
 const BOOK: BookInfo = { root: 'C:\\tmp\\book-a', bookId: 'bk_1', title: '雾港失真' }
 
+async function walkToStepFive(): Promise<void> {
+  await userEvent.click(screen.getByRole('button', { name: /继续/ }))
+  await waitFor(() => expect(screen.getByTestId('wizard-eyebrow').textContent).toBe('STEP 02 / 05'))
+  for (const expected of ['STEP 03 / 05', 'STEP 04 / 05', 'STEP 05 / 05']) {
+    await userEvent.click(screen.getByRole('button', { name: /继续/ }))
+    await waitFor(() => expect(screen.getByTestId('wizard-eyebrow').textContent).toBe(expected))
+  }
+}
+
 describe('WizardOverlay（T42）', () => {
   it('首次建书：步 1 调 /api/book 建书；五步走通后 onComplete 收口为 WizardOutcome', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, root: 'C:\\tmp\\newbook', bookId: 'bk_new' }), { status: 200 })),
+      vi.fn().mockImplementation(async () =>
+        new Response(JSON.stringify({ ok: true, root: 'C:\\tmp\\newbook', bookId: 'bk_new' }), { status: 200 }),
+      ),
     )
     const onComplete = vi.fn()
     const onReplay = vi.fn()
@@ -110,6 +121,10 @@ describe('WizardOverlay（T42）', () => {
 
   it('重放场景（既有书 precreated）：步 1 不再建书即直接可进，走完后以既有书收口', async () => {
     const io = vi.fn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    )
     render(<WizardOverlay precreated={BOOK} onComplete={io} onReplay={() => {}} />)
     // 步 1 可继续（created 已在）
     const nextBtn = screen.getByRole('button', { name: /继续/ })
@@ -138,5 +153,76 @@ describe('WizardOverlay（T42）', () => {
     render(<WizardOverlay precreated={null} onComplete={() => {}} onReplay={onReplay} />)
     await userEvent.click(screen.getByRole('button', { name: '关闭' }))
     expect(onReplay).toHaveBeenCalledTimes(1)
+  })
+
+  it('409 且 stored 可回读：以盘上现值收口，不重复提交本次冲突输入', async () => {
+    const stored = {
+      worldRule: '盘上原文：被潮汐钟遗忘的人消失',
+      volumePromise: '盘上原文：找回一个全城都不记得的人',
+      opening: '盘上原文：末班船票',
+      firstChapterGoal: '盘上原文：800 字内意识到记忆被篡改',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          code: 'AUTHOR_INTENT_ALREADY_INITIALIZED',
+          error: '这本书已经保存过首次建书输入，本次输入未写入（受保护原文不覆盖）。',
+          stored,
+        }),
+        { status: 409 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const onComplete = vi.fn()
+    render(<WizardOverlay precreated={BOOK} onComplete={onComplete} onReplay={() => {}} />)
+
+    await walkToStepFive()
+    await userEvent.type(screen.getByLabelText('首章目标'), '本次输入不会被保存')
+    await userEvent.click(screen.getByRole('button', { name: /进入工作台/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /保留已有设定并进入工作台/ })).not.toBeNull())
+    await userEvent.click(screen.getByRole('button', { name: /保留已有设定并进入工作台/ }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    const outcome = onComplete.mock.calls[0]?.[0] as WizardOutcome
+    expect(outcome.worldRule).toBe(stored.worldRule)
+    expect(outcome.firstChapterGoal).toBe(stored.firstChapterGoal)
+    expect(outcome.firstChapterGoal).not.toBe('本次输入不会被保存')
+  })
+
+  it('409 且 stored=null：不写盘、不重试，明确未保存后仍可进入工作台', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          code: 'AUTHOR_INTENT_ALREADY_INITIALIZED',
+          error: '这本书已经保存过首次建书输入，本次输入未写入（受保护原文不覆盖）。',
+          stored: null,
+        }),
+        { status: 409 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const onComplete = vi.fn()
+    const onReplay = vi.fn()
+    render(<WizardOverlay precreated={BOOK} onComplete={onComplete} onReplay={onReplay} />)
+
+    await walkToStepFive()
+    await userEvent.type(screen.getByLabelText('首章目标'), '本次输入不会被保存')
+    await userEvent.click(screen.getByRole('button', { name: /进入工作台/ }))
+    await waitFor(() => expect(screen.getByTestId('wizard-error').textContent).toContain('本次输入未写入'))
+
+    expect(screen.queryByRole('button', { name: /保留已有设定/ })).toBeNull()
+    expect(screen.getByTestId('wizard-unsaved-intent').textContent).toContain('不会写入')
+    await userEvent.click(screen.getByRole('button', { name: /不保存本次输入，进入工作台/ }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onReplay).not.toHaveBeenCalled()
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    const outcome = onComplete.mock.calls[0]?.[0] as WizardOutcome
+    expect(outcome.root).toBe(BOOK.root)
+    expect(outcome.bookId).toBe(BOOK.bookId)
+    expect(outcome.firstChapterGoal).toBe('本次输入不会被保存')
   })
 })

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { createBook } from './create-book.js'
+import { createBook, writeWizardAuthorIntent } from './create-book.js'
 import { MANIFEST_PATH, RUNTIME_DB_PATH } from './layout.js'
 import { readManifest } from './manifest.js'
 import { parseFrontmatter } from './yaml-frontmatter.js'
@@ -165,6 +165,27 @@ describe('createBook', () => {
   it('initializes the SQLite projection stamped with PROJECTION_SCHEMA_VERSION', () => {
     createBook({ dir: bookRoot, title: 't' })
     expect(existsSync(join(bookRoot, RUNTIME_DB_PATH))).toBe(true)
+  })
+
+  it('writes first-book inputs once without allowing wizard replay to overwrite them', () => {
+    createBook({ dir: bookRoot, title: '向导输入书' })
+    writeWizardAuthorIntent(bookRoot, {
+      worldRule: '潮汐钟遗忘的人会从书面记录消失',
+      volumePromise: '林岚必须找回一个全城不记得的人',
+      opening: '没有乘客姓名的末班船票',
+      firstChapterGoal: '让读者在 800 字内意识到记忆被篡改',
+    })
+
+    const raw = readFileSync(join(bookRoot, '设定/作者意图.md'), 'utf8')
+    expect(raw).toContain('潮汐钟遗忘的人会从书面记录消失')
+    expect(raw).toContain('没有乘客姓名的末班船票')
+    expect(raw).toContain('revision: 1')
+    expect(() => writeWizardAuthorIntent(bookRoot, {
+      worldRule: '覆盖',
+      volumePromise: '',
+      opening: '',
+      firstChapterGoal: '',
+    })).toThrow(/already contains/i)
   })
 
   it('refuses to clobber a non-empty directory and leaves no partial book behind', () => {

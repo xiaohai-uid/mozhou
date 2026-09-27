@@ -2,7 +2,17 @@
  * apps/web · Story Brain 与核心书目数据路由控制器。
  */
 import type { RouteHandler } from '../router.js'
-import { TRACKING_STREAMS, createBook, LocalDataPlane } from '@mozhou/data-plane'
+import {
+  AUTHOR_INTENT_PATH,
+  TRACKING_STREAMS,
+  createBook,
+  LocalDataPlane,
+  readWizardAuthorIntent,
+  rebuildProjectionFromCanon,
+  wizardAuthorIntentEquals,
+  writeWizardAuthorIntent,
+} from '@mozhou/data-plane'
+import type { WizardAuthorIntentInput } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
@@ -10,7 +20,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 
-export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
+export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, json, principal, authorizedBook, bookRoot }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
@@ -54,6 +64,55 @@ export const storyBrainRoutes: RouteHandler = (req, res, { path, body, json, pri
     } finally {
       plane.close()
     }
+    return true
+  }
+
+  if (path === '/api/author-intent.save') {
+    if (resolvedRoot === null) {
+      json(400, { ok: false, error: 'root required' })
+      return true
+    }
+    const root = assertSafeBookRoot(resolvedRoot)
+    const fields: WizardAuthorIntentInput = {
+      worldRule: typeof body['worldRule'] === 'string' ? body['worldRule'] : '',
+      volumePromise: typeof body['volumePromise'] === 'string' ? body['volumePromise'] : '',
+      opening: typeof body['opening'] === 'string' ? body['opening'] : '',
+      firstChapterGoal: typeof body['firstChapterGoal'] === 'string' ? body['firstChapterGoal'] : '',
+    }
+    const values = Object.values(fields)
+    if (values.some((value) => value.length > 20_000)) {
+      json(413, { ok: false, error: 'author intent fields must be at most 20000 characters' })
+      return true
+    }
+    const bookKey = authorizedBook?.bookId ?? root
+    await defaultBookAccessManager.queue.withBookLock(bookKey, async () => {
+      try {
+        const revision = writeWizardAuthorIntent(root, fields)
+        // Keep the projection's planning_artifacts row and the file hash baseline
+        // aligned with the user-authored write before returning success.
+        rebuildProjectionFromCanon(root)
+        json(200, { ok: true, path: AUTHOR_INTENT_PATH, revision })
+      } catch (cause) {
+        if ((cause as Error).name === 'AuthorIntentAlreadyInitializedError') {
+          // 已初始化 ≠ 本次输入已保存。只有与盘上现值逐字等价时才判幂等成功
+          // （响应丢失后客户端重试的路径）；任意不同输入必须走冲突，且原文不动。
+          const stored = readWizardAuthorIntent(root)
+          if (stored !== null && wizardAuthorIntentEquals(stored, fields)) {
+            rebuildProjectionFromCanon(root)
+            json(200, { ok: true, idempotent: true, path: AUTHOR_INTENT_PATH, stored })
+            return
+          }
+          json(409, {
+            ok: false,
+            code: 'AUTHOR_INTENT_ALREADY_INITIALIZED',
+            error: '这本书已经保存过首次建书输入，本次输入未写入（受保护原文不覆盖）。可保留已有设定继续进入工作台。',
+            stored,
+          })
+          return
+        }
+        json(500, { ok: false, error: (cause as Error).message })
+      }
+    })
     return true
   }
 

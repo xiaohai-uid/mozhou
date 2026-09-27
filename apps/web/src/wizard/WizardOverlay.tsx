@@ -6,9 +6,9 @@
  *
  * 五步数据绑定（t73 既有读面，零新增后端能力）：
  *   1 建书    → /api/book（createBook 直出 root+bookId，真实落盘）；
- *   2 世界观  → 收集世界规则（随 outcome 返回；Author Intent 持久化在后续票接线）；
- *   3 大纲    → 收集卷级承诺（随 outcome 返回；向导不在此处写入 Canon）；
- *   4 首章    → 收集开场画面/首章目标（章节生产会话接入在后续票）；
+ *   2 世界观  → 收集世界规则（完成时写入受保护的 Author Intent）；
+ *   3 大纲    → 收集卷级承诺（完成时写入 Author Intent，不直接改写 Canon）；
+ *   4 首章    → 收集开场画面/首章目标（完成时写入 Author Intent）；
  *   5 连写    → 收口回调（App 设 book → 常驻工作台）。
  *
  * 错误族（BookDirectoryNotEmptyError / CanonStructureError / StepGuardError 族 /
@@ -31,7 +31,7 @@ export const WIZARD_STEPS = [
     key: 'world',
     label: '世界观',
     eyebrow: '写下这个世界绝不能违背的规则',
-    lead: '从一条硬规则开始。此输入会随完成结果保留在工作台——进入 Author Intent 生成边界的持久化在后续票接线。',
+    lead: '从一条硬规则开始。完成向导时会写入受保护的 Author Intent（设定/作者意图.md），此后仍可手工修改。',
     field: '世界规则',
     placeholder: '如：被潮汐钟遗忘的人会从所有书面记录中消失',
   },
@@ -85,6 +85,17 @@ interface CreatedBook {
   readonly bookId: string
 }
 
+/** 服务端冲突响应回带的盘上现值（与 WizardOutcome 的四项同形）。 */
+type WizardAuthorIntentInput = Pick<
+  WizardOutcome,
+  'worldRule' | 'volumePromise' | 'opening' | 'firstChapterGoal'
+>
+
+/** 冲突响应信封：只有携带盘上现值时才允许「保留已有设定」收口。 */
+interface AuthorIntentConflictBody {
+  readonly stored?: WizardAuthorIntentInput | null
+}
+
 export function WizardOverlay({
   precreated,
   onComplete,
@@ -107,12 +118,18 @@ export function WizardOverlay({
   const [created, setCreated] = useState<CreatedBook | null>(precreated)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** 非空 = 该书已有首次建书输入且与本次输入不同；本次输入未落盘。 */
+  const [conflict, setConflict] = useState<WizardAuthorIntentInput | null>(null)
+  /** 409 冲突但服务端无法安全回读盘上现值；本次输入未落盘。 */
+  const [unreadableConflict, setUnreadableConflict] = useState(false)
 
   const stepIndex = STEP_INDEX[current]
   const step = WIZARD_STEPS[stepIndex] ?? WIZARD_STEPS[0]
 
   useEffect(() => {
     setError(null)
+    setConflict(null)
+    setUnreadableConflict(false)
   }, [current])
 
   const canProceed = useMemo(() => {
@@ -123,6 +140,30 @@ export function WizardOverlay({
 
   const setField = (value: string): void => {
     setValues((prev) => ({ ...prev, [current]: value }))
+    setConflict(null)
+    setUnreadableConflict(false)
+  }
+
+  const completeWith = (intent: WizardAuthorIntentInput): void => {
+    if (created === null) return
+    onComplete({
+      root: created.root,
+      bookId: created.bookId,
+      title: values.create.trim() || '未命名之书',
+      worldRule: intent.worldRule,
+      volumePromise: intent.volumePromise,
+      opening: intent.opening,
+      firstChapterGoal: intent.firstChapterGoal,
+    })
+  }
+
+  const exitWithoutSaving = (): void => {
+    completeWith({
+      worldRule: values.world.trim(),
+      volumePromise: values.outline.trim(),
+      opening: values['first-chapter'].trim(),
+      firstChapterGoal: values.continue.trim(),
+    })
   }
 
   const handleNext = async (): Promise<void> => {
@@ -145,15 +186,36 @@ export function WizardOverlay({
     }
     if (current === 'continue') {
       if (created === null) return
-      onComplete({
-        root: created.root,
-        bookId: created.bookId,
-        title: values.create.trim() || '未命名之书',
-        worldRule: values.world.trim(),
-        volumePromise: values.outline.trim(),
-        opening: values['first-chapter'].trim(),
-        firstChapterGoal: values.continue.trim(),
-      })
+      setBusy(true)
+      try {
+        await post('/api/author-intent.save', {
+          root: created.root,
+          worldRule: values.world.trim(),
+          volumePromise: values.outline.trim(),
+          opening: values['first-chapter'].trim(),
+          firstChapterGoal: values.continue.trim(),
+        })
+        completeWith({
+          worldRule: values.world.trim(),
+          volumePromise: values.outline.trim(),
+          opening: values['first-chapter'].trim(),
+          firstChapterGoal: values.continue.trim(),
+        })
+      } catch (cause) {
+        // 同名输入重试（响应丢失）已由服务端判幂等成功；走到这里的冲突一定是
+        // 「不同输入 + 已有受保护原文」——呈现服务端说明，并允许保留已有设定收口。
+        const failure = cause as Error & { body?: AuthorIntentConflictBody }
+        setError(failure.message)
+        if (failure.name === 'AUTHOR_INTENT_ALREADY_INITIALIZED') {
+          if (failure.body?.stored != null) {
+            setConflict(failure.body.stored)
+          } else {
+            setUnreadableConflict(true)
+          }
+        }
+      } finally {
+        setBusy(false)
+      }
       return
     }
     const nextIndex = (stepIndex + 1) % WIZARD_STEPS.length
@@ -234,6 +296,12 @@ export function WizardOverlay({
               </p>
             )}
 
+            {unreadableConflict && (
+              <p className="mono muted" data-testid="wizard-unsaved-intent" style={{ margin: '12px 0 0' }}>
+                本次输入不会写入：盘上已有受保护原文且当前无法安全回读。进入工作台后可直接检查“设定/作者意图.md”。
+              </p>
+            )}
+
             <div className="wiz-actions">
               <button
                 type="button"
@@ -246,10 +314,28 @@ export function WizardOverlay({
               <button
                 type="button"
                 className="primary"
-                onClick={() => { void handleNext() }}
+                onClick={() => {
+                  if (conflict !== null) {
+                    completeWith(conflict)
+                    return
+                  }
+                  if (unreadableConflict) {
+                    exitWithoutSaving()
+                    return
+                  }
+                  void handleNext()
+                }}
                 disabled={!canProceed || busy}
               >
-                {current === 'continue' ? '进入工作台' : busy ? '建书中…' : '继续'}
+                {conflict !== null
+                  ? '保留已有设定并进入工作台'
+                  : unreadableConflict
+                    ? '不保存本次输入，进入工作台'
+                    : current === 'continue'
+                      ? '进入工作台'
+                      : busy
+                        ? '建书中…'
+                        : '继续'}
                 <span>→</span>
               </button>
             </div>

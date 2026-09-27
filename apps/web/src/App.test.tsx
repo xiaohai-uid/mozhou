@@ -32,6 +32,7 @@ function stubAppFetch(): void {
     'fetch',
     vi.fn().mockImplementation((path: string) => {
       if (path === '/api/book') return okJson({ ok: true, root: 'C:\\tmp\\app-book', bookId: 'bk_app' })
+      if (path === '/api/author-intent.save') return okJson({ ok: true, path: '设定/作者意图.md', revision: 1 })
       if (path === '/api/book.state') return okJson({ ok: true, state: emptyCanonState() })
       if (path === '/api/story-brain.entities') return okJson({ ok: true, cards: [] })
       if (path === '/api/story-brain.facts') {

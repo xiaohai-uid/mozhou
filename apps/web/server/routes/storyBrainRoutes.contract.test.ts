@@ -128,4 +128,110 @@ describe('POST /api/story-brain.contract · 追踪流基线纪律', () => {
       plane.close()
     }
   })
+
+  it('POST /api/author-intent.save · 首次建书输入真实落盘并刷新投影基线', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-author-intent-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const bookDir = join(dataRoot, 'intent-book')
+    createBook({ dir: bookDir, title: '向导输入书' })
+    const base = await listen()
+    const payload = {
+      root: bookDir,
+      worldRule: '潮汐钟遗忘的人会从书面记录消失',
+      volumePromise: '林岚必须找回一个全城不记得的人',
+      opening: '没有乘客姓名的末班船票',
+      firstChapterGoal: '让读者在 800 字内意识到记忆被篡改',
+    }
+    const res = await fetch(`${base}/api/author-intent.save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(res.status).toBe(200)
+    expect((await res.json()) as { ok: boolean }).toMatchObject({ ok: true })
+
+    const intentPath = join(bookDir, '设定/作者意图.md')
+    const raw = readFileSync(intentPath, 'utf8')
+    expect(raw).toContain(payload.worldRule)
+    expect(raw).toContain(payload.firstChapterGoal)
+    const plane = LocalDataPlane.open(bookDir)
+    try {
+      expect(plane.verifyBaseline().modified).not.toContain('设定/作者意图.md')
+    } finally {
+      plane.close()
+    }
+
+    const beforeReplay = readFileSync(intentPath, 'utf8')
+    const replay = await fetch(`${base}/api/author-intent.save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(replay.status).toBe(200)
+    const replayBody = (await replay.json()) as {
+      ok: boolean
+      idempotent?: boolean
+      stored?: { worldRule?: string; firstChapterGoal?: string }
+    }
+    expect(replayBody.ok).toBe(true)
+    expect(replayBody.idempotent).toBe(true)
+    expect(replayBody.stored?.worldRule).toBe(payload.worldRule)
+    expect(replayBody.stored?.firstChapterGoal).toBe(payload.firstChapterGoal)
+    expect(readFileSync(intentPath, 'utf8')).toBe(beforeReplay)
+    const replayPlane = LocalDataPlane.open(bookDir)
+    try {
+      expect(replayPlane.verifyBaseline().modified).not.toContain('设定/作者意图.md')
+    } finally {
+      replayPlane.close()
+    }
+  })
+
+  it('POST /api/author-intent.save · 不同输入冲突时 409、回带盘上现值且原文不动', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-author-intent-conflict-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const bookDir = join(dataRoot, 'intent-conflict-book')
+    createBook({ dir: bookDir, title: '向导冲突书' })
+    const base = await listen()
+    const fields = {
+      worldRule: '潮汐钟遗忘的人会从书面记录消失',
+      volumePromise: '林岚必须找回一个全城都不记得的人',
+      opening: '没有乘客姓名的末班船票',
+      firstChapterGoal: '让读者在 800 字内意识到记忆被篡改',
+    }
+    const created = await fetch(`${base}/api/author-intent.save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: bookDir, ...fields }),
+    })
+    expect(created.status).toBe(200)
+
+    const intentPath = join(bookDir, '设定/作者意图.md')
+    const before = readFileSync(intentPath, 'utf8')
+    const conflicting = await fetch(`${base}/api/author-intent.save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: bookDir, ...fields, worldRule: '另一条世界规则：潮汐钟从不遗忘任何人' }),
+    })
+    expect(conflicting.status).toBe(409)
+    const conflictBody = (await conflicting.json()) as {
+      ok: boolean
+      code?: string
+      stored?: typeof fields | null
+    }
+    expect(conflictBody.ok).toBe(false)
+    expect(conflictBody.code).toBe('AUTHOR_INTENT_ALREADY_INITIALIZED')
+    expect(conflictBody.stored).toMatchObject(fields)
+    expect(readFileSync(intentPath, 'utf8')).toBe(before)
+    expect(before).not.toContain('另一条世界规则')
+    const plane = LocalDataPlane.open(bookDir)
+    try {
+      expect(plane.verifyBaseline().modified).not.toContain('设定/作者意图.md')
+    } finally {
+      plane.close()
+    }
+  })
 })
