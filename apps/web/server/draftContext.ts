@@ -12,6 +12,8 @@ const PREVIEW_CONTEXT_WINDOW_TOKENS = 32_000
 const MAX_RECENT_CHAPTERS = 3
 const MAX_RECENT_CHARS_PER_CHAPTER = 12_000
 
+export const AUTHOR_INTENT_SECTION = 'author_intent'
+
 /**
  * 预算路径的 Token 计量（token-budget-assembly-spec §3）。
  *
@@ -47,6 +49,7 @@ function structuralFallback(
   bookTitle: string,
   chapterIndex: number,
   authorPrompt: string,
+  authorIntentBody: string,
   storyText: readonly string[],
   alwaysCards: readonly { ref: string; brief?: string | null }[],
 ): ContextPacket {
@@ -55,6 +58,9 @@ function structuralFallback(
       section: 'book_identity',
       text: `作品：《${bookTitle}》\n当前章节：第 ${chapterIndex} 章\n作者指令：${authorPrompt}\n`,
     },
+    ...(authorIntentBody.trim().length === 0
+      ? []
+      : [{ section: AUTHOR_INTENT_SECTION, text: `${authorIntentBody.trim()}\n` }]),
     ...alwaysCards.map((card) => ({
       section: `entity:${card.ref}`,
       text: `${card.brief ?? ''}\n`,
@@ -124,6 +130,9 @@ export async function buildDraftContext(input: {
         section: 'book_identity',
         content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
       },
+      ...(prepared.authorIntent.body.trim().length === 0
+        ? []
+        : [{ section: AUTHOR_INTENT_SECTION, content: prepared.authorIntent.body.trim() }]),
       ...qualityStructuralSections(prepared.qualitySlice),
       ...styleSections,
     ]
@@ -156,7 +165,14 @@ export async function buildDraftContext(input: {
     } catch (error) {
       if (!(error instanceof EmptyRecallError)) throw error
       return {
-        packet: structuralFallback(book.title, input.chapterIndex, input.authorPrompt, storyText, alwaysCards),
+        packet: structuralFallback(
+          book.title,
+          input.chapterIndex,
+          input.authorPrompt,
+          prepared.authorIntent.body,
+          storyText,
+          alwaysCards,
+        ),
         mode: 'structural_fallback',
       }
     }

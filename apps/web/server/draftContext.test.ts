@@ -32,6 +32,7 @@ import {
   readStyleProfiles,
   serializeStyleProfiles,
   STYLE_PROFILE_PATH,
+  writeWizardAuthorIntent,
   type PlaneContext,
   type StyleProfilesMap,
 } from '@mozhou/data-plane'
@@ -48,11 +49,17 @@ import {
   STALE_WARNING_SECTION,
   readPendingDependencyManifest,
 } from '@mozhou/pipeline'
-import { buildDraftContext } from './draftContext.js'
+import { AUTHOR_INTENT_SECTION, buildDraftContext } from './draftContext.js'
 import { setLocalEmbeddingLoaderForTest } from './localEmbedding.js'
 
 const LIN = 'char:lin-xuan' as EntityRef
 const NOW = '2026-08-26T10:00:00.000Z'
+const WIZARD_INPUT = {
+  worldRule: '潮汐钟遗忘的人会从所有书面记录中消失',
+  volumePromise: '林岚必须找回一个全城都不记得的人',
+  opening: '没有乘客姓名的末班船票',
+  firstChapterGoal: '让读者在 800 字内意识到记忆正在被篡改',
+} as const
 
 let roots: string[] = []
 afterEach(() => {
@@ -630,4 +637,38 @@ describe('buildDraftContext · 第三召回通道接线（T8b）', () => {
     await expect(buildDraftContext({ root, chapterIndex: 2, authorPrompt: SEMANTIC_PROMPT })).rejects.toThrow()
     expect(loads).toBe(0)
   }, 30_000)
+})
+
+/* ---------------------------------------------------------------------------
+ * Author Intent 进生产编译：向导四项必须真实到达模型输入。
+ * ------------------------------------------------------------------------- */
+
+describe('buildDraftContext · Author Intent 注入', () => {
+  it('正式编译路径：author_intent 段进入 structural/text 并留痕 Receipt', async () => {
+    const { root } = makeBook(true)
+    writeWizardAuthorIntent(root, WIZARD_INPUT)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '枫儿踏入山门' })
+
+    expect(result.mode).toBe('compiled_receipt')
+    const section = structuralOf(result.packet, AUTHOR_INTENT_SECTION)
+    expect(section).toContain(WIZARD_INPUT.worldRule)
+    expect(section).toContain(WIZARD_INPUT.firstChapterGoal)
+    expect(result.packet.text).toContain(WIZARD_INPUT.worldRule)
+    expect(result.packet.text).toContain(WIZARD_INPUT.volumePromise)
+    const entry = readSoleReceipt(root).entries.find((candidate) => candidate.identifier === AUTHOR_INTENT_SECTION)
+    expect(entry?.included).toBe(true)
+    expect(entry?.stage).toBe('structural')
+  })
+
+  it('结构层回落路径：author_intent 同样进入 packet', async () => {
+    const { root } = makeBook(false)
+    writeWizardAuthorIntent(root, WIZARD_INPUT)
+
+    const result = await buildDraftContext({ root, chapterIndex: 2, authorPrompt: '空白指令' })
+
+    expect(result.mode).toBe('structural_fallback')
+    expect(structuralOf(result.packet, AUTHOR_INTENT_SECTION)).toContain(WIZARD_INPUT.worldRule)
+    expect(result.packet.text).toContain(WIZARD_INPUT.firstChapterGoal)
+  })
 })
