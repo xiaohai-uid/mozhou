@@ -22,6 +22,7 @@
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
     "graph:snapshot": "node scripts/export-code-graph.mjs",
+    "audit:unreferenced": "node scripts/audit-unreferenced.mjs",
     "graph:check": "gitnexus check --cycles --repo mozhou"
   },
   "devDependencies": {

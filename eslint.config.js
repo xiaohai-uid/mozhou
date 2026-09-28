@@ -17,6 +17,7 @@ export default tseslint.config(
         // 传递发现，登记进 allowDefaultProject 反而报「重复包含」。
         projectService: {
           allowDefaultProject: [
+            'scripts/*.d.mts',
             'scripts/*.mjs',
             'apps/web/server/productionServer.ts',
             'apps/web/server/observability.ts',
