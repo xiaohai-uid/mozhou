@@ -33,6 +33,7 @@ import { loadReceiptForResume, readPipelineLedger } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 import { runSemanticBatch } from '@mozhou/flywheel'
 import type { AffectedRef, AnalyzeDeps, SemanticBatchItem, SemanticBatchOutcome } from '@mozhou/flywheel'
+import { defaultBookAccessManager } from './bookAccess.js'
 import { resolveChatEndpoint } from './llm/openaiStream.js'
 import { buildSemanticPrompt, createSemanticEvaluator } from './llm/semanticEvaluator.js'
 
@@ -111,7 +112,7 @@ interface ResolvedDeps {
  * 选 (b)。要真正支持，得先把 reconciliation runtime 按用户拆开，那是重设计，不在本次范围。
  */
 function resolveDefaultDeps(): ResolvedDeps | null {
-  if (process.env.MOZHOU_HOSTED === 'true') {
+  if (defaultBookAccessManager.isHostedMode()) {
     return null
   }
   const endpoint = resolveChatEndpoint(process.env)
@@ -133,7 +134,7 @@ export async function runSettledSemanticAnalysis(request: SettledSemanticRequest
   const deps = request.deps ?? resolved?.deps ?? null
   const provider = resolved?.provider ?? 'byok'
   if (deps === null) {
-    const hosted = process.env.MOZHOU_HOSTED === 'true'
+    const hosted = defaultBookAccessManager.isHostedMode()
     const cause = hosted
       ? 'hosted 模式且此旁路无 principal，选不出该用户的凭据（L0 显式拒答：用共享端点会跨用户串号）'
       : '未配置真实 LLM 端点（BYOK）'

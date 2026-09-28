@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest'
 import { latestCompiledReceiptIdForChapter, resolveCompiledAnchor } from './compiledAnchor.js'
 import type { PipelineLedgerRow } from '@mozhou/pipeline'
+import type { DomainEvent } from '@mozhou/kernel'
 
 let seq = 0
 
@@ -34,7 +35,7 @@ function taskRow(): PipelineLedgerRow {
     position: seq,
     kind: 'task',
     seq,
-    event: { type: 'TaskStarted' } as never,
+    event: { type: 'TaskStarted', taskRef: 'tsk_probe' } satisfies DomainEvent,
   }
 }
 

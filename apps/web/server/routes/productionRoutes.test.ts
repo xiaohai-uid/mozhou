@@ -25,6 +25,7 @@ import {
 } from '@mozhou/data-plane'
 import { runCompileStep } from '@mozhou/pipeline'
 import { newUlid } from '@mozhou/kernel'
+import type { ContextReceiptId } from '@mozhou/kernel'
 import { defaultBookAccessManager } from '../bookAccess.js'
 
 const charTok = { version: 'fake-char-v1', count: (text: string) => text.length }
@@ -222,7 +223,7 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
         scope: { chapterIndex: 1, pov: 'protagonist' },
         modelProfile: { id: 't06-review-test', contextWindow: 4096 },
         tokenizer: charTok,
-        receiptId: ('rcpt_' + newUlid()) as never,
+        receiptId: ('rcpt_' + newUlid()) as ContextReceiptId,
         nowIso: '2026-09-27T00:00:00.000Z',
       },
     )

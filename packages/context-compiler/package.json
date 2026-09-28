@@ -10,10 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@mozhou/data-plane": "workspace:*",
     "@mozhou/kernel": "workspace:*",
     "fastembed": "^2.1.0"
-  },
-  "devDependencies": {
-    "@mozhou/data-plane": "workspace:*"
   }
 }

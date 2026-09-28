@@ -25,6 +25,7 @@ import {
 } from '@mozhou/data-plane'
 import { canonicalJson } from '@mozhou/context-compiler'
 import { newFactId, newKnowledgeStateId, newUlid } from '@mozhou/kernel'
+import type { ContextReceiptId } from '@mozhou/kernel'
 import type { EntityRef } from '@mozhou/kernel'
 import { ChapterProductionSession, readDraftCandidate, recordUserEdit, runCompileStep } from '@mozhou/pipeline'
 import { PublishBus, readLedger } from '@mozhou/runtime'
@@ -227,7 +228,7 @@ async function makeBookAtReview(title: string): Promise<string> {
       scope: { chapterIndex: 1, pov: 'protagonist' },
       modelProfile: { id: 'api-contract-test', contextWindow: 4096 },
       tokenizer: charTok,
-      receiptId: ('rcpt_' + newUlid()) as never,
+      receiptId: ('rcpt_' + newUlid()) as ContextReceiptId,
       nowIso: '2026-09-27T00:00:00.000Z',
     },
   )

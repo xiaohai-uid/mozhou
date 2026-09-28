@@ -23,8 +23,15 @@
  *                   Always/Never 档在全链路中优先于检测逻辑）。
  *
  * Research 参考区硬隔离（US17）：携带 research 区 fileRel 的卡在编译入口即拒绝——
- * 确定性错误面而非静默吸收。判据取 @mozhou/data-plane layout 的单一实现
- * （此前是镜像字面量；该包依赖已存在且无循环，加研究目录时两侧必然同步）。
+ * 确定性错误面而非静默吸收。判据取 @mozhou/data-plane layout 的单一实现。
+ *
+ * 【这里反转过一个刻意的决定，理由留下】此前本文件镜像一份 RESEARCH_DIRS 字面量，
+ * 注释写「包边界解耦，不跨包依赖」。镜像的代价是：日后新增研究目录，data-plane 那侧
+ * 认得、这份名单不认，US17 的硬隔离闸会按旧名单放行——闸门看着在，其实是敞的。
+ * 镜像换来的「解耦」不值这个价，故改为直接依赖。
+ * 因此 @mozhou/data-plane 从 devDependencies 移入 dependencies：它现在是**运行期**
+ * 依赖，留在 devDeps 里会让本包 dist 带一个未声明的运行期 require（打包即炸）。
+ * 两者无循环，`pnpm graph:check --cycles` 持续盯着。
  *
  * 失败路径（AC③ 一律显式异常禁止降级静默）：
  *   - 召回合并后候选集为空 ⇒ EmptyRecallError（零设定上下文的生成尝试被拒绝）；
