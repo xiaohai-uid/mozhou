@@ -106,8 +106,12 @@ export function WorkbenchHub({
       // 于是把 done(partial) 半稿也报成「已完成并持久化」——那是对作者撒谎。
       const result = await readDraftStream(res)
       const degraded = describeContextMode(result.contextMode)
+      // 配色跟事实走。半稿（partial）不是成功，挂着绿色等于告诉作者这章成了；
+      // 上下文降级同理——模型这次几乎没拿到设定，凭什么按成功配色。
+      // 唯一配得上 ok 的：终帧 done、非半稿、且没有降级。
+      const clean = result.terminal === 'done' && !result.partial && degraded === null
       setNotice({
-        kind: result.terminal === 'done' && degraded === null ? 'ok' : result.terminal === 'done' ? 'warn' : 'err',
+        kind: result.terminal === 'done' ? (clean ? 'ok' : 'warn') : 'err',
         text: degraded === null ? describeDraftResult(result) : describeDraftResult(result) + '\n' + degraded,
       })
     } catch (error) {

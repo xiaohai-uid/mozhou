@@ -235,3 +235,20 @@ export function describeContextMode(mode: string | null | undefined): string | n
   if (mode === 'compiled_receipt') return '上下文已编译（含收据）'
   return `上下文模式：${mode}`
 }
+
+/**
+ * 这个模式该不该挂「降级」告警。
+ *
+ * 和 describeContextMode 分开，是因为两者回答的不是同一个问题：
+ * 「这次上下文是什么」几乎总有话说；「作者需不需要被提醒」只在两种情况下为真——
+ * 明确降级（structural_fallback），或我们**不认识**这个模式。
+ *
+ * 把 `compiled_receipt` 也算成要告警，等于每次正常编译都挂一条琥珀色横幅。
+ * 那不是提示，那是狼来了：真降级那天作者已经学会无视它了。
+ *
+ * 不认识也算要告警：客户端看不懂服务端说的事，只能原样交给作者，不能装作没看见。
+ */
+export function isDegradedContextMode(mode: string | null | undefined): boolean {
+  if (mode === undefined || mode === null) return false
+  return mode !== 'compiled_receipt'
+}

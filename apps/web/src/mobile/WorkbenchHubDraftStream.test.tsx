@@ -56,6 +56,12 @@ function renderHub(): void {
   render(<WorkbenchHub book={BOOK} onOpenDrawer={vi.fn()} chapterIndex={1} />)
 }
 
+/** 提示条的配色档位：末位那个词就是 kind（ok / warn / err）。 */
+function noticeKind(): string {
+  const cls = screen.getByTestId('workbench-notice').className
+  return (cls.split(' ').pop() ?? '').trim()
+}
+
 describe('WorkbenchHub · 草稿流终帧诚实性', () => {
   it('done(partial=true) 断流半稿：必须说是半稿，不得说已持久化', async () => {
     stubFetch([
@@ -73,6 +79,10 @@ describe('WorkbenchHub · 草稿流终帧诚实性', () => {
     expect(text).toContain('半稿')
     expect(text).not.toContain('已持久化')
     expect(text).not.toContain('已落盘')
+    // 文字对了、颜色错了，等于还在骗人：半稿挂绿色成功档，
+    // 作者扫一眼就当成了完整一章。配色必须跟着事实走。
+    expect(noticeKind()).not.toBe('ok')
+    expect(noticeKind()).toBe('warn')
   })
 
   it('完整成功：说是候选并说明需采纳，不得说已持久化', async () => {
@@ -91,6 +101,8 @@ describe('WorkbenchHub · 草稿流终帧诚实性', () => {
     const text = screen.getByTestId('workbench-notice').textContent ?? ''
     expect(text).toContain('采纳')
     expect(text).not.toContain('已持久化')
+    // 完整成功才配绿色：这是唯一一种「绿得对」的情况。
+    expect(noticeKind()).toBe('ok')
   })
 
   it('error 帧：报失败，不得报完成', async () => {

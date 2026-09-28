@@ -14,7 +14,7 @@ import {
 } from '../shell/workbenchStorage'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
 import type { BookInfo } from '../shell/workbenchStorage'
-import { describeContextMode, readDraftStream } from '../draftStream'
+import { describeContextMode, describeDraftResult, isDegradedContextMode, readDraftStream } from '../draftStream'
 
 type DialoguePhase = 'ask' | 'answered' | 'drafting' | 'draft_done' | 'error'
 
@@ -79,6 +79,11 @@ export function DialogueStream({
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   /** start 帧证据（装配 tokens/provider）——AI CANDIDATE 的来源可追溯性。 */
   const [streamMeta, setStreamMeta] = useState<{ contextTokens?: number; provider?: string; contextMode?: string } | null>(null)
+  /**
+   * done 帧的终态判定。断流半稿（partial）与完整一章必须让作者看出区别——
+   * 此前这里不看 done 的 payload，一律当完成，措辞与移动端各说各话。
+   */
+  const [draftTerminal, setDraftTerminal] = useState<{ partial: boolean } | null>(null)
   /** 采纳进写作层的回执（Candidate → Accept → Active Draft 链）。 */
   const [adoptState, setAdoptState] = useState<string | null>(null)
   /** C2（T05）：候选状态（candidateId+base+mode），随流请求建立；切书/切章/重开即失效。 */
@@ -278,6 +283,7 @@ export function DialogueStream({
               setCandidate(candState)
             }
           } else if (frame.event === 'done') {
+            setDraftTerminal({ partial: frame.partial === true })
             setPhase('draft_done')
             // 将就绪候选保存到本地缓存（按书章恢复）
             if (currentCandidateState !== null) {
@@ -646,7 +652,14 @@ export function DialogueStream({
       {(phase === 'drafting' || phase === 'draft_done') && (
         <article className="draft-slice candidate" data-testid="draft-slice">
           <div className="kicker">
-            <span className="candidate-tag">AI CANDIDATE · {phase === 'drafting' ? 'STREAMING · 渲染中' : 'DONE · 完成'}</span>
+            <span className="candidate-tag">
+              AI CANDIDATE · 
+              {phase === 'drafting'
+                ? 'STREAMING · 渲染中'
+                : draftTerminal?.partial === true
+                  ? 'DONE · 断流半稿（未完成）'
+                  : 'DONE · 完成'}
+            </span>
             {streamMeta !== null && (
               <span className="mono muted" style={{ marginLeft: 8, fontSize: 10 }}>
                 start · {streamMeta.contextTokens !== undefined ? `${streamMeta.contextTokens} tok` : 'context —'}
@@ -654,21 +667,41 @@ export function DialogueStream({
               </span>
             )}
           </div>
-          {streamMeta?.contextMode === 'structural_fallback' && (
-            <p
-              role="status"
-              data-testid="context-degraded"
-              className="mono"
-              style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--warning, #d98b2b)' }}
-            >
-              {describeContextMode('structural_fallback')}
-            </p>
-          )}
+          {/* 未知模式也透出：describeContextMode 认不出的会原样带出模式名。
+            硬编码白名单等于把新模式的提示悄悄吞掉——那正是本条要防的静默。 */}
+          {isDegradedContextMode(streamMeta?.contextMode) && (
+              <p
+                role="status"
+                data-testid="context-degraded"
+                className="mono"
+                style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--warning, #d98b2b)' }}
+              >
+                {describeContextMode(streamMeta?.contextMode)}
+              </p>
+            )}
           <p data-testid="draft-text" className={phase === 'drafting' ? 'stream-caret' : undefined}>{draftText}</p>
           {phase === 'draft_done' && (
             <>
-              <p className="mono muted" style={{ margin: '6px 0 0', fontSize: 10 }}>
-                候选已就绪（未写入正文）——采纳经服务端受控事务（CAS + 幂等），质量门常驻，Accepted ≠ Committed。
+              <p
+                className="mono muted"
+                data-testid="draft-terminal-note"
+                style={{ margin: '6px 0 0', fontSize: 10 }}
+              >
+                {/* 措辞走 draftStream：桌面与移动对同一终帧必须说同一句话。
+                  半稿尤其不能只靠 kicker 的「完成」二字一笔带过——
+                  断流半稿若被当作可采纳的完整一章，作者会把半章写进正文。 */}
+                {draftTerminal !== null
+                  ? describeDraftResult({
+                      terminal: 'done',
+                      candidateId: candidate?.candidateId ?? null,
+                      text: draftText,
+                      partial: draftTerminal.partial,
+                      outcome: draftTerminal.partial ? 'failed_recoverable' : 'succeeded',
+                      chars: draftText.length,
+                      error: null,
+                      contextMode: null,
+                    })
+                  : '候选已就绪（未写入正文）——采纳经服务端受控事务（CAS + 幂等），质量门常驻，Accepted ≠ Committed。'}
               </p>
               {adoptState !== null && (
                 <p role="status" className="mono" style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--success)' }} data-testid="adopt-state">
