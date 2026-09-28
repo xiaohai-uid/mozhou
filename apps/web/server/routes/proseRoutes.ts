@@ -73,7 +73,10 @@
  *   - 提案与正文 revision 绑定（taskRef=web_commit_ch<N>_rev<R>）：同一 revision
  *     的重试续接同一提案（不重跑提取、不重复落提案），改文后旧提案显式拒绝
  *     （409 CANON_PROPOSAL_STALE）而非静默丢弃作者的逐条决策；
- *   - 无候选可路由时不落空提案（空 CanonProposalCreated 只会污染悬挂扫描）。
+ *   - 无候选可路由时不落空提案（空 CanonProposalCreated 只会污染悬挂扫描）；
+ *   - 落盘时哈希基线失配（正文被外部改过）⇒ 409 PROSE_EXTERNAL_CHANGE，与
+ *     /api/prose.save（:384-387）同一条件同一码——漏这条会退化成裸 500 且把英文
+ *     内部消息吐给作者（工单 01）。
  * 未决提案的盘面凭据落在 .mozhou/proposals/，跨重启待决（S8 Proposal 后行）。
  *
  * D06 依赖钉版消费（change-impact-engine-spec §2 D06 / ADR-0003 §2.1）：
@@ -729,6 +732,12 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         plane.close()
       }
     } catch (cause) {
+      // 工单 01：与 /api/prose.save（:384-387）同一物理条件、同一错误码。漏这条时作者看到的是
+      // 裸 500 + 英文内部消息（无 code 字段），无法据此行动——违反 AGENTS.md 规则 15。
+      if (cause instanceof PreWriteHashMismatchError) {
+        json(409, { ok: false, code: 'PROSE_EXTERNAL_CHANGE', error: '磁盘内容已被外部修改（或与基线不一致）——拒绝静默覆盖，请先读取最新内容' })
+        return true
+      }
       if (cause instanceof ChapterPhaseError) {
         json(409, { ok: false, code: 'CHAPTER_ALREADY_COMMITTED', error: (cause as Error).message })
         return true

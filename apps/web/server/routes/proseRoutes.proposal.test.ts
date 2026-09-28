@@ -8,7 +8,9 @@
  *   2. 待决（medium/high）⇒ 409 CANON_PROPOSAL_PENDING，相位不翻转、正典零写入；
  *   3. POST /api/proposal.decide 经 ProposalPort 逐条 confirm/reject/editAccept；
  *   4. 重提提交续接同一提案（不重跑提取），Commit 只写已确认集；
- *   5. 正文改过（revision 变）⇒ 409 CANON_PROPOSAL_STALE，旧提案不被静默丢弃。
+ *   5. 正文改过（revision 变）⇒ 409 CANON_PROPOSAL_STALE，旧提案不被静默丢弃；
+ *   6. 正文在盘上被外部改过（哈希基线失配）⇒ 409 PROSE_EXTERNAL_CHANGE——与
+ *      /api/prose.save 同一条件同一码，外部字节不被静默覆盖。
  *
  * 提取缝在本文件内被替换为夹具（真实归一语义归 deltaExtractor.test.ts）——夹具行由
  * 真实 normalizeDelta 产出并自证 dropped 为空，否则「分流档位」与「行形状本就坏」
@@ -16,7 +18,7 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -362,6 +364,38 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
     expect(advanced.status).toBe(200)
     expect(advanced.data.previousStep).toBe('prepare')
     expect(advanced.data.currentStep).toBe('compile')
+  })
+
+  it('外部改盘后提交：409 PROSE_EXTERNAL_CHANGE，不是裸 500', async () => {
+    // 工单 01：commit 自己的 catch 链（proseRoutes.ts:734-750）漏了 PreWriteHashMismatchError，
+    // 而 /api/prose.save 在 :384-387 对同一条件返回 409。同条件两种契约 ⇒ 作者看到「服务器错误」
+    // 却无法据此行动（真实原因是「你的章节在别处被改过」）。违反 AGENTS.md 规则 15。
+    const { base, root, bookId } = await makeDraftChapter()
+    fixture.result = secretExtraction(bookId)
+
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    expect(suspended.status).toBe(409)
+    expect(suspended.data.code).toBe('CANON_PROPOSAL_PENDING')
+    for (const itemId of ['temporalFact#0', 'knowledgeState#0']) {
+      const decided = await post(base, '/api/proposal.decide', {
+        root, proposalId: proposalOf(suspended.data).proposalId, itemId, action: 'confirm',
+      })
+      expect(decided.status).toBe(200)
+    }
+
+    // 提案已确认、正典待落盘此刻，正文在盘上被外部改过（哈希基线失配）
+    const prosePath = join(root, proseChapterPath(1))
+    writeFileSync(prosePath, `${readFileSync(prosePath, 'utf8')}\n<!-- 未对账的外部修改 -->\n`, 'utf8')
+
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+
+    expect(status, JSON.stringify(data)).toBe(409)
+    expect(data.code).toBe('PROSE_EXTERNAL_CHANGE')
+    // 冲突时零磁盘变更：相位不翻转、正典零写入
+    expect(data.ok).toBe(false)
+    assertCanonUntouched(root)
+    // 错误文案承诺「拒绝静默覆盖」——外部字节必须仍在（assertCanonUntouched 只查相位/追踪流/事件行）
+    expect(readFileSync(prosePath, 'utf8')).toContain('未对账的外部修改')
   })
 })
 
