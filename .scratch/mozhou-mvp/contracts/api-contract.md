@@ -460,8 +460,40 @@ interface StyleGuide {
 // 完整 Delta：deltas/DELTA-005.md
 ```
 
+## 27. 备忘录与 AI 起名（OpenWrite 对标切片，2026-09-30）
+
+> 现行应用（无版本前缀 `/api/*`，本地无登录态回退 local_user 主体）端点契约——由工单
+> `.scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md` 授权变更；
+> 策略均为 account（routePolicies FAIL-CLOSED 注册表）；两者为新增自有形状（无既有同族可照搬）。
+
+```typescript
+// POST /api/memo —— 备忘录（与书无关的作者便签，按主体持久化于 <dataRoot>/memo/）
+// 请求（单端点 action 分发）：
+//   { action:'list' }                          → 200 { ok:true, notes: MemoNote[] }
+//   { action:'create', title?, content }        → 200 { ok:true, note: MemoNote }
+//   { action:'update', id, title?|content? }    → 200 { ok:true, note: MemoNote }
+//   { action:'delete', id }                     → 200 { ok:true, deleted:true }
+// MemoNote = { id, title, content, createdAt, updatedAt }（时间为 ISO 字符串）
+//   - title ≤200 字、content ≤20000 字、每主体 ≤200 条；超限 → 409 MEMO_LIMIT_EXCEEDED
+//   - content 为空 / 非法 action / 超长字段 → 400 INVALID_MEMO_REQUEST（动盘之前）
+//   - id 不存在 → 404 MEMO_NOTE_NOT_FOUND
+//   - 便签文件损坏 → 500 MEMO_PERSIST_FAILED（诚实报错，不静默重置或丢数据）
+// 本地模式回退主体 local_user（单机一份）；hosted 模式按登录用户隔离（SHA-256 分文件）。
+
+// POST /api/naming —— AI 起名（OpenWrite 对标；本地随机摇号在灵感面板 LOCAL PRESET，不经本端点）
+// 请求：{ mode:'ai', category, count?, hint? }
+//   - category ∈ character | sect | item | place | technique
+//   - count：1-10 整数，默认 5；hint ≤200 字；非法 → 400 INVALID_NAMING_REQUEST
+// 成功 → 200 { ok:true, mode:'ai', names: [{ name, meaning? }] }（最多 count 条）
+// 未配置可用模型 → 501 { ok:false, code:'NAMING_NOT_CONFIGURED' }（真实性门禁：不返回伪造名称）
+// 模型调用失败 / 输出不可解析 → 502 NAMING_UPSTREAM_FAILED / NAMING_PARSE_FAILED
+// 端点解析走 resolveChatEndpoint（BYOK：环境变量或 /api/llm/settings 用户设置）；
+// 测试接缝 MOZHOU_NAMING_PROVIDER=mock（仅测试环境；对齐 MOZHOU_DRAFT_PROVIDER 先例）。
+```
+
 ## 历史
 
 - DELTA-001：PATCH 正文乐观并发（expectedRevision + 409 ContentChanged）
 - DELTA-002（2026-08-22）：任务重试与 WebDAV 推送限流；同日完成全量契约回填（openapi 23→53 paths，覆盖全部已实现路由）
 - DELTA-005（2026-09-28）：/api/chapter.commit 提交幂等（expectedRevision + 409 PROSE_REVISION_CONFLICT，见第 26 节）
+- DELTA-006（2026-09-30）：/api/memo 与 /api/naming 新增（OpenWrite 对标切片，见第 27 节）

@@ -41,7 +41,10 @@ export const NAV_GROUPS = [
   },
   {
     group: '工作流',
-    items: [{ id: 'tasks', label: '任务中心', icon: '10', badge: 'tasks' }],
+    items: [
+      { id: 'tasks', label: '任务中心', icon: '10', badge: 'tasks' },
+      { id: 'memo', label: '备忘录', icon: 'MO' },
+    ],
   },
   {
     group: '资源',

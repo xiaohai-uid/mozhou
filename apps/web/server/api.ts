@@ -21,6 +21,8 @@ import { backupRoutes } from './routes/backupRoutes.js'
 import { billingRoutes } from './routes/billingRoutes.js'
 import { managedModelRoutes } from './routes/managedModelRoutes.js'
 import { exportRoutes } from './routes/exportRoutes.js'
+import { memoRoutes } from './routes/memoRoutes.js'
+import { namingRoutes } from './routes/namingRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -435,6 +437,8 @@ export interface NovelBreakdownResponse {
 
 export type { RankBoard, RankingItem } from './crawlers/rankings.js'
 export type { CrawledBook } from './crawlers/qidian.js'
+export type { MemoNote, MemoListResponse, MemoMutationResponse, MemoResponse } from './routes/memoRoutes.js'
+export type { NamingCategory, NamingSuggestion, NamingSuccessResponse } from './routes/namingRoutes.js'
 
 export interface RankScanResponse {
   readonly ok: true
@@ -616,6 +620,8 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(billingRoutes)
     .use(managedModelRoutes)
     .use(exportRoutes)
+    .use(memoRoutes)
+    .use(namingRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

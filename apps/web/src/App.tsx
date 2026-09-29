@@ -32,6 +32,7 @@ import { StyleDistillView } from './style-distill/StyleDistillView'
 import { NovelBreakdownView } from './novel-breakdown/NovelBreakdownView'
 import { RankScanView } from './rank-scan/RankScanView'
 import { WebSearchView } from './web-search/WebSearchView'
+import { MemoView } from './memo/MemoView'
 import { CloudSyncView } from './cloud-sync/CloudSyncView'
 import { MembershipView } from './membership/MembershipView'
 import { ModelSettingsView } from './settings/ModelSettingsView'
@@ -277,6 +278,8 @@ export function App(): JSX.Element {
           />
         ) : view === 'tasks' ? (
           <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
+        ) : view === 'memo' ? (
+          <MemoView />
         ) : view === 'genre-kits' ? (
           <GenreKitMarketplaceView book={book} />
         ) : view === 'canon-graph' ? (

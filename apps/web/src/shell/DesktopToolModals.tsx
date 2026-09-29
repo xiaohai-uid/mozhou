@@ -16,6 +16,8 @@ import {
 } from '../shared/inspirationPresets'
 import { runLocalComplianceCheck } from '../shared/complianceCheck'
 import { executeExportWorkflow } from '../export-suite/exportDownload'
+import { post } from '../lib/post'
+import type { NamingSuccessResponse, NamingSuggestion } from '../../server/api'
 
 export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'compliance'
 
@@ -31,6 +33,17 @@ const TITLES: Record<Exclude<DesktopModalType, null>, string> = {
   export: '作品导出',
   compliance: '平台敏感词与合规审查',
 }
+
+/** AI 起名类目（/api/naming 契约 id 的展示映射；本地摇号见上方 LOCAL PRESET）。 */
+const NAMING_OPTIONS = [
+  { id: 'character', label: '人物名' },
+  { id: 'sect', label: '宗门势力' },
+  { id: 'item', label: '法宝神兵' },
+  { id: 'place', label: '地点场景' },
+  { id: 'technique', label: '功法武学' },
+] as const
+
+type NamingOptionId = (typeof NAMING_OPTIONS)[number]['id']
 
 function Unavailable({ children }: { children: string }): JSX.Element {
   return (
@@ -61,6 +74,13 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
   const [complianceText, setComplianceText] = useState('')
   const [complianceResults, setComplianceResults] = useState<string[]>([])
 
+  // AI 起名状态（/api/naming；未配置模型时服务端 501，诚实提示不伪造结果）
+  const [aiCategory, setAiCategory] = useState<NamingOptionId>('character')
+  const [aiHint, setAiHint] = useState('')
+  const [aiNames, setAiNames] = useState<readonly NamingSuggestion[]>([])
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
   const { panelRef } = useSheetA11y(activeModal !== null, onClose)
 
   if (activeModal === null) return null
@@ -74,6 +94,20 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
 
   const runComplianceCheck = () => {
     setComplianceResults(runLocalComplianceCheck(complianceText))
+  }
+
+  const generateAiNames = async (): Promise<void> => {
+    setAiBusy(true)
+    setAiError(null)
+    try {
+      const res = await post<NamingSuccessResponse>('/api/naming', { mode: 'ai', category: aiCategory, hint: aiHint })
+      setAiNames(res.names)
+    } catch (cause) {
+      setAiNames([])
+      setAiError((cause as Error).message)
+    } finally {
+      setAiBusy(false)
+    }
   }
 
   const handleTriggerExport = async () => {
@@ -154,6 +188,58 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
             <p className="muted" style={{ fontSize: 11, lineHeight: 1.7, marginTop: 12 }}>
               本地随机预设，零 API、零 AI 生成。
             </p>
+            <div style={{ borderTop: '1px solid var(--hairline)', paddingTop: 12, marginTop: 6 }} data-testid="naming-ai-section">
+              <div style={{ fontSize: 13, fontWeight: 600 }}>AI 起名</div>
+              <p className="muted" style={{ fontSize: 11, margin: '4px 0 8px' }}>
+                调用「模型设置」中配置的模型，生成贴合题材的名称与释义；未配置模型时不可用，不伪造结果。
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 8 }}>
+                {NAMING_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setAiCategory(opt.id)}
+                    className={`btn ${aiCategory === opt.id ? 'btn-primary' : ''}`}
+                    style={{ fontSize: 10, padding: '5px 2px' }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="题材/风格提示（可选，如：东方玄幻、废土）"
+                value={aiHint}
+                onChange={(e) => setAiHint(e.target.value)}
+                data-testid="naming-hint"
+                style={{ width: '100%', padding: '6px 8px', fontSize: 12, background: 'var(--surface-sunken)', border: '1px solid var(--hairline)', borderRadius: 6, color: 'var(--fg-pure)', marginBottom: 8 }}
+              />
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => { void generateAiNames() }}
+                disabled={aiBusy}
+                data-testid="naming-generate"
+                style={{ fontSize: 12, padding: '7px 12px' }}
+              >
+                {aiBusy ? '生成中…' : '生成 5 个名称'}
+              </button>
+              {aiError !== null && (
+                <div role="alert" data-testid="naming-error" style={{ fontSize: 11, color: 'var(--warning)', marginTop: 8 }}>
+                  {aiError}
+                </div>
+              )}
+              {aiNames.length > 0 && (
+                <div data-testid="naming-results" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {aiNames.map((n) => (
+                    <div key={n.name} style={{ padding: 8, background: 'var(--surface-sunken)', borderRadius: 6, fontSize: 11 }}>
+                      <b style={{ fontSize: 12 }}>{n.name}</b>
+                      {n.meaning !== undefined && <span className="muted"> — {n.meaning}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
 

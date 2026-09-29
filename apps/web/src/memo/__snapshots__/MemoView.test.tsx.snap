@@ -1,0 +1,108 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MemoView（备忘录） > 便签列表渲染与契约快照 1`] = `
+<section
+  aria-label="memo-view"
+  class="center solo"
+>
+  <div
+    class="chapterbar"
+  >
+    <h1>
+      备忘录
+    </h1>
+    <span
+      class="meta"
+    >
+      跨作品的作者便签 · 本地持久化
+    </span>
+    <div
+      class="save"
+    >
+      <button
+        class="btn"
+        style="font-size: 10px; padding: 4px 8px;"
+      >
+        刷新
+      </button>
+    </div>
+  </div>
+  <div
+    class="conversation"
+  >
+    <div
+      data-testid="memo-create"
+      style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;"
+    >
+      <input
+        data-testid="memo-input-title"
+        placeholder="标题（可选）"
+        style="width: 100%; padding: 7px 10px; font-size: 12px; background: var(--surface-sunken); border: 1px solid var(--hairline); border-radius: 6px; color: var(--fg-pure);"
+        type="text"
+        value=""
+      />
+      <textarea
+        data-testid="memo-input-content"
+        placeholder="记下灵感、大纲碎片、待办备忘…"
+        rows="3"
+        style="width: 100%; padding: 7px 10px; font-size: 12px; background: var(--surface-sunken); border: 1px solid var(--hairline); border-radius: 6px; color: var(--fg-pure); resize: vertical;"
+      />
+      <button
+        class="btn-primary"
+        data-testid="memo-save-new"
+        style="align-self: flex-start; font-size: 12px; padding: 7px 14px;"
+      >
+        保存便签
+      </button>
+    </div>
+    <div
+      data-testid="memo-list"
+      style="display: flex; flex-direction: column; gap: 10px;"
+    >
+      <div
+        data-testid="memo-item"
+        style="padding: 12px; background: var(--surface-sunken); border-radius: 8px; border: 1px solid var(--hairline);"
+      >
+        <div
+          style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;"
+        >
+          <b
+            style="font-size: 13px;"
+          >
+            第三章钩子
+          </b>
+          <span
+            class="muted"
+            style="font-size: 10px;"
+          >
+            2026-09-30 08:30:00
+          </span>
+        </div>
+        <p
+          style="font-size: 12px; white-space: pre-wrap; margin: 6px 0px 8px; line-height: 1.7;"
+        >
+          雨夜追逐后留下断簪。
+        </p>
+        <div
+          style="display: flex; gap: 8px;"
+        >
+          <button
+            class="btn"
+            data-testid="memo-edit"
+            style="font-size: 10px; padding: 3px 8px;"
+          >
+            编辑
+          </button>
+          <button
+            class="btn"
+            data-testid="memo-delete"
+            style="font-size: 10px; padding: 3px 8px;"
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+`;

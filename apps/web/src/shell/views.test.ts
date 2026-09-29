@@ -6,14 +6,15 @@ import { describe, expect, it } from 'vitest'
 import { NAV_GROUPS, isViewId, viewLabel, VIEW_COUNT, VIEW_IDS } from './views'
 
 describe('views 注册表契约', () => {
-  it('六组共 22 项，id 全局唯一，徽标仅任务中心持有', () => {
+  it('六组共 23 项，id 全局唯一，徽标仅任务中心持有', () => {
     expect(NAV_GROUPS).toHaveLength(6)
-    expect(VIEW_COUNT).toBe(22)
-    expect(new Set(VIEW_IDS).size).toBe(22)
+    expect(VIEW_COUNT).toBe(23)
+    expect(new Set(VIEW_IDS).size).toBe(23)
     expect(viewLabel('storyboard')).toBe('漫剧分镜')
     expect(viewLabel('canon-graph')).toBe('因果图谱')
     expect(viewLabel('genre-kits')).toBe('流派工坊')
     expect(viewLabel('code-graph')).toBe('代码图谱')
+    expect(viewLabel('memo')).toBe('备忘录')
     const badgeItems = NAV_GROUPS.flatMap((group) =>
       group.items.filter((item) => 'badge' in item && item.badge === 'tasks'),
     )
