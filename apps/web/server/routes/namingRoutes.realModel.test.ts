@@ -27,7 +27,8 @@ import { assertSafeEndpointUrl } from '../llm/openaiStream.js'
 
 const PROXY_CONFIG = 'C:/Users/a1691/cli-proxy-api/config.yaml'
 const PROXY_BASE = 'http://127.0.0.1:8317/v1'
-const PROXY_MODEL = 'DeepSeek-V4-Flash'
+/** 起名是短输出任务，用本免费模型（用户指定）；实测 2026-09-30：6.6-8.0s 正常产出。 */
+const PROXY_MODEL = 'stealth/space-bunny-alpha'
 
 /**
  * 从本机代理配置的 `api-keys:` 段读出第一条 key 到内存。

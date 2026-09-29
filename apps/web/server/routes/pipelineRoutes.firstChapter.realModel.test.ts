@@ -30,7 +30,13 @@ import { assertSafeEndpointUrl } from '../llm/openaiStream.js'
 
 const PROXY_CONFIG = 'C:/Users/a1691/cli-proxy-api/config.yaml'
 const PROXY_BASE = 'http://127.0.0.1:8317/v1'
-const PROXY_MODEL = 'DeepSeek-V4-Flash'
+/**
+ * 章节生成用非思考型免费模型（全量测试在本机跑时不再消耗付费额度）。
+ * 实测 2026-09-30：dots-3-note-preview:free 首 content 1.6s、21.0s 产 1594 字。
+ * 注意：思考型模型（如 stealth/space-bunny-alpha，首 content 24s+、整章 72s）
+ * 会撞 60s 管线窗口；gpt-oss-120b-medium 容量不稳（间歇 503），均不选。
+ */
+const PROXY_MODEL = 'dots-studio/dots-3-note-preview:free'
 
 /**
  * 从本机代理配置的 `api-keys:` 段读出第一条 key 到内存。
