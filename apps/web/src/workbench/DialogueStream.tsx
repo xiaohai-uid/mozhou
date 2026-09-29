@@ -15,6 +15,8 @@ import {
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
 import type { BookInfo } from '../shell/workbenchStorage'
 import { describeContextMode, describeDraftResult, isDegradedContextMode, readDraftStream } from '../draftStream'
+import { providerGuidance } from './providerGuidance'
+import type { ProviderUnavailableReason } from './providerGuidance'
 
 type DialoguePhase = 'ask' | 'answered' | 'drafting' | 'draft_done' | 'error'
 
@@ -74,6 +76,13 @@ export function DialogueStream({
   })
   const [error, setError] = useState<string | null>(null)
   const [providerUnavailable, setProviderUnavailable] = useState(false)
+  /**
+   * provider 不可用的**病因**（P2「本机模型接入指引误导」）。
+   * 存 reason 而非文案：文案由 providerGuidance 按 reason 现算，判据与呈现分离。
+   * 缺省 null ⇒ 兼容不带该字段的老服务端，落到 BYOK 指引（原文案，成立）。
+   */
+  const [providerReason, setProviderReason] = useState<ProviderUnavailableReason | null>(null)
+  const [providerBlockedHost, setProviderBlockedHost] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [accepting, setAccepting] = useState(false)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
@@ -112,6 +121,9 @@ export function DialogueStream({
         ])
         setCapabilities(caps.capabilities)
         setProviderUnavailable(!caps.providerAvailable)
+        // 病因随可用性一起存：布尔只说「不能用」，reason 才说「下一步做什么」。
+        setProviderReason(caps.providerAvailable ? null : caps.providerUnavailableReason ?? null)
+        setProviderBlockedHost(caps.providerAvailable ? null : caps.providerBlockedHost ?? null)
         setQuestion(q)
       } catch (cause) {
         setError((cause as Error).message)
@@ -608,11 +620,18 @@ export function DialogueStream({
     <>
       <div className="date-rule">CHAPTER {chapterIndex} PRODUCTION SESSION · 对话流 T44</div>
 
-      {providerUnavailable && (
-        <div className="wb-error" role="alert" data-testid="provider-unavailable">
-          尚未接入大模型，写作对话暂不可用。请到「账户 → 模型设置」填入你的 API 密钥，保存后回到这里重新生成即可。
-        </div>
-      )}
+      {providerUnavailable &&
+        (() => {
+          // 指引按病因现算（P2）：本机端点被门禁拦下时，说的是「让部署者显式放行」，
+          // 而不是把人送去填 BYOK 密钥——后者对本机部署是条走不通的路。
+          const guidance = providerGuidance({ reason: providerReason, blockedHost: providerBlockedHost })
+          return (
+            <div className="wb-error" role="alert" data-testid="provider-unavailable" data-reason={guidance.reason}>
+              <strong>{guidance.headline}</strong>
+              {guidance.body !== '' && <span> {guidance.body}</span>}
+            </div>
+          )
+        })()}
 
       <div className="msg ai">
         <div className="avatar">舟</div>

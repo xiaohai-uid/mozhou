@@ -114,6 +114,26 @@ export interface CapabilitiesResponse {
   readonly ok: true
   readonly capabilities: readonly CapabilityListItem[]
   readonly providerAvailable: boolean
+  /**
+   * providerAvailable=false 时的病因分类（可用时为 null）。
+   *
+   * 为什么要有（P2「本机模型接入指引误导」）：`providerAvailable` 是布尔量，
+   * 「真没配 provider」与「本机端点被 SSRF 门禁按设计拒绝」在它眼里同形，但两者的
+   * 下一步相反。UI 据此分支才能给出**可行**的指引，而不是一律指向 BYOK 设置页。
+   * 取值与 server/llm/generationTarget.ts 的 GenerationUnavailableReason 同源。
+   * 可选字段：只读 providerAvailable 的老消费方行为不变。
+   */
+  readonly providerUnavailableReason?:
+    | 'hosted_no_principal'
+    | 'no_provider_configured'
+    | 'provider_config_invalid'
+    | 'provider_endpoint_blocked'
+    | null
+    | undefined
+  /** 带键路径的病因原文（UI 可选展示）。判据用 reason，不用它。 */
+  readonly providerDetail?: string | undefined
+  /** reason='provider_endpoint_blocked' 时被拒的上游主机，否则 null。 */
+  readonly providerBlockedHost?: string | null | undefined
 }
 
 export interface DraftQuestionResponse {

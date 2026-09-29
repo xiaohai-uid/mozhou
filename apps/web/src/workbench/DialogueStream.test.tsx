@@ -46,11 +46,24 @@ function ndjsonResponse(frames: readonly Record<string, unknown>[]): Response {
 
 function stubDialogueFetch(options: {
   providerAvailable?: boolean
+  /**
+   * 病因分类 / 被拒主机（P2）。不传时服务端字段缺省 ⇒ 组件按 no_provider_configured
+   * 处理，既有「provider 未配」用例的断言因此保持不变。
+   */
+  providerUnavailableReason?: string | null
+  providerBlockedHost?: string | null
+  providerDetail?: string
   stream?: readonly Record<string, unknown>[]
 }): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn().mockImplementation((path: string) => {
     if (path === '/api/capabilities') {
-      return okJson({ ...CAPS, providerAvailable: options.providerAvailable ?? true })
+      return okJson({
+        ...CAPS,
+        providerAvailable: options.providerAvailable ?? true,
+        providerUnavailableReason: options.providerUnavailableReason ?? null,
+        providerBlockedHost: options.providerBlockedHost ?? null,
+        providerDetail: options.providerDetail ?? '',
+      })
     }
     if (path === '/api/draft.question') return okJson(QUESTION)
     if (path === '/api/draft.stream') return ndjsonResponse(options.stream ?? [])
@@ -147,6 +160,51 @@ describe('DialogueStream（T44）', () => {
       expect(screen.getByTestId('provider-unavailable').textContent).toContain('模型设置')
     })
     expect(screen.getByLabelText('发送')).toBeDisabled()
+  })
+
+  /* --------------------------------------------------------------------------
+   * P2 缺陷「本机模型接入指引误导」的组件级回归。
+   *
+   * 现象：本机部署（MOZHOU_API_BASE=http://127.0.0.1:8317）失败的真因是 SSRF 门禁
+   * 按设计拒绝环回地址，但横幅一律说「请到『账户 → 模型设置』填入你的 API 密钥」——
+   * 把本机用户指引去填 BYOK 密钥，而那是本机部署不该走、也走不通的路。
+   *
+   * 下面两条把「两类病因 ⇒ 两套指引」钉在渲染层（分类逻辑本身另见 providerGuidance.test.ts）。
+   * ------------------------------------------------------------------------ */
+  it('本机端点被门禁拦下（provider_endpoint_blocked）：横幅讲放行开关，不叫用户去填 BYOK 密钥', async () => {
+    const fetchMock = stubDialogueFetch({
+      providerAvailable: false,
+      providerUnavailableReason: 'provider_endpoint_blocked',
+      providerBlockedHost: '127.0.0.1',
+      providerDetail: 'SSRF 门禁：拒绝调用私有/环回/保留地址 127.0.0.1',
+    })
+    render(<DialogueStream book={BOOK} />)
+
+    const banner = await screen.findByTestId('provider-unavailable')
+    // 真正可行的下一步：显式放行开关
+    expect(banner.textContent).toContain('MOZHOU_ALLOW_PRIVATE_LLM=1')
+    // 点名被拒的端点
+    expect(banner.textContent).toContain('127.0.0.1')
+    // 缺陷本体的反面：不得把本机用户送去填密钥
+    expect(banner.textContent).not.toContain('账户 → 模型设置')
+    expect(banner.textContent).not.toContain('填入你的 API 密钥')
+    // 病因分类透出，供排障/埋点用
+    expect(banner.getAttribute('data-reason')).toBe('provider_endpoint_blocked')
+    // 阻断行为不变：仍不可生成
+    expect(screen.getByLabelText('发送')).toBeDisabled()
+    expect(fetchMock.mock.calls.some((call) => call[0] === '/api/draft.stream')).toBe(false)
+  })
+
+  it('真没配 provider（no_provider_configured）：横幅仍指向模型设置页填密钥（云端路径不得回归）', async () => {
+    stubDialogueFetch({ providerAvailable: false, providerUnavailableReason: 'no_provider_configured' })
+    render(<DialogueStream book={BOOK} />)
+
+    const banner = await screen.findByTestId('provider-unavailable')
+    expect(banner.textContent).toContain('账户 → 模型设置')
+    expect(banner.textContent).toContain('API 密钥')
+    // 云端用户不得看到无关的本机放行提示
+    expect(banner.textContent).not.toContain('MOZHOU_ALLOW_PRIVATE_LLM')
+    expect(banner.getAttribute('data-reason')).toBe('no_provider_configured')
   })
 
   it('流中断 error 帧：显式报错（role=alert），不静默', async () => {

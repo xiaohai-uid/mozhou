@@ -120,4 +120,25 @@ describe('模型设置页', () => {
     await waitFor(() => expect(screen.getByTestId('provider-error')).toHaveTextContent('端点未通过安全校验'))
     expect(screen.queryByTestId('provider-save-notice')).not.toBeInTheDocument()
   })
+
+  it('本机模型接入说明常驻可见：讲清 base + 放行开关两个变量（不只说「填密钥」）', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(okJson({
+      ok: true,
+      settings: { configured: false, providerId: 'deepseek', baseUrl: '', maskedKey: '', model: 'deepseek-chat', configVersion: 0, updatedAt: null },
+    })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ModelSettingsView />)
+    // 本机说明是静态文案，不依赖 settings 读回；等一次读回让 React 树进入稳态
+    // （否则 useProviderSettings 的异步 setState 落在断言之外，触发 act 警告）。
+    await waitFor(() => expect(screen.getByTestId('provider-status')).toHaveTextContent('未配置'))
+
+    // 缺陷本体：写作区把本机部署也指引到「填密钥」，而本机部署根本不该填这张表。
+    // 作者被指引到本页时，必须在这里读到本机路径（含「只设 base 会被拦下」）。
+    const note = screen.getByTestId('provider-local-model-note')
+    expect(note).toHaveTextContent('MOZHOU_API_BASE')
+    expect(note).toHaveTextContent('MOZHOU_ALLOW_PRIVATE_LLM=1')
+    // 放行开关是「还需额外一个」的条件，不能被写成 base 的一部分
+    expect(note).toHaveTextContent('只设 base 会被拦下')
+  })
 })
