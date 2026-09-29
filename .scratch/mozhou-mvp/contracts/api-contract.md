@@ -439,7 +439,29 @@ interface StyleGuide {
 //   扫榜 POST /api/v1/rankings/scan    全局 60s 冷却（路由内置，非通用限流器）
 ```
 
+## 26. 章节提交幂等：expectedRevision（DELTA-005，2026-09-28）
+
+> 现行应用（无版本前缀 `/api/*`，本地无登录态）端点契约——由工单
+> `.scratch/mozhou-deepening-20260928/issues/05-commit-idempotency-contract-delta.md` 授权变更；
+> 形状照搬 `/api/chapter.prose.save` 冻结契约（第 24 节同族乐观并发），不发明新形状。
+
+```typescript
+// POST /api/chapter.commit
+// 请求：{ root, chapterIndex, summary, expectedRevision, usage? }
+// expectedRevision：作者实际读取的章版本（/api/chapter.prose 读回的 revision）。
+//   - 必填整数 >= 0（commit 无新建语义，不收 null）；缺失/非法 → 400（动盘之前）
+//   - 与盘上 revision 一致 → 照常提交（200 committed）
+//   - 失配 → 409 { ok:false, code:"PROSE_REVISION_CONFLICT", expectedRevision, currentRevision, error }
+//     在提取缝（真实模型调用）之前拒绝：模型调用增量 0，正文/正典/账本零写入
+//   - 相位守卫仍在 revision 比对之前：已提交章重复提交仍 409 CHAPTER_ALREADY_COMMITTED
+// 客户端义务：提交必须携带作者所读 revision（双窗口/成功响应丢失后重试携带同一值）；
+// 收到 409 PROSE_REVISION_CONFLICT 时刷新对账后重发，禁止静默改带最新 revision 重试；
+// 不同输入不视为幂等成功（重复提交落在相位 409）。
+// 完整 Delta：deltas/DELTA-005.md
+```
+
 ## 历史
 
 - DELTA-001：PATCH 正文乐观并发（expectedRevision + 409 ContentChanged）
 - DELTA-002（2026-08-22）：任务重试与 WebDAV 推送限流；同日完成全量契约回填（openapi 23→53 paths，覆盖全部已实现路由）
+- DELTA-005（2026-09-28）：/api/chapter.commit 提交幂等（expectedRevision + 409 PROSE_REVISION_CONFLICT，见第 26 节）

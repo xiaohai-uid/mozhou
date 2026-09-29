@@ -11,6 +11,7 @@ import {
   ChapterPhaseError,
   PendingCommitConflictError,
   PreWriteHashMismatchError,
+  ProseRevisionConflictError,
   readProseChapter,
 } from './chapter.js'
 import { createBook } from './create-book.js'
@@ -452,6 +453,26 @@ describe('S3 写前校验与相位守卫', () => {
 
       plane.reopenChapter(1)
       expect(() => plane.reopenChapter(1)).toThrow(ChapterPhaseError)
+    } finally {
+      plane.close()
+    }
+  })
+
+  it('工单05：expectedRevision 与盘上 revision 失配 ⇒ ProseRevisionConflictError，写盘一步不进', () => {
+    const plane = newBook()
+    try {
+      plane.createChapterDraft({ chapterIndex: 1, title: '风起' })
+      const diskRevision = readProseChapter(bookRoot, proseChapterPath(1)).revision
+      const eventsBefore = jsonLines(RUNTIME_EVENTS_PATH).length
+      // 提取缝 await 期间的并发保存（TOCTOU 窗口）：编排层前置比对已通过，
+      // commitChapter 写路守卫兜住 revision 漂移——任何 journal/流/事件/正文写入之前抛出。
+      expect(() => plane.commitChapter({ chapterIndex: 1, summary: 'x', expectedRevision: diskRevision + 5 }))
+        .toThrow(ProseRevisionConflictError)
+      // 匹配当前 revision：照常提交（守卫只拦失配，不拦契约路径）
+      plane.commitChapter({ chapterIndex: 1, summary: 'x', expectedRevision: diskRevision })
+      expect(readProseChapter(bookRoot, proseChapterPath(1)).phase).toBe('committed')
+      // 失配路径零副作用：事件账本只增了成功提交那一行
+      expect(jsonLines(RUNTIME_EVENTS_PATH).length).toBe(eventsBefore + 1)
     } finally {
       plane.close()
     }

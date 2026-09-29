@@ -119,16 +119,44 @@ export class PublishBus {
    * （TaskFinished）时新实例的 #openHeads 是空的，直接 publish 必抛
    * PAIRING_TAIL_WITHOUT_HEAD——即使账本上这个 head 明明还悬挂着。本方法把账本
    * 里仍悬挂的 head 认领进本实例，使「跨请求闭合一个已开的窗口」成为可能
-   * （如 S9 重提交窗口的作废）。折叠规则与 projectTasks 的 openHeads 同源
-   * （同一 EVENT_PAIRS：head 入列、tail 出列），幂等、只读、不改写任何行。
+   * （如 S9 重提交窗口的作废）。
+   *
+   * position 门控（工单 02B）：只认领「当前开卷窗口」内的 head——最后一个未闭合
+   * TaskStarted 及其后的事件；窗口被 TaskFinished 闭合后、下个 TaskStarted 之前
+   * 的 head 属于窗口间历史，不被认领；新 TaskStarted 取代旧窗口时清零重来（与
+   * projectSession.openHeads 的窗口闸同源：openedAtPosition 闸 + position 比较，
+   * 见 packages/pipeline/src/projection.ts）。没有这道闸，账本历史的永久悬挂 head
+   * （web 提交路径的 CanonProposalCreated 按设计无配对尾，见 proseRoutes 成对账目
+   * 注）会被灌进本实例的配对状态机，同一窗口键的合法新 head（windowTaskRef 是
+   * 确定性键 web_commit_ch<N>_rev<R>，同章同 revision 重提交即同键）就会撞
+   * PAIRING_HEAD_UNCLOSED。折叠规则仍与投影同源（同一 EVENT_PAIRS：head 入列、
+   * tail 出列），幂等、只读、不改写任何行。
    */
   adoptOpenHeads(ctx: LedgerCtx): void {
-    for (const { event } of readStoredLines(ctx)) {
+    const lines = readStoredLines(ctx);
+    let openedAt: number | null = null;
+    for (let i = 0; i < lines.length; i++) {
+      const event = lines[i]!.event;
       const pair = EVENT_PAIRS.find(
         ([h, t]) => h === event.type || t === event.type,
       );
       if (!pair) continue;
       const key = `${pair[0]}#${event.taskRef}`;
+      if (event.type === 'TaskStarted') {
+        // 新窗口取代旧窗口（重提交 = 新 session）：投影同款折叠（openHeads 清零）
+        this.#openHeads.clear();
+        openedAt = i;
+        this.#openHeads.set(key, pair[0]);
+        continue;
+      }
+      if (event.type === 'TaskFinished') {
+        // 窗口闭合：恰闭合当前窗口 head 时，其后到下个 TaskStarted 之间的
+        // head 属于窗口间历史，不再认领；孤儿 tail（账本上不可能经 publish 产生）
+        // 不动窗口状态。
+        if (this.#openHeads.delete(key)) openedAt = null;
+        continue;
+      }
+      if (openedAt === null) continue;
       if (event.type === pair[0]) {
         this.#openHeads.set(key, pair[0]);
       } else {

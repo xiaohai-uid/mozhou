@@ -1998,6 +1998,54 @@
           }
         }
       }
+    },
+    "/api/chapter.commit": {
+      "post": {
+        "summary": "章节定稿提交（现行应用端点，无版本前缀；工单05 Contract Delta · DELTA-005）",
+        "operationId": "chapterCommit",
+        "description": "expectedRevision 语义照搬 /api/chapter.prose.save 冻结契约：作者实际读取的章版本，与盘上 revision 失配即 409 PROSE_REVISION_CONFLICT（提取缝之前拒绝，正文/正典零写入）；缺失/非法 400；已提交章重复提交 409 CHAPTER_ALREADY_COMMITTED（不视为幂等成功）。详见 api-contract.md §26 与 deltas/DELTA-005.md",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "root": { "type": "string", "description": "书目录（本地绝对路径）" },
+                  "chapterIndex": { "type": "integer", "minimum": 1 },
+                  "summary": { "type": "string", "description": "定稿摘要；缺省由服务端补默认值" },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "作者实际读取的章版本（/api/chapter.prose 读回的 revision）；commit 无新建语义，不收 null"
+                  },
+                  "usage": {
+                    "type": "array",
+                    "description": "步 10 usage/cost 事实（可选；形状非法 400）",
+                    "items": { "type": "object" }
+                  }
+                },
+                "required": ["root", "chapterIndex", "expectedRevision"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "提交成功：{ ok:true, commitId, chapterIndex, contentSha256, phase:'committed', continuityGate, canonProposal, deltaExtraction?, flywheelRecord, sessionWindow, resubmitWindowCleanup }"
+          },
+          "400": {
+            "description": "形状非法：root/chapterIndex/expectedRevision/usage 校验失败（动盘之前拒绝）"
+          },
+          "404": {
+            "description": "CHAPTER_MISSING：盘上无此章"
+          },
+          "409": {
+            "description": "冲突族：PROSE_REVISION_CONFLICT（作者所读 revision 已过期，响应含 expectedRevision/currentRevision）· CHAPTER_ALREADY_COMMITTED（重复提交/成功响应丢失后重试）· PROSE_EXTERNAL_CHANGE（外部改盘）· CANON_PROPOSAL_STALE / CANON_PROPOSAL_PENDING / CONTINUITY_HARD_CONFLICT（正典挂起族，正典零写入）",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
     }
   },
   "components": {
