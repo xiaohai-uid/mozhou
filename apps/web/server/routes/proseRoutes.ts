@@ -12,6 +12,18 @@
  *   语义：phase 恒 draft；Commit 仍只经管线质量门后的 commitChapter。
  * 不触碰 Protected Author Content 以外的任何正典工件。
  *
+ * 步 6-10 提交编排单一事实源（工单04 2026-09-28）：/api/chapter.commit 的编排规则已收进
+ * packages/pipeline/src/commit-orchestration.ts（runChapterCommit）——本路由只保留输入解码、
+ * 身份/书权限与响应契约映射；提取缝（真实模型调用）与 StyleLearner 窗口闭合钩子在此注入，
+ * web_commit_* 窗口键形状冻结。以下各步接线注释描述的行为语义不变，实现归属以管线 module 为准。
+ *
+ * 提交幂等契约（工单05 Contract Delta 2026-09-28）：POST /api/chapter.commit 请求
+ * {root, chapterIndex, summary, expectedRevision, usage?}——expectedRevision 为作者实际
+ * 读取的章版本（/api/chapter.prose 读回的 revision），形状照搬 /api/chapter.prose.save
+ * 冻结契约（必填整数 >= 0；缺失/非法 400）。与盘上 revision 失配 ⇒ 409
+ * PROSE_REVISION_CONFLICT {expectedRevision, currentRevision}（与 prose.save 同码同形），
+ * 在提取缝（真实模型调用）之前拒绝：模型调用增量 0，正文/正典/账本零写入。
+ *
  * 步 9 S9 重提交接线（chapter-pipeline-spec §1 表第 9 行 / S9）：
  * 重提交**不与作者编辑用的 /api/chapter.reopen 混用**——reopen 保持它原本的语义
  * （可重复的底层重开：写前哈希 + ChapterReopened 事件 + 基线刷新，不开会话窗口），
@@ -27,15 +39,14 @@
  *      **不读已翻回 draft 的正文文件**）；重提交完成后真相由新 commit 前移。
  *   有相位无匹配事件行 = 账实不符：显式 500 失败（宁败不猜），绝不返回假锚。
  *   I5：旧 commit 的物理痕迹（追踪流行 + ChapterCommitted 事件行）只增不改。
- * 该会话窗口按 S9 设计由本会话第 9 步 CanonCommitted 或 TaskFinished 闭合。web 侧
- * **没有**会话内 commit/finish 路由（/api/session.advance 也不携带门禁 verdict，故
- * continuity_gate→canon_proposal 恒被 GateNotPassedError 拒），故本端点开出的窗口
- * 不能靠「走完十步」闭合——它靠**作废**闭合（S9 收口，本分支补完）：
- *   - 显式入口 POST /api/session.abandon（pipelineRoutes）→ ChapterProductionSession
- *     .abandonOpenWindow，发布 TaskFinished{outcome:'abandoned'}（复用既有事件词汇，
- *     不发 CanonCommitted——完成态语义不动）；
- *   - 自动收口：作者经 /api/chapter.commit 重新定稿后，该章残留的活动窗口即「过时」，
- *     提交出口就地作废它（见下方步 10 注释的 resubmitWindowCleanup）。
+ * 该会话窗口按 S9 设计由本会话第 9 步 CanonCommitted 或 TaskFinished 闭合。窗口的
+ * 闭合路径自工单 03（2026-09-28）起分两种形态（详见下方步 9 收口注释）：
+ *   - 完成收口：作者把会话走到 user_edit 及之后（/api/session.advance 与
+ *     /api/chapter.review 驱动步 2-5），/api/chapter.commit 即沿十步驱动窗口走完
+ *     步 6-10（步 7 门禁 verdict 随 TaskStepTransitioned Result 字段进账），以
+ *     TaskFinished{outcome:'succeeded'} 闭合——走完的窗口不再需要 abandon；
+ *   - 作废收口：未被行走的窗口（光标停在 prepare..review）在作者重新定稿后就地
+ *     作废（POST /api/session.abandon 或提交出口的 resubmitWindowCleanup）。
  * 两条路径都在 findOpenSessionWindow 视角下真正关闭窗口并释放 V1 全局单飞；
  * reopen 走数据平面相位机、不查会话账本，故作者编辑旅程始终不受影响。
  *
@@ -44,7 +55,7 @@
  * 保护，契约不动）落定之后，把「作者这次保存改了什么」折算成结构化操作块并落
  * UserEditRecorded（recordWholeBodyAuthorEdit）——作者写作层提交的是一整篇正文，
  * 故块由行级 diff 推导（发布侧 removedText 盖章 / deltaStats 口径复用管线单一事实源）。
- *   - 窗口键与提交侧同源（windowTaskRef = web_commit_ch<N>_rev<R>，R = 窗口闭合时的
+ *   - 窗口键与提交侧同源（webCommitWindowTaskRef = web_commit_ch<N>_rev<R>，R = 窗口闭合时的
  *     盘上 revision）。窗口键只认**恰在 R 上**落的那一条（学习器按 taskRef 精确匹配），
  *     故每次保存落的是**本窗口累计编辑链**（自上次提交/重开起的全部编辑，可依序应用到
  *     窗口基线）：作者改完再原样重存一次（revision 照常 +1）时窗口信号不会被挤出窗口键，
@@ -104,64 +115,77 @@
  *   窗口闭合后触发 afterRecord 钩子（T23 · #56 触发点）：StyleLearner 自读本窗口
  *   author 编辑更新派生画像；钩子失败同样不阻断（S12 同款），但错误文本进响应。
  *
- * 步 9 S9 收口（本章补完）：/api/chapter.commit 在 commitChapter 落定后（两条提交
- * 分支各自调用点）就地作废本章残留的活动会话窗口——作者已重新提交，该窗口过时。
- * 作废发布 TaskFinished{outcome:'abandoned', reason:'author_resubmitted'}，释放 V1
- * 全局单飞；**绝不发 CanonCommitted**（完成态语义不动，窗口靠「作废」而非「完成」关闭）。
- * 收口是派生面：失败不回退已落定的提交，但响应携带 resubmitWindowCleanup 如实上报
- * （abandoned/taskRef/errorDetail，绝不静默）。被拒的提交零副作用（不触发收口）。
+ * 步 9 S9 收口（本章补完；工单 03 起完成优先）：/api/chapter.commit 在 commitChapter
+ * 落定后（两条提交分支各自调用点）按窗口形态二选一收口——
+ *   - 完成收口（驱动路径）：窗口已被作者走到 user_edit 及之后 ⇒ 本次提交沿十步驱动
+ *     它走完：步 6 runFinalExtract（web 提取器作注入缝，CandidateDeltaExtracted 以
+ *     会话 taskRef 落账）→ 步 7 runContinuityGate（verdict/hardConflicts 随步进事件
+ *     Result 字段进账，冲突悬置窗口、正典零写入）→ 步 8 提案步锚（窗口内
+ *     CanonProposalCreated 配对头，payload 携带 web 提案 proposalId 作关联）→
+ *     步 9 markCommitted → 步 10 finish（TaskFinished{outcome:'succeeded'}）。
+ *     走完的窗口不占 abandon 路径；恢复请求发尾事件前 adoptOpenHeads 认领跨请求
+ *     悬挂头（TaskStarted / CanonProposalCreated 的 head 只活在发布总线实例内存里）。
+ *     响应 sessionWindow 如实呈现驱动结果。
+ *   - 作废收口（未行走窗口）：光标停在 prepare..review 的窗口不能被诚实驱动
+ *     （步 2-5 的编译/审查工作属其他端点，路由不伪造会话步），就地作废——发布
+ *     TaskFinished{outcome:'abandoned', reason:'author_resubmitted'}，释放 V1
+ *     全局单飞；**绝不发 CanonCommitted**（完成态语义不动）。
+ * 两种收口都是派生面：失败不回退已落定的提交，响应如实上报（sessionWindow /
+ * resubmitWindowCleanup，绝不静默）。被拒的提交零副作用（不触发收口）。
  */
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RouteHandler } from '../router.js'
-import { CHAPTER_MISSING } from '../routeCodes.js'
-import { assertSafeBookRoot } from '../security.js'
+import {
+  CANON_PROPOSAL_PENDING,
+  CANON_PROPOSAL_STALE,
+  CHAPTER_ALREADY_COMMITTED,
+  CHAPTER_COMMITTED,
+  CHAPTER_EXISTS,
+  CHAPTER_MISSING,
+  CHAPTER_NOT_COMMITTED,
+  CONTINUITY_HARD_CONFLICT,
+  INVALID_BOOK_REQUEST,
+  PROSE_EXTERNAL_CHANGE,
+  PROSE_REVISION_CONFLICT,
+  RESUBMIT_SESSION_CONFLICT,
+} from '../routeCodes.js'
+import { decodeBookRequest } from '../bookRequest.js'
 import {
   ChapterExistsError,
   ChapterPhaseError,
-  LocalDataPlane,
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
   proseChapterPath,
   readProseChapter,
+  withBook,
 } from '@mozhou/data-plane'
 import {
-  ChapterProductionSession,
   GlobalSingleFlightError,
-  ProposalPort,
   ResubmitNotCommittedError,
   SessionAlreadyActiveError,
-  confirmedAppendsForCommit,
-  createCanonProposal,
-  loadCanonProposal,
-  readPendingDependencyManifest,
   recordWholeBodyAuthorEdit,
   requestResubmit,
-  runContinuityGate,
-  runFlywheelRecord,
+  runChapterCommit,
+  webCommitWindowTaskRef,
 } from '@mozhou/pipeline'
-import type { FlywheelRecordStatus, UsageFact } from '@mozhou/pipeline'
+import type {
+  UsageFact,
+} from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 import { runStyleLearnerForWindow } from '@mozhou/flywheel'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
-import { resolveChatEndpoint } from '../llm/openaiStream.js'
+import { resolveGenerationTarget } from '../llm/generationTarget.js'
 import {
   canonProposalView,
-  openProposalForTask,
-  openProposalsOfChapter,
   pendingItemViewsOf,
 } from '../proposals.js'
 
 /**
- * web 路径的窗口键（步 8 提案绑定 / 步 10 窗口锚 / 保存路径的编辑信号共用同一格式）：
- * `web_commit_ch<N>_rev<R>`，R = 窗口闭合（提交）时的盘上 revision。
- * 保存路径以**本次保存后的 revision** 落编辑信号，故「保存后即提交」的正常流下
- * 作者编辑与本窗口对齐（runStyleLearnerForWindow 按 taskRef 精确匹配本窗口）。
- * 两处必须同源——格式漂移会让学习器静默读到零条编辑。
+ * web 路径的窗口键 `web_commit_ch<N>_rev<R>` 的生成器已随提交编排收口（工单04）
+ * 移至 @mozhou/pipeline（webCommitWindowTaskRef）——提交路径与保存路径的编辑信号
+ * 必须同源（runStyleLearnerForWindow 按 taskRef 精确匹配本窗口），键形状冻结不改。
  */
-function windowTaskRef(chapterIndex: number, revision: number): string {
-  return 'web_commit_ch' + chapterIndex + '_rev' + revision
-}
 
 /**
  * 保存路径编辑信号在响应里的呈现面（派生面失败不阻断保存，但必须可见）。
@@ -233,62 +257,29 @@ function parseUsageFacts(raw: unknown): UsageFact[] | null {
   return facts
 }
 
-/** 收尾记账在响应里的呈现面（降级与钩子失败都必须可被作者看见）。 */
-interface FlywheelRecordView {
-  readonly status: FlywheelRecordStatus
-  readonly recordedCount: number
-  readonly errorDetail: string | null
-  readonly afterRecordError: string | null
-}
-
-/**
- * 提交后「陈旧重提交窗口」清理的呈现面（S9 收口）。
- *
- * 背景：requestResubmit 开出的会话窗口只能由第 9 步 CanonCommitted 或 TaskFinished
- * 闭合，而 web 提交路径不走会话（它落平铺 ChapterCommitted 行，taskRef 是
- * web_commit_*，与会话 taskRef 不同）——于是窗口会残留、占住 V1 全局单飞。
- * 作者经 web 重新定稿即宣告该窗口过时，故在 commitChapter 落定后就地作废它。
- * 这是派生收口面：失败不回退已落定的提交，但必须在响应里可见（绝不静默）。
- * 形状单一事实源在此（发射端）；提交响应在 server/api.ts 未声明类型（历史形状），
- * 故本视图不设 api.ts 镜像。
- */
-interface ResubmitWindowCleanupView {
-  /** 本次是否真的作废了一个活动窗口（false = 本章无残留窗口，正常路径）。 */
-  readonly abandoned: boolean
-  /** 被作废的会话 taskRef；无窗口为 null。 */
-  readonly taskRef: string | null
-  readonly errorDetail: string | null
-}
-
 export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
 
   if (path === '/api/chapter.prose') {
-    const rawRoot = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
-      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     try {
-      const root = assertSafeBookRoot(rawRoot)
-      const plane = LocalDataPlane.openOrRebuild(root)
-      try {
-        const chapter = plane.getProseChapter(chapterIndex)
-        json(200, {
-          ok: true,
-          exists: true,
-          chapterIndex: chapter.chapterIndex,
-          revision: chapter.revision,
-          phase: chapter.phase,
-          commitId: chapter.commitId,
-          body: chapter.body,
-        })
-      } finally {
-        plane.close()
-      }
+      const chapter = withBook(root, (plane) => plane.getProseChapter(chapterIndex))
+      json(200, {
+        ok: true,
+        exists: true,
+        chapterIndex: chapter.chapterIndex,
+        revision: chapter.revision,
+        phase: chapter.phase,
+        commitId: chapter.commitId,
+        body: chapter.body,
+      })
     } catch (cause) {
       if (isEnoent(cause)) {
         json(200, { ok: true, exists: false, chapterIndex })
@@ -300,8 +291,12 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
   }
 
   if (path === '/api/chapter.prose.save') {
-    const rawRoot = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
     const rawBody = typeof body['body'] === 'string' ? body['body'] : null
     const title = typeof body['title'] === 'string' ? body['title'] : undefined
     // 契约显式：expectedRevision 必须在场（null=新建语义），杜绝旧客户端静默覆盖
@@ -313,14 +308,12 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         : undefined
     // 作者显式确认覆盖外部修改（仅在 expectedRevision 匹配 + 写前哈希失配时被数据平面采纳）
     const confirmExternalOverwrite = body['confirmExternalOverwrite'] === true ? true : undefined
-    if (rawRoot === null || chapterIndex === null || rawBody === null || rawBody.trim() === '' || expectedRevision === undefined) {
-      json(400, { ok: false, error: 'root, chapterIndex, non-empty body and expectedRevision (integer >= 0 or null) required' })
+    if (rawBody === null || rawBody.trim() === '' || expectedRevision === undefined) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root, chapterIndex, non-empty body and expectedRevision (integer >= 0 or null) required' })
       return true
     }
     try {
-      const root = assertSafeBookRoot(rawRoot)
-      const plane = LocalDataPlane.openOrRebuild(root)
-      try {
+      withBook(root, (plane) => {
         // 作者编辑信号的基线：更新语义 = 盘上当前正文（作者读取后据以改写）；
         // 新建语义 = ''（建章占位标题不是作者内容，作者实际从空白起笔）。
         // 读取失败（盘上缺章）由 saveProseDraft 同款抛 ENOENT → 外层 404，零写入。
@@ -330,13 +323,13 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         const result = plane.saveProseDraft({ chapterIndex, body: rawBody, expectedRevision, title, confirmExternalOverwrite })
         // 步 5 User Edit 接线：保存已由受守卫的权威写路径落定，编辑信号是派生面——
         // 落账失败不阻断保存（S12 同款降级），但必须在响应里可见（绝不静默）。
-        // taskRef 与提交侧窗口锚同源（windowTaskRef），否则 StyleLearner 读不到。
+        // taskRef 与提交侧窗口锚同源（webCommitWindowTaskRef），否则 StyleLearner 读不到。
         let authorEditSignal: AuthorEditSignalView
         try {
           const outcome = recordWholeBodyAuthorEdit({
             bus: new PublishBus(),
             bookRoot: root,
-            taskRef: windowTaskRef(chapterIndex, result.revision),
+            taskRef: webCommitWindowTaskRef(chapterIndex, result.revision),
             chapterIndex,
             beforeBody,
             afterBody: rawBody,
@@ -354,27 +347,23 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           created: result.created,
           authorEditSignal,
         })
-      } finally {
-        plane.close()
-      }
+      })
     } catch (cause) {
       if (cause instanceof ChapterPhaseError) {
         // committed 章拒绝普通保存；带出 commitId 供界面呈现定稿身份
-        const plane = LocalDataPlane.openOrRebuild(assertSafeBookRoot(rawRoot))
+        let commitId: string | null = null
         try {
-          const chapter = plane.getProseChapter(chapterIndex)
-          json(409, { ok: false, code: 'CHAPTER_COMMITTED', commitId: chapter.commitId, error: (cause as Error).message })
+          commitId = withBook(root, (plane) => plane.getProseChapter(chapterIndex).commitId ?? null)
         } catch {
-          json(409, { ok: false, code: 'CHAPTER_COMMITTED', commitId: null, error: (cause as Error).message })
-        } finally {
-          plane.close()
+          commitId = null
         }
+        json(409, { ok: false, code: CHAPTER_COMMITTED, commitId, error: (cause as Error).message })
         return true
       }
       if (cause instanceof ProseRevisionConflictError) {
         json(409, {
           ok: false,
-          code: 'PROSE_REVISION_CONFLICT',
+          code: PROSE_REVISION_CONFLICT,
           expectedRevision: cause.expectedRevision,
           currentRevision: cause.currentRevision,
           error: (cause as Error).message,
@@ -382,11 +371,11 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         return true
       }
       if (cause instanceof PreWriteHashMismatchError) {
-        json(409, { ok: false, code: 'PROSE_EXTERNAL_CHANGE', error: '磁盘内容已被外部修改（或与基线不一致）——拒绝静默覆盖，请先读取最新内容' })
+        json(409, { ok: false, code: PROSE_EXTERNAL_CHANGE, error: '磁盘内容已被外部修改（或与基线不一致）——拒绝静默覆盖，请先读取最新内容' })
         return true
       }
       if (cause instanceof ChapterExistsError) {
-        json(409, { ok: false, code: 'CHAPTER_EXISTS', error: '章节已存在（并发新建？）——请先读取后按更新语义保存' })
+        json(409, { ok: false, code: CHAPTER_EXISTS, error: '章节已存在（并发新建？）——请先读取后按更新语义保存' })
         return true
       }
       if (isEnoent(cause)) {
@@ -399,33 +388,27 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
   }
 
   if (path === '/api/chapter.reopen') {
-    const rawRoot = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
-      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     try {
-      const root = assertSafeBookRoot(rawRoot)
-      const plane = LocalDataPlane.openOrRebuild(root)
-      try {
-        const result = plane.reopenChapter(chapterIndex)
-        json(200, {
-          ok: true,
-          chapterIndex: result.chapterIndex,
-          reopenedFromCommitId: result.reopenedFromCommitId,
-          proseRelPath: result.proseRelPath,
-        })
-      } finally {
-        plane.close()
-      }
+      const result = withBook(root, (plane) => plane.reopenChapter(chapterIndex))
+      json(200, {
+        ok: true,
+        chapterIndex: result.chapterIndex,
+        reopenedFromCommitId: result.reopenedFromCommitId,
+        proseRelPath: result.proseRelPath,
+      })
     } catch (cause) {
       if (cause instanceof ChapterPhaseError) {
-        json(409, { ok: false, code: 'CHAPTER_NOT_COMMITTED', error: '章节不是 committed 态——无定稿可重开' })
+        json(409, { ok: false, code: CHAPTER_NOT_COMMITTED, error: '章节不是 committed 态——无定稿可重开' })
         return true
       }
       if (cause instanceof PreWriteHashMismatchError) {
-        json(409, { ok: false, code: 'PROSE_EXTERNAL_CHANGE', error: '定稿文件已被外部修改——拒绝重开，请先人工核对外部改动' })
+        json(409, { ok: false, code: PROSE_EXTERNAL_CHANGE, error: '定稿文件已被外部修改——拒绝重开，请先人工核对外部改动' })
         return true
       }
       if (isEnoent(cause)) {
@@ -438,14 +421,13 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
   }
 
   if (path === '/api/chapter.resubmit') {
-    const rawRoot = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
-      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     try {
-      const root = assertSafeBookRoot(rawRoot)
       // 盘上无此章保持 CHAPTER_MISSING 404 语义——守卫的 ResubmitNotCommittedError
       // 分不出「无章」与「有章非 committed」，故先判存在性再进管线（只做错误码分层）。
       if (!existsSync(join(root, proseChapterPath(chapterIndex)))) {
@@ -465,20 +447,20 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       })
     } catch (cause) {
       if (cause instanceof ResubmitNotCommittedError) {
-        json(409, { ok: false, code: 'CHAPTER_NOT_COMMITTED', error: '章节不是 committed 态——无定稿可重提交' })
+        json(409, { ok: false, code: CHAPTER_NOT_COMMITTED, error: '章节不是 committed 态——无定稿可重提交' })
         return true
       }
       if (cause instanceof SessionAlreadyActiveError || cause instanceof GlobalSingleFlightError) {
         // 单飞双守卫在翻相位之前拒绝：正文相位与盘面零变更（S11）
-        json(409, { ok: false, code: 'RESUBMIT_SESSION_CONFLICT', error: (cause as Error).message })
+        json(409, { ok: false, code: RESUBMIT_SESSION_CONFLICT, error: (cause as Error).message })
         return true
       }
       if (cause instanceof ChapterPhaseError) {
-        json(409, { ok: false, code: 'CHAPTER_NOT_COMMITTED', error: '章节不是 committed 态——无定稿可重提交' })
+        json(409, { ok: false, code: CHAPTER_NOT_COMMITTED, error: '章节不是 committed 态——无定稿可重提交' })
         return true
       }
       if (cause instanceof PreWriteHashMismatchError) {
-        json(409, { ok: false, code: 'PROSE_EXTERNAL_CHANGE', error: '定稿文件已被外部修改——拒绝重提交，请先人工核对外部改动' })
+        json(409, { ok: false, code: PROSE_EXTERNAL_CHANGE, error: '定稿文件已被外部修改——拒绝重提交，请先人工核对外部改动' })
         return true
       }
       if (isEnoent(cause)) {
@@ -491,14 +473,25 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
   }
 
   if (path === '/api/chapter.commit') {
-    const rawRoot = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
     const summary = typeof body['summary'] === 'string' && body['summary'].trim().length > 0
       ? body['summary'].trim()
       : `第 ${chapterIndex} 章定稿`
 
-    if (rawRoot === null || chapterIndex === null || chapterIndex < 1) {
-      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+    // 工单05 Contract Delta：expectedRevision 必须在场（作者实际读取的章版本，与
+    // /api/chapter.prose.save 的冻结契约同构——commit 无新建语义，故不收 null）。
+    // 缺失/非法在动盘之前 400 拒绝，杜绝旧客户端静默提交作者未读过的正文。
+    const rawExpected = body['expectedRevision']
+    const expectedRevision = typeof rawExpected === 'number' && Number.isInteger(rawExpected) && rawExpected >= 0
+      ? rawExpected
+      : null
+    if (expectedRevision === null) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'expectedRevision (integer >= 0) required — the chapter revision the author last read' })
       return true
     }
 
@@ -508,6 +501,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     if (usageFacts === null) {
       json(400, {
         ok: false,
+        code: INVALID_BOOK_REQUEST,
         error:
           'usage must be an array of {kind:"usage"|"cost", provider?, model?, ' +
           'inputTokens?, outputTokens?, costMicros?} (non-negative integers, no unknown keys)',
@@ -516,230 +510,106 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     }
 
     try {
-      const root = assertSafeBookRoot(rawRoot)
-      const plane = LocalDataPlane.openOrRebuild(root)
-      try {
-        const proseFile = readProseChapter(root, proseChapterPath(chapterIndex))
-        const prose = proseFile.body
-        // D06 依赖钉版消费侧：本章生成时编译入包的实体钉版随 ChapterCommitted 行落账，
-        // 上游重算据此圈定受影响章。无暂存 = 本章未经编译（手写/结构层降级）⇒ 不带清单，
-        // 如实声明「本章不钉任何上游版本」；暂存存在但形状非法则由回读显式抛错（绝不静默丢钉版）。
-        const pendingManifest = readPendingDependencyManifest(root, chapterIndex)
-        const dependencyManifestFields = pendingManifest === null ? {} : { dependencyManifest: pendingManifest }
-        // 步 8 提案与正文 revision 绑定：同一 revision 的提交重试续接同一提案
-        // （否则每次重试都重跑提取、再落一份同内容提案，且新提案的行 id 与作者
-        // 已确认的行对不上——「只写已确认集」就无从谈起）。
-        const taskRef = windowTaskRef(chapterIndex, proseFile.revision)
-        const port = new ProposalPort({ root })
-
-        // 步 10 收尾记账：两条提交分支共用同一调用点语义（同一窗口恰一条
-        // FlywheelRecorded）。记账是派生面——正文与正典此刻已落定，本函数
-        // 的任何失败都只降级上报，绝不回退提交。
-        const recordFlywheel = (commitId: string): FlywheelRecordView => {
-          let afterRecordError: string | null = null
-          const outcome = runFlywheelRecord({
-            bus: new PublishBus(),
-            bookRoot: root,
-            taskRef,
-            chapterIndex,
-            commitId,
-            usage: usageFacts,
-            afterRecord: () => {
-              // 窗口闭合钩子（T23 · #56）：StyleLearner 自读本窗口 author 编辑并
-              // 更新派生画像。record-step 会吞掉钩子抛错（S12），故此处先留痕再
-              // 原样抛出——静默吞掉会让「学习器从未运行」看起来像「一切正常」。
-              try {
-                runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
-              } catch (cause) {
-                afterRecordError = (cause as Error).message
-                throw cause
-              }
-            },
-          })
-          return {
-            status: outcome.status,
-            recordedCount: outcome.recordedCount,
-            errorDetail: outcome.errorDetail,
-            afterRecordError,
-          }
-        }
-
-        // S9 收口：作者经 web 重新定稿 ⇒ 本章残留的会话窗口（requestResubmit 开的、
-        // 或 session.open 开的）已过时，就地作废。只在 commitChapter 落定之后调用
-        // （提交成功才代表窗口过时；被拒的提交必须零副作用）。作废发布
-        // TaskFinished{outcome:'abandoned'} 闭合配对并释放全局单飞，绝不发
-        // CanonCommitted（完成态语义不动）。失败不回退已落定的提交，如实上报。
-        const cleanupStaleResubmitWindow = (): ResubmitWindowCleanupView => {
-          try {
-            const taskRef = ChapterProductionSession.abandonOpenWindow(
-              { bus: new PublishBus(), root, chapterIndex },
-              'author_resubmitted',
-            )
-            return { abandoned: taskRef !== null, taskRef, errorDetail: null }
-          } catch (cause) {
-            return { abandoned: false, taskRef: null, errorDetail: (cause as Error).message }
-          }
-        }
-
-        let record = openProposalForTask(root, taskRef)
-        let deltaExtraction: Record<string, unknown> | null = null
-
-        if (record === null) {
-          const stale = openProposalsOfChapter(root, chapterIndex)
-          if (stale.length > 0) {
-            // 正文已改（revision 变）：盘上未决提案描述的是旧正文。既不能拿旧行写正典，
-            // 也不能静默丢弃作者的逐条决策——显式拒绝并给出收口入口。
-            json(409, {
-              ok: false,
-              code: 'CANON_PROPOSAL_STALE',
-              chapterIndex,
-              proposalId: stale[0]!.proposalId,
-              error:
-                `第 ${chapterIndex} 章存在描述旧正文的未决提案（正文 revision 已变）——` +
-                '请先 /api/proposal.discard 收口旧提案，再提交本章；本章正典零写入',
-              staleProposals: stale.map(canonProposalView),
-            })
-            return true
-          }
-
-          // 步 6 Final Extract 接线：终稿 → 五族叙事状态增量。
-          // 提取失败不阻塞提交（作者的正文必须能定稿），但必须在响应里如实报出，
-          // 否则「提交后叙事层零增长」会被误读为「一切正常」。
-          const delta = await extractChapterDelta(root, plane.book.id, chapterIndex, prose, {
-            resolveEndpoint: (env) => resolveChatEndpoint(env, principal?.userId),
-          })
-          deltaExtraction = {
-            extractor: delta.extractor,
-            counts: delta.counts,
-            dropped: delta.dropped,
-            ...(delta.reason === undefined ? {} : { reason: delta.reason }),
-          }
-
-          if (Object.keys(delta.appends).length === 0) {
-            // 无候选可路由：步 8 不落空提案（无内容的 CanonProposalCreated 只会污染
-            // 悬挂扫描），直接提交——叙事层零增长由 deltaExtraction 如实报出。
-            const result = plane.commitChapter({ chapterIndex, summary, ...dependencyManifestFields })
-            json(200, {
-              ok: true,
-              commitId: result.commitId,
-              chapterIndex: result.chapterIndex,
-              contentSha256: result.contentSha256,
-              phase: 'committed',
-              continuityGate: { verdict: 'pass' },
-              canonProposal: null,
-              deltaExtraction,
-              flywheelRecord: recordFlywheel(result.commitId),
-              resubmitWindowCleanup: cleanupStaleResubmitWindow(),
-            })
-            return true
-          }
-
-          // 步 7 Continuity Gate：候选 delta 写正典前过机械核检。冲突 = 硬门禁，
-          // 提案不落盘、commitChapter 一步不调（正典零写入），冲突清单经 Result 顶层
-          // hardConflicts[] 回给作者——回炉重提取是唯一出路，不许静默放行。
-          const gate = runContinuityGate({ bookRoot: root, chapterIndex, delta: delta.appends, prose })
-          if (gate.verdict === 'hard_conflict') {
-            json(409, {
-              ok: false,
-              code: 'CONTINUITY_HARD_CONFLICT',
-              chapterIndex,
-              error: `连续性门禁未通过：${gate.hardConflicts.length} 项硬冲突——本章正典零写入`,
-              hardConflicts: gate.hardConflicts,
-              deltaExtraction,
-            })
-            return true
-          }
-
-          // 步 8 Canon Proposal：riskClass 三档分流（low 入场即 confirmed，medium/high 挂起）。
-          const created = createCanonProposal({
-            bus: new PublishBus(),
-            bookRoot: root,
-            taskRef,
-            chapterIndex,
-            delta: delta.appends,
-          })
-          record = loadCanonProposal(root, created.proposalId)
-          if (record === null) {
-            // 刚落盘即读不回 = 盘面故障：绝不降级为「无提案直接提交」把未确认行写进正典
-            throw new Error('canon proposal ' + created.proposalId + ' unreadable right after persist')
-          }
-        }
-
-        // 待决 = 挂起（S6）：medium 等队列确认、high 等显式确认——本章正典零写入、
-        // 相位不翻转；提案记录已落盘，跨重启保持待决。
-        const pending = pendingItemViewsOf(record)
-        if (pending.length > 0) {
-          json(409, {
-            ok: false,
-            code: 'CANON_PROPOSAL_PENDING',
-            chapterIndex,
-            proposalId: record.proposalId,
-            error:
-              `正典提案待确认：${pending.length} 项未决（high 必须显式确认，medium 等队列确认）` +
-              '——本章正典零写入',
-            proposal: canonProposalView(record),
-            pendingItems: pending,
-            ...(deltaExtraction === null ? {} : { deltaExtraction }),
-          })
-          return true
-        }
-
-        // Commit 只写已确认集（S6）：confirmed + edit_accepted（含 patch 后载荷），
-        // rejected 排除在外。ProposalPort 在仍有未决条目时拒读（上方已拦）。
-        const appends = confirmedAppendsForCommit(root, record.proposalId)
-
-        // 写前门禁：续接路径的载荷可能经作者 editAccept 改动，写正典前必须重过核检
-        // （Gate 是确定性纯核检，幂等重算；此处不通过则提案保持未收口，正典零写入）。
-        const confirmedGate = runContinuityGate({ bookRoot: root, chapterIndex, delta: appends, prose })
-        if (confirmedGate.verdict === 'hard_conflict') {
-          json(409, {
-            ok: false,
-            code: 'CONTINUITY_HARD_CONFLICT',
-            chapterIndex,
-            proposalId: record.proposalId,
-            error: `连续性门禁未通过：${confirmedGate.hardConflicts.length} 项硬冲突——本章正典零写入`,
-            hardConflicts: confirmedGate.hardConflicts,
-            ...(deltaExtraction === null ? {} : { deltaExtraction }),
-          })
-          return true
-        }
-
-        const hasAppends = Object.keys(appends).length > 0
-        const result = plane.commitChapter({
+      // 步 6-10 编排已收进管线边界（工单04 · packages/pipeline/src/commit-orchestration.ts）：
+      // 相位守卫、依赖钉版回读、窗口键、提案续接/stale/待决规则、门禁两道、commitChapter
+      // 收口、飞轮记账、会话驱动与作废收口全部是 module 侧单一实现——路由只保留输入解码、
+      // 身份/书权限与响应契约映射。提取缝（真实模型调用）与 StyleLearner 窗口闭合钩子在
+      // 此注入（依赖方向：pipeline 不 import web 提取器与 flywheel）；web_commit_* 窗口键
+      // 形状冻结不变。
+      const outcome = await runChapterCommit({
+        root,
+        chapterIndex,
+        summary,
+        expectedRevision,
+        usage: usageFacts,
+        extractDelta: ({ bookId, chapterIndex: extractChapter, prose }) =>
+          extractChapterDelta(root, bookId, extractChapter, prose, {
+            // 工单06：提取与草稿走同一个解析缝（注册表 → BYOK → 带原因 Unavailable），
+            // 注册表-only 部署的提取不再回落 BYOK 或静默失败；hosted 下按 principal 隔离。
+            resolveTarget: (env) =>
+              resolveGenerationTarget({ taskType: 'FINAL_EXTRACT', principal: principal ?? undefined, env }),
+          }),
+        afterRecord: ({ taskRef }) => {
+          runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
+        },
+      })
+      if (outcome.kind === 'proposal_stale') {
+        const stale = outcome.staleProposals
+        json(409, {
+          ok: false,
+          code: CANON_PROPOSAL_STALE,
           chapterIndex,
-          summary,
-          ...(hasAppends ? { appends } : {}),
-          ...dependencyManifestFields,
+          proposalId: stale[0]!.proposalId,
+          error:
+            `第 ${chapterIndex} 章存在描述旧正文的未决提案（正文 revision 已变）——` +
+            '请先 /api/proposal.discard 收口旧提案，再提交本章；本章正典零写入',
+          staleProposals: stale.map(canonProposalView),
         })
-
-        // 提案收口：commitChapter 成功之后才翻 consumed——提交失败时作者的逐条决策
-        // 必须留在提案记录里供重试，收口过早等于丢弃作者劳动。
-        port.markConsumed({ port: 'pipeline', proposalId: record.proposalId })
-
-        json(200, {
-          ok: true,
-          commitId: result.commitId,
-          chapterIndex: result.chapterIndex,
-          contentSha256: result.contentSha256,
-          phase: 'committed',
-          continuityGate: { verdict: 'pass' },
-          canonProposal: canonProposalView(loadCanonProposal(root, record.proposalId) ?? record),
-          ...(deltaExtraction === null ? {} : { deltaExtraction }),
-          flywheelRecord: recordFlywheel(result.commitId),
-          resubmitWindowCleanup: cleanupStaleResubmitWindow(),
-        })
-      } finally {
-        plane.close()
+        return true
       }
+      if (outcome.kind === 'gate_conflict') {
+        json(409, {
+          ok: false,
+          code: CONTINUITY_HARD_CONFLICT,
+          chapterIndex,
+          ...(outcome.proposalId === null ? {} : { proposalId: outcome.proposalId }),
+          error: `连续性门禁未通过：${outcome.hardConflicts.length} 项硬冲突——本章正典零写入`,
+          hardConflicts: outcome.hardConflicts,
+          ...(outcome.deltaExtraction === null ? {} : { deltaExtraction: outcome.deltaExtraction }),
+        })
+        return true
+      }
+      if (outcome.kind === 'proposal_pending') {
+        const pending = pendingItemViewsOf(outcome.record)
+        json(409, {
+          ok: false,
+          code: CANON_PROPOSAL_PENDING,
+          chapterIndex,
+          proposalId: outcome.record.proposalId,
+          error:
+            `正典提案待确认：${pending.length} 项未决（high 必须显式确认，medium 等队列确认）` +
+            '——本章正典零写入',
+          proposal: canonProposalView(outcome.record),
+          pendingItems: pending,
+          ...(outcome.deltaExtraction === null ? {} : { deltaExtraction: outcome.deltaExtraction }),
+        })
+        return true
+      }
+      json(200, {
+        ok: true,
+        commitId: outcome.commitId,
+        chapterIndex: outcome.chapterIndex,
+        contentSha256: outcome.contentSha256,
+        phase: 'committed',
+        continuityGate: { verdict: 'pass' },
+        canonProposal: outcome.canonProposal === null ? null : canonProposalView(outcome.canonProposal),
+        ...(outcome.deltaExtraction === null ? {} : { deltaExtraction: outcome.deltaExtraction }),
+        flywheelRecord: outcome.flywheelRecord,
+        sessionWindow: outcome.sessionWindow,
+        resubmitWindowCleanup: outcome.resubmitWindowCleanup,
+      })
     } catch (cause) {
       // 工单 01：与 /api/prose.save（:384-387）同一物理条件、同一错误码。漏这条时作者看到的是
       // 裸 500 + 英文内部消息（无 code 字段），无法据此行动——违反 AGENTS.md 规则 15。
       if (cause instanceof PreWriteHashMismatchError) {
-        json(409, { ok: false, code: 'PROSE_EXTERNAL_CHANGE', error: '磁盘内容已被外部修改（或与基线不一致）——拒绝静默覆盖，请先读取最新内容' })
+        json(409, { ok: false, code: PROSE_EXTERNAL_CHANGE, error: '磁盘内容已被外部修改（或与基线不一致）——拒绝静默覆盖，请先读取最新内容' })
         return true
       }
       if (cause instanceof ChapterPhaseError) {
-        json(409, { ok: false, code: 'CHAPTER_ALREADY_COMMITTED', error: (cause as Error).message })
+        json(409, { ok: false, code: CHAPTER_ALREADY_COMMITTED, error: (cause as Error).message })
+        return true
+      }
+      // 工单05 Contract Delta：作者所读 revision 已过期（他端保存/双窗口）——与
+      // /api/chapter.prose.save 同码同形（409 PROSE_REVISION_CONFLICT + 双 revision），
+      // 本章正文/正典/账本零写入、提取缝零调用（编排层在提取之前比对）。
+      if (cause instanceof ProseRevisionConflictError) {
+        json(409, {
+          ok: false,
+          code: PROSE_REVISION_CONFLICT,
+          expectedRevision: cause.expectedRevision,
+          currentRevision: cause.currentRevision,
+          error: (cause as Error).message,
+        })
         return true
       }
       if (isEnoent(cause)) {

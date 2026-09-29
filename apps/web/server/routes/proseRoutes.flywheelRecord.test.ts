@@ -97,7 +97,7 @@ function lowFactExtraction(bookId: string): DeltaExtractionResult {
   return result
 }
 
-async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string; taskRef: string }> {
+async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string; taskRef: string; expectedRevision: number }> {
   const base = await listen()
   const root = mkdtempSync(join(tmpdir(), 'mozhou-web-flywheel-'))
   roots.push(root)
@@ -109,7 +109,8 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
   expect(saved.status).toBe(200)
   // taskRef 与路由同源（步 8 提案绑定 / 步 10 窗口锚共用）：revision 从盘上读，不硬编码
   const revision = readProseChapter(root, proseChapterPath(1)).revision
-  return { base, root, bookId: String(created.data.bookId), taskRef: 'web_commit_ch1_rev' + revision }
+  // 工单05 Contract Delta：提交必须携带作者所读 revision。
+  return { base, root, bookId: String(created.data.bookId), taskRef: 'web_commit_ch1_rev' + revision, expectedRevision: revision }
 }
 
 /** 账本行按文件顺序（append 序即权威序）：平铺行取 type，任务事件行取 event.type。 */
@@ -147,11 +148,11 @@ function flywheelRecordView(data: Record<string, unknown>): Record<string, unkno
 
 describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
   it('带 usage 事实：投影表落同步行（机械字段盖章）且收尾事件 outcome=succeeded', async () => {
-    const { base, root, taskRef } = await makeDraftChapter()
+    const { base, root, taskRef, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
 
     const { status, data } = await post(base, '/api/chapter.commit', {
-      root, chapterIndex: 1, summary: '定稿',
+      root, chapterIndex: 1, summary: '定稿', expectedRevision,
       usage: [
         { kind: 'usage', provider: 'deepseek', model: 'v3', inputTokens: 1200, outputTokens: 300 },
         { kind: 'cost', costMicros: 42 },
@@ -182,11 +183,11 @@ describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
   })
 
   it('确认集提交分支（带 appends）同样落窗口锚：两个 commitChapter 调用点不得漏记账', async () => {
-    const { base, root, bookId, taskRef } = await makeDraftChapter()
+    const { base, root, bookId, taskRef, expectedRevision } = await makeDraftChapter()
     fixture.result = lowFactExtraction(bookId)
 
     const { status, data } = await post(base, '/api/chapter.commit', {
-      root, chapterIndex: 1, summary: '定稿',
+      root, chapterIndex: 1, summary: '定稿', expectedRevision,
       usage: [{ kind: 'usage', provider: 'deepseek', model: 'v3', inputTokens: 10 }],
     })
     expect(status, JSON.stringify(data)).toBe(200)
@@ -201,10 +202,10 @@ describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
   })
 
   it('空计量也落窗口锚：recordedCount=0、投影表零行（无计量不造数）', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(status, JSON.stringify(data)).toBe(200)
 
     // 空 usage 数组合法（S12：无计量也要落收尾事件）——投影表不因此建空文件
@@ -218,10 +219,10 @@ describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
   })
 
   it('不变量：每完成窗口恰一条 FlywheelRecorded，且顺排在本窗口 ChapterCommitted 之后', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
 
-    const first = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const first = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(first.status).toBe(200)
 
     const types = ledgerRowTypes(root)
@@ -230,20 +231,20 @@ describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
     expect(types.indexOf('ChapterCommitted')).toBeLessThan(types.indexOf('FlywheelRecorded'))
 
     // 重复提交（已 committed）被拒 ⇒ 不得再落一条窗口锚
-    const second = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const second = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(second.status).toBe(409)
     expect(second.data['code']).toBe('CHAPTER_ALREADY_COMMITTED')
     expect(ledgerRowTypes(root).filter((type) => type === 'FlywheelRecorded')).toHaveLength(1)
   })
 
   it('记账失败不阻断正文（S12）：投影写故障 ⇒ 200 定稿 + state_degraded 如实上报', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
     // 故障注入：把投影表路径占成目录 ⇒ appendUsageRows 的 appendFileSync 必抛（EISDIR）
     mkdirSync(join(root, USAGE_PROJECTION_PATH), { recursive: true })
 
     const { status, data } = await post(base, '/api/chapter.commit', {
-      root, chapterIndex: 1, summary: '定稿',
+      root, chapterIndex: 1, summary: '定稿', expectedRevision,
       usage: [{ kind: 'usage', inputTokens: 1 }],
     })
     expect(status, JSON.stringify(data)).toBe(200)
@@ -275,11 +276,11 @@ describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
     ['非字符串 provider', [{ kind: 'cost', provider: 5 }]],
     ['空字符串 model', [{ kind: 'usage', model: '' }]],
   ])('usage 形状非法（%s）：400 且零写入', async (_label, badUsage) => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
 
     const { status, data } = await post(base, '/api/chapter.commit', {
-      root, chapterIndex: 1, summary: '定稿', usage: badUsage,
+      root, chapterIndex: 1, summary: '定稿', expectedRevision, usage: badUsage,
     })
     expect(status, JSON.stringify(data)).toBe(400)
     expect(String(data['error'])).toContain('usage must be an array')
@@ -292,12 +293,12 @@ describe('POST /api/chapter.commit · 步 10 Flywheel Record 接线', () => {
   })
 
   it('afterRecord 钩子失败不阻断已落账事件，但错误必须可见（不静默吞掉学习器故障）', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
     // 故障注入：删掉文风.md ⇒ StyleLearner 读画像抛 CanonStructureError（宁败不脏）
     rmSync(join(root, STYLE_PROFILE_PATH))
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(status, JSON.stringify(data)).toBe(200)
 
     // 钩子是派生面：投影面照常 succeeded，事件照常落账（S12 同款降级）

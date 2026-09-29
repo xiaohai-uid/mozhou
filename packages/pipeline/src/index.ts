@@ -264,6 +264,22 @@ export {
 export type { CommittedTruthAnchor, ResubmitOutcome } from './resubmit.js';
 
 /**
+ * 章节提交编排（工单04 2026-09-28）：web 提交路由的步 6-10 单一事实源——路由只保留
+ * 输入解码、身份/书权限与响应契约映射；提取缝（extractDelta）与窗口闭合钩子
+ * （afterRecord）由编排方注入，窗口键 web_commit_ch<N>_rev<R> 形状冻结。
+ */
+export { runChapterCommit, webCommitWindowTaskRef } from './commit-orchestration.js';
+export type {
+  ChapterCommitCleanupView,
+  ChapterCommitDeltaSummary,
+  ChapterCommitExtraction,
+  ChapterCommitFlywheelRecordView,
+  ChapterCommitOutcome,
+  ChapterCommitSessionWindowView,
+  RunChapterCommitRequest,
+} from './commit-orchestration.js';
+
+/**
  * S10 watcher × S3（T19 · #43）：步边界检查点响应 EXTERNAL_MODIFIED（步内不打断）；
  * 对账软门禁=警告不硬阻塞，适用整条管线。
  */

@@ -139,7 +139,7 @@ describe('POST /api/chapter.reopen · 作者编辑用重开保持可重复（本
       root, chapterIndex: 1, body: '重开后的新草稿。', expectedRevision: Number(snap.data.revision),
     })
     expect(saved.status).toBe(200)
-    const recommitted = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '再定稿' })
+    const recommitted = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '再定稿', expectedRevision: Number(saved.data.revision) })
     expect(recommitted.status).toBe(200)
     expect(readProseChapter(root, proseChapterPath(1)).phase).toBe('committed')
 

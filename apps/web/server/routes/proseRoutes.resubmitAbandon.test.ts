@@ -226,7 +226,7 @@ describe('POST /api/chapter.commit · 作者重新定稿自动收口陈旧重提
     expect(saved.status).toBe(200)
 
     // 提交：出口自动作废陈旧窗口
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '重提交定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '重提交定稿', expectedRevision: Number(saved.data.revision) })
     expect(committed.status).toBe(200)
     expect(committed.data.resubmitWindowCleanup).toMatchObject({
       abandoned: true,
@@ -254,7 +254,7 @@ describe('POST /api/chapter.commit · 作者重新定稿自动收口陈旧重提
     })
     expect(saved.status).toBe(200)
 
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '首稿定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '首稿定稿', expectedRevision: Number(saved.data.revision) })
     expect(committed.status).toBe(200)
     expect(committed.data.resubmitWindowCleanup).toMatchObject({ abandoned: false, taskRef: null, errorDetail: null })
     // 无窗口可作废 ⇒ 不落任何 TaskFinished（零噪声）

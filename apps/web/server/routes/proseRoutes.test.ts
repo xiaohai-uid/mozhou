@@ -316,16 +316,18 @@ describe('POST /api/chapter.commit · 五族增量提取接线（步 6 Final Ext
     delete process.env['OPENAI_API_KEY']
     try {
       const { base, root } = await makeBook()
-      await post(base, '/api/chapter.prose.save', {
+      const savedProse = await post(base, '/api/chapter.prose.save', {
         root,
         chapterIndex: 1,
         body: '第一章正文。',
         expectedRevision: null,
       })
+      // 工单05 Contract Delta：提交携带作者所读 revision。
       const { status, data } = await post(base, '/api/chapter.commit', {
         root,
         chapterIndex: 1,
         summary: '定稿',
+        expectedRevision: Number(savedProse.data['revision']),
       })
 
       expect(status).toBe(200)
@@ -336,7 +338,10 @@ describe('POST /api/chapter.commit · 五族增量提取接线（步 6 Final Ext
         reason?: string
       }
       expect(delta.extractor).toBe('none')
-      expect(delta.reason).toContain('未配置可用 provider')
+      // 工单06：失败原因改由统一解析的 reason+detail 携带（不再是笼统一句「未配置可用
+      // provider」）。可观察行为不变——提交成功、extractor=none、追踪层零行；变的只是
+      // 病因文本更精确（并区分「没配」与「配了不可用」）。
+      expect(delta.reason).toContain('no_provider_configured')
 
       // 追踪层保持 0 行——诚实反映「增量未提取」，而不是伪造增长
       const facts = readFileSync(join(root, '追踪', '事实.jsonl'), 'utf8').trim()
@@ -363,16 +368,18 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal（无候选可路由�
     delete process.env['OPENAI_API_KEY']
     try {
       const { base, root } = await makeBook()
-      await post(base, '/api/chapter.prose.save', {
+      const savedProse = await post(base, '/api/chapter.prose.save', {
         root,
         chapterIndex: 1,
         body: '第一章正文。',
         expectedRevision: null,
       })
+      // 工单05 Contract Delta：提交携带作者所读 revision。
       const { status, data } = await post(base, '/api/chapter.commit', {
         root,
         chapterIndex: 1,
         summary: '定稿',
+        expectedRevision: Number(savedProse.data['revision']),
       })
 
       expect(status).toBe(200)

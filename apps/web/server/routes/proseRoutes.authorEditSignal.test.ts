@@ -142,7 +142,8 @@ describe('POST /api/chapter.prose.save · 步 5 User Edit 接线', () => {
     })
 
     // 提交：窗口锚 taskRef = web_commit_ch1_rev<盘上 revision> —— 与上面同键
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    // 工单05 Contract Delta：提交携带作者所读 revision（最近一次保存响应回带的值）。
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(saved.data['revision']) })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
     expect(committed.data['flywheelRecord']).toMatchObject({ status: 'succeeded', afterRecordError: null })
 
@@ -193,7 +194,7 @@ describe('POST /api/chapter.prose.save · 步 5 User Edit 接线', () => {
     expect(again.status, JSON.stringify(again.data)).toBe(200)
     expect(signalOf(again.data)).toEqual({ published: true, blocks: 1, errorDetail: null })
 
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(again.data['revision']) })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
 
     // 窗口键 = 提交时盘上 revision（rev2）——累计链把它带到 rev2，学习器据此读到编辑
@@ -222,7 +223,7 @@ describe('POST /api/chapter.prose.save · 步 5 User Edit 接线', () => {
     // 累计链两条：第一次整篇 insert（12 句）+ 第二次 replace（13 句）
     expect((events[1]?.['payload'] as { blocks: unknown[] }).blocks).toHaveLength(2)
 
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(second.data['revision']) })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
 
     // 数值分面真的更新（改前：sampleCount=1 < Nmin ⇒ action.revision 恒 0）
@@ -241,7 +242,7 @@ describe('POST /api/chapter.prose.save · 步 5 User Edit 接线', () => {
       root, chapterIndex: 1, body: '一字未改。\n', expectedRevision: null,
     })
     expect(created.status).toBe(200)
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(created.data['revision']) })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
     const reopened = await post(base, '/api/chapter.reopen', { root, chapterIndex: 1 })
     expect(reopened.status).toBe(200)

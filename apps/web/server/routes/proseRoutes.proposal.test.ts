@@ -86,7 +86,7 @@ async function post(base: string, path: string, body: Record<string, unknown>): 
   return { status: res.status, data }
 }
 
-async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string }> {
+async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string; expectedRevision: number }> {
   const base = await listen()
   const root = mkdtempSync(join(tmpdir(), 'mozhou-web-proposal-'))
   roots.push(root)
@@ -96,7 +96,8 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
     root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
   })
   expect(saved.status).toBe(200)
-  return { base, root, bookId: String(created.data.bookId) }
+  // 工单05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值；挂起类 409 不改 revision）。
+  return { base, root, bookId: String(created.data.bookId), expectedRevision: Number(saved.data.revision) }
 }
 
 function tracking(root: string, name: string): string {
@@ -179,10 +180,10 @@ function secretExtraction(bookId: string): DeltaExtractionResult {
 
 describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () => {
   it('medium 待决：409 CANON_PROPOSAL_PENDING，提案落盘、正典零写入、相位不翻转', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status).toBe(409)
     expect(data.ok).toBe(false)
@@ -213,10 +214,10 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
   })
 
   it('high 待决：secret 事实无显式确认不进正典；确认后提交，正典含该行且 POV 视角不可见', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = secretExtraction(bookId)
 
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(suspended.status).toBe(409)
     expect(suspended.data.code).toBe('CANON_PROPOSAL_PENDING')
     const proposal = proposalOf(suspended.data)
@@ -233,7 +234,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
       expect(decided.data.action).toBe('confirmed')
     }
 
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
     expect(committed.data.phase).toBe('committed')
     expect(proposalOf(committed.data).state).toBe('consumed')
@@ -253,16 +254,16 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
   })
 
   it('续接路径：重提提交复用同一提案（不重跑提取），确认集逐条决定后写入正典', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
 
-    const first = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const first = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(first.status).toBe(409)
     expect(fixture.calls).toBe(1)
     const firstId = proposalOf(first.data).proposalId
 
     // 未决时重提：同一提案、同一待决面，提取不再跑（否则新行 id 与作者已确认的行对不上）
-    const again = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const again = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(again.status).toBe(409)
     expect(again.data.code).toBe('CANON_PROPOSAL_PENDING')
     expect(proposalOf(again.data).proposalId).toBe(firstId)
@@ -284,7 +285,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
     expect(edited.data.finalized).toBe(true)
     expect(edited.data.pendingItems).toBe(0)
 
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
     expect(fixture.calls).toBe(1) // 仍走续接，不重跑提取
     expect(trackingLines(root, '关系.jsonl')).toHaveLength(1)
@@ -299,17 +300,17 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
   })
 
   it('reject 的条目绝不进正典（确认集只含 confirmed/edit_accepted）', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
 
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     const proposalId = proposalOf(suspended.data).proposalId
     for (const itemId of ['relationshipState#0', 'narrativePromise#0']) {
       const decided = await post(base, '/api/proposal.decide', { root, proposalId, itemId, action: 'reject' })
       expect(decided.status).toBe(200)
     }
 
-    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
     expect(trackingLines(root, '关系.jsonl')).toHaveLength(0)
     expect(trackingLines(root, '伏笔.jsonl')).toHaveLength(0)
@@ -317,10 +318,10 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
   })
 
   it('不变量：正文改过 ⇒ 409 CANON_PROPOSAL_STALE（旧提案不被静默丢弃），收口后可重新提交', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
 
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(suspended.status).toBe(409)
     const staleId = proposalOf(suspended.data).proposalId
 
@@ -331,7 +332,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
     })
     expect(saved.status).toBe(200)
 
-    const stale = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const stale = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(saved.data.revision) })
     expect(stale.status).toBe(409)
     expect(stale.data.code).toBe('CANON_PROPOSAL_STALE')
     expect(stale.data.proposalId).toBe(staleId)
@@ -344,7 +345,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
     expect(discarded.status).toBe(200)
     expect((discarded.data.proposal as ProposalView).state).toBe('consumed')
 
-    const reproposed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const reproposed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(saved.data.revision) })
     expect(reproposed.status).toBe(409)
     expect(reproposed.data.code).toBe('CANON_PROPOSAL_PENDING')
     expect(proposalOf(reproposed.data).proposalId).not.toBe(staleId)
@@ -353,9 +354,9 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
   it('不变量：web 提交留下的提案头不制造幻影会话窗口（session.open/advance 照常）', async () => {
     // 本路径无 session，提案头（CanonProposalCreated）在窗口外开——若投影把它当成
     // 开放窗口，紧随其后的会话步进就会误判。此用例钉住「投影只计窗口内事件」。
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(suspended.status).toBe(409)
 
     const opened = await post(base, '/api/session.open', { root, chapterIndex: 1 })
@@ -370,10 +371,10 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
     // 工单 01：commit 自己的 catch 链（proseRoutes.ts:734-750）漏了 PreWriteHashMismatchError，
     // 而 /api/prose.save 在 :384-387 对同一条件返回 409。同条件两种契约 ⇒ 作者看到「服务器错误」
     // 却无法据此行动（真实原因是「你的章节在别处被改过」）。违反 AGENTS.md 规则 15。
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = secretExtraction(bookId)
 
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(suspended.status).toBe(409)
     expect(suspended.data.code).toBe('CANON_PROPOSAL_PENDING')
     for (const itemId of ['temporalFact#0', 'knowledgeState#0']) {
@@ -387,7 +388,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
     const prosePath = join(root, proseChapterPath(1))
     writeFileSync(prosePath, `${readFileSync(prosePath, 'utf8')}\n<!-- 未对账的外部修改 -->\n`, 'utf8')
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status, JSON.stringify(data)).toBe(409)
     expect(data.code).toBe('PROSE_EXTERNAL_CHANGE')
@@ -401,13 +402,13 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
 
 describe('POST /api/proposal.* · ProposalPort 确认面（S6）', () => {
   it('list：未决提案队列（跨重启待决的读取面），决毕后不再列出', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     const empty = await post(base, '/api/proposal.list', { root })
     expect(empty.status).toBe(200)
     expect(empty.data.proposals).toEqual([])
 
     fixture.result = mediumExtraction(bookId)
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     const proposalId = proposalOf(suspended.data).proposalId
 
     const listed = await post(base, '/api/proposal.list', { root })
@@ -427,9 +428,9 @@ describe('POST /api/proposal.* · ProposalPort 确认面（S6）', () => {
   })
 
   it('decide 失败路径：未知条目/已决条目 409；空 patch、patch 用于 confirm、非法 action 400', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     const proposalId = proposalOf(suspended.data).proposalId
 
     const unknownItem = await post(base, '/api/proposal.decide', {
@@ -486,9 +487,9 @@ describe('POST /api/proposal.* · ProposalPort 确认面（S6）', () => {
   })
 
   it('discard：整份提案逐条 reject 后收口，正典零写入且不再待决', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = mediumExtraction(bookId)
-    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const suspended = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     const proposalId = proposalOf(suspended.data).proposalId
 
     const discarded = await post(base, '/api/proposal.discard', { root, proposalId })

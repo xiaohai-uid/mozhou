@@ -8,7 +8,6 @@
  * 行载荷原样带出（row 不做裁剪）：editAccept 的 patch 是顶层字段浅合并，作者必须
  * 看到候选行全字段才能改；裁剪视图会把「作者改的字段」变成盲改。
  */
-import { listCanonProposals } from '@mozhou/pipeline'
 import type { CanonProposalItem, CanonProposalRecord } from '@mozhou/pipeline'
 
 /** 提案条目作者可见面（逐条确认粒度：itemId 是 decide 的定位键）。 */
@@ -77,20 +76,4 @@ export function canonProposalView(record: CanonProposalRecord): CanonProposalVie
 /** 未决条目视图（挂起响应与队列共用；空数组 = 全部决毕可进 Commit）。 */
 export function pendingItemViewsOf(record: CanonProposalRecord): CanonProposalItemView[] {
   return record.items.filter((item) => item.state === 'pending').map(itemView)
-}
-
-/** 同 taskRef 的未决提案（提交重试的续接锚：同一正文 revision 的提案唯一）。 */
-export function openProposalForTask(root: string, taskRef: string): CanonProposalRecord | null {
-  return (
-    listCanonProposals(root).find(
-      (record) => record.state === 'open' && record.taskRef === taskRef,
-    ) ?? null
-  )
-}
-
-/** 本章未收口的提案（正文已改 ⇒ 盘上提案描述的是旧正文，路由据此显式拒绝而非静默丢弃）。 */
-export function openProposalsOfChapter(root: string, chapterIndex: number): CanonProposalRecord[] {
-  return listCanonProposals(root).filter(
-    (record) => record.state === 'open' && record.chapterIndex === chapterIndex,
-  )
 }

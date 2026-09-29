@@ -81,7 +81,7 @@ async function post(base: string, path: string, body: Record<string, unknown>): 
 }
 
 /** 建书 + 落一章 draft 终稿，返回提交所需上下文（bookId 供夹具盖合法结构头）。 */
-async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string }> {
+async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string; expectedRevision: number }> {
   const base = await listen()
   const root = mkdtempSync(join(tmpdir(), 'mozhou-web-gate-'))
   roots.push(root)
@@ -91,7 +91,8 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
     root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
   })
   expect(saved.status).toBe(200)
-  return { base, root, bookId: String(created.data.bookId) }
+  // 工单05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值）。
+  return { base, root, bookId: String(created.data.bookId), expectedRevision: Number(saved.data.revision) }
 }
 
 function tracking(root: string, name: string): string {
@@ -141,10 +142,10 @@ function cleanExtraction(bookId: string): DeltaExtractionResult {
 
 describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
   it('门禁通过：delta 写正典，响应带 continuityGate.verdict=pass', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = cleanExtraction(bookId)
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status).toBe(200)
     expect(data.phase).toBe('committed')
@@ -160,7 +161,7 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
   })
 
   it('失败路径 · POV 秘密零泄漏：secret 事实无授权认知行 → 409 + hardConflicts[]，正典零写入', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     // 真实提取产物的真实形态：模型抽出了秘密，但没给任何披露行
     const extraction = normalizeDelta(
       { facts: [{ subject: 'char:liu-bei', predicate: 'secret.identity', value: '汉室宗亲', importance: 'critical', riskClass: 'high' }] },
@@ -170,7 +171,7 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
     fixture.result = extraction
     const secretFactId = (extraction.appends['temporalFact'] as { id: string }[])[0]!.id
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status).toBe(409)
     expect(data.ok).toBe(false)
@@ -186,7 +187,7 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
   })
 
   it('失败路径 · dependency 引用完整性：认知行引用悬空 factId → 409，正典零写入', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     // 行先自证结构合法（冻结 Schema 通过）——否则冲突可能只是形状坏行，测试就失去证伪力
     const now = new Date().toISOString()
     const danglingRow = {
@@ -209,7 +210,7 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
       extractor: 'llm',
     } satisfies DeltaExtractionResult
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status).toBe(409)
     expect(data.code).toBe('CONTINUITY_HARD_CONFLICT')
@@ -221,7 +222,7 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
   })
 
   it('失败路径 · M2 时间线单调：批内序数逆序 → 409，正典零写入', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     const now = new Date().toISOString()
     const timelineRow = (worldTimeOrder: number): Record<string, unknown> => ({
       id: newTimelineEventId(),
@@ -246,7 +247,7 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
       extractor: 'llm',
     } satisfies DeltaExtractionResult
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status).toBe(409)
     expect(data.code).toBe('CONTINUITY_HARD_CONFLICT')
@@ -257,12 +258,12 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
   })
 
   it('不变量：门禁读不到存量（追踪流坏行）→ 显式 500，绝不静默跳过门禁放行', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = cleanExtraction(bookId)
     // 存量正典被外部弄坏：门禁无法建立「存量活跃 ∪ 本批」事实集
     writeFileSync(tracking(root, '事实.jsonl'), '{ not json\n')
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
 
     expect(status).toBe(500)
     expect(data.ok).toBe(false)

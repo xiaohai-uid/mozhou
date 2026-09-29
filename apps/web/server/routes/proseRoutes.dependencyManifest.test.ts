@@ -83,7 +83,7 @@ async function post(base: string, path: string, body: Record<string, unknown>): 
   return { status: res.status, data }
 }
 
-async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string }> {
+async function makeDraftChapter(): Promise<{ base: string; root: string; bookId: string; expectedRevision: number }> {
   const base = await listen()
   const root = mkdtempSync(join(tmpdir(), 'mozhou-web-dep-'))
   roots.push(root)
@@ -93,7 +93,8 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
     root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
   })
   expect(saved.status).toBe(200)
-  return { base, root, bookId: String(created.data.bookId) }
+  // 工单05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值）。
+  return { base, root, bookId: String(created.data.bookId), expectedRevision: Number(saved.data.revision) }
 }
 
 /** 无候选提取产物（走「无 appends 直提」分支）。 */
@@ -125,12 +126,12 @@ function committedRows(root: string): Record<string, unknown>[] {
 
 describe('POST /api/chapter.commit · D06 依赖钉版搬运', () => {
   it('无候选直提分支：暂存钉版钉进事件行，并成为 findReaders 的读者来源', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
     const factId = newFactId()
     persistPendingDependencyManifest(root, 1, { entries: [{ kind: 'temporalFact', id: factId, revision: 3 }] })
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(status, JSON.stringify(data)).toBe(200)
 
     const rows = committedRows(root)
@@ -141,12 +142,12 @@ describe('POST /api/chapter.commit · D06 依赖钉版搬运', () => {
   })
 
   it('确认集提交分支：带 appends 的提交同样钉版（两条 commitChapter 调用点不得漏搬）', async () => {
-    const { base, root, bookId } = await makeDraftChapter()
+    const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = lowFactExtraction(bookId)
     const factId = newFactId()
     persistPendingDependencyManifest(root, 1, { entries: [{ kind: 'temporalFact', id: factId, revision: 0 }] })
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(status, JSON.stringify(data)).toBe(200)
 
     const rows = committedRows(root)
@@ -156,10 +157,10 @@ describe('POST /api/chapter.commit · D06 依赖钉版搬运', () => {
   })
 
   it('无暂存：提交照常成功但不带清单（诚实「本章不钉任何上游版本」，不造空清单假数据）', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(status, JSON.stringify(data)).toBe(200)
 
     const rows = committedRows(root)
@@ -169,12 +170,12 @@ describe('POST /api/chapter.commit · D06 依赖钉版搬运', () => {
   })
 
   it('暂存形状非法：显式 500 且正典零写入（绝不静默丢钉版让影响分析失明）', async () => {
-    const { base, root } = await makeDraftChapter()
+    const { base, root, expectedRevision } = await makeDraftChapter()
     fixture.result = emptyExtraction()
     mkdirSync(join(root, PENDING_DEPENDENCY_MANIFEST_DIR), { recursive: true })
     writeFileSync(join(root, pendingDependencyManifestPath(1)), JSON.stringify({ entries: [{ kind: 'bogus', id: 'x', revision: 0 }] }))
 
-    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿' })
+    const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })
     expect(status).toBe(500)
     expect(String(data.error)).toContain('dependency manifest violation')
 
