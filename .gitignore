@@ -10,6 +10,9 @@
 !.scratch/mozhou-mvp/
 !.scratch/mozhou-diagnosis-20260822/
 !.scratch/morning-report.md
+# 深化工单与其执行记录是本轮工单 01–08 的规格依据，必须入库，
+# 否则提交后规格依据消失、下一次改动无从判断验收标准
+!.scratch/mozhou-deepening-20260928/
 .worktrees/
 .mimosa/
 .next/
@@ -24,6 +27,18 @@ figma-upload/
 node_modules/
 scripts/embedding-calib/.cache/
 scripts/embedding-calib/fp32-model/
+
+# 验收与审计过程产物：体积大（.dsh-audit 约 109M、模型旅程证据约 27M、
+# 编译缓存约 8.7M）且每轮重新生成，不应进版本库。
+# 需要的结论已在 .dsh-audit/launchfix/*.md 与工单执行记录里摘要。
+.dsh-audit/
+artifacts/
+.tmp-vite-build/
+# 模型旅程证据逐轮追加、含完整生成文本；已追踪的 R-fixes 等既有证据保留入库
+evidence/*
+!evidence/R-fixes/
+# Windows 设备名误建的文件
+nul
 
 # 本地凭据与私钥：商业发行仓库禁止误提交
 .env

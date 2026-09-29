@@ -40,6 +40,28 @@ function number(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function nodeKind(raw) {
+  if (Array.isArray(raw)) return raw.length > 0 ? String(raw[0]) : '';
+  if (raw === null || raw === undefined) return '';
+  return String(raw);
+}
+
+// GitNexus returns an empty id for many Function nodes and a truncated id for
+// 178 more, so Function ids are never trusted: they are always derived from
+// the legacy `Kind:filePath:name` shape.
+function isFunctionKind(kind) {
+  return kind === 'Function';
+}
+
+function baseNodeId(kind, filePath, name) {
+  return `${kind}:${filePath}:${name}`;
+}
+
+// Relation endpoints are matched on node coordinates, never on native ids.
+function nodeSignature(kind, filePath, name, line) {
+  return [kind, filePath, name, number(line)].join('\u0000');
+}
+
 function communityIds(raw) {
   if (!raw) return [];
   try {
@@ -87,17 +109,80 @@ const nodeKinds = runCypher(
   count: number(row.count),
 }));
 
-const nodes = runCypher(
+// Pass 1: read every filePath-scoped node and derive its candidate id. A
+// non-Function node keeps a non-empty native id; Function nodes (empty or
+// truncated native id) and id-less nodes fall back to `Kind:filePath:name`.
+const nodeRows = runCypher(
   'MATCH (n) WHERE n.filePath IS NOT NULL RETURN n.id AS id, n.name AS name, n.filePath AS filePath, n.startLine AS line, labels(n) AS kind ORDER BY n.id',
   30000,
-).map((row) => ({
-  id: row.id, name: row.name, filePath: row.filePath,
-  line: number(row.line) + 1, kind: row.kind,
-}));
-const relations = runCypher(
-  'MATCH (a)-[r:CodeRelation]->(b) RETURN a.id AS source, b.id AS target, r.type AS type ORDER BY a.id, b.id, r.type',
+).map((row) => {
+  const kind = nodeKind(row.kind);
+  const nativeId = (row.id ?? '').trim();
+  const filePath = row.filePath ?? '';
+  const name = row.name ?? '';
+  const rawLine = number(row.line);
+  const derived = isFunctionKind(kind) || nativeId.length === 0;
+  return {
+    kind, name, filePath,
+    line: rawLine + 1, rawLine, derived,
+    candidate: derived ? baseNodeId(kind, filePath, name) : nativeId,
+  };
+});
+
+// Pass 2: emit unique ids. A candidate id that is not unique in the exported
+// node set (e.g. two `timer` functions in one file) gains a source-line suffix.
+const candidateCounts = new Map();
+for (const row of nodeRows) {
+  candidateCounts.set(row.candidate, (candidateCounts.get(row.candidate) ?? 0) + 1);
+}
+
+const nodes = [];
+const nodeIds = new Set();
+const nodeIdBySignature = new Map();
+for (const row of nodeRows) {
+  const id = row.derived && (candidateCounts.get(row.candidate) ?? 0) > 1
+    ? `${row.candidate}:${row.line}`
+    : row.candidate;
+  if (id.length === 0) throw new Error('GitNexus returned a node without a usable id; refusing to export an unstable graph');
+  if (nodeIds.has(id)) throw new Error(`Duplicate node id ${id} in the GitNexus export; refusing to write ambiguous graph data`);
+  nodeIds.add(id);
+  nodeIdBySignature.set(nodeSignature(row.kind, row.filePath, row.name, row.rawLine), id);
+  nodes.push({ id, name: row.name, filePath: row.filePath, line: row.line, kind: row.kind });
+}
+
+const relationRows = runCypher(
+  'MATCH (a)-[r:CodeRelation]->(b) RETURN a.id AS sourceId, a.name AS sourceName, a.filePath AS sourceFilePath, a.startLine AS sourceLine, labels(a) AS sourceKind, b.id AS targetId, b.name AS targetName, b.filePath AS targetFilePath, b.startLine AS targetLine, labels(b) AS targetKind, r.type AS type ORDER BY a.id, b.id, r.type',
   50000,
 );
+const relations = [];
+let outOfScopeRelations = 0;
+for (const row of relationRows) {
+  const sourceFilePath = (row.sourceFilePath ?? '').trim();
+  const targetFilePath = (row.targetFilePath ?? '').trim();
+  // Community/Process endpoints carry no filePath and are outside the
+  // filePath-scoped node export; those edges are skipped explicitly.
+  if (sourceFilePath.length === 0 || targetFilePath.length === 0) {
+    outOfScopeRelations += 1;
+    continue;
+  }
+  const source = nodeIdBySignature.get(
+    nodeSignature(nodeKind(row.sourceKind), sourceFilePath, row.sourceName ?? '', row.sourceLine),
+  );
+  const target = nodeIdBySignature.get(
+    nodeSignature(nodeKind(row.targetKind), targetFilePath, row.targetName ?? '', row.targetLine),
+  );
+  if (source === undefined || target === undefined) {
+    throw new Error(`Relation endpoint could not be resolved to an exported node: ${sourceFilePath} -> ${targetFilePath} (${row.type})`);
+  }
+  relations.push({ source, target, type: row.type });
+}
+
+for (const relation of relations) {
+  if (!relation.source || !relation.target) throw new Error('Relation endpoint is empty; refusing to write a dangling edge');
+  if (!nodeIds.has(relation.source)) throw new Error(`Relation source ${relation.source} is not an exported node`);
+  if (!nodeIds.has(relation.target)) throw new Error(`Relation target ${relation.target} is not an exported node`);
+}
+
 const graph = { nodes, relations };
 writeFileSync(resolve(root, 'apps/web/src/code-graph/codeGraphData.json'), JSON.stringify(graph), 'utf8');
 
@@ -133,3 +218,4 @@ writeFileSync(
 );
 console.log(`Wrote ${outputPath}`);
 console.log(`${communities.length} communities, ${processes.length} processes, ${nodeKinds.length} node kinds`);
+console.log(`${nodes.length} nodes, ${relations.length} relations, ${outOfScopeRelations} out-of-scope relations skipped`);
