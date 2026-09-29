@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-09-29T08:30:00Z",
+  "artifact": "C:\\zcode\\novel-ai\\release-artifacts\\MoZhou-0.3.0-windows-x64-setup.exe",
+  "sha256": "aa9c859c8a1873f718a667f8b807ab090bbaed0819fc3aa12eeb4ca9e04eb42f",
+  "previousSha256": "A900F832E2256D4EEE1D4584B8123AA69D97DB7DC680B7D9B3F9F2BC9427998A",
+  "webView2Detected": true,
+  "signatureStatus": "NotSigned",
+  "signatureNote": "Expected and unchanged. Signing requires purchasing a code-signing certificate; this is an open product to-do, not a failure of this step.",
+  "fileSizeBytes": 125770738,
+  "version": "0.3.0",
+  "sourceCommit": "0f23e55aaeffcb04623d3d052d931b4414c34ffb",
+  "node": "v24.18.0",
+  "dependencyCopies": 100,
+  "buildCommand": "pnpm package:windows",
+  "buildExitCode": 0,
+  "buildElapsedSeconds": 42,
+  "buildNote": "Two prior attempts failed at vite/esbuild with 'remove ...Temp\\esbuild-<hash>: Access is denied' (also reproduced in the previous round's .dsh-audit/launchfix/build.log). Root cause is the agent sandbox denying delete under %LOCALAPPDATA%\\Temp, not a source defect. Resolved by redirecting TEMP/TMP/TMPDIR to .dsh-audit/launchfix/tmp/pack-temp for the build only.",
+  "installVerification": {
+    "isolatedDirSupport": "supported (Inno Setup /DIR= override honoured; 4837 destination paths, 0 into %LOCALAPPDATA%\\Programs\\MoZhou; only the isolated dir plus Desktop/Start Menu shortcuts were targeted)",
+    "fullInstallCompleted": false,
+    "installExitCode": 4,
+    "installElapsedSeconds": 13.1,
+    "blockedReason": "Environment-level, not a product defect. The spawned Inno child cannot write HKCU: 'RegCreateKeyEx failed; code 5 (Access denied)' creating HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MoZhou.Local.Windows_is1, and 'IPersistFile::Save failed; code 0x80070005' for the Desktop/Start Menu .lnk icons. Inno rolled back ('Uninstallation process succeeded.') and exited 4. Verified environmental by direct probe: 'reg add HKCU\\...\\Uninstall\\MoZhouProbeTest_is1' from the agent shell succeeds (exit 0) and Desktop is writable - the denial applies only to the sandboxed child process. Not worked around; no security check was disabled and no elevation was attempted.",
+    "rollbackCleanupVerified": "isolated dir emptied to 0 files; no MoZhou.Local.Windows_is1 key left behind; the user's own Desktop/Start Menu shortcuts retained original Sep 27 timestamps and still target the real install (Inno failed to overwrite them, log: 'Failed to delete directory (5)')",
+    "userIsolationVerified": "0 of 4837 install paths targeted the user install dir; user install unchanged at 380MB / 4803 files with 6/6 key file SHA256 identical to the pre-install baseline",
+    "uninstallViaUnins000": "not run - the isolated install rolled back before unins000.exe survived on disk, so there is no isolated uninstaller to exercise. The user's own unins000.exe was deliberately NOT run.",
+    "bundleFormJourney": "passed - GET /api/health 200 (dataRootSource=env, dataRootWritable=true, hostedMode=false); POST /api/book 200 root=...\\books\\book-mumetn12-3c09d38f; POST /api/chapter.prose.save 200 revision=1 phase=draft created=true authorEditSignal.published=true; on-disk 正文\\第一卷\\第0001章.md carries revision: 1 with the exact saved text; stdin 'shutdown' -> shutdown.drained; restart -> POST /api/chapter.prose 200 with byte-identical body"
+  },
+  "userAssetsIntact": true
+}
