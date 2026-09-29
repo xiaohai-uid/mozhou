@@ -2,6 +2,7 @@ import {
   LocalDataPlane,
   readNarrativeSnapshot,
   readStyleProfiles,
+  withBook,
 } from '@mozhou/data-plane'
 import { EmptyRecallError, createLocalTokenizer, type ContextPacket, type ExactTokenizer } from '@mozhou/context-compiler'
 import { assertStyleSectionsWithinBudget, renderStyleSections } from '@mozhou/flywheel'
@@ -104,79 +105,88 @@ export async function buildDraftContext(input: {
   readonly chapterIndex: number
   readonly authorPrompt: string
 }): Promise<DraftContextResult> {
-  const plane = LocalDataPlane.openOrRebuild(input.root)
-  try {
-    const book = plane.book
-    const cards = plane.getEntityCards()
-    const snapshot = readNarrativeSnapshot(input.root)
-    const storyText = recentStoryText(plane, input.chapterIndex)
-    const alwaysCards = cards.filter((card) => card.aiContext === 'always')
+  // 句柄只借到「盘上事实读齐」为止：下面 `prepared` 之后的整段是纯 CPU/模型调用，
+  // 句柄在 await 期间没有任何用途。旧写法 `try { …await… } finally { plane.close() }`
+  // 会在第一个 await 之前就把句柄关掉（工单 08 修掉的正是这个）。
+  const { book, cards, snapshot, storyText, alwaysCards, prepared, styleSections } = withBook(input.root, (plane) => {
+    const bookRecord = plane.book
+    const entityCards = plane.getEntityCards()
+    const narrativeSnapshot = readNarrativeSnapshot(input.root)
+    const recent = recentStoryText(plane, input.chapterIndex)
 
     // Prepare 步（S2）：章查询结果集是正文生成的生产输入面——stale 标记由 Compile
     // 追加 stale_warning 段（警告继续 + Receipt 留痕），有界质量切片（ADR-0025）
-    // 并入既有结构段通道。章大纲缺失/非法原样抛出：宁败不脏，不降级成假上下文。
-    const prepared = prepareChapterInputs(input.root, input.chapterIndex)
+    // 并入既有结构层通道。章大纲缺失/非法原样抛出：宁败不脏，不降级成假上下文。
+    const chapterInputs = prepareChapterInputs(input.root, input.chapterIndex)
 
     // 风格画像（t51:B4）：文风.md 四场景型全注入 compile 结构层，section 键冻结为
     // style_profile:<scenarioType>。每次生成重扫盘上现值——StyleLearner 学习与文风面板
     // 改动因此下一章即生效；合计超 800 token 预算即抛错（冻结硬约束），不用泛化话术冒充文风。
     // 计量用预算路径同一个精确 tokenizer（规格 §3 禁估算器）：估算器曾把 1120 精确 token
     // 的画像报成 1228 而误杀生成，故这里与 assemble 的结构层口径逐字对齐。
-    const styleSections = renderStyleSections(readStyleProfiles(input.root))
-    assertStyleSectionsWithinBudget(styleSections, exactTokenizer())
+    const sections = renderStyleSections(readStyleProfiles(input.root))
+    assertStyleSectionsWithinBudget(sections, exactTokenizer())
 
-    const structuralSections = [
-      {
-        section: 'book_identity',
-        content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
-      },
-      ...(prepared.authorIntent.body.trim().length === 0
-        ? []
-        : [{ section: AUTHOR_INTENT_SECTION, content: prepared.authorIntent.body.trim() }]),
-      ...qualityStructuralSections(prepared.qualitySlice),
-      ...styleSections,
-    ]
-
-    // 第三召回通道（T8b）：随仓 bge-small-zh-v1.5 惰性装载（24MB ONNX，进程内单例）。
-    // 装载失败返回 null ⇒ 退回 keyword+graph 双通道继续生成——降级裁决与理由见
-    // localEmbedding.ts 模块头（召回面变窄 ≠ 正确性受损，故不阻断整章生成）。
-    // 位置刻意在结构层断言之后、try 之前：章大纲/文风画像的既有失败路径不为此付装载成本。
-    const embedding = await localEmbeddingProvider()
-
-    try {
-      const outcome = await runCompileStep(prepared, {
-        bookRoot: input.root,
-        bookId: book.id,
-        // keyword / graph / embedding 的激活查询同时看作者指令与近期正文。
-        draftText: [input.authorPrompt, ...storyText].join('\n\n'),
-        cards,
-        snapshot,
-        scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
-        structuralSections,
-        storyText,
-        modelProfile: {
-          id: 'mozhou-preview-wordpiece-budget-v1',
-          contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
-        },
-        tokenizer: exactTokenizer(),
-        ...(embedding === null ? {} : { embedding }),
-      })
-      return { packet: outcome.packet, mode: 'compiled_receipt' }
-    } catch (error) {
-      if (!(error instanceof EmptyRecallError)) throw error
-      return {
-        packet: structuralFallback(
-          book.title,
-          input.chapterIndex,
-          input.authorPrompt,
-          prepared.authorIntent.body,
-          storyText,
-          alwaysCards,
-        ),
-        mode: 'structural_fallback',
-      }
+    return {
+      book: bookRecord,
+      cards: entityCards,
+      snapshot: narrativeSnapshot,
+      storyText: recent,
+      alwaysCards: entityCards.filter((card) => card.aiContext === 'always'),
+      prepared: chapterInputs,
+      styleSections: sections,
     }
-  } finally {
-    plane.close()
+  })
+
+  const structuralSections = [
+    {
+      section: 'book_identity',
+      content: `作品：《${book.title}》\n当前章节：第 ${input.chapterIndex} 章\n作者指令：${input.authorPrompt}`,
+    },
+    ...(prepared.authorIntent.body.trim().length === 0
+      ? []
+      : [{ section: AUTHOR_INTENT_SECTION, content: prepared.authorIntent.body.trim() }]),
+    ...qualityStructuralSections(prepared.qualitySlice),
+    ...styleSections,
+  ]
+
+  // 第三召回通道（T8b）：随仓 bge-small-zh-v1.5 惰性装载（24MB ONNX，进程内单例）。
+  // 装载失败返回 null ⇒ 退回 keyword+graph 双通道继续生成——降级裁决与理由见
+  // localEmbedding.ts 模块头（召回面变窄 ≠ 正确性受损，故不阻断整章生成）。
+  // 位置刻意在结构层断言之后：章大纲/文风画像的既有失败路径不为此付装载成本。
+  const embedding = await localEmbeddingProvider()
+
+  try {
+    const outcome = await runCompileStep(prepared, {
+      bookRoot: input.root,
+      bookId: book.id,
+      // keyword / graph / embedding 的激活查询同时看作者指令与近期正文。
+      draftText: [input.authorPrompt, ...storyText].join('\n\n'),
+      cards,
+      snapshot,
+      scope: { chapterIndex: input.chapterIndex, pov: 'protagonist' },
+      structuralSections,
+      storyText,
+      modelProfile: {
+        id: 'mozhou-preview-wordpiece-budget-v1',
+        contextWindow: PREVIEW_CONTEXT_WINDOW_TOKENS,
+      },
+      tokenizer: exactTokenizer(),
+      ...(embedding === null ? {} : { embedding }),
+    })
+    return { packet: outcome.packet, mode: 'compiled_receipt' }
+  } catch (error) {
+    if (!(error instanceof EmptyRecallError)) throw error
+    return {
+      packet: structuralFallback(
+        book.title,
+        input.chapterIndex,
+        input.authorPrompt,
+        prepared.authorIntent.body,
+        storyText,
+        alwaysCards,
+      ),
+      mode: 'structural_fallback',
+    }
   }
 }

@@ -31,7 +31,6 @@ import type {
 import {
   createBook,
   createEntityCard,
-  LocalDataPlane,
   MANIFEST_PATH,
   openDatabase,
   readManifest,
@@ -39,6 +38,8 @@ import {
   rebuildProjectionFromCanon,
   RUNTIME_DB_PATH,
   scanEntityCards,
+  releaseBook,
+  retainStrictBook,
   type PlaneContext,
   type TrackingKind,
 } from '@mozhou/data-plane'
@@ -1134,7 +1135,10 @@ async function runScenario(root: string): Promise<Omit<LifecycleBenchReport, 'du
   }
 
   // ── 50 章生命周期：全部行为只经 LocalDataPlane 接缝 ──
-  let plane = LocalDataPlane.open(root)
+  // 句柄必须活过下方全部探针与两次删库重建（它自己控制重建时序，故走严格打开：
+  // openOrRebuild 会在台架毫不知情时把刚删掉的投影重建掉，毁掉要测的指纹）。
+  // 工单 08：显式所有权转移，acquire/release 成对，句柄没有名字可忘。
+  let plane = retainStrictBook(root)
   const chaptersCommitted: number[] = []
   const appendedTotals: Record<string, number> = {}
   const appendsPerChapter: Record<number, number> = {}
@@ -1292,7 +1296,7 @@ async function runScenario(root: string): Promise<Omit<LifecycleBenchReport, 'du
   let rebuildFingerprintStable = true
   let rebuildQueriesIdentical = true
   for (let round = 0; round < 2; round++) {
-    plane.close()
+    releaseBook(plane)
     removeProjectionFiles(root)
     rebuildProjectionFromCanon(root)
 
@@ -1301,7 +1305,7 @@ async function runScenario(root: string): Promise<Omit<LifecycleBenchReport, 'du
       canonNow.size === canonBefore.size && [...canonBefore].every(([rel, hash]) => canonNow.get(rel) === hash)
     rebuildManifestStable &&= readFileSync(join(root, MANIFEST_PATH)).equals(manifestBefore)
 
-    plane = LocalDataPlane.open(root)
+    plane = retainStrictBook(root)
     rebuildFingerprintStable &&= projectionFingerprint(plane.db) === fingerprintBefore
     const probesAfter = behaviorProbes()
     rebuildQueriesIdentical &&= probesAfter.every((probe, i) => probe === probesBefore[i])
@@ -1352,7 +1356,7 @@ async function runScenario(root: string): Promise<Omit<LifecycleBenchReport, 'du
   const promiseRows = plane
     .getCanonState()
     .trackingLines.narrativePromise.map((line) => JSON.parse(line.payload) as { status?: unknown; targetChapter?: unknown })
-  plane.close()
+  releaseBook(plane)
 
   const { packet, receipt } = compiled
   const structuralSections = packet.structural.map((piece) => piece.section)

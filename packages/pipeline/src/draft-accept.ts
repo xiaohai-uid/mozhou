@@ -18,11 +18,11 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path'
 import {
   ChapterPhaseError,
-  LocalDataPlane,
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
   proseChapterPath,
   renderProseChapter,
+  withBook,
 } from '@mozhou/data-plane'
 import { CandidateError, acceptDraftCandidate as markAccepted, readDraftCandidate, type WriteBase } from './draft-candidate.js'
 
@@ -251,8 +251,9 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${String(candidate.status)} cannot be accepted`)
   }
 
-  const plane = LocalDataPlane.openOrRebuild(bookRoot)
-  try {
+  // 采纳全程在同一次借用内完成：读相位 → 写 intent → 落正文 → 落 done intent。
+  // 中途任何抛出都经 seam 的 catch 归还句柄（工单 08）——此前靠手写 finally。
+  return withBook(bookRoot, (plane) => {
     const scan = plane.getProseChapter(candidate.chapterIndex)
     if (scan.phase !== 'draft') {
       throw new ChapterPhaseError(candidate.chapterIndex, 'accept requires phase=draft, got ' + scan.phase)
@@ -329,7 +330,5 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
     writeIntent(bookRoot, { ...intent, after: { revision: finalRevision, sha256: finalSha256 }, state: 'done' })
     markAccepted(bookRoot, candidateId, finalRevision, isPartialConfirmed)
     return { candidateId, chapterIndex: candidate.chapterIndex, revision: finalRevision, sha256: finalSha256, alreadyApplied: false }
-  } finally {
-    plane.close()
-  }
+  })
 }

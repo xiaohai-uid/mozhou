@@ -13,10 +13,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  LocalDataPlane,
   RUNTIME_EVENTS_PATH,
   proseChapterPath,
   readProseChapter,
+  withStrictBook,
 } from '@mozhou/data-plane';
 import type { ChapterReopenResult } from '@mozhou/data-plane';
 import { ChapterProductionSession, assertSessionStartable } from './session.js';
@@ -125,13 +125,9 @@ export function requestResubmit(deps: ChapterProductionSessionDeps): ResubmitOut
     );
   }
 
-  const plane = LocalDataPlane.open(deps.root);
-  let reopened: ChapterReopenResult;
-  try {
-    reopened = plane.reopenChapter(deps.chapterIndex);
-  } finally {
-    plane.close();
-  }
+  const reopened: ChapterReopenResult = withStrictBook(deps.root, (plane) =>
+    plane.reopenChapter(deps.chapterIndex),
+  );
 
   const session = ChapterProductionSession.start(deps);
 

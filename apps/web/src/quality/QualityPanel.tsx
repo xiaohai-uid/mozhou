@@ -111,6 +111,9 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const [note, setNote] = useState('')
   const [correctionSaved, setCorrectionSaved] = useState(false)
   const [chapterPhase, setChapterPhase] = useState<'draft' | 'committed'>('draft')
+  // 作者实际读取的章版本（工单05 提交幂等契约）：定稿请求必须携带它作为 expectedRevision，
+  // 服务端与盘上 revision 失配即 409——禁止把作者没读过的正文静默提交。
+  const [proseRevision, setProseRevision] = useState<number | null>(null)
   const [commitSummary, setCommitSummary] = useState('')
   const [commitBusy, setCommitBusy] = useState(false)
   const [commitNotice, setCommitNotice] = useState<string | null>(null)
@@ -125,11 +128,12 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
     try {
       const [status, prose] = await Promise.all([
         post<ChapterQualityStatusResponse>('/api/chapter.quality', { root, chapterIndex }),
-        post<{ ok: boolean; phase?: 'draft' | 'committed' }>('/api/chapter.prose', { root, chapterIndex }).catch(() => null),
+        post<{ ok: boolean; phase?: 'draft' | 'committed'; revision?: number }>('/api/chapter.prose', { root, chapterIndex }).catch(() => null),
       ])
       if (prose?.phase) {
         setChapterPhase(prose.phase)
       }
+      setProseRevision(typeof prose?.revision === 'number' ? prose.revision : null)
       setSummary(status.status === 'no_review'
         ? { ok: true, hasReport: false, current: true }
         : reportToSummary(status.report, status.current))
@@ -143,6 +147,17 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
     setError(null)
     setCommitNotice(null)
     try {
+      // 提交幂等契约（工单05）：携带作者实际读取的章版本。面板从未读到 revision
+      // （refresh 的 prose 快照失败）时补读一次——仍拿不到就显式拒绝，不盲发。
+      let expected = proseRevision
+      if (expected === null) {
+        const prose = await post<{ revision?: number }>('/api/chapter.prose', { root, chapterIndex }).catch(() => null)
+        expected = typeof prose?.revision === 'number' ? prose.revision : null
+      }
+      if (expected === null) {
+        setError('无法读取章节当前版本（revision）——定稿被拒绝，请刷新面板后重试')
+        return
+      }
       const res = await post<{
         ok: boolean
         commitId: string
@@ -156,6 +171,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
         root,
         chapterIndex,
         summary: commitSummary,
+        expectedRevision: expected,
       })
       if (res.ok) {
         setChapterPhase('committed')
@@ -179,7 +195,16 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { chapterIndex } }))
       }
     } catch (cause) {
-      setError((cause as Error).message)
+      const error = cause as Error
+      if (error.name === 'PROSE_REVISION_CONFLICT') {
+        // 提交幂等契约（工单05）：所读 revision 已过期（他端保存/双窗口）——正文零写入，
+        // 与 prose.save 冲突同款处置：刷新面板对账（refresh 会重置 error，故报错在后），
+        // 绝不静默改带新 revision 重发。
+        await refresh()
+        setError('定稿被拒绝（版本冲突）：本章正文在你读取之后已有更新——面板已刷新到最新版本，请核对后重新定稿。')
+        return
+      }
+      setError(error.message)
     } finally {
       setCommitBusy(false)
     }

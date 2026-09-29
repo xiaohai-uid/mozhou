@@ -246,6 +246,10 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
       expect(screen.getByText('● 已定稿')).toBeInTheDocument()
     })
 
+    // 工单05 提交幂等契约：定稿请求必须携带作者所读 revision（面板 prose 快照回带的值）
+    const commitCall = fetchMock.mock.calls.find(([path]) => path === '/api/chapter.commit')
+    expect(JSON.parse((commitCall?.[1] as { body: string }).body)).toMatchObject({ expectedRevision: 2 })
+
     const reopenBtn = screen.getByRole('button', { name: '显式重开草稿 (Reopen)' })
     await userEvent.click(reopenBtn)
 
@@ -253,6 +257,47 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/chapter.reopen', expect.objectContaining({ method: 'POST' }))
       expect(screen.getByText('○ 草稿期')).toBeInTheDocument()
     })
+  })
+})
+
+/**
+ * 工单05 提交幂等契约（UI 侧）：服务端对过期 expectedRevision 回 409 PROSE_REVISION_CONFLICT
+ * 时，面板必须显式报错并刷新对账——不得静默改带最新 revision 重发，也不得误报成功。
+ */
+describe('定稿版本冲突（PROSE_REVISION_CONFLICT）显式处置', () => {
+  it('409 版本冲突：报错可见、相位保持草稿期、面板自动刷新到最新 revision', async () => {
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/chapter.quality') return Promise.resolve(okJson(NO_REVIEW_STATUS))
+      if (path === '/api/chapter.prose') return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision: 7 }))
+      if (path === '/api/chapter.commit') {
+        return Promise.resolve(new Response(JSON.stringify({
+          ok: false,
+          code: 'PROSE_REVISION_CONFLICT',
+          expectedRevision: 5,
+          currentRevision: 7,
+          error: 'prose save conflict on chapter 1: expected r5, disk has r7',
+        }), { status: 409, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return Promise.resolve(okJson({ ok: true }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<QualityPanel root="C:/tmp/b" chapterIndex={1} />)
+    await waitFor(() => expect(screen.getByTestId('canon-commit-section')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '确认定稿入账 (Commit)' }))
+
+    await waitFor(() => {
+      // 显式报错（不是「成功」也不是静默重发）
+      expect(screen.getByRole('alert').textContent).toContain('版本冲突')
+      // 相位保持草稿期：冲突后可重新定稿
+      expect(screen.getByText('○ 草稿期')).toBeInTheDocument()
+      // 面板已刷新对账：prose 快照至少读了两次（初载 + 冲突后刷新）
+      const proseReads = fetchMock.mock.calls.filter(([path]) => path === '/api/chapter.prose')
+      expect(proseReads.length).toBeGreaterThanOrEqual(2)
+    })
+    // 冲突请求本身携带了面板所读 revision（契约义务：带值提交，而非缺省）
+    const commitCall = fetchMock.mock.calls.find(([path]) => path === '/api/chapter.commit')
+    expect(commitCall).toBeDefined()
   })
 })
 

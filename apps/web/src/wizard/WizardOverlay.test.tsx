@@ -31,7 +31,7 @@ describe('WizardOverlay（T42）', () => {
   it('首次建书：步 1 调 /api/book 建书；五步走通后 onComplete 收口为 WizardOutcome', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async () =>
+      vi.fn().mockImplementation(() =>
         new Response(JSON.stringify({ ok: true, root: 'C:\\tmp\\newbook', bookId: 'bk_new' }), { status: 200 }),
       ),
     )
@@ -123,7 +123,7 @@ describe('WizardOverlay（T42）', () => {
     const io = vi.fn()
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })),
+      vi.fn().mockImplementation(() => new Response(JSON.stringify({ ok: true }), { status: 200 })),
     )
     render(<WizardOverlay precreated={BOOK} onComplete={io} onReplay={() => {}} />)
     // 步 1 可继续（created 已在）

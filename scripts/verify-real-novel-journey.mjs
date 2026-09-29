@@ -244,7 +244,8 @@ try {
     log(`采纳: HTTP ${accept.status} ok=${String(acceptData.ok)}`);
     const commit = await fetch(`${SERVER_URL}/api/chapter.commit`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ root: bookRoot, chapterIndex: 1, summary: '真实长篇验收·第 1 回定稿' }),
+      // 工单05 Contract Delta：提交携带作者所读 revision（draft.accept 响应回带的值）。
+      body: JSON.stringify({ root: bookRoot, chapterIndex: 1, summary: '真实长篇验收·第 1 回定稿', expectedRevision: acceptData.revision }),
     });
     const commitData = await commit.json();
     log(`提交: HTTP ${commit.status} ok=${String(commitData.ok)} phase=${commitData.phase}`);
