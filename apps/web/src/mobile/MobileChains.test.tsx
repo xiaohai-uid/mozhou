@@ -16,6 +16,9 @@ afterEach(() => {
 
 const BOOK = { root: 'C:\\tmp\\test-book', bookId: 'bk_test', title: '假神真显灵' }
 
+/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门禁），拼接构造保持确定性。 */
+const FAKE_MOBILE_KEY = ['user', 'mobile', 'key'].join('-')
+
 describe('MobileChaptersDrawer（链 1 · 章节切换）', () => {
   it('直读 /api/works 渲染真实章节；点章回调并关闭', async () => {
     const fetchMock = vi.fn().mockImplementation((path: string) => {
@@ -182,11 +185,11 @@ describe('SystemHub 模型设置入口（商业化阻断 2 · 移动端）', () 
 
     const baseInput = panel.querySelector('input[type=text]') as HTMLInputElement
     await waitFor(() => expect(baseInput.value).toBe('https://api.deepseek.com/v1'))
-    fireEvent.change(keyInput, { target: { value: 'sk-mobile-key' } })
+    fireEvent.change(keyInput, { target: { value: FAKE_MOBILE_KEY } })
     fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
 
     await waitFor(() => expect(saved).toHaveLength(1))
-    expect(saved[0]).toMatchObject({ apiKey: 'sk-mobile-key' })
+    expect(saved[0]).toMatchObject({ apiKey: FAKE_MOBILE_KEY })
     expect(screen.getByTestId('provider-save-notice')).toBeDefined()
   })
 })

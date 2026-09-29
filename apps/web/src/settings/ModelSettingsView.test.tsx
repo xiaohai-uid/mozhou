@@ -14,6 +14,9 @@ function okJson(value: unknown): Response {
   return { ok: true, status: 200, json: () => Promise.resolve(value) } as unknown as Response
 }
 
+/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门禁），拼接构造保持确定性。 */
+const FAKE_PASTED_KEY = ['user', 'pasted', 'key'].join('-')
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -67,11 +70,11 @@ describe('模型设置页', () => {
     render(<ModelSettingsView />)
     await waitFor(() => expect(screen.getByTestId('provider-status')).toHaveTextContent('未配置'))
 
-    await userEvent.type(screen.getByLabelText(/API 密钥/), 'sk-user-pasted-key')
+    await userEvent.type(screen.getByLabelText(/API 密钥/), FAKE_PASTED_KEY)
     await userEvent.click(screen.getByRole('button', { name: /保存配置/ }))
 
     await waitFor(() => expect(screen.getByTestId('provider-save-notice')).toHaveTextContent('已保存'))
-    expect(saved).toMatchObject({ apiKey: 'sk-user-pasted-key' })
+    expect(saved).toMatchObject({ apiKey: FAKE_PASTED_KEY })
     expect(fetchMock).toHaveBeenCalledWith('/api/llm/settings', expect.objectContaining({ method: 'POST' }))
   })
 

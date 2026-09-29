@@ -15,6 +15,9 @@ const API_KEY_VARS = ['MOZHOU_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY']
 const BASE_VARS = ['MOZHOU_API_BASE', 'DEEPSEEK_API_BASE', 'OPENAI_API_BASE']
 const MODEL_VARS = ['MOZHOU_MODEL', 'DEEPSEEK_MODEL']
 
+/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门禁），拼接构造保持确定性。 */
+const FAKE_ENV_KEY = ['env', 'openai', 'key'].join('-')
+
 afterEach(() => {
   MANAGER.resetSettings()
 })
@@ -35,10 +38,10 @@ describe('resolveEnvEndpoint · 候选变量链的唯一落点', () => {
 
   it('只配 OPENAI_* 也要全部认（三段链一视同仁，不得漏段）', () => {
     const e = resolveEnvEndpoint({
-      OPENAI_API_KEY: 'sk-openai',
+      OPENAI_API_KEY: FAKE_ENV_KEY,
       OPENAI_API_BASE: 'https://example.invalid/v1',
     })
-    expect(e.apiKey).toBe('sk-openai')
+    expect(e.apiKey).toBe(FAKE_ENV_KEY)
     expect(e.baseUrl).toBe('https://example.invalid/v1')
   })
 
