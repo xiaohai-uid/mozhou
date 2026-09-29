@@ -14,13 +14,18 @@
 import { STORYBOARD_LIMITS, STORYBOARD_SCHEMA_VERSION, sumEstimatedDuration, validateStoryboardDocument } from './contract.js'
 import type { AdaptationOptions, StoryboardDocument } from './contract.js'
 import { mintStoryboardId, readSourceSnapshot, withBookLock } from './store.js'
-import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
-import type { ResolvedEndpoint } from '../llm/openaiStream.js'
+import { streamOpenAiChat } from '../llm/openaiStream.js'
+import { resolveGenerationTarget } from '../llm/generationTarget.js'
+import type { GenerationTargetResolution } from '../llm/generationTarget.js'
 
 export class ProviderUnavailableError extends Error {
   override readonly name = 'ProviderUnavailableError'
-  constructor() {
-    super('分镜生成需要已配置的模型 provider（MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）——当前不可用。')
+  constructor(detail?: string) {
+    super(
+      detail === undefined || detail.length === 0
+        ? '分镜生成需要已配置的模型 provider（MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）——当前不可用。'
+        : `分镜生成 provider 不可用——${detail}（请在「模型设置」页填写，或设 MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）`,
+    )
   }
 }
 
@@ -49,9 +54,17 @@ export interface StoryboardCandidate {
   readonly document: StoryboardDocument
 }
 
+/**
+ * 分镜缺省解析：统一缝 + STORYBOARD 标签、无主体（hosted 下统一解析显式拒答——
+ * 旁路分镜不该拿共享凭据替不确定的用户出图；local 下共享单机凭据，行为不变）。
+ */
+const defaultStoryboardTarget = (env: NodeJS.ProcessEnv): Promise<GenerationTargetResolution> =>
+  resolveGenerationTarget({ taskType: 'STORYBOARD', env })
+
 /** 依赖注入（仅测试用；生产走真实传输）。 */
 export interface GenerateDeps {
-  readonly resolveEndpoint?: (env: NodeJS.ProcessEnv) => ResolvedEndpoint | null
+  /** 工单06 统一解析缝：注入方携带自己的 principal（缺省无主体解析）。 */
+  readonly resolveTarget?: (env: NodeJS.ProcessEnv) => GenerationTargetResolution | Promise<GenerationTargetResolution>
   readonly streamChat?: typeof streamOpenAiChat
   readonly env?: NodeJS.ProcessEnv
 }
@@ -104,12 +117,17 @@ export async function generateStoryboardCandidate(
   deps: GenerateDeps = {},
 ): Promise<StoryboardCandidate> {
   return withBookLock(root, async () => {
-    const resolveEndpoint = deps.resolveEndpoint ?? resolveChatEndpoint
+    // 工单06：端点解析走统一缝（注册表 → BYOK → 带原因 Unavailable），Unavailable 的
+    // reason/detail 透传给 ProviderUnavailableError，路由 503 如实呈现病因。
+    const resolveTarget = deps.resolveTarget ?? defaultStoryboardTarget
     const streamChat = deps.streamChat ?? streamOpenAiChat
     const env = deps.env ?? process.env
 
-    const endpoint = resolveEndpoint(env)
-    if (endpoint === null) throw new ProviderUnavailableError()
+    const resolution = await resolveTarget(env)
+    if (!resolution.available) {
+      throw new ProviderUnavailableError(`${resolution.reason}: ${resolution.detail}`)
+    }
+    const endpoint = resolution.endpoint
 
     const snapshot = readSourceSnapshot(root, chapterIndex)
     if (snapshot.source.sha256 !== expectedSourceHash) {

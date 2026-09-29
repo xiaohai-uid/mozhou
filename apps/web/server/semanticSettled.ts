@@ -33,8 +33,8 @@ import { loadReceiptForResume, readPipelineLedger } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 import { runSemanticBatch } from '@mozhou/flywheel'
 import type { AffectedRef, AnalyzeDeps, SemanticBatchItem, SemanticBatchOutcome } from '@mozhou/flywheel'
-import { defaultBookAccessManager } from './bookAccess.js'
-import { resolveChatEndpoint } from './llm/openaiStream.js'
+import { resolveGenerationTarget } from './llm/generationTarget.js'
+import type { GenerationTargetUnavailable } from './llm/generationTarget.js'
 import { buildSemanticPrompt, createSemanticEvaluator } from './llm/semanticEvaluator.js'
 
 /** 输入计量的随仓精确词表（惰性装载；与 draftContext 预算路径同一把尺）。 */
@@ -89,15 +89,21 @@ export interface SettledSemanticOutcome {
 }
 
 interface ResolvedDeps {
+  /** 与 GenerationTargetOk 同一判别位（`available`）：TS 才能真正窄化本联合类型。
+   *  没有它，`resolved?.available === true` 不是类型守卫——TS2339 的根因。 */
+  readonly available: true
   readonly deps: AnalyzeDeps
   /** 报告 provider 字段 = 实际出站模型标识（可见性优先，不写路由身份）。 */
   readonly provider: string
 }
 
 /**
- * 缺省适配器装配：无真实端点 ⇒ null（调用方按 L0 显式跳过收口）。
+ * 缺省适配器装配（工单06 收敛）：走统一解析缝 `resolveGenerationTarget`——
+ *   - available ⇒ 端点适配器（source 与草稿同一条解析：注册表 → BYOK）；
+ *   - Unavailable ⇒ 原样透传（带 reason/detail），调用方按 L0 显式跳过收口。
  *
- * **hosted 模式下一律返回 null，这是有意的拒答，不是偷懒。**
+ * **hosted 模式下此旁路没有 principal ⇒ 统一解析显式拒答（hosted_no_principal），**
+ * 这是有意的拒答，不是偷懒。
  *
  * hosted 下 ProviderSettingsManager.getSettingsPath 按 userId 分目录，凭据是**每用户**的。
  * 而本函数由旁路调用：reconciliation runtime 是按书根常驻的进程级单例，
@@ -106,18 +112,19 @@ interface ResolvedDeps {
  *
  * 曾经的写法是无条件 resolveChatEndpoint(process.env)（不传 userId），在 hosted 下
  * 落到共享/本地那一档配置：用户的落定语义分析会用别人的 Key 去调 LLM。这是静默的
- * 跨用户串号，而且没有任何一行日志会提示它。
+ * 跨用户串号，而且没有任何一行日志会提示它。4423db4 在本调用点打了 hosted 闸补丁；
+ * 工单06 把该闸收进解析 module 本体（hosted_no_principal），任何调用方不再各自记得它。
  *
- * 两种选择：(a) 猜一个主体——那就是上面那个 bug；(b) 承认此路拿不到主体，显式拒答。
- * 选 (b)。要真正支持，得先把 reconciliation runtime 按用户拆开，那是重设计，不在本次范围。
+ * 要真正支持 hosted 旁路，得先把 reconciliation runtime 按用户拆开，那是重设计，不在本次范围。
  */
-function resolveDefaultDeps(): ResolvedDeps | null {
-  if (defaultBookAccessManager.isHostedMode()) {
-    return null
+async function resolveDefaultDeps(): Promise<ResolvedDeps | GenerationTargetUnavailable> {
+  const resolution = await resolveGenerationTarget({ taskType: 'SEMANTIC_ANALYSIS', env: process.env })
+  if (!resolution.available) return resolution
+  return {
+    available: true,
+    deps: { evaluate: createSemanticEvaluator({ endpoint: resolution.endpoint, countTokens }) },
+    provider: resolution.model,
   }
-  const endpoint = resolveChatEndpoint(process.env)
-  if (endpoint === null) return null
-  return { deps: { evaluate: createSemanticEvaluator({ endpoint, countTokens }) }, provider: endpoint.model }
 }
 
 /**
@@ -130,14 +137,18 @@ export async function runSettledSemanticAnalysis(request: SettledSemanticRequest
     return { status: 'skipped', reason: 'no_affected_chapters', batch: null, analyzedChapters: [], skippedChapters: [] }
   }
 
-  const resolved = request.deps === undefined ? resolveDefaultDeps() : null
-  const deps = request.deps ?? resolved?.deps ?? null
-  const provider = resolved?.provider ?? 'byok'
+  const resolved = request.deps === undefined ? await resolveDefaultDeps() : null
+  const deps = request.deps ?? (resolved?.available === true ? resolved.deps : null)
+  const provider = resolved?.available === true ? resolved.provider : 'byok'
   if (deps === null) {
-    const hosted = defaultBookAccessManager.isHostedMode()
-    const cause = hosted
-      ? 'hosted 模式且此旁路无 principal，选不出该用户的凭据（L0 显式拒答：用共享端点会跨用户串号）'
-      : '未配置真实 LLM 端点（BYOK）'
+    // 工单06：跳过原因直接取统一解析的 reason——hosted_no_principal（凭据隔离拒答）与
+    // provider_unavailable（真没配/配了不可用）是两回事，处置完全不同，不得互相掩盖。
+    const unavailable = resolved !== null && !resolved.available ? resolved : undefined
+    const hosted = unavailable?.reason === 'hosted_no_principal'
+    const cause =
+      unavailable === undefined
+        ? '未配置真实 LLM 端点（BYOK）'
+        : `${unavailable.reason}: ${unavailable.detail}`
     console.warn(
       `[semantic] 落定语义批次 ${request.proposalId} 跳过：${cause}——不产报告、不静默 mock`,
     )

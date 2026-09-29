@@ -30,7 +30,9 @@ import {
   type FactId,
 } from '@mozhou/kernel'
 import { readNarrativeSnapshot, type TrackingKind } from '@mozhou/data-plane'
-import { resolveChatEndpoint, streamOpenAiChat, type ResolvedEndpoint } from '../llm/openaiStream.js'
+import { streamOpenAiChat } from '../llm/openaiStream.js'
+import { resolveGenerationTarget } from '../llm/generationTarget.js'
+import type { GenerationTargetResolution } from '../llm/generationTarget.js'
 
 /** 提取产物：五族行数组（行已过 kernel Schema 校验）+ 计数 + 丢弃原因。 */
 export interface DeltaExtractionResult {
@@ -42,9 +44,17 @@ export interface DeltaExtractionResult {
   readonly reason?: string | undefined
 }
 
+/**
+ * 提取缺省解析：统一缝 + FINAL_EXTRACT 标签、无主体（commit 编排在管线边界内执行，
+ * 主体由调用方（proseRoutes）按需注入自己的 resolveTarget）。
+ */
+const defaultExtractionTarget = (env: NodeJS.ProcessEnv): Promise<GenerationTargetResolution> =>
+  resolveGenerationTarget({ taskType: 'FINAL_EXTRACT', env })
+
 /** 依赖注入（仅测试用；生产走真实传输）。 */
 export interface DeltaExtractorDeps {
-  readonly resolveEndpoint?: ((env: NodeJS.ProcessEnv) => ResolvedEndpoint | null) | undefined
+  /** 工单06 统一解析缝：注入方携带自己的 principal（缺省无主体解析）。 */
+  readonly resolveTarget?: ((env: NodeJS.ProcessEnv) => GenerationTargetResolution | Promise<GenerationTargetResolution>) | undefined
   readonly streamChat?: typeof streamOpenAiChat | undefined
   readonly env?: NodeJS.ProcessEnv | undefined
 }
@@ -380,8 +390,11 @@ export function normalizeDelta(
 /**
  * 生产提取入口：终稿正文 → 五族增量。
  *
- * 未配置 provider 时返回 `extractor:'none'` 与空批（诚实降级，不伪造）；
- * 模型输出不可解析或调用失败同样返回空批 + reason，由调用方决定呈现方式。
+ * 端点解析走工单06 统一缝 `resolveGenerationTarget`（注册表 → BYOK → Unavailable），
+ * 与草稿同一条解析——注册表-only 的部署不再出现「写增量的是 A 端点、账本 providerId
+ * 是 B」。Unavailable 时返回 `extractor:'none'` 与空批，reason 携带统一解析的
+ * `<reason>: <detail>`（诚实降级，不伪造）；模型输出不可解析或调用失败同样返回空批 +
+ * reason，由调用方决定呈现方式。
  */
 export async function extractChapterDelta(
   root: string,
@@ -398,14 +411,15 @@ export async function extractChapterDelta(
     reason,
   })
 
-  const resolveEndpoint = deps.resolveEndpoint ?? resolveChatEndpoint
+  const resolveTarget = deps.resolveTarget ?? defaultExtractionTarget
   const streamChat = deps.streamChat ?? streamOpenAiChat
   const env = deps.env ?? process.env
 
-  const endpoint = resolveEndpoint(env)
-  if (endpoint === null || !endpoint.apiKey) {
-    return empty('未配置可用 provider')
+  const resolution = await resolveTarget(env)
+  if (!resolution.available) {
+    return empty(`${resolution.reason}: ${resolution.detail}`)
   }
+  const endpoint = resolution.endpoint
 
   let raw = ''
   try {

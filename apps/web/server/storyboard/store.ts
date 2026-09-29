@@ -13,10 +13,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  LocalDataPlane,
   atomicReplace,
   proseChapterPath,
   sha256Hex,
+  withBook,
 } from '@mozhou/data-plane'
 import { newUlid } from '@mozhou/kernel'
 import {
@@ -81,8 +81,7 @@ export class ChapterMissingError extends Error {
 
 /** 读源快照：磁盘原始字节算 hash（不信任客户端），标题取大纲节点，空章拒绝。 */
 export function readSourceSnapshot(root: string, chapterIndex: number): StoryboardSourceInfo {
-  const plane = LocalDataPlane.openOrRebuild(root)
-  try {
+  return withBook(root, (plane) => {
     let scan: ReturnType<typeof plane.getProseChapter>
     try {
       scan = plane.getProseChapter(chapterIndex)
@@ -112,9 +111,7 @@ export function readSourceSnapshot(root: string, chapterIndex: number): Storyboa
       excerpt: body.slice(0, SOURCE_EXCERPT_CHARS),
       body,
     }
-  } finally {
-    plane.close()
-  }
+  })
 }
 
 /** 当前盘上源 hash；章缺失返回 null（保存仍允许——作者可继续编辑既有分镜）。 */
@@ -229,16 +226,13 @@ function saveStoryboardLocked(
   const document = validateStoryboardDocument(candidate)
 
   // 写盘前权威校验：书身份归属（请求 root 对应的 bookId）与源章存在性。
-  const plane = LocalDataPlane.openOrRebuild(root)
-  try {
+  withBook(root, (plane) => {
     if (document.source.bookId !== plane.book.id) {
       throw new StoryboardValidationError([
         `source.bookId ownership mismatch: document claims ${document.source.bookId.slice(0, 12)}…, root is ${plane.book.id.slice(0, 12)}…`,
       ])
     }
-  } finally {
-    plane.close()
-  }
+  })
   if (currentSourceHash(root, document.source.chapterIndex) === null) {
     throw new ChapterMissingError(document.source.chapterIndex)
   }

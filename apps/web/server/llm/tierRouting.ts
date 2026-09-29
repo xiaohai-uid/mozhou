@@ -84,11 +84,16 @@ export class TierProviderError extends Error {
   readonly configPath: string;
   readonly keyPath: string;
 
-  constructor(code: TierProviderErrorCode, configPath: string, keyPath: string, detail: string) {
+  constructor(code: TierProviderErrorCode, configPath: string, keyPath: string, detail: string, cause?: unknown) {
     super(`${code}: ${detail}（${configPath} @ ${keyPath}）`);
     this.code = code;
     this.configPath = configPath;
     this.keyPath = keyPath;
+    // 原样挂上被包装的底层错误（如 SsrfBlockedError）。分类方（generationTarget 的
+    // unavailableFromError）要能穿过这层包装认出「门禁拒绝」——message 里只有中文
+    // 散文，类型链才是稳定的判据。不挂 cause 就只能改 message 来传递类型信息，而
+    // 既有测试逐字断言了那段文案。
+    if (cause !== undefined) this.cause = cause
   }
 }
 
@@ -185,6 +190,7 @@ export function resolveTierEndpoint(
       route.configPath,
       `providers.${leaf.providerId}.baseURL`,
       `baseURL '${entry.baseURL}' 未过出站 SSRF 门禁：${err instanceof Error ? err.message : String(err)}`,
+      err,
     )
   }
 

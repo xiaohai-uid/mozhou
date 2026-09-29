@@ -4,8 +4,8 @@
 import type { RouteHandler } from '../router.js'
 import { join } from 'node:path'
 import {
-  LocalDataPlane,
-  withPlane,
+  withBook,
+  withStrictBook,
   atomicWriteFileSync,
   createBook,
   listImpactRecords,
@@ -100,7 +100,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
       return true
     }
     const root = assertSafeBookRoot(rawRoot)
-    const matrix = withPlane(root, (plane) => plane.getChangeMatrix())
+    const matrix = withStrictBook(root, (plane) => plane.getChangeMatrix())
     const revisionBriefs = buildRevisionBriefsForMatrix(matrix.columns, listImpactRecords(root))
     json(200, { ok: true, matrix, revisionBriefs })
     return true
@@ -129,7 +129,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
     })
     json(200, {
       ok: true,
-      matrix: withPlane(root, (plane) => plane.getChangeMatrix()),
+      matrix: withStrictBook(root, (plane) => plane.getChangeMatrix()),
       rerunCount: 1,
     })
     return true
@@ -144,7 +144,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
     }
     const root = assertSafeBookRoot(rawRoot)
 
-    const { overview, canon } = withPlane(root, (plane) => ({
+    const { overview, canon } = withStrictBook(root, (plane) => ({
       overview: plane.getWorksOverview(),
       canon: plane.getCanonState(),
     }))
@@ -272,12 +272,8 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
     }
     const root = assertSafeBookRoot(rawRoot)
     try {
-      const plane = LocalDataPlane.openOrRebuild(root)
-      try {
-        json(200, { ok: true, root, bookId: plane.book.id, title: plane.book.title })
-      } finally {
-        plane.close()
-      }
+      const book = withBook(root, (plane) => ({ bookId: plane.book.id, title: plane.book.title }))
+      json(200, { ok: true, root, bookId: book.bookId, title: book.title })
     } catch (error) {
       json(404, { ok: false, error: 'not a valid book root: ' + (error as Error).message })
     }
@@ -297,8 +293,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
       const result = createBook({ dir: targetDir ?? join(rawParent, sanitizeDirName(title)), title })
       if (initialBody !== undefined && initialBody.length > 0) {
         try {
-          const plane = LocalDataPlane.open(result.root)
-          try {
+          withStrictBook(result.root, (plane) => {
             plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
             const scan = readProseChapter(result.root, proseChapterPath(1))
             const updatedContent = renderProseChapter({
@@ -310,9 +305,7 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
             })
             const absPath = join(result.root, proseChapterPath(1))
             atomicWriteFileSync(absPath, updatedContent)
-          } finally {
-            plane.close()
-          }
+          })
         } catch {
           // 容错处理
         }

@@ -828,6 +828,69 @@ describe('T44 中栏对话流 API 契约', () => {
     }
   })
 
+  /* --------------------------------------------------------------------------
+   * P2 缺陷「本机模型接入指引误导」：providerAvailable 必须带病因分类。
+   *
+   * 缺陷本体：端点只回一个布尔，UI 对所有失败原因共用「去『账户 → 模型设置』填
+   * 密钥」一句。而本机部署（MOZHOU_API_BASE=http://127.0.0.1:8317）失败的真因是
+   * SSRF 门禁按设计拒绝环回地址——填密钥接不上。本机用户被指引去填 BYOK 密钥，
+   * 照着做也接不上本地模型。
+   *
+   * 关键：下面第一条断言门禁**仍然拒绝**（providerAvailable 保持 false），
+   * 变的只是随回的分类——分类不是放宽。
+   * ------------------------------------------------------------------------ */
+  it('POST /api/capabilities：本机环回端点被门禁拦下 ⇒ 仍不可用，但带 provider_endpoint_blocked + 被拒主机', async () => {
+    const saved = {
+      key: process.env['MOZHOU_API_KEY'],
+      base: process.env['MOZHOU_API_BASE'],
+      allow: process.env['MOZHOU_ALLOW_PRIVATE_LLM'],
+    }
+    try {
+      process.env['MOZHOU_API_KEY'] = 'placeholder-not-a-real-credential'
+      process.env['MOZHOU_API_BASE'] = 'http://127.0.0.1:8317/v1'
+      delete process.env['MOZHOU_ALLOW_PRIVATE_LLM'] // 部署者未显式放行
+      const base = await listen()
+      const { status, data } = await post(base, '/api/capabilities', {})
+
+      expect(status).toBe(200)
+      // 门禁未被本次修复放宽：仍然不可用
+      expect(data.providerAvailable).toBe(false)
+      // 但病因如实带出，UI 不必再把本机用户指引去填密钥
+      expect(data.providerUnavailableReason).toBe('provider_endpoint_blocked')
+      expect(data.providerBlockedHost).toBe('127.0.0.1')
+      expect(String(data.providerDetail)).toContain('SSRF')
+    } finally {
+      for (const [k, v] of [['MOZHOU_API_KEY', saved.key], ['MOZHOU_API_BASE', saved.base], ['MOZHOU_ALLOW_PRIVATE_LLM', saved.allow]] as const) {
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+      }
+    }
+  })
+
+  it('POST /api/capabilities：真没配 provider ⇒ 带 no_provider_configured（云端路径文案前提）', async () => {
+    const base = await listen()
+    const { data } = await post(base, '/api/capabilities', {})
+    expect(data.providerAvailable).toBe(false)
+    expect(data.providerUnavailableReason).toBe('no_provider_configured')
+    // 未配置时不该凭空点名某个被拒主机
+    expect(data.providerBlockedHost).toBeNull()
+  })
+
+  it('POST /api/capabilities：provider 可用时病因字段为 null（不留旧值）', async () => {
+    const before = process.env['MOZHOU_API_KEY']
+    try {
+      process.env['MOZHOU_API_KEY'] = 'sk-real-test-key'
+      const base = await listen()
+      const { data } = await post(base, '/api/capabilities', {})
+      expect(data.providerAvailable).toBe(true)
+      expect(data.providerUnavailableReason).toBeNull()
+      expect(data.providerBlockedHost).toBeNull()
+    } finally {
+      if (before === undefined) delete process.env['MOZHOU_API_KEY']
+      else process.env['MOZHOU_API_KEY'] = before
+    }
+  })
+
   it('POST /api/draft.question：mock 先问直出（问题 + choices）', async () => {
     const base = await listen()
     const { status, data } = await post(base, '/api/draft.question', {})

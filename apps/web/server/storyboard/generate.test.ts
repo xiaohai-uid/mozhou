@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBook, proseChapterPath, renderProseChapter, sha256Hex } from '@mozhou/data-plane'
 import type { OpenAiStreamChunk, ResolvedEndpoint } from '../llm/openaiStream.js'
+import type { GenerationTargetResolution, GenerationTargetUnavailable } from '../llm/generationTarget.js'
 import {
   ModelOutputError,
   ProviderUnavailableError,
@@ -67,9 +68,26 @@ function fakeStream(chunks: string[], opts: { recordAbort?: (s: string) => void 
   }
 }
 
-function resolveEndpointOk(): ResolvedEndpoint | null {
-  return ENDPOINT
-}
+/**
+ * 工单06：deps 的端点缝换成统一解析缝 `resolveTarget`（带 reason 的显式结果）。
+ * 注入的是**成功解析结果**（providerId 与端点由同一次解析产出，测试即按此形状构造），
+ * 传输仍由 fakeStream 桩接管。
+ */
+const resolveTargetOk: () => GenerationTargetResolution = () => ({
+  available: true,
+  taskType: 'STORYBOARD',
+  endpoint: ENDPOINT,
+  providerId: 'deepseek',
+  model: ENDPOINT.model,
+  source: 'byok',
+  registryRoute: null,
+})
+
+/** Unavailable 侧的注入桩：显式 reason/detail，不靠 null 表达失败。 */
+const resolveTargetUnavailable = (
+  reason: GenerationTargetUnavailable['reason'],
+  detail: string,
+): GenerationTargetResolution => ({ available: false, taskType: 'STORYBOARD', reason, detail })
 
 function modelPayload(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
@@ -103,17 +121,40 @@ function sourceHashOf(root: string): string {
 }
 
 describe('generateStoryboardCandidate（注入式传输）', () => {
-  it('无 provider → PROVIDER_UNAVAILABLE', async () => {
+  it('无 provider → PROVIDER_UNAVAILABLE（错误信息携带解析 reason + detail）', async () => {
     const root = makeBook()
     const hash = sourceHashOf(root)
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: () => null,
+      resolveTarget: () => resolveTargetUnavailable('no_provider_configured', '未配置真实 LLM Key'),
       env: {},
     })).rejects.toMatchObject({ name: 'ProviderUnavailableError' })
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: () => null,
+      resolveTarget: () => resolveTargetUnavailable('no_provider_configured', '未配置真实 LLM Key'),
       env: {},
     })).rejects.toBeInstanceOf(ProviderUnavailableError)
+    // 新契约：病因进入错误信息，调用方不必再猜 null 背后的原因。
+    await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+      resolveTarget: () => resolveTargetUnavailable('no_provider_configured', '未配置真实 LLM Key'),
+      env: {},
+    })).rejects.toThrow(/no_provider_configured.*未配置真实 LLM Key/)
+  })
+
+  it('hosted 无主体 → hosted_no_principal（凭据隔离拒答，503 带病因）', async () => {
+    const root = makeBook()
+    const hash = sourceHashOf(root)
+    await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+      resolveTarget: () => resolveTargetUnavailable('hosted_no_principal', 'hosted 模式且无 principal'),
+      env: {},
+    })).rejects.toThrow(/hosted_no_principal/)
+  })
+
+  it('注册表配了但解析不出来 → provider_config_invalid，不回落 BYOK', async () => {
+    const root = makeBook()
+    const hash = sourceHashOf(root)
+    await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+      resolveTarget: () => resolveTargetUnavailable('provider_config_invalid', 'providers.qing: api_key_ref 不可用'),
+      env: {},
+    })).rejects.toThrow(/provider_config_invalid.*api_key_ref/)
   })
 
   it('分片 JSON 流 → 候选合法；id/revision/源/总时长服务端权威；引文锚定', async () => {
@@ -122,7 +163,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     const payload = modelPayload()
     const chunks = [payload.slice(0, 60), payload.slice(60, 200), payload.slice(200)]
     const { document } = await generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream(chunks) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })
@@ -143,14 +184,14 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     const hash = sourceHashOf(root)
     const fenced = '```json\n' + modelPayload() + '\n```'
     const ok = await generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream([fenced]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })
     expect(ok.document.title).toBeTruthy()
 
     const bad = generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream(['这不是 JSON']) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })
@@ -171,7 +212,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
       }],
     })
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream([payload]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })).rejects.toMatchObject({ code: 'MODEL_OUTPUT_UNANCHORED' })
@@ -189,7 +230,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     const shots = Array.from({ length: STORYBOARD_LIMITS.maxShots + 1 }, (_, i) => ({ ...baseShot, id: `s${i}`, order: i + 1 }))
     const payload = modelPayload({ shots })
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream([payload]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })).rejects.toMatchObject({ code: 'MODEL_OUTPUT_INVALID' })
@@ -200,7 +241,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     const hash = sourceHashOf(root)
     const big = 'x'.repeat(STORYBOARD_LIMITS.maxResponseBytes + 1024)
     await expect(generateStoryboardCandidate(root, 1, hash, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream([big]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })).rejects.toMatchObject({ code: 'MODEL_OUTPUT_OVERSIZE' })
@@ -209,7 +250,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
   it('expectedSourceHash 与磁盘不符 → SOURCE_CHANGED；超长章节 → SOURCE_TOO_LARGE', async () => {
     const root = makeBook()
     await expect(generateStoryboardCandidate(root, 1, 'f'.repeat(64), OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream([]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })).rejects.toBeInstanceOf(SourceChangedError)
@@ -221,7 +262,7 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     )
     const hash2 = sourceHashOf(root)
     await expect(generateStoryboardCandidate(root, 1, hash2, OPTIONS, {
-      resolveEndpoint: resolveEndpointOk,
+      resolveTarget: resolveTargetOk,
       streamChat: fakeStream([]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })).rejects.toBeInstanceOf(SourceTooLargeError)

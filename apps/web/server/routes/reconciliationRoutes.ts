@@ -30,7 +30,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { LocalDataPlane, ReconciliationError } from '@mozhou/data-plane'
+import { LocalDataPlane, ReconciliationError, releaseBook, retainBook } from '@mozhou/data-plane'
 import type { ReconciliationService, ReconciliationSettledPayload, ScanOutcome } from '@mozhou/data-plane'
 import type { DependencyManifestEntry } from '@mozhou/kernel'
 import type { ApiRouter, RouteHandler } from '../router.js'
@@ -82,7 +82,10 @@ export function ensureReconciliationRuntime(
   if (existing !== undefined) return existing
 
   const safeRoot = assertSafeBookRoot(key)
-  const plane = LocalDataPlane.openOrRebuild(safeRoot)
+  // 所有权转移（工单 08）：此处的句柄**本就该长活**——它要活过请求边界，供
+  // stopReconciliationRuntime / stopAllReconciliationRuntimes 显式停机时归还。
+  // 用 retainBook/releaseBook 成对表达，替代此前「裸 open + 远端 close」的隐式持有。
+  const plane = retainBook(safeRoot)
   try {
     const service = plane.reconciliation({
       onSettled: (payload) => propagateSettledChanges(plane, service, payload, safeRoot),
@@ -102,7 +105,7 @@ export function ensureReconciliationRuntime(
     attachFailures.delete(key)
     return runtime
   } catch (error) {
-    plane.close()
+    releaseBook(plane)
     throw error
   }
 }
@@ -113,7 +116,7 @@ export function stopReconciliationRuntime(root: string): void {
   if (runtime === undefined) return
   runtimes.delete(key)
   runtime.service.stopWatcher()
-  runtime.plane.close()
+  releaseBook(runtime.plane)
 }
 
 export function stopAllReconciliationRuntimes(): void {
@@ -309,11 +312,13 @@ function resolveService(root: string): ResolvedService {
     return { service: runtime.service, close: () => undefined }
   }
   const safeRoot = assertSafeBookRoot(root)
-  const plane = LocalDataPlane.openOrRebuild(safeRoot)
+  // 无常驻宿主时回退一次性平面：service 必须逃出回调在请求体内使用，故同样是
+  // 所有权转移（retainBook），由调用方 finally 里的 close() 经 releaseBook 归还。
+  const plane = retainBook(safeRoot)
   const service = plane.reconciliation({
     onSettled: (payload) => propagateSettledChanges(plane, service, payload, safeRoot),
   })
-  return { service, close: () => plane.close() }
+  return { service, close: () => releaseBook(plane) }
 }
 
 function sendError(json: (status: number, body: unknown) => void, error: unknown): void {

@@ -18,7 +18,7 @@ import {
 import { join, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { packZip, unpackZip, type ZipEntry, C5_ZIP_LIMITS } from './zip-util.js'
-import { LocalDataPlane } from './local-data-plane.js'
+import { withBook } from './with-plane.js'
 
 export interface BackupManifestItem {
   readonly path: string
@@ -228,9 +228,8 @@ export function restoreBookBackup(archiveBuffer: Buffer, targetRoot: string): Re
       writeFileSync(outPath, data)
     }
 
-    // 5. 调用 LocalDataPlane.openOrRebuild 重建 SQLite 投影数据库
-    const plane = LocalDataPlane.openOrRebuild(target)
-    plane.close()
+    // 5. 借用句柄触发 openOrRebuild 重建 SQLite 投影；借完即还，不留常驻句柄
+    withBook(target, () => undefined)
 
     return {
       bookId: manifest.bookId,

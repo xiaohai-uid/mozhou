@@ -73,15 +73,46 @@ function isPrivateOrReservedAddress(address: string): boolean {
   return true
 }
 
+/**
+ * SSRF 门禁拒绝的**结构化标记**（P2 缺陷「本机模型接入指引误导」）。
+ *
+ * 为什么需要：门禁的失败此前只有一个 Error，其 message 是中文散文。上层
+ * （generationTarget → 能力探针 → UI）要区分「本机模型被门禁拦下，部署者显式
+ * 放行即可」与「配置本身非法」，只能去正则匹配 message 文本——文案一改就断。
+ * 这里给拒绝**加一个字段**而不是改一个字：message 逐字不变（既有测试与日志继续
+ * 按 `SSRF 门禁` 断言），上层按 `code` 分支，不依赖措辞。
+ *
+ * 门禁本身**不因此放宽**：`code` 只是给既有的拒绝附加可编程的分类，不改变任何
+ * 判定条件。`targetHost` 如实带上被拒主机，便于 UI 提示具体是哪个端点被拦。
+ */
+export const SSRF_BLOCKED_CODE = 'SSRF_BLOCKED' as const
+
+export class SsrfBlockedError extends Error {
+  override name = 'SsrfBlockedError';
+  readonly code = SSRF_BLOCKED_CODE;
+  /** 被拒的上游主机（规范化小写、无方括号）。诊断用，不参与判定。 */
+  readonly targetHost: string
+
+  constructor(message: string, targetHost: string) {
+    super(message)
+    this.targetHost = targetHost
+  }
+}
+
+/** 门禁拒绝的统一出口：文案与抛出点解耦，但 message 内容与抛出点自写时逐字相同。 */
+function rejectSsrf(message: string, target: URL): never {
+  throw new SsrfBlockedError(message, normalizeAddress(target.hostname))
+}
+
 function assertProtocol(target: URL, allowPrivateNetwork: boolean): void {
   if (allowPrivateNetwork) {
     if (target.protocol !== 'https:' && target.protocol !== 'http:') {
-      throw new Error(`SSRF 门禁：仅允许 http/https 上游，实际为 ${target.protocol}`)
+      rejectSsrf(`SSRF 门禁：仅允许 http/https 上游，实际为 ${target.protocol}`, target)
     }
     return
   }
   if (target.protocol !== 'https:') {
-    throw new Error('SSRF 门禁：公网模型端点必须使用 HTTPS')
+    rejectSsrf('SSRF 门禁：公网模型端点必须使用 HTTPS', target)
   }
 }
 
@@ -103,10 +134,10 @@ export function assertSafeEndpointUrl(baseUrl: string, allowPrivateNetwork = fal
 
   const hostname = normalizeAddress(target.hostname)
   if (isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
-    throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
+    rejectSsrf(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`, target)
   }
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
+    rejectSsrf(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`, target)
   }
   return target
 }
@@ -126,22 +157,22 @@ export async function assertSafeRemoteTarget(
   const hostname = normalizeAddress(target.hostname)
   if (isIP(hostname) !== 0) {
     if (isPrivateOrReservedAddress(hostname)) {
-      throw new Error(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`)
+      rejectSsrf(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`, target)
     }
     return
   }
 
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    throw new Error(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`)
+    rejectSsrf(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`, target)
   }
 
   const addresses = await lookupAll(hostname)
   if (addresses.length === 0) {
-    throw new Error(`SSRF 门禁：DNS 未解析出可验证地址 ${hostname}`)
+    rejectSsrf(`SSRF 门禁：DNS 未解析出可验证地址 ${hostname}`, target)
   }
   const blocked = addresses.find((entry) => isPrivateOrReservedAddress(entry.address))
   if (blocked !== undefined) {
-    throw new Error(`SSRF 门禁：${hostname} 解析到私有/环回/保留地址 ${blocked.address}`)
+    rejectSsrf(`SSRF 门禁：${hostname} 解析到私有/环回/保留地址 ${blocked.address}`, target)
   }
 }
 

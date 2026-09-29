@@ -7,9 +7,9 @@ import {
   exportSubmissionEpub,
   exportCleanTxt,
   type ChapterExportItem,
-  LocalDataPlane,
   readProseChapter,
   proseChapterPath,
+  withStrictBook,
 } from '@mozhou/data-plane'
 
 export const exportRoutes: RouteHandler = (req, res, { path, body, json, bookRoot, authorizedBook }) => {
@@ -32,17 +32,16 @@ export const exportRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
 
     if (chapters.length === 0 && typeof bookRoot === 'string') {
       const root = bookRoot
-      let plane: LocalDataPlane | null = null
       try {
-        plane = LocalDataPlane.open(root)
-        const overview = plane.getWorksOverview()
-        chapters = overview.chapters.map((ch) => {
-          const scan = readProseChapter(root, proseChapterPath(ch.chapterIndex))
-          return {
-            title: ch.title || `第 ${ch.chapterIndex} 章`,
-            content: scan.body,
-          }
-        })
+        chapters = withStrictBook(root, (plane) =>
+          plane.getWorksOverview().chapters.map((ch) => {
+            const scan = readProseChapter(root, proseChapterPath(ch.chapterIndex))
+            return {
+              title: ch.title || `第 ${ch.chapterIndex} 章`,
+              content: scan.body,
+            }
+          }),
+        )
       } catch (error) {
         json(409, {
           ok: false,
@@ -50,8 +49,6 @@ export const exportRoutes: RouteHandler = (req, res, { path, body, json, bookRoo
           error: `导出源章节读取失败，已取消导出：${(error as Error).message}`,
         })
         return true
-      } finally {
-        plane?.close()
       }
     }
 

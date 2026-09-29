@@ -16,6 +16,7 @@ import {
   normalizeDelta,
   type DeltaExtractorDeps,
 } from './deltaExtractor.js'
+import type { GenerationTargetUnavailable } from '../llm/generationTarget.js'
 
 const tmpRoots: string[] = []
 let bookRoot = ''
@@ -44,8 +45,28 @@ function fakeStream(text: string): NonNullable<DeltaExtractorDeps['streamChat']>
   }
 }
 
-const endpointStub = (): NonNullable<DeltaExtractorDeps['resolveEndpoint']> =>
-  () => ({ baseUrl: 'https://example.com', apiKey: 'k', model: 'm' })
+/**
+ * 工单06：deps 的端点缝由 `resolveEndpoint`（裸端点/null）换成统一解析缝
+ * `resolveTarget`（GenerationTargetResolution）。这里注入的是**成功的解析结果**，
+ * 传输仍由 streamChat 桩接管——解析层与传输层各自独立可断言。
+ */
+const targetStub = (): NonNullable<DeltaExtractorDeps['resolveTarget']> =>
+  () => ({
+    available: true,
+    taskType: 'FINAL_EXTRACT',
+    endpoint: { baseUrl: 'https://example.com', apiKey: 'k', model: 'm' },
+    providerId: 'deepseek',
+    model: 'm',
+    source: 'byok',
+    registryRoute: null,
+  })
+
+/** Unavailable 侧的注入桩：显式给出 reason/detail，不靠「返回 null」表达失败。 */
+const unavailableStub = (
+  reason: GenerationTargetUnavailable['reason'],
+  detail: string,
+): NonNullable<DeltaExtractorDeps['resolveTarget']> =>
+  () => ({ available: false, taskType: 'FINAL_EXTRACT', reason, detail })
 
 describe('normalizeDelta · 模型只出语义，代码盖结构', () => {
   it('完整载荷归一为五族合法行，计数正确', () => {
@@ -150,16 +171,35 @@ describe('normalizeDelta · 模型只出语义，代码盖结构', () => {
 describe('extractChapterDelta · 生产入口的诚实降级', () => {
   it('未配置 provider 时返回 none + 空批 + 原因，不伪造', async () => {
     const result = await extractChapterDelta(bookRoot, bookId, 1, '正文', {
-      resolveEndpoint: () => null,
+      resolveTarget: unavailableStub('no_provider_configured', '未配置真实 LLM Key'),
     })
     expect(result.extractor).toBe('none')
     expect(result.appends).toEqual({})
-    expect(result.reason).toContain('未配置可用 provider')
+    // 新契约：失败**带原因**，不再是一个裸 null 让调用方自己解释。
+    expect(result.reason).toContain('no_provider_configured')
+    expect(result.reason).toContain('未配置真实 LLM Key')
+  })
+
+  it('注册表配了但解析不出来时如实呈现 provider_config_invalid，不回落 BYOK', async () => {
+    const result = await extractChapterDelta(bookRoot, bookId, 1, '正文', {
+      resolveTarget: unavailableStub('provider_config_invalid', 'providers.qing.providerId: 未登记'),
+    })
+    expect(result.extractor).toBe('none')
+    expect(result.reason).toContain('provider_config_invalid')
+    expect(result.reason).toContain('未登记')
+  })
+
+  it('hosted 无主体时如实呈现 hosted_no_principal（凭据隔离拒答）', async () => {
+    const result = await extractChapterDelta(bookRoot, bookId, 1, '正文', {
+      resolveTarget: unavailableStub('hosted_no_principal', '无 principal'),
+    })
+    expect(result.extractor).toBe('none')
+    expect(result.reason).toContain('hosted_no_principal')
   })
 
   it('模型输出不可解析时返回 none + 原因', async () => {
     const result = await extractChapterDelta(bookRoot, bookId, 1, '正文', {
-      resolveEndpoint: endpointStub(),
+      resolveTarget: targetStub(),
       streamChat: fakeStream('这里没有 JSON'),
     })
     expect(result.extractor).toBe('none')
@@ -172,7 +212,7 @@ describe('extractChapterDelta · 生产入口的诚实降级', () => {
       throw new Error('upstream 429')
     }
     const result = await extractChapterDelta(bookRoot, bookId, 1, '正文', {
-      resolveEndpoint: endpointStub(),
+      resolveTarget: targetStub(),
       streamChat: throwing,
     })
     expect(result.extractor).toBe('none')
@@ -185,7 +225,7 @@ describe('extractChapterDelta · 生产入口的诚实降级', () => {
       timeline: [{ worldTimeLabel: '元年', summary: '启程', participants: ['char:a'], impactFactIndexes: [0] }],
     })
     const result = await extractChapterDelta(bookRoot, bookId, 1, '正文', {
-      resolveEndpoint: endpointStub(),
+      resolveTarget: targetStub(),
       streamChat: fakeStream('```json\n' + payload + '\n```'),
     })
     expect(result.extractor).toBe('llm')

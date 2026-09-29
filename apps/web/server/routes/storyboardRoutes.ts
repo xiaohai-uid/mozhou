@@ -10,7 +10,8 @@
  * 生成分镜（该路径绑定小说写作管线）。
  */
 import type { RouteHandler } from '../router.js'
-import { CHAPTER_MISSING, PROVIDER_UNAVAILABLE } from '../routeCodes.js'
+import { CHAPTER_MISSING, INVALID_BOOK_REQUEST, PROVIDER_UNAVAILABLE } from '../routeCodes.js'
+import { decodeBookRequest } from '../bookRequest.js'
 import { assertSafeBookRoot, RequestBoundaryError } from '../security.js'
 import {
   ChapterMissingError,
@@ -30,20 +31,21 @@ import {
   SourceTooLargeError,
   generateStoryboardCandidate,
 } from '../storyboard/generate.js'
+import { resolveGenerationTarget } from '../llm/generationTarget.js'
 
-export const storyboardRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
+export const storyboardRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
   if (req.method !== 'POST') return false
 
   const rawRoot = bookRoot ?? null
 
   if (path === '/api/storyboard.source') {
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (rawRoot === null || chapterIndex === null || !Number.isInteger(chapterIndex) || chapterIndex < 1) {
-      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+    const decoded = decodeBookRequest(body, rawRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     try {
-      const root = assertSafeBookRoot(rawRoot)
       const info = readSourceSnapshot(root, chapterIndex)
       json(200, {
         ok: true,
@@ -59,11 +61,16 @@ export const storyboardRoutes: RouteHandler = async (req, res, { path, body, jso
   }
 
   if (path === '/api/storyboard.generate') {
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const decoded = decodeBookRequest(body, rawRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root: safeRoot, chapterIndex } = decoded.value
     const expectedSourceHash = typeof body['expectedSourceHash'] === 'string' ? body['expectedSourceHash'] : null
     const optionsRaw = body['options']
-    if (rawRoot === null || chapterIndex === null || expectedSourceHash === null || typeof optionsRaw !== 'object' || optionsRaw === null) {
-      json(400, { ok: false, error: 'root, chapterIndex, expectedSourceHash and options required' })
+    if (expectedSourceHash === null || typeof optionsRaw !== 'object' || optionsRaw === null) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root, chapterIndex, expectedSourceHash and options required' })
       return true
     }
     const record = optionsRaw as Record<string, unknown>
@@ -74,16 +81,20 @@ export const storyboardRoutes: RouteHandler = async (req, res, { path, body, jso
     const visualStyle = typeof record['visualStyle'] === 'string' ? record['visualStyle'] : ''
     const languageOk = record['language'] === undefined || record['language'] === 'zh-CN'
     if (!aspectRatioOk || !durationOk || visualStyle.trim() === '' || !languageOk) {
-      json(400, { ok: false, error: 'options invalid: aspectRatio(9:16|16:9|1:1), targetDurationSeconds(1..3600), visualStyle required' })
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'options invalid: aspectRatio(9:16|16:9|1:1), targetDurationSeconds(1..3600), visualStyle required' })
       return true
     }
     try {
-      const root = assertSafeBookRoot(rawRoot)
-      const { document } = await generateStoryboardCandidate(root, chapterIndex, expectedSourceHash, {
+      // 工单06：端点解析走统一缝并携带 principal（hosted 下按用户隔离凭据；此前无主体
+      // 解析在 hosted 下会落到共享档——与 semanticSettled 同源的跨用户串号隐患）。
+      const { document } = await generateStoryboardCandidate(safeRoot, chapterIndex, expectedSourceHash, {
         aspectRatio: record['aspectRatio'] as AspectRatio,
         targetDurationSeconds: record['targetDurationSeconds'] as number,
         visualStyle,
         language: 'zh-CN',
+      }, {
+        resolveTarget: (env) =>
+          resolveGenerationTarget({ taskType: 'STORYBOARD', principal: principal ?? undefined, env }),
       })
       // 候选只在响应中返回，绝不写盘（保存走 /api/storyboard.save）。
       json(200, { ok: true, candidate: document })

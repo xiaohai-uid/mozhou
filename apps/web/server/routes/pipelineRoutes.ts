@@ -9,7 +9,17 @@
  * 本路由只做请求形状校验与错误码映射，不复制确认协议。
  */
 import type { RouteHandler } from '../router.js'
-import { PROVIDER_UNAVAILABLE } from '../routeCodes.js'
+import {
+  CANDIDATE_NOT_FOUND,
+  CHAPTER_SCAFFOLD_FAILED,
+  INVALID_BOOK_REQUEST,
+  NO_COMPILED_RECEIPT,
+  PROVIDER_UNAVAILABLE,
+  PROPOSAL_DECISION_REJECTED,
+  PROPOSAL_DISCARD_REJECTED,
+  QUALITY_REWORK_LIMIT_EXCEEDED,
+} from '../routeCodes.js'
+import { decodeBookRequest, noOpenProductionSessionError } from '../bookRequest.js'
 import { emptyDraftStream, mockDraftStream } from './draftStreamEmulation.js'
 import {
   AcceptConflictError,
@@ -40,23 +50,25 @@ import {
   type QualityPolicy,
 } from '@mozhou/quality-engine'
 import { resolveCompiledAnchor } from '../compiledAnchor.js'
-import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
+import {
+  ChapterExistsError,
+  chapterOutlinePath,
+  proseChapterPath,
+  readProseChapter,
+  withStrictBook,
+} from '@mozhou/data-plane'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PublishBus, RuntimeEngine, createDraftRecipe, toProviderOverride } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
-import { resolveChatEndpoint, streamOpenAiChat } from '../llm/openaiStream.js'
-import {
-  resolveTierEndpoint,
-  resolveDraftTierRoute,
-  tierConfigPath,
-  tierRouteTraceLine,
-} from '../llm/tierRouting.js'
-import type { ResolvedEndpoint } from '../llm/types.js'
+import { streamOpenAiChat } from '../llm/openaiStream.js'
+import { DRAFT_TASK_TYPE, tierRouteTraceLine } from '../llm/tierRouting.js'
+import { resolveGenerationTarget } from '../llm/generationTarget.js'
+import type { GenerationUnavailableReason } from '../llm/generationTarget.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
-import { defaultProviderSettingsManager } from '../llm/providerSettings.js'
+import { defaultBookAccessManager } from '../bookAccess.js'
 import { canonProposalView } from '../proposals.js'
 
 const DIALOGUE_CAPABILITIES = [
@@ -73,19 +85,36 @@ const DIALOGUE_CAPABILITIES = [
 
 
 /**
- * 覆盖层能否解析出一条**可用**的 providerId → 端点路由（注册表能力独立可用的判据）。
- * 任何失败（结构非法 / 多叶子歧义 / api_key_ref / providerId 未登记 / baseURL 未过 SSRF 门禁 /
- * apiKeyEnv 缺失）都收敛成 false——本函数只回答「能不能生成」，病因留给真正生成时上抛。
+ * mock 开关族判据（hasDraftProvider / draft.stream 前置闸 / makeStreamEngine 三处共用，
+ * 工单06 收敛）：`MOZHOU_DRAFT_PROVIDER=mock` 恒成立；`mock-empty` 仅非生产成立
+ * （空流回归测试缝，生产不生效以免「探针报可用、生成都失败」的假可用）。
  */
-async function hasResolvableTierRoute(env: NodeJS.ProcessEnv): Promise<boolean> {
-  try {
-    const route = await resolveDraftTierRoute(env)
-    if (route === null) return false
-    resolveTierEndpoint(route, env)
-    return true
-  } catch {
-    return false
-  }
+function isMockDraftProviderMode(env: NodeJS.ProcessEnv): boolean {
+  const configured = env['MOZHOU_DRAFT_PROVIDER']
+  return configured === 'mock' || (configured === 'mock-empty' && env['NODE_ENV'] !== 'production')
+}
+
+/**
+ * 能力探针的**完整**结论：可用性 + 病因分类。
+ *
+ * reason 直接复用 resolveGenerationTarget 的 GenerationUnavailableReason，另加两个
+ * 可用态（'available' / 'mock'）。**不另造一套枚举**——探针与生成闸共用同一个解析缝，
+ * 两边若各有一套 reason，「UI 说的原因」与「生成时报的原因」就会漂移，那正是本缺陷
+ * 想消灭的东西。
+ *
+ * 这是**加法**而非替换：hasDraftProvider 的布尔签名与全部既有调用点不变
+ * （/api/capability-square 的 providerAvailable 等），UI 只在需要指引时才读 reason。
+ */
+export type DraftProviderAvailabilityReason = 'available' | 'mock' | GenerationUnavailableReason
+
+export interface DraftProviderAvailability {
+  readonly available: boolean
+  /** available=true ⇒ 'available' | 'mock'；false ⇒ 解析缝给出的三类病因之一。 */
+  readonly reason: DraftProviderAvailabilityReason
+  /** 带键路径的病因原文（available 时为空串）。UI 展示用，判据用 reason。 */
+  readonly detail: string
+  /** reason='provider_endpoint_blocked' 时为被拒主机，否则 undefined。 */
+  readonly blockedHost?: string | undefined
 }
 
 /**
@@ -93,29 +122,52 @@ async function hasResolvableTierRoute(env: NodeJS.ProcessEnv): Promise<boolean> 
  * 与 `/api/draft.stream` 前置闸共用）——回答「现在能不能真的生成」：
  *   - `MOZHOU_DRAFT_PROVIDER=mock` ⇒ true（既有显式开关，不参与分级路由选档）；
  *   - `MOZHOU_DRAFT_PROVIDER=mock-empty` ⇒ true，**但仅非生产环境**（空流回归测试缝）；
- *   - 产品内配置的凭据（`POST /api/llm/settings` 落盘的 AES-256-GCM 配置）⇒ true，
- *   - BYOK 密钥齐备 ⇒ true（既有语义不变）；
- *   - 否则看覆盖层 `~/.mozhou/settings.yaml`：无该文件 ⇒ false（维持 BYOK 判据，行为不变）；
- *     有该文件且叶子 providerId 能经 `providers:` 注册表解析出可用端点 ⇒ true。
+ *   - 否则 = `resolveGenerationTarget` 是否可用（工单06 单缝）：注册表可解析 ∥ BYOK 凭据齐备。
  *
  * 为什么要认注册表：端点身份已由 providerId 决定（见 llm/tierRouting.ts），所以「有没有可用的
  * 草稿 provider」的判据必须把注册表算进去——否则「只用注册表、不配 BYOK」的部署会被挡在门外，
- * 等于注册表能力独立不可用。判据取**可解析性**而非「文件存在」：配了但解析不出来时返回 false，
- * 不让 UI 报出与实际不符的能力声明。
- *
- * 同步 → 异步：判据要读 YAML 才能回答，故本函数与它的 3 个调用点一并改为 async（改动面：
- * 本文件的 `/api/capabilities` 与 `/api/draft.stream` 前置闸，以及 `systemRoutes.ts` 的
- * `/api/capability-square`——三处均已在 async 路由处理器内，`router.ts` 的 dispatch 会 await）。
+ * 等于注册表能力独立不可用。判据取**可解析性**而非「文件存在」：配了但解析不出来
+ * （provider_config_invalid）时返回 false，不让 UI 报出与实际不符的能力声明；病因
+ * （带键路径的 detail）由真正生成时的同一次解析上抛。
  */
 export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env, userId?: string): Promise<boolean> {
-  const configured = env['MOZHOU_DRAFT_PROVIDER']
-  // mock 开关族同 makeStreamEngine：'mock' 恒成立；'mock-empty' 仅非生产成立。
-  const isMockMode = configured === 'mock' || (configured === 'mock-empty' && env['NODE_ENV'] !== 'production')
-  // 凭据判据归 ProviderSettingsManager.hasUsableCredentials（产品内配置优先，再退环境变量）
-  // ——本文件此前自己重写候选变量链，已因漏项漂移过一次。
-  const hasCredentials = defaultProviderSettingsManager.hasUsableCredentials(userId, env)
-  if (!isMockMode && !hasCredentials && !(await hasResolvableTierRoute(env))) return false
-  return true
+  return (await draftProviderAvailability(env, userId)).available
+}
+
+/**
+ * 与 hasDraftProvider 同一次解析，但**不丢掉病因**。
+ *
+ * 为什么需要（P2 缺陷「本机模型接入指引误导」）：hasDraftProvider 回答的是布尔量，
+ * 而 UI 要回答「下一步做什么」。真没配 provider（该去设置页填密钥）与端点被 SSRF
+ * 门禁按设计拒绝（该让部署者显式放行本机网络）的下一步**相反**；压成 false 之后
+ * 两者共用一句话，于是本机部署的用户被指引去填 BYOK 密钥——本机部署根本不该走那条
+ * 路，照着做也接不上本地模型。
+ *
+ * 探针不重跑解析、不重跑门禁：只是把 resolveGenerationTarget 本来就算好的
+ * reason / detail / blockedHost 如实带出来。故 mock 档没有「病因」可言，
+ * 按 available=true、reason='mock' 报（mock 是显式测试/演示开关，不是诊断类别）。
+ */
+export async function draftProviderAvailability(
+  env: NodeJS.ProcessEnv = process.env,
+  userId?: string,
+): Promise<DraftProviderAvailability> {
+  if (isMockDraftProviderMode(env)) {
+    return { available: true, reason: 'mock', detail: '', blockedHost: undefined }
+  }
+  const resolution = await resolveGenerationTarget({
+    taskType: DRAFT_TASK_TYPE,
+    principal: userId === undefined ? undefined : { userId },
+    env,
+  })
+  if (resolution.available) {
+    return { available: true, reason: 'available', detail: '', blockedHost: undefined }
+  }
+  return {
+    available: false,
+    reason: resolution.reason,
+    detail: resolution.detail,
+    blockedHost: resolution.blockedHost,
+  }
 }
 
 function decoratePromptWithSkills(prompt: string, skills: readonly string[]): string {
@@ -150,20 +202,66 @@ function hashProseRaw(root: string, chapterIndex: number): string {
   return createHash('sha256').update(readFileSync(join(root, proseChapterPath(chapterIndex)))).digest('hex')
 }
 
+/** 单章脚手架两件（章大纲节点 + 正文载体）同时缺失——「这本书还没写到这一章」。 */
+function chapterScaffoldAbsent(root: string, chapterIndex: number): boolean {
+  return (
+    !existsSync(join(root, chapterOutlinePath(chapterIndex))) &&
+    !existsSync(join(root, proseChapterPath(chapterIndex)))
+  )
+}
+
+/**
+ * 首章脚手架按需补齐（P1 缺陷 1，`.dsh-audit/launch/02-browser-ui.md` §7 缺陷 1）。
+ *
+ * 为什么放在生成路径而不是 `/api/book` 建书时：建书是**开卷**动作，卷内有几章
+ * 本来就是作者尚未决定的；把「第 1 章必然存在」写进建书，等于替作者决定了
+ * 首章标题与章号语义。生成则是「作者已经点了写这一章」——此时补一件同名空
+ * 脚手架是纯落账，不构成内容决定。观察到的唯一可观察目标是「新用户建书后
+ * 第一次点生成就能成功」，按需创建正好是最小实现。
+ *
+ * 幂等与并发：
+ * - 已存在（含只存在其一的部分状态）⇒ 直接返回，既有行为逐字不变；
+ * - 两个请求同时进来 ⇒ 书级锁内串行，第二个撞到 ChapterExistsError 视作成功；
+ * - 只在**两件都缺**时创建，故绝不用脚手架覆盖任何已有内容。
+ *
+ * 只在 createChapterDraft 的原子不变量（两件一起建）被打破时才算真损坏，
+ * 那种盘面状态不在本路径的修复面内，交由既有错误路径如实暴露。
+ */
+async function ensureChapterScaffold(root: string, chapterIndex: number, bookKey: string): Promise<void> {
+  if (!chapterScaffoldAbsent(root, chapterIndex)) return
+  // 书级锁内串行：check-then-create 不是原子的，两请求同刻进来会各自看到
+  // 「两件都缺」然后争抢同一对文件。锁只圈这一次建章，不圈整段生成。
+  await defaultBookAccessManager.queue.withBookLock(bookKey, async () => {
+    await Promise.resolve()
+    if (!chapterScaffoldAbsent(root, chapterIndex)) return
+    try {
+      withStrictBook(root, (plane) => {
+        plane.createChapterDraft({ chapterIndex, title: `第${chapterIndex}章` })
+      })
+    } catch (error) {
+      // 并发窗口：另一请求刚建好同一章。已存在即达成目的，不是失败。
+      if (error instanceof ChapterExistsError) return
+      throw error
+    }
+  })
+}
+
 /**
  * 真实 provider 消费完整编译上下文；mock 仅用作者指令生成演示正文，避免把
  * ContextPacket 自身写回小说正文，但 start 帧仍暴露真实 modelPrompt 供契约审计。
  * C2（T04）：stream 只 append 候选（candidate 上下文必传，缺省拒绝绑定）；
  * signal 在请求断开/显式取消时中止上游。
  *
- * T14 接线：真实分支的 providerId/model/端点不再硬编码——先读全局覆盖层
- * （`~/.mozhou/settings.yaml`，见 llm/tierRouting.ts）解析 CHAPTER_DRAFTING 的活动路由：
- *   - providerId ⇒ CapabilityRegistry.setGlobalOverride（包内默认 'deepseek' 仍是注册项，
- *     覆盖层只改解析结果，且覆盖后 GenerationStarted.snapshot.providerId 记的就是配置值）；
- *   - 端点（baseURL + 密钥）⇒ providers 注册表按**同一个** providerId 解析
- *     （resolveTierEndpoint）。账本 providerId 与实际出站端点因此同源，不再出现
- *     「账本说走 X、请求发往 BYOK 端点 Y」；未登记 / baseURL 非法 / apiKeyEnv 缺失 ⇒ 显式抛错；
- *   - 无配置文件 ⇒ 解析返回 null，本函数行为与接线前逐字节一致（BYOK 解析）。
+ * T14 接线 + 工单06 收敛：真实分支的 providerId/model/端点由
+ * `llm/generationTarget.resolveGenerationTarget`（单缝）解析——注册表 → BYOK → 带原因的
+ * Unavailable：
+ *   - source='registry' ⇒ providerId ⇒ CapabilityRegistry.setGlobalOverride（包内默认
+ *     'deepseek' 仍是注册项，覆盖层只改解析结果，覆盖后 GenerationStarted.snapshot.providerId
+ *     记的就是配置值）；端点（baseURL + 密钥）由**同一次解析**按同一个 providerId 从注册表
+ *     解析——账本 providerId 与实际出站端点强制同源，不存在「账本说走 X、请求发往端点 Y」；
+ *   - source='byok' ⇒ 与接线前逐字节一致（BYOK 解析 + 包内默认 providerId）；
+ *   - Unavailable ⇒ 抛 `PROVIDER_UNAVAILABLE: <reason>: <detail>`，NDJSON error 帧如实
+ *     呈现病因（注册表失败绝不回落 BYOK）。
  * mock 是显式「不调真实 provider」开关（测试/演示），不参与分级路由选档。
  */
 async function makeStreamEngine(
@@ -191,9 +289,8 @@ async function makeStreamEngine(
   // 'mock-empty' 只在**非生产**环境成立：它模拟真实上游「HTTP 200 但零 delta」的静默空输出形态
   // （commit 0693776 记录），供空流守卫的 HTTP 级回归测试使用。生产构建下该值不生效，
   // 免得出现「能力探针报可用、但每次生成都失败」的假可用（AGENTS.md §4.13-4.14）。
-  const mockMode = process.env['MOZHOU_DRAFT_PROVIDER']
-  const emptyMock = mockMode === 'mock-empty' && process.env['NODE_ENV'] !== 'production'
-  const explicitMock = mockMode === 'mock' || emptyMock
+  const emptyMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock-empty' && process.env['NODE_ENV'] !== 'production'
+  const explicitMock = isMockDraftProviderMode(process.env)
   let real = false
 
   if (explicitMock) {
@@ -220,35 +317,33 @@ async function makeStreamEngine(
     const defaultProviderId = 'deepseek'
     const providerVersion = '1.0.0'
 
-    const tierRoute = await resolveDraftTierRoute()
-    let providerId: string
-    let effectiveEndpoint: ResolvedEndpoint
-    if (tierRoute === null) {
-      // 无覆盖层文件 ⇒ 与接线前逐字节一致：BYOK 解析 + 包内默认 providerId。
-      const endpoint = resolveChatEndpoint(process.env, userId)
-      if (endpoint === null) {
-        throw new Error('PROVIDER_UNAVAILABLE: 未配置真实 LLM Key（请在「模型设置」页填写，或设 MOZHOU_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY）')
-      }
-      providerId = defaultProviderId
-      effectiveEndpoint = endpoint
-    } else {
-      // 有覆盖层文件 ⇒ 端点由 providers 注册表按 providerId 解析：**同一个** providerId 既作
-      // 绑定键与账本快照（下方 registerProviderBinding + setGlobalOverride），又决定实际出站
-      // baseURL 与 apiKey（resolveTierEndpoint 查同一份注册表）。二者同源 ⇒ 账本记的
-      // providerId 就是实际服务的那一家，不存在「账本说 X、请求发 Y」。
-      // 未登记 / baseURL 未过 SSRF 门禁 / apiKeyEnv 缺失一律显式抛错，绝不回落 BYOK
-      // （见 llm/tierRouting.ts 的 TierProviderError）。
-      providerId = tierRoute.selection.route.providerId
-      effectiveEndpoint = resolveTierEndpoint(tierRoute, process.env)
+    // 工单06：解析收敛到 llm/generationTarget.resolveGenerationTarget 单缝——注册表 → BYOK
+    // → 带原因的 Unavailable。providerId 与实际出站端点由**同一次解析**产生（providerId 既作
+    // 下方 registerProviderBinding 绑定键与账本快照，又决定 baseURL/apiKey），账本与出站
+    // 因此强制同源（tierRouting.ts:146-158 不变量）。注册表解析失败绝不回落 BYOK；
+    // Unavailable 带病因 detail，NDJSON error 帧如实呈现，不用笼统码掩盖。
+    const target = await resolveGenerationTarget({
+      taskType: DRAFT_TASK_TYPE,
+      principal: userId === undefined ? undefined : { userId },
+      env: process.env,
+    })
+    if (!target.available) {
+      throw new Error(`PROVIDER_UNAVAILABLE: ${target.detail}`)
+    }
+    const providerId = target.providerId
+    const effectiveEndpoint = target.endpoint
+    real = true
+
+    if (target.source === 'registry' && target.registryRoute !== null) {
+      engine.registry.setGlobalOverride(toProviderOverride(target.registryRoute.selection, providerVersion))
       // 不许静默生效：留痕把 providerId 与实际出站端点并排写出（注册表落地后二者强制一致）。
       console.log(
-        tierRouteTraceLine(tierRoute, {
+        tierRouteTraceLine(target.registryRoute, {
           defaultProviderId,
           endpointBaseUrl: effectiveEndpoint.baseUrl,
         }),
       )
     }
-    real = true
 
     engine.registerCapability({
       taskType: 'CHAPTER_DRAFTING',
@@ -256,9 +351,6 @@ async function makeStreamEngine(
       providerVersion,
       failurePolicy: { timeoutMs: 60_000, fallbackProviderIds: [] },
     })
-    if (tierRoute !== null) {
-      engine.registry.setGlobalOverride(toProviderOverride(tierRoute.selection, providerVersion))
-    }
     engine.registerProviderBinding(
       providerId,
       makeDraftProviderBinding({
@@ -295,18 +387,18 @@ async function makeStreamEngine(
 
 /** 零增量流夹具：正常结束、一个 delta 都不发——等价于上游静默空输出。 */
 
-export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
+export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal, authorizedBook }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
 
   if (path === '/api/session.open') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (root === null || chapterIndex === null) {
-      json(400, { ok: false, error: 'root and chapterIndex required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     try {
       const session = ChapterProductionSession.start({ bus: new PublishBus(), root, chapterIndex })
       json(200, { ok: true, taskRef: session.taskRef, currentStep: session.currentStep, chapterIndex })
@@ -317,15 +409,16 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/session.advance') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (root === null || chapterIndex === null) {
-      json(400, { ok: false, error: 'root and chapterIndex required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     const session = ChapterProductionSession.resume({ bus: new PublishBus(), root, chapterIndex })
     if (session === null) {
-      json(409, { ok: false, error: 'chapter ' + chapterIndex + ' has no open production session' })
+      const contract = noOpenProductionSessionError(chapterIndex)
+      json(contract.status, { ok: false, code: contract.code, error: contract.error })
       return true
     }
     try {
@@ -357,15 +450,15 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
    * 调用清理）；reason 落账留痕（缺省 author_abandoned），显式给空串即 400。
    */
   if (path === '/api/session.abandon') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (root === null || chapterIndex === null || chapterIndex < 1) {
-      json(400, { ok: false, error: 'root and integer chapterIndex >= 1 required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     const rawReason = body['reason']
     if (rawReason !== undefined && (typeof rawReason !== 'string' || rawReason.trim().length === 0)) {
-      json(400, { ok: false, error: 'reason must be a non-empty string when provided' })
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'reason must be a non-empty string when provided' })
       return true
     }
     const reason = typeof rawReason === 'string' ? rawReason.trim() : 'author_abandoned'
@@ -382,7 +475,18 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/capabilities') {
-    json(200, { ok: true, capabilities: DIALOGUE_CAPABILITIES, providerAvailable: await hasDraftProvider(process.env, principal?.userId) })
+    // providerAvailable 保持原义（布尔），**新增** providerUnavailableReason / providerDetail /
+    // providerBlockedHost 三个字段供 UI 分流指引。加法而非替换：既有消费方（含契约测试）
+    // 读 providerAvailable 继续成立。字段只带出解析缝已经算好的结论，不新增任何判定。
+    const availability = await draftProviderAvailability(process.env, principal?.userId)
+    json(200, {
+      ok: true,
+      capabilities: DIALOGUE_CAPABILITIES,
+      providerAvailable: availability.available,
+      providerUnavailableReason: availability.available ? null : availability.reason,
+      providerDetail: availability.detail,
+      providerBlockedHost: availability.blockedHost ?? null,
+    })
     return true
   }
 
@@ -418,8 +522,12 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/draft.stream') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root: safeRoot, chapterIndex } = decoded.value
     const rawPrompt = typeof body['prompt'] === 'string' ? body['prompt'].trim() : ''
     const activeSkills = Array.isArray(body['activeSkills'])
       ? (body['activeSkills'] as unknown[]).filter((entry): entry is string => typeof entry === 'string')
@@ -440,23 +548,25 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         ? { from: Number(rawSelection.from), to: Number(rawSelection.to), selectedTextHash: String(rawSelection.selectedTextHash) }
         : undefined
 
-    if (root === null || chapterIndex === null || !Number.isInteger(chapterIndex) || chapterIndex < 1) {
-      json(400, { ok: false, error: 'valid root and chapterIndex required' })
-      return true
-    }
-    const safeRoot = assertSafeBookRoot(root)
     if (mode === 'replace-selection') {
       if (!selection || !Number.isInteger(selection.from) || !Number.isInteger(selection.to) || selection.from < 0 || selection.to < selection.from) {
-        json(400, { ok: false, error: 'replace-selection requires valid selection { from, to, selectedTextHash }' })
+        json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'replace-selection requires valid selection { from, to, selectedTextHash }' })
         return true
       }
     }
 
-    if (!(await hasDraftProvider(process.env, principal?.userId))) {
-      // 覆盖层文件存在却判否 ⇒ 是「配了但解析不出来」，不是「没配任何 provider」。
-      // 放行进真实分支，让 resolveDraftTierRoute / resolveTierEndpoint 抛出带键路径的精确
-      // 错误（NDJSON error 帧），而不是用笼统的 PROVIDER_UNAVAILABLE 掩盖病因。
-      if (!existsSync(tierConfigPath())) {
+    if (!isMockDraftProviderMode(process.env)) {
+      // 工单06：闸与真实生成走**同一个**解析缝（resolveGenerationTarget）。
+      // 仅「真没配任何 provider」（no_provider_configured）才用笼统 PROVIDER_UNAVAILABLE 收口；
+      // 「配了但解析不出来」（provider_config_invalid，注册表带键路径的病因 / BYOK 端点未过
+      // 门禁）放行进真实分支，让 makeStreamEngine 的同一次解析抛出带原因的精确错误帧
+      // （NDJSON error 帧），而不是用笼统码掩盖病因。
+      const probe = await resolveGenerationTarget({
+        taskType: DRAFT_TASK_TYPE,
+        principal: principal ?? undefined,
+        env: process.env,
+      })
+      if (!probe.available && probe.reason === 'no_provider_configured') {
         json(200, {
           ok: false,
           code: PROVIDER_UNAVAILABLE,
@@ -469,6 +579,15 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
     const ndjson = (payload: unknown) => { res.write(JSON.stringify(payload) + '\n') }
+
+    // 脚手架补齐排在设置流头**之前**：NDJSON 的 error 帧需要可写响应头；若建章本身
+    // 失败，交给下方 try/catch 之前的既有 HTTP 错误通道如实报出（不被流语义吞掉）。
+    try {
+      await ensureChapterScaffold(safeRoot, chapterIndex, authorizedBook?.bookId ?? safeRoot)
+    } catch (error) {
+      json(500, { ok: false, code: CHAPTER_SCAFFOLD_FAILED, error: (error as Error).message })
+      return true
+    }
 
     try {
       const context = await buildDraftContext({ root: safeRoot, chapterIndex, authorPrompt })
@@ -550,12 +669,12 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     const root = resolvedRoot
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
     if (root === null || candidateId === null) {
-      json(400, { ok: false, error: 'root and candidateId required' })
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root and candidateId required' })
       return true
     }
     const candidate = readDraftCandidate(assertSafeBookRoot(root), candidateId)
     if (candidate === null) {
-      json(404, { ok: false, code: 'CANDIDATE_NOT_FOUND', error: 'candidate not found' })
+      json(404, { ok: false, code: CANDIDATE_NOT_FOUND, error: 'candidate not found' })
       return true
     }
     json(200, { ok: true, candidate })
@@ -566,7 +685,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     const root = resolvedRoot
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
     if (root === null || candidateId === null) {
-      json(400, { ok: false, error: 'root and candidateId required' })
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root and candidateId required' })
       return true
     }
     try {
@@ -579,25 +698,32 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/draft.accept') {
-    const root = resolvedRoot
+    // 章号在此端点是**可选**的：候选自身带 chapterIndex，请求方不带即采信候选的
+    // （draft-accept.ts:206 会在双方都带时核对身份）。带了就必须满足 ≥1 整数的冻结规则。
+    const decoded = decodeBookRequest(body, resolvedRoot, { chapter: 'optional', principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
     const idempotencyKey = typeof body['idempotencyKey'] === 'string' ? body['idempotencyKey'] : null
     const rawBase = body['base'] as { revision?: unknown; sha256?: unknown } | undefined
-    if (root === null || candidateId === null || idempotencyKey === null || rawBase === null || typeof rawBase !== 'object') {
-      json(400, { ok: false, error: 'root, candidateId, base and idempotencyKey required' })
+    if (candidateId === null || idempotencyKey === null || rawBase === null || typeof rawBase !== 'object') {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root, candidateId, base and idempotencyKey required' })
       return true
     }
     const bookId = typeof body['bookId'] === 'string' ? body['bookId'] : undefined
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : undefined
+    const requestedChapterIndex = chapterIndex ?? undefined
     const allowPartial = Boolean(body['allowPartial'] ?? body['confirmPartial'])
     try {
       const result = acceptDraft({
-        bookRoot: assertSafeBookRoot(root),
+        bookRoot: root,
         candidateId,
         base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
         idempotencyKey,
         bookId,
-        chapterIndex,
+        chapterIndex: requestedChapterIndex,
         allowPartial,
         confirmPartial: allowPartial,
       })
@@ -622,15 +748,16 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
 
   /* ---- 文学质量审查与回炉 ---- */
   if (path === '/api/chapter.review') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (root === null || chapterIndex === null) {
-      json(400, { ok: false, error: 'root and chapterIndex required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     const session = ChapterProductionSession.resume({ bus: new PublishBus(), root, chapterIndex })
     if (session === null) {
-      json(409, { ok: false, error: 'chapter ' + chapterIndex + ' has no open production session' })
+      const contract = noOpenProductionSessionError(chapterIndex)
+      json(contract.status, { ok: false, code: contract.code, error: contract.error })
       return true
     }
     if (session.currentStep === 'draft') session.advance('review')
@@ -645,7 +772,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     if (compiledAnchor === null) {
       json(409, {
         ok: false,
-        code: 'NO_COMPILED_RECEIPT',
+        code: NO_COMPILED_RECEIPT,
         error:
           '第 ' + chapterIndex + ' 章没有 Context 编译凭证，无法声明评估锚点；请先生成草稿再审查（D10 不编造锚点）',
       })
@@ -692,22 +819,23 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/chapter.rework') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (root === null || chapterIndex === null) {
-      json(400, { ok: false, error: 'root and chapterIndex required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
+    const { root, chapterIndex } = decoded.value
     const session = ChapterProductionSession.resume({ bus: new PublishBus(), root, chapterIndex })
     if (session === null) {
-      json(409, { ok: false, error: 'chapter ' + chapterIndex + ' has no open production session' })
+      const contract = noOpenProductionSessionError(chapterIndex)
+      json(contract.status, { ok: false, code: contract.code, error: contract.error })
       return true
     }
     try {
       session.requestQualityRework()
     } catch (error) {
       if (error instanceof QualityReworkLimitExceededError) {
-        json(422, { ok: false, code: 'QualityReworkLimitExceeded', error: error.message })
+        json(422, { ok: false, code: QUALITY_REWORK_LIMIT_EXCEEDED, error: error.message })
         return true
       }
       throw error
@@ -717,13 +845,17 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/chapter.corrections') {
-    const root = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
     const reasons = Array.isArray(body['reasons']) ? (body['reasons'] as string[]) : []
     const note = typeof body['note'] === 'string' ? body['note'] : undefined
 
-    if (root === null || chapterIndex === null || reasons.length === 0) {
-      json(400, { ok: false, error: 'root, chapterIndex, and non-empty reasons required' })
+    if (reasons.length === 0) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root, chapterIndex, and non-empty reasons required' })
       return true
     }
 
@@ -732,7 +864,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
 
     const invalid = reasons.filter((r) => !isCorrectionReason(r))
     if (invalid.length > 0) {
-      json(400, { ok: false, error: 'invalid correction reasons: ' + invalid.map(String).join(', ') })
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'invalid correction reasons: ' + invalid.map(String).join(', ') })
       return true
     }
 
@@ -758,13 +890,12 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
   }
 
   if (path === '/api/chapter.quality') {
-    const rawRoot = resolvedRoot
-    const chapterIndex = typeof body['chapterIndex'] === 'number' ? body['chapterIndex'] : null
-    if (rawRoot === null || chapterIndex === null) {
-      json(400, { ok: false, error: 'root and chapterIndex required' })
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
       return true
     }
-    const root = assertSafeBookRoot(rawRoot)
+    const { root, chapterIndex } = decoded.value
 
     // 章节文件不存在（新书/未建章）≠ 结构违例：诚实返回 no_review，而非 500。
     let draftIdentity: { draftRevision: number; draftContentHash: string }
@@ -874,7 +1005,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       })
     } catch (error) {
       if (error instanceof ProposalPortError) {
-        json(409, { ok: false, code: 'PROPOSAL_DECISION_REJECTED', error: error.message })
+        json(409, { ok: false, code: PROPOSAL_DECISION_REJECTED, error: error.message })
         return true
       }
       json(500, { ok: false, error: (error as Error).message })
@@ -902,7 +1033,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       json(200, { ok: true, discarded: true, proposal: record === null ? null : canonProposalView(record) })
     } catch (error) {
       if (error instanceof ProposalPortError) {
-        json(409, { ok: false, code: 'PROPOSAL_DISCARD_REJECTED', error: error.message })
+        json(409, { ok: false, code: PROPOSAL_DISCARD_REJECTED, error: error.message })
         return true
       }
       json(500, { ok: false, error: (error as Error).message })

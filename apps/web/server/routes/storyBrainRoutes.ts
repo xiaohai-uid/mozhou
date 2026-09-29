@@ -6,11 +6,11 @@ import {
   AUTHOR_INTENT_PATH,
   TRACKING_STREAMS,
   createBook,
-  LocalDataPlane,
   readPlanningArtifact,
   readWizardAuthorIntent,
   syncPlanningArtifactRow,
-  withPlane,
+  withBook,
+  withStrictBook,
   wizardAuthorIntentEquals,
   writeWizardAuthorIntent,
 } from '@mozhou/data-plane'
@@ -28,13 +28,10 @@ import { randomBytes } from 'node:crypto'
  * 会把无关的外部漂移一并吸进基线，静默吞掉作者尚未审阅的外部改动。
  */
 function absorbAuthorIntentWrite(root: string): void {
-  const plane = LocalDataPlane.openOrRebuild(root)
-  try {
+  withBook(root, (plane) => {
     syncPlanningArtifactRow(plane.db, readPlanningArtifact(root, AUTHOR_INTENT_PATH, 'authorIntent'))
     plane.absorbAppWrite([AUTHOR_INTENT_PATH])
-  } finally {
-    plane.close()
-  }
+  })
 }
 
 export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, json, principal, authorizedBook, bookRoot }) => {
@@ -75,12 +72,8 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
       return true
     }
     const root = assertSafeBookRoot(rawRoot)
-    const plane = LocalDataPlane.openOrRebuild(root)
-    try {
-      json(200, { ok: true, state: plane.getCanonState() })
-    } finally {
-      plane.close()
-    }
+    const state = withBook(root, (plane) => plane.getCanonState())
+    json(200, { ok: true, state })
     return true
   }
 
@@ -96,13 +89,14 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
       opening: typeof body['opening'] === 'string' ? body['opening'] : '',
       firstChapterGoal: typeof body['firstChapterGoal'] === 'string' ? body['firstChapterGoal'] : '',
     }
-    const values = Object.values(fields)
+    const values = [fields.worldRule, fields.volumePromise, fields.opening, fields.firstChapterGoal]
     if (values.some((value) => value.length > 20_000)) {
       json(413, { ok: false, error: 'author intent fields must be at most 20000 characters' })
       return true
     }
     const bookKey = authorizedBook?.bookId ?? root
     await defaultBookAccessManager.queue.withBookLock(bookKey, async () => {
+      await Promise.resolve()
       try {
         const revision = writeWizardAuthorIntent(root, fields)
         // S4 增量收口：只吸收本次应用写入的这一个文件（含 planning_artifacts 行同步），
@@ -140,7 +134,7 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
       return true
     }
     const root = assertSafeBookRoot(rawRoot)
-    const cards = withPlane(root, (plane) => plane.getEntityCards())
+    const cards = withStrictBook(root, (plane) => plane.getEntityCards())
     json(200, { ok: true, cards })
     return true
   }
@@ -174,17 +168,14 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
     const ref = `${cardType}:${safeSlug}` as EntityRef
 
     try {
-      const plane = LocalDataPlane.open(root)
-      try {
-        const card = plane.saveEntityCard(ref, {
+      const card = withStrictBook(root, (plane) =>
+        plane.saveEntityCard(ref, {
           name,
           brief,
           body: details.length > 0 ? `# ${name}\n\n${details}\n` : `# ${name}\n`,
-        })
-        json(200, { ok: true, card })
-      } finally {
-        plane.close()
-      }
+        }),
+      )
+      json(200, { ok: true, card })
     } catch (err) {
       json(500, { ok: false, error: (err as Error).message })
     }
@@ -201,7 +192,7 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
     const rawEntityIds = Array.isArray(body['entityIds']) ? body['entityIds'] : []
     const entityIds = rawEntityIds.filter((r): r is EntityRef => typeof r === 'string' && r.length > 0)
 
-    const overview = withPlane(root, (plane) => plane.queryStoryBrain({ entityIds }))
+    const overview = withStrictBook(root, (plane) => plane.queryStoryBrain({ entityIds }))
     json(200, {
       ok: true,
       ...overview,
@@ -251,12 +242,9 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
     appendFileSync(promiseFile, `${JSON.stringify(contractRecord)}\n`, 'utf8')
     // 应用自己的写入必须并入基线（S4）：否则下次对账会把这行契约误判为
     // EXTERNAL_MODIFIED，作者刚建完契约就收到一条伪冲突提案。
-    const plane = LocalDataPlane.openOrRebuild(root)
-    try {
+    withBook(root, (plane) => {
       plane.absorbAppWrite([promiseStream.path])
-    } finally {
-      plane.close()
-    }
+    })
 
     json(200, { ok: true, contractId, contract: contractRecord })
     return true
