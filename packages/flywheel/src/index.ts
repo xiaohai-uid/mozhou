@@ -146,3 +146,94 @@ export { runSemanticBatch } from './semantic/batch.js';
 export type { RunSemanticBatchRequest, SemanticBatchItem, SemanticBatchOutcome } from './semantic/batch.js';
 export { selectSemanticAnalysisRows } from './semantic/projection.js';
 export type { SemanticAnalysisRow } from './semantic/projection.js';
+
+/**
+ * 评测子系统（T24 · #57；t53 裁决 C1–C7）：只读投影 → cell 六信号 → 五规则判定 →
+ * RoutingSuggestion 落 .mozhou/suggestions/suggestions.jsonl。
+ *
+ * 此前该子树**未从本文件再导出**，因此全仓没有消费者（图谱与
+ * `pnpm audit:unreferenced` 双证：`readSuggestions` 为真零引用）。
+ * 本段把它接成包的一等公开面——这是 t53 附B「接线」的前半。
+ */
+export {
+  DEMOTE_FAILURE_RATIO,
+  DEMOTE_MIN_WINDOWS,
+  EDIT_RATIO_FLOOR,
+  EDIT_RATIO_REL_REDUCTION,
+  EVAL_MIN_CHAPTER_WINDOWS,
+  EVAL_MIN_DECISIONS,
+  WILSON_Z_95,
+  WINDOW_MAX_DECISIONS,
+  WINDOW_SPAN_DAYS,
+  WINDOW_SPAN_MS,
+  cellIdOf,
+  emptySignals,
+} from './evaluator/types.js';
+export type {
+  CellKey,
+  CellSignals,
+  RoutingSuggestion,
+  SuggestionKind,
+  SuggestionStatus,
+} from './evaluator/types.js';
+
+/** Wilson 区间：五规则共用的统计底座。 */
+export { wilsonInterval } from './evaluator/wilson.js';
+
+/** 只读投影面：账本 + usage + 矩阵存档三件输入 → cell 六信号。 */
+export { aggregateSignals, distinctChapters, projectInputs } from './evaluator/project.js';
+export type {
+  CorrectionFact,
+  DecisionFact,
+  GenerationFact,
+  ProjectionInput,
+  ProjectionOutput,
+  SignalSlice,
+  UnattributedRoute,
+  WindowFact,
+} from './evaluator/project.js';
+
+/** 建议物存储面（派生面，账本零字节触碰）+ 基准矩阵存档读取。 */
+export {
+  MATRIX_ROWS_RELPATH,
+  SUGGESTIONS_DIR,
+  SUGGESTIONS_RELPATH,
+  appendSuggestions,
+  matrixRowRefFor,
+  readMatrixRowArchive,
+  readSuggestions,
+} from './evaluator/storage.js';
+export type { ArchivedMatrixRow } from './evaluator/storage.js';
+
+/** 阈值引擎：五规则判定 + 资格门 + 地板效应条款。 */
+export {
+  acceptanceWilson,
+  baselineFailureRate,
+  buildArchiveView,
+  cutConfirmationWindows,
+  cutWindowsOfPositionOrdered,
+  eligibilityOf,
+  failureRateOf,
+  gateStreakFailed,
+  judgeDemotion,
+  judgePair,
+  rowGatePassedAll,
+  s2Condition,
+  userEditReductionOf,
+  withArchiveSignals,
+} from './evaluator/thresholds.js';
+export type {
+  ArchiveView,
+  ConfirmationWindows,
+  EligibilityEvidence,
+  PairEvidence,
+  PairJudgement,
+} from './evaluator/thresholds.js';
+
+/** 编排入口：评估一次并落盘建议面（纯读输入 + 单一追加写出口）。 */
+export { runTaskModelEvaluation } from './evaluator/run.js';
+export type { RunTaskModelEvaluationRequest, TaskModelEvaluationOutcome } from './evaluator/run.js';
+
+/** 建议确认核心（t53 附B 第 4 步）：纯配置变换，作者显式确认用；不自动改路由。 */
+export { confirmRoutingSuggestion } from './evaluator/confirm.js';
+export type { ConfirmOutcome, ConfirmRejectionReason, ConfirmRequest, RouteChange } from './evaluator/confirm.js';
