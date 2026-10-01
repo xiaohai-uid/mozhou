@@ -53,3 +53,4 @@ jobs:
         run: |
           pnpm run check:glossary
           pnpm run check:architecture
+          pnpm run check:gates

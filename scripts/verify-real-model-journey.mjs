@@ -13,6 +13,10 @@
  *   （或 OPENAI_API_KEY / MOZHOU_API_KEY；可选 MOZHOU_API_BASE / MOZHOU_MODEL）
  *
  * 未配置密钥时：如实写出 BLOCKED 证据并以 0 退出——不伪造成功，也不假装跑过。
+ *
+ * --strict：让 BLOCKED 以退出码 2 结束，使自动化能把它读成「没跑」而不是「跑过且通过」。
+ *   不带该参数时行为与 result.json / run.log / stdout 逐字节不变。
+ *   约定全文见 docs/gates.md。
  */
 import { execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,6 +26,13 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = resolve(__dirname, '..');
+
+// --strict：BLOCKED 时以非 0 退出，供 CI / 自动化区分「没跑」与「跑过」。
+// 不带该参数时，下面两行与改动前完全相同，故默认输出逐字节不变。
+const STRICT = process.argv.includes('--strict');
+const BLOCKED_EXIT_CODE = STRICT ? 2 : 0;
+const INVOKED_COMMAND =
+  'node scripts/verify-real-model-journey.mjs' + (STRICT ? ' --strict' : '');
 
 const SERVER_PORT = Number(process.env.MOZHOU_VERIFY_PORT ?? 5199);
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
@@ -65,15 +76,20 @@ if (!apiKey) {
     status: 'BLOCKED',
     reason: 'NO_REAL_MODEL_CREDENTIAL',
     sourceCommit: sourceCommit(),
-    command: 'node scripts/verify-real-model-journey.mjs',
-    exitCode: 0,
+    command: INVOKED_COMMAND,
+    exitCode: BLOCKED_EXIT_CODE,
     scope: '真实模型端到端旅程（建书 → 建章 → 真实流式生成 → 采纳候选 → 定稿提交）',
     limitations: [
       '未配置真实模型密钥，旅程未执行：本次运行不构成任何真实生成能力的证据。',
       '配置 DEEPSEEK_API_KEY（或 OPENAI_API_KEY / MOZHOU_API_KEY）后重跑本脚本方可取证。',
+      ...(STRICT
+        ? [
+            '已启用 --strict：BLOCKED 的退出码为 2（非 0），使自动化能把它读成「没跑」而非「跑过」。不带该参数时退出码为 0。约定见 docs/gates.md。',
+          ]
+        : []),
     ],
   });
-  process.exit(0);
+  process.exit(BLOCKED_EXIT_CODE);
 }
 
 const { createBook, LocalDataPlane } = await import(
