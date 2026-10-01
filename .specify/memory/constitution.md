@@ -1,3 +1,16 @@
+> ⚠️ **这是未填写的上游模板，不是本仓的工程宪法。**
+>
+> 本文件与 `.specify/templates/constitution-template.md` **逐字节相同**（SHA-256 `ce7549540fa4`），
+> 正文全是 `[PRINCIPLE_1_NAME]` 一类占位符，从未被实例化。
+>
+> 本仓真正的工程宪法是 **`AGENTS.md` §1–§8（UVSD Protocol v2.2.1 Final）**。
+>
+> spec-kit 已于 2026-10-01 被裁决降级为**产物目录**，其模板不再产生新约束
+> （见 [`docs/adr/0031-single-workflow-authority.md`](../../docs/adr/0031-single-workflow-authority.md)）。
+> 因此 `.specify/templates/plan-template.md:41` 的 Constitution Check 门是**惰性的**——
+> 它每次都在检查一份不存在的宪法。若你依赖该门，请改读 `AGENTS.md` §1–§8。
+
+---
 # [PROJECT_NAME] Constitution
 <!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
 

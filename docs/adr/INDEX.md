@@ -15,7 +15,7 @@
 
 ## 裸号速查表（`0001`–`0007`）
 
-> **这是本文件最重要的一张表。** `0001`–`0007` 每个编号对应**两条不同决策**。任何残留的裸号引用，都用这张表定位：
+> **这是本文件最重要的一张表。** 每个编号对应**两条不同决策**。任何残留裸号引用都靠它定位：
 
 | 裸号 | `K-`（内核线） | `A-`（应用线） |
 |---|---|---|
@@ -27,11 +27,13 @@
 | 0006 | Local Data Plane: Canon Files and SQLite Projection | Skill 运行时与 A 版双栏工作台 |
 | 0007 | Novel Runtime Event Architecture | 可恢复创作任务运行时 |
 
-**引用规则**：`0001`–`0007` 必须写全前缀。裸写 `ADR-0006` 是歧义。`0008` 及以后可裸写。
+**引用规则**：`0001`–`0007` 必须写全前缀；`0008` 及以后可裸写。
 
-**自动改写**：`pnpm gen:adr-refs` 按上下文标题线索机械加前缀。**判不出的引用一律不动**——宁可留歧义，也不制造错误引用。当前：30 处已改写，44 处保持原样待人工判定。
+**自动改写**：`pnpm gen:adr-refs` 按上下文标题线索机械加前缀，**判不出的一律不动**。当前 30 处已改写。
 
-> **已知误判并已修正**：脚本曾把 `docs/research/t30-d-upstream-convergence.md:36`（原文写「直接对应内核线 NovelRuntime」）判成 `A-0007`，实际应为 `K-0007`；已修正为 `K`。关键词匹配的固有局限记录在此。
+> **已知误判并已修正**：脚本曾把 `docs/research/t30-d-upstream-convergence.md:36`（原文写「直接对应内核线 NovelRuntime」）判成 `A-0007`，实为 `K-0007`；已修正。`0024:18` 的 `候选生命周期在 ADR-0002/0014` 属真歧义（K-0002 与 A-0002 都讲候选生命周期），已**退回裸号**。
+
+**门禁**：`pnpm run check:glossary` 统计裸号数量并与预算比对（当前 **54 / 54，只许减不许增**），已接入 CI。
 
 ## 内核线（K-）
 
@@ -93,28 +95,30 @@
 
 | 编号 | 决定了什么 | 执行结果 |
 |---|---|---|
-| 0031 | mattpocock/skills 是唯一流程权威 | `AGENTS.md` 两块合一 + §0 优先级规则；`.zcode/skills/` 10 个副本已删 |
+| 0031 | mattpocock/skills 是唯一流程权威 | `AGENTS.md` 两块合一 + §0 优先级规则；`.zcode/skills/` 10 个副本已删；`.specify/memory/constitution.md` 已加警示横幅 |
 | 0032 | `CONTEXT.md` → `GLOSSARY.md` | 459 行 / 88 词条 / 88 条 `_Avoid_`；27 个文件引用改写；`CONTEXT.md` 已退役 |
-| 0033 | `K-` / `A-` 前缀消歧 | 14 文件重命名；30 处交叉引用加前缀；44 处留待人工 |
-| 0034 | 执行状态 = GitHub，规格决策 = 本地 | `docs/agents/issue-tracker.md` 空白备档节已填 |
+| 0033 | `K-` / `A-` 前缀消歧 | 14 文件重命名；30 处交叉引用加前缀 |
+| 0034 | 执行状态 = GitHub，规格决策 = 本地 | `docs/agents/issue-tracker.md` 空白备档节已填；**实测纠正「74 个带 status」为 9/74** |
+
+## 门禁（均已接入 CI）
+
+| 命令 | 检查什么 | 失效方式 |
+|---|---|---|
+| `pnpm run check:glossary` | 术语单一权威：GLOSSARY 存在且每词条有 `_Avoid_`；`CONTEXT.md` 不复现；AGENTS 流程块唯一；ADR 文件名无裸号；裸号引用不超预算 | exit 1 |
+| `pnpm run check:architecture` | `docs/architecture.md` 与生成器输出逐字一致 | exit 1 |
+| `pnpm run gen:adr-refs` | 把可判定的裸 `ADR-000X` 改写为 `K-`/`A-` 前缀 | 判不出则不动 |
+| `pnpm run gen:architecture` | 重建架构地图 | — |
+
+> 两个门禁都**实测过会失败**：加一处歧义引用 → glossary 门 exit 1；手动改架构地图 → architecture 门 exit 1。
 
 ## 挂账项
 
-| # | 事项 | 状态 |
+| # | 事项 | 状态与证据 |
 |---|---|---|
-| 1 | 74 个 `.scratch/*/issues/*.md` 的 `status` frontmatter 迁移方案 | **未决** — 需先定迁移策略；清理会改写历史归档 |
-| 2 | `.claude/skills/` 6 个 gitnexus 副本 | **保留** — 它是 Claude Code 读项目技能的唯一路径，该回退行为在此环境**无法验证**，删错会静默丢失 6 个技能 |
-| 3 | `.mimosa/` 保留期策略（122,160 文件 / 954 MB，`hook-state/` 占 121,980） | **未决** — 它是本仓唯一在执行的机器门禁，无 README / manifest / 保留期 |
-| 4 | `apps/web/src/code-graph/codeGraphSnapshot.ts`（8,295 行已提交生成物） | **未决** — 属代码层裁决 |
-| 5 | 代码层重复裁决（两套 tier router、同一 24 MB BGE 两处加载、7 个独立 store、3 个生产启动器、3 套 UI CSS 并存） | **未决** — 多数是有意的分层成本；「零消费者」是死代码还是未接线，处置相反 |
-| 6 | 44 处未判定的 ADR 交叉引用 | **未决** — 需人工按速查表逐条判定 |
+| 1 | ~~74 个本地工单的 status frontmatter 迁移~~ | **已裁决**（ADR-0034）— 实测只有 **9 / 74** 且同属 `mozhou-deepening-20260928` 单一批次，改为整批冻结，无需逐文件迁移 |
+| 2 | `.claude/skills/` 6 个 gitnexus 副本 | **保留** — 它是 Claude Code 读项目技能的唯一路径，该回退行为**未验证**；已在 `.claude/skills/README.md` 写明「两份都别手工改」+ 一致性核验命令 |
+| 3 | `.mimosa/` 保留期 | **方案已成型，待你点头**。实测：`hook-state/` = 121,980 文件 / 953.1 MB，占全目录 **99.9%**；其下 85 个子目录形如 `sess_<uuid>.<hash>.baseline`，是**逐 actor 的基线快照**；最新写入 **2026-09-30 13:05**，距今约 32 小时无活动；在 `~/.claude`、`~/.dsh`、`~/.agents`、`~/.codex`、winclaw（深度 3）**均未找到 mimosa 配置**。<br>**建议**：保留 `reports/`(49) + `finding-ledger/`(50) + `history/`(37) + `hook-status/`(44) = 180 文件 / ~0.9 MB（有审计证据价值），归档或删除 `hook-state/`（**可释放约 953 MB**）。**未执行**——「未找到配置」不等于「已卸载」，且你 Q12 明确要求先定保留期再动手 |
+| 4 | `apps/web/src/code-graph/codeGraphSnapshot.ts`（8,295 行已提交生成物） | **未决** — 需你跑一次 `pnpm graph:snapshot` 让它自然重生成 |
+| 5 | 代码层重复裁决 | **未决** — 需逐项判断「有意的分层成本」还是「真重复」；见 `docs/adr/CODE-DUPLICATION-INVENTORY.md` |
+| 6 | 44 处未判定的 ADR 交叉引用 | **未决** — 门禁已锁住预算（54 / 54），只许减不许增 |
 | 7 | 0029 / 0030 标题格式与其余 35 条不一致 | **未决** — 无实质影响 |
-
-## 已完成清理
-
-| 对象 | 结果 |
-|---|---|
-| `release-artifacts/` | 93,004 文件 / 6,079 MB — 已删（gitignored、0 tracked，可由 `pnpm build:release` 重建） |
-| `.dsh-audit/` | 22,479 文件 / 251 MB — 已删（同上） |
-| `.zcode/skills/` | 10 个未跟踪重复 skill — 已删（SHA-256 与 `.agents/skills/` 完全相同） |
-| **仓库总体积** | **7.78 GB → 1.59 GB** |

@@ -47,3 +47,9 @@ jobs:
         run: pnpm --filter @mozhou/web test
       - name: Build apps/web (vite)
         run: pnpm --filter @mozhou/web build
+      # 文档门禁：术语单一权威 + 架构地图新鲜度。
+      # 二者都是「只许变好」的检查，失败即阻断合并。
+      - name: Doc gates (glossary authority + architecture freshness)
+        run: |
+          pnpm run check:glossary
+          pnpm run check:architecture

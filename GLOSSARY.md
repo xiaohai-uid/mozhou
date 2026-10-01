@@ -453,7 +453,7 @@ _Avoid_: 工作台、workbench
 
 ## 已知存量违规（待迁移，不阻塞使用）
 
-1. **74 个 `.scratch/*/issues/*.md` 带 `status: ready-for-agent` 等状态 frontmatter**——按 Part 2 §2.1，状态应只存在于 GitHub 议题。存量暂不改写，迁移方案见 `docs/adr/` 对应记录。
+1. **9 个 `.scratch/mozhou-deepening-20260928/issues/*.md` 带 `status` frontmatter**（8 个 `ready-for-agent` + 1 个 `wontfix`），其余 65 个本地规格文档**没有**该字段，74 个中仅 32 个进 git。按 Part 2 §2.1，状态只应存在于 GitHub 议题，故这 9 个字段无权威。该批次已冻结（见 ADR-0034）。
 2. **4 处"闸门"**（Part 2 §2.2 已列）。
 3. **三套工单 ID 方案并存**：本地 `NN-<slug>`、speckit `[ID] [P?]`、GitHub `#31`。规范只剩 GitHub `#31`。
 4. **两套"造什么"权威**：`AGENTS.md` §1（User journeys define product scope）与 `specs/*/spec.md`（User Scenarios）互不引用。规范权威是 `AGENTS.md` §1。
