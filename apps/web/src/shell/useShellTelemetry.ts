@@ -4,7 +4,7 @@
  * 供 Pipeline 六态与检视摘要轨消费。全部失败容忍（allSettled）——
  * 任一面不可用只降级为 '—'，不阻塞壳层。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { post } from '../lib/post'
 import type { WorksOverviewResponse, ReceiptListItem } from '../../server/api'
 import type { MatrixRowsLite, QualityStatusLite } from './shellTelemetry'
@@ -19,8 +19,10 @@ const EMPTY: ShellTelemetry = { works: null, receipts: [], quality: null, matrix
 
 export function useShellTelemetry(root: string | null, chapterIndex: number): ShellTelemetry {
   const [telemetry, setTelemetry] = useState<ShellTelemetry>(EMPTY)
+  const refreshIdRef = useRef(0)
 
   const refresh = useCallback(async (): Promise<void> => {
+    const refreshId = ++refreshIdRef.current
     if (root === null) {
       setTelemetry(EMPTY)
       return
@@ -31,6 +33,8 @@ export function useShellTelemetry(root: string | null, chapterIndex: number): Sh
       post<QualityStatusLite & { ok: boolean }>('/api/chapter.quality', { root, chapterIndex }),
       post<{ ok: boolean; matrix: MatrixRowsLite }>('/api/change-matrix', { root }),
     ])
+    // 采纳/撤销会重叠刷新；迟到的旧结果不能覆盖新书章或更新的版本。
+    if (refreshId !== refreshIdRef.current) return
     // 载荷归一化：字段缺失（如测试桩/降级面）不得让壳层崩溃。
     setTelemetry({
       works: works.status === 'fulfilled' && Array.isArray(works.value?.chapters) ? works.value : null,
@@ -45,7 +49,9 @@ export function useShellTelemetry(root: string | null, chapterIndex: number): Sh
   }, [root, chapterIndex])
 
   useEffect(() => {
+    setTelemetry(EMPTY)
     void refresh()
+    return () => { ++refreshIdRef.current }
   }, [refresh])
 
   /** 写作层落盘（ProseEditorPanel Accept）→ 遥测即时重验（works 相位/质量时效变化）。 */

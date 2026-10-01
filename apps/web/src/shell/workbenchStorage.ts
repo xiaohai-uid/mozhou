@@ -4,6 +4,7 @@
  */
 import { isViewId } from './views'
 import type { ViewId } from './views'
+import { syncSha256Hex } from '../workbench/lib/sha256'
 
 export interface BookInfo {
   readonly root: string
@@ -18,6 +19,7 @@ export interface WorkbenchState {
 
 const STORAGE_KEY = 'mozhou.workbench.v1'
 const DRAFT_CACHE_KEY = 'mozhou.draft.cache'
+const DRAFT_BASELINE_KEY = 'mozhou.draft.baseline'
 
 export const DEFAULT_WORKBENCH_STATE: WorkbenchState = { book: null, view: 'workbench' }
 
@@ -81,6 +83,26 @@ export function saveDraftCache(text: string, chapterKey: DraftCacheKey): void {
   }
 }
 
+/** 只在成功保存或服务端回填时记录；编辑输入不会改变保存基线。 */
+export function saveDraftBaseline(text: string, chapterKey: DraftCacheKey): void {
+  if (chapterKey === null) return
+  try {
+    window.localStorage.setItem(`${DRAFT_BASELINE_KEY}.${chapterKey}`, syncSha256Hex(text))
+  } catch {
+    // 基线不可用时按未保存草稿处理，保留本地文字。
+  }
+}
+
+/** 无基线的历史缓存保守地按作者未保存文字处理。 */
+export function draftCacheMatchesBaseline(text: string, chapterKey: DraftCacheKey): boolean {
+  if (chapterKey === null) return false
+  try {
+    return window.localStorage.getItem(`${DRAFT_BASELINE_KEY}.${chapterKey}`) === syncSha256Hex(text)
+  } catch {
+    return false
+  }
+}
+
 /** 章维度草稿缓存键唯一出处（写作层/对话流/移动阅读面共用，禁止再内联）。
  *  书身份取 bookId（服务端 ULID，随书目持久化），缺失时以 root 兜底；两者皆空
  *  返回 null——无身份内容不得写入或读出任何缓存槽。 */
@@ -100,6 +122,7 @@ export interface CandidateCache {
   readonly mode: 'replace' | 'continue' | 'insert' | 'replace-selection'
   readonly draftText: string
   readonly phase: 'draft_done' | 'drafting' | 'answered'
+  readonly partial?: boolean | undefined
 }
 
 export function candidateDraftKey(

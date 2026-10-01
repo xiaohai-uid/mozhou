@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { post } from '../../lib/post'
 import { NovelEditorCanvas } from './NovelEditorCanvas'
 import { EditorQualityTelemetry } from './EditorQualityTelemetry'
-import { chapterDraftKey, loadDraftCache, saveDraftCache } from '../../shell/workbenchStorage'
+import { chapterDraftKey, draftCacheMatchesBaseline, loadDraftCache, saveDraftBaseline, saveDraftCache } from '../../shell/workbenchStorage'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ChapterProseResponse, ChapterProseSaveResponse } from '../../../server/api'
 
@@ -36,24 +36,21 @@ type Snapshot =
   | { kind: 'ready'; revision: number; phase: 'draft' | 'committed'; commitId: string | undefined; body: string }
   | { kind: 'unavailable' }
 
-export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: ProseEditorPanelProps): JSX.Element {
+export function ProseEditorPanel(props: ProseEditorPanelProps): JSX.Element {
+  // 正文与版本快照属于同一个书章会话；切换时一起重建，禁止旧快照回填新缓存。
+  const sessionKey = JSON.stringify([props.book?.root, props.book?.bookId, props.chapterIndex])
+  return <ProseEditorSession key={sessionKey} {...props} />
+}
+
+function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEditorPanelProps): JSX.Element {
   // T00：缓存键绑定书身份——切书（含同章号）必须重载对应书的草稿；未绑书不读缓存。
   const draftKey = book !== null ? chapterDraftKey(book, chapterIndex) : null
   const [text, setText] = useState(() => loadDraftCache(draftKey))
-  const [loadedFor, setLoadedFor] = useState(draftKey)
   const [notice, setNotice] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<{ kind: 'busy' | 'ok' | 'err'; text: string } | null>(null)
   const [conflict, setConflict] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<Snapshot>({ kind: 'loading' })
   const [reloadTick, setReloadTick] = useState(0)
-
-  // 切书或切章：载入对应书章的本地 Active Draft 缓存
-  if (loadedFor !== draftKey) {
-    setLoadedFor(draftKey)
-    setText(loadDraftCache(draftKey))
-    setNotice(null)
-    setConflict(null)
-  }
 
   const root = book?.root ?? null
 
@@ -103,8 +100,10 @@ export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: Pros
   // 本地缓存为空且服务端有正文：先回填显示（作者保存前必然读过所覆盖的内容）
   useEffect(() => {
     if (draftKey === null || snapshot.kind !== 'ready' || snapshot.body.trim() === '') return
-    if (loadDraftCache(draftKey).trim() !== '') return // 作者已有工作文本（含读取期间的新键入）
+    const cached = loadDraftCache(draftKey)
+    if (cached.trim() !== '' && !draftCacheMatchesBaseline(cached, draftKey)) return
     saveDraftCache(snapshot.body, draftKey)
+    saveDraftBaseline(snapshot.body, draftKey)
     setText(snapshot.body)
   }, [draftKey, snapshot])
 
@@ -139,6 +138,7 @@ export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: Pros
         '/api/chapter.prose.save',
         { root: book.root, chapterIndex, body: text, title: book.title, expectedRevision, confirmExternalOverwrite },
       )
+      saveDraftBaseline(text, draftKey)
       setConflict(null)
       setSaveState({
         kind: 'ok',
@@ -161,7 +161,7 @@ export function ProseEditorPanel({ book, chapterIndex, onSelectionChange }: Pros
       }
       setSaveState({ kind: 'err', text: `落盘失败：${error.message}` })
     }
-  }, [book, chapterIndex, text])
+  }, [book, chapterIndex, draftKey, text])
 
   /** Accept → Active Draft：按快照选预期版本（missing=null 新建；draft=所读 revision）。 */
   const saveAsDraft = useCallback(async (): Promise<void> => {

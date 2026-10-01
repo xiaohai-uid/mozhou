@@ -10,6 +10,7 @@ import {
   chapterDraftKey,
   loadCandidateCache,
   saveCandidateCache,
+  saveDraftBaseline,
   saveDraftCache,
 } from '../shell/workbenchStorage'
 import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
@@ -93,6 +94,7 @@ export function DialogueStream({
    * 此前这里不看 done 的 payload，一律当完成，措辞与移动端各说各话。
    */
   const [draftTerminal, setDraftTerminal] = useState<{ partial: boolean } | null>(null)
+  const [draftStopped, setDraftStopped] = useState(false)
   /** 采纳进写作层的回执（Candidate → Accept → Active Draft 链）。 */
   const [adoptState, setAdoptState] = useState<string | null>(null)
   /** C2（T05）：候选状态（candidateId+base+mode），随流请求建立；切书/切章/重开即失效。 */
@@ -102,6 +104,7 @@ export function DialogueStream({
   /** Undo 一次可逆编辑（accept 前的盘面）。严格绑定采纳后的版本与指纹（CAS 保护）。 */
   const [undo, setUndo] = useState<AcceptUndo | null>(null)
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null)
+  const requestControllerRef = useRef<AbortController | null>(null)
   /** 发起流请求时的书/章现场：迟到响应与切书后身份不符时丢弃（T05 切书隔离）。 */
   const requestSiteRef = useRef<{ bookId: string; chapterIndex: number } | null>(null)
   const requestIdRef = useRef(0)
@@ -109,6 +112,9 @@ export function DialogueStream({
 
   useEffect(() => {
     currentSiteRef.current = { bookId: book?.bookId ?? null, chapterIndex, root: book?.root ?? null }
+    return () => {
+      currentSiteRef.current = { bookId: null, chapterIndex: 0, root: null }
+    }
   }, [book?.bookId, book?.root, chapterIndex])
 
   useEffect(() => {
@@ -132,12 +138,19 @@ export function DialogueStream({
   }, [book])
 
   useEffect(() => {
-    return () => { void readerRef.current?.cancel() }
+    return () => {
+      ++requestIdRef.current
+      requestControllerRef.current?.abort()
+      void readerRef.current?.cancel().catch(() => {})
+    }
   }, [])
 
   useEffect(() => {
     // 切书或切章：取消正在读取的流
-    void readerRef.current?.cancel()
+    ++requestIdRef.current
+    requestControllerRef.current?.abort()
+    requestControllerRef.current = null
+    void readerRef.current?.cancel().catch(() => {})
     readerRef.current = null
     requestSiteRef.current = null
 
@@ -148,17 +161,21 @@ export function DialogueStream({
       if (cached !== null) {
         setCandidate({ candidateId: cached.candidateId, base: cached.base, mode: cached.mode })
         setDraftText(cached.draftText)
-        setPhase(cached.phase)
+        setPhase(cached.phase === 'drafting' ? 'draft_done' : cached.phase)
+        setDraftTerminal({ partial: cached.partial === true || cached.phase === 'drafting' })
       } else {
         setCandidate(null)
         setDraftText('')
         setPhase('ask')
+        setDraftTerminal(null)
       }
     } else {
       setCandidate(null)
       setDraftText('')
       setPhase('ask')
+      setDraftTerminal(null)
     }
+    setDraftStopped(false)
     setStreamMeta(null)
     setAdoptState(null)
     setConflictView(null)
@@ -170,12 +187,18 @@ export function DialogueStream({
   }, [book?.bookId, book?.root, chapterIndex])
 
   const handleSend = useCallback(async (): Promise<void> => {
-    if (book === null || phase === 'drafting' || sending) return
+    if (book === null || phase === 'drafting' || sending || requestControllerRef.current !== null) return
+    const controller = new AbortController()
+    requestControllerRef.current = controller
     const prompt = answer.trim()
     setError(null)
     setSending(true)
     setPhase('drafting')
     setDraftText('')
+    setDraftTerminal(null)
+    setDraftStopped(false)
+    setStreamMeta(null)
+    saveCandidateCache(null, candidateDraftKey(book, chapterIndex))
     setCandidate(null)
     setConflictView(null)
     setUndo(null)
@@ -189,6 +212,7 @@ export function DialogueStream({
 
     try {
       const res = await fetch('/api/draft.stream', {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,7 +230,7 @@ export function DialogueStream({
         currentSiteRef.current.bookId !== site.bookId ||
         currentSiteRef.current.chapterIndex !== site.chapterIndex
       ) {
-        setSending(false)
+        void res.body?.cancel().catch(() => {})
         return
       }
 
@@ -268,12 +292,17 @@ export function DialogueStream({
 
       // 帧协议与终帧判定只有一份实现（../draftStream）。本文件此前自己解了一遍，
       // 移动端也解了一遍；契约一变就有一侧静默漂移。
-      await readDraftStream(res, {
+      const result = await readDraftStream(res, {
         onReader: (reader) => {
+          if (!stillOnSite()) {
+            void reader.cancel().catch(() => {})
+            return
+          }
           readerRef.current = reader
         },
         shouldStop: () => !stillOnSite(),
         onDelta: (chunk) => {
+          if (!stillOnSite()) return
           accumulatedDraftText += chunk
           setDraftText((prev) => prev + chunk)
         },
@@ -306,6 +335,7 @@ export function DialogueStream({
                   mode: currentCandidateState.mode,
                   draftText: accumulatedDraftText,
                   phase: 'draft_done',
+                  partial: frame.partial === true,
                 },
                 candidateDraftKey(site, site.chapterIndex),
               )
@@ -316,6 +346,15 @@ export function DialogueStream({
           }
         },
       })
+      if (stillOnSite() && result.terminal === 'aborted') {
+        setDraftTerminal({ partial: true })
+        setPhase('draft_done')
+        // start 回调赋值；TypeScript 不追踪 await 内回调对局部变量的写入。
+        const interruptedCandidate = currentCandidateState as CandidateState | null
+        if (interruptedCandidate !== null) {
+          saveCandidateCache({ ...interruptedCandidate, draftText: accumulatedDraftText, phase: 'draft_done', partial: true }, candidateDraftKey(site, site.chapterIndex))
+        }
+      }
       if (
         requestIdRef.current === reqId &&
         currentSiteRef.current.bookId === site.bookId &&
@@ -333,8 +372,29 @@ export function DialogueStream({
         setPhase('error')
         setSending(false)
       }
+    } finally {
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null
+        readerRef.current = null
+      }
     }
   }, [answer, book, chapterIndex, phase, selectedSkills, sending, selection])
+
+  const handleStop = (): void => {
+    ++requestIdRef.current
+    requestControllerRef.current?.abort()
+    requestControllerRef.current = null
+    void readerRef.current?.cancel().catch(() => {})
+    readerRef.current = null
+    requestSiteRef.current = null
+    setSending(false)
+    setDraftStopped(true)
+    setDraftTerminal({ partial: true })
+    setPhase('draft_done')
+    if (book !== null && candidate !== null) {
+      saveCandidateCache({ ...candidate, draftText, phase: 'draft_done', partial: true }, candidateDraftKey(book, chapterIndex))
+    }
+  }
 
   const handleChoice = (choice: string): void => {
     setAnswer(choice)
@@ -349,6 +409,8 @@ export function DialogueStream({
     setError(null)
     setAnswer('')
     setStreamMeta(null)
+    setDraftTerminal(null)
+    setDraftStopped(false)
     setAdoptState(null)
     setCandidate(null)
     setConflictView(null)
@@ -373,7 +435,7 @@ export function DialogueStream({
    *  成功 → 刷新章快照到本地写作缓存 + 通知 Reading Slate + 记录一次可逆 Undo；
    *  409 冲突 → 保留两份文本（候选 vs 最新盘面），交作者裁决。 */
   const handleAccept = useCallback(async (): Promise<void> => {
-    if (book === null || candidate === null || accepting) return
+    if (book === null || candidate === null || accepting || draftTerminal?.partial === true) return
     const site = { bookId: book.bookId, chapterIndex, root: book.root }
     setError(null)
     setAdoptState(null)
@@ -444,8 +506,10 @@ export function DialogueStream({
           return
         }
         saveDraftCache(readback.body, chapterDraftKey(book, chapterIndex))
+        saveDraftBaseline(readback.body, chapterDraftKey(book, chapterIndex))
         saveCandidateCache(null, candidateDraftKey(book, chapterIndex))
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
+        window.dispatchEvent(new CustomEvent('mozhou:telemetry-refresh'))
 
         // 处理幂等与连续采纳：避免第二次采纳（alreadyApplied: true）把 Undo 基底变成已采纳正文
         if (data.alreadyApplied !== true || undo === null) {
@@ -491,7 +555,7 @@ export function DialogueStream({
     } finally {
       setAccepting(false)
     }
-  }, [accepting, book, candidate, chapterIndex, draftText, loadSnapshot, undo])
+  }, [accepting, book, candidate, chapterIndex, draftText, draftTerminal, loadSnapshot, undo])
 
   /** 冲突裁决：作者读最新版并明确确认后，以最新盘面现场重新生成候选（再走 accept）。
    *  旧候选文本保留在服务端候选区，可人工复制。 */
@@ -528,20 +592,17 @@ export function DialogueStream({
       return
     }
     setError(null)
-    const site = { bookId: book.bookId, chapterIndex }
+    // 对象身份区分同书同章的不同打开现场，切走再切回也不能接收旧撤销。
+    const site = currentSiteRef.current
+    const stillOnSite = (): boolean => currentSiteRef.current === site
     let latest: { body: string; revision: number | null }
     try {
       latest = await loadSnapshot(book)
     } catch (cause) {
-      setError((cause as Error).message)
+      if (stillOnSite()) setError((cause as Error).message)
       return
     }
-    if (
-      currentSiteRef.current.bookId !== site.bookId ||
-      currentSiteRef.current.chapterIndex !== site.chapterIndex
-    ) {
-      return
-    }
+    if (!stillOnSite()) return
 
     // 冲突保护：若盘面最新版本不等于采纳后的 afterRevision，说明采纳后有新编辑（手工/外部），拒绝覆盖
     if (latest.revision !== undo.afterRevision) {
@@ -565,20 +626,19 @@ export function DialogueStream({
           expectedRevision: undo.afterRevision, // 绑定采纳后版本，拒绝覆盖后续新修改
         }),
       })
-      if (
-        currentSiteRef.current.bookId !== site.bookId ||
-        currentSiteRef.current.chapterIndex !== site.chapterIndex
-      ) {
-        return
-      }
+      if (!stillOnSite()) return
       const data = (await res.json()) as { ok?: boolean; revision?: number; error?: string }
+      if (!stillOnSite()) return
       if (res.ok && data.ok === true) {
         saveDraftCache(undo.oldText, chapterDraftKey(book, chapterIndex))
+        saveDraftBaseline(undo.oldText, chapterDraftKey(book, chapterIndex))
         window.dispatchEvent(new CustomEvent('mozhou:prose-adopted', { detail: { bookId: book.bookId, chapterIndex } }))
+        window.dispatchEvent(new CustomEvent('mozhou:telemetry-refresh'))
         setUndo(null)
         setAdoptState('已撤销采纳（新 revision 保存，不倒退服务端历史）')
       } else if (res.status === 409) {
         const currentSnap = await loadSnapshot(book).catch(() => latest)
+        if (!stillOnSite()) return
         setError(`撤销被拒绝（冲突）：该章在采纳后已被外部修改或已存有新版本。磁盘原文与撤销文本都已保留，未覆盖新内容。`)
         setConflictView({
           candidateText: undo.oldText,
@@ -589,10 +649,7 @@ export function DialogueStream({
         setError(data.error ?? '撤销保存失败')
       }
     } catch (cause) {
-      if (
-        currentSiteRef.current.bookId === site.bookId &&
-        currentSiteRef.current.chapterIndex === site.chapterIndex
-      ) {
+      if (stillOnSite()) {
         setError((cause as Error).message)
       }
     }
@@ -709,7 +766,11 @@ export function DialogueStream({
                 {/* 措辞走 draftStream：桌面与移动对同一终帧必须说同一句话。
                   半稿尤其不能只靠 kicker 的「完成」二字一笔带过——
                   断流半稿若被当作可采纳的完整一章，作者会把半章写进正文。 */}
-                {draftTerminal !== null
+                {draftStopped
+                  ? '已停止生成，半稿已保留，正文未改变。半稿不能直接采纳，可重新生成。'
+                  : draftTerminal?.partial === true
+                    ? '本次为断流半稿，已保留收到的内容，不能直接采纳；可重新生成。'
+                    : draftTerminal !== null
                   ? describeDraftResult({
                       terminal: 'done',
                       candidateId: candidate?.candidateId ?? null,
@@ -733,7 +794,7 @@ export function DialogueStream({
                   className="btn btn-author btn-sm"
                   data-testid="adopt-into-slate"
                   onClick={() => { void handleAccept() }}
-                  disabled={candidate === null || accepting}
+                  disabled={candidate === null || accepting || draftTerminal?.partial === true}
                 >
                   {accepting ? '采纳落盘中…' : '采纳进正文（Accept → Active Draft）'}
                 </button>
@@ -844,7 +905,9 @@ export function DialogueStream({
             </button>
             <div className="composer-foot">
               <span>已注入 {selectedSkills.length} 项技能 · 风格未接入 · 质量门常驻</span>
-              <span>⌘ Enter 发送</span>
+              {phase === 'drafting'
+                ? <button type="button" className="btn btn-sm" onClick={handleStop}>停止生成</button>
+                : <span>⌘ Enter 发送</span>}
             </div>
           </div>
         </div>
