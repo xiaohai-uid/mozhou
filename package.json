@@ -31,7 +31,9 @@
     "check:architecture": "node scripts/gen-architecture.mjs --check",
     "gen:adr-refs": "node scripts/gen-adr-refs.mjs",
     "check:glossary": "node scripts/verify-glossary.mjs",
-    "check:gates": "node scripts/verify-gates-contract.mjs"
+    "check:gates": "node scripts/verify-gates-contract.mjs",
+    "gen:term-map": "node scripts/gen-term-map.mjs",
+    "check:term-map": "node scripts/gen-term-map.mjs --check"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

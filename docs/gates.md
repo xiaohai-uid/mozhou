@@ -23,6 +23,8 @@
 | 门禁 | 命令 | 退出码（出处） | BLOCKED | 在 CI |
 |---|---|---|---|---|
 | **术语单一权威** | `pnpm run check:glossary` | 0 通过 `scripts/verify-glossary.mjs:89` · 1 失败 `:92` | 无此状态 | ✅ `ci.yml` |
+| **中英术语映射新鲜度** | `pnpm run check:term-map` | 0 一致 · 1 与生成器输出不符 `scripts/gen-term-map.mjs --check` | 无此状态 | ✅ `ci.yml` |
+
 | **门禁契约防腐化** | `pnpm run check:gates` | 0 一致 · 1 清单与仓库现实脱节 `scripts/verify-gates-contract.mjs` | 无此状态 | ✅ `ci.yml` |
 
 | **架构地图新鲜度** | `pnpm run check:architecture` | 0 一致（无显式 exit，自然落透） · 1 陈旧 `scripts/gen-architecture.mjs:140` | 无此状态 | ✅ `ci.yml` |
