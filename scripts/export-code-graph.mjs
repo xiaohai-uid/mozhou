@@ -1,21 +1,82 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 const root = process.cwd();
 const metaPath = resolve(root, '.gitnexus/meta.json');
 const outputPath = resolve(root, 'apps/web/src/code-graph/codeGraphSnapshot.ts');
-const gitnexusCli = join(process.env.APPDATA ?? '', 'npm', 'node_modules', 'gitnexus', 'dist', 'cli', 'index.js');
+
+/**
+ * 统一走仓库自带的 .gitnexus/run.cjs 包装器（整改 T05）。
+ *
+ * 整改前这里硬编码 %APPDATA%
+pm
+ode_modulesgitnexusdistcliindex.js 并**直连底层 CLI**：
+ * 换机器 / 换包管理器 / 用 pnpm dlx 装的 gitnexus 一律 ENOENT，而且它和 AGENTS.md、
+ * hooks、其余 graph:* 脚本各自选用的调用路径可能不是同一份安装。本文件因此改为与
+ * 仓库其余部分共用同一个包装器：它按 全局 gitnexus → pnpm dlx → npx 自选可用入口。
+ *
+ * 包装器由 gitnexus analyze 在 analyze 运行时写入 .gitnexus/run.cjs（该目录不入库）。
+ * 缺失 = 索引没建立过，此时**明确失败**并给出可执行的下一步，绝不产出半新不旧的文件。
+ */
+const runCjs = resolve(root, '.gitnexus/run.cjs');
+if (!existsSync(runCjs)) {
+  // 注意引导命令不能是 pnpm run graph:analyze —— 那条脚本正是 node .gitnexus/run.cjs analyze，
+  // 它依赖的就是这里缺失的文件，属于循环引导。run.cjs 由分析器自身在 analyze 时写入
+  // （见 .gitnexus/run.cjs:23-26 的自述），所以只能先用分析器 CLI 直接把它生成出来。
+  throw new Error(
+    'Missing .gitnexus/run.cjs (the repo GitNexus runner). ' +
+      'It is written BY the analyzer, so "pnpm run graph:analyze" cannot create it ' +
+      '(that script runs this very wrapper). Bootstrap it once with the analyzer CLI directly: ' +
+      '"npx gitnexus@latest analyze" (or "pnpm dlx gitnexus@latest analyze"), then re-run ' +
+      '"pnpm run graph:snapshot". Refusing to write a partial snapshot.',
+  );
+}
+
+/**
+ * run.cjs 是否经过 shell **随平台而变**（.gitnexus/run.cjs:313：
+ * shell: process.platform === 'win32'）：
+ *   - Windows: shell:true  → cmd.exe 把 program 与实参拼成一条命令行，按空白**二次切分**；
+ *   - POSIX:   shell:false → argv 原样透传，shell **不会**剥引号。
+ *
+ * 由此得出两条必须同时满足的规则：
+ *   1. 加引号只在 Windows 路径上成立。POSIX 上多出来的双引号会原样成为 Cypher 查询的一部分
+ *      （实测收到 \"MATCH (c:Community) ... DESC\"），直接改变查询语义。
+ *   2. Windows 上必须**按实参各自判断**，不能只保护查询：仓库路径含空格时 -r 的取值
+ *      同样会被切成两段（实测 C:\zcode\novel ai → "C:\zcode\novel" + "ai"）。
+ *
+ * 两条结论均由 R01 判别实验在真实 Windows 与 WSL Ubuntu 上双向实测确认，
+ * 日志见 .dsh-audit/repair-20260930/R01-argv/probe-{windows,posix}.log。
+ */
+const isWindows = process.platform === 'win32';
+
+function shellArg(value) {
+  if (!isWindows) return value;
+  return /\s/.test(value) ? '"' + value + '"' : value;
+}
 
 function runCypher(query, limit = 1000) {
+  // run.cjs 是透传 exec：它把 gitnexus 子进程的 stdio 设为 inherit，而本进程给 run.cjs
+  // 的 stdout 是一根管道，所以 JSON 仍会回到这里（已在真实运行中验证）。
   const raw = execFileSync(
     process.execPath,
-    [gitnexusCli, 'cypher', '-r', root, '-l', String(limit), query],
-    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+    [runCjs, 'cypher', '-r', shellArg(root), '-l', String(limit), shellArg(query)],
+    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true },
   );
-  const payload = JSON.parse(raw);
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch (error) {
+    // 只回显开头一小段用于定位，不整段刷屏（stdout 里是图谱数据，不是凭据）。
+    throw new Error(
+      'GitNexus cypher did not return JSON: ' + error.message +
+        ' | stdout head: ' + JSON.stringify(String(raw).slice(0, 200)),
+    );
+  }
   if (payload.error) throw new Error(payload.error);
-  if (payload.row_count >= limit) throw new Error(`Graph export reached row limit ${limit}; refusing a truncated snapshot`);
+  if (payload.row_count >= limit) {
+    throw new Error('Graph export reached row limit ' + limit + '; refusing a truncated snapshot');
+  }
   return parseMarkdownTable(payload.markdown ?? '');
 }
 
