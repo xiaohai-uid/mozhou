@@ -75,7 +75,13 @@ $env:ONNXRUNTIME_NODE_INSTALL_CUDA="skip"; pnpm install
 pnpm build
 
 # 3. 运行全量测试（发布门禁以当前 CI/本地实际输出为准）
+#    pnpm test = pnpm run test:packages && pnpm run test:web，两层都跑，任一失败即非零。
+#    默认零真实模型调用：真实模型用例在未显式启用时是 skipped，不发任何上游请求。
 pnpm test
+
+# 3b. 只跑包层 / 只跑 Web 层（调试分层失败时用）
+pnpm run test:packages
+pnpm run test:web
 
 # 4. 启动本地完整桌面/Web 创作工作台
 pnpm --filter @mozhou/web dev
@@ -139,8 +145,9 @@ mozhou/
 
 ## 🛡️ 质量保证与图谱门禁
 
-- **自动化测试**：发布前要求全仓库 `pnpm test`、Web 专项测试与构建门禁全部通过；README 不固定写死会过时的测试数量，以当前 CI 实际输出为准；
-- **GitNexus 代码图谱门禁**：通过 `pnpm graph:check` 进行架构拓扑依赖检查，**保证 0 循环依赖（Zero Circular Dependencies）**；
+- **自动化测试**：发布前要求全仓库 `pnpm test` 全部通过。根 `pnpm test` 是 `pnpm run test:packages && pnpm run test:web` 的串联（包层 vitest + Web 层 vitest），任一层失败即非零；CI 为保留分层诊断，按 `test:packages` 与 `--filter @mozhou/web test` 两步分别执行，避免 Web 层重复运行。README 不固定写死会过时的测试数量，以当前 CI 实际输出为准；
+- **真实模型测试是显式入口**：`pnpm test` **默认零真实模型调用**。需要验证真实上游链路时，另跑 `pnpm run test:real-model`，并自行显式提供 `MOZHOU_API_KEY` / `MOZHOU_API_BASE` / `MOZHOU_MODEL`（该入口会设置 `MOZHOU_RUN_REAL_MODEL_TESTS=1`）。三项缺任一项即**非零失败**而非跳过；上游不可达或鉴权失败同样非零。测试不会自动发现本机凭据，也不会自行放开 `MOZHOU_ALLOW_PRIVATE_LLM` 私网端点授权。**该入口会产生真实上游费用。** 端到端取证脚本另见 `pnpm verify:real-model`；
+- **GitNexus 代码图谱门禁**：`pnpm graph:check` 经仓库自带的 `.gitnexus/run.cjs` 包装器执行 `check --cycles --json -r .`，**按 cwd 相对定位本仓库**——不再用 `--repo mozhou` 按同名选择：本机索引里存在三个同名 mozhou 仓库，那样无法确定检查的是哪一个。输出为结构化字段 `{"status":"clean","cycleCount":0,"cycles":[]}`；包装器缺失或检查失败即非零退出；
 - **严格类型检查**：全仓库 `tsc --noEmit` **0 错误**。
 
 ---

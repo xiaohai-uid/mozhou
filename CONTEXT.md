@@ -284,3 +284,24 @@ _Avoid_: 让文学判定进入 Gate 裁决、把质量规则写进 TemporalFact�
 ## 2026-09-20 遗留 app/ 移出仓库
 
 落实上节第 5 条的冻结决定：遗留 Next.js 应用 `app/`（750 个跟踪文件）整体移出仓库跟踪，本机归档于 `archive-legacy/app-v1-legacy/`（内容在 git 历史中可完整回溯）；配套删除 `.github/workflows/legacy-app.yml`。Novel OS 主线仍为 `apps/web + packages/*`，本文件术语与契约不受影响。
+
+## 2026-09-30 评测子系统接线：RoutingSuggestion 确认闭环（t53 附B 第 4 步）
+
+落实 [[0008-evaluation-engine-as-first-class-system]] 的「一等子系统」定位，并按 `docs/research/t53-grill-task-model-evaluator.md` 附B 的依赖序补齐**唯一未闭合的一步**。此前三步（#50-P1 桥接、flywheel 建包 + 投影器、R1–R5 阈值引擎）均已落地。
+
+**接线前的事实**（图谱与工具双证）：`packages/flywheel/src/index.ts` 有 148 行导出，对 `evaluator/` 子树**零导出**，因此全仓无消费者；`readSuggestions` 被 `pnpm audit:unreferenced` 判为**真零引用**。该子树是整包唯一未被再导出的子系统。
+
+**本轮决定**：
+
+1. **把评测子树接成包的一等公开面**：`@mozhou/flywheel` 现在再导出投影面（`projectInputs`/`aggregateSignals`/`distinctChapters`）、阈值引擎（`judgePair`/`judgeDemotion`/`eligibilityOf` 等五规则全家）、存储面（`appendSuggestions`/`readSuggestions`/`readMatrixRowArchive`）、编排入口 `runTaskModelEvaluation` 与建议物类型 `RoutingSuggestion`。加导出是纯增量：该文件此前只被包内 4 个测试 import，无生产破坏面。
+2. **新增确认核心 `confirmRoutingSuggestion`**（t53 附B 第 4 步的可测内核）：纯函数，输入 = 既有 `loadTierConfigFile` 产出的已校验配置 + 一条建议，输出 = 新路由表或一条类型化拒绝（`not_a_route_change` / `insufficient_sample` / `task_type_absent` / `incumbent_not_found` / `ambiguous_incumbent` / `already_applied` / `provider_not_registered`）。
+3. **C6 纪律不变**：只建议不自动改路由。该核心**不读盘、不写盘、不读环境**，也不提供任何自动应用路径；生效仍只能由作者显式触发，落盘后由既有 `loadTierConfigFile` 的 mtime 热加载重新机械校验——**校验栏零新增**。
+4. **确认后的叶子不带 `api_key_ref`**：web 入口 `apps/web/server/llm/tierRouting.ts:134-144` 对带该槽位的叶子直接抛 `TIER_ROUTE_API_KEY_REF_UNSUPPORTED`，凭据**只**来自 `providers` 注册表的 `apiKeyEnv`。因此确认只写 providerId+model 两个标识（R5 单变量单 cell），且**要求目标 provider 已登记**——宁可拒绝，不写一份入口兑现不了的配置。
+5. **图谱审计的一处更正**：`.scratch/mozhou-deepening-20260928/audit/codegraph-audit-20260928.md:66` 称 `RunTaskModelEvaluation` 是「由 `process.argv` 分发的 CLI 入口」，实测**全仓无任何分发器**（`scripts/` 12 个脚本亦无）。它当时是零引用，被误归入 CLI 入口一类。
+
+**仍然挂账（边界必须说清）**：本轮接的是**库级公开面**，**运行期仍不可达**——`confirmRoutingSuggestion` / `runTaskModelEvaluation` / `readSuggestions` 在生产代码里没有任何调用方，也无路由/脚本/定时任务触发；`run.ts` 与 `storage.ts` 至今**没有测试**。t53 附B 第 4 步的**命令部分**（真正代写 settings.yaml 的 CLI/入口）未做，故 ADR-0008 的「一等子系统」定位**尚未兑现**。
+
+**空串守卫（本轮自查发现并修复的缺陷）**：`confirmRoutingSuggestion` 早先版本对 `proposedRoute` 的空 `providerId`/`model` 返回 `applied`，产出会被既有校验器以 `TIER_CONFIG_STRUCTURE_INVALID` 拒收；且该输入**真实可达**——`storage.narrowSuggestion`（`storage.ts:66-68`）只判 `typeof === 'string'`、不判非空，空串能从磁盘 `suggestions.jsonl` 读回。现新增 `malformed_proposed_route` 拒绝原因与三个回归用例（含磁盘可达性用例），探针复跑由 `applied` 变为 `rejected`。
+
+新增术语：**RoutingSuggestion 确认**（作者显式把一条 promote/demote 建议落到 tier 配置的动作；watch 条目不可确认）、**RouteChange**（一次确认所描述的单叶子 providerId+model 变更记录）。
+_Avoid_: 自动应用建议改路由、把 `api_key_ref` 写进确认后的叶子、把 watch 条目当作路由变更、为确认流程新造第二套配置校验器
