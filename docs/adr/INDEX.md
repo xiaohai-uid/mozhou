@@ -118,7 +118,8 @@
 | 1 | ~~74 个本地工单的 status frontmatter 迁移~~ | **已裁决**（ADR-0034）— 实测只有 **9 / 74** 且同属 `mozhou-deepening-20260928` 单一批次，改为整批冻结，无需逐文件迁移 |
 | 2 | `.claude/skills/` 6 个 gitnexus 副本 | **保留** — 它是 Claude Code 读项目技能的唯一路径，该回退行为**未验证**；已在 `.claude/skills/README.md` 写明「两份都别手工改」+ 一致性核验命令 |
 | 3 | `.mimosa/` 保留期 | **方案已成型，待你点头**。实测：`hook-state/` = 121,980 文件 / 953.1 MB，占全目录 **99.9%**；其下 85 个子目录形如 `sess_<uuid>.<hash>.baseline`，是**逐 actor 的基线快照**；最新写入 **2026-09-30 13:05**，距今约 32 小时无活动；在 `~/.claude`、`~/.dsh`、`~/.agents`、`~/.codex`、winclaw（深度 3）**均未找到 mimosa 配置**。<br>**建议**：保留 `reports/`(49) + `finding-ledger/`(50) + `history/`(37) + `hook-status/`(44) = 180 文件 / ~0.9 MB（有审计证据价值），归档或删除 `hook-state/`（**可释放约 953 MB**）。**未执行**——「未找到配置」不等于「已卸载」，且你 Q12 明确要求先定保留期再动手 |
-| 4 | `apps/web/src/code-graph/codeGraphSnapshot.ts`（8,295 行已提交生成物） | **未决** — 需你跑一次 `pnpm graph:snapshot` 让它自然重生成 |
-| 5 | 代码层重复裁决 | **未决** — 需逐项判断「有意的分层成本」还是「真重复」；见 `docs/adr/CODE-DUPLICATION-INVENTORY.md` |
+| 4 | `apps/web/src/code-graph/codeGraphSnapshot.ts`（8,296 行已提交生成物） | **未决** — 但它**是活的**：`CodeGraphView.tsx:2` 与 `CodeNodeExplorer.tsx:4` 都 import 它。需你跑一次 `pnpm graph:snapshot` 让它自然重生成 |
+| 5 | 代码层重复裁决 | **已完成裁决** — 见 `CODE-DUPLICATION-INVENTORY.md`。9 项里 **5 项前提不成立**；真问题只剩 4 条，见该清单 |
 | 6 | 44 处未判定的 ADR 交叉引用 | **未决** — 门禁已锁住预算（54 / 54），只许减不许增 |
+| 7a | **ADR-0029「银白」状态陈旧** — 声称已实施，但 `a3bd0db`(09-19) 五天后换回 obsidian 暗色；`globals.css:12` 实为 `#080b11`。回滚残留：`scenePreference.ts:56` 仍默认 `silver-atrium`（暗色 UI 配银白底图）、`storyboard.css:11` / `mobile.css:524` 仍带 `#e6ecf2`。**无任何 ADR 记录这次回滚** | **未决** |
 | 7 | 0029 / 0030 标题格式与其余 35 条不一致 | **未决** — 无实质影响 |
