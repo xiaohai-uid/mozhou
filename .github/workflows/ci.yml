@@ -49,9 +49,10 @@ jobs:
         run: pnpm --filter @mozhou/web build
       # 文档门禁：术语单一权威 + 架构地图新鲜度。
       # 二者都是「只许变好」的检查，失败即阻断合并。
-      - name: Doc gates (glossary / architecture / gates / term-map)
+      - name: Doc gates (glossary / architecture / gates / term-map / readmes)
         run: |
           pnpm run check:glossary
           pnpm run check:architecture
           pnpm run check:gates
           pnpm run check:term-map
+          pnpm run check:readmes

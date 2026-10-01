@@ -23,6 +23,8 @@
 | 门禁 | 命令 | 退出码（出处） | BLOCKED | 在 CI |
 |---|---|---|---|---|
 | **术语单一权威** | `pnpm run check:glossary` | 0 通过 `scripts/verify-glossary.mjs:89` · 1 失败 `:92` | 无此状态 | ✅ `ci.yml` |
+| **包 README 契约** | `pnpm run check:readmes` | 0 四段齐备 · 1 缺 README 或缺段 `scripts/verify-package-readmes.mjs` | 无此状态 | ✅ `ci.yml` |
+
 | **中英术语映射新鲜度** | `pnpm run check:term-map` | 0 一致 · 1 与生成器输出不符 `scripts/gen-term-map.mjs --check` | 无此状态 | ✅ `ci.yml` |
 
 | **门禁契约防腐化** | `pnpm run check:gates` | 0 一致 · 1 清单与仓库现实脱节 `scripts/verify-gates-contract.mjs` | 无此状态 | ✅ `ci.yml` |
@@ -35,6 +37,9 @@
 | 真实小说旅程 | `node scripts/verify-real-novel-journey.mjs` | 2 `scripts/verify-real-novel-journey.mjs:31` | 无 | ❌ |
 | R05 端到端旅程 | `node scripts/verify-r05-journey.mjs` | 0 `scripts/verify-r05-journey.mjs:1249` | 无 | ❌ |
 | 草稿上下文测量 | `node scripts/measure-draft-context.mjs` | 2 `:229`、`:238`、`:242` · 1 `:246` | 无 | ❌ |
+| 覆盖率 | `pnpm run coverage:check`（仅报告状态） | 0 配置就绪 · 1 配置缺失 | 无 | ❌ 未接入 |
+| 克隆检测 | `pnpm run duplication` | 见 jscpd | 无 | ❌ 未接入 |
+
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 
 ## `verify:real-model` 的完整契约
@@ -74,3 +79,17 @@
 - 术语规则见 [`GLOSSARY.md`](../GLOSSARY.md)；本文件只讲门禁，不定义术语。
 - 决策记录见 [`docs/adr/INDEX.md`](./adr/INDEX.md)。
 - CI 里文档门禁的实际位置：`.github/workflows/ci.yml` 的 `Doc gates` 步骤。
+---
+
+## 实测基线（2026-10-02）
+
+| 项 | 实测值 | 出处 |
+|---|---|---|
+| 包层测试 | **103 个文件 / 910 个测试全部通过**，耗时 14.66s | `pnpm run test:packages` 实跑 |
+| 覆盖率 | **未启用**。`vitest.config.ts` 已配好 coverage 段，但 `@vitest/coverage-v8` 未安装，
+| 直接 `--coverage` 会报 MISSING DEPENDENCY | `pnpm run coverage:check` |
+| 克隆检测 | `.jscpd.json` 已就位，但 `pnpm run duplication` 需 `npx` 现场下载 jscpd，**未实跑验证** | `.jscpd.json` |
+| | 覆盖率阈值 | **刻意未设** —— DSH 的「逐文件 100%」按其 §七 判断不适用于本仓；阈值须由人看过真实数字后再定 |
+
+> 启用覆盖率需要 `pnpm add -D @vitest/coverage-v8`。本仓库**刻意未擅自添加该依赖**：
+> 它会改动 `pnpm-lock.yaml` 并引入供应链变更，需显式授权。
