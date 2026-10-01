@@ -33,7 +33,7 @@
     "check:glossary": "node scripts/verify-glossary.mjs",
     "check:gates": "node scripts/verify-gates-contract.mjs",
     "gen:term-map": "node scripts/gen-term-map.mjs",
-    "check:term-map": "node scripts/gen-term-map.mjs --check",
+    "check:term-map": "node scripts/gen-term-map.mjs --self-test && node scripts/gen-term-map.mjs --check",
     "check:readmes": "node scripts/verify-package-readmes.mjs",
     "duplication": "npx --yes jscpd@3.5.10 --config .jscpd.json",
     "coverage:check": "node scripts/report-coverage-status.mjs"
