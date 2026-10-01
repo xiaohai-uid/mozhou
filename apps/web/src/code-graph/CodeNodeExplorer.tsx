@@ -1,17 +1,51 @@
-import { useMemo, useState } from 'react'
-import graph from './codeGraphData.json'
+import { useEffect, useMemo, useState } from 'react'
+import graphUrl from './codeGraphData.json?url'
+import type { CodeGraphData } from './codeGraphData.json'
 import { CODE_GRAPH_SNAPSHOT } from './codeGraphSnapshot'
 
-const nodeById = new Map(graph.nodes.map((node) => [node.id, node]))
-const names = new Map([
-  ...graph.nodes.map((node) => [node.id, node.name] as const),
-  ...CODE_GRAPH_SNAPSHOT.communities.map((node) => [node.id, node.label] as const),
-  ...CODE_GRAPH_SNAPSHOT.processes.map((node) => [node.id, node.label] as const),
-])
-const kinds = [...new Set(graph.nodes.map((node) => node.kind))].sort()
-const relationTypes = [...new Set(graph.relations.map((edge) => edge.type))].sort()
-
 export function CodeNodeExplorer(): JSX.Element {
+  const [graph, setGraph] = useState<CodeGraphData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    setError(null)
+    // Keep the generated JSON as an asset instead of compiling >4MB of data
+    // into JavaScript (esbuild's >1MB transform uses temporary-file IPC).
+    void fetch(graphUrl, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json() as CodeGraphData
+        if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.relations)) {
+          throw new Error('图谱数据格式无效')
+        }
+        if (!controller.signal.aborted) setGraph(data)
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
+      })
+    return () => controller.abort()
+  }, [attempt])
+
+  if (error !== null) return (
+    <section aria-label="代码节点与关系">
+      <p role="alert">图谱数据加载失败：{error}</p>
+      <button type="button" onClick={() => setAttempt(value => value + 1)}>重试加载图谱</button>
+    </section>
+  )
+  if (graph === null) return <p role="status">正在载入全量节点数据…</p>
+  return <LoadedCodeNodeExplorer graph={graph} />
+}
+
+function LoadedCodeNodeExplorer({ graph }: { graph: CodeGraphData }): JSX.Element {
+  const nodeById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph])
+  const names = useMemo(() => new Map([
+    ...graph.nodes.map((node) => [node.id, node.name] as const),
+    ...CODE_GRAPH_SNAPSHOT.communities.map((node) => [node.id, node.label] as const),
+    ...CODE_GRAPH_SNAPSHOT.processes.map((node) => [node.id, node.label] as const),
+  ]), [graph])
+  const kinds = useMemo(() => [...new Set(graph.nodes.map((node) => node.kind))].sort(), [graph])
+  const relationTypes = useMemo(() => [...new Set(graph.relations.map((edge) => edge.type))].sort(), [graph])
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState('')
   const [relationType, setRelationType] = useState('')
@@ -24,12 +58,12 @@ export function CodeNodeExplorer(): JSX.Element {
       (kind === '' || node.kind === kind) &&
       [node.name, node.id, node.filePath].join(' ').toLowerCase().includes(search),
     )
-  }, [query, kind])
+  }, [graph, query, kind])
   const selected = selectedId === null ? undefined : nodeById.get(selectedId)
   const relations = useMemo(() => graph.relations.filter((edge) =>
     (edge.source === selectedId || edge.target === selectedId) &&
     (relationType === '' || edge.type === relationType),
-  ), [selectedId, relationType])
+  ), [graph, selectedId, relationType])
   const selectNode = (id: string): void => {
     setSelectedId(id)
     setRelationLimit(40)
