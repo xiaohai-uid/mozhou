@@ -17,13 +17,16 @@
     "desktop:build": "tauri build",
     "package": "node scripts/build-release.mjs",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "pnpm run test:packages && pnpm run test:web",
+    "test:packages": "vitest run",
+    "test:web": "pnpm --filter @mozhou/web test",
     "verify:real-model": "node scripts/verify-real-model-journey.mjs",
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
     "graph:snapshot": "node scripts/export-code-graph.mjs",
     "audit:unreferenced": "node scripts/audit-unreferenced.mjs",
-    "graph:check": "gitnexus check --cycles --repo mozhou"
+    "graph:check": "gitnexus check --cycles --repo mozhou",
+    "test:real-model": "node scripts/run-real-model-tests.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

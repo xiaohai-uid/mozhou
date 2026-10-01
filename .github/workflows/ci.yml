@@ -36,8 +36,11 @@ jobs:
       # 必须在 workspace 构建之后执行，否则工作区导入全部坍缩为 any 产生千级误报。
       - name: Static lint gate
         run: pnpm lint
+      # 分层诊断：包层与 Web 层各跑一次，失败时能直接看出是哪一层。
+      # 根 pnpm test 现在是 test:packages && test:web 的串联，CI 不再调用它，
+      # 否则 Web 层会被跑两遍（根入口一次 + 下面一次），既浪费时间也放大 flake 概率。
       - name: Test workspace (vitest)
-        run: pnpm test
+        run: pnpm run test:packages
       - name: Typecheck apps/web (tsc -b)
         run: pnpm --filter @mozhou/web typecheck
       - name: Test apps/web (vitest)

@@ -9,7 +9,7 @@
  * - 超 60 镜/引用不存在角色 → MODEL_OUTPUT_INVALID（上限拒绝，不截断）；
  * - 输出超 262144 字节 → MODEL_OUTPUT_OVERSIZE 立即中止（假传输记录中止）；
  * - expectedSourceHash 与磁盘不符 → SOURCE_CHANGED；超长章节 → SOURCE_TOO_LARGE。
- * 真机模型冒烟：仅当环境配置了真实 key 时运行（本机无 key 则如实跳过）。
+ * 真机模型冒烟：仅当显式设置 MOZHOU_RUN_REAL_MODEL_TESTS=1 且配置完整时运行（否则 skipped）。
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -26,6 +26,15 @@ import {
   generateStoryboardCandidate,
 } from './generate.js'
 import { STORYBOARD_LIMITS } from './contract.js'
+import {
+  applyEnvOverrides,
+  requireRealModelConfig,
+  resolveRealModelGate,
+} from '../test-support/realModelGate.js'
+
+/** 真实模型门控（整改 T02）：默认 disabled ⇒ 本文件零上游请求。 */
+const realModelGate = resolveRealModelGate()
+const realModelEnabled = realModelGate.kind === 'enabled'
 
 const ROOTS: string[] = []
 afterEach(() => {
@@ -268,18 +277,29 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     })).rejects.toBeInstanceOf(SourceTooLargeError)
   })
 
-  it('真机冒烟（仅在配置真实 key 的环境运行；未配置则如实跳过）', async (ctx) => {
-    const hasKey = Boolean(process.env['MOZHOU_API_KEY'] || process.env['DEEPSEEK_API_KEY'] || process.env['OPENAI_API_KEY'])
-    if (!hasKey) {
-      ctx.skip()
-      return
+  // 整改 T02：这条真机冒烟原先只要 shell 里有 MOZHOU_API_KEY / DEEPSEEK_API_KEY /
+  // OPENAI_API_KEY 任一就**自动发真实请求**——而这三个变量正是 README 记载的常规 BYOK
+  // 配置，于是「本地开发者跑一次普通 pnpm test」= 一次无人预期的计费调用。现改为与
+  // 三份 *.realModel.test.ts 共用同一门控：只有 MOZHOU_RUN_REAL_MODEL_TESTS=1 才执行；
+  // 启用但配置不全则让整份 suite 失败，而不是静默跳过。
+  // 本文件其余用例是注入式假传输（不打真网），不受门控影响，任何时候都跑。
+  it.skipIf(!realModelEnabled)('真机冒烟（仅在显式启用且配置完整时运行）', async () => {
+    const config = requireRealModelConfig(realModelGate)
+    const overrides = applyEnvOverrides({
+      MOZHOU_API_KEY: config.apiKey,
+      MOZHOU_API_BASE: config.apiBase,
+      MOZHOU_MODEL: config.model,
+    })
+    try {
+      const root = makeBook()
+      const hash = sourceHashOf(root)
+      const { document } = await generateStoryboardCandidate(root, 1, hash, OPTIONS)
+      // 真机验收：结构合法 + 引文锚定 + 不写盘（人工内容核对在 evidence 记录）
+      expect(document.shots.length).toBeGreaterThan(0)
+      expect(document.totalEstimatedDurationSeconds).toBeGreaterThan(0)
+      expect(document.generation.provider).toBe('openai-compatible')
+    } finally {
+      overrides()
     }
-    const root = makeBook()
-    const hash = sourceHashOf(root)
-    const { document } = await generateStoryboardCandidate(root, 1, hash, OPTIONS)
-    // 真机验收：结构合法 + 引文锚定 + 不写盘（人工内容核对在 evidence 记录）
-    expect(document.shots.length).toBeGreaterThan(0)
-    expect(document.totalEstimatedDurationSeconds).toBeGreaterThan(0)
-    expect(document.generation.provider).toBe('openai-compatible')
-  })
+  }, 300_000)
 })

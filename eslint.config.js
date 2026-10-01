@@ -1,6 +1,8 @@
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
+  // 交回包是归档证据与仓库外脚本副本，不属于产品 TypeScript 工程。
+  { ignores: ['handoff-results/**'] },
   { ignores: ['**/dist/**', '**/dist-server/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
@@ -33,6 +35,11 @@ export default tseslint.config(
             // 工单 08 新增：句柄 seam 的真实语义测试（packages/data-plane 那份走
             // 自己的 tsconfig，不经 defaultProject；这里的是路由级迁移回归）。
             'apps/web/server/routes/planeSeamMigration.test.ts',
+            // 2026-09-30 整改 T02 新增：真实模型测试的统一门控目录。
+            // 含门控实现 realModelGate.ts（非测试文件，同样不被任何 project 发现）
+            // 与它自己的确定性测试 realModelGate.test.ts —— 两者都要登记，
+            // 只登记 *.test.ts 会让实现文件本身继续报 Parsing error。
+            'apps/web/server/test-support/*.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-09-29 由 70 上调至 80：本票的 P1 首章回归测试

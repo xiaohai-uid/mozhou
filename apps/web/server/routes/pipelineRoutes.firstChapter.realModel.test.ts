@@ -1,20 +1,24 @@
 // @vitest-environment node
 /**
- * P1 真实模型端到端复验（不开 mock）：证明「新用户建书 → 第一次点生成」在
- * **本机真实模型**下真的成功，不只是 mock provider 下的绿。
+ * P1 真实模型端到端复验（不开 mock）：证明「新用户建书 → 第一次点生成」在**真实模型**
+ * 下真的成功，不只是 mock provider 下的绿。
  *
- * 凭据处置：key 只在本测试进程内从本机代理配置读出并注入 `process.env`
- * （`providerSettings.resolveEnvEndpoint` 只读环境变量，见 providerSettings.ts:53-59），
- * 全程不写盘、不打印、不落任何产物。与 `.dsh-audit/launch/01-real-model-smoke.md` §1
- * 同一路径。
+ * 【整改 T02 后的门控语义】见 ../test-support/realModelGate.ts 与
+ * namingRoutes.realModel.test.ts 头注，逐条对应同一份契约：
+ *  1. 只有 MOZHOU_RUN_REAL_MODEL_TESTS=1 才执行真实用例；否则 it.skipIf ⇒ skipped
+ *     （不是"提前 return 的 passing"），默认零上游请求。
+ *  2. 凭据只认显式传入的 MOZHOU_API_KEY / MOZHOU_API_BASE / MOZHOU_MODEL；
+ *     本文件不再读本机代理配置文件、不再硬编码端口与模型名。
+ *  3. 启用但配置不全 ⇒ beforeAll 抛错 ⇒ suite 失败 + 退出码非零，不退化成 skip。
+ *  4. 启用后上游不可达 / 鉴权失败 ⇒ 断言失败 ⇒ 同样非零。
+ *  5. MOZHOU_ALLOW_PRIVATE_LLM 本文件绝不设置：授权环回端点是部署者的决定。
  *
- * SSRF 门禁：环回端点必须由部署者显式 `MOZHOU_ALLOW_PRIVATE_LLM=1` 授权才放行
- * （openaiStream.ts:99-110：只允许部署者环境变量，配置文件无权设置）。本测试
- * 设置它是为了接通本机代理——这与审计 `02-browser-ui.md` §7 缺陷 2 记的接线方式
- * 相同。下方第一个用例反向断言**未授权时门禁仍然拒绝环回**，以证明本次修复没有
- * 借道放宽门禁。
+ * 凭据处置：key 只在本测试进程内注入 process.env，afterAll 逐项恢复原值；
+ * 全程不写盘、不打印、不落任何产物。
  *
- * 不可提交性：本测试依赖本机 CLI Proxy API 与其私钥，CI/他人机器上**必然跳过**。
+ * SSRF 门禁：下方第一个用例是**确定性守卫**（纯 URL 判定，不发请求），
+ * 不依赖凭据，任何时候都执行——反向断言未授权时环回端点仍被拒，
+ * 以证明本次修复没有借道放宽门禁。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -27,59 +31,34 @@ import { createMoZhouApiRouter } from '../api.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { proseChapterPath, readProseChapter } from '@mozhou/data-plane'
 import { assertSafeEndpointUrl } from '../llm/openaiStream.js'
+import {
+  applyEnvOverrides,
+  requireRealModelConfig,
+  resolveRealModelGate,
+} from '../test-support/realModelGate.js'
 
-const PROXY_CONFIG = 'C:/Users/a1691/cli-proxy-api/config.yaml'
-const PROXY_BASE = 'http://127.0.0.1:8317/v1'
-/**
- * 章节生成用非思考型免费模型（全量测试在本机跑时不再消耗付费额度）。
- * 实测 2026-09-30：dots-3-note-preview:free 首 content 1.6s、21.0s 产 1594 字。
- * 注意：思考型模型（如 stealth/space-bunny-alpha，首 content 24s+、整章 72s）
- * 会撞 60s 管线窗口；gpt-oss-120b-medium 容量不稳（间歇 503），均不选。
- */
-const PROXY_MODEL = 'dots-studio/dots-3-note-preview:free'
+/** 仅供 SSRF 守卫用例的环回 URL 字面量；不发起任何请求，端口是明显的占位值。 */
+const LOOPBACK_BASE = 'http://127.0.0.1:45999/v1'
 
-/**
- * 从本机代理配置的 `api-keys:` 段读出第一条 key 到内存。
- * 纯行解析，不执行任何外部进程，key 不离开本函数返回值。
- */
-function readProxyKey(): string | null {
-  let lines: string[]
-  try {
-    lines = readFileSync(PROXY_CONFIG, 'utf8').split('\n')
-  } catch {
-    return null
-  }
-  let inSection = false
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('api-keys:')) {
-      inSection = true
-      continue
-    }
-    if (!inSection) continue
-    if (trimmed.length === 0) continue
-    if (!trimmed.startsWith('-')) break // 段内出现非列表行 ⇒ 段结束
-    const value = trimmed.slice(1).trim().replace(/^["']|["']$/g, '')
-    if (value.length > 0) return value
-  }
-  return null
-}
+const gate = resolveRealModelGate()
+const realModelEnabled = gate.kind === 'enabled'
 
 let server: ReturnType<typeof createServer> | null = null
 let base = ''
 let dataRoot = ''
-let available = false
+let restoreEnv: (() => void) | null = null
 
 beforeAll(async () => {
-  const key = readProxyKey()
-  if (key === null) return // 无本机代理 ⇒ 整套跳过（本文件不承诺在别处可跑）
-  process.env.MOZHOU_API_KEY = key
-  process.env.MOZHOU_API_BASE = PROXY_BASE
-  process.env.MOZHOU_MODEL = PROXY_MODEL
-  delete process.env.MOZHOU_DRAFT_PROVIDER
-  // 环回端点的部署者授权（只由环境变量，配置文件无权设置——openaiStream.ts:97-98）
-  process.env.MOZHOU_ALLOW_PRIVATE_LLM = '1'
+  if (gate.kind !== 'enabled') return
+  const config = requireRealModelConfig(gate)
+  restoreEnv = applyEnvOverrides({
+    MOZHOU_API_KEY: config.apiKey,
+    MOZHOU_API_BASE: config.apiBase,
+    MOZHOU_MODEL: config.model,
+    MOZHOU_DRAFT_PROVIDER: undefined,
+  })
 
+  // 每次运行独占书根与随机可用端口
   dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-first-chapter-real-'))
   defaultBookAccessManager.clear()
   defaultBookAccessManager.setHostedMode(false)
@@ -95,12 +74,13 @@ beforeAll(async () => {
     })
   })
   base = await new Promise((r) => {
-    server!.listen(0, '127.0.0.1', () => r(`http://127.0.0.1:${(server!.address() as AddressInfo).port}`))
+    server!.listen(0, '127.0.0.1', () => r('http://127.0.0.1:' + (server!.address() as AddressInfo).port))
   })
-  available = true
 })
 
 afterAll(() => {
+  restoreEnv?.()
+  restoreEnv = null
   server?.close()
   try {
     if (dataRoot.length > 0) rmSync(dataRoot, { recursive: true, force: true })
@@ -119,22 +99,18 @@ async function post(path: string, body: Record<string, unknown>) {
 }
 
 describe('P1 真实模型 · 建书后第一次点生成', () => {
+  // 确定性守卫：不依赖凭据、不发请求，任何时候都执行。
   it('SSRF 门禁未被本次修复放宽：未授权时环回端点被拒（且与章脚手架无关）', () => {
     // 直接打门禁本体，而不是靠生成请求顺带触发——生成请求还要穿 provider 解析，
     // 一旦别处先拒，断言就测不到门禁本身了。
-    expect(() => assertSafeEndpointUrl(PROXY_BASE, false)).toThrowError(/SSRF 门禁/)
-    // 显式授权后才放行（与 openaiStream.ts:99-110 一致）
-    expect(() => assertSafeEndpointUrl(PROXY_BASE, true)).not.toThrow()
+    expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, false)).toThrowError(/SSRF 门禁/)
+    // 显式授权后才放行（与 openaiStream.ts 的部署者环境变量口径一致）
+    expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, true)).not.toThrow()
     // 非 http/https 协议无论是否授权都拒绝
     expect(() => assertSafeEndpointUrl('file:///etc/passwd', true)).toThrowError()
   })
 
-  it('走真 provider（不 mock）：建书零脚手架 → 首次生成到达真模型并落出真实正文', async () => {
-    if (!available) {
-      console.log('[real-model] 跳过：本机无 CLI Proxy API 配置')
-      return
-    }
-
+  it.skipIf(!realModelEnabled)('走真 provider（不 mock）：建书零脚手架 → 首次生成到达真模型并落出真实正文', async () => {
     const created = await post('/api/book', { title: '首章真实模型书' })
     expect(created.status).toBe(200)
     const root = created.data['root'] as string
@@ -207,24 +183,22 @@ describe('P1 真实模型 · 建书后第一次点生成', () => {
     }
 
     console.log(
-      `[real-model] provider=real-openai-compatible model=${PROXY_MODEL} ` +
-        `elapsedMs=${elapsed} candidateChars=${text.length} terminal=${JSON.stringify(terminalEvent)} ` +
-        `head=${JSON.stringify(text.slice(0, 40))}`,
+      '[real-model] provider=real-openai-compatible model=' + String(process.env['MOZHOU_MODEL']) +
+        ' elapsedMs=' + String(elapsed) + ' candidateChars=' + String(text.length) +
+        ' terminal=' + JSON.stringify(terminalEvent) +
+        ' head=' + JSON.stringify(text.slice(0, 40)),
     )
   }, 300_000)
 
   /**
    * 对照组（不是修法，是归因）：**已有章脚手架**的书走同一条生成路径，
    * 若终态与 P1 用例完全一致（同样的 TIMEOUT/partial），则该终态与本次修复无关，
-   * 而属于既有的 provider 超时口径（pipelineRoutes.ts:297 的 60_000ms）。
+   * 而属于既有的 provider 超时口径（pipelineRoutes.ts 的 60_000ms）。
    * 这一条不修 P1，也不该由 P1 票去改 60s 常量。
    */
-  it('对照组：章 1 已存在时走同路径，终态与首章用例一致 ⇒ 证明终态不来自脚手架补齐', async () => {
-    if (!available) {
-      console.log('[real-model] 跳过：本机无 CLI Proxy API 配置')
-      return
-    }
+  it.skipIf(!realModelEnabled)('对照组：章 1 已存在时走同路径，终态与首章用例一致 ⇒ 证明终态不来自脚手架补齐', async () => {
     const created = await post('/api/book', { title: '对照组书' })
+    expect(created.status).toBe(200)
     const root = created.data['root'] as string
     // 用既有建章路径预置第 1 章（= 修复前的世界：脚手架已存在）
     const seeded = await post('/api/chapter.prose.save', {
@@ -247,7 +221,7 @@ describe('P1 真实模型 · 建书后第一次点生成', () => {
       .filter((l) => l.length > 0)
       .map((l) => JSON.parse(l) as Record<string, unknown>)
     const terminal = frames.at(-1)
-    console.log(`[real-model/control] terminal=${JSON.stringify(terminal)}`)
+    console.log('[real-model/control] terminal=' + JSON.stringify(terminal))
 
     // 对照组同样不出现 ENOENT（有脚手架时更不该有）
     expect(JSON.stringify(frames)).not.toContain('ENOENT')
