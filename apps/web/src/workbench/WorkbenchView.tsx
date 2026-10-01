@@ -327,7 +327,7 @@ export function WorkbenchView({
         </div>
       </div>
 
-      <DesktopToolModals activeModal={activeModal} onClose={() => setActiveModal(null)} />
+      <DesktopToolModals key={book?.root ?? 'no-book'} activeModal={activeModal} book={book} onClose={() => setActiveModal(null)} />
     </section>
   )
 }

@@ -50,7 +50,12 @@ describe('Technical Preview UI truthfulness', () => {
 
     rerender(<DesktopToolModals activeModal="export" onClose={() => undefined} />)
     expect(screen.queryByRole('button', { name: /导出 Word/ })).not.toBeInTheDocument()
-    expect(screen.getByText(/导出.*尚未接入/)).toBeInTheDocument()
+    // Local export is implemented and exercised against the production server;
+    // its available state must not claim an operation succeeded before a click.
+    expect(screen.getByRole('button', { name: '打包下载本地作品' })).toBeEnabled()
+    expect(screen.queryByText(/导出.*尚未接入/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/导出成功/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
 
     rerender(<DesktopToolModals activeModal="compliance" onClose={() => undefined} />)
     expect(screen.queryByText(/合规率 100%/)).not.toBeInTheDocument()

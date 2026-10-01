@@ -16,6 +16,32 @@ afterEach(() => {
 const BOOK: BookInfo = { root: 'C:\\tmp\\book-a', bookId: 'bk_1', title: '测试之书' }
 
 describe('WorkbenchView', () => {
+  it('从工作台打开导出时传入当前作品，可选择导出全本', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
+      if (path === '/api/chapter.prose') return okJson({ ok: true, exists: false })
+      return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
+    }))
+    render(<WorkbenchView book={BOOK} onBookCreated={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: '导出排版' }))
+    expect(screen.getByRole('checkbox', { name: /导出当前作品全量/ })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('作品名称')).toHaveValue(BOOK.title)
+  })
+
+  it('切书后导出面板使用新书名，清除上一书的导出选择', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/capabilities') return okJson({ ok: true, capabilities: [], providerAvailable: false })
+      if (path === '/api/chapter.prose') return okJson({ ok: true, exists: false })
+      return okJson({ ok: true, question: '问题', hint: '提示', choices: [] })
+    }))
+    const { rerender } = render(<WorkbenchView book={BOOK} onBookCreated={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: '导出排版' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: /导出当前作品全量/ }))
+    rerender(<WorkbenchView book={{ root: 'C:/book-b', bookId: 'bk_2', title: '另一部书' }} onBookCreated={() => {}} />)
+    expect(screen.getByPlaceholderText('作品名称')).toHaveValue('另一部书')
+    expect(screen.getByRole('checkbox', { name: /导出当前作品全量/ })).not.toBeChecked()
+  })
+
   it('空书对话流显示建书提示；composer 不在未建书状态伪装可用', () => {
     render(<WorkbenchView book={null} onBookCreated={() => {}} />)
     expect(screen.getByTestId('dialogue-no-book').textContent).toContain('先建书')

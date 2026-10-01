@@ -68,6 +68,8 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
   const [exportTitle, setExportTitle] = useState(book?.title ?? '我的作品')
   const [exportSampleText, setExportSampleText] = useState('')
   const [exportStatus, setExportStatus] = useState<string | null>(null)
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportFailed, setExportFailed] = useState(false)
   const [exportingRealBook, setExportingRealBook] = useState(false)
 
   // 本地合规审查状态
@@ -111,15 +113,27 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
   }
 
   const handleTriggerExport = async () => {
+    if (exportBusy) return
+    setExportBusy(true)
+    setExportFailed(false)
     setExportStatus('正在准备导出文件…')
-    const result = await executeExportWorkflow({
-      book,
-      exportingRealBook,
-      title: exportTitle,
-      format: exportFormat,
-      customSampleText: exportSampleText,
-    })
-    setExportStatus(result.message)
+    try {
+      const result = await executeExportWorkflow({
+        book,
+        exportingRealBook,
+        title: exportTitle,
+        format: exportFormat,
+        customSampleText: exportSampleText,
+      })
+      setExportFailed(!result.success)
+      setExportStatus(result.message)
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause)
+      setExportFailed(true)
+      setExportStatus(`导出失败：${detail}。内容已保留，可重试。`)
+    } finally {
+      setExportBusy(false)
+    }
   }
 
   return (
@@ -245,7 +259,6 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
 
         {activeModal === 'export' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Unavailable>导出</Unavailable>
             <div style={{ borderTop: '1px solid var(--hairline)', paddingTop: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>本地出版级格式打包下载</div>
               <p className="muted" style={{ fontSize: 11, margin: '4px 0 10px' }}>
@@ -273,7 +286,7 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
                         checked={exportingRealBook}
                         onChange={(e) => setExportingRealBook(e.target.checked)}
                       />
-                      导出当前作品全量正典章节（《{book.title}》）
+                      导出当前作品全量正文章节（《{book.title}》）
                     </label>
                   </div>
                 )}
@@ -287,7 +300,7 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
                 {!exportingRealBook && (
                   <textarea
                     rows={4}
-                    placeholder="章节或样章内容（留空则生成当前样章模板）"
+                    placeholder="章节或样章内容（粘贴要导出的正文）"
                     value={exportSampleText}
                     onChange={(e) => setExportSampleText(e.target.value)}
                     style={{ padding: '6px 8px', fontSize: 12, background: 'var(--surface-sunken)', border: '1px solid var(--hairline)', borderRadius: 6, color: 'var(--fg-pure)', resize: 'vertical' }}
@@ -297,12 +310,13 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
                   type="button"
                   className="btn-primary"
                   onClick={() => { void handleTriggerExport() }}
+                  disabled={exportBusy}
                   style={{ fontSize: 12, padding: '8px 12px' }}
                 >
                   {exportingRealBook ? `打包全本《${book?.title}》并下载` : '打包下载本地作品'}
                 </button>
                 {exportStatus && (
-                  <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>{exportStatus}</div>
+                  <div role={exportFailed ? 'alert' : 'status'} style={{ fontSize: 11, color: exportFailed ? 'var(--danger)' : 'var(--success)', marginTop: 4 }}>{exportStatus}</div>
                 )}
               </div>
             </div>

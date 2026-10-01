@@ -74,7 +74,7 @@ export function TopBar({
         <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('inspiration')} title="打开本地灵感工坊">
           <ToolIcon path={ICONS.inspiration} /> <span className="top-btn-label">灵感工坊</span>
         </button>
-        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('export')} title="导出尚未接入">
+        <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('export')} title="导出本地作品（TXT / DOCX / EPUB）">
           <ToolIcon path={ICONS.export} /> <span className="top-btn-label">导出</span>
         </button>
         <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('compliance')} title="合规审查尚未接入">
