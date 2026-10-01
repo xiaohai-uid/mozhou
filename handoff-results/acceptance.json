@@ -1,0 +1,447 @@
+{
+  "capturedAt": "2026-09-30T10:40:11.196Z",
+  "slices": [
+    {
+      "id": "B",
+      "title": "第二章确实接收到第一章的内容；生成后可以采纳、保存和全本导出",
+      "verdict": "PASSED",
+      "assertions": [
+        {
+          "name": "provider 可用（真实通道）",
+          "result": "PASS",
+          "evidence": null
+        },
+        {
+          "name": "第一章读回正文与写入一致（正文载荷逐字相同）",
+          "result": "PASS",
+          "evidence": {
+            "revision": 1,
+            "rawChars": 164,
+            "payloadChars": 164,
+            "payloadSha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+            "rawSha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+          }
+        },
+        {
+          "name": "第一章夹具含全部稀有事实",
+          "result": "PASS",
+          "evidence": {
+            "missing": []
+          }
+        },
+        {
+          "name": "第二章上下文里出现第一章的 4 个稀有事实",
+          "result": "PASS",
+          "evidence": {
+            "present": [
+              "靛蓝色缺口",
+              "阿岚",
+              "潮退三寸",
+              "熄灯三年"
+            ]
+          }
+        },
+        {
+          "name": "第二章上下文不含第二章指令以外的提示（指令未复述细节）",
+          "result": "PASS",
+          "evidence": {
+            "prompt": "接着上一章写约200字，保持既有角色与物件，不要分析。"
+          }
+        },
+        {
+          "name": "第二章 start 帧 provider 自报真实上游",
+          "result": "PASS",
+          "evidence": "real-openai-compatible"
+        },
+        {
+          "name": "第二章有 done 帧且 succeeded",
+          "result": "PASS",
+          "evidence": {
+            "ok": true,
+            "event": "done",
+            "candidateId": "1bb7d37b-5b0f-4349-b1c4-9de9930e154a",
+            "outcome": "succeeded",
+            "partial": false,
+            "chars": 224,
+            "__tMs": 38972
+          }
+        },
+        {
+          "name": "生成未覆盖已保存的第一章",
+          "result": "PASS",
+          "evidence": {
+            "revisionBefore": 1,
+            "revisionAfter": 1
+          }
+        },
+        {
+          "name": "未采纳的候选没有污染第二章正文（仍是脚手架原文，revision 不变）",
+          "result": "PASS",
+          "evidence": {
+            "exists": true,
+            "payload": "# 第2章\n",
+            "revision": 0
+          }
+        },
+        {
+          "name": "第二章候选采纳成功（200 + ok）",
+          "result": "PASS",
+          "evidence": {
+            "ok": true,
+            "candidateId": "1bb7d37b-5b0f-4349-b1c4-9de9930e154a",
+            "chapterIndex": 2,
+            "revision": 1,
+            "sha256": "aea606df5670c0d59fd3db6402ab1f24f0e00a5d6bddc8a3d378a5d5833f68c0",
+            "alreadyApplied": false
+          }
+        },
+        {
+          "name": "同幂等键重复采纳不新增版本",
+          "result": "PASS",
+          "evidence": {
+            "status": 200,
+            "alreadyApplied": true,
+            "revision": 1
+          }
+        },
+        {
+          "name": "第二章正文落盘且含采纳的候选文本",
+          "result": "PASS",
+          "evidence": {
+            "payloadChars": 225,
+            "candidateChars": 224
+          }
+        },
+        {
+          "name": "第一章在第二章采纳后仍未变",
+          "result": "PASS",
+          "evidence": null
+        },
+        {
+          "name": "TXT 导出含第一章各段（按序）",
+          "result": "PASS",
+          "evidence": [
+            71,
+            129,
+            186,
+            206
+          ]
+        },
+        {
+          "name": "TXT 导出含第二章各段（按序）",
+          "result": "PASS",
+          "evidence": [
+            301,
+            407,
+            459
+          ]
+        },
+        {
+          "name": "TXT 导出章序为 1 → 2",
+          "result": "PASS",
+          "evidence": {
+            "lastCh1": 206,
+            "firstCh2": 301
+          }
+        }
+      ],
+      "evidenceFiles": [
+        "artifacts/context-chapter2.txt",
+        "artifacts/context-chapter2.frames.ndjson",
+        "artifacts/chapter2-candidate.md",
+        "artifacts/chapter2-accepted.md",
+        "artifacts/export-parse.json",
+        "artifacts/book-export.txt",
+        "artifacts/book-export.docx",
+        "artifacts/book-export.epub"
+      ],
+      "unknownOrUnverified": [
+        "生成正文的文学质量与「是否忠实复述前章每一处细节」未做评审：模型在本轮第二章正文只承接了部分设定（属模型行为，不构成上下文断裂证据）。",
+        "EPUB/DOCX 只做 ZIP+XML 解析核对（各章实际正文与章序），未用真实阅读器渲染，排版未验证。",
+        "compiled_receipt 模式下 compiled context 的收据（receipt）内容未逐条核对，只核对了真正送进模型的 prompt 文本。"
+      ]
+    },
+    {
+      "id": "C",
+      "title": "生成中取消不会写坏正文；取消后可以继续编辑、再生成并采纳",
+      "verdict": "PASSED",
+      "controlledFixture": [
+        {
+          "name": "受控上游已发出首个 delta（取消前确有流）",
+          "result": "PASS",
+          "evidence": {
+            "chars": 14
+          }
+        },
+        {
+          "name": "客户端断开后不再收到 done 帧",
+          "result": "PASS",
+          "evidence": {
+            "doneFrame": null
+          }
+        },
+        {
+          "name": "上游侧观察到连接关闭/中止（模型调用确实被停止）",
+          "result": "PASS",
+          "evidence": [
+            {
+              "at": "2026-09-30T10:28:35.021Z",
+              "tMs": 542,
+              "event": "connection_closed",
+              "emittedFrames": 1,
+              "finishedNaturally": false
+            }
+          ]
+        },
+        {
+          "name": "取消后正文/revision/指纹零变化",
+          "result": "PASS",
+          "evidence": {
+            "revision": 1,
+            "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+            "chars": 164
+          }
+        },
+        {
+          "name": "采纳已取消候选被拒（409 + CANDIDATE_NOT_ACCEPTABLE）",
+          "result": "PASS",
+          "evidence": {
+            "status": 409,
+            "code": "CANDIDATE_NOT_ACCEPTABLE",
+            "error": "CANDIDATE_NOT_ACCEPTABLE: candidate 8982c5ee-94a2-4299-b6bb-59b4d84ac3fd in status partial requires explicit confirmation"
+          }
+        },
+        {
+          "name": "被拒采纳后正文/revision/指纹仍零变化",
+          "result": "PASS",
+          "evidence": null
+        },
+        {
+          "name": "显式 /api/draft.cancel：partial → cancelled（或已终态时 409 CANDIDATE_TERMINAL），且不改正文",
+          "result": "PASS",
+          "evidence": {
+            "beforeStatus": "partial",
+            "status": 200,
+            "data": {
+              "ok": true,
+              "candidateId": "8982c5ee-94a2-4299-b6bb-59b4d84ac3fd",
+              "status": "cancelled"
+            }
+          }
+        },
+        {
+          "name": "显式 cancel 后正文零变化",
+          "result": "PASS",
+          "evidence": null
+        },
+        {
+          "name": "重启后已保存正文仍可读且一致",
+          "result": "PASS",
+          "evidence": {
+            "revision": 1,
+            "chars": 164
+          }
+        },
+        {
+          "name": "重启后取消候选不被当作成功成品（status=cancelled）",
+          "result": "PASS",
+          "evidence": {
+            "status": "cancelled",
+            "textChars": 14
+          }
+        },
+        {
+          "name": "取消后作者仍可保存编辑",
+          "result": "PASS",
+          "evidence": {
+            "status": 200,
+            "revision": 2,
+            "error": null
+          }
+        },
+        {
+          "name": "编辑落盘一致（正文载荷逐字相同）",
+          "result": "PASS",
+          "evidence": {
+            "revision": 2,
+            "payloadChars": 173
+          }
+        },
+        {
+          "name": "取消后再次生成能拿到 done（completed candidate）",
+          "result": "PASS",
+          "evidence": {
+            "ok": true,
+            "event": "done",
+            "candidateId": "81eaf39e-b044-4288-8269-7989a700f5cc",
+            "outcome": "succeeded",
+            "partial": false,
+            "chars": 41,
+            "__tMs": 320
+          }
+        },
+        {
+          "name": "取消后再生成的候选可采纳",
+          "result": "PASS",
+          "evidence": {
+            "status": 200,
+            "revision": 3,
+            "error": null
+          }
+        }
+      ],
+      "realUpstream": [
+        {
+          "name": "真实上游：取消在 done 之前发生（否则本场景 NOT EXERCISED）",
+          "result": "PASS",
+          "evidence": {
+            "sawDeltaAt": 33058,
+            "done": null
+          }
+        },
+        {
+          "name": "真实取消后正文/revision/指纹零变化",
+          "result": "PASS",
+          "evidence": {
+            "revision": 1,
+            "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+            "chars": 164
+          }
+        },
+        {
+          "name": "真实上游：取消后再次生成成功",
+          "result": "PASS",
+          "evidence": {
+            "ok": true,
+            "event": "done",
+            "candidateId": "200ea47f-828d-4ea1-bb1c-55ec9af1810c",
+            "outcome": "succeeded",
+            "partial": false,
+            "chars": 230,
+            "__tMs": 27100
+          }
+        },
+        {
+          "name": "真实上游：取消后再生成可采纳",
+          "result": "PASS",
+          "evidence": {
+            "status": 200,
+            "revision": 2,
+            "error": null
+          }
+        },
+        {
+          "name": "真实采纳后正文不只含原文（确有新正文）",
+          "result": "PASS",
+          "evidence": {
+            "revision": 2,
+            "chars": 231,
+            "sha256": "2aaa79e83994f26481280a4e1679c0298cd250beae4873e08beb24486d5b5f9a"
+          }
+        }
+      ],
+      "disconnectAfterComplete": [
+        {
+          "name": "客户端断开后服务端在 4s 内没有退出",
+          "result": "PASS",
+          "evidence": null
+        },
+        {
+          "name": "客户端断开后服务端仍能响应 /api/health",
+          "result": "PASS",
+          "evidence": 200
+        },
+        {
+          "name": "断开取消后正文/revision/指纹零变化",
+          "result": "PASS",
+          "evidence": {
+            "revision": 1,
+            "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+          }
+        },
+        {
+          "name": "上游侧观察到连接关闭（模型调用确实被停止）",
+          "result": "PASS",
+          "evidence": [
+            {
+              "at": "2026-09-30T10:25:28.468Z",
+              "tMs": 506,
+              "event": "request_received",
+              "url": "/v1/chat/completions",
+              "model": "controlled-fixture",
+              "stream": true,
+              "authHeaderPresent": true
+            },
+            {
+              "at": "2026-09-30T10:25:28.477Z",
+              "tMs": 515,
+              "event": "connection_closed",
+              "emittedFrames": 1,
+              "finishedNaturally": false
+            }
+          ]
+        },
+        {
+          "name": "服务端日志没有 uncaughtException / unhandledRejection",
+          "result": "PASS",
+          "evidence": []
+        }
+      ],
+      "evidenceFiles": [
+        "artifacts/real-cancel-partial.md",
+        "artifacts/real-regenerate-candidate.md",
+        "artifacts/real-accepted.md",
+        "artifacts/controlled-upstream-events.json",
+        "artifacts/controlled-upstream-disc.json"
+      ],
+      "unknownOrUnverified": [
+        "真实上游侧「收到 RST 后是否立刻停止推理、是否计费」无法观测也未经上游确认：本轮只证明了本机到上游的 HTTP 请求在取消后不再继续读、应用侧候选标 partial/cancelled、正文零变化。",
+        "浏览器 UI 层未经真实点击验证（本会话没有可用浏览器工具）：未验证「点击停止 → 编辑 → 再生成 → 采纳」的真实按钮路径，也未截图。",
+        "本轮 HEAD 的 UI 里不存在调用 /api/draft.cancel 的入口（见 source-map.md 的调用方清单），因此 UI 侧取消只能由断开流触发。",
+        "并发取消（两个标签页同时生成同一章）未测；只有进程内单飞的既有回归覆盖。"
+      ]
+    }
+  ],
+  "noProductionCodeChange": {
+    "statement": "无生产代码修改 —— 本轮没有发现需要修改产品代码的缺陷。",
+    "targetFileHashesBefore": {
+      "apps/web/server/draftContext.ts": {
+        "sha256": "b7ff5cf1f7229a8651452c9d2eae09f4dbc4f3cb0ec4c65924224983891fb36f",
+        "bytes": 8112
+      },
+      "apps/web/server/routes/pipelineRoutes.ts": {
+        "sha256": "8c2094b77c0123e1d3bc9256f2f4b06a1281b169e916073de4e18a814ae11bcb",
+        "bytes": 46237
+      },
+      "apps/web/src/workbench/DialogueStream.tsx": {
+        "sha256": "34326296346dce94867442bfd401d4bcf4fc088a0e1672f7b5661c120660519b",
+        "bytes": 35948
+      },
+      "packages/pipeline/src/draft-candidate.ts": {
+        "sha256": "b48de162bde34df34dd386620adc3315681f4abab601aae14a8408dd4d72d560",
+        "bytes": 9954
+      },
+      "packages/pipeline/src/draft-step.ts": {
+        "sha256": "8364f2cd75277467b7e44da1adf4fe5aa2756322bc8224703ce8190ac751fa8a",
+        "bytes": 22513
+      },
+      "apps/web/server/routes/proseRoutes.ts": {
+        "sha256": "166d2f1a7d16d6de8ff0eaf7867f634d70313b89813e19773654b17eb397af3b",
+        "bytes": 33272
+      },
+      "apps/web/server/routes/exportRoutes.ts": {
+        "sha256": "f350b2f07143102f3f264f781d91875456b7d1dc1cf23782f9417937f5413995",
+        "bytes": 3723
+      },
+      "apps/web/src/draftStream.ts": {
+        "sha256": "b63204308f892b7c39a8593b233401c17f2f657d8806cdd69dcbece757b82193",
+        "bytes": 9398
+      },
+      "apps/web/server/llm/openaiStream.ts": {
+        "sha256": "5c3f683f893dfa7b06ecea86b8237f382243a30d36a914187df7f11c6f63c952",
+        "bytes": 14823
+      }
+    },
+    "patchDiffBytes": 0
+  }
+}

@@ -1,0 +1,135 @@
+diff --git a/harness/transport.mjs b/harness/transport.mjs
+index 7787de5..af1423f 100644
+--- a/harness/transport.mjs
++++ b/harness/transport.mjs
+@@ -1,53 +1,97 @@
+ /**
+- * harness/transport.mjs —— 真实通道的**唯一**发放入口（额度 + 门禁 + 记账 三合一）。
++ * harness/transport.mjs —— 真实通道的**唯一发放入口**。
+  *
+- * 为什么单独成模块：Codex 复核指出 runner 里存在多处各自发请求的路径
+- * （B 阶段一处、C-real 一处、C-control 曾误配一处），任何一处漏检都等于预算失效。
+- * 现在所有真实上游请求必须经过 guardedSend()，它做三件事且顺序不可颠倒：
++ * 第四轮返修（Codex 复核 P2）新增：
++ *   - 每次尝试有**唯一 attemptId**，把 reservationId（额度占用）与请求的
++ *     started / terminal 事件绑在一起，报告层据此计数，帧只作内容证据；
++ *   - **首帧前传输异常也留痕**：terminal 事件在 finally 里写，所以「一次都没吐帧就炸了」
++ *     的尝试同样在账上，且明确标 terminal=error；
++ *   - 进程在发请求途中被杀 ⇒ 有 started 无 terminal，报告层标 UNKNOWN，不静默丢。
+  *
+- *   1. channel 判别：只有 channel==='real' 才可能发真实请求；'controlled' 一律拒绝；
+- *   2. **先 spendRealCall() 原子持久化占用**（失败/取消/429 都不退款）；
+- *   3. 拿到 reservationId 之后才真正调用 transport()。
+- *
+- * transport 由调用方注入 ⇒ 离线测试可以用假 transport 完整验证门禁，
+- * 不需要任何真实网络。
++ * 不变的两条硬规矩：
++ *   - **先持久化占用，再发送**（spendRealCall 在 transport 之前）；
++ *   - **任何异常 / 429 / 取消都不退款**（这里没有 finally 退款分支）。
+  */
+-import { spendRealCall } from './accounting.mjs';
++import {
++  appendAttemptEvent, BudgetUnavailableError, spendRealCall,
++} from './accounting.mjs';
+ 
+ export class ChannelRefusedError extends Error {
+-  constructor(message, detail) {
++  constructor(message) {
+     super(message);
+     this.name = 'ChannelRefusedError';
+-    this.detail = detail ?? null;
++    this.code = 'CHANNEL_REFUSED';
+   }
+ }
+ 
++function isoNow() { return new Date().toISOString(); }
++
++function classify(error) {
++  const text = String((error && error.message) ?? error ?? '');
++  if (/429|tpm\/rpm|rate_limit/i.test(text)) return 'rate_limited';
++  if (/BUDGET_EXHAUSTED/.test(text)) return 'budget_exhausted';
++  return 'transport_error';
++}
++
+ /**
+- * @param {object} opts
+- * @param {'real'|'controlled'} opts.channel
+- * @param {string} opts.ticketDir
+- * @param {string} opts.reason            这次真实调用的用途（进账本，必填）
+- * @param {string|null} opts.runDir
+- * @param {(reservation)=>Promise<any>} opts.transport 真正发请求的函数
+- * @returns {Promise<{result:any, reservation:object}>}
++ * @param {{channel:'real'|'controlled', ticketDir:string, reason:string, runDir?:string,
++ *          transport:() => Promise<any>, attemptId?:string}} opts
++ * @returns {Promise<{result:any, reservation:object|null, attemptId:string}>}
+  */
+-export async function guardedSend(opts) {
+-  const { channel, ticketDir, reason, runDir = null, transport } = opts;
+-  if (typeof transport !== 'function') throw new TypeError('guardedSend: transport 必须是函数');
++export async function guardedSend({ channel, ticketDir, reason, runDir = null, transport, attemptId = null }) {
+   if (channel !== 'real' && channel !== 'controlled') {
+-    throw new ChannelRefusedError('guardedSend: channel 必须是 real 或 controlled，收到 ' + String(channel));
++    throw new ChannelRefusedError('channel 必须是 real 或 controlled，收到 ' + JSON.stringify(channel));
+   }
++  if (typeof reason !== 'string' || reason.trim().length === 0) {
++    throw new BudgetUnavailableError('REASON_REQUIRED', '发放必须给出非空 reason（否则账目不可审计）');
++  }
++  if (typeof transport !== 'function') {
++    throw new TypeError('transport 必须是函数');
++  }
++
+   if (channel === 'controlled') {
+-    // 受控替身**不允许**占用真实额度：占用了就是账目污染。
+-    const result = await transport(null);
+-    return { result, reservation: null };
++    // 受控替身**不占真实额度**，但同样留下 attemptId 与起止事件，便于与真实通道对账口径一致。
++    const aid = attemptId ?? ('at_ctl_' + process.pid + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8));
++    const startedAt = Date.now();
++    appendAttemptEvent(ticketDir, {
++      event: 'started', attemptId: aid, reservationId: null, seq: null, channel: 'controlled',
++      reason: reason.trim(), runDir, pid: process.pid,
++    });
++    try {
++      const result = await transport();
++      appendAttemptEvent(ticketDir, {
++        event: 'terminal', attemptId: aid, channel: 'controlled', terminal: 'ok',
++        elapsedMs: Date.now() - startedAt, error: null,
++      });
++      return { result, reservation: null, attemptId: aid };
++    } catch (error) {
++      appendAttemptEvent(ticketDir, {
++        event: 'terminal', attemptId: aid, channel: 'controlled',
++        terminal: classify(error), elapsedMs: Date.now() - startedAt,
++        error: String((error && error.message) ?? error),
++      });
++      throw error;
++    }
+   }
+-  // 唯一授权点。抛错（额度用尽 / 账本损坏 / 锁超时 / 非法预算）⇒ 请求根本不发出。
+-  const reservation = spendRealCall(ticketDir, { reason, runDir, channel });
++
++  // ---- real：先占用（同一把锁内同时写 started 事件），再发送 ----
++  const startedAt = Date.now();
++  const reservation = spendRealCall(ticketDir, { reason, runDir, channel: 'real', attemptId });
+   try {
+-    const result = await transport(reservation);
+-    return { result, reservation };
+-  } finally {
+-    // 故意不退款：无论成功、失败、取消、429，占用都已持久化。
++    const result = await transport();
++    appendAttemptEvent(ticketDir, {
++      event: 'terminal', attemptId: reservation.attemptId, reservationId: reservation.reservationId,
++      seq: reservation.seq, channel: 'real', terminal: 'ok',
++      elapsedMs: Date.now() - startedAt, error: null,
++    });
++    return { result, reservation, attemptId: reservation.attemptId };
++  } catch (error) {
++    // 首帧前异常也必须留痕；**不退款**
++    appendAttemptEvent(ticketDir, {
++      event: 'terminal', attemptId: reservation.attemptId, reservationId: reservation.reservationId,
++      seq: reservation.seq, channel: 'real', terminal: classify(error),
++      elapsedMs: Date.now() - startedAt, error: String((error && error.message) ?? error),
++    });
++    throw error;
+   }
+ }

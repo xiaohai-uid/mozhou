@@ -1,0 +1,80 @@
+{
+  "generatedBy": ".patch/package.mjs",
+  "baseline": "C:/zcode/novel-ai-handoff-stage4/.baseline-round5",
+  "files": [
+    {
+      "file": "runner.mjs",
+      "kind": "modified",
+      "addedLines": 62,
+      "removedLines": 24,
+      "diff": "diffs/runner.mjs.diff"
+    },
+    {
+      "file": "harness/accounting.mjs",
+      "kind": "modified",
+      "addedLines": 372,
+      "removedLines": 113,
+      "diff": "diffs/harness__accounting.mjs.diff"
+    },
+    {
+      "file": "harness/transport.mjs",
+      "kind": "modified",
+      "addedLines": 77,
+      "removedLines": 33,
+      "diff": "diffs/harness__transport.mjs.diff"
+    },
+    {
+      "file": "harness/make-ledger.mjs",
+      "kind": "modified",
+      "addedLines": 278,
+      "removedLines": 155,
+      "diff": "diffs/harness__make-ledger.mjs.diff"
+    },
+    {
+      "file": "harness/tests/offline-budget.test.mjs",
+      "kind": "modified",
+      "addedLines": 0,
+      "removedLines": 0,
+      "diff": "diffs/harness__tests__offline-budget.test.mjs.diff"
+    },
+    {
+      "file": "harness/tests/child-spend.mjs",
+      "kind": "modified",
+      "addedLines": 0,
+      "removedLines": 0,
+      "diff": "diffs/harness__tests__child-spend.mjs.diff"
+    },
+    {
+      "file": "fixtures/controlled-upstream.mjs",
+      "kind": "modified",
+      "addedLines": 0,
+      "removedLines": 0,
+      "diff": "diffs/fixtures__controlled-upstream.mjs.diff"
+    }
+  ],
+  "addedFiles": [
+    {
+      "file": "harness/tests/audit-red.test.mjs",
+      "kind": "added",
+      "newFile": "new-files/harness__tests__audit-red.test.mjs"
+    },
+    {
+      "file": "harness/tests/lock-holder.mjs",
+      "kind": "added",
+      "newFile": "new-files/harness__tests__lock-holder.mjs"
+    },
+    {
+      "file": "harness/tests/init-child.mjs",
+      "kind": "added",
+      "newFile": "new-files/harness__tests__init-child.mjs"
+    }
+  ],
+  "copiedEvidence": [
+    "evidence/tests/logs-red-BEFORE.log",
+    "evidence/tests/logs-red-AFTER.log",
+    "evidence/tests/logs-52-after.log",
+    "evidence/tests/artifacts-audit-red.json",
+    "evidence/runs-ledger.json",
+    "evidence/runs-ledger.md"
+  ]
+}

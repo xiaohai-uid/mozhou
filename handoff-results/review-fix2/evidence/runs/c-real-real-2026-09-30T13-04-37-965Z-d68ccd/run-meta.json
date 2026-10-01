@@ -1,0 +1,18 @@
+{
+  "runId": "c-real-real-2026-09-30T13-04-37-965Z-d68ccd",
+  "phase": "c-real",
+  "channel": "real",
+  "realModelCallsAllowed": 0,
+  "ledgerFile": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket\\ledger.json",
+  "repo": "C:\\zcode\\novel-ai",
+  "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data",
+  "startedAt": "2026-09-30T13:04:37.973Z",
+  "argv": [
+    "--phase",
+    "c-real",
+    "--channel",
+    "real",
+    "--callBudget",
+    "0"
+  ]
+}

@@ -1,0 +1,31 @@
+ M .github/workflows/ci.yml
+ M AGENTS.md
+ M CLAUDE.md
+ M CONTEXT.md
+ M README.md
+ M apps/web/package.json
+ M apps/web/server/routes/namingRoutes.realModel.test.ts
+ M apps/web/server/routes/pipelineRoutes.firstChapter.realModel.test.ts
+ M apps/web/server/routes/realModel.featureSweep.test.ts
+ M apps/web/server/storyboard/generate.test.ts
+ M apps/web/src/code-graph/CodeNodeExplorer.test.tsx
+ M apps/web/src/code-graph/CodeNodeExplorer.tsx
+ M apps/web/src/code-graph/codeGraphData.json
+ M apps/web/src/code-graph/codeGraphSnapshot.ts
+ M apps/web/src/shell/DesktopToolModals.tsx
+ M apps/web/src/shell/TopBar.tsx
+ M apps/web/src/ui-truthfulness.hardening.test.tsx
+ M apps/web/src/workbench/WorkbenchView.test.tsx
+ M apps/web/src/workbench/WorkbenchView.tsx
+ M eslint.config.js
+ M package.json
+ M packages/flywheel/src/index.ts
+ M pnpm-lock.yaml
+ M scripts/export-code-graph.mjs
+?? apps/web/server/test-support/
+?? apps/web/src/shell/DesktopToolModals.export.test.tsx
+?? docs/handoff/HANDOFF-20260930-code-level.md
+?? handoff-results/
+?? packages/flywheel/src/evaluator/confirm.test.ts
+?? packages/flywheel/src/evaluator/confirm.ts
+?? scripts/run-real-model-tests.mjs

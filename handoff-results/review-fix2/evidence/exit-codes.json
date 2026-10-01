@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-09-30T13:08:45.1138376Z",
+  "realModelCalls": 0,
+  "networkUsed": false,
+  "note": "phase=c-real 以额度 0 运行：guardedSend 在发请求前抛 BUDGET_EXHAUSTED，退出码 1 是**预期的 fail-closed**，不是失败。其余离线阶段退出码必须为 0。",
+  "runs": [
+    {
+      "name": "T1-T52 原 52 项离线测试（修后实现）",
+      "command": "node harness/tests/offline-budget.test.mjs",
+      "exitCode": 0,
+      "log": "logs/offline-budget-52-AFTER.log"
+    },
+    {
+      "name": "T15-T17 新增红例（修后实现，应全绿）",
+      "command": "node harness/tests/audit-red.test.mjs",
+      "exitCode": 0,
+      "log": "logs/audit-red-AFTER.log"
+    },
+    {
+      "name": "T15-T17 新增红例（修前基线，应变红）",
+      "command": "node harness/tests/audit-red.test.mjs",
+      "exitCode": 1,
+      "log": "logs/audit-red-BEFORE.log"
+    },
+    {
+      "name": "phase=b 第二章拿到第一章上下文并采纳/导出",
+      "command": "node runner.mjs --phase b",
+      "exitCode": 0,
+      "log": "logs/phase-b.log"
+    },
+    {
+      "name": "phase=c-control 取消后再生成",
+      "command": "node runner.mjs --phase c-control",
+      "exitCode": 0,
+      "log": "logs/phase-c-control.log"
+    },
+    {
+      "name": "phase=c-disc 断开后服务端无未捕获异常",
+      "command": "node runner.mjs --phase c-disc",
+      "exitCode": 0,
+      "log": "logs/phase-c-disc.log"
+    },
+    {
+      "name": "phase=guard 额度门与损坏账本门",
+      "command": "node runner.mjs --phase guard",
+      "exitCode": 0,
+      "log": "logs/phase-guard.log"
+    },
+    {
+      "name": "phase=c-real 真实通道（额度 0，应在预算门被挡）",
+      "command": "node runner.mjs --phase c-real --channel real --callBudget 0",
+      "exitCode": 1,
+      "log": "logs/phase-c-real-BLOCKED.log"
+    },
+    {
+      "name": "make-ledger 生成账目",
+      "command": "node harness/make-ledger.mjs",
+      "exitCode": 0,
+      "log": "logs/make-ledger.log"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "verifiedAtUtc": "2026-09-30T10:32:28Z",
+  "processesIStarted": [
+    {
+      "kind": "mozhou service (node apps/web/dist-server/productionServer.js)",
+      "howStarted": "runner.mjs spawn(process.execPath, ...)",
+      "ports": [
+        50524,
+        58978,
+        58988,
+        49805,
+        62644,
+        62746
+      ],
+      "allStopped": true
+    },
+    {
+      "kind": "controlled upstream test double (node fixtures/controlled-upstream.mjs)",
+      "howStarted": "runner.mjs spawn(process.execPath, ...)",
+      "ports": [
+        58983
+      ],
+      "allStopped": true
+    }
+  ],
+  "verification": {
+    "method": "Get-NetTCPConnection -LocalPort <recorded> -State Listen 全部为空，且 Get-CimInstance Win32_Process 中不存在命令行含 novel-ai / handoff-stage4 / controlled-upstream 的 node 进程",
+    "result": "全部已停止",
+    "untouched": "没有 kill 任何不是我启动的进程（本机其它 node 进程一律未动）",
+    "note": "port=50524 是 B 阶段的一次成功运行；数据根 stage4-data 目录下的 .mozhou_instance.lock 是文件锁残留，进程退出后锁已释放，文件保留不影响下次启动"
+  },
+  "portsRecordedByArtifacts": {
+    "b": 50524,
+    "cControl": {
+      "server": 58978,
+      "controlled": 58988,
+      "upstream": 58983
+    },
+    "cDisc": {
+      "server": 49805,
+      "controlled": 62644
+    },
+    "cReal": 62746
+  },
+  "testDataRetained": {
+    "isolatedDataRoots": [
+      "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data (B)",
+      "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data-ccontrol (C-control)",
+      "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data-cdisc (C-disc)",
+      "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data-creal (C-real)"
+    ],
+    "note": "全部在仓库之外、且都是 MOZHOU_DATA_ROOT 覆盖出的新建目录；真实书稿库与开发者本机数据根未读写。测试数据按交接要求保留以便复核。",
+    "realBookDirsTouched": "none"
+  },
+  "harnessKeptOutsideRepo": "C:\\zcode\\novel-ai-handoff-stage4\\{runner.mjs, fixtures\\controlled-upstream.mjs, parse-exports.py, export-results.mjs} —— 刻意不入仓库，避免 typescript-eslint project service 报 Parsing error 污染 pnpm lint"
+}

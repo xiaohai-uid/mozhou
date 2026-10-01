@@ -1,0 +1,38 @@
+{
+  "apps/web/server/draftContext.ts": {
+    "sha256": "b7ff5cf1f7229a8651452c9d2eae09f4dbc4f3cb0ec4c65924224983891fb36f",
+    "bytes": 8112
+  },
+  "apps/web/server/routes/pipelineRoutes.ts": {
+    "sha256": "8c2094b77c0123e1d3bc9256f2f4b06a1281b169e916073de4e18a814ae11bcb",
+    "bytes": 46237
+  },
+  "apps/web/src/workbench/DialogueStream.tsx": {
+    "sha256": "34326296346dce94867442bfd401d4bcf4fc088a0e1672f7b5661c120660519b",
+    "bytes": 35948
+  },
+  "packages/pipeline/src/draft-candidate.ts": {
+    "sha256": "b48de162bde34df34dd386620adc3315681f4abab601aae14a8408dd4d72d560",
+    "bytes": 9954
+  },
+  "packages/pipeline/src/draft-step.ts": {
+    "sha256": "8364f2cd75277467b7e44da1adf4fe5aa2756322bc8224703ce8190ac751fa8a",
+    "bytes": 22513
+  },
+  "apps/web/server/routes/proseRoutes.ts": {
+    "sha256": "166d2f1a7d16d6de8ff0eaf7867f634d70313b89813e19773654b17eb397af3b",
+    "bytes": 33272
+  },
+  "apps/web/server/routes/exportRoutes.ts": {
+    "sha256": "f350b2f07143102f3f264f781d91875456b7d1dc1cf23782f9417937f5413995",
+    "bytes": 3723
+  },
+  "apps/web/src/draftStream.ts": {
+    "sha256": "b63204308f892b7c39a8593b233401c17f2f657d8806cdd69dcbece757b82193",
+    "bytes": 9398
+  },
+  "apps/web/server/llm/openaiStream.ts": {
+    "sha256": "5c3f683f893dfa7b06ecea86b8237f382243a30d36a914187df7f11c6f63c952",
+    "bytes": 14823
+  }
+}

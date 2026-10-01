@@ -1,0 +1,103 @@
+{
+  "phase": "GUARD",
+  "startedAt": "2026-09-30T11:35:22.593Z",
+  "channel": "controlled",
+  "runId": "guard-controlled-2026-09-30T11-35-22-591Z-cce8e2",
+  "runDir": "C:\\zcode\\novel-ai-handoff-stage4\\runs\\guard-controlled-2026-09-30T11-35-22-591Z-cce8e2",
+  "networkUsed": false,
+  "results": [
+    {
+      "name": "controlled 通道下 sendReal 必须被拒（不会偷发真实请求）",
+      "rejected": true,
+      "code": null,
+      "name_": "Error",
+      "message": "ChannelRefused: 当前 channel=controlled，真实通道未开启（不许发真实请求）"
+    },
+    {
+      "name": "额度 0：guardedSend 在发请求前被挡（BUDGET_EXHAUSTED）",
+      "rejected": true,
+      "code": "BUDGET_EXHAUSTED",
+      "name_": "BudgetExhaustedError",
+      "message": "BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送"
+    },
+    {
+      "name": "缺账本：fail closed（LEDGER_MISSING）",
+      "rejected": true,
+      "code": "LOCK_ERROR",
+      "name_": "BudgetUnavailableError",
+      "message": "LOCK_ERROR: 无法创建账本锁：ENOENT: no such file or directory, mkdir 'C:\\zcode\\novel-ai-handoff-stage4\\runs\\guard-controlled-2026-09-30T11-35-22-591Z-cce8e2\\no-such-ticket\\.ledger.lock'"
+    },
+    {
+      "name": "非法额度（负数）：fail closed（BUDGET_INVALID）",
+      "rejected": true,
+      "code": "BUDGET_INVALID",
+      "name_": "BudgetUnavailableError",
+      "message": "BUDGET_INVALID: allowance 不能为负，收到 -1"
+    },
+    {
+      "name": "损坏账本：fail closed（LEDGER_CORRUPT）",
+      "rejected": true,
+      "code": "LEDGER_CORRUPT",
+      "name_": "BudgetUnavailableError",
+      "message": "LEDGER_CORRUPT: 账本 JSON 无法解析：Expected property name or '}' in JSON at position 2 (line 1 column 3)"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "controlled 通道下 sendReal 必须被拒（不会偷发真实请求）",
+      "result": "PASS",
+      "evidence": {
+        "name": "controlled 通道下 sendReal 必须被拒（不会偷发真实请求）",
+        "rejected": true,
+        "code": null,
+        "name_": "Error",
+        "message": "ChannelRefused: 当前 channel=controlled，真实通道未开启（不许发真实请求）"
+      }
+    },
+    {
+      "name": "额度 0：guardedSend 在发请求前被挡（BUDGET_EXHAUSTED）",
+      "result": "PASS",
+      "evidence": {
+        "name": "额度 0：guardedSend 在发请求前被挡（BUDGET_EXHAUSTED）",
+        "rejected": true,
+        "code": "BUDGET_EXHAUSTED",
+        "name_": "BudgetExhaustedError",
+        "message": "BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送"
+      }
+    },
+    {
+      "name": "缺账本：fail closed（LEDGER_MISSING）",
+      "result": "PASS",
+      "evidence": {
+        "name": "缺账本：fail closed（LEDGER_MISSING）",
+        "rejected": true,
+        "code": "LOCK_ERROR",
+        "name_": "BudgetUnavailableError",
+        "message": "LOCK_ERROR: 无法创建账本锁：ENOENT: no such file or directory, mkdir 'C:\\zcode\\novel-ai-handoff-stage4\\runs\\guard-controlled-2026-09-30T11-35-22-591Z-cce8e2\\no-such-ticket\\.ledger.lock'"
+      }
+    },
+    {
+      "name": "非法额度（负数）：fail closed（BUDGET_INVALID）",
+      "result": "PASS",
+      "evidence": {
+        "name": "非法额度（负数）：fail closed（BUDGET_INVALID）",
+        "rejected": true,
+        "code": "BUDGET_INVALID",
+        "name_": "BudgetUnavailableError",
+        "message": "BUDGET_INVALID: allowance 不能为负，收到 -1"
+      }
+    },
+    {
+      "name": "损坏账本：fail closed（LEDGER_CORRUPT）",
+      "result": "PASS",
+      "evidence": {
+        "name": "损坏账本：fail closed（LEDGER_CORRUPT）",
+        "rejected": true,
+        "code": "LEDGER_CORRUPT",
+        "name_": "BudgetUnavailableError",
+        "message": "LEDGER_CORRUPT: 账本 JSON 无法解析：Expected property name or '}' in JSON at position 2 (line 1 column 3)"
+      }
+    }
+  ],
+  "allAssertionsPassed": true
+}

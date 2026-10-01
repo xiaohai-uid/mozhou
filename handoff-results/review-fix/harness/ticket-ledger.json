@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "ticket": "mozhou-stage4-audit-fix",
+  "realCallAllowance": 0,
+  "createdAt": "2026-09-30T11:28:04.704Z",
+  "migratedSpend": [],
+  "spend": [],
+  "note": "整张工单共享额度；缺省 0 = 默认不允许任何真实调用"
+}

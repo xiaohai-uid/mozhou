@@ -1,0 +1,171 @@
+diff --git a/runner.mjs b/runner.mjs
+index e2b0389..b82dd29 100644
+--- a/runner.mjs
++++ b/runner.mjs
+@@ -31,7 +31,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
+ import { createServer as createNetServer } from 'node:net';
+ import { join, resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { budgetSnapshot, initLedger } from './harness/accounting.mjs';
++import { budgetSnapshot, initLedger, migrateLedgerV1toV2, readLedger } from './harness/accounting.mjs';
+ import { guardedSend } from './harness/transport.mjs';
+ 
+ const HERE = resolve(fileURLToPath(new URL('.', import.meta.url)));
+@@ -100,16 +100,34 @@ function writeLog(name) {
+ 
+ /* ---- 额度账本：先立案（只写盘），真实通道每次请求前先占用 ---- */
+ function ensureLedger() {
+-  const existing = budgetSnapshot(TICKET_DIR);
+-  if (existing.exists) {
+-    // 已立案：**不重置**（重启不退款）；只做合法性检查
+-    return existing;
+-  }
+-  initLedger(TICKET_DIR, {
+-    ticket: 'mozhou-stage4-audit-fix',
++  const TICKET_NAME = 'mozhou-stage4-audit-fix';
++  const initArgs = {
++    ticket: TICKET_NAME,
+     allowance: CALL_BUDGET,
+     note: '整张工单共享额度；缺省 0 = 默认不允许任何真实调用',
+-  });
++  };
++  // 旧的 v1 测试账本：**显式**迁移（不是自动重置）。
++  let existing = null;
++  try { existing = readLedger(TICKET_DIR); }
++  catch (error) {
++    if (error && error.code === 'LEDGER_CORRUPT') {
++      let raw = null;
++      try { raw = JSON.parse(readUtf8(join(TICKET_DIR, 'ledger.json')) ?? 'null'); } catch { raw = null; }
++      if (raw !== null && raw.version === 1) {
++        log('  账本为 v1，执行显式迁移 v1→v2（保留全部消耗）');
++        migrateLedgerV1toV2(TICKET_DIR, { reason: 'stage4 round-5 ledger schema v2' });
++        existing = readLedger(TICKET_DIR);
++      } else { throw error; }
++    } else { throw error; }
++  }
++  if (existing !== null) {
++    // 幂等重入：把账本现值原样传回，init 内部逐字段校验后原样返回。
++    // 绝不做「先 existsSync 再 init」的检查-使用竞态。
++    initLedger(TICKET_DIR, { ticket: existing.ticket, allowance: existing.realCallAllowance, note: initArgs.note });
++    return budgetSnapshot(TICKET_DIR);
++  }
++  // 首次创建：allowance 缺省 0 = 默认不允许任何真实调用
++  initLedger(TICKET_DIR, initArgs);
+   return budgetSnapshot(TICKET_DIR);
+ }
+ const LEDGER_AT_START = ensureLedger();
+@@ -129,12 +147,17 @@ writeFileSync(join(RUN_DIR, 'run-meta.json'), JSON.stringify({
+ }, null, 2) + '\n', 'utf8');
+ 
+ /** 每个生成调用都落一份**原始 NDJSON 帧**（不加工、不截断）。 */
+-let frameSeq = 0;
+-function writeFrames(label, rawLines) {
+-  frameSeq += 1;
+-  const safe = String(label).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60);
+-  const name = 'frames-' + String(frameSeq).padStart(2, '0') + '-' + safe + '.ndjson';
+-  writeRaw(name, rawLines.join(String.fromCharCode(10)) + String.fromCharCode(10));
++/**
++ * 每个生成调用落一份原始 NDJSON 帧（不加工、不截断），文件名带 attemptId。
++ * 一次尝试只写一个文件 —— 报告层按 attemptId 关联账目，帧只是内容证据；
++ * 同一份帧的重复副本不会增加计数（Codex 第四轮复核 P2）。
++ */
++const runAttempts = [];
++function writeFrames(attemptId, label, rawLines) {
++  const text = rawLines.join(String.fromCharCode(10)) + String.fromCharCode(10);
++  const name = 'frames-' + attemptId + '.ndjson';
++  writeRaw(name, text);
++  runAttempts.push({ attemptId, label, framesFile: name, framesSha256: sha256Text(text) });
+   return name;
+ }
+ /** 运行时请求上限 = 账本额度（跨进程共享），不再是本进程局部变量。 */
+@@ -187,7 +210,7 @@ async function sendReal(body, onFrame, label, runDir) {
+     throw new Error('ChannelRefused: 当前 channel=' + CHANNEL + '，真实通道未开启（不许发真实请求）');
+   }
+   const t0 = Date.now();
+-  const { result, reservation } = await guardedSend({
++  const { result, reservation, attemptId } = await guardedSend({
+     channel: 'real',
+     ticketDir: TICKET_DIR,
+     reason: label,
+@@ -195,8 +218,8 @@ async function sendReal(body, onFrame, label, runDir) {
+     transport: async () => await openDraftStream(body, onFrame),
+   });
+   const summary = summarizeStream(result);
+-  log('  [real] ' + label + ' reservation=' + reservation.reservationId + ' seq=' + reservation.seq + ' remaining=' + reservation.remainingAfter + ' → ' + summary.terminal);
+-  return { result, reservation, summary };
++  log('  [real] ' + label + ' attemptId=' + attemptId + ' reservation=' + reservation.reservationId + ' seq=' + reservation.seq + ' remaining=' + reservation.remainingAfter + ' → ' + summary.terminal);
++  return { result, reservation, attemptId, summary };
+ }
+ 
+ /**
+@@ -206,13 +229,24 @@ async function sendReal(body, onFrame, label, runDir) {
+  * 调用方一律用这个函数，禁止再出现「某处自己 fetch /api/draft.stream」的裸调用。
+  */
+ async function generate(body, onFrame, label) {
++  // 没有 label 的调用也要给**可审计的** reason —— 账目不接受空理由。
++  const why = (label !== undefined && label !== null && label !== '')
++    ? label
++    : ('phase=' + PHASE + ' generate(unnamed)');
+   if (CHANNEL === 'controlled') {
+-    const result = await openDraftStream({ ...body, channel: 'controlled' }, onFrame);
+-    const framesFile = writeFrames('controlled-' + label, result.rawLines ?? []);
+-    return { result, reservation: null, summary: summarizeStream(result), channel: 'controlled', framesFile };
++    const out = await guardedSend({
++      channel: 'controlled',
++      ticketDir: TICKET_DIR,
++      reason: why,
++      runDir: RUN_DIR,
++      transport: async () => await openDraftStream({ ...body, channel: 'controlled' }, onFrame),
++    });
++    const result = out.result;
++    const framesFile = writeFrames(out.attemptId, why, result.rawLines ?? []);
++    return { result, reservation: null, attemptId: out.attemptId, summary: summarizeStream(result), channel: 'controlled', framesFile };
+   }
+-  const out = await sendReal({ ...body, channel: 'real' }, onFrame, label, RUN_DIR);
+-  const framesFile = writeFrames('real-' + label, out.result.rawLines ?? []);
++  const out = await sendReal({ ...body, channel: 'real' }, onFrame, why, RUN_DIR);
++  const framesFile = writeFrames(out.attemptId, why, out.result.rawLines ?? []);
+   return { ...out, channel: 'real', framesFile };
+ }
+ 
+@@ -511,7 +545,7 @@ async function phaseB() {
+   const ctxText = String(start.prompt ?? '');
+   writeFileSync(join(RUN_DIR, 'context-chapter2.txt'), ctxText, 'utf8');
+   // 落盘诊断帧（prompt 是本请求**实际**送进模型装配的完整上下文）
+-  writeFileSync(join(RUN_DIR, 'context-chapter2.frames.ndjson'), gen2.rawLines.join('\n') + '\n', 'utf8');
++  // 原始帧只写一次（writeFrames 已按 attemptId 落盘）——不再另存副本，避免报告层重复计数。
+ 
+   out.captureContext = {
+     contextMode: start.contextMode,
+@@ -595,6 +629,7 @@ async function phaseB() {
+ 
+   out.serverLogTail = serverLog.join('').split('\n').slice(-25);
+   out.ledger = budgetSnapshot(TICKET_DIR);
++  out.attempts = runAttempts;
+   out.assertions = assertions;
+   out.finishedAt = new Date().toISOString();
+   if (fixture !== null) { try { fixture.fixture.kill(); } catch { /* ignore */ } }
+@@ -773,6 +808,7 @@ async function phaseCControl() {
+   child.kill();
+   fixture.kill();
+   out.serverLogTail = serverLog.join('').split('\n').slice(-30);
++  out.attempts = runAttempts;
+   out.assertions = assertions;
+   out.finishedAt = new Date().toISOString();
+   return out;
+@@ -855,6 +891,7 @@ async function phaseCReal() {
+   }
+ 
+   out.ledger = budgetSnapshot(TICKET_DIR);
++  out.attempts = runAttempts;
+   out.assertions = assertions;
+   out.finishedAt = new Date().toISOString();
+   return out;
+@@ -937,6 +974,7 @@ async function phaseCDisc() {
+ 
+   writeFileSync(join(RUN_DIR, 'controlled-upstream-disc.log'), upLog.join(''), 'utf8');
+   try { fixture.kill(); } catch { /* ignore */ }
++  out.attempts = runAttempts;
+   out.assertions = assertions;
+   out.finishedAt = new Date().toISOString();
+   return out;

@@ -1,0 +1,30 @@
+# patch.diff（本轮为空补丁）
+
+## 结论
+
+**本轮没有修改任何生产代码，因此没有补丁。**
+
+- `git diff HEAD --stat` 在收工后仍与开工前逐字一致（工作区里那 25 个已修改文件全部是**他人/前一阶段**的未提交改动，
+  见 `baseline.json` 的 `gitStatusPorcelain` 与 `baseline-git-status.txt`）。
+- 本轮唯一新增的未跟踪路径是 `handoff-results/`（本证据包本身）。
+- 9 个目标文件（`apps/web/server/draftContext.ts`、`apps/web/server/routes/pipelineRoutes.ts`、
+  `apps/web/src/workbench/DialogueStream.tsx`、`packages/pipeline/src/draft-candidate.ts`、
+  `packages/pipeline/src/draft-step.ts`、`apps/web/server/routes/proseRoutes.ts`、
+  `apps/web/server/routes/exportRoutes.ts`、`apps/web/src/draftStream.ts`、
+  `apps/web/server/llm/openaiStream.ts`）的 sha256 在收工后逐一重算，**与开工前完全相同**（见 `baseline.json`）。
+
+## 为什么不能拿 `git diff HEAD` 当本轮补丁
+
+工作区在开工前就有大量未提交改动（`.github/workflows/ci.yml`、`AGENTS.md`、`CLAUDE.md`、`CONTEXT.md`、`README.md`、
+`apps/web/package.json`、`pnpm-lock.yaml`、若干 realModel 测试、`packages/flywheel/`、`scripts/` 等）。
+把它们算成本轮补丁是**归属错误**。本轮已按交接要求保留它们原样，未 reset / clean / stash / 覆盖。
+
+## 如果确实需要一份「本轮新增」的差异
+
+那只有证据包内部的文件，且全部是**新增**（不是对仓库既有文件的修改）：
+
+```text
+handoff-results/**            （本目录，全部为新增；含 REVIEW-ME.md、各类 JSON 与产物）
+```
+
+仓库外的取证装置（`C:\zcode\novel-ai-handoff-stage4\`）不在仓库里，也不构成补丁。

@@ -1,0 +1,14 @@
+{
+  "runId": "c-disc-controlled-2026-09-30T13-03-47-766Z-17583e",
+  "phase": "c-disc",
+  "channel": "controlled",
+  "realModelCallsAllowed": 0,
+  "ledgerFile": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket\\ledger.json",
+  "repo": "C:\\zcode\\novel-ai",
+  "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data",
+  "startedAt": "2026-09-30T13:03:47.775Z",
+  "argv": [
+    "--phase",
+    "c-disc"
+  ]
+}

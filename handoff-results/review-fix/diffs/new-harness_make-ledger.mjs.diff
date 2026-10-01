@@ -1,0 +1,223 @@
+diff --git "a/harness\\make-ledger.mjs" "b/harness\\make-ledger.mjs"
+new file mode 100644
+index 0000000..e63043c
+--- /dev/null
++++ "b/harness\\make-ledger.mjs"
+@@ -0,0 +1,217 @@
++/**
++ * harness/make-ledger.mjs —— **自动**从运行目录生成账目。
++ *
++ * 为什么需要：Codex 第四轮指出，上一版 handoff-results/calls.json 是**手写数组**，
++ * 于是必然漏账（两次 B 只有一笔）。现在账目只有一个来源：runs/<runId>/ 里的
++ * 原始帧（*.ndjson）、上游事件（*.json）、运行元数据（run.json / *.log）。
++ *
++ * 本脚本做三件事：
++ *   1. 扫描 runs/ 下每个运行目录，抽取「每个 /api/draft.stream 调用」；
++ *   2. 读工单账本（ticket/ledger.json），按 reservationId 把额度占用与调用对齐；
++ *   3. 合并**历史遗留条目**（LEGACY 常量，来自旧交回包与会话日志；端点身份不可核实的一律
++ *      标 UNKNOWN，绝不猜测），输出 runs-ledger.json + runs-ledger.md。
++ *
++ * 只读；不联网；不改任何账本。
++ */
++import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
++import { join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { budgetSnapshot } from './accounting.mjs';
++
++const HERE = resolve(fileURLToPath(new URL('.', import.meta.url)));
++const STAGE = resolve(HERE, '..');
++const RUNS = join(STAGE, 'runs');
++const TICKET_DIR = join(STAGE, '.state', 'ticket');
++const OUT_JSON = join(HERE, 'runs-ledger.json');
++const OUT_MD = join(HERE, 'runs-ledger.md');
++
++/**
++ * 历史遗留调用（**本轮修复过程中已经发生、无法由 runs/ 重建**的那些）。
++ * 每条的 source 指向它的留档位置；endpointProvenance 只有两种合法值：
++ *   'KNOWN_*'（有直接留档）或 'UNKNOWN'（**没有**独立留档，禁止猜测）。
++ */
++const LEGACY = [
++  {
++    seq: 1, at: '2026-09-30T10:15:20Z', phase: 'B（上一版 harness 首次尝试）',
++    purpose: '第二章上下文生成（首次尝试）',
++    terminal: 'error', elapsedMs: 530, deltaChars: 0, rateLimited: true,
++    error: '上游 429: inference exceeds tpm/rpm limit (429003)',
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '该次构建由上一版 runner 的 B 分支默认启动真实通道（buildEnv(real=true) 且无受控端点注入）；且错误文本是真实供应商的 429 体。',
++    evidence: '会话日志 10:15:20；产物已被后续运行覆盖，无原始帧留存',
++  },
++  {
++    seq: 2, at: '2026-09-30T10:16:06Z', phase: 'B（上一版 harness）',
++    purpose: '第二章上下文生成（成功）',
++    terminal: 'done', elapsedMs: 19480, deltaChars: 302, rateLimited: false, error: null,
++    candidateId: 'a60d02ba-afa6-49d6-bd82-819877c2dbc3',
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '仅有 start 帧自报的 provider 字符串（real-openai-compatible）与耗时，**没有**端点/环回覆盖值的独立留档；provider 字符串对受控替身与真实通道取值相同，无法据此排除替身（Codex 第四轮同判）。',
++    evidence: 'C:\\zcode\\novel-ai\\handoff-results\\test-logs\\phase-b.log（10:16:29 的 done 帧行）；原始帧已被覆盖',
++  },
++  {
++    seq: 3, at: '2026-09-30T10:18:56Z', phase: 'C-control（上一版 harness 配错通道）',
++    purpose: '取消后再生成——本应走本地替身，实际被起成了真实通道',
++    terminal: 'error', elapsedMs: 60166, deltaChars: 0, rateLimited: false,
++    error: '全部候选失败：TIMEOUT: deepseek 超过 60000ms 未返回',
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '该次重启被显式配置为真实通道（上一版 runner 的 startServerWithEnv 走 buildEnv(true)），且 60s 无任何 delta 与真实上游行为一致。',
++    evidence: '会话日志 10:18:56；无原始帧留存',
++  },
++  {
++    seq: 4, at: '2026-09-30T10:19:41Z', phase: 'C-real（上一版 harness）',
++    purpose: '真实取消：收到首个 delta 即断开',
++    terminal: 'aborted_by_client', elapsedMs: 9696, deltaChars: 1, rateLimited: false, error: null,
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '上一版 runner 的 --phase c-real 分支不注入受控端点，只从凭据解析；首 delta 9.7s 到达符合公网上游首字节特征。',
++    evidence: '会话日志 10:19:41；产物已被最终运行覆盖',
++  },
++  {
++    seq: 5, at: '2026-09-30T10:19:57Z', phase: 'C-real（上一版 harness）',
++    purpose: '取消之后重新生成',
++    terminal: 'done', elapsedMs: 15521, deltaChars: 230, rateLimited: false, error: null,
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '同上（同一进程内的第二条真实请求）。',
++    evidence: '会话日志 10:19:57；产物已被覆盖',
++  },
++  {
++    seq: 6, at: '2026-09-30T10:28:46Z', phase: 'C-real（重跑尝试）',
++    purpose: '真实取消（重跑尝试 1）',
++    terminal: 'error', elapsedMs: 120, deltaChars: 0, rateLimited: false,
++    error: 'fetch failed（连接层失败，未取得任何帧）',
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '连接层失败发生在任何帧之前，没有 start 帧可以佐证端点；也没有当时的端点覆盖留档。',
++    evidence: '会话日志 10:28:46（该次结果文件随后被覆盖）',
++  },
++  {
++    seq: 7, at: '2026-09-30T10:28:46Z', phase: 'C-real（重跑尝试）',
++    purpose: '取消之后重新生成（重跑尝试 1）',
++    terminal: 'error', elapsedMs: 223, deltaChars: 0, rateLimited: true,
++    error: '上游 429: inference exceeds tpm/rpm limit (429003)',
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '429 体来自真实供应商。',
++    evidence: '会话日志 10:28:46',
++  },
++  {
++    seq: 8, at: '2026-09-30T10:30:37Z', phase: 'C-real（最终留档前一次尝试）',
++    purpose: '真实取消：收到首个 delta 即断开',
++    terminal: 'aborted_by_client', elapsedMs: 33059, deltaChars: 1, rateLimited: false, error: null,
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '上一版 artifacts/phase-c-real.json 保留了该次运行的帧（含 provider 自报与 base.revision=1），端点由凭据解析路径产生。',
++    evidence: '上一版 artifacts/phase-c-real.json（已随旧包保留）',
++  },
++  {
++    seq: 9, at: '2026-09-30T10:31:10Z', phase: 'C-real（最终留档）',
++    purpose: '取消之后重新生成并采纳',
++    terminal: 'done', elapsedMs: 27100, deltaChars: 230, rateLimited: false, error: null,
++    endpointProvenance: 'KNOWN_REAL',
++    provenanceBasis: '同上（上一版 artifacts/phase-c-real.json 的第二条记录）。',
++    evidence: '上一版 artifacts/phase-c-real.json',
++  },
++];
++
++/** 扫描一个运行目录，抽取所有生成调用。 */
++function scanRun(runDir) {
++  const names = readdirSync(runDir);
++  const metaPath = join(runDir, 'run-meta.json');
++  const meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : null;
++  const calls = [];
++  for (const name of names) {
++    if (!name.endsWith('.ndjson')) continue;
++    const lines = readFileSync(join(runDir, name), 'utf8').split(/\r?\n/).filter((l) => l.trim().length > 0);
++    const frames = [];
++    for (const line of lines) { try { frames.push(JSON.parse(line)); } catch { /* 原始行保留在文件里 */ } }
++    const start = frames.find((f) => f.event === 'start');
++    const done = frames.find((f) => f.event === 'done');
++    const err = frames.find((f) => f.event === 'error');
++    const deltas = frames.filter((f) => f.event === 'delta');
++    calls.push({
++      rawFile: name,
++      candidateId: start?.candidateId ?? done?.candidateId ?? err?.candidateId ?? null,
++      startFrameProvider: start?.provider ?? null,
++      contextMode: start?.contextMode ?? null,
++      contextTokens: start?.contextTokens ?? null,
++      terminal: done !== undefined ? 'done' : err !== undefined ? 'error' : 'no_terminal_frame',
++      error: err?.error ?? null,
++      rateLimited: err !== undefined && /429|tpm\/rpm|rate_limit/i.test(String(err.error ?? '')),
++      deltaChars: deltas.map((f) => f.text ?? '').join('').length,
++      finishedAtMs: (done ?? err)?.__tMs ?? null,
++    });
++  }
++  return { runDir, meta, calls };
++}
++
++const runs = existsSync(RUNS)
++  ? readdirSync(RUNS).filter((n) => existsSync(join(RUNS, n, 'run-meta.json')) || existsSync(join(RUNS, n, 'run.log'))).sort()
++  : [];
++const scanned = runs.map((n) => scanRun(join(RUNS, n)));
++const ledger = budgetSnapshot(TICKET_DIR);
++
++const doc = {
++  generatedAt: new Date().toISOString(),
++  generator: 'harness/make-ledger.mjs（自动扫描 runs/，非手写数组）',
++  ticket: ledger.exists ? ledger.ticket : null,
++  allowance: ledger.exists ? ledger.allowance : null,
++  spentRecorded: ledger.exists ? ledger.used : 0,
++  remaining: ledger.exists ? ledger.remaining : null,
++  overBudget: ledger.exists ? ledger.overBudget : false,
++  legacyRealCalls: LEGACY,
++  legacyRealCallCount: LEGACY.length,
++  legacyCountsAsFinal: false,
++  runs: scanned.map((s) => ({
++    runId: s.meta?.runId ?? null,
++    phase: s.meta?.phase ?? null,
++    channel: s.meta?.channel ?? null,
++    realModelCallsAllowed: s.meta?.realModelCallsAllowed ?? null,
++    calls: s.calls,
++  })),
++  totals: {
++    legacy: LEGACY.length,
++    fromRuns: scanned.reduce((sum, s) => sum + s.calls.filter((c) => s.meta?.channel === 'real').length, 0),
++    note: '总计只统计「真实通道」的运行；controlled 运行不消耗真实额度。',
++  },
++  unknowns: [
++    'seq2（10:16 的 B）端点身份 UNKNOWN：只有 provider 字符串与耗时，无端点覆盖留档。',
++    'seq6（10:28 连接层失败）端点身份 UNKNOWN：失败在任何帧之前。',
++    '两次 B 的原始帧均已不可得（数据根已删除、旧 artifacts 被后续运行覆盖），只保留日志行的结构化引用。',
++  ],
++};
++
++mkdirSync(HERE, { recursive: true });
++writeFileSync(OUT_JSON, JSON.stringify(doc, null, 2) + '\n', 'utf8');
++
++const lines = [];
++lines.push('# 运行账目（自动生成，勿手改）');
++lines.push('');
++lines.push('- 生成时间：' + doc.generatedAt);
++lines.push('- 生成器：' + doc.generator);
++lines.push('- 工单账本：ticket=' + String(doc.ticket) + ' allowance=' + String(doc.allowance) + ' 已记录占用=' + String(doc.spentRecorded) + ' 剩余=' + String(doc.remaining));
++lines.push('- 遗留真实调用（无法由 runs/ 重建）：**' + LEGACY.length + '** 条');
++lines.push('');
++lines.push('## 遗留调用（上一版 harness 期间发生）');
++lines.push('');
++lines.push('| seq | 时间 | 阶段 | 用途 | 终态 | 耗时 | delta | 端点身份 | 依据 |');
++lines.push('|---|---|---|---|---|---|---|---|---|');
++for (const l of LEGACY) {
++  lines.push('| ' + l.seq + ' | ' + l.at + ' | ' + l.phase + ' | ' + l.purpose + ' | ' + l.terminal + ' | ' + (l.elapsedMs ?? '') + 'ms | ' + l.deltaChars + ' | **' + l.endpointProvenance + '** | ' + l.provenanceBasis + ' |');
++}
++lines.push('');
++lines.push('## 本次修复期间的运行（runs/，自动扫描）');
++lines.push('');
++if (scanned.length === 0) lines.push('（无）');
++for (const s of scanned) {
++  lines.push('### ' + (s.meta?.runId ?? s.runDir));
++  lines.push('- phase=' + String(s.meta?.phase) + ' channel=' + String(s.meta?.channel) + ' 额度=' + String(s.meta?.realModelCallsAllowed));
++  if (s.calls.length === 0) lines.push('- （该运行没有生成调用）');
++  for (const c of s.calls) {
++    lines.push('- ' + c.rawFile + ' → terminal=' + c.terminal + ' provider=' + String(c.startFrameProvider) + ' contextMode=' + String(c.contextMode) + ' delta=' + c.deltaChars + (c.error ? ' error=' + String(c.error).slice(0, 120) : ''));
++  }
++  lines.push('');
++}
++lines.push('## 未知项（禁止猜测）');
++lines.push('');
++for (const u of doc.unknowns) lines.push('- ' + u);
++lines.push('');
++writeFileSync(OUT_MD, lines.join('\n') + '\n', 'utf8');
++
++console.log(JSON.stringify({ runs: scanned.length, legacy: LEGACY.length, fromRunsReal: doc.totals.fromRuns, out: [OUT_JSON, OUT_MD] }, null, 2));

@@ -1,0 +1,55 @@
+[
+  {
+    "at": "2026-09-30T13:03:45.146Z",
+    "tMs": 979,
+    "event": "request_received",
+    "url": "/v1/chat/completions",
+    "model": "controlled-fixture",
+    "stream": true,
+    "authHeaderPresent": true
+  },
+  {
+    "at": "2026-09-30T13:03:45.146Z",
+    "tMs": 979,
+    "event": "delta_sent",
+    "index": 1,
+    "chars": 14
+  },
+  {
+    "at": "2026-09-30T13:03:45.153Z",
+    "tMs": 986,
+    "event": "connection_closed",
+    "emittedFrames": 1,
+    "finishedNaturally": false
+  },
+  {
+    "at": "2026-09-30T13:03:47.546Z",
+    "tMs": 3379,
+    "event": "request_received",
+    "url": "/v1/chat/completions",
+    "model": "controlled-fixture",
+    "stream": true,
+    "authHeaderPresent": true
+  },
+  {
+    "at": "2026-09-30T13:03:47.546Z",
+    "tMs": 3379,
+    "event": "delta_sent",
+    "index": 1,
+    "chars": 14
+  },
+  {
+    "at": "2026-09-30T13:03:47.611Z",
+    "tMs": 3444,
+    "event": "delta_sent",
+    "index": 2,
+    "chars": 27
+  },
+  {
+    "at": "2026-09-30T13:03:47.673Z",
+    "tMs": 3506,
+    "event": "stream_completed",
+    "emittedFrames": 2,
+    "finishedNaturally": true
+  }
+]

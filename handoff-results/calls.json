@@ -1,0 +1,192 @@
+{
+  "capturedAt": "2026-09-30T10:40:11.196Z",
+  "budget": {
+    "allowedRealGenerationRequests": 4,
+    "allowedMinimalProbe": 1,
+    "actualRealGenerationRequests": 9,
+    "budgetExceeded": true,
+    "overrunBy": 5,
+    "minimalProbeUsed": 0
+  },
+  "budgetOverrun": {
+    "admitted": true,
+    "why": [
+      "第一次尝试就在 B 阶段撞上上游 429（免费公测通道的 tpm/rpm 限流），失败也占额度；",
+      "C-control 阶段我先把服务重启成了真实通道（配错），多打了一次真实请求（seq 3）；",
+      "C-real 的两次「重跑尝试」是在我给 runner 加\"限流退避重试\"**之前**发出的，退避逻辑当时还没接上计数器，于是 seq 6/7 绕过了预算检查。"
+    ],
+    "mitigation": [
+      "发现后立即停止一切真实调用：此后所有验证（含 B 阶段回归、C-control、C-disc）全部改走本地受控替身，零真实调用；",
+      "runner 已加硬约束：realAttempt 在每次开流**之前**检查 realCalls.length >= callBudget 并抛 BLOCKED，机器层面不可能再绕过；",
+      "未再使用任何收费/订阅通道，未修改全局 provider 配置，未把凭据写入任何文件。"
+    ]
+  },
+  "realCalls": [
+    {
+      "seq": 1,
+      "at": "2026-09-30T10:15:20Z",
+      "phase": "B",
+      "purpose": "第二章上下文生成（首次尝试）",
+      "terminal": "error",
+      "elapsedMs": 530,
+      "deltaChars": 0,
+      "rateLimited": true,
+      "error": "上游 429: inference exceeds tpm/rpm limit (429003)",
+      "evidence": "会话日志 10:15:20；产物已被后续成功运行覆盖"
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-30T10:16:06Z",
+      "phase": "B",
+      "purpose": "第二章上下文生成（成功）",
+      "terminal": "done",
+      "elapsedMs": 19480,
+      "deltaChars": 302,
+      "rateLimited": false,
+      "error": null,
+      "evidence": "artifacts/phase-b.json / context-chapter2.frames.ndjson"
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-30T10:18:56Z",
+      "phase": "C-control（配错）",
+      "purpose": "取消后再生成——本应走本地替身，实际被起成了真实通道",
+      "terminal": "error",
+      "elapsedMs": 60166,
+      "deltaChars": 0,
+      "rateLimited": false,
+      "error": "全部候选失败：TIMEOUT: deepseek 超过 60000ms 未返回",
+      "evidence": "会话日志 10:18:56；该次配错已修复（重启后保持受控环境）"
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-30T10:19:41Z",
+      "phase": "C-real",
+      "purpose": "真实取消：收到首个 delta 即断开（成功）",
+      "terminal": "aborted_by_client",
+      "elapsedMs": 9696,
+      "deltaChars": 1,
+      "rateLimited": false,
+      "error": null,
+      "evidence": "会话日志 10:19:41（该次产物已被覆盖，最终证据见 seq 8）"
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-30T10:19:57Z",
+      "phase": "C-real",
+      "purpose": "取消之后重新生成（成功）",
+      "terminal": "done",
+      "elapsedMs": 15521,
+      "deltaChars": 230,
+      "rateLimited": false,
+      "error": null,
+      "evidence": "会话日志 10:19:57（同上，已被覆盖）"
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-30T10:28:46Z",
+      "phase": "C-real",
+      "purpose": "真实取消（重跑尝试 1）",
+      "terminal": "error",
+      "elapsedMs": 120,
+      "deltaChars": 0,
+      "rateLimited": false,
+      "error": "fetch failed（连接层失败，未取得任何帧）",
+      "evidence": "artifacts/phase-c-real.json 的上一次内容（已被覆盖）；会话日志 10:28:46"
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-30T10:28:46Z",
+      "phase": "C-real",
+      "purpose": "取消之后重新生成（重跑尝试 1）",
+      "terminal": "error",
+      "elapsedMs": 223,
+      "deltaChars": 0,
+      "rateLimited": true,
+      "error": "上游 429: inference exceeds tpm/rpm limit (429003)",
+      "evidence": "会话日志 10:28:46"
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-30T10:30:37Z",
+      "phase": "C-real",
+      "purpose": "真实取消：收到首个 delta 即断开（成功，最终留档）",
+      "terminal": "aborted_by_client",
+      "elapsedMs": 33059,
+      "deltaChars": 1,
+      "rateLimited": false,
+      "error": null,
+      "evidence": "artifacts/phase-c-real.json / real-cancel-partial.md"
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-30T10:31:10Z",
+      "phase": "C-real",
+      "purpose": "取消之后重新生成并采纳（成功，最终留档）",
+      "terminal": "done",
+      "elapsedMs": 27100,
+      "deltaChars": 230,
+      "rateLimited": false,
+      "error": null,
+      "evidence": "artifacts/phase-c-real.json / real-regenerate-candidate.md / real-accepted.md"
+    }
+  ],
+  "controlledFixtureCalls": [
+    {
+      "phase": "C-control",
+      "provider": "controlled-fixture (local test double)",
+      "realModelCalls": 0,
+      "generationRequestsToFixture": 2
+    },
+    {
+      "phase": "C-disc",
+      "provider": "controlled-fixture (local test double)",
+      "realModelCalls": 0,
+      "generationRequestsToFixture": 1
+    },
+    {
+      "phase": "B / C-real 的回归重跑",
+      "provider": "controlled-fixture (local test double)",
+      "realModelCalls": 0,
+      "generationRequestsToFixture": 0
+    }
+  ],
+  "credentialHandling": {
+    "source": "Windows 用户级环境变量 SENSENOVA_API_KEY / SENSENOVA_BASE_URL",
+    "injectedAs": "MOZHOU_API_KEY / MOZHOU_API_BASE / MOZHOU_MODEL，只进子进程内存",
+    "writtenToDisk": false,
+    "printed": false,
+    "passedOnCommandLine": false
+  },
+  "failures": [
+    {
+      "seq": 1,
+      "phase": "B",
+      "purpose": "第二章上下文生成（首次尝试）",
+      "error": "上游 429: inference exceeds tpm/rpm limit (429003)"
+    },
+    {
+      "seq": 3,
+      "phase": "C-control（配错）",
+      "purpose": "取消后再生成——本应走本地替身，实际被起成了真实通道",
+      "error": "全部候选失败：TIMEOUT: deepseek 超过 60000ms 未返回"
+    },
+    {
+      "seq": 6,
+      "phase": "C-real",
+      "purpose": "真实取消（重跑尝试 1）",
+      "error": "fetch failed（连接层失败，未取得任何帧）"
+    },
+    {
+      "seq": 7,
+      "phase": "C-real",
+      "purpose": "取消之后重新生成（重跑尝试 1）",
+      "error": "上游 429: inference exceeds tpm/rpm limit (429003)"
+    }
+  ],
+  "notes": [
+    "真实调用计数含失败、取消与连接层失败：每次 HTTP POST /api/draft.stream 开流即计 1 次。",
+    "成功留档的两次真实调用是 seq 8 / seq 9（均为最终产物所对应的那次）。",
+    "免费公测通道本轮实测有明显的 tpm/rpm 限流（429003），且出现过连接层 fetch failed；这都是上游状态，不是产品缺陷。"
+  ]
+}

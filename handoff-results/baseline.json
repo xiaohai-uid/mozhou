@@ -1,0 +1,92 @@
+{
+  "capturedAt": "2026-09-30T10:40:11.194Z",
+  "repoRoot": "C:\\zcode\\novel-ai",
+  "branch": "feature/windows-local-release",
+  "head": "dc0f7f3ddb2ed58be326d4002c902f852778e2cc",
+  "handedOffHead": "dc0f7f3ddb2ed58be326d4002c902f852778e2cc",
+  "headMatchesHandoff": true,
+  "gitStatusPorcelain": [
+    " M .github/workflows/ci.yml",
+    " M AGENTS.md",
+    " M CLAUDE.md",
+    " M CONTEXT.md",
+    " M README.md",
+    " M apps/web/package.json",
+    " M apps/web/server/routes/namingRoutes.realModel.test.ts",
+    " M apps/web/server/routes/pipelineRoutes.firstChapter.realModel.test.ts",
+    " M apps/web/server/routes/realModel.featureSweep.test.ts",
+    " M apps/web/server/storyboard/generate.test.ts",
+    " M apps/web/src/code-graph/CodeNodeExplorer.test.tsx",
+    " M apps/web/src/code-graph/CodeNodeExplorer.tsx",
+    " M apps/web/src/code-graph/codeGraphData.json",
+    " M apps/web/src/code-graph/codeGraphSnapshot.ts",
+    " M apps/web/src/shell/DesktopToolModals.tsx",
+    " M apps/web/src/shell/TopBar.tsx",
+    " M apps/web/src/ui-truthfulness.hardening.test.tsx",
+    " M apps/web/src/workbench/WorkbenchView.test.tsx",
+    " M apps/web/src/workbench/WorkbenchView.tsx",
+    " M eslint.config.js",
+    " M package.json",
+    " M packages/flywheel/src/index.ts",
+    " M pnpm-lock.yaml",
+    " M scripts/export-code-graph.mjs",
+    "?? apps/web/server/test-support/",
+    "?? apps/web/src/shell/DesktopToolModals.export.test.tsx",
+    "?? docs/handoff/HANDOFF-20260930-code-level.md",
+    "?? handoff-results/",
+    "?? packages/flywheel/src/evaluator/confirm.test.ts",
+    "?? packages/flywheel/src/evaluator/confirm.ts",
+    "?? scripts/run-real-model-tests.mjs"
+  ],
+  "preExistingDirtyCount": 30,
+  "targetFileHashesBeforeWork": {
+    "apps/web/server/draftContext.ts": {
+      "sha256": "b7ff5cf1f7229a8651452c9d2eae09f4dbc4f3cb0ec4c65924224983891fb36f",
+      "bytes": 8112
+    },
+    "apps/web/server/routes/pipelineRoutes.ts": {
+      "sha256": "8c2094b77c0123e1d3bc9256f2f4b06a1281b169e916073de4e18a814ae11bcb",
+      "bytes": 46237
+    },
+    "apps/web/src/workbench/DialogueStream.tsx": {
+      "sha256": "34326296346dce94867442bfd401d4bcf4fc088a0e1672f7b5661c120660519b",
+      "bytes": 35948
+    },
+    "packages/pipeline/src/draft-candidate.ts": {
+      "sha256": "b48de162bde34df34dd386620adc3315681f4abab601aae14a8408dd4d72d560",
+      "bytes": 9954
+    },
+    "packages/pipeline/src/draft-step.ts": {
+      "sha256": "8364f2cd75277467b7e44da1adf4fe5aa2756322bc8224703ce8190ac751fa8a",
+      "bytes": 22513
+    },
+    "apps/web/server/routes/proseRoutes.ts": {
+      "sha256": "166d2f1a7d16d6de8ff0eaf7867f634d70313b89813e19773654b17eb397af3b",
+      "bytes": 33272
+    },
+    "apps/web/server/routes/exportRoutes.ts": {
+      "sha256": "f350b2f07143102f3f264f781d91875456b7d1dc1cf23782f9417937f5413995",
+      "bytes": 3723
+    },
+    "apps/web/src/draftStream.ts": {
+      "sha256": "b63204308f892b7c39a8593b233401c17f2f657d8806cdd69dcbece757b82193",
+      "bytes": 9398
+    },
+    "apps/web/server/llm/openaiStream.ts": {
+      "sha256": "5c3f683f893dfa7b06ecea86b8237f382243a30d36a914187df7f11c6f63c952",
+      "bytes": 14823
+    }
+  },
+  "targetFileHashesUnchangedAfterWork": true,
+  "targetFilesModifiedByThisRun": [],
+  "afterWorkGitStatus": {
+    "file": "after-git-status.txt",
+    "entryCount": 31,
+    "comparedWithBaseline": "IDENTICAL（31 行逐字相同；baseline 已含 handoff-results/ 这一条新增未跟踪路径）"
+  },
+  "note": [
+    "baseline-git-status.txt 是本次开工前（10:11Z）的实时快照，与交接文档给的对照快照一致：",
+    "本轮唯一新增的未跟踪路径是 handoff-results/（证据包本身）。",
+    "上表 9 个目标文件的 sha256 在收工后逐一重算，全部未变 —— 即本轮没有改动任何产品源码。"
+  ]
+}

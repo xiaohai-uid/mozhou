@@ -1,0 +1,384 @@
+{
+  "phase": "B",
+  "startedAt": "2026-09-30T13:04:23.257Z",
+  "channel": "controlled",
+  "runId": "b-controlled-2026-09-30T13-04-23-248Z-70e238",
+  "runDir": "C:\\zcode\\novel-ai-handoff-stage4\\runs\\b-controlled-2026-09-30T13-04-23-248Z-70e238",
+  "controlledUpstream": {
+    "port": 63795,
+    "kind": "test-double (not a real model)"
+  },
+  "server": {
+    "port": 63805,
+    "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data"
+  },
+  "capabilities": {
+    "ok": true,
+    "capabilities": [
+      {
+        "id": "continuation",
+        "label": "续写"
+      },
+      {
+        "id": "sepia-write",
+        "label": "sepia 架构创作"
+      },
+      {
+        "id": "sepia-review",
+        "label": "sepia 叙事诊断"
+      },
+      {
+        "id": "sepia-refactor",
+        "label": "sepia 就地去味"
+      },
+      {
+        "id": "sepia-recreate",
+        "label": "sepia 意图重写"
+      },
+      {
+        "id": "suspense",
+        "label": "悬念调度"
+      },
+      {
+        "id": "dialogue-polish",
+        "label": "对白打磨"
+      },
+      {
+        "id": "atmosphere",
+        "label": "场景氛围"
+      },
+      {
+        "id": "consistency",
+        "label": "一致性自查"
+      }
+    ],
+    "providerAvailable": true,
+    "providerUnavailableReason": null,
+    "providerDetail": "",
+    "providerBlockedHost": null
+  },
+  "book": {
+    "ok": true,
+    "root": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data\\books\\book-muo4a7yw-09b7aef7",
+    "bookId": "book_01M3S6N2PR90ZKTPTR0N652GSC"
+  },
+  "chapter1Save": {
+    "ok": true,
+    "chapterIndex": 1,
+    "revision": 1,
+    "phase": "draft",
+    "created": true,
+    "authorEditSignal": {
+      "published": true,
+      "blocks": 1,
+      "errorDetail": null
+    }
+  },
+  "chapter1Readback": {
+    "revision": 1,
+    "rawChars": 164,
+    "payloadChars": 164,
+    "payloadSha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+    "rawSha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+  },
+  "reservation": null,
+  "chapter2Stream": {
+    "meta": {
+      "status": 200,
+      "contentType": "application/x-ndjson; charset=utf-8"
+    },
+    "elapsedMs": 279,
+    "error": null,
+    "frames": [
+      {
+        "ok": true,
+        "event": "start",
+        "candidateId": "ac3429e3-04cd-4166-b126-db197f71c9bb",
+        "prompt": "__343_chars__",
+        "contextMode": "structural_fallback",
+        "contextTokens": 278,
+        "provider": "real-openai-compatible",
+        "base": {
+          "revision": 0,
+          "sha256": "b145f8d7da07d34f9dc19f3ba97cc5a348184cab2ac4f760b067a2b7590342d8"
+        },
+        "__tMs": 145
+      },
+      {
+        "event": "delta",
+        "chars": 14,
+        "__tMs": 151
+      },
+      {
+        "event": "delta",
+        "chars": 27,
+        "__tMs": 215
+      },
+      {
+        "ok": true,
+        "event": "done",
+        "candidateId": "ac3429e3-04cd-4166-b126-db197f71c9bb",
+        "outcome": "succeeded",
+        "partial": false,
+        "chars": 41,
+        "__tMs": 279
+      }
+    ]
+  },
+  "captureContext": {
+    "contextMode": "structural_fallback",
+    "contextTokens": 278,
+    "provider": "real-openai-compatible",
+    "promptChars": 343,
+    "promptSha256": "8eefafc49706c9523a8d0d406e9dd394e73250c60a58d47fefffe4886c8d8f79",
+    "promptFile": "context-chapter2.txt"
+  },
+  "providerIdentity": {
+    "startFrameProvider": "real-openai-compatible",
+    "channel": "controlled",
+    "endpointProvenance": "KNOWN_CONTROLLED_FIXTURE（本进程用 MOZHOU_API_BASE=http://127.0.0.1:<fixture> 起的服务，端点身份由本运行自身的环境决定）",
+    "note": "真实通道的端点身份无法从墨舟账本反查（GenerationStarted 只记 providerId，BYOK 不打印 tier-route trace）；因此每次运行的 channel 必须由本文件显式声明。"
+  },
+  "chapter2BeforeAccept": {
+    "exists": true,
+    "revision": 0,
+    "bodyChars": 6
+  },
+  "candidate": {
+    "status": 200,
+    "data": {
+      "status": "ready",
+      "chars": 41,
+      "mode": "replace"
+    }
+  },
+  "candidateChars": 41,
+  "accept": {
+    "status": 200,
+    "data": {
+      "ok": true,
+      "candidateId": "ac3429e3-04cd-4166-b126-db197f71c9bb",
+      "chapterIndex": 2,
+      "revision": 1,
+      "sha256": "9d7791779145a1fbffeb6227c2e4dbcbfb51975546f56894941b1e6794ed8d33",
+      "alreadyApplied": false
+    }
+  },
+  "acceptReplay": {
+    "status": 200,
+    "alreadyApplied": true,
+    "revision": 1
+  },
+  "chapter2Readback": {
+    "revision": 1,
+    "phase": "draft",
+    "payloadChars": 42,
+    "payloadSha256": "37fe270da5300fb38a4f22596c015aa96eb50638c873e08eb008752ba4afae2e"
+  },
+  "exportTxt": {
+    "status": 200,
+    "bytes": 788,
+    "sha256": "c1103ac15c151f2b6751f1ad38d8b83f5c7447d899bfe1b60c70d679a6637882"
+  },
+  "exportDocx": {
+    "status": 200,
+    "bytes": 1755
+  },
+  "exportEpub": {
+    "status": 200,
+    "bytes": 3162
+  },
+  "exportTxtParagraphCheck": {
+    "ch1": [
+      71,
+      129,
+      186,
+      206
+    ],
+    "ch2": [
+      301
+    ]
+  },
+  "serverLogTail": [
+    "{\"books\":13,\"ts\":\"2026-09-30T13:04:23.656Z\",\"level\":\"info\",\"event\":\"reconciliation.boot_attached\"}",
+    "{\"url\":\"http://127.0.0.1:63805\",\"dataRoot\":\"C:\\\\zcode\\\\novel-ai-handoff-stage4\\\\.state\\\\stage4-data\",\"nodeEnv\":\"production\",\"hostedMode\":false,\"pid\":30544,\"ts\":\"2026-09-30T13:04:23.660Z\",\"level\":\"info\",\"event\":\"server.listening\"}",
+    "{\"requestId\":\"muo4a7yj-1\",\"method\":\"GET\",\"path\":\"/api/health\",\"status\":200,\"durationMs\":2.2,\"ts\":\"2026-09-30T13:04:23.757Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a7yq-2\",\"method\":\"POST\",\"path\":\"/api/capabilities\",\"status\":200,\"durationMs\":1.73,\"ts\":\"2026-09-30T13:04:23.763Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a7yw-3\",\"method\":\"POST\",\"path\":\"/api/book\",\"status\":200,\"durationMs\":38.36,\"ts\":\"2026-09-30T13:04:23.806Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a806-4\",\"method\":\"POST\",\"path\":\"/api/chapter.prose.save\",\"status\":200,\"durationMs\":20.11,\"ts\":\"2026-09-30T13:04:23.835Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a811-5\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":3.1,\"ts\":\"2026-09-30T13:04:23.848Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a817-6\",\"method\":\"POST\",\"path\":\"/api/draft.stream\",\"status\":200,\"durationMs\":276.93,\"ts\":\"2026-09-30T13:04:24.128Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a890-7\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":2.46,\"ts\":\"2026-09-30T13:04:24.134Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a897-8\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":2.95,\"ts\":\"2026-09-30T13:04:24.142Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a89c-9\",\"method\":\"POST\",\"path\":\"/api/draft.candidate\",\"status\":200,\"durationMs\":0.7,\"ts\":\"2026-09-30T13:04:24.144Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a89o-a\",\"method\":\"POST\",\"path\":\"/api/draft.accept\",\"status\":200,\"durationMs\":9.65,\"ts\":\"2026-09-30T13:04:24.166Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a8a3-b\",\"method\":\"POST\",\"path\":\"/api/draft.accept\",\"status\":200,\"durationMs\":2.12,\"ts\":\"2026-09-30T13:04:24.173Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a8aj-c\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":2.94,\"ts\":\"2026-09-30T13:04:24.190Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a8az-d\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":2.8,\"ts\":\"2026-09-30T13:04:24.205Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a8be-e\",\"method\":\"POST\",\"path\":\"/api/export\",\"status\":200,\"durationMs\":7.11,\"ts\":\"2026-09-30T13:04:24.225Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4a8bu-f\",\"method\":\"POST\",\"path\":\"/api/export\",\"status\":200,\"durationMs\":6.62,\"ts\":\"2026-09-30T13:04:24.241Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    ""
+  ],
+  "ledger": {
+    "exists": true,
+    "ticketDir": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket",
+    "ticket": "mozhou-stage4-audit-fix",
+    "allowance": 0,
+    "migrated": 0,
+    "spentThisVersion": 0,
+    "used": 0,
+    "remaining": 0,
+    "overBudget": false,
+    "updatedAt": "2026-09-30T13:04:23.254Z",
+    "spend": [],
+    "rows": []
+  },
+  "attempts": [
+    {
+      "attemptId": "at_ctl_25548_muo4a816_bj2bb4",
+      "label": "B:第二章上下文生成（第 1 次尝试）",
+      "framesFile": "frames-at_ctl_25548_muo4a816_bj2bb4.ndjson",
+      "framesSha256": "20047cbecc76282eff7558f8145d8e9dee0e02ae6a6a5e920bcef53dda8a9513"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "provider 可用（真实通道）",
+      "result": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "第一章读回正文与写入一致（正文载荷逐字相同）",
+      "result": "PASS",
+      "evidence": {
+        "revision": 1,
+        "rawChars": 164,
+        "payloadChars": 164,
+        "payloadSha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+        "rawSha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+      }
+    },
+    {
+      "name": "第一章夹具含全部稀有事实",
+      "result": "PASS",
+      "evidence": {
+        "missing": []
+      }
+    },
+    {
+      "name": "第二章上下文里出现第一章的 4 个稀有事实",
+      "result": "PASS",
+      "evidence": {
+        "present": [
+          "靛蓝色缺口",
+          "阿岚",
+          "潮退三寸",
+          "熄灯三年"
+        ]
+      }
+    },
+    {
+      "name": "第二章上下文不含第二章指令以外的提示（指令未复述细节）",
+      "result": "PASS",
+      "evidence": {
+        "prompt": "接着上一章写约200字，保持既有角色与物件，不要分析。"
+      }
+    },
+    {
+      "name": "第二章 start 帧 provider 自报可用上游",
+      "result": "PASS",
+      "evidence": "real-openai-compatible"
+    },
+    {
+      "name": "第二章有 done 帧且 succeeded",
+      "result": "PASS",
+      "evidence": {
+        "ok": true,
+        "event": "done",
+        "candidateId": "ac3429e3-04cd-4166-b126-db197f71c9bb",
+        "outcome": "succeeded",
+        "partial": false,
+        "chars": 41,
+        "__tMs": 279
+      }
+    },
+    {
+      "name": "生成未覆盖已保存的第一章",
+      "result": "PASS",
+      "evidence": {
+        "revisionBefore": 1,
+        "revisionAfter": 1
+      }
+    },
+    {
+      "name": "未采纳的候选没有污染第二章正文（仍是脚手架原文，revision 不变）",
+      "result": "PASS",
+      "evidence": {
+        "exists": true,
+        "payload": "# 第2章\n",
+        "revision": 0
+      }
+    },
+    {
+      "name": "第二章候选采纳成功（200 + ok）",
+      "result": "PASS",
+      "evidence": {
+        "ok": true,
+        "candidateId": "ac3429e3-04cd-4166-b126-db197f71c9bb",
+        "chapterIndex": 2,
+        "revision": 1,
+        "sha256": "9d7791779145a1fbffeb6227c2e4dbcbfb51975546f56894941b1e6794ed8d33",
+        "alreadyApplied": false
+      }
+    },
+    {
+      "name": "同幂等键重复采纳不新增版本",
+      "result": "PASS",
+      "evidence": {
+        "status": 200,
+        "alreadyApplied": true,
+        "revision": 1
+      }
+    },
+    {
+      "name": "第二章正文落盘且含采纳的候选文本",
+      "result": "PASS",
+      "evidence": {
+        "payloadChars": 42,
+        "candidateChars": 41
+      }
+    },
+    {
+      "name": "第一章在第二章采纳后仍未变",
+      "result": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "TXT 导出含第一章各段（按序）",
+      "result": "PASS",
+      "evidence": [
+        71,
+        129,
+        186,
+        206
+      ]
+    },
+    {
+      "name": "TXT 导出含第二章各段（按序）",
+      "result": "PASS",
+      "evidence": [
+        301
+      ]
+    },
+    {
+      "name": "TXT 导出章序为 1 → 2",
+      "result": "PASS",
+      "evidence": {
+        "lastCh1": 206,
+        "firstCh2": 301
+      }
+    }
+  ],
+  "finishedAt": "2026-09-30T13:04:24.259Z",
+  "allAssertionsPassed": true
+}

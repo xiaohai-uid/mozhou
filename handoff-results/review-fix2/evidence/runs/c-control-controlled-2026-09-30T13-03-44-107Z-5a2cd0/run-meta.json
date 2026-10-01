@@ -1,0 +1,14 @@
+{
+  "runId": "c-control-controlled-2026-09-30T13-03-44-107Z-5a2cd0",
+  "phase": "c-control",
+  "channel": "controlled",
+  "realModelCallsAllowed": 0,
+  "ledgerFile": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket\\ledger.json",
+  "repo": "C:\\zcode\\novel-ai",
+  "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data",
+  "startedAt": "2026-09-30T13:03:44.115Z",
+  "argv": [
+    "--phase",
+    "c-control"
+  ]
+}

@@ -1,0 +1,758 @@
+{
+  "generatedAt": "2026-09-30T13:08:45.104Z",
+  "generator": "harness/make-ledger.mjs（计数单位=attemptId；帧仅作内容证据）",
+  "ticketDir": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket",
+  "ticket": "mozhou-stage4-audit-fix",
+  "allowance": 0,
+  "used": 0,
+  "remaining": 0,
+  "ledgerError": null,
+  "counts": {
+    "attemptsFromThisInstrumentation": 19,
+    "realChannelAttempts": 0,
+    "legacyRequestAttempts": 10,
+    "grandTotalRequestAttempts": 29,
+    "note": "「请求尝试」≠「已核实的真实供应商调用」。只有带供应商自身错误体的条目能核实端点，见 legacy 中 endpointProvenance=KNOWN_REAL 的条数。"
+  },
+  "attempts": [
+    {
+      "attemptId": "at_ctl_21156_muo4fjkw_mawbho",
+      "reservationId": null,
+      "seq": null,
+      "reason": "phase=c-control generate(unnamed)",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:08:32.096Z",
+      "terminalAt": "2026-09-30T13:08:32.242Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-08-30-966Z-67a70b",
+          "file": "frames-at_ctl_21156_muo4fjkw_mawbho.ndjson",
+          "sha256": "0666afeee0a6fed5aa09c395d1a99d12445af0f8240432689c617f1582c68145",
+          "attemptIdFromName": "at_ctl_21156_muo4fjkw_mawbho",
+          "candidateId": "7b8022d5-bedf-458f-b20d-7a450f918214",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 146
+    },
+    {
+      "attemptId": "at_ctl_21156_muo4flmm_d2nkq7",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-control:取消后再生成",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:08:34.751Z",
+      "terminalAt": "2026-09-30T13:08:35.024Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-08-30-966Z-67a70b",
+          "file": "frames-at_ctl_21156_muo4flmm_d2nkq7.ndjson",
+          "sha256": "e15b0c793465ff13244d38dd78ff497cf89afd6b638aecdbf84ae8ed43fd5ce0",
+          "attemptIdFromName": "at_ctl_21156_muo4flmm_d2nkq7",
+          "candidateId": "48de7cef-9aa5-48f0-bf53-6e07a16656f7",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 274
+    },
+    {
+      "attemptId": "at_ctl_25548_muo4a816_bj2bb4",
+      "reservationId": null,
+      "seq": null,
+      "reason": "B:第二章上下文生成（第 1 次尝试）",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:04:23.850Z",
+      "terminalAt": "2026-09-30T13:04:24.129Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "b-controlled-2026-09-30T13-04-23-248Z-70e238",
+          "file": "frames-at_ctl_25548_muo4a816_bj2bb4.ndjson",
+          "sha256": "20047cbecc76282eff7558f8145d8e9dee0e02ae6a6a5e920bcef53dda8a9513",
+          "attemptIdFromName": "at_ctl_25548_muo4a816_bj2bb4",
+          "candidateId": "ac3429e3-04cd-4166-b126-db197f71c9bb",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 279
+    },
+    {
+      "attemptId": "at_ctl_30752_muo44lln_gwek2n",
+      "reservationId": null,
+      "seq": null,
+      "reason": "phase=c-control generate(unnamed)",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:00:01.499Z",
+      "terminalAt": "2026-09-30T13:00:01.650Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-00-00-593Z-7c311b",
+          "file": "frames-at_ctl_30752_muo44lln_gwek2n.ndjson",
+          "sha256": "cdfd844750b41b11c2271aad9572ac636c691db1ebbbeb45af0b77dd8c751885",
+          "attemptIdFromName": "at_ctl_30752_muo44lln_gwek2n",
+          "candidateId": "149ebb41-81dd-4d4d-9da8-9afd96b0ba56",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 151
+    },
+    {
+      "attemptId": "at_ctl_30752_muo44ng6_d0z443",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-control:取消后再生成",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:00:03.894Z",
+      "terminalAt": "2026-09-30T13:00:04.173Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-00-00-593Z-7c311b",
+          "file": "frames-at_ctl_30752_muo44ng6_d0z443.ndjson",
+          "sha256": "2b03e8edc766035ca60024c8d22249117c54451fa6d5de76e6658b84063f516e",
+          "attemptIdFromName": "at_ctl_30752_muo44ng6_d0z443",
+          "candidateId": "42c92706-d17e-43a2-91bc-06043dfc9883",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 279
+    },
+    {
+      "attemptId": "at_ctl_33452_muo4a9ak_gomd6y",
+      "reservationId": null,
+      "seq": null,
+      "reason": "phase=c-control generate(unnamed)",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:04:25.484Z",
+      "terminalAt": "2026-09-30T13:04:25.631Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-04-24-321Z-ff12d0",
+          "file": "frames-at_ctl_33452_muo4a9ak_gomd6y.ndjson",
+          "sha256": "00fe0d833eb5ecc8d740b30524d730276d0ba3e1660132fc9399edfc1bdbcda8",
+          "attemptIdFromName": "at_ctl_33452_muo4a9ak_gomd6y",
+          "candidateId": "3b4ddb72-937b-4bcf-8224-e1509ccba360",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 147
+    },
+    {
+      "attemptId": "at_ctl_33452_muo4abbw_9yw0ly",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-control:取消后再生成",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:04:28.124Z",
+      "terminalAt": "2026-09-30T13:04:28.420Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-04-24-321Z-ff12d0",
+          "file": "frames-at_ctl_33452_muo4abbw_9yw0ly.ndjson",
+          "sha256": "6d4553790de407c16837e296cc7711d4f36c64b965cda6e8e8dbc3be3ec3f70e",
+          "attemptIdFromName": "at_ctl_33452_muo4abbw_9yw0ly",
+          "candidateId": "a412bd00-fd9d-452f-897b-209cc4ec0786",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 295
+    },
+    {
+      "attemptId": "at_ctl_37668_muo4achs_p6hbga",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-disc:断开后上游收尾",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:04:29.632Z",
+      "terminalAt": "2026-09-30T13:04:29.782Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-disc-controlled-2026-09-30T13-04-28-512Z-25cdd4",
+          "file": "frames-at_ctl_37668_muo4achs_p6hbga.ndjson",
+          "sha256": "af8e0f02c4382dd3a375b7da78a06aa30519ede5000ed52ab9bb0632d765df10",
+          "attemptIdFromName": "at_ctl_37668_muo4achs_p6hbga",
+          "candidateId": "d993145c-e975-4245-9a68-45e03820d6c3",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 150
+    },
+    {
+      "attemptId": "at_ctl_40008_muo4fibh_mzralh",
+      "reservationId": null,
+      "seq": null,
+      "reason": "B:第二章上下文生成（第 1 次尝试）",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:08:30.461Z",
+      "terminalAt": "2026-09-30T13:08:30.746Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "b-controlled-2026-09-30T13-08-29-853Z-5914a7",
+          "file": "frames-at_ctl_40008_muo4fibh_mzralh.ndjson",
+          "sha256": "8f3288f8d1c75d38a871c9a2c8de47d8d157598b13d8ab4496ff7a5abce31074",
+          "attemptIdFromName": "at_ctl_40008_muo4fibh_mzralh",
+          "candidateId": "a07544bb-fd83-436c-9ae0-1b9d6e4e1514",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 285
+    },
+    {
+      "attemptId": "at_ctl_50128_muo42v8h_1o0660",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-disc:断开后上游收尾",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T12:58:40.673Z",
+      "terminalAt": "2026-09-30T12:58:40.824Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-disc-controlled-2026-09-30T12-58-39-784Z-6b1172",
+          "file": "frames-at_ctl_50128_muo42v8h_1o0660.ndjson",
+          "sha256": "7e864ba981de76aa974134c99f1a3f5f4c87fe806f850aa18b86c726f5464bd3",
+          "attemptIdFromName": "at_ctl_50128_muo42v8h_1o0660",
+          "candidateId": "d8bae337-5fa3-400f-b77d-d84148298665",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 151
+    },
+    {
+      "attemptId": "at_ctl_51356_muo49cz5_mab3sv",
+      "reservationId": null,
+      "seq": null,
+      "reason": "B:第二章上下文生成（第 1 次尝试）",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:03:43.602Z",
+      "terminalAt": "2026-09-30T13:03:43.902Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "b-controlled-2026-09-30T13-03-43-006Z-11cea8",
+          "file": "frames-at_ctl_51356_muo49cz5_mab3sv.ndjson",
+          "sha256": "d2768630ee97e3ff3024766f9078679dc7184641f30db3f532c4b34a672d5df4",
+          "attemptIdFromName": "at_ctl_51356_muo49cz5_mab3sv",
+          "candidateId": "16485219-650d-4288-93fb-2408d8a11bb9",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 301
+    },
+    {
+      "attemptId": "at_ctl_55444_muo44oep_85d1ta",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-disc:断开后上游收尾",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:00:05.137Z",
+      "terminalAt": "2026-09-30T13:00:05.280Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-disc-controlled-2026-09-30T13-00-04-269Z-19d7be",
+          "file": "frames-at_ctl_55444_muo44oep_85d1ta.ndjson",
+          "sha256": "4d2560a3147b570f600f563a284fd39615f56c794ca58d8fdffe5df66c32d1e8",
+          "attemptIdFromName": "at_ctl_55444_muo44oep_85d1ta",
+          "candidateId": "d763d23e-279e-402e-8d34-f32696713a8e",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 143
+    },
+    {
+      "attemptId": "at_ctl_56388_muo4fms3_n4q0n5",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-disc:断开后上游收尾",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:08:36.243Z",
+      "terminalAt": "2026-09-30T13:08:36.386Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-disc-controlled-2026-09-30T13-08-35-114Z-b3a51b",
+          "file": "frames-at_ctl_56388_muo4fms3_n4q0n5.ndjson",
+          "sha256": "dcb989b9a9fd15d7a4d00424d07c8e4dbb3a03d221a892c042d0ceb66af9d02e",
+          "attemptIdFromName": "at_ctl_56388_muo4fms3_n4q0n5",
+          "candidateId": "7843b2fd-6e5e-425a-8740-32ee8b73ee7c",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 143
+    },
+    {
+      "attemptId": "at_ctl_57204_muo48wsm_bknwzb",
+      "reservationId": null,
+      "seq": null,
+      "reason": "B:第二章上下文生成（第 1 次尝试）",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:03:22.630Z",
+      "terminalAt": "2026-09-30T13:03:22.924Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "b-controlled-2026-09-30T13-03-22-026Z-9e1ed8",
+          "file": "frames-at_ctl_57204_muo48wsm_bknwzb.ndjson",
+          "sha256": "fe439c892c0b32cf4b1704faa4c51027f3b1449aaed263b2df04d6e7e44d03e8",
+          "attemptIdFromName": "at_ctl_57204_muo48wsm_bknwzb",
+          "candidateId": "832c758f-9997-4fcd-9099-87932a40ede9",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 294
+    },
+    {
+      "attemptId": "at_ctl_57320_muo49e24_uiufla",
+      "reservationId": null,
+      "seq": null,
+      "reason": "phase=c-control generate(unnamed)",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:03:45.005Z",
+      "terminalAt": "2026-09-30T13:03:45.151Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-03-44-107Z-5a2cd0",
+          "file": "frames-at_ctl_57320_muo49e24_uiufla.ndjson",
+          "sha256": "8330a4bd860cd56071b0d057fa6e893d3a74222814520c70c707aecf2acbfd9a",
+          "attemptIdFromName": "at_ctl_57320_muo49e24_uiufla",
+          "candidateId": "57feff14-5785-4200-9e02-80700e96ec44",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 146
+    },
+    {
+      "attemptId": "at_ctl_57320_muo49fwj_r12g4n",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-control:取消后再生成",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:03:47.395Z",
+      "terminalAt": "2026-09-30T13:03:47.676Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-control-controlled-2026-09-30T13-03-44-107Z-5a2cd0",
+          "file": "frames-at_ctl_57320_muo49fwj_r12g4n.ndjson",
+          "sha256": "23953ddf228f34d15868e9e22d38976a3900ff0b1f6ede24a6562261c95ac829",
+          "attemptIdFromName": "at_ctl_57320_muo49fwj_r12g4n",
+          "candidateId": "2b40a97b-3de4-4af3-ae77-501ec76baa86",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 280
+    },
+    {
+      "attemptId": "at_ctl_59156_muo49guu_amytyl",
+      "reservationId": null,
+      "seq": null,
+      "reason": "C-disc:断开后上游收尾",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:03:48.630Z",
+      "terminalAt": "2026-09-30T13:03:48.778Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "c-disc-controlled-2026-09-30T13-03-47-766Z-17583e",
+          "file": "frames-at_ctl_59156_muo49guu_amytyl.ndjson",
+          "sha256": "4efc6edb98126d2d4608899f2d915c7432e70ab55327a18667805b0a8e26c178",
+          "attemptIdFromName": "at_ctl_59156_muo49guu_amytyl",
+          "candidateId": "716b2dc0-660d-4968-bddd-dd35ec4302b6",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "no_terminal_frame",
+          "error": null,
+          "deltaChars": 14,
+          "frameCount": 2
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 148
+    },
+    {
+      "attemptId": "at_ctl_59764_muo44kid_9n7l2x",
+      "reservationId": null,
+      "seq": null,
+      "reason": "B:第二章上下文生成（第 1 次尝试）",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T13:00:00.085Z",
+      "terminalAt": "2026-09-30T13:00:00.376Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "b-controlled-2026-09-30T12-59-59-486Z-8020e2",
+          "file": "frames-at_ctl_59764_muo44kid_9n7l2x.ndjson",
+          "sha256": "8cc162515b2dbd019121694971185cd38ec82c0f938aba56ac0070d43e9f9567",
+          "attemptIdFromName": "at_ctl_59764_muo44kid_9n7l2x",
+          "candidateId": "e797ad29-aed2-4c6b-95e7-aabed5a0cc0f",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 291
+    },
+    {
+      "attemptId": "at_ctl_60092_muo42pzf_8gpwdj",
+      "reservationId": null,
+      "seq": null,
+      "reason": "B:第二章上下文生成（第 1 次尝试）",
+      "channel": "controlled",
+      "startedAt": "2026-09-30T12:58:33.867Z",
+      "terminalAt": "2026-09-30T12:58:34.166Z",
+      "terminal": "ok",
+      "error": null,
+      "frames": [
+        {
+          "run": "b-controlled-2026-09-30T12-58-33-266Z-ed3a9d",
+          "file": "frames-at_ctl_60092_muo42pzf_8gpwdj.ndjson",
+          "sha256": "18d6ff0af4d4f8626c201aa3f8a8fd2ecc650a8e8596a30486719afe394224d0",
+          "attemptIdFromName": "at_ctl_60092_muo42pzf_8gpwdj",
+          "candidateId": "2cdc5534-32cd-4dff-af2e-2b0bbfc802d3",
+          "startFrameProvider": "real-openai-compatible",
+          "contextMode": "structural_fallback",
+          "terminal": "done",
+          "error": null,
+          "deltaChars": 41,
+          "frameCount": 4
+        }
+      ],
+      "duplicateFrameFiles": [],
+      "elapsedMs": 299
+    }
+  ],
+  "reconciliation": {
+    "spendRows": 0,
+    "startedEvents": 19,
+    "attemptsCounted": 19,
+    "spendWithoutStarted": [],
+    "startedWithoutSpend": [],
+    "unknownResults": [],
+    "frameFilesSeen": 24,
+    "frameFilesUnique": 23,
+    "duplicateFrameFiles": 1,
+    "frameFilesUnmatchedToAttempt": [
+      {
+        "run": "b-controlled-2026-09-30T11-35-08-734Z-8ca752",
+        "file": "context-chapter2.frames.ndjson",
+        "candidateId": "581f787e-cdf2-4b25-9dd2-4ef47dfe9743",
+        "duplicateOf": []
+      },
+      {
+        "run": "b-controlled-2026-09-30T11-35-08-734Z-8ca752",
+        "file": "frames-01-controlled-B_1_.ndjson",
+        "candidateId": "581f787e-cdf2-4b25-9dd2-4ef47dfe9743",
+        "duplicateOf": [
+          "context-chapter2.frames.ndjson"
+        ]
+      },
+      {
+        "run": "c-control-controlled-2026-09-30T11-35-09-825Z-e432c7",
+        "file": "frames-01-controlled-undefined.ndjson",
+        "candidateId": "93731d5c-c038-4d0f-be0c-2f1027ebc1e5",
+        "duplicateOf": []
+      },
+      {
+        "run": "c-control-controlled-2026-09-30T11-35-09-825Z-e432c7",
+        "file": "frames-02-controlled-C-control_.ndjson",
+        "candidateId": "0d1a1ad6-fbca-4d83-a043-18e2c5da44f1",
+        "duplicateOf": []
+      },
+      {
+        "run": "c-disc-controlled-2026-09-30T11-35-13-471Z-ecec5b",
+        "file": "frames-01-controlled-C-disc_.ndjson",
+        "candidateId": "3ebc4a47-0cb6-4b93-956b-ffcda9616fe2",
+        "duplicateOf": []
+      }
+    ]
+  },
+  "legacy": [
+    {
+      "seq": 1,
+      "at": "2026-09-30T10:15:20Z",
+      "phase": "B",
+      "purpose": "第二章上下文生成（首次尝试）",
+      "terminal": "error",
+      "elapsedMs": 530,
+      "deltaChars": 0,
+      "rateLimited": true,
+      "error": "上游 429: inference exceeds tpm/rpm limit (429003)",
+      "candidateId": null,
+      "endpointProvenance": "KNOWN_REAL",
+      "provenanceBasis": "错误体 429003 是公网供应商自身的限流码；本地替身不会产生该错误体。",
+      "evidence": "handoff-results/calls.json seq1（原始行仍在旧包，未被覆盖）",
+      "rawFrames": "无（未留存）"
+    },
+    {
+      "seq": 2,
+      "at": "2026-09-30T10:16:06Z",
+      "phase": "B",
+      "purpose": "第二章上下文生成（成功）",
+      "terminal": "done",
+      "elapsedMs": 19480,
+      "deltaChars": 302,
+      "rateLimited": false,
+      "error": null,
+      "candidateId": "a60d02ba-afa6-49d6-bd82-819877c2dbc3",
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "只有耗时与 start 帧 provider 字符串；BYOK 路径不打印 tier-route trace（generationTarget.ts:218-270），无法区分真实与替身。原始帧已被后续运行覆盖。",
+      "evidence": "handoff-results/calls.json seq2 + handoff-results/test-logs/phase-b.log 的 10:16:29 done 帧行",
+      "rawFrames": "已丢失（数据根删除 + 旧 artifacts 被覆盖）"
+    },
+    {
+      "seq": 3,
+      "at": "2026-09-30T10:18:56Z",
+      "phase": "C-control（上一版误配真实通道）",
+      "purpose": "取消后再生成——本应走本地替身，实际被起成了真实通道",
+      "terminal": "error",
+      "elapsedMs": 60166,
+      "deltaChars": 0,
+      "rateLimited": false,
+      "error": "全部候选失败：TIMEOUT: deepseek 超过 60000ms 未返回",
+      "candidateId": null,
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "该超时文案由墨舟自身代码产生（providerId 超时），替身挂住时同样会触发，不构成端点证据。",
+      "evidence": "handoff-results/calls.json seq3",
+      "rawFrames": "无（未留存）"
+    },
+    {
+      "seq": 4,
+      "at": "2026-09-30T10:19:41Z",
+      "phase": "C-real",
+      "purpose": "真实取消：收到首个 delta 即断开",
+      "terminal": "aborted_by_client",
+      "elapsedMs": 9696,
+      "deltaChars": 1,
+      "rateLimited": false,
+      "error": null,
+      "candidateId": null,
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "仅旧 harness 自报行，无独立端点证据。",
+      "evidence": "handoff-results/calls.json seq4",
+      "rawFrames": "已丢失（被最终留档那次运行覆盖）"
+    },
+    {
+      "seq": 5,
+      "at": "2026-09-30T10:19:57Z",
+      "phase": "C-real",
+      "purpose": "取消之后重新生成",
+      "terminal": "done",
+      "elapsedMs": 15521,
+      "deltaChars": 230,
+      "rateLimited": false,
+      "error": null,
+      "candidateId": null,
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "仅旧 harness 自报行，无独立端点证据。",
+      "evidence": "handoff-results/calls.json seq5",
+      "rawFrames": "已丢失（被最终留档那次运行覆盖）"
+    },
+    {
+      "seq": 6,
+      "at": "2026-09-30T10:23:54Z",
+      "phase": "B",
+      "purpose": "第二章上下文生成（第二轮尝试）—— **旧 calls.json 漏记的正是这一条**",
+      "terminal": "done",
+      "elapsedMs": 38972,
+      "deltaChars": 224,
+      "rateLimited": false,
+      "error": null,
+      "candidateId": "1bb7d37b-5b0f-4349-b1c4-9de9930e154a",
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "原始帧在，但 start 帧 provider 字符串与替身取值相同，且该次运行未记录 channel；按统一判据判 UNKNOWN。耗时 38972ms 同样不能区分。",
+      "evidence": "handoff-results/artifacts/context-chapter2.frames.ndjson（172 帧：1 start + 170 delta + 1 done，累计 224 字）+ artifacts/phase-b.json + 外部 run-b.log",
+      "rawFrames": "**仍在**：handoff-results/artifacts/context-chapter2.frames.ndjson"
+    },
+    {
+      "seq": 7,
+      "at": "2026-09-30T10:28:46Z",
+      "phase": "C-real（重跑尝试）",
+      "purpose": "真实取消（重跑尝试 1）",
+      "terminal": "error",
+      "elapsedMs": 120,
+      "deltaChars": 0,
+      "rateLimited": false,
+      "error": "fetch failed（连接层失败，未取得任何帧）",
+      "candidateId": null,
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "失败发生在任何帧之前，没有 start 帧，也没有任何端点留档。",
+      "evidence": "handoff-results/calls.json seq6",
+      "rawFrames": "无（未留存）"
+    },
+    {
+      "seq": 8,
+      "at": "2026-09-30T10:28:46Z",
+      "phase": "C-real（重跑尝试）",
+      "purpose": "取消之后重新生成（重跑尝试 1）",
+      "terminal": "error",
+      "elapsedMs": 223,
+      "deltaChars": 0,
+      "rateLimited": true,
+      "error": "上游 429: inference exceeds tpm/rpm limit (429003)",
+      "candidateId": null,
+      "endpointProvenance": "KNOWN_REAL",
+      "provenanceBasis": "错误体 429003 是公网供应商自身的限流码。",
+      "evidence": "handoff-results/calls.json seq7",
+      "rawFrames": "无（未留存）"
+    },
+    {
+      "seq": 9,
+      "at": "2026-09-30T10:30:37Z",
+      "phase": "C-real（最终留档前一次）",
+      "purpose": "真实取消：收到首个 delta 即断开",
+      "terminal": "aborted_by_client",
+      "elapsedMs": 33059,
+      "deltaChars": 1,
+      "rateLimited": false,
+      "error": null,
+      "candidateId": null,
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "仅旧 harness 自报行与结果摘要，无端点覆盖留档。",
+      "evidence": "handoff-results/calls.json seq8 + 第四轮之前的 artifacts/phase-c-real.json",
+      "rawFrames": "已丢失（被最终留档那次运行覆盖）"
+    },
+    {
+      "seq": 10,
+      "at": "2026-09-30T10:31:10Z",
+      "phase": "C-real（最终留档）",
+      "purpose": "取消之后重新生成并采纳",
+      "terminal": "done",
+      "elapsedMs": 27100,
+      "deltaChars": 230,
+      "rateLimited": false,
+      "error": null,
+      "candidateId": null,
+      "endpointProvenance": "UNKNOWN",
+      "provenanceBasis": "仅旧 harness 自报行与结果摘要，无端点覆盖留档。",
+      "evidence": "handoff-results/calls.json seq9 + 第四轮之前的 artifacts/phase-c-real.json",
+      "rawFrames": "已丢失（被最终留档那次运行覆盖）"
+    }
+  ]
+}

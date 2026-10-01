@@ -1,0 +1,13 @@
+{
+  "note": "同一份环回端点：未授权时解析必须抛 SSRF_BLOCKED；显式授权时解析成功。全局开关未被修改。",
+  "withoutAllow": {
+    "resolved": false,
+    "errorCode": "SSRF_BLOCKED",
+    "errorName": "SsrfBlockedError",
+    "message": "SSRF 门禁：公网模型端点必须使用 HTTPS"
+  },
+  "withAllow": {
+    "resolved": true,
+    "allowPrivateNetwork": true
+  }
+}

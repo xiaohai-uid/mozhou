@@ -1,0 +1,140 @@
+{
+  "phase": "C-disc",
+  "startedAt": "2026-09-30T13:08:35.122Z",
+  "channel": "controlled",
+  "runId": "c-disc-controlled-2026-09-30T13-08-35-114Z-b3a51b",
+  "runDir": "C:\\zcode\\novel-ai-handoff-stage4\\runs\\c-disc-controlled-2026-09-30T13-08-35-114Z-b3a51b",
+  "server": {
+    "port": 52621,
+    "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data"
+  },
+  "book": {
+    "ok": true,
+    "root": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data\\books\\book-muo4fmb6-5889e0cb",
+    "bookId": "book_01M3S6WRNJ8200AHR3WYAKAQ5J"
+  },
+  "chapter1Before": {
+    "revision": 1,
+    "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+  },
+  "controlledServer": {
+    "port": 52631
+  },
+  "stream": {
+    "aborted": true,
+    "frames": [
+      {
+        "event": "start",
+        "__tMs": 134
+      },
+      {
+        "event": "delta",
+        "__tMs": 140
+      }
+    ],
+    "error": null
+  },
+  "serverExitedWithin4s": null,
+  "serverAliveAfterCompletion": true,
+  "healthStatus": 200,
+  "candidate": {
+    "status": "partial",
+    "chars": 14
+  },
+  "chapter1After": {
+    "revision": 1,
+    "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+  },
+  "upstreamEvents": [
+    {
+      "at": "2026-09-30T13:08:36.382Z",
+      "tMs": 1211,
+      "event": "request_received",
+      "url": "/v1/chat/completions",
+      "model": "controlled-fixture",
+      "stream": true,
+      "authHeaderPresent": true
+    },
+    {
+      "at": "2026-09-30T13:08:36.383Z",
+      "tMs": 1212,
+      "event": "delta_sent",
+      "index": 1,
+      "chars": 14
+    },
+    {
+      "at": "2026-09-30T13:08:36.389Z",
+      "tMs": 1218,
+      "event": "connection_closed",
+      "emittedFrames": 1,
+      "finishedNaturally": false
+    }
+  ],
+  "serverLogTail": [
+    "{\"books\":20,\"ts\":\"2026-09-30T13:08:36.062Z\",\"level\":\"info\",\"event\":\"reconciliation.boot_attached\"}",
+    "{\"url\":\"http://127.0.0.1:52631\",\"dataRoot\":\"C:\\\\zcode\\\\novel-ai-handoff-stage4\\\\.state\\\\stage4-data\",\"nodeEnv\":\"production\",\"hostedMode\":false,\"pid\":56940,\"ts\":\"2026-09-30T13:08:36.067Z\",\"level\":\"info\",\"event\":\"server.listening\"}",
+    "{\"requestId\":\"muo4fms2-1\",\"method\":\"GET\",\"path\":\"/api/health\",\"status\":200,\"durationMs\":2.2,\"ts\":\"2026-09-30T13:08:36.244Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4fms6-2\",\"method\":\"POST\",\"path\":\"/api/draft.stream\",\"status\":499,\"durationMs\":141.46,\"ts\":\"2026-09-30T13:08:36.387Z\",\"level\":\"warn\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4ft2f-3\",\"method\":\"GET\",\"path\":\"/api/health\",\"status\":200,\"durationMs\":1.09,\"ts\":\"2026-09-30T13:08:44.392Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4ft2l-4\",\"method\":\"POST\",\"path\":\"/api/draft.candidate\",\"status\":200,\"durationMs\":2.02,\"ts\":\"2026-09-30T13:08:44.399Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    ""
+  ],
+  "uncaught": [],
+  "attempts": [
+    {
+      "attemptId": "at_ctl_56388_muo4fms3_n4q0n5",
+      "label": "C-disc:断开后上游收尾",
+      "framesFile": "frames-at_ctl_56388_muo4fms3_n4q0n5.ndjson",
+      "framesSha256": "dcb989b9a9fd15d7a4d00424d07c8e4dbb3a03d221a892c042d0ceb66af9d02e"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "客户端断开后服务端在 4s 内没有退出",
+      "result": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "客户端断开后服务端仍能响应 /api/health",
+      "result": "PASS",
+      "evidence": 200
+    },
+    {
+      "name": "断开取消后正文/revision/指纹零变化",
+      "result": "PASS",
+      "evidence": {
+        "revision": 1,
+        "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f"
+      }
+    },
+    {
+      "name": "上游侧观察到连接关闭（模型调用确实被停止）",
+      "result": "PASS",
+      "evidence": [
+        {
+          "at": "2026-09-30T13:08:36.382Z",
+          "tMs": 1211,
+          "event": "request_received",
+          "url": "/v1/chat/completions",
+          "model": "controlled-fixture",
+          "stream": true,
+          "authHeaderPresent": true
+        },
+        {
+          "at": "2026-09-30T13:08:36.389Z",
+          "tMs": 1218,
+          "event": "connection_closed",
+          "emittedFrames": 1,
+          "finishedNaturally": false
+        }
+      ]
+    },
+    {
+      "name": "服务端日志没有 uncaughtException / unhandledRejection",
+      "result": "PASS",
+      "evidence": []
+    }
+  ],
+  "finishedAt": "2026-09-30T13:08:44.410Z",
+  "allAssertionsPassed": true
+}

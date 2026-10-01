@@ -1,0 +1,312 @@
+{
+  "phase": "C-control",
+  "startedAt": "2026-09-30T13:08:30.974Z",
+  "channel": "controlled",
+  "runId": "c-control-controlled-2026-09-30T13-08-30-966Z-67a70b",
+  "runDir": "C:\\zcode\\novel-ai-handoff-stage4\\runs\\c-control-controlled-2026-09-30T13-08-30-966Z-67a70b",
+  "server": {
+    "port": 57931,
+    "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data"
+  },
+  "book": {
+    "ok": true,
+    "root": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data\\books\\book-muo4fj3q-cb4cb026",
+    "bookId": "book_01M3S6WMKQMBEPX63GG1PGHJ64"
+  },
+  "chapter1Save": {
+    "status": 200,
+    "revision": 1
+  },
+  "chapter1Before": {
+    "revision": 1,
+    "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+    "chars": 164
+  },
+  "controlledUpstream": {
+    "port": 57928,
+    "kind": "test-double (not a real model)"
+  },
+  "loopbackGateControl": {
+    "note": "同一份环回端点：未授权时解析必须抛 SSRF_BLOCKED；显式授权时解析成功。全局开关未被修改。",
+    "withoutAllow": {
+      "resolved": false,
+      "errorCode": "SSRF_BLOCKED",
+      "errorName": "SsrfBlockedError",
+      "message": "SSRF 门禁：公网模型端点必须使用 HTTPS"
+    },
+    "withAllow": {
+      "resolved": true,
+      "allowPrivateNetwork": true
+    }
+  },
+  "controlledServer": {
+    "port": 57935,
+    "note": "MOZHOU_ALLOW_PRIVATE_LLM=1 只设在这个测试子进程；全局开关未改"
+  },
+  "clientCancel": {
+    "abortedClientSide": true,
+    "frames": [
+      {
+        "ok": true,
+        "event": "start",
+        "candidateId": "7b8022d5-bedf-458f-b20d-7a450f918214",
+        "prompt": "__prompt_330___",
+        "contextMode": "structural_fallback",
+        "contextTokens": 268,
+        "provider": "real-openai-compatible",
+        "base": {
+          "revision": 1,
+          "sha256": "7999346d6e17233bd7eaaaf8a545c24a1b09bf36a541f6c2ad66a2bc16ec1b7a"
+        },
+        "__tMs": 139
+      },
+      {
+        "event": "delta",
+        "chars": 14,
+        "__tMs": 145
+      }
+    ],
+    "elapsedMs": 146,
+    "error": null
+  },
+  "upstreamEvents": [
+    {
+      "at": "2026-09-30T13:08:32.238Z",
+      "tMs": 1215,
+      "event": "request_received",
+      "url": "/v1/chat/completions",
+      "model": "controlled-fixture",
+      "stream": true,
+      "authHeaderPresent": true
+    },
+    {
+      "at": "2026-09-30T13:08:32.238Z",
+      "tMs": 1215,
+      "event": "delta_sent",
+      "index": 1,
+      "chars": 14
+    },
+    {
+      "at": "2026-09-30T13:08:32.245Z",
+      "tMs": 1222,
+      "event": "connection_closed",
+      "emittedFrames": 1,
+      "finishedNaturally": false
+    }
+  ],
+  "candidateAfterCancel": {
+    "http": 200,
+    "status": "partial",
+    "chars": 14
+  },
+  "chapter1After": {
+    "revision": 1,
+    "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+    "chars": 164
+  },
+  "acceptCancelled": {
+    "status": 409,
+    "code": "CANDIDATE_NOT_ACCEPTABLE",
+    "error": "CANDIDATE_NOT_ACCEPTABLE: candidate 7b8022d5-bedf-458f-b20d-7a450f918214 in status partial requires explicit confirmation"
+  },
+  "explicitCancel": {
+    "beforeStatus": "partial",
+    "status": 200,
+    "data": {
+      "ok": true,
+      "candidateId": "7b8022d5-bedf-458f-b20d-7a450f918214",
+      "status": "cancelled"
+    }
+  },
+  "restartedAt": {
+    "port": 57956
+  },
+  "afterRestart": {
+    "revision": 1,
+    "chars": 164
+  },
+  "candidateAfterRestart": {
+    "status": "cancelled",
+    "textChars": 14
+  },
+  "authorEditAfterCancel": {
+    "status": 200,
+    "revision": 2,
+    "error": null
+  },
+  "regenerateAfterCancel": {
+    "meta": {
+      "status": 200,
+      "contentType": "application/x-ndjson; charset=utf-8"
+    },
+    "done": {
+      "ok": true,
+      "event": "done",
+      "candidateId": "48de7cef-9aa5-48f0-bf53-6e07a16656f7",
+      "outcome": "succeeded",
+      "partial": false,
+      "chars": 41,
+      "__tMs": 273
+    },
+    "error": null,
+    "deltas": 2
+  },
+  "regenerateAccept": {
+    "status": 200,
+    "revision": 3,
+    "error": null
+  },
+  "serverLogTail": [
+    "{\"books\":19,\"ts\":\"2026-09-30T13:08:34.460Z\",\"level\":\"info\",\"event\":\"reconciliation.boot_attached\"}",
+    "{\"url\":\"http://127.0.0.1:57956\",\"dataRoot\":\"C:\\\\zcode\\\\novel-ai-handoff-stage4\\\\.state\\\\stage4-data\",\"nodeEnv\":\"production\",\"hostedMode\":false,\"pid\":51068,\"ts\":\"2026-09-30T13:08:34.465Z\",\"level\":\"info\",\"event\":\"server.listening\"}",
+    "{\"requestId\":\"muo4fll1-1\",\"method\":\"GET\",\"path\":\"/api/health\",\"status\":200,\"durationMs\":2.35,\"ts\":\"2026-09-30T13:08:34.696Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4fll4-2\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":4.96,\"ts\":\"2026-09-30T13:08:34.701Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4flle-3\",\"method\":\"POST\",\"path\":\"/api/draft.candidate\",\"status\":200,\"durationMs\":1.12,\"ts\":\"2026-09-30T13:08:34.708Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4fllu-4\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":2.66,\"ts\":\"2026-09-30T13:08:34.724Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4flm9-5\",\"method\":\"POST\",\"path\":\"/api/chapter.prose.save\",\"status\":200,\"durationMs\":8.47,\"ts\":\"2026-09-30T13:08:34.746Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4flmj-6\",\"method\":\"POST\",\"path\":\"/api/chapter.prose\",\"status\":200,\"durationMs\":2.47,\"ts\":\"2026-09-30T13:08:34.750Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    "{\"requestId\":\"muo4flmp-7\",\"method\":\"POST\",\"path\":\"/api/draft.stream\",\"status\":200,\"durationMs\":270.62,\"ts\":\"2026-09-30T13:08:35.023Z\",\"level\":\"info\",\"event\":\"http.request\"}",
+    ""
+  ],
+  "attempts": [
+    {
+      "attemptId": "at_ctl_21156_muo4fjkw_mawbho",
+      "label": "phase=c-control generate(unnamed)",
+      "framesFile": "frames-at_ctl_21156_muo4fjkw_mawbho.ndjson",
+      "framesSha256": "0666afeee0a6fed5aa09c395d1a99d12445af0f8240432689c617f1582c68145"
+    },
+    {
+      "attemptId": "at_ctl_21156_muo4flmm_d2nkq7",
+      "label": "C-control:取消后再生成",
+      "framesFile": "frames-at_ctl_21156_muo4flmm_d2nkq7.ndjson",
+      "framesSha256": "e15b0c793465ff13244d38dd78ff497cf89afd6b638aecdbf84ae8ed43fd5ce0"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "受控上游已发出首个 delta（取消前确有流）",
+      "result": "PASS",
+      "evidence": {
+        "chars": 14
+      }
+    },
+    {
+      "name": "客户端断开后不再收到 done 帧",
+      "result": "PASS",
+      "evidence": {
+        "doneFrame": null
+      }
+    },
+    {
+      "name": "上游侧观察到连接关闭/中止（模型调用确实被停止）",
+      "result": "PASS",
+      "evidence": [
+        {
+          "at": "2026-09-30T13:08:32.245Z",
+          "tMs": 1222,
+          "event": "connection_closed",
+          "emittedFrames": 1,
+          "finishedNaturally": false
+        }
+      ]
+    },
+    {
+      "name": "取消后正文/revision/指纹零变化",
+      "result": "PASS",
+      "evidence": {
+        "revision": 1,
+        "sha256": "bb5e020b8a867d54eadecc9ee3acebcbbbc4f7fd50d9373bc6ea2b827f9c6f9f",
+        "chars": 164
+      }
+    },
+    {
+      "name": "采纳已取消候选被拒（409 + CANDIDATE_NOT_ACCEPTABLE）",
+      "result": "PASS",
+      "evidence": {
+        "status": 409,
+        "code": "CANDIDATE_NOT_ACCEPTABLE",
+        "error": "CANDIDATE_NOT_ACCEPTABLE: candidate 7b8022d5-bedf-458f-b20d-7a450f918214 in status partial requires explicit confirmation"
+      }
+    },
+    {
+      "name": "被拒采纳后正文/revision/指纹仍零变化",
+      "result": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "显式 /api/draft.cancel：partial → cancelled（或已终态时 409 CANDIDATE_TERMINAL），且不改正文",
+      "result": "PASS",
+      "evidence": {
+        "beforeStatus": "partial",
+        "status": 200,
+        "data": {
+          "ok": true,
+          "candidateId": "7b8022d5-bedf-458f-b20d-7a450f918214",
+          "status": "cancelled"
+        }
+      }
+    },
+    {
+      "name": "显式 cancel 后正文零变化",
+      "result": "PASS",
+      "evidence": null
+    },
+    {
+      "name": "重启后已保存正文仍可读且一致",
+      "result": "PASS",
+      "evidence": {
+        "revision": 1,
+        "chars": 164
+      }
+    },
+    {
+      "name": "重启后取消候选不被当作成功成品（status=cancelled）",
+      "result": "PASS",
+      "evidence": {
+        "status": "cancelled",
+        "textChars": 14
+      }
+    },
+    {
+      "name": "取消后作者仍可保存编辑",
+      "result": "PASS",
+      "evidence": {
+        "status": 200,
+        "revision": 2,
+        "error": null
+      }
+    },
+    {
+      "name": "编辑落盘一致（正文载荷逐字相同）",
+      "result": "PASS",
+      "evidence": {
+        "revision": 2,
+        "payloadChars": 173
+      }
+    },
+    {
+      "name": "取消后再次生成能拿到 done（completed candidate）",
+      "result": "PASS",
+      "evidence": {
+        "ok": true,
+        "event": "done",
+        "candidateId": "48de7cef-9aa5-48f0-bf53-6e07a16656f7",
+        "outcome": "succeeded",
+        "partial": false,
+        "chars": 41,
+        "__tMs": 273
+      }
+    },
+    {
+      "name": "取消后再生成的候选可采纳",
+      "result": "PASS",
+      "evidence": {
+        "status": 200,
+        "revision": 3,
+        "error": null
+      }
+    }
+  ],
+  "finishedAt": "2026-09-30T13:08:35.047Z",
+  "allAssertionsPassed": true
+}

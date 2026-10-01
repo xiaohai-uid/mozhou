@@ -1,0 +1,592 @@
+{
+  "passed": 52,
+  "failed": 0,
+  "total": 52,
+  "ranAt": "2026-09-30T11:35:27.998Z",
+  "networkUsed": false,
+  "realModelCalls": 0,
+  "results": [
+    {
+      "name": "传输异常时 transport 被调用了一次",
+      "ok": true,
+      "evidence": [
+        {
+          "reservationId": "rc_001_11260_muo13qsk",
+          "ledgerUsedAtEntry": 1
+        }
+      ]
+    },
+    {
+      "name": "进入 transport 时账本已记账（先记账后发送）",
+      "ok": true,
+      "evidence": {
+        "reservationId": "rc_001_11260_muo13qsk",
+        "ledgerUsedAtEntry": 1
+      }
+    },
+    {
+      "name": "传输异常被如实抛出",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "Error",
+        "code": null,
+        "message": "simulated ECONNRESET before any byte"
+      }
+    },
+    {
+      "name": "异常后额度不退款（used=1）",
+      "ok": true,
+      "evidence": {
+        "used": 1
+      }
+    },
+    {
+      "name": "第二次尝试被额度挡住，且 transport 没有被再次调用",
+      "ok": true,
+      "evidence": {
+        "second": {
+          "rejected": true,
+          "name": "BudgetExhaustedError",
+          "code": "BUDGET_EXHAUSTED",
+          "message": "BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送"
+        },
+        "transportCalls": 1
+      }
+    },
+    {
+      "name": "第二次拒绝后 used 仍为 1",
+      "ok": true,
+      "evidence": {
+        "used": 1
+      }
+    },
+    {
+      "name": "两次 429 各消耗一次额度且不退款",
+      "ok": true,
+      "evidence": {
+        "used": 2,
+        "calls": 2
+      }
+    },
+    {
+      "name": "第三次被额度挡住",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetExhaustedError",
+        "code": "BUDGET_EXHAUSTED",
+        "message": "BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送"
+      }
+    },
+    {
+      "name": "两次 429 的错误被如实带出",
+      "ok": true,
+      "evidence": {
+        "r1": {
+          "rejected": true,
+          "name": "Error",
+          "code": "RATE_LIMITED",
+          "message": "上游 429: inference exceeds tpm/rpm limit"
+        },
+        "r2": {
+          "rejected": true,
+          "name": "Error",
+          "code": "RATE_LIMITED",
+          "message": "上游 429: inference exceeds tpm/rpm limit"
+        }
+      }
+    },
+    {
+      "name": "取消后额度不退款",
+      "ok": true,
+      "evidence": {
+        "r": {
+          "rejected": true,
+          "name": "AbortError",
+          "code": null,
+          "message": "aborted by client"
+        },
+        "used": 1
+      }
+    },
+    {
+      "name": "账本里留有取消原因（可审计）",
+      "ok": true,
+      "evidence": [
+        "T3 取消"
+      ]
+    },
+    {
+      "name": "子进程正常退出（无 spawn/管道异常）",
+      "ok": true,
+      "evidence": {
+        "code": 0,
+        "stderr": ""
+      }
+    },
+    {
+      "name": "父进程占用已持久化",
+      "ok": true,
+      "evidence": {
+        "exists": true,
+        "ticket": "offline-test-t4",
+        "allowance": 2,
+        "migrated": 0,
+        "spentThisVersion": 1,
+        "used": 1,
+        "remaining": 1,
+        "overBudget": false,
+        "rows": [
+          {
+            "reservationId": "rc_001_11260_muo13qsz",
+            "seq": 1,
+            "state": "spent",
+            "reason": "T4 父进程占用",
+            "channel": "real",
+            "at": "2026-09-30T11:35:22.739Z",
+            "pid": 11260,
+            "runDir": null,
+            "source": "ledger"
+          }
+        ]
+      }
+    },
+    {
+      "name": "子进程第 1 次成功、第 2 次被挡（额度跨进程继承）",
+      "ok": true,
+      "evidence": {
+        "label": "child",
+        "pid": 37444,
+        "outcomes": [
+          "spent",
+          "BUDGET_EXHAUSTED"
+        ],
+        "snapshot": {
+          "exists": true,
+          "ticket": "offline-test-t4",
+          "allowance": 2,
+          "migrated": 0,
+          "spentThisVersion": 2,
+          "used": 2,
+          "remaining": 0,
+          "overBudget": false,
+          "rows": [
+            {
+              "reservationId": "rc_001_11260_muo13qsz",
+              "seq": 1,
+              "state": "spent",
+              "reason": "T4 父进程占用",
+              "channel": "real",
+              "at": "2026-09-30T11:35:22.739Z",
+              "pid": 11260,
+              "runDir": null,
+              "source": "ledger"
+            },
+            {
+              "reservationId": "rc_002_37444_muo13qu9",
+              "seq": 2,
+              "state": "spent",
+              "reason": "child child attempt 1",
+              "channel": "real",
+              "at": "2026-09-30T11:35:22.785Z",
+              "pid": 37444,
+              "runDir": null,
+              "source": "ledger"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "磁盘上总占用 = 2（不因重启重置）",
+      "ok": true,
+      "evidence": {
+        "used": 2
+      }
+    },
+    {
+      "name": "并发子进程全部正常退出",
+      "ok": true,
+      "evidence": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "并发 8 进程 / 额度 3：成功数恰好等于额度",
+      "ok": true,
+      "evidence": {
+        "okCount": 3,
+        "allowance": 3,
+        "spent": [
+          "spent",
+          "BUDGET_EXHAUSTED",
+          "spent",
+          "spent",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED"
+        ]
+      }
+    },
+    {
+      "name": "并发 8 进程 / 额度 3：其余全部被挡",
+      "ok": true,
+      "evidence": {
+        "blocked": 5,
+        "used": 3,
+        "procs": 8
+      }
+    },
+    {
+      "name": "并发子进程全部正常退出",
+      "ok": true,
+      "evidence": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "并发 6 进程 / 额度 1：成功数恰好等于额度",
+      "ok": true,
+      "evidence": {
+        "okCount": 1,
+        "allowance": 1,
+        "spent": [
+          "spent",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED",
+          "BUDGET_EXHAUSTED"
+        ]
+      }
+    },
+    {
+      "name": "并发 6 进程 / 额度 1：其余全部被挡",
+      "ok": true,
+      "evidence": {
+        "blocked": 5,
+        "used": 1,
+        "procs": 6
+      }
+    },
+    {
+      "name": "额度用尽后直接调 spendRealCall 也被挡（没有第二条放行路径）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetExhaustedError",
+        "code": "BUDGET_EXHAUSTED",
+        "message": "BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送"
+      }
+    },
+    {
+      "name": "非法 channel 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "ChannelRefusedError",
+        "code": null,
+        "message": "guardedSend: channel 必须是 real 或 controlled，收到 any"
+      }
+    },
+    {
+      "name": "空 reason 被拒（账目不可审计就不许占用）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "REASON_REQUIRED",
+        "message": "REASON_REQUIRED: 占用额度必须给出非空 reason（否则账目无法审计）"
+      }
+    },
+    {
+      "name": "非法 allowance -1 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 不能为负，收到 -1"
+      }
+    },
+    {
+      "name": "非法 allowance 1.5 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 1.5"
+      }
+    },
+    {
+      "name": "非法 allowance \"4\" 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 \"4\""
+      }
+    },
+    {
+      "name": "非法 allowance null 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 null"
+      }
+    },
+    {
+      "name": "非法 allowance undefined 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 undefined"
+      }
+    },
+    {
+      "name": "非法 allowance null 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 null"
+      }
+    },
+    {
+      "name": "非法 allowance null 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 null"
+      }
+    },
+    {
+      "name": "非法 allowance 999 被拒",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 超过硬上限 64，收到 999"
+      }
+    },
+    {
+      "name": "损坏账本「非 JSON」被拒且不发请求（fail-closed）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LEDGER_CORRUPT",
+        "message": "LEDGER_CORRUPT: 账本 JSON 无法解析：Expected property name or '}' in JSON at position 2 (line 1 column 3)"
+      }
+    },
+    {
+      "name": "损坏账本「缺 version」被拒且不发请求（fail-closed）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LEDGER_CORRUPT",
+        "message": "LEDGER_CORRUPT: 账本结构非法：version 不是 1（收到 undefined）"
+      }
+    },
+    {
+      "name": "损坏账本「version 错」被拒且不发请求（fail-closed）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LEDGER_CORRUPT",
+        "message": "LEDGER_CORRUPT: 账本结构非法：version 不是 1（收到 99）"
+      }
+    },
+    {
+      "name": "损坏账本「allowance 为字符串」被拒且不发请求（fail-closed）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "BUDGET_INVALID",
+        "message": "BUDGET_INVALID: allowance 必须是安全整数，收到 \"4\""
+      }
+    },
+    {
+      "name": "损坏账本「spend 不是数组」被拒且不发请求（fail-closed）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LEDGER_CORRUPT",
+        "message": "LEDGER_CORRUPT: 账本结构非法：spend 不是数组"
+      }
+    },
+    {
+      "name": "损坏账本「reservationId 重复」被拒且不发请求（fail-closed）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LEDGER_CORRUPT",
+        "message": "LEDGER_CORRUPT: 账本结构非法：reservationId 重复：a"
+      }
+    },
+    {
+      "name": "账本缺失被拒（默认不允许任何真实调用）",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LEDGER_MISSING",
+        "message": "LEDGER_MISSING: 账本不存在；真实通道关闭（先 initLedger 并显式设额度）"
+      }
+    },
+    {
+      "name": "锁被占用时抛 LOCK_TIMEOUT 而不是照发",
+      "ok": true,
+      "evidence": {
+        "rejected": true,
+        "name": "BudgetUnavailableError",
+        "code": "LOCK_TIMEOUT",
+        "message": "LOCK_TIMEOUT: 等待账本锁超过 5000ms，拒绝在不确定状态下发请求"
+      }
+    },
+    {
+      "name": "锁超时等待有界（<15s）",
+      "ok": true,
+      "evidence": {
+        "elapsed": 5005
+      }
+    },
+    {
+      "name": "锁超时后额度未被消耗",
+      "ok": true,
+      "evidence": {
+        "exists": true,
+        "ticket": "offline-test-t9",
+        "allowance": 4,
+        "migrated": 0,
+        "spentThisVersion": 0,
+        "used": 0,
+        "remaining": 4,
+        "overBudget": false,
+        "rows": []
+      }
+    },
+    {
+      "name": "受控通道可以发请求（不占真实额度）",
+      "ok": true,
+      "evidence": {
+        "result": "fixture-ok",
+        "reservation": null
+      }
+    },
+    {
+      "name": "受控通道没有写入任何额度占用",
+      "ok": true,
+      "evidence": {
+        "exists": true,
+        "ticket": "offline-test-t10",
+        "allowance": 0,
+        "migrated": 0,
+        "spentThisVersion": 0,
+        "used": 0,
+        "remaining": 0,
+        "overBudget": false,
+        "rows": []
+      }
+    },
+    {
+      "name": "打 /api/draft.stream 的 fetch 只有一处（唯一物理入口）",
+      "ok": true,
+      "evidence": {
+        "fetchSites": 1,
+        "openFnFetches": 1,
+        "generateSingleEntry": true,
+        "sendRealGuards": true,
+        "guardedSites": 5,
+        "defaultChannelIsControlled": true
+      }
+    },
+    {
+      "name": "generate() 是唯一分流函数（内部各一处 openDraftStream / sendReal）",
+      "ok": true,
+      "evidence": {
+        "fetchSites": 1,
+        "openFnFetches": 1,
+        "generateSingleEntry": true,
+        "sendRealGuards": true,
+        "guardedSites": 5,
+        "defaultChannelIsControlled": true
+      }
+    },
+    {
+      "name": "sendReal() 既判 channel 又过 guardedSend",
+      "ok": true,
+      "evidence": {
+        "fetchSites": 1,
+        "openFnFetches": 1,
+        "generateSingleEntry": true,
+        "sendRealGuards": true,
+        "guardedSites": 5,
+        "defaultChannelIsControlled": true
+      }
+    },
+    {
+      "name": "runner 默认 channel 为 controlled（真实通道默认关闭）",
+      "ok": true,
+      "evidence": {
+        "fetchSites": 1,
+        "openFnFetches": 1,
+        "generateSingleEntry": true,
+        "sendRealGuards": true,
+        "guardedSites": 5,
+        "defaultChannelIsControlled": true
+      }
+    },
+    {
+      "name": "写入后账本是完整可解析 JSON",
+      "ok": true,
+      "evidence": null
+    },
+    {
+      "name": "文件里不含临时文件名残留",
+      "ok": true,
+      "evidence": null
+    },
+    {
+      "name": "目录里没有遗留 .tmp 文件",
+      "ok": true,
+      "evidence": {
+        "tmpFiles": []
+      }
+    },
+    {
+      "name": "validateLedger 接受正常账本",
+      "ok": true,
+      "evidence": null
+    }
+  ]
+}

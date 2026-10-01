@@ -1,0 +1,14 @@
+{
+  "runId": "guard-controlled-2026-09-30T13-08-44-476Z-453d9c",
+  "phase": "guard",
+  "channel": "controlled",
+  "realModelCallsAllowed": 0,
+  "ledgerFile": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket\\ledger.json",
+  "repo": "C:\\zcode\\novel-ai",
+  "dataRoot": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\stage4-data",
+  "startedAt": "2026-09-30T13:08:44.484Z",
+  "argv": [
+    "--phase",
+    "guard"
+  ]
+}

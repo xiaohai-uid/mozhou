@@ -1,0 +1,295 @@
+{
+  "passed": 25,
+  "failed": 0,
+  "total": 25,
+  "ranAt": "2026-09-30T13:08:24.362Z",
+  "implUnderTest": "C:\\zcode\\novel-ai-handoff-stage4\\harness",
+  "networkUsed": false,
+  "realModelCalls": 0,
+  "results": [
+    {
+      "name": "持锁者子进程已持锁（ready 标记出现）",
+      "result": "PASS",
+      "evidence": {
+        "ready": true
+      }
+    },
+    {
+      "name": "父进程必须**等到活锁被释放**才可能进入临界区（elapsed >= 持锁时长的大部分），不得凭年龄夺锁",
+      "result": "PASS",
+      "evidence": {
+        "elapsed": 2499,
+        "holdMs": 2500,
+        "parentError": null,
+        "parentTransportRan": true,
+        "staleMs": 31000
+      }
+    },
+    {
+      "name": "全过程最多只有一个 transport 实际执行",
+      "result": "PASS",
+      "evidence": {
+        "transports": 1,
+        "holder": {
+          "label": "A",
+          "pid": 51036,
+          "outcome": "refused",
+          "errorCode": "BUDGET_EXHAUSTED",
+          "seq": null
+        }
+      }
+    },
+    {
+      "name": "账本完整可解析、无 .tmp 残留、used=1",
+      "result": "PASS",
+      "evidence": {
+        "parsed": true,
+        "used": 1,
+        "spendRows": 1,
+        "seqs": [
+          1
+        ],
+        "tmpLeft": []
+      }
+    },
+    {
+      "name": "父进程**等到了活锁释放**才进入临界区（elapsed >= 持锁时长的大部分），未夺锁",
+      "result": "PASS",
+      "evidence": {
+        "elapsed": 2490,
+        "holdMs": 2500,
+        "parentError": null,
+        "parentTransportRan": true
+      }
+    },
+    {
+      "name": "额度 2 下两个尝试串行完成，账本两条占用互不覆盖",
+      "result": "PASS",
+      "evidence": {
+        "transports": 2,
+        "parsed": true,
+        "used": 2,
+        "spendRows": 2,
+        "seqs": [
+          1,
+          2
+        ],
+        "tmpLeft": []
+      }
+    },
+    {
+      "name": "迟到释放因 token 不匹配被拒（LOCK_NOT_OWNER）",
+      "result": "PASS",
+      "evidence": {
+        "code": "LOCK_NOT_OWNER"
+      }
+    },
+    {
+      "name": "B 的锁没有被 A 的迟到释放删掉",
+      "result": "PASS",
+      "evidence": {
+        "lockExists": true
+      }
+    },
+    {
+      "name": "同参数重复初始化后消耗保持不变（不重置）",
+      "result": "PASS",
+      "evidence": {
+        "before": 1,
+        "after": 1,
+        "initErr": null
+      }
+    },
+    {
+      "name": "重置会导致第二次占用成功 —— 修复后必须被额度挡住",
+      "result": "PASS",
+      "evidence": {
+        "secondSpend": "BUDGET_EXHAUSTED",
+        "used": 1
+      }
+    },
+    {
+      "name": "用 init 改额度被拒（配置冲突），账本不变",
+      "result": "PASS",
+      "evidence": {
+        "code": "ALLOWANCE_CONFLICT",
+        "allowance": 1,
+        "used": 1
+      }
+    },
+    {
+      "name": "换 ticket 名重新初始化被拒（TICKET_CONFLICT）",
+      "result": "PASS",
+      "evidence": {
+        "code": "TICKET_CONFLICT"
+      }
+    },
+    {
+      "name": "6 个子进程并发首次创建全部正常退出",
+      "result": "PASS",
+      "evidence": [
+        {
+          "code": 0,
+          "outcome": "UNEXPECTED_OK",
+          "error": null
+        },
+        {
+          "code": 0,
+          "outcome": "UNEXPECTED_OK",
+          "error": null
+        },
+        {
+          "code": 0,
+          "outcome": "UNEXPECTED_OK",
+          "error": null
+        },
+        {
+          "code": 0,
+          "outcome": "UNEXPECTED_OK",
+          "error": null
+        },
+        {
+          "code": 0,
+          "outcome": "UNEXPECTED_OK",
+          "error": null
+        },
+        {
+          "code": 0,
+          "outcome": "UNEXPECTED_OK",
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "并发创建后账本合法且额度没有被叠加/清零",
+      "result": "PASS",
+      "evidence": {
+        "allowance": 2,
+        "used": 0
+      }
+    },
+    {
+      "name": "初始化/占用交错后，占用记录一条都没丢（used=3）",
+      "result": "PASS",
+      "evidence": {
+        "parsed": true,
+        "used": 3,
+        "spendRows": 3,
+        "seqs": [
+          1,
+          2,
+          3
+        ],
+        "tmpLeft": []
+      }
+    },
+    {
+      "name": "同一工单换目录重开被拒（TICKET_RELOCATED）",
+      "result": "PASS",
+      "evidence": {
+        "code": "TICKET_RELOCATED"
+      }
+    },
+    {
+      "name": "换目录后没有凭空多出可用额度",
+      "result": "PASS",
+      "evidence": {
+        "bSpend": "not_attempted"
+      }
+    },
+    {
+      "name": "首帧前传输异常也占用一次额度（不漏计、不退款）",
+      "result": "PASS",
+      "evidence": {
+        "used": 1,
+        "thrown": "connect ECONNREFUSED before any frame"
+      }
+    },
+    {
+      "name": "取消也占额度且不退款",
+      "result": "PASS",
+      "evidence": {
+        "used": 2
+      }
+    },
+    {
+      "name": "每条 spend 都有唯一 attemptId 与配对的 started/terminal 事件（对账一致）",
+      "result": "PASS",
+      "evidence": {
+        "spendRows": 2,
+        "distinctAttemptIds": 2,
+        "terminalEvents": 2,
+        "matched": true
+      }
+    },
+    {
+      "name": "有 started 无 terminal 的尝试被识别为结果未知（UNKNOWN），不静默丢弃",
+      "result": "PASS",
+      "evidence": {
+        "orphanAttempts": [
+          "at_ea343bc4_39933125"
+        ]
+      }
+    },
+    {
+      "name": "同一请求的两份同内容帧文件只计一次（不按文件计数）",
+      "result": "PASS",
+      "evidence": {
+        "attempts": 3,
+        "dup": 1,
+        "ids": [
+          "at_2f8ee997_ce732903",
+          "at_9c7ed2fb_96c1a1f9",
+          "at_f83451ce_0601558b"
+        ]
+      }
+    },
+    {
+      "name": "首帧前异常的那次尝试仍被计入（有 terminal 事件、零帧文件）",
+      "result": "PASS",
+      "evidence": {
+        "errored": [
+          {
+            "id": "at_9c7ed2fb_96c1a1f9",
+            "frames": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "占用后即死的尝试标为 UNKNOWN 而不是被丢弃",
+      "result": "PASS",
+      "evidence": {
+        "unknown": [
+          "at_f83451ce_0601558b"
+        ],
+        "orphan": "at_f83451ce_0601558b"
+      }
+    },
+    {
+      "name": "账本行与 started 事件一一对账（无孤儿 started / 无无主占用）",
+      "result": "PASS",
+      "evidence": {
+        "spendRows": 3,
+        "startedEvents": 3,
+        "attemptsCounted": 3,
+        "spendWithoutStarted": [],
+        "startedWithoutSpend": [],
+        "unknownResults": [
+          "at_f83451ce_0601558b"
+        ],
+        "frameFilesSeen": 2,
+        "frameFilesUnique": 1,
+        "duplicateFrameFiles": 1,
+        "frameFilesUnmatchedToAttempt": [
+          {
+            "run": "synth",
+            "file": "context-dump-at_2f8ee997_ce732903.ndjson",
+            "candidateId": "cand-synth",
+            "duplicateOf": []
+          }
+        ]
+      }
+    }
+  ]
+}

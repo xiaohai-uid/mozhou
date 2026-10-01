@@ -1,0 +1,23 @@
+{
+  "phase": "c-real",
+  "channel": "real",
+  "runId": "c-real-real-2026-09-30T13-03-56-947Z-e20f0e",
+  "runDir": "C:\\zcode\\novel-ai-handoff-stage4\\runs\\c-real-real-2026-09-30T13-03-56-947Z-e20f0e",
+  "fatal": "BudgetExhaustedError: BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送\n    at file:///C:/zcode/novel-ai-handoff-stage4/harness/accounting.mjs:386:13\n    at withLock (file:///C:/zcode/novel-ai-handoff-stage4/harness/accounting.mjs:183:12)\n    at spendRealCall (file:///C:/zcode/novel-ai-handoff-stage4/harness/accounting.mjs:379:10)\n    at guardedSend (file:///C:/zcode/novel-ai-handoff-stage4/harness/transport.mjs:79:23)\n    at sendReal (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:213:52)\n    at generate (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:248:21)\n    at generateWithBackoff (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:258:18)\n    at phaseCReal (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:834:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:1051:41",
+  "assertions": [],
+  "ledger": {
+    "exists": true,
+    "ticketDir": "C:\\zcode\\novel-ai-handoff-stage4\\.state\\ticket",
+    "ticket": "mozhou-stage4-audit-fix",
+    "allowance": 0,
+    "migrated": 0,
+    "spentThisVersion": 0,
+    "used": 0,
+    "remaining": 0,
+    "overBudget": false,
+    "updatedAt": "2026-09-30T13:03:56.953Z",
+    "spend": [],
+    "rows": []
+  },
+  "allAssertionsPassed": false
+}

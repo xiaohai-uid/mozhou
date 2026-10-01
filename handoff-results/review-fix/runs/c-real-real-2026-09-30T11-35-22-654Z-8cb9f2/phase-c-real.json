@@ -1,0 +1,20 @@
+{
+  "phase": "c-real",
+  "channel": "real",
+  "runId": "c-real-real-2026-09-30T11-35-22-654Z-8cb9f2",
+  "runDir": "C:\\zcode\\novel-ai-handoff-stage4\\runs\\c-real-real-2026-09-30T11-35-22-654Z-8cb9f2",
+  "fatal": "Error: BLOCKED: 缺少真实模型凭据（变量名 MOZHOU_API_KEY/SENSENOVA_API_KEY 与 MOZHOU_API_BASE/SENSENOVA_BASE_URL）\n    at buildEnv (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:302:42)\n    at startServer (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:339:10)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async phaseCReal (file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:784:3)\n    at async file:///C:/zcode/novel-ai-handoff-stage4/runner.mjs:1005:41",
+  "assertions": [],
+  "ledger": {
+    "exists": true,
+    "ticket": "mozhou-stage4-audit-fix",
+    "allowance": 0,
+    "migrated": 0,
+    "spentThisVersion": 0,
+    "used": 0,
+    "remaining": 0,
+    "overBudget": false,
+    "rows": []
+  },
+  "allAssertionsPassed": false
+}

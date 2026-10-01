@@ -1,0 +1,32 @@
+[
+  {
+    "at": "2026-09-30T13:04:23.997Z",
+    "tMs": 692,
+    "event": "request_received",
+    "url": "/v1/chat/completions",
+    "model": "controlled-fixture",
+    "stream": true,
+    "authHeaderPresent": true
+  },
+  {
+    "at": "2026-09-30T13:04:23.997Z",
+    "tMs": 692,
+    "event": "delta_sent",
+    "index": 1,
+    "chars": 14
+  },
+  {
+    "at": "2026-09-30T13:04:24.063Z",
+    "tMs": 758,
+    "event": "delta_sent",
+    "index": 2,
+    "chars": 27
+  },
+  {
+    "at": "2026-09-30T13:04:24.124Z",
+    "tMs": 819,
+    "event": "stream_completed",
+    "emittedFrames": 2,
+    "finishedNaturally": true
+  }
+]

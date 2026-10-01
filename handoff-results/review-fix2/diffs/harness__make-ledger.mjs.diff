@@ -1,0 +1,500 @@
+diff --git a/harness/make-ledger.mjs b/harness/make-ledger.mjs
+index e63043c..a6d7efc 100644
+--- a/harness/make-ledger.mjs
++++ b/harness/make-ledger.mjs
+@@ -1,217 +1,340 @@
+ /**
+- * harness/make-ledger.mjs —— **自动**从运行目录生成账目。
++ * harness/make-ledger.mjs —— **自动**从账本与尝试事件流生成账目。
+  *
+- * 为什么需要：Codex 第四轮指出，上一版 handoff-results/calls.json 是**手写数组**，
+- * 于是必然漏账（两次 B 只有一笔）。现在账目只有一个来源：runs/<runId>/ 里的
+- * 原始帧（*.ndjson）、上游事件（*.json）、运行元数据（run.json / *.log）。
++ * 第四轮返修（Codex 复核 P2）改掉了上一版「按 .ndjson 文件计数」的错误做法：
++ *   - 计数单位是**一次尝试**（唯一 attemptId），不是文件；
++ *   - attemptId 由账本 spend 行与 attempts.jsonl 的 started/terminal 事件共同关联；
++ *   - 帧文件只是**内容证据**，同内容的重复副本按 sha256 去重，不增加次数；
++ *   - 首帧前就抛异常的尝试有 terminal 事件，照样计一次；
++ *   - 有 started 无 terminal（进程中途被杀）⇒ 结果标 UNKNOWN，不静默丢；
++ *   - 账本行与事件流互相**对账**，不一致单列出来。
+  *
+- * 本脚本做三件事：
+- *   1. 扫描 runs/ 下每个运行目录，抽取「每个 /api/draft.stream 调用」；
+- *   2. 读工单账本（ticket/ledger.json），按 reservationId 把额度占用与调用对齐；
+- *   3. 合并**历史遗留条目**（LEGACY 常量，来自旧交回包与会话日志；端点身份不可核实的一律
+- *      标 UNKNOWN，绝不猜测），输出 runs-ledger.json + runs-ledger.md。
+- *
+- * 只读；不联网；不改任何账本。
++ * 历史条目（LEGACY）单列，**不与自动计数混算**：它们来自第四轮之前的 harness，
++ * 没有 attemptId，只能按「可定位的现存证据」登记。
+  */
++import { createHash } from 'node:crypto';
+ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+ import { join, resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { budgetSnapshot } from './accounting.mjs';
++import { budgetSnapshot, readAttemptEvents } from './accounting.mjs';
+ 
+ const HERE = resolve(fileURLToPath(new URL('.', import.meta.url)));
+ const STAGE = resolve(HERE, '..');
+-const RUNS = join(STAGE, 'runs');
+-const TICKET_DIR = join(STAGE, '.state', 'ticket');
+-const OUT_JSON = join(HERE, 'runs-ledger.json');
+-const OUT_MD = join(HERE, 'runs-ledger.md');
++
++function sha256(buf) { return createHash('sha256').update(buf).digest('hex'); }
+ 
+ /**
+- * 历史遗留调用（**本轮修复过程中已经发生、无法由 runs/ 重建**的那些）。
+- * 每条的 source 指向它的留档位置；endpointProvenance 只有两种合法值：
+- *   'KNOWN_*'（有直接留档）或 'UNKNOWN'（**没有**独立留档，禁止猜测）。
++ * 历史请求尝试（第四轮返修后共 **10 条**，此前版本误记为 9 条且漏了第 6 条）。
++ *
++ * endpointProvenance 的**统一判据**（Codex 指出上一版对 B 拒绝用耗时/provider 判断，
++ * 却对其他条目用同样依据标 KNOWN_REAL —— 现统一如下）：
++ *   KNOWN_REAL：存在**只有真实公网上游才会产生**的证据，即供应商自身的错误体（429003 等）。
++ *   UNKNOWN    ：证据只有 (a) 耗时/时长、(b) start 帧的 provider 字符串、(c) 旧 harness 的自报行。
++ *               这三者对本地替身同样成立，因此一律判 UNKNOWN。
++ * 缺少原始依据的历史自报，保留为自报并在 endpointProvenance 写 UNKNOWN，不删除条目。
+  */
+-const LEGACY = [
++export const LEGACY = [
+   {
+-    seq: 1, at: '2026-09-30T10:15:20Z', phase: 'B（上一版 harness 首次尝试）',
+-    purpose: '第二章上下文生成（首次尝试）',
++    seq: 1, at: '2026-09-30T10:15:20Z', phase: 'B', purpose: '第二章上下文生成（首次尝试）',
+     terminal: 'error', elapsedMs: 530, deltaChars: 0, rateLimited: true,
+     error: '上游 429: inference exceeds tpm/rpm limit (429003)',
++    candidateId: null,
+     endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '该次构建由上一版 runner 的 B 分支默认启动真实通道（buildEnv(real=true) 且无受控端点注入）；且错误文本是真实供应商的 429 体。',
+-    evidence: '会话日志 10:15:20；产物已被后续运行覆盖，无原始帧留存',
++    provenanceBasis: '错误体 429003 是公网供应商自身的限流码；本地替身不会产生该错误体。',
++    evidence: 'handoff-results/calls.json seq1（原始行仍在旧包，未被覆盖）',
++    rawFrames: '无（未留存）',
+   },
+   {
+-    seq: 2, at: '2026-09-30T10:16:06Z', phase: 'B（上一版 harness）',
+-    purpose: '第二章上下文生成（成功）',
++    seq: 2, at: '2026-09-30T10:16:06Z', phase: 'B', purpose: '第二章上下文生成（成功）',
+     terminal: 'done', elapsedMs: 19480, deltaChars: 302, rateLimited: false, error: null,
+     candidateId: 'a60d02ba-afa6-49d6-bd82-819877c2dbc3',
+     endpointProvenance: 'UNKNOWN',
+-    provenanceBasis: '仅有 start 帧自报的 provider 字符串（real-openai-compatible）与耗时，**没有**端点/环回覆盖值的独立留档；provider 字符串对受控替身与真实通道取值相同，无法据此排除替身（Codex 第四轮同判）。',
+-    evidence: 'C:\\zcode\\novel-ai\\handoff-results\\test-logs\\phase-b.log（10:16:29 的 done 帧行）；原始帧已被覆盖',
++    provenanceBasis: '只有耗时与 start 帧 provider 字符串；BYOK 路径不打印 tier-route trace（generationTarget.ts:218-270），无法区分真实与替身。原始帧已被后续运行覆盖。',
++    evidence: 'handoff-results/calls.json seq2 + handoff-results/test-logs/phase-b.log 的 10:16:29 done 帧行',
++    rawFrames: '已丢失（数据根删除 + 旧 artifacts 被覆盖）',
+   },
+   {
+-    seq: 3, at: '2026-09-30T10:18:56Z', phase: 'C-control（上一版 harness 配错通道）',
++    seq: 3, at: '2026-09-30T10:18:56Z', phase: 'C-control（上一版误配真实通道）',
+     purpose: '取消后再生成——本应走本地替身，实际被起成了真实通道',
+     terminal: 'error', elapsedMs: 60166, deltaChars: 0, rateLimited: false,
+     error: '全部候选失败：TIMEOUT: deepseek 超过 60000ms 未返回',
+-    endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '该次重启被显式配置为真实通道（上一版 runner 的 startServerWithEnv 走 buildEnv(true)），且 60s 无任何 delta 与真实上游行为一致。',
+-    evidence: '会话日志 10:18:56；无原始帧留存',
++    candidateId: null,
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '该超时文案由墨舟自身代码产生（providerId 超时），替身挂住时同样会触发，不构成端点证据。',
++    evidence: 'handoff-results/calls.json seq3',
++    rawFrames: '无（未留存）',
+   },
+   {
+-    seq: 4, at: '2026-09-30T10:19:41Z', phase: 'C-real（上一版 harness）',
+-    purpose: '真实取消：收到首个 delta 即断开',
++    seq: 4, at: '2026-09-30T10:19:41Z', phase: 'C-real', purpose: '真实取消：收到首个 delta 即断开',
+     terminal: 'aborted_by_client', elapsedMs: 9696, deltaChars: 1, rateLimited: false, error: null,
+-    endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '上一版 runner 的 --phase c-real 分支不注入受控端点，只从凭据解析；首 delta 9.7s 到达符合公网上游首字节特征。',
+-    evidence: '会话日志 10:19:41；产物已被最终运行覆盖',
++    candidateId: null,
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '仅旧 harness 自报行，无独立端点证据。',
++    evidence: 'handoff-results/calls.json seq4',
++    rawFrames: '已丢失（被最终留档那次运行覆盖）',
+   },
+   {
+-    seq: 5, at: '2026-09-30T10:19:57Z', phase: 'C-real（上一版 harness）',
+-    purpose: '取消之后重新生成',
++    seq: 5, at: '2026-09-30T10:19:57Z', phase: 'C-real', purpose: '取消之后重新生成',
+     terminal: 'done', elapsedMs: 15521, deltaChars: 230, rateLimited: false, error: null,
+-    endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '同上（同一进程内的第二条真实请求）。',
+-    evidence: '会话日志 10:19:57；产物已被覆盖',
++    candidateId: null,
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '仅旧 harness 自报行，无独立端点证据。',
++    evidence: 'handoff-results/calls.json seq5',
++    rawFrames: '已丢失（被最终留档那次运行覆盖）',
+   },
+   {
+-    seq: 6, at: '2026-09-30T10:28:46Z', phase: 'C-real（重跑尝试）',
+-    purpose: '真实取消（重跑尝试 1）',
++    seq: 6, at: '2026-09-30T10:23:54Z', phase: 'B',
++    purpose: '第二章上下文生成（第二轮尝试）—— **旧 calls.json 漏记的正是这一条**',
++    terminal: 'done', elapsedMs: 38972, deltaChars: 224, rateLimited: false, error: null,
++    candidateId: '1bb7d37b-5b0f-4349-b1c4-9de9930e154a',
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '原始帧在，但 start 帧 provider 字符串与替身取值相同，且该次运行未记录 channel；按统一判据判 UNKNOWN。耗时 38972ms 同样不能区分。',
++    evidence: 'handoff-results/artifacts/context-chapter2.frames.ndjson（172 帧：1 start + 170 delta + 1 done，累计 224 字）+ artifacts/phase-b.json + 外部 run-b.log',
++    rawFrames: '**仍在**：handoff-results/artifacts/context-chapter2.frames.ndjson',
++  },
++  {
++    seq: 7, at: '2026-09-30T10:28:46Z', phase: 'C-real（重跑尝试）', purpose: '真实取消（重跑尝试 1）',
+     terminal: 'error', elapsedMs: 120, deltaChars: 0, rateLimited: false,
+     error: 'fetch failed（连接层失败，未取得任何帧）',
++    candidateId: null,
+     endpointProvenance: 'UNKNOWN',
+-    provenanceBasis: '连接层失败发生在任何帧之前，没有 start 帧可以佐证端点；也没有当时的端点覆盖留档。',
+-    evidence: '会话日志 10:28:46（该次结果文件随后被覆盖）',
++    provenanceBasis: '失败发生在任何帧之前，没有 start 帧，也没有任何端点留档。',
++    evidence: 'handoff-results/calls.json seq6',
++    rawFrames: '无（未留存）',
+   },
+   {
+-    seq: 7, at: '2026-09-30T10:28:46Z', phase: 'C-real（重跑尝试）',
+-    purpose: '取消之后重新生成（重跑尝试 1）',
++    seq: 8, at: '2026-09-30T10:28:46Z', phase: 'C-real（重跑尝试）', purpose: '取消之后重新生成（重跑尝试 1）',
+     terminal: 'error', elapsedMs: 223, deltaChars: 0, rateLimited: true,
+     error: '上游 429: inference exceeds tpm/rpm limit (429003)',
++    candidateId: null,
+     endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '429 体来自真实供应商。',
+-    evidence: '会话日志 10:28:46',
++    provenanceBasis: '错误体 429003 是公网供应商自身的限流码。',
++    evidence: 'handoff-results/calls.json seq7',
++    rawFrames: '无（未留存）',
+   },
+   {
+-    seq: 8, at: '2026-09-30T10:30:37Z', phase: 'C-real（最终留档前一次尝试）',
+-    purpose: '真实取消：收到首个 delta 即断开',
++    seq: 9, at: '2026-09-30T10:30:37Z', phase: 'C-real（最终留档前一次）', purpose: '真实取消：收到首个 delta 即断开',
+     terminal: 'aborted_by_client', elapsedMs: 33059, deltaChars: 1, rateLimited: false, error: null,
+-    endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '上一版 artifacts/phase-c-real.json 保留了该次运行的帧（含 provider 自报与 base.revision=1），端点由凭据解析路径产生。',
+-    evidence: '上一版 artifacts/phase-c-real.json（已随旧包保留）',
++    candidateId: null,
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '仅旧 harness 自报行与结果摘要，无端点覆盖留档。',
++    evidence: 'handoff-results/calls.json seq8 + 第四轮之前的 artifacts/phase-c-real.json',
++    rawFrames: '已丢失（被最终留档那次运行覆盖）',
+   },
+   {
+-    seq: 9, at: '2026-09-30T10:31:10Z', phase: 'C-real（最终留档）',
+-    purpose: '取消之后重新生成并采纳',
++    seq: 10, at: '2026-09-30T10:31:10Z', phase: 'C-real（最终留档）', purpose: '取消之后重新生成并采纳',
+     terminal: 'done', elapsedMs: 27100, deltaChars: 230, rateLimited: false, error: null,
+-    endpointProvenance: 'KNOWN_REAL',
+-    provenanceBasis: '同上（上一版 artifacts/phase-c-real.json 的第二条记录）。',
+-    evidence: '上一版 artifacts/phase-c-real.json',
++    candidateId: null,
++    endpointProvenance: 'UNKNOWN',
++    provenanceBasis: '仅旧 harness 自报行与结果摘要，无端点覆盖留档。',
++    evidence: 'handoff-results/calls.json seq9 + 第四轮之前的 artifacts/phase-c-real.json',
++    rawFrames: '已丢失（被最终留档那次运行覆盖）',
+   },
+ ];
+ 
+-/** 扫描一个运行目录，抽取所有生成调用。 */
+-function scanRun(runDir) {
+-  const names = readdirSync(runDir);
+-  const metaPath = join(runDir, 'run-meta.json');
+-  const meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : null;
+-  const calls = [];
+-  for (const name of names) {
+-    if (!name.endsWith('.ndjson')) continue;
+-    const lines = readFileSync(join(runDir, name), 'utf8').split(/\r?\n/).filter((l) => l.trim().length > 0);
+-    const frames = [];
+-    for (const line of lines) { try { frames.push(JSON.parse(line)); } catch { /* 原始行保留在文件里 */ } }
+-    const start = frames.find((f) => f.event === 'start');
+-    const done = frames.find((f) => f.event === 'done');
+-    const err = frames.find((f) => f.event === 'error');
+-    const deltas = frames.filter((f) => f.event === 'delta');
+-    calls.push({
+-      rawFile: name,
+-      candidateId: start?.candidateId ?? done?.candidateId ?? err?.candidateId ?? null,
+-      startFrameProvider: start?.provider ?? null,
+-      contextMode: start?.contextMode ?? null,
+-      contextTokens: start?.contextTokens ?? null,
+-      terminal: done !== undefined ? 'done' : err !== undefined ? 'error' : 'no_terminal_frame',
+-      error: err?.error ?? null,
+-      rateLimited: err !== undefined && /429|tpm\/rpm|rate_limit/i.test(String(err.error ?? '')),
+-      deltaChars: deltas.map((f) => f.text ?? '').join('').length,
+-      finishedAtMs: (done ?? err)?.__tMs ?? null,
+-    });
++/** 扫描运行目录里的全部 .ndjson，按内容 sha256 去重后作为「内容证据」挂到尝试上。 */
++function collectFrameEvidence(runsDir) {
++  const bySha = new Map();
++  const files = [];
++  if (!existsSync(runsDir)) return { files, bySha };
++  for (const run of readdirSync(runsDir)) {
++    const runPath = join(runsDir, run);
++    if (!existsSync(join(runPath, 'run-meta.json')) && !existsSync(join(runPath, 'run.log'))) continue;
++    for (const name of readdirSync(runPath)) {
++      if (!name.endsWith('.ndjson')) continue;
++      const abs = join(runPath, name);
++      const buf = readFileSync(abs);
++      const hash = sha256(buf);
++      const frames = buf.toString('utf8').split(/\r?\n/).filter((l) => l.trim().length > 0).map((l) => {
++        try { return JSON.parse(l); } catch { return null; }
++      }).filter(Boolean);
++      const start = frames.find((f) => f.event === 'start');
++      const done = frames.find((f) => f.event === 'done');
++      const err = frames.find((f) => f.event === 'error');
++      const rec = {
++        run,
++        file: name,
++        sha256: hash,
++        attemptIdFromName: (name.match(/^frames-(.+)\.ndjson$/) ?? [])[1] ?? null,
++        candidateId: start?.candidateId ?? done?.candidateId ?? err?.candidateId ?? null,
++        startFrameProvider: start?.provider ?? null,
++        contextMode: start?.contextMode ?? null,
++        terminal: done !== undefined ? 'done' : err !== undefined ? 'error' : 'no_terminal_frame',
++        error: err?.error ?? null,
++        deltaChars: frames.filter((f) => f.event === 'delta').map((f) => f.text ?? '').join('').length,
++        frameCount: frames.length,
++      };
++      files.push(rec);
++      if (!bySha.has(hash)) bySha.set(hash, []);
++      bySha.get(hash).push(name);
++    }
+   }
+-  return { runDir, meta, calls };
++  return { files, bySha };
+ }
+ 
+-const runs = existsSync(RUNS)
+-  ? readdirSync(RUNS).filter((n) => existsSync(join(RUNS, n, 'run-meta.json')) || existsSync(join(RUNS, n, 'run.log'))).sort()
+-  : [];
+-const scanned = runs.map((n) => scanRun(join(RUNS, n)));
+-const ledger = budgetSnapshot(TICKET_DIR);
++export function buildLedgerReport({ ticketDir, runsDir, legacy = LEGACY } = {}) {
++  let snapshot = null;
++  let ledgerError = null;
++  try { snapshot = budgetSnapshot(ticketDir); }
++  catch (error) { ledgerError = { code: error?.code ?? null, message: String(error?.message ?? error) }; }
+ 
+-const doc = {
+-  generatedAt: new Date().toISOString(),
+-  generator: 'harness/make-ledger.mjs（自动扫描 runs/，非手写数组）',
+-  ticket: ledger.exists ? ledger.ticket : null,
+-  allowance: ledger.exists ? ledger.allowance : null,
+-  spentRecorded: ledger.exists ? ledger.used : 0,
+-  remaining: ledger.exists ? ledger.remaining : null,
+-  overBudget: ledger.exists ? ledger.overBudget : false,
+-  legacyRealCalls: LEGACY,
+-  legacyRealCallCount: LEGACY.length,
+-  legacyCountsAsFinal: false,
+-  runs: scanned.map((s) => ({
+-    runId: s.meta?.runId ?? null,
+-    phase: s.meta?.phase ?? null,
+-    channel: s.meta?.channel ?? null,
+-    realModelCallsAllowed: s.meta?.realModelCallsAllowed ?? null,
+-    calls: s.calls,
+-  })),
+-  totals: {
+-    legacy: LEGACY.length,
+-    fromRuns: scanned.reduce((sum, s) => sum + s.calls.filter((c) => s.meta?.channel === 'real').length, 0),
+-    note: '总计只统计「真实通道」的运行；controlled 运行不消耗真实额度。',
+-  },
+-  unknowns: [
+-    'seq2（10:16 的 B）端点身份 UNKNOWN：只有 provider 字符串与耗时，无端点覆盖留档。',
+-    'seq6（10:28 连接层失败）端点身份 UNKNOWN：失败在任何帧之前。',
+-    '两次 B 的原始帧均已不可得（数据根已删除、旧 artifacts 被后续运行覆盖），只保留日志行的结构化引用。',
+-  ],
+-};
++  let events = [];
++  try { events = readAttemptEvents(ticketDir); }
++  catch (error) { events = []; }
++
++  // ---- 一次尝试 = 一个 attemptId（账本行 ∪ started 事件）----
++  const byId = new Map();
++  const touch = (id) => {
++    if (!byId.has(id)) {
++      byId.set(id, { attemptId: id, reservationId: null, seq: null, reason: null, channel: null,
++        startedAt: null, terminalAt: null, terminal: null, error: null, frames: [], duplicateFrameFiles: [] });
++    }
++    return byId.get(id);
++  };
++  for (const row of (snapshot?.spend ?? [])) {
++    const a = touch(row.attemptId ?? ('UNKNOWN_ROW_' + row.reservationId));
++    a.reservationId = row.reservationId;
++    a.seq = row.seq;
++    a.reason = row.reason;
++    a.startedAt = a.startedAt ?? row.at;
++    a.channel = a.channel ?? 'real';
++  }
++  for (const ev of events) {
++    if (ev.event === 'started') {
++      const a = touch(ev.attemptId);
++      a.reservationId = a.reservationId ?? ev.reservationId ?? null;
++      a.seq = a.seq ?? ev.seq ?? null;
++      a.reason = a.reason ?? ev.reason ?? null;
++      a.channel = a.channel ?? ev.channel ?? null;
++      a.startedAt = a.startedAt ?? ev.at;
++    } else if (ev.event === 'terminal') {
++      const a = touch(ev.attemptId);
++      a.terminal = ev.terminal ?? 'UNKNOWN';
++      a.terminalAt = ev.at;
++      a.error = ev.error ?? null;
++      a.elapsedMs = ev.elapsedMs ?? null;
++    }
++  }
++  for (const a of byId.values()) {
++    if (a.terminal === null) { a.terminal = 'UNKNOWN'; a.unknownReason = '有 started 无 terminal：进程在请求途中消失，结果不可知'; }
++  }
+ 
+-mkdirSync(HERE, { recursive: true });
+-writeFileSync(OUT_JSON, JSON.stringify(doc, null, 2) + '\n', 'utf8');
++  // ---- 帧只作证据：按 attemptId 挂载；同内容副本去重 ----
++  const { files, bySha } = collectFrameEvidence(runsDir ?? join(STAGE, 'runs'));
++  const seenSha = new Set();
++  const unmatched = [];
++  for (const f of files) {
++    const dup = seenSha.has(f.sha256);
++    if (!dup) seenSha.add(f.sha256);
++    const target = f.attemptIdFromName !== null ? byId.get(f.attemptIdFromName) : null;
++    if (target !== undefined && target !== null) {
++      (dup ? target.duplicateFrameFiles : target.frames).push(f);
++    } else {
++      unmatched.push({ ...f, duplicateOf: dup ? (bySha.get(f.sha256) ?? []).filter((n) => n !== f.file) : [] });
++    }
++  }
++
++  // ---- 对账 ----
++  const spendRowIds = new Set((snapshot?.spend ?? []).map((r) => r.attemptId));
++  const startedIds = new Set(events.filter((e) => e.event === 'started').map((e) => e.attemptId));
++  const reconciliation = {
++    spendRows: spendRowIds.size,
++    startedEvents: startedIds.size,
++    attemptsCounted: byId.size,
++    spendWithoutStarted: [...spendRowIds].filter((id) => !startedIds.has(id)),
++    startedWithoutSpend: [...startedIds].filter((id) => !spendRowIds.has(id) && byId.get(id)?.channel === 'real'),
++    unknownResults: [...byId.values()].filter((a) => a.terminal === 'UNKNOWN').map((a) => a.attemptId),
++    frameFilesSeen: files.length,
++    frameFilesUnique: seenSha.size,
++    duplicateFrameFiles: files.length - seenSha.size,
++    frameFilesUnmatchedToAttempt: unmatched.map((f) => ({ run: f.run, file: f.file, candidateId: f.candidateId, duplicateOf: f.duplicateOf })),
++  };
+ 
+-const lines = [];
+-lines.push('# 运行账目（自动生成，勿手改）');
+-lines.push('');
+-lines.push('- 生成时间：' + doc.generatedAt);
+-lines.push('- 生成器：' + doc.generator);
+-lines.push('- 工单账本：ticket=' + String(doc.ticket) + ' allowance=' + String(doc.allowance) + ' 已记录占用=' + String(doc.spentRecorded) + ' 剩余=' + String(doc.remaining));
+-lines.push('- 遗留真实调用（无法由 runs/ 重建）：**' + LEGACY.length + '** 条');
+-lines.push('');
+-lines.push('## 遗留调用（上一版 harness 期间发生）');
+-lines.push('');
+-lines.push('| seq | 时间 | 阶段 | 用途 | 终态 | 耗时 | delta | 端点身份 | 依据 |');
+-lines.push('|---|---|---|---|---|---|---|---|---|');
+-for (const l of LEGACY) {
+-  lines.push('| ' + l.seq + ' | ' + l.at + ' | ' + l.phase + ' | ' + l.purpose + ' | ' + l.terminal + ' | ' + (l.elapsedMs ?? '') + 'ms | ' + l.deltaChars + ' | **' + l.endpointProvenance + '** | ' + l.provenanceBasis + ' |');
++  const attempts = [...byId.values()].sort((a, b) => (a.seq ?? 1e9) - (b.seq ?? 1e9) || String(a.attemptId).localeCompare(String(b.attemptId)));
++  return {
++    generatedAt: new Date().toISOString(),
++    generator: 'harness/make-ledger.mjs（计数单位=attemptId；帧仅作内容证据）',
++    ticketDir,
++    ticket: snapshot?.ticket ?? null,
++    allowance: snapshot?.allowance ?? null,
++    used: snapshot?.used ?? null,
++    remaining: snapshot?.remaining ?? null,
++    ledgerError,
++    counts: {
++      attemptsFromThisInstrumentation: attempts.length,
++      realChannelAttempts: attempts.filter((a) => a.channel === 'real').length,
++      legacyRequestAttempts: legacy.length,
++      grandTotalRequestAttempts: attempts.length + legacy.length,
++      note: '「请求尝试」≠「已核实的真实供应商调用」。只有带供应商自身错误体的条目能核实端点，见 legacy 中 endpointProvenance=KNOWN_REAL 的条数。',
++    },
++    attempts,
++    reconciliation,
++    legacy,
++  };
+ }
+-lines.push('');
+-lines.push('## 本次修复期间的运行（runs/，自动扫描）');
+-lines.push('');
+-if (scanned.length === 0) lines.push('（无）');
+-for (const s of scanned) {
+-  lines.push('### ' + (s.meta?.runId ?? s.runDir));
+-  lines.push('- phase=' + String(s.meta?.phase) + ' channel=' + String(s.meta?.channel) + ' 额度=' + String(s.meta?.realModelCallsAllowed));
+-  if (s.calls.length === 0) lines.push('- （该运行没有生成调用）');
+-  for (const c of s.calls) {
+-    lines.push('- ' + c.rawFile + ' → terminal=' + c.terminal + ' provider=' + String(c.startFrameProvider) + ' contextMode=' + String(c.contextMode) + ' delta=' + c.deltaChars + (c.error ? ' error=' + String(c.error).slice(0, 120) : ''));
++
++function toMarkdown(rep) {
++  const L = [];
++  L.push('# 运行账目（自动生成，勿手改）');
++  L.push('');
++  L.push('- 生成时间：' + rep.generatedAt);
++  L.push('- 生成器：' + rep.generator);
++  L.push('- 工单：' + String(rep.ticket) + '　额度=' + String(rep.allowance) + '　已用=' + String(rep.used) + '　剩余=' + String(rep.remaining));
++  L.push('');
++  L.push('## 计数口径');
++  L.push('');
++  L.push('| 口径 | 数量 |');
++  L.push('|---|---|');
++  L.push('| 本装置记录的尝试（含受控替身） | ' + rep.counts.attemptsFromThisInstrumentation + ' |');
++  L.push('| 其中真实通道 | ' + rep.counts.realChannelAttempts + ' |');
++  L.push('| 历史请求尝试（LEGACY） | ' + rep.counts.legacyRequestAttempts + ' |');
++  L.push('| **请求尝试总计** | **' + rep.counts.grandTotalRequestAttempts + '** |');
++  L.push('');
++  L.push('> ' + rep.counts.note);
++  L.push('');
++  L.push('## 对账');
++  L.push('');
++  L.push('```json');
++  L.push(JSON.stringify(rep.reconciliation, null, 2));
++  L.push('```');
++  L.push('');
++  L.push('## 本装置的尝试（按 attemptId 计数）');
++  L.push('');
++  if (rep.attempts.length === 0) L.push('（无）');
++  for (const a of rep.attempts) {
++    L.push('- `' + a.attemptId + '` seq=' + String(a.seq) + ' channel=' + String(a.channel)
++      + ' terminal=**' + a.terminal + '**' + (a.error ? ' error=' + String(a.error).slice(0, 120) : '')
++      + ' 帧文件=' + a.frames.length + '（重复副本 ' + a.duplicateFrameFiles.length + '）'
++      + (a.unknownReason ? '　⚠ ' + a.unknownReason : ''));
++  }
++  L.push('');
++  L.push('## 历史请求尝试（LEGACY，单列，不与上面混算）');
++  L.push('');
++  L.push('| seq | 时间 | 阶段 | 用途 | 终态 | 耗时 | delta | 候选 | 端点身份 | 现存证据 |');
++  L.push('|---|---|---|---|---|---|---|---|---|---|');
++  for (const l of rep.legacy) {
++    L.push('| ' + l.seq + ' | ' + l.at + ' | ' + l.phase + ' | ' + l.purpose + ' | ' + l.terminal
++      + ' | ' + (l.elapsedMs ?? '') + 'ms | ' + l.deltaChars + ' | ' + (l.candidateId === null ? '—' : l.candidateId.slice(0, 8) + '…')
++      + ' | **' + l.endpointProvenance + '** | ' + l.evidence + ' |');
+   }
+-  lines.push('');
++  L.push('');
++  L.push('### 端点判据（统一）');
++  L.push('');
++  L.push('- `KNOWN_REAL`：存在只有公网上游才会产生的证据（供应商自身错误体 429003）。共 **'
++    + rep.legacy.filter((l) => l.endpointProvenance === 'KNOWN_REAL').length + '** 条。');
++  L.push('- `UNKNOWN`：证据只有耗时、start 帧 provider 字符串、或旧 harness 自报行 —— 这三者对本地替身同样成立。共 **'
++    + rep.legacy.filter((l) => l.endpointProvenance === 'UNKNOWN').length + '** 条。');
++  L.push('');
++  return L.join(String.fromCharCode(10)) + String.fromCharCode(10);
+ }
+-lines.push('## 未知项（禁止猜测）');
+-lines.push('');
+-for (const u of doc.unknowns) lines.push('- ' + u);
+-lines.push('');
+-writeFileSync(OUT_MD, lines.join('\n') + '\n', 'utf8');
+ 
+-console.log(JSON.stringify({ runs: scanned.length, legacy: LEGACY.length, fromRunsReal: doc.totals.fromRuns, out: [OUT_JSON, OUT_MD] }, null, 2));
++function main() {
++  const rep = buildLedgerReport({ ticketDir: process.env.MOZHOU_TICKET_DIR ?? join(STAGE, '.state', 'ticket') });
++  writeFileSync(join(HERE, 'runs-ledger.json'), JSON.stringify(rep, null, 2) + String.fromCharCode(10), 'utf8');
++  writeFileSync(join(HERE, 'runs-ledger.md'), toMarkdown(rep), 'utf8');
++  console.log(JSON.stringify({ counts: rep.counts, reconciliation: rep.reconciliation }, null, 2));
++}
++
++if (process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())) {
++  main();
++}

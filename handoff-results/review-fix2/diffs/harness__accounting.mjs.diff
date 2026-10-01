@@ -1,0 +1,593 @@
+diff --git a/harness/accounting.mjs b/harness/accounting.mjs
+index 3657b10..6ea4452 100644
+--- a/harness/accounting.mjs
++++ b/harness/accounting.mjs
+@@ -1,53 +1,73 @@
+ /**
+- * harness/accounting.mjs —— 整张工单共享的「真实模型调用」额度账本。
++ * harness/accounting.mjs —— **整张工单共享**的真实调用额度账本。
+  *
+- * 设计目标（逐条对应 Codex 第四轮复核的 [P1] 预算可绕过）：
+- *   1. **唯一入口**：任何真实上游请求都必须先调用 spendRealCall()；本模块是唯一授权点。
+- *   2. **先记账再发请求**：spendOrThrow 在返回之前已经把这次占用**原子写入磁盘**；
+- *      调用方拿到 reservationId 才允许发出请求。传输异常 / 429 / 取消**一律不退款**。
+- *   3. **跨进程共享**：额度属于整张工单，落在 ticketDir 下的单个 ledger.json；
+- *      新进程启动时先读盘，因此重启不重置消耗。
+- *   4. **并发安全**：用 mkdir 的原子性做跨进程互斥（Windows/POSIX 都成立），
+- *      拿锁 → 读 → 校验 → 追加 → 写临时文件 → rename → 放锁。并发抢额度不会超发。
+- *   5. **失败关闭（fail closed）**：非法预算 / 账本损坏 / 锁超时 / 时钟不可能值
+- *      ⇒ 一律抛 BudgetUnavailableError，真实通道关闭。
+- *   6. **默认零额度**：allowance 缺省 0 ⇒ 新工单默认不允许任何真实调用。
++ * 第四轮返修（Codex 复核 P1 × 2）改了三处要害：
+  *
+- * 本模块**不联网**，也不认识任何 provider；它只负责记账。
++ *   1. **锁不再按年龄删除**。旧实现 stat(mtime) > 30s 就 rmSync，等于「持锁者被暂停/时钟前跳
++ *      就可被夺锁」，两个进程会拿着同一份旧账本各占一次 ⇒ 超发且丢账。
++ *      现在：锁目录里有 owner.json（token/pid/host/acquiredAt）；取不到锁一律 LOCK_TIMEOUT
++ *      （fail closed）；释放必须校验 token 匹配，防误删后继者的锁；
++ *      自动恢复是**独立显式操作** reclaimLock()，且必须先证明所有者进程已死。
++ *
++ *   2. **initLedger 不再是「重置」**。旧实现读到已有账本后仍用 createLedger 原子覆盖，
++ *      spend/migratedSpend 被清空，额度凭空回来。
++ *      现在：init 与 spend 走**同一把锁**；账本已存在时逐字段比对，配置一致则**幂等返回且
++ *      保留全部消耗**，配置冲突（ticket / allowance 不同）直接拒绝。
++ *      调整额度只能走显式的 amendAllowance()。
++ *
++ *   3. **不得靠换账本位置重获额度**。ticket-registry 记录每个工单名 ↔ 账本路径 ↔ 累计消耗；
++ *      同一工单名在别处重新 init 且原账本已消耗 ⇒ TICKET_RELOCATED 拒绝。
++ *
++ * 另加：每次占用在**同一把锁内**向 attempts.jsonl 追加 started 事件，
++ *  使「额度占用」与「请求开始」成为一条可对账的原子事实（Codex 复核 P2）。
++ *
++ * 跨进程互斥用 mkdir 的原子语义（已存在即失败），比文件锁在 Windows 上可靠。
++ * 锁内只做「读-校验-追加-原子替换」，都是毫秒级操作。
+  */
+-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+-import { join } from 'node:path';
++import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
++import { hostname } from 'node:os';
++import { join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { randomUUID } from 'node:crypto';
+ 
+-export const LEDGER_VERSION = 1;
++const HERE = resolve(fileURLToPath(new URL('.', import.meta.url)));
++const STAGE = resolve(HERE, '..');
++
++export const LEDGER_VERSION = 2;
++export const HARD_CEILING = 64;
++/** 取锁等待上限。取不到就 fail closed，绝不猜「锁大概没人了」。 */
++export const LOCK_TIMEOUT_MS = 5000;
+ 
+-/** 额度不可用 ⇒ 真实通道必须关闭。任何调用方都不许吞掉这个错误继续发请求。 */
+ export class BudgetUnavailableError extends Error {
+   constructor(code, message, detail) {
+     super(code + ': ' + message);
+     this.name = 'BudgetUnavailableError';
+     this.code = code;
+-    this.detail = detail ?? null;
++    this.detail = detail === undefined ? null : detail;
+   }
+ }
+-
+-export class BudgetExhaustedError extends BudgetUnavailableError {
+-  constructor(detail) {
+-    super('BUDGET_EXHAUSTED', '工单真实调用额度已用尽，拒绝再次发送', detail);
++export class BudgetExhaustedError extends Error {
++  constructor(info) {
++    super('BUDGET_EXHAUSTED: 工单真实调用额度已用尽，拒绝再次发送');
+     this.name = 'BudgetExhaustedError';
++    this.code = 'BUDGET_EXHAUSTED';
++    this.info = info;
+   }
+ }
+ 
+-export function ledgerPath(ticketDir) {
+-  return join(ticketDir, 'ledger.json');
+-}
+-function lockDir(ticketDir) {
+-  return join(ticketDir, '.ledger.lock');
++export function ledgerPath(ticketDir) { return join(ticketDir, 'ledger.json'); }
++export function lockDir(ticketDir) { return join(ticketDir, '.ledger.lock'); }
++export function attemptsPath(ticketDir) { return join(ticketDir, 'attempts.jsonl'); }
++export function registryPath() {
++  // 空串/纯空白当作**没设**：环境变量写错时必须 fail-closed 地走默认路径，
++  // 而不是把 mkdir('') 抛出来把整个运行打断（`??` 挡不住空串）。
++  const override = process.env.MOZHOU_TICKET_REGISTRY;
++  if (typeof override === 'string' && override.trim() !== '') return override;
++  return join(STAGE, '.state', 'ticket-registry.json');
+ }
+ 
+-/** 预算合法性：必须是 [0, HARD_CEILING] 内的安全整数。任何其它值都关闭真实通道。 */
+-export const HARD_CEILING = 64;
+ export function assertValidAllowance(allowance) {
+-  if (typeof allowance !== 'number' || !Number.isInteger(allowance) || !Number.isSafeInteger(allowance)) {
++  if (typeof allowance !== 'number' || !Number.isSafeInteger(allowance)) {
+     throw new BudgetUnavailableError('BUDGET_INVALID', 'allowance 必须是安全整数，收到 ' + JSON.stringify(allowance));
+   }
+   if (allowance < 0) {
+@@ -59,51 +79,152 @@ export function assertValidAllowance(allowance) {
+   return allowance;
+ }
+ 
+-export function createLedger({ ticket, allowance, note }) {
+-  assertValidAllowance(allowance);
+-  const now = Date.now();
+-  return {
+-    version: LEDGER_VERSION,
+-    ticket,
+-    realCallAllowance: allowance,
+-    createdAt: new Date(now).toISOString(),
+-    // 已发生的历史占用（迁移自上一版手写账本）。新工单应为空数组。
+-    migratedSpend: [],
+-    spend: [],
+-    ...(note === undefined ? {} : { note }),
+-  };
++function isoNow() { return new Date().toISOString(); }
++function sha256(s) {
++  // 只用于幂等 token，不用密码学强度要求
++  let h = 0x811c9dc5;
++  for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
++  return ('00000000' + h.toString(16)).slice(-8);
++}
++
++/* ------------------------------------------------------------------ *
++ * 锁：所有权令牌 + 默认 fail closed
++ * ------------------------------------------------------------------ */
++
++/**
++ * 取锁。**不做任何基于年龄的自动删除**。
++ * 锁已在 ⇒ 只能等，等到 LOCK_TIMEOUT_MS 就抛 LOCK_TIMEOUT。
++ */
++export function acquireLock(ticketDir, { timeoutMs = LOCK_TIMEOUT_MS } = {}) {
++  const lock = lockDir(ticketDir);
++  const token = randomUUID();
++  const started = Date.now();
++  for (;;) {
++    try {
++      mkdirSync(lock); // 原子：已存在必须抛 EEXIST。**不可加 { recursive: true }**（那会吞掉 EEXIST，互斥直接失效）
++      writeFileSync(join(lock, 'owner.json'), JSON.stringify({
++        token, pid: process.pid, host: hostname(), acquiredAt: isoNow(),
++      }, null, 2) + '\n', 'utf8');
++      return { lock, token };
++    } catch (error) {
++      if (error == null || error.code !== 'EEXIST') {
++        throw new BudgetUnavailableError('LOCK_ERROR', '无法创建账本锁：' + String(error && error.message), lock);
++      }
++      if (Date.now() - started > timeoutMs) {
++        let owner = null;
++        try { owner = JSON.parse(readFileSync(join(lock, 'owner.json'), 'utf8')); } catch { /* 锁正在建立或无主 */ }
++        throw new BudgetUnavailableError(
++          'LOCK_TIMEOUT',
++          '等待账本锁超过 ' + timeoutMs + 'ms；按 fail-closed 处理，**不**按年龄删除活锁。'
++          + '若确认持锁进程已死，请显式调用 reclaimLock()。',
++          { lock, owner },
++        );
++      }
++      const until = Date.now() + 5;
++      while (Date.now() < until) { /* spin */ }
++    }
++  }
++}
++
++/**
++ * 释放锁。**必须校验所有权**：token 不匹配说明锁已被回收并被他人取得，
++ * 此时绝不能删——否则会把后继者的锁删掉，造成两个进程同时持锁。
++ */
++export function releaseLock(ticketDir, token) {
++  const lock = lockDir(ticketDir);
++  let owner = null;
++  try { owner = JSON.parse(readFileSync(join(lock, 'owner.json'), 'utf8')); } catch { /* ignore */ }
++  if (owner === null || owner.token !== token) {
++    throw new BudgetUnavailableError('LOCK_NOT_OWNER',
++      '释放失败：当前锁不属于本持有者（token 不匹配或 owner.json 缺失）。'
++      + '可能已被显式回收并转交他人；为防误删后继者的锁，本次不删除。', { lock, expected: token, actual: owner });
++  }
++  rmSync(lock, { recursive: true, force: true });
++}
++
++/** 进程是否还活着（本机 pid 探测；跨主机一律判为不可证明 ⇒ 不回收）。 */
++export function ownerProcessAlive(owner) {
++  if (owner === null || typeof owner !== 'object') return null; // 未知
++  if (owner.host !== hostname()) return null;                  // 跨主机：无法证明
++  if (!Number.isInteger(owner.pid) || owner.pid <= 0) return null;
++  try {
++    process.kill(owner.pid, 0);
++    return true;
++  } catch (error) {
++    if (error && error.code === 'ESRCH') return false;
++    return null; // EPERM 等：进程存在但无权限，仍不能判死
++  }
++}
++
++/**
++ * **显式**的活锁恢复。默认不会被 acquireLock 调用。
++ * 只有在**证明**所有者已死（本机 + pid 不存在）时才删除；否则拒绝。
++ */
++export function reclaimLock(ticketDir, { expectToken = null } = {}) {
++  const lock = lockDir(ticketDir);
++  if (!existsSync(lock)) return { reclaimed: false, why: 'lock_absent' };
++  let owner = null;
++  try { owner = JSON.parse(readFileSync(join(lock, 'owner.json'), 'utf8')); } catch { /* ignore */ }
++  if (expectToken !== null && (owner === null || owner.token !== expectToken)) {
++    throw new BudgetUnavailableError('LOCK_NOT_OWNER', 'reclaimLock 的 expectToken 与当前持有者不符，拒绝回收', { lock, owner });
++  }
++  const alive = ownerProcessAlive(owner);
++  if (alive !== false) {
++    throw new BudgetUnavailableError('LOCK_OWNER_ALIVE',
++      '无法证明所有者已死（alive=' + String(alive) + '），拒绝回收活锁。请人工确认后用 reclaimLock。', { lock, owner });
++  }
++  rmSync(lock, { recursive: true, force: true });
++  return { reclaimed: true, owner };
++}
++
++export function withLock(ticketDir, fn, opts = {}) {
++  const { lock, token } = acquireLock(ticketDir, opts);
++  try {
++    return fn();
++  } finally {
++    // 释放失败（例如锁被显式回收）不能让业务结果被静默吞掉，但也不能误删他人锁。
++    try { releaseLock(ticketDir, token); }
++    catch (error) { if (error && error.code === 'LOCK_NOT_OWNER') { /* 已被回收：保持现状 */ } else { throw error; } }
++  }
+ }
+ 
+-/** 结构校验：任何字段类型不对都是「账本损坏」⇒ 关闭真实通道，绝不「猜着重置」。 */
++/* ------------------------------------------------------------------ *
++ * 账本
++ * ------------------------------------------------------------------ */
++
+ export function validateLedger(ledger) {
+   const fail = (why) => { throw new BudgetUnavailableError('LEDGER_CORRUPT', '账本结构非法：' + why); };
+   if (ledger === null || typeof ledger !== 'object' || Array.isArray(ledger)) fail('不是对象');
+-  if (ledger.version !== LEDGER_VERSION) fail('version 不是 ' + LEDGER_VERSION + '（收到 ' + JSON.stringify(ledger.version) + '）');
++  if (ledger.version !== LEDGER_VERSION) fail('version 必须是 ' + LEDGER_VERSION + '，收到 ' + JSON.stringify(ledger.version));
+   if (typeof ledger.ticket !== 'string' || ledger.ticket.length === 0) fail('ticket 缺失');
+   assertValidAllowance(ledger.realCallAllowance);
+-  if (!Array.isArray(ledger.migratedSpend)) fail('migratedSpend 不是数组');
+   if (!Array.isArray(ledger.spend)) fail('spend 不是数组');
+-  const seen = new Set();
+-  for (const row of [...ledger.migratedSpend, ...ledger.spend]) {
+-    if (row === null || typeof row !== 'object' || Array.isArray(row)) fail('占用记录不是对象');
+-    if (typeof row.reservationId !== 'string' || row.reservationId.length === 0) fail('占用记录缺 reservationId');
+-    if (seen.has(row.reservationId)) fail('reservationId 重复：' + row.reservationId);
+-    seen.add(row.reservationId);
+-    if (row.state !== undefined && !['unknown', 'spent', 'reserved'].includes(row.state)) fail('state 非法：' + String(row.state));
++  if (!Array.isArray(ledger.migratedSpend)) fail('migratedSpend 不是数组');
++  const ids = new Set();
++  for (const row of ledger.spend) {
++    if (row === null || typeof row !== 'object') fail('spend 行不是对象');
++    if (typeof row.reservationId !== 'string' || row.reservationId.length === 0) fail('spend 行缺 reservationId');
++    if (ids.has(row.reservationId)) fail('reservationId 重复：' + row.reservationId);
++    ids.add(row.reservationId);
++    if (typeof row.attemptId !== 'string' || row.attemptId.length === 0) fail('spend 行缺 attemptId：' + row.reservationId);
++    if (row.state !== 'spent') fail('spend 行 state 必须是 spent：' + row.state);
+   }
+   return ledger;
+ }
+ 
+-export function readLedger(ticketDir) {
+-  const p = ledgerPath(ticketDir);
+-  if (!existsSync(p)) return null;
+-  let parsed;
+-  try {
+-    parsed = JSON.parse(readFileSync(p, 'utf8'));
+-  } catch (error) {
+-    throw new BudgetUnavailableError('LEDGER_CORRUPT', '账本 JSON 无法解析：' + String(error && error.message), p);
+-  }
+-  return validateLedger(parsed);
++export function createLedger({ ticket, allowance, note = '' }) {
++  assertValidAllowance(allowance);
++  return {
++    version: LEDGER_VERSION,
++    ticket,
++    realCallAllowance: allowance,
++    createdAt: isoNow(),
++    updatedAt: isoNow(),
++    note,
++    allowanceHistory: [{ at: isoNow(), allowance, why: 'init' }],
++    migratedSpend: [],
++    spend: [],
++  };
+ }
+ 
+ function writeLedgerAtomic(ticketDir, ledger) {
+@@ -113,66 +234,145 @@ function writeLedgerAtomic(ticketDir, ledger) {
+   renameSync(tmp, p);
+ }
+ 
+-export function initLedger(ticketDir, { ticket, allowance, note }) {
++export function readLedger(ticketDir) {
++  const p = ledgerPath(ticketDir);
++  if (!existsSync(p)) return null;
++  let parsed;
++  try { parsed = JSON.parse(readFileSync(p, 'utf8')); }
++  catch (error) { throw new BudgetUnavailableError('LEDGER_CORRUPT', '账本 JSON 无法解析：' + String(error && error.message), p); }
++  return validateLedger(parsed);
++}
++
++/** 追加一条尝试事件（append-only，一行一事件）。 */
++export function appendAttemptEvent(ticketDir, event) {
+   mkdirSync(ticketDir, { recursive: true });
+-  const existing = readLedger(ticketDir);
+-  if (existing !== null) assertValidAllowance(existing.realCallAllowance);
+-  writeLedgerAtomic(ticketDir, createLedger({ ticket, allowance, note }));
+-  return readLedger(ticketDir);
++  appendFileSync(attemptsPath(ticketDir), JSON.stringify({ at: isoNow(), ...event }) + '\n', 'utf8');
+ }
+ 
+-/** 已消耗 = 迁移的历史占用 + 本进程/其它进程写入的占用。**不退款**：任何 state 都算占用。 */
+-export function spentCount(ledger) {
+-  return ledger.migratedSpend.length + ledger.spend.length;
++export function readAttemptEvents(ticketDir) {
++  const p = attemptsPath(ticketDir);
++  if (!existsSync(p)) return [];
++  return readFileSync(p, 'utf8').split(/\r?\n/).filter((l) => l.trim().length > 0).map((l) => {
++    try { return JSON.parse(l); } catch { return { event: 'unparsable', raw: l }; }
++  });
+ }
+-export function remaining(ledger) {
+-  return ledger.realCallAllowance - spentCount(ledger);
++
++/* ---- ticket registry：同一工单名不得在别处重获额度 ---- */
++
++function readRegistry() {
++  const p = registryPath();
++  if (!existsSync(p)) return { version: 1, tickets: {} };
++  try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return { version: 1, tickets: {} }; }
++}
++function writeRegistryAtomic(reg) {
++  const p = registryPath();
++  mkdirSync(p.slice(0, p.lastIndexOf('\\')) || p.slice(0, p.lastIndexOf('/')), { recursive: true });
++  const tmp = p + '.tmp-' + process.pid + '-' + Date.now();
++  writeFileSync(tmp, JSON.stringify(reg, null, 2) + '\n', 'utf8');
++  renameSync(tmp, p);
+ }
+ 
++/* ------------------------------------------------------------------ *
++ * 初始化：**幂等、不重置、冲突拒绝**
++ * ------------------------------------------------------------------ */
++
+ /**
+- * 跨进程互斥。用 mkdir 的原子语义（已存在即失败），比文件锁在 Windows 上更可靠。
+- * 锁内只做「读-校验-追加-原子替换」，都是毫秒级操作。
++ * 初始化/确认工单账本。
++ *  - 账本不存在 → 创建（首次）。
++ *  - 账本存在且 ticket + allowance 完全一致 → **原样返回，保留全部消耗**（幂等）。
++ *  - ticket 或 allowance 不同 → 拒绝（TICKET_CONFLICT / ALLOWANCE_CONFLICT），
++ *    账本一个字节都不动。要改额度请显式调用 amendAllowance()。
++ *  - 同一工单名在**别的目录**重开且原账本已消耗 → 拒绝（TICKET_RELOCATED）。
+  */
+-function withLock(ticketDir, fn, { timeoutMs = 5000, staleMs = 30000 } = {}) {
+-  const lock = lockDir(ticketDir);
+-  const started = Date.now();
+-  for (;;) {
+-    try {
+-      mkdirSync(lock); // 原子：存在即抛 EEXIST
+-      break;
+-    } catch (error) {
+-      if (error && error.code !== 'EEXIST') {
+-        throw new BudgetUnavailableError('LOCK_ERROR', '无法创建账本锁：' + String(error && error.message), lock);
++export function initLedger(ticketDir, { ticket, allowance, note = '' }) {
++  assertValidAllowance(allowance);
++  mkdirSync(ticketDir, { recursive: true });
++  return withLock(ticketDir, () => {
++    const reg = readRegistry();
++    const known = reg.tickets[ticket];
++    const here = resolve(ticketDir);
++    if (known !== undefined && resolve(known.ledgerPath) !== here) {
++      const spent = Number(known.spentEver ?? 0);
++      if (spent > 0) {
++        throw new BudgetUnavailableError('TICKET_RELOCATED',
++          '工单「' + ticket + '」已在 ' + known.ledgerPath + ' 消耗 ' + spent + ' 次；'
++          + '不得通过更换账本位置重新初始化来重获额度。请用 --ticketDir 指回原路径，或走显式迁移操作。',
++          { ticket, originalLedgerPath: known.ledgerPath, requestedLedgerPath: here, spentEver: spent });
+       }
+-      // 陈旧锁（持锁进程崩了）不算「异常」，但要显式回收并留痕
+-      try {
+-        const st = statSync(lock);
+-        if (Date.now() - st.mtimeMs > staleMs) {
+-          rmSync(lock, { recursive: true, force: true });
+-          continue;
+-        }
+-      } catch (statError) { /* 锁刚好被释放，重试即可 */ }
+-      if (Date.now() - started > timeoutMs) {
+-        throw new BudgetUnavailableError('LOCK_TIMEOUT', '等待账本锁超过 ' + timeoutMs + 'ms，拒绝在不确定状态下发请求', lock);
++    }
++
++    const existing = readLedger(ticketDir);
++    let ledger;
++    if (existing === null) {
++      ledger = createLedger({ ticket, allowance, note });
++    } else {
++      if (existing.ticket !== ticket) {
++        throw new BudgetUnavailableError('TICKET_CONFLICT',
++          '该目录已属于工单「' + existing.ticket + '」，不能以「' + ticket + '」重新初始化。', existing.ticket);
+       }
+-      // 短自旋：跨进程场景下不做 sleep 也能很快拿到
+-      const until = Date.now() + 5;
+-      while (Date.now() < until) { /* spin */ }
++      if (existing.realCallAllowance !== allowance) {
++        throw new BudgetUnavailableError('ALLOWANCE_CONFLICT',
++          '账本现额度为 ' + existing.realCallAllowance + '，与请求的 ' + allowance + ' 冲突；'
++          + '初始化不得改额度（那会丢掉消耗语义）。请显式调用 amendAllowance()。',
++          { current: existing.realCallAllowance, requested: allowance, spent: spentCount(existing) });
++      }
++      // 幂等：完全保留 spend / migratedSpend，只刷新 updatedAt
++      ledger = existing;
++      ledger.updatedAt = isoNow();
+     }
++    writeLedgerAtomic(ticketDir, ledger);
++    reg.version = 1;
++    reg.tickets[ticket] = {
++      ledgerPath: resolve(ticketDir),
++      createdAt: known?.createdAt ?? ledger.createdAt,
++      spentEver: spentCount(ledger),
++      updatedAt: isoNow(),
++    };
++    writeRegistryAtomic(reg);
++    return ledger;
++  });
++}
++
++/** **显式**的额度调整（恢复/迁移专用）。只增不减，且必须给 reason。 */
++export function amendAllowance(ticketDir, newAllowance, { reason } = {}) {
++  assertValidAllowance(newAllowance);
++  if (typeof reason !== 'string' || reason.trim().length === 0) {
++    throw new BudgetUnavailableError('REASON_REQUIRED', '调整额度必须给出非空 reason（否则无法审计）');
+   }
+-  try {
+-    return fn();
+-  } finally {
+-    rmSync(lock, { recursive: true, force: true });
+-  }
++  mkdirSync(ticketDir, { recursive: true });
++  return withLock(ticketDir, () => {
++    const ledger = readLedger(ticketDir);
++    if (ledger === null) throw new BudgetUnavailableError('LEDGER_MISSING', '账本不存在，无法调整额度', ledgerPath(ticketDir));
++    if (newAllowance < ledger.realCallAllowance) {
++      throw new BudgetUnavailableError('ALLOWANCE_DECREASE_FORBIDDEN',
++        '额度只增不减：不能从 ' + ledger.realCallAllowance + ' 降到 ' + newAllowance + '（否则等于退款）');
++    }
++    ledger.realCallAllowance = newAllowance;
++    ledger.allowanceHistory.push({ at: isoNow(), allowance: newAllowance, why: reason.trim(), by: process.pid });
++    ledger.updatedAt = isoNow();
++    writeLedgerAtomic(ticketDir, ledger);
++    return ledger;
++  });
+ }
+ 
++/** 已消耗 = 迁移的历史占用 + 本进程/其它进程写入的占用。**不退款**：任何 state 都算占用。 */
++export function spentCount(ledger) {
++  return ledger.migratedSpend.length + ledger.spend.length;
++}
++export function remaining(ledger) {
++  return ledger.realCallAllowance - spentCount(ledger);
++}
++
++/* ------------------------------------------------------------------ *
++ * 占用：唯一授权入口
++ * ------------------------------------------------------------------ */
++
+ /**
+- * **唯一授权入口**：先持久化占用，再返回。
+- * @returns {{reservationId: string, seq: number, spentAfter: number, remainingAfter: number}}
++ * **先记账后发送**。在**同一把锁内**同时写 spend 行与 attempts.jsonl 的 started 事件，
++ * 使「额度被占用」与「一次请求开始」成为可对账的原子事实。
+  * 任何异常（非法预算 / 损坏账本 / 锁超时 / 额度用尽）都抛错 ⇒ 调用方必须放弃发请求。
+  */
+-export function spendRealCall(ticketDir, { reason, runDir = null, channel = 'real', extra = {} } = {}) {
++export function spendRealCall(ticketDir, { reason, runDir = null, channel = 'real', attemptId = null, extra = {} } = {}) {
+   if (typeof reason !== 'string' || reason.trim().length === 0) {
+     throw new BudgetUnavailableError('REASON_REQUIRED', '占用额度必须给出非空 reason（否则账目无法审计）');
+   }
+@@ -183,35 +383,49 @@ export function spendRealCall(ticketDir, { reason, runDir = null, channel = 'rea
+     }
+     const used = spentCount(ledger);
+     if (used >= ledger.realCallAllowance) {
+-      throw new BudgetExhaustedError({
+-        ticket: ledger.ticket, allowance: ledger.realCallAllowance, used, reason,
+-      });
++      throw new BudgetExhaustedError({ ticket: ledger.ticket, allowance: ledger.realCallAllowance, used, reason });
+     }
+     const seq = used + 1;
++    const at = isoNow();
+     const reservationId = 'rc_' + String(seq).padStart(3, '0') + '_' + process.pid + '_' + Date.now().toString(36);
++    const aid = attemptId ?? ('at_' + sha256(reservationId) + '_' + randomUUID().slice(0, 8));
+     const row = {
+       reservationId,
++      attemptId: aid,
+       seq,
+       state: 'spent',
+       reason: reason.trim(),
+       channel,
+-      at: new Date().toISOString(),
++      at,
+       pid: process.pid,
+       runDir,
+       ...extra,
+     };
+     ledger.spend.push(row);
++    ledger.updatedAt = at;
+     writeLedgerAtomic(ticketDir, ledger);
+-    return { reservationId, seq, spentAfter: spentCount(ledger), remainingAfter: remaining(ledger), row };
++    // 与占用同锁：请求开始事件绝不可能与占用记录脱节
++    appendAttemptEvent(ticketDir, {
++      event: 'started', attemptId: aid, reservationId, seq, channel,
++      reason: row.reason, runDir, pid: process.pid,
++    });
++    const reg = readRegistry();
++    if (reg.tickets[ledger.ticket] !== undefined) {
++      reg.tickets[ledger.ticket].spentEver = spentCount(ledger);
++      reg.tickets[ledger.ticket].updatedAt = at;
++      writeRegistryAtomic(reg);
++    }
++    return { reservationId, attemptId: aid, seq, spentAfter: spentCount(ledger), remainingAfter: remaining(ledger), row };
+   });
+ }
+ 
+-/** 只读快照（给报告生成器用）。 */
++/** 只读快照（给报告生成器与 runner 用）。 */
+ export function budgetSnapshot(ticketDir) {
+   const ledger = readLedger(ticketDir);
+   if (ledger === null) return { exists: false, ticketDir };
+   return {
+     exists: true,
++    ticketDir,
+     ticket: ledger.ticket,
+     allowance: ledger.realCallAllowance,
+     migrated: ledger.migratedSpend.length,
+@@ -219,6 +433,51 @@ export function budgetSnapshot(ticketDir) {
+     used: spentCount(ledger),
+     remaining: remaining(ledger),
+     overBudget: spentCount(ledger) > ledger.realCallAllowance,
+-    rows: [...ledger.migratedSpend.map((r) => ({ ...r, source: 'migrated' })), ...ledger.spend.map((r) => ({ ...r, source: 'ledger' }))],
++    updatedAt: ledger.updatedAt,
++    spend: ledger.spend.map((r) => ({ reservationId: r.reservationId, attemptId: r.attemptId, seq: r.seq, at: r.at, reason: r.reason })),
++    // rows 是 spend 的旧字段别名，保留以兼容第四轮的 52 项离线测试
++    rows: ledger.spend.map((r) => ({ reservationId: r.reservationId, attemptId: r.attemptId, seq: r.seq, at: r.at, reason: r.reason })),
+   };
+ }
++
++/**
++ * **显式**迁移：v1 账本 → v2（给历史 spend 行补 attemptId）。
++ * 迁移不是自动行为，也不重置消耗；必须显式调用并给 reason。
++ * v1 的每一行都仍然算已消耗（迁移不退款）。
++ */
++export function migrateLedgerV1toV2(ticketDir, { reason } = {}) {
++  if (typeof reason !== 'string' || reason.trim().length === 0) {
++    throw new BudgetUnavailableError('REASON_REQUIRED', '迁移必须给出非空 reason');
++  }
++  mkdirSync(ticketDir, { recursive: true });
++  return withLock(ticketDir, () => {
++    const p = ledgerPath(ticketDir);
++    if (!existsSync(p)) throw new BudgetUnavailableError('LEDGER_MISSING', '账本不存在，无法迁移', p);
++    let raw;
++    try { raw = JSON.parse(readFileSync(p, 'utf8')); }
++    catch (error) { throw new BudgetUnavailableError('LEDGER_CORRUPT', '账本 JSON 无法解析：' + String(error && error.message), p); }
++    if (raw.version === LEDGER_VERSION) return validateLedger(raw);
++    if (raw.version !== 1) {
++      throw new BudgetUnavailableError('LEDGER_CORRUPT', '只支持从 v1 迁移，收到 version=' + JSON.stringify(raw.version));
++    }
++    assertValidAllowance(raw.realCallAllowance);
++    const spend = (Array.isArray(raw.spend) ? raw.spend : []).map((row) => ({
++      ...row,
++      attemptId: row.attemptId ?? ('at_legacy_' + sha256(String(row.reservationId)) + '_' + process.pid),
++    }));
++    const ledger = {
++      ...raw,
++      version: LEDGER_VERSION,
++      updatedAt: isoNow(),
++      allowanceHistory: Array.isArray(raw.allowanceHistory)
++        ? raw.allowanceHistory
++        : [{ at: raw.createdAt ?? isoNow(), allowance: raw.realCallAllowance, why: 'imported-v1' }],
++      migratedSpend: Array.isArray(raw.migratedSpend) ? raw.migratedSpend : [],
++      spend,
++    };
++    validateLedger(ledger);
++    ledger.allowanceHistory.push({ at: isoNow(), allowance: ledger.realCallAllowance, why: 'migrate v1->v2: ' + reason.trim() });
++    writeLedgerAtomic(ticketDir, ledger);
++    return ledger;
++  });
++}
+\ No newline at end of file

@@ -1,0 +1,25 @@
+[
+  {
+    "at": "2026-09-30T13:00:05.274Z",
+    "tMs": 945,
+    "event": "request_received",
+    "url": "/v1/chat/completions",
+    "model": "controlled-fixture",
+    "stream": true,
+    "authHeaderPresent": true
+  },
+  {
+    "at": "2026-09-30T13:00:05.275Z",
+    "tMs": 946,
+    "event": "delta_sent",
+    "index": 1,
+    "chars": 14
+  },
+  {
+    "at": "2026-09-30T13:00:05.282Z",
+    "tMs": 953,
+    "event": "connection_closed",
+    "emittedFrames": 1,
+    "finishedNaturally": false
+  }
+]

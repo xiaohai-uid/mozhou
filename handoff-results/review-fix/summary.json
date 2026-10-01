@@ -1,0 +1,53 @@
+{
+  "package": "C:\\zcode\\novel-ai\\handoff-results\\review-fix",
+  "generatedAt": "2026-09-30T12:31:44.5572059Z",
+  "realModelCalls": 0,
+  "productionCodeChanged": 0,
+  "gitStatusCount": 31,
+  "gitStatusMatchesBaseline": true,
+  "targetFilesByteIdentical": 9,
+  "runs": {
+    "b_controlled": {
+      "assertions": 17,
+      "failures": 0,
+      "exitCode": 0
+    },
+    "c_control_controlled": {
+      "assertions": 15,
+      "failures": 0,
+      "exitCode": 0
+    },
+    "c_disc_controlled": {
+      "assertions": 6,
+      "failures": 0,
+      "exitCode": 0
+    },
+    "guard_zero_network": {
+      "allFailClosed": true,
+      "exitCode": 0,
+      "probes": 6
+    },
+    "c_real_real_allowance0": {
+      "reason": "BUDGET_EXHAUSTED before any request; 0 frames written",
+      "expected": true,
+      "exitCode": 1
+    },
+    "c_real_real_allowance0_dummycreds": {
+      "reason": "BUDGET_EXHAUSTED before any request; 0 frames written",
+      "expected": true,
+      "exitCode": 1
+    }
+  },
+  "offlineBudgetSuite": {
+    "failed": 0,
+    "passed": 52,
+    "exitCode": 0
+  },
+  "ledger": {
+    "legacyRealCallsRecorded": 9,
+    "spentThisRound": 0,
+    "endpointUnknown": 2,
+    "allowance": 0
+  },
+  "oldPackageIntact": true
+}

@@ -1,0 +1,224 @@
+/**
+ * harness/accounting.mjs —— 整张工单共享的「真实模型调用」额度账本。
+ *
+ * 设计目标（逐条对应 Codex 第四轮复核的 [P1] 预算可绕过）：
+ *   1. **唯一入口**：任何真实上游请求都必须先调用 spendRealCall()；本模块是唯一授权点。
+ *   2. **先记账再发请求**：spendOrThrow 在返回之前已经把这次占用**原子写入磁盘**；
+ *      调用方拿到 reservationId 才允许发出请求。传输异常 / 429 / 取消**一律不退款**。
+ *   3. **跨进程共享**：额度属于整张工单，落在 ticketDir 下的单个 ledger.json；
+ *      新进程启动时先读盘，因此重启不重置消耗。
+ *   4. **并发安全**：用 mkdir 的原子性做跨进程互斥（Windows/POSIX 都成立），
+ *      拿锁 → 读 → 校验 → 追加 → 写临时文件 → rename → 放锁。并发抢额度不会超发。
+ *   5. **失败关闭（fail closed）**：非法预算 / 账本损坏 / 锁超时 / 时钟不可能值
+ *      ⇒ 一律抛 BudgetUnavailableError，真实通道关闭。
+ *   6. **默认零额度**：allowance 缺省 0 ⇒ 新工单默认不允许任何真实调用。
+ *
+ * 本模块**不联网**，也不认识任何 provider；它只负责记账。
+ */
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export const LEDGER_VERSION = 1;
+
+/** 额度不可用 ⇒ 真实通道必须关闭。任何调用方都不许吞掉这个错误继续发请求。 */
+export class BudgetUnavailableError extends Error {
+  constructor(code, message, detail) {
+    super(code + ': ' + message);
+    this.name = 'BudgetUnavailableError';
+    this.code = code;
+    this.detail = detail ?? null;
+  }
+}
+
+export class BudgetExhaustedError extends BudgetUnavailableError {
+  constructor(detail) {
+    super('BUDGET_EXHAUSTED', '工单真实调用额度已用尽，拒绝再次发送', detail);
+    this.name = 'BudgetExhaustedError';
+  }
+}
+
+export function ledgerPath(ticketDir) {
+  return join(ticketDir, 'ledger.json');
+}
+function lockDir(ticketDir) {
+  return join(ticketDir, '.ledger.lock');
+}
+
+/** 预算合法性：必须是 [0, HARD_CEILING] 内的安全整数。任何其它值都关闭真实通道。 */
+export const HARD_CEILING = 64;
+export function assertValidAllowance(allowance) {
+  if (typeof allowance !== 'number' || !Number.isInteger(allowance) || !Number.isSafeInteger(allowance)) {
+    throw new BudgetUnavailableError('BUDGET_INVALID', 'allowance 必须是安全整数，收到 ' + JSON.stringify(allowance));
+  }
+  if (allowance < 0) {
+    throw new BudgetUnavailableError('BUDGET_INVALID', 'allowance 不能为负，收到 ' + allowance);
+  }
+  if (allowance > HARD_CEILING) {
+    throw new BudgetUnavailableError('BUDGET_INVALID', 'allowance 超过硬上限 ' + HARD_CEILING + '，收到 ' + allowance);
+  }
+  return allowance;
+}
+
+export function createLedger({ ticket, allowance, note }) {
+  assertValidAllowance(allowance);
+  const now = Date.now();
+  return {
+    version: LEDGER_VERSION,
+    ticket,
+    realCallAllowance: allowance,
+    createdAt: new Date(now).toISOString(),
+    // 已发生的历史占用（迁移自上一版手写账本）。新工单应为空数组。
+    migratedSpend: [],
+    spend: [],
+    ...(note === undefined ? {} : { note }),
+  };
+}
+
+/** 结构校验：任何字段类型不对都是「账本损坏」⇒ 关闭真实通道，绝不「猜着重置」。 */
+export function validateLedger(ledger) {
+  const fail = (why) => { throw new BudgetUnavailableError('LEDGER_CORRUPT', '账本结构非法：' + why); };
+  if (ledger === null || typeof ledger !== 'object' || Array.isArray(ledger)) fail('不是对象');
+  if (ledger.version !== LEDGER_VERSION) fail('version 不是 ' + LEDGER_VERSION + '（收到 ' + JSON.stringify(ledger.version) + '）');
+  if (typeof ledger.ticket !== 'string' || ledger.ticket.length === 0) fail('ticket 缺失');
+  assertValidAllowance(ledger.realCallAllowance);
+  if (!Array.isArray(ledger.migratedSpend)) fail('migratedSpend 不是数组');
+  if (!Array.isArray(ledger.spend)) fail('spend 不是数组');
+  const seen = new Set();
+  for (const row of [...ledger.migratedSpend, ...ledger.spend]) {
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) fail('占用记录不是对象');
+    if (typeof row.reservationId !== 'string' || row.reservationId.length === 0) fail('占用记录缺 reservationId');
+    if (seen.has(row.reservationId)) fail('reservationId 重复：' + row.reservationId);
+    seen.add(row.reservationId);
+    if (row.state !== undefined && !['unknown', 'spent', 'reserved'].includes(row.state)) fail('state 非法：' + String(row.state));
+  }
+  return ledger;
+}
+
+export function readLedger(ticketDir) {
+  const p = ledgerPath(ticketDir);
+  if (!existsSync(p)) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(p, 'utf8'));
+  } catch (error) {
+    throw new BudgetUnavailableError('LEDGER_CORRUPT', '账本 JSON 无法解析：' + String(error && error.message), p);
+  }
+  return validateLedger(parsed);
+}
+
+function writeLedgerAtomic(ticketDir, ledger) {
+  const p = ledgerPath(ticketDir);
+  const tmp = p + '.tmp-' + process.pid + '-' + Date.now();
+  writeFileSync(tmp, JSON.stringify(ledger, null, 2) + '\n', 'utf8');
+  renameSync(tmp, p);
+}
+
+export function initLedger(ticketDir, { ticket, allowance, note }) {
+  mkdirSync(ticketDir, { recursive: true });
+  const existing = readLedger(ticketDir);
+  if (existing !== null) assertValidAllowance(existing.realCallAllowance);
+  writeLedgerAtomic(ticketDir, createLedger({ ticket, allowance, note }));
+  return readLedger(ticketDir);
+}
+
+/** 已消耗 = 迁移的历史占用 + 本进程/其它进程写入的占用。**不退款**：任何 state 都算占用。 */
+export function spentCount(ledger) {
+  return ledger.migratedSpend.length + ledger.spend.length;
+}
+export function remaining(ledger) {
+  return ledger.realCallAllowance - spentCount(ledger);
+}
+
+/**
+ * 跨进程互斥。用 mkdir 的原子语义（已存在即失败），比文件锁在 Windows 上更可靠。
+ * 锁内只做「读-校验-追加-原子替换」，都是毫秒级操作。
+ */
+function withLock(ticketDir, fn, { timeoutMs = 5000, staleMs = 30000 } = {}) {
+  const lock = lockDir(ticketDir);
+  const started = Date.now();
+  for (;;) {
+    try {
+      mkdirSync(lock); // 原子：存在即抛 EEXIST
+      break;
+    } catch (error) {
+      if (error && error.code !== 'EEXIST') {
+        throw new BudgetUnavailableError('LOCK_ERROR', '无法创建账本锁：' + String(error && error.message), lock);
+      }
+      // 陈旧锁（持锁进程崩了）不算「异常」，但要显式回收并留痕
+      try {
+        const st = statSync(lock);
+        if (Date.now() - st.mtimeMs > staleMs) {
+          rmSync(lock, { recursive: true, force: true });
+          continue;
+        }
+      } catch (statError) { /* 锁刚好被释放，重试即可 */ }
+      if (Date.now() - started > timeoutMs) {
+        throw new BudgetUnavailableError('LOCK_TIMEOUT', '等待账本锁超过 ' + timeoutMs + 'ms，拒绝在不确定状态下发请求', lock);
+      }
+      // 短自旋：跨进程场景下不做 sleep 也能很快拿到
+      const until = Date.now() + 5;
+      while (Date.now() < until) { /* spin */ }
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    rmSync(lock, { recursive: true, force: true });
+  }
+}
+
+/**
+ * **唯一授权入口**：先持久化占用，再返回。
+ * @returns {{reservationId: string, seq: number, spentAfter: number, remainingAfter: number}}
+ * 任何异常（非法预算 / 损坏账本 / 锁超时 / 额度用尽）都抛错 ⇒ 调用方必须放弃发请求。
+ */
+export function spendRealCall(ticketDir, { reason, runDir = null, channel = 'real', extra = {} } = {}) {
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    throw new BudgetUnavailableError('REASON_REQUIRED', '占用额度必须给出非空 reason（否则账目无法审计）');
+  }
+  return withLock(ticketDir, () => {
+    const ledger = readLedger(ticketDir);
+    if (ledger === null) {
+      throw new BudgetUnavailableError('LEDGER_MISSING', '账本不存在；真实通道关闭（先 initLedger 并显式设额度）', ledgerPath(ticketDir));
+    }
+    const used = spentCount(ledger);
+    if (used >= ledger.realCallAllowance) {
+      throw new BudgetExhaustedError({
+        ticket: ledger.ticket, allowance: ledger.realCallAllowance, used, reason,
+      });
+    }
+    const seq = used + 1;
+    const reservationId = 'rc_' + String(seq).padStart(3, '0') + '_' + process.pid + '_' + Date.now().toString(36);
+    const row = {
+      reservationId,
+      seq,
+      state: 'spent',
+      reason: reason.trim(),
+      channel,
+      at: new Date().toISOString(),
+      pid: process.pid,
+      runDir,
+      ...extra,
+    };
+    ledger.spend.push(row);
+    writeLedgerAtomic(ticketDir, ledger);
+    return { reservationId, seq, spentAfter: spentCount(ledger), remainingAfter: remaining(ledger), row };
+  });
+}
+
+/** 只读快照（给报告生成器用）。 */
+export function budgetSnapshot(ticketDir) {
+  const ledger = readLedger(ticketDir);
+  if (ledger === null) return { exists: false, ticketDir };
+  return {
+    exists: true,
+    ticket: ledger.ticket,
+    allowance: ledger.realCallAllowance,
+    migrated: ledger.migratedSpend.length,
+    spentThisVersion: ledger.spend.length,
+    used: spentCount(ledger),
+    remaining: remaining(ledger),
+    overBudget: spentCount(ledger) > ledger.realCallAllowance,
+    rows: [...ledger.migratedSpend.map((r) => ({ ...r, source: 'migrated' })), ...ledger.spend.map((r) => ({ ...r, source: 'ledger' }))],
+  };
+}
