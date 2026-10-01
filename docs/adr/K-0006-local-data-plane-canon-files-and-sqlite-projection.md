@@ -1,4 +1,4 @@
-# 0006. Local Data Plane: Dual Storage of Human-Readable Canon Files and SQLite Projection
+# K-0006. Local Data Plane: Dual Storage of Human-Readable Canon Files and SQLite Projection
 
 ## Context
 

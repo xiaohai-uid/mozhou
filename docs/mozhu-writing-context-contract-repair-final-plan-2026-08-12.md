@@ -106,7 +106,7 @@ Contract 正确
 3. `C:\zcode\novel-ai\docs\mozhu-full-materials-audit-report-2026-08-12.md`（全资料交叉审计）；
 4. `C:\zcode\novel-ai\docs\project-data-package-v1.3.md`（原始项目数据包）；
 5. `C:\zcode\novel-ai\AGENTS.md` 与 `C:\zcode\novel-ai\app\AGENTS.md`（工程约束）；
-6. `C:\zcode\novel-ai\CONTEXT.md`（领域词汇与已定产品决策）；
+6. `C:\zcode\novel-ai\GLOSSARY.md`（领域词汇与已定产品决策）；
 7. `C:\zcode\novel-ai\docs\agents\issue-tracker.md`、`triage-labels.md`、`domain.md`（Matt 技能落盘规则）；
 8. `C:\zcode\novel-ai\docs\production-deployment.md` 与 `docs\release-report-v1.2.md`（生产和验收基线）；
 9. 当前代码与测试：`app/lib/chat/`、`app/lib/novels/chapter-chat.ts`、`app/lib/novels/rag.ts`、两条 chat route、`app/tests/http/chat.test.ts`、`app/tests/http/chapter-continuation.test.ts`、`app/tests/unit/compress.test.ts`、`app/tests/http/skills.test.ts`。
@@ -124,7 +124,7 @@ Contract 正确
   > 早期 Inbox 摘要或设想
 ```
 
-例如 `CONTEXT.md` 早期写“Docker Compose 单机部署”，但当前生产事实已是 Cloud Run + Neon。执行者必须把前者理解为历史规划或本地方案，不能用它覆盖生产事实。
+例如 `GLOSSARY.md` 早期写“Docker Compose 单机部署”，但当前生产事实已是 Cloud Run + Neon。执行者必须把前者理解为历史规划或本地方案，不能用它覆盖生产事实。
 
 ### 3.3 参考项目如何使用
 
@@ -217,7 +217,7 @@ Throwaway Prototype            Evidence Audit
 
 本机仓库级 setup 已完成，已有：
 
-- `CONTEXT.md`；
+- `GLOSSARY.md`；
 - `docs/agents/issue-tracker.md`；
 - `docs/agents/triage-labels.md`；
 - `docs/agents/domain.md`；

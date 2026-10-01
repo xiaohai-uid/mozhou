@@ -8,7 +8,7 @@ tags:
 
 # 0021. Context Receipt Physical Storage: Receipt Files with Pointer Events
 
-> 相关笔记：[[context-receipt-physical-format-spec]] · [[token-budget-assembly-spec]] · [[ADR-0007 Novel Runtime Event Architecture]] · [[ADR-0019 Research-Driven Amendments]] · [[kernel-schema-draft]]
+> 相关笔记：[[context-receipt-physical-format-spec]] · [[token-budget-assembly-spec]] · [[ADR-K-0007 Novel Runtime Event Architecture]] · [[ADR-0019 Research-Driven Amendments]] · [[kernel-schema-draft]]
 
 ## Context
 

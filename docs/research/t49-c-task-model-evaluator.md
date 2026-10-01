@@ -104,7 +104,7 @@ cell := (taskType, providerId, model, recipeVersion)。taskType/route 取自 Gen
 
 ## 3. 与 Tier 2 Capability Evolution 的关系
 
-规格锚：data-flywheel-spec.md §3.2（Tier 2 三机制：T2A Recipe Benchmarking / T2B Context Policy Debugging / T2C Task-Model Router）；CONTEXT.md:255-257（Capability Evolution = 按 acceptance rates 与 edit ratios 对 capability/recipe 版本的实证追踪）。TaskModelEvaluator 即 T2C 的本地实现，同时给 T2A 供给矩阵行。
+规格锚：data-flywheel-spec.md §3.2（Tier 2 三机制：T2A Recipe Benchmarking / T2B Context Policy Debugging / T2C Task-Model Router）；GLOSSARY.md:255-257（Capability Evolution = 按 acceptance rates 与 edit ratios 对 capability/recipe 版本的实证追踪）。TaskModelEvaluator 即 T2C 的本地实现，同时给 T2A 供给矩阵行。
 
 ### 3.1 双维度四象限（acceptance_rate × edit_ratio）
 
@@ -155,7 +155,7 @@ interface RoutingSuggestion {
 - UVSD §1.2：未经批准旅程不实现能力——自动改路由无旅程背书，「作者审阅后生效」有。
 - 工程原则 3（分层生长）：最小端到端版本 = 只读投影器 + 报告，学习闭环后置。
 - L1 纪律：评估器本体纯函数、零时钟（nowUtc 注入）、零外部服务，与 T20 判定器同界（types.ts:4）。
-- 隐私边界：全程本地 P1/P2 面；若未来匿名上报仅聚合值出域（data-flywheel-spec.md §2 P2 行 L15；ADR-0005 Privacy Tiering）。
+- 隐私边界：全程本地 P1/P2 面；若未来匿名上报仅聚合值出域（data-flywheel-spec.md §2 P2 行 L15；ADR-K-0005 Privacy Tiering）。
 
 ## 5. 开放问题（移交 grilling）
 
@@ -175,7 +175,7 @@ interface RoutingSuggestion {
 - 版本矩阵：packages/benchmark/src/version-matrix.ts:15-54
 - Recipe 七件套与装载：packages/runtime/src/recipe/types.ts:112-146；schema.ts:133-177；loader.ts:65-106,154-213
 - tier 路由：packages/runtime/src/tierConfig.ts:13-63,189-221；docs/specs/runtime-capability-spec.md §6
-- 规格：docs/specs/data-flywheel-spec.md §2/§3.2/§3.3/§4；docs/specs/chapter-pipeline-spec.md §S12(L94-96)、§3(L108)；docs/adr/0005-policy-flywheel-and-privacy-tiering.md（7-Tier Engine Tier 4=Task-Model Router）；docs/adr/0008-evaluation-engine-as-first-class-system.md §2/§3；CONTEXT.md:245-265
+- 规格：docs/specs/data-flywheel-spec.md §2/§3.2/§3.3/§4；docs/specs/chapter-pipeline-spec.md §S12(L94-96)、§3(L108)；docs/adr/0005-policy-flywheel-and-privacy-tiering.md（7-Tier Engine Tier 4=Task-Model Router）；docs/adr/0008-evaluation-engine-as-first-class-system.md §2/§3；GLOSSARY.md:245-265
 
 ## 附 B：与姊妹票的分工边界
 

@@ -16,7 +16,7 @@
 
 1. 当前 `apps/web/src` 实际挂载关系与组件代码。
 2. 当前 `apps/web/server/api.ts` 与 `server/routes/*` 的真实数据契约、路由顺序和 truthfulness gate。
-3. `CONTEXT.md`、`AGENTS.md` 与现有 domain vocabulary。
+3. `GLOSSARY.md`、`AGENTS.md` 与现有 domain vocabulary。
 4. `docs/adr/0027-ui-baseline-ink-orbit.md` 中仍有效的作者主权、管线、信息架构与 WebGL 克制原则。
 5. 本规格定义的新视觉方向与 Scene System。
 6. 外部设计参考只能回答“怎么表达”，不能覆盖“产品是什么”。

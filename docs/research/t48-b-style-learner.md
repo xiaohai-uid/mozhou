@@ -25,7 +25,7 @@ tags:
 - `StyleProfile` 五个量化分面：dialogueRatio / sentenceLengthDistribution / tabooWords / sensoryDensity / actionPacing（kernel-schema.ts:337-345）。行 335 注释明示两点：**EMA 平滑簿记归 flywheel 层，kernel 只存平滑结果**；规格 §2.8 的 `version` 字段由 `KernelEntityHead.revision` 承担（改名裁决见 docs/specs/kernel-schema-decisions.md:85,123）。
 - revision 语义（Q14）：事务性原地变更 +1；不可变实体恒 0（kernel-schema.ts:96-104；kernel-schema-decisions.md:94）⇒ StyleProfile 是**可变实体**，vN 即 revision 序。
 - ID 品牌 `style_` + ULID（kernel-schema.ts:54；ulid.ts:98-99）。
-- 领域词条锚：Scenario Style Profile = quantified / archetype-specific，avoid prompt prefix / global tone（CONTEXT.md:67-69）。
+- 领域词条锚：Scenario Style Profile = quantified / archetype-specific，avoid prompt prefix / global tone（GLOSSARY.md:67-69）。
 
 ### 1.2 存储面（data-plane）与保护位矛盾
 
@@ -33,7 +33,7 @@ tags:
 - 建书种子即宣告单文件多场景意图：「StyleProfile × scenarioType（…）；EMA 平滑结果算完即落盘，初始为空表」（create-book.ts:140-143）。
 - 但扫描器只取文件身份+全文哈希：`PlanningArtifactScan {id, kind, revision, contentSha256}`，不解析任何分面（canon-read.ts:389-402,413-416）；SQLite 投影 `planning_artifacts` 同样只有版本锚列（projection.ts:42-47）。**⇒ 分面数据今天无处结构化落地，是纯 gap。**
 - 外部手改文风.md → EXTERNAL_MODIFIED → 进 reconcileSurface（local-data-plane.test.ts:131-144）：作者手动改画像走对账确认，是既有权威通道。
-- **矛盾点（实现票必须拍板）**：种子 frontmatter 发射 `protected: true`（create-book.ts:82-93，注释称「宪法层整体受保护 I1」），而 I1 = 保护位禁自动化通道写入（kernel-schema.ts:76-82；prose 侧执法见 user-edit-step.ts:203-209）——但同文件正文却声明「EMA 平滑结果算完即落盘」。飞轮 learner 正是自动化写入方。【推断】I1 的立法本意是防生成管线改写作者宪法文件，不是禁飞轮自维护（ADR-0005 Tier 2 与 data-flywheel-spec §3.1 都要求持续自动精修）；推荐解法见 §6-D。
+- **矛盾点（实现票必须拍板）**：种子 frontmatter 发射 `protected: true`（create-book.ts:82-93，注释称「宪法层整体受保护 I1」），而 I1 = 保护位禁自动化通道写入（kernel-schema.ts:76-82；prose 侧执法见 user-edit-step.ts:203-209）——但同文件正文却声明「EMA 平滑结果算完即落盘」。飞轮 learner 正是自动化写入方。【推断】I1 的立法本意是防生成管线改写作者宪法文件，不是禁飞轮自维护（ADR-K-0005 Tier 2 与 data-flywheel-spec §3.1 都要求持续自动精修）；推荐解法见 §6-D。
 
 ### 1.3 信号面（EventLedger 现状）
 
@@ -59,14 +59,14 @@ tags:
 
 ## 2. RQ1：版本化形态——每场景型独立分面，版本按更新批次递增
 
-**裁决依据（实证）**：ADR-0012 Decision 明文「Each category maintains an independent StyleProfile」+ EMA α=0.05（docs/adr/0012 Decision 2/3）；scenarioType 判别键正是 Q13 为「US23 EMA 按场景隔离的前提」而补（kernel-schema-decisions.md:85）；CONTEXT.md:69 把「global tone」列入 avoid 词。统一向量方案被三重证据封死。
+**裁决依据（实证）**：ADR-0012 Decision 明文「Each category maintains an independent StyleProfile」+ EMA α=0.05（docs/adr/0012 Decision 2/3）；scenarioType 判别键正是 Q13 为「US23 EMA 按场景隔离的前提」而补（kernel-schema-decisions.md:85）；GLOSSARY.md:69 把「global tone」列入 avoid 词。统一向量方案被三重证据封死。
 
 **版本尺度（提案）**：
 - vN = `KernelEntityHead.revision`；learner 每应用一个更新批次 ⇒ 整文件原子替换 + revision +1（沿 user-edit-step.ts:213-219 的 atomicReplace+revision 步进先例）。更新批次挂章粒度：十步第 10 步 Flywheel Record 之后批处理本章全部 edit_blocks（chapter-pipeline-spec.md §1 表第 10 行；失败降级不阻断正文的 state_degraded 先例 record-step.ts:104-124）。
 - 时间常数：EMA(α=0.05) 半衰期 ≈ ln0.5/ln0.95 ≈ **13.5 个更新批次**，有效记忆 ≈ 1/α = 20 批【数学推导，非引用】⇒ 统计上显著的画像移动以 ~15 章为单位；这解释了为何每章都可 +1 revision 而「漂移感知窗口」应设 ≥20 批（§4）。
 - 历史保留：不在 canon 文件里存历史（I5 不适用——它是可变实体）；历史 = ledger 里逐批落的 StyleProfileUpdated 事件快照（§4-C），回滚即重放。
 
-**物理形态裁决（提案）**：维持文风.md 单文件（目录树 v2 冻结纪律、create-book 种子意图、Sync Layering 把 style profiles 归 planning 层立即落盘——CONTEXT.md:87-89）。body 冻结为一个 fenced YAML 块：`profiles:` map × 四 ScenarioType，每分面携带建书时一次性铸好的独立 `style_<ULID>` id 与五分面值。canon-read 升级 readStyleProfiles() 结构化解析、宁败不脏（canon-read.ts:404-407 纪律先例）；projection 不动（contentSha256 已覆盖任何分面变化，projection.ts:42-47）。
+**物理形态裁决（提案）**：维持文风.md 单文件（目录树 v2 冻结纪律、create-book 种子意图、Sync Layering 把 style profiles 归 planning 层立即落盘——GLOSSARY.md:87-89）。body 冻结为一个 fenced YAML 块：`profiles:` map × 四 ScenarioType，每分面携带建书时一次性铸好的独立 `style_<ULID>` id 与五分面值。canon-read 升级 readStyleProfiles() 结构化解析、宁败不脏（canon-read.ts:404-407 纪律先例）；projection 不动（contentSha256 已覆盖任何分面变化，projection.ts:42-47）。
 
 ## 3. RQ2：编辑 delta → 分面更新规则
 
@@ -100,7 +100,7 @@ tags:
 
 ## 5. RQ4：compile() 消费接缝 + 收敛指标
 
-**消费方式（可直写）**：新增纯函数 renderStyleSections(profiles): StructuralSection[] ——section 标识符 `style_profile:<scenarioType>`（沿 'entity:<ref>'/'author_intent' 命名先例，compile.ts:169、compile-step.test.ts:111），content = 量化分面的人读指令渲染（如「对话占比约 45%；句长峰值 12–25 字桶占 60%；禁用词：……」）。编排方在 Prepare 后读取文风.md → 渲染 → 填入 RunCompileRequest.structuralSections（compile-step.ts:48,118）。CHAPTER_DRAFTING 任务 V1 **四分面全注入**：确定性、零分类依赖，估算总量 ≤800 token << structuralCapTokens 4096【token 数为估计】，且分 section 使 Receipt diff 可定位单一场景型的画像变更（receipt-spec §3.2）。CONTEXT.md:69 的 avoid「prompt prefix」指的是把 StyleProfile 概念降格为固定提示词前缀，不妨碍其量化结果经 structural 通道注入——该通道定义原文即含「风格等结构性注入」（kernel-schema.ts:362-364）。
+**消费方式（可直写）**：新增纯函数 renderStyleSections(profiles): StructuralSection[] ——section 标识符 `style_profile:<scenarioType>`（沿 'entity:<ref>'/'author_intent' 命名先例，compile.ts:169、compile-step.test.ts:111），content = 量化分面的人读指令渲染（如「对话占比约 45%；句长峰值 12–25 字桶占 60%；禁用词：……」）。编排方在 Prepare 后读取文风.md → 渲染 → 填入 RunCompileRequest.structuralSections（compile-step.ts:48,118）。CHAPTER_DRAFTING 任务 V1 **四分面全注入**：确定性、零分类依赖，估算总量 ≤800 token << structuralCapTokens 4096【token 数为估计】，且分 section 使 Receipt diff 可定位单一场景型的画像变更（receipt-spec §3.2）。GLOSSARY.md:69 的 avoid「prompt prefix」指的是把 StyleProfile 概念降格为固定提示词前缀，不妨碍其量化结果经 structural 通道注入——该通道定义原文即含「风格等结构性注入」（kernel-schema.ts:362-364）。
 
 **USER_EDIT_RATIO_REDUCTION 能否作收敛指标——能作验收级，不能作过程级**：
 - 可用性：它度量的恰是 StyleLearner 的最终目的（人工改写量下降），且判定器/gate 现成（metrics.ts:171-174；types.ts:38）。

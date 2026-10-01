@@ -8,7 +8,7 @@ tags:
 
 # Context Receipt 物理格式与 EventLedger 关系规格
 
-> 相关笔记：[[token-budget-assembly-spec]] · [[kernel-schema-draft]] · [[ADR-0007 Novel Runtime Event Architecture]] · [[ADR-0006 Local Data Plane]] · [[MoZhou Wayfinder 地图]]
+> 相关笔记：[[token-budget-assembly-spec]] · [[kernel-schema-draft]] · [[ADR-K-0007 Novel Runtime Event Architecture]] · [[ADR-K-0006 Local Data Plane]] · [[MoZhou Wayfinder 地图]]
 
 > 工单 [#9](https://github.com/xiaohai-uid/mozhou/issues/9) · 决策记录见 ADR-0021 · 前置：[Token 预算装配算法规格](./token-budget-assembly-spec.md)（#8）
 > 边界：本票裁 **物理存储形态、ledger 关系、可复算/diff 精确语义**；条目 schema 冻结在 #4（本票仅受控增补 Q15/Q16），UI 回放归 Phase 6。

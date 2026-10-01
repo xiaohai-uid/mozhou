@@ -3,7 +3,7 @@ status: accepted
 date: 2026-08-15
 ---
 
-# ADR-0006：Skill 运行时与 A 版双栏工作台进入真实产品
+# A-0006：Skill 运行时与 A 版双栏工作台进入真实产品
 
 ## 背景
 
@@ -19,7 +19,7 @@ date: 2026-08-15
 1. 在真实产品中实现 Skill 运行时：SkillDefinition / SkillRun / GenerationPlan / GenerationManifest / ArtifactRef / ContextAssembler，契约按 `.scratch/mozhou-workbench-a/contracts/01-技能运行时契约.md` 冻结（FROZEN，变更须 Contract Delta）。
 2. 内置五个默认创作技能（story_grounding / chapter_planning / audience_genre / narrative_style / quality_gate），互斥、按阶段触发；AI 味预检是质量门的写后检查组，与叙事声音不同阶段。
 3. 采用 A 版双栏写作台作为产品工作台基线，在真实代码中重写（原型仅作交互参考，不复刻原型代码/样式）。
-4. 自由回答是一级入口；「AI 先提问」状态在任何模板选择之前可见；模板是次级入口（对齐 CONTEXT.md「创作模板」语义）。
+4. 自由回答是一级入口；「AI 先提问」状态在任何模板选择之前可见；模板是次级入口（对齐 GLOSSARY.md「创作模板」语义）。
 5. 默认开启 = 按阶段自动路由调用，不是每轮全量注入。
 6. 只重写原型方向，不把原型工作区未跟踪文件带入产品仓库（handoff 约束）。
 

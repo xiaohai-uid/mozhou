@@ -122,7 +122,7 @@ tags:
 1. **新增字段**（规格 §2 未有）：`TemporalFact.riskClass`、`TemporalFact.compactedIntoVolumeId`、`TemporalFact.provenance`、`KnowledgeState.knownSinceSceneId`、`Scene`（整实体）、`OutlineNode.stale/provenance`、`ChapterCommit.receiptId`、Receipt 三预留字段组。
 2. **改名**：`entity_id`→`holder`；StyleProfile `version`→`revision`；`source: string`→判别联合 `FactSource`。
 3. **层级修正**：OutlineGraph 五层（…→Scene/Beat）→ 四层（…→Chapter）+ Scene 独立实体（卷二 §A 修正信号）。
-4. **秘密建模**：CONTEXT.md "fact 或 secret" 双型引用 → 秘密即事实（`secret.*` 谓词 + 高风险级）。
+4. **秘密建模**：GLOSSARY.md "fact 或 secret" 双型引用 → 秘密即事实（`secret.*` 谓词 + 高风险级）。
 
 ## 验收对照（地图 Destination 判据）
 

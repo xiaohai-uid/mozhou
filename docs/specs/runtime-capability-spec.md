@@ -178,7 +178,7 @@ CHAPTER_DRAFTING:
 
 ## 9. 对既有规格的受控增补清单
 
-1. ADR-0007(novel) 事件词表增补任务族事件（TaskStarted 族）与成对约束 —— 随实现票落
+1. ADR-K-0007(novel) 事件词表增补任务族事件（TaskStarted 族）与成对约束 —— 随实现票落
 2. master spec §Implementation Decisions Execution Seam 补「账本写入权 = publishEvent 单口」一句
 3. dual-plane 目录树无需改动：任务投影入 runtime.sqlite 既有库（记录判定，防实现票误开新文件）
 

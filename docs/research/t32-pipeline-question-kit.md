@@ -38,7 +38,7 @@ tags:
 ## 5. Continuity Gate 组成 `[READY]`
 
 - **Q5.1** M15 推论正式拍板：连续性维度纯机械核检（M2 时间线单调/四族行校验/POV 秘密零泄漏已实现），LLM 审查层不进 Gate 只进可选旁路？倾向：是——Gate 必须确定性可回归测试
-- **Q5.2** AutomatedReviewCompleted 事件的处置：载荷冻结 or 从 ADR-0007 词表删除？倾向：若 Q5.1 裁纯机械则删（不留死事件）
+- **Q5.2** AutomatedReviewCompleted 事件的处置：载荷冻结 or 从 ADR-K-0007 词表删除？倾向：若 Q5.1 裁纯机械则删（不留死事件）
 - **Q5.3** Gate 失败的输出契约：HARD_CONFLICT 清单（冲突事实 id+断言原文+建议修复方向）作为独立事件还是 Result 字段？
 
 ## 6. Canon Proposal 确认面 `[B-#31:Result/failurePolicy]`
@@ -83,7 +83,7 @@ tags:
 
 ## 12. Flywheel Record 终版 `[B-#31:事件词表]`
 
-- **Q12.1** ADR-0007 八事件 ↔ 十步对齐表的终版：哪些事件改名/合并/删除（如 Q5.2 若删 AutomatedReviewCompleted）
+- **Q12.1** ADR-K-0007 八事件 ↔ 十步对齐表的终版：哪些事件改名/合并/删除（如 Q5.2 若删 AutomatedReviewCompleted）
 - **Q12.2** usage_ledger 收编形态：attempt 级成本记账进 Ledger 任务事件流还是独立投影表？倾向：投影表（沿 Q3 投影裁决）
 - **Q12.3** artifact_delta 异步回灌边界：Record 步允许落后正文热路径多久/多少事件？
 

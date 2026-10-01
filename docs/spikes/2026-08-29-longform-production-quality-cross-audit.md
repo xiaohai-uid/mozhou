@@ -29,7 +29,7 @@ Repo：`xiaohai-uid/mozhou`（master）
 必须优先阅读：
 
 - `AGENTS.md`
-- `CONTEXT.md`
+- `GLOSSARY.md`
 - `docs/specs/chapter-pipeline-spec.md`
 - `docs/specs/capability-recipe-schema-v1.md`
 - `docs/specs/migration-and-phasing-plan.md`

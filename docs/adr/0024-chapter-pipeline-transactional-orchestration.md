@@ -11,7 +11,7 @@ tags:
 - **状态**：Accepted（授权终审制，作者全稿签署）
 - **日期**：2026-08-24
 - **来源**：[工单 #32](https://github.com/xiaohai-uid/mozhou/issues/32) · 配套规格：[[chapter-pipeline-spec]]
-- **前置**：ADR-0023（执行基底吸收）· ADR-0007(novel)（事件架构）
+- **前置**：ADR-0023（执行基底吸收）· ADR-K-0007(novel)（事件架构）
 
 ## Context
 

@@ -33,7 +33,7 @@ tags:
 | 0004 双 seam | 业务层 PreparedChatRequest seam + transport wire payload seam 双测试边界 | 测试接缝思路与内核线黑盒三接缝兼容 |
 | 0005 扫榜/趋势/搜索 | ranking_snapshots 表、番茄全量榜 8-16 个、msToken 签名搜索、90 天保留 | **踩进内核线 Phase 7 Market Brain 领地**，数据架构两套（快照表 vs MarketBrief 文件） |
 | 0006 Skill 运行时 + A 版双栏工作台 | SkillDefinition/SkillRun/GenerationPlan/ContextAssembler/ArtifactRef，五内置技能按阶段自动路由，契约 FROZEN | **直接对应内核线 CapabilityRegistry**（ADR-0009）：两套能力运行时设计并存 |
-| 0007 可恢复创作任务运行时 | generation_jobs/steps/attempts/events 四表、planned→queued→running→waiting_retry→终态状态机、attempt 级重试（仅未产生结果）、SSE Last-Event-ID 补发、usage_ledger、无外部队列、lease/claim 预留 | **直接对应内核线 NovelRuntime**（ADR-0007 同号异物！）+ #32 雾区崩溃恢复矩阵的部分答案 |
+| 0007 可恢复创作任务运行时 | generation_jobs/steps/attempts/events 四表、planned→queued→running→waiting_retry→终态状态机、attempt 级重试（仅未产生结果）、SSE Last-Event-ID 补发、usage_ledger、无外部队列、lease/claim 预留 | **直接对应内核线 NovelRuntime**（ADR-K-0007 同号异物！）+ #32 雾区崩溃恢复矩阵的部分答案 |
 
 ## 3. 与 Phase 3 地图三雾区的碰撞面
 

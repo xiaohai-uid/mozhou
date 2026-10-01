@@ -1,4 +1,4 @@
-# ADR-0004：写作请求保留语义 seam 与 wire payload seam
+# A-0004：写作请求保留语义 seam 与 wire payload seam
 
 - 状态：Accepted
 - 日期：2026-08-13

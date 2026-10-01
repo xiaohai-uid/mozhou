@@ -233,7 +233,7 @@ LLM 层是全项目最精细处：17 类任务各自路由模型档位/温度/ma
 | M8 | 拆文炼化合规三件套：pin 上游 commit + 保留原 license + 重写边界规则段 | openwrite oh-story 先例 | 拆文炼化 |
 | M9 | 提示词 = 版本化 JSON 数据文件 + 类型化变量 + 仓储注入，禁硬编码散落 | 天命 37 套资产形态 + novel-ai 反例 | 拆文炼化 |
 | M10 | BYOK 加密存储 + 任务级模型路由（档位/温度/max_tokens 三表）+ 逐调用用量账本 | jarvis crypto/router/usage + novel-ai 双印证 | ADR-0013 |
-| M11 | 隐私承诺产品化：零遥测、key 不入项目/Git/Agent 上下文、日志递归脱敏 | openwrite 全仓示范 | ADR-0005 |
+| M11 | 隐私承诺产品化：零遥测、key 不入项目/Git/Agent 上下文、日志递归脱敏 | openwrite 全仓示范 | ADR-K-0005 |
 | M12 | 开书渐进式：允许"先写第 1 章"，设定可后补；禁六步前置向导强制路径 | jarvis 开书摩擦反例 | Phase 6 UX |
 | M13 | 测试密度与管线复杂度同步冻结：核心管线测试基线 ≥500 函数量级，Gate B 真实模型 smoke 进 release 门禁 | jarvis 541 根因 + novel-ai gate 范式 | ADR-0016 |
 

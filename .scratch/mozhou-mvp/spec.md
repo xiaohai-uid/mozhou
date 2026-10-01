@@ -1,6 +1,6 @@
 # 墨舟 (MoZhou) — AI 小说写作平台 MVP 规格
 
-> 状态: ready-for-agent | 来源: grill-with-docs（CONTEXT.md 23 项决策）| 日期: 2026-08-09
+> 状态: ready-for-agent | 来源: grill-with-docs（GLOSSARY.md 23 项决策）| 日期: 2026-08-09
 
 ## Problem Statement
 

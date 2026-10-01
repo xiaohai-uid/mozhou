@@ -66,7 +66,7 @@ packages/kernel/src/kernel-schema.ts          # 仅 P1 KnowledgeState 认知层�
 packages/kernel/src/narrative-state.ts
 apps/web/server/api.ts
 apps/web/src/App.tsx
-CONTEXT.md
+GLOSSARY.md
 docs/specs/chapter-pipeline-spec.md
 docs/specs/data-flywheel-v1-spec.md
 docs/adr/00xx-literary-quality-review-boundary.md
@@ -78,7 +78,7 @@ docs/adr/00xx-literary-quality-review-boundary.md
 
 **Files:**
 - Create: `docs/adr/0025-literary-quality-review-boundary.md`
-- Modify: `CONTEXT.md`
+- Modify: `GLOSSARY.md`
 - Modify: `docs/specs/chapter-pipeline-spec.md`
 - Modify: `README.md`
 - Modify: `app/README.md` if present; otherwise create `app/LEGACY.md`
@@ -118,7 +118,7 @@ Do not change step 7 `Continuity Gate` semantics.
 - [x] **Step 4: Commit**
 
 ```bash
-git add docs/adr/0025-literary-quality-review-boundary.md docs/specs/chapter-pipeline-spec.md CONTEXT.md README.md app/LEGACY.md
+git add docs/adr/0025-literary-quality-review-boundary.md docs/specs/chapter-pipeline-spec.md GLOSSARY.md README.md app/LEGACY.md
 git commit -m "docs: freeze literary quality review boundary"
 ```
 

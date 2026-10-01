@@ -131,4 +131,4 @@ tags: [主角, 雷系]           # 永不入包
 - [x] Always 超限纪律冻结（§2 Q10 + §6 D5）
 - [x] `kernel-schema.draft.ts` §10 受控增补，tsc strict 零错误
 - [x] #6 目录树细化落字（§7.1）
-- [x] CONTEXT.md 词条补齐（实体目录卡 / 实体引用 / 装配策略四档）
+- [x] GLOSSARY.md 词条补齐（实体目录卡 / 实体引用 / 装配策略四档）

@@ -11,7 +11,7 @@ tags:
 > 相关笔记：[[kernel-schema-decisions]] · [[kernel-schema-draft]] · [[ADR-0010 External Edit Reconciliation]] · [[MoZhou Wayfinder 地图]]
 
 - **状态**：冻结 v1（随 wayfinder 工单 [#6](https://github.com/xiaohai-uid/mozhou/issues/6) 收口）
-- **规范性输入**：ADR-0006（双平面存储）、ADR-0010（hash 对账协议方向）、ADR-0019 §4（保护位/stale）、规格 US#18-20、`kernel-schema.draft.ts`（同步对象 = 已冻结实体）
+- **规范性输入**：ADR-K-0006（双平面存储）、ADR-0010（hash 对账协议方向）、ADR-0019 §4（保护位/stale）、规格 US#18-20、`kernel-schema.draft.ts`（同步对象 = 已冻结实体）
 - **决策过程**：两轮 grilling 共 15 问（Q1-Q15），全部由作者拍板
 
 ## 根部决策（Q1-Q7）

@@ -32,7 +32,7 @@
 ## 关键设计（可追溯）
 - UI 工作方式：参考灵笔（lingbi-next：DocumentConflict/CandidateStale/humanizeError/autosave）+ 笔枢写作（技能化流程）+ 墨舟既有 skill 体系 → 技能驱动对话
 - 测试 seam：HTTP 契约测试（真实 dev server + mock provider 回显 system 使注入可断言）；生成内核复用管线（runNodeStream）
-- 决策记录：spec.md V1.1 章节（B1-B11/Q1-Q4/S1-S4/W1-W2）+ CONTEXT.md 术语表
+- 决策记录：spec.md V1.1 章节（B1-B11/Q1-Q4/S1-S4/W1-W2）+ GLOSSARY.md 术语表
 
 ## 排除范围（用户定案，勿劝）
 - ① 会员支付真实化（支付二期）② projects 审查记录+导出备份 ③ 书源 HTML 规则解析器（R5 决策边界）

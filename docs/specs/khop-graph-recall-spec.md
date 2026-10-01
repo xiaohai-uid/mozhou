@@ -8,7 +8,7 @@ tags:
 
 # k-hop 图召回算子规格（Temporal Canon Graph 召回通道）
 
-> 相关笔记：[[token-budget-assembly-spec]] · [[context-receipt-physical-format-spec]] · [[kernel-schema-draft]] · [[ADR-0002 Temporal Canon and Candidate-to-Canon Fact Lifecycle]] · [[MoZhou Wayfinder 地图]]
+> 相关笔记：[[token-budget-assembly-spec]] · [[context-receipt-physical-format-spec]] · [[kernel-schema-draft]] · [[ADR-K-0002 Temporal Canon and Candidate-to-Canon Fact Lifecycle]] · [[MoZhou Wayfinder 地图]]
 
 > 工单 [#12](https://github.com/xiaohai-uid/mozhou/issues/12) · 决策记录见 ADR-0022
 > 前置：[kernel-schema.draft.ts](./kernel-schema.draft.ts)（#4）· [#7 三通道决议](https://github.com/xiaohai-uid/mozhou/issues/7) · [Token 预算装配算法规格](./token-budget-assembly-spec.md)（#8）· [Receipt 物理格式](./context-receipt-physical-format-spec.md)（#9，Q15/Q16）

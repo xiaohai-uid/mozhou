@@ -17,7 +17,7 @@
 1. `C:\zcode\novel-ai\docs\superpowers\specs\2026-09-12-mozhou-ink-realm-design.md`
 2. `C:\zcode\novel-ai\apps\web\DESIGN.md`
 3. `C:\zcode\novel-ai\docs\adr\0027-ui-baseline-ink-orbit.md`
-4. `C:\zcode\novel-ai\CONTEXT.md`
+4. `C:\zcode\novel-ai\GLOSSARY.md`
 5. `C:\zcode\novel-ai\AGENTS.md`
 
 然后读取本机最新 GitNexus / `.gitnexus` 代码图谱。**不要只靠上面这份规格，因为本地 HEAD 可能比规格生成时更新。**

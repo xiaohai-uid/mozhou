@@ -21,7 +21,7 @@ gantt
 
 ### Phase Breakdown
 
-- **Phase 0 — Domain Freeze**: Complete formal definitions of `CONTEXT.md`, ADRs (`0001` - `0018`), and core schemas.
+- **Phase 0 — Domain Freeze**: Complete formal definitions of `GLOSSARY.md`, ADRs (`0001` - `0018`), and core schemas.
 - **Phase 1 — Story Kernel & Local Data Plane**: Implement the 9 Core Domain entities in TypeScript/Node with SQLite projection indexing and bidirectional Markdown/JSONL synchronization.
 - **Phase 2 — Context Compiler & Receipts**: Build the deterministic query, filtering, token budgeting, and Context Receipt generation pipeline.
 - **Phase 3 — Chapter Transaction Pipeline**: Implement the 10-step chapter production lifecycle (Prepare → Compile → Draft → Review → User Edit → Final Extract → Continuity Gate → Canon Proposal → Commit → Flywheel Record).

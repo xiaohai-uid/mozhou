@@ -33,7 +33,7 @@
 **修改部分（推翻 t50 平铺标尺方案，代码级证据）**：
 t50 P1 提议 `meta.eventPayload: {recipeId, recipeVersion}` 平铺标量入账。**否决该形状**，理由三条：
 1. **唯一生产消费者走嵌套路径**：全仓读 recipe 身份的只有 benchmark 版本矩阵 `payload[recipeSnapshot].recipe.recipeVersion` 三级收窄（benchmark/src/version-matrix.ts:18-29、:49），平铺路径消费者为零——grep 实证 recipeId/recipeVersion 写入仅 draft-step.ts:326-327，无任何读取方。
-2. **M14 缝形状已在库且自带背书**：`toGenerationStartedPayload(doc)` 返回 `{recipeSnapshot: doc}`（runtime/src/recipe/loader.ts:209-213），注释明示「解析产物本就是纯数据，JSON 序列化往返无损，账本回放可得原快照」。t50 担心的 ADR-0021 体量问题已被 M14 评审时的在码决定覆盖；且嵌整份配方使 GenerationStarted 自包含，正是 ADR-0007(novel):24-25 回放可审计性（"recipe ID, model parameters" 可考）的要求——配方 YAML 后续演进不会伪造历史回放。
+2. **M14 缝形状已在库且自带背书**：`toGenerationStartedPayload(doc)` 返回 `{recipeSnapshot: doc}`（runtime/src/recipe/loader.ts:209-213），注释明示「解析产物本就是纯数据，JSON 序列化往返无损，账本回放可得原快照」。t50 担心的 ADR-0021 体量问题已被 M14 评审时的在码决定覆盖；且嵌整份配方使 GenerationStarted 自包含，正是 ADR-K-0007(novel):24-25 回放可审计性（"recipe ID, model parameters" 可考）的要求——配方 YAML 后续演进不会伪造历史回放。
 3. **同行双份身份 = 冗余投影**：同时盖平铺标量与 recipeSnapshot 违反单一事实源（工程原则 2 最简实现）；UVSD §工程原则1 要求删除无人消费的旧路径而非保留。
 
 **定案值（给实现票）**：
@@ -46,7 +46,7 @@ t50 P1 提议 `meta.eventPayload: {recipeId, recipeVersion}` 平铺标量入账�
 
 ## 2. B2 · P2 编辑 delta ——【终裁】批准（附精度修正）
 
-**批准部分**：deltaStats 五字段 `(opsInsert, opsDelete, opsReplace, insertedChars, removedChars)` 应用前机械计数盖章（仿 UsageFact 盖章先例 record-step.ts:86-102）；removedText 补齐 diff 另半边——规格三重背书复核无误：ADR-0007(novel):20「diffs between candidate and user final text」（两侧都要）、ADR-0005:25 Tier2 抽象编辑为风格规则、data-flywheel-spec:53 明列 prose deletions。
+**批准部分**：deltaStats 五字段 `(opsInsert, opsDelete, opsReplace, insertedChars, removedChars)` 应用前机械计数盖章（仿 UsageFact 盖章先例 record-step.ts:86-102）；removedText 补齐 diff 另半边——规格三重背书复核无误：ADR-K-0007(novel):20「diffs between candidate and user final text」（两侧都要）、ADR-0005:25 Tier2 抽象编辑为风格规则、data-flywheel-spec:53 明列 prose deletions。
 
 **体量裁决（t50 §7 Q-B：全文 vs 截断折中）→ 定案全文、无截断上限**：
 - 对称性证据：insert 侧 replacementText 今天就无上限入账（user-edit-step.ts:69-70 可选字符串无任何预算校验；validateBlock :73-100 只查存在性不查长度）。单给 removedText 设上限会造成 replace 块两侧不对称失真——原文截断而新文全量，内容级 diff 学不了，恰好废掉本字段的用途。

@@ -22,7 +22,7 @@ tags:
 1. **视觉基线 = Ink Orbit（夜墨精密仪器）**：近黑分级表面承载主体视觉重量，窄幅夜墨紫能量线、内侧高光、发丝线、固定颗粒为材质体系（克制玻璃拟态）；排印双轨——系统黑体承载高密度操作信息，宋体承载作品名/章节标题/文学正文；品牌 token 逐值沿用 legacy `globals.css`（`#0b0a0f`/`#f4f1fa`/`#8b78ff` 系，基色不可偏移）。
 2. **信息架构 = 专注工作台 + 指挥能力（B+C 混合）**：工作台居中且独占主要画面；左侧五组功能航道（CAPABILITY INDEX，17 项一级功能全部常驻可见可达）；**顶部八步管线为全局脊柱**（prepare/compile/draft/review/extract/continuity/proposal/commit，状态可点击、牵引背景墨迹聚焦）；右侧四面板检视塔（质量门/Story Brain/装配看板/变更矩阵）带状态摘要；Wizard 五步为首次建书覆盖层（可重放，Q3）；技能双胶囊轨（技能多选 + 风格单选）贴近输入动作，完整能力注册表抽屉承载发现与管理。
 3. **WebGL 克制原则**：仅最底层低频墨流/微粒/阶段牵引光核，不覆盖正文；`prefers-reduced-motion` 下静止单帧；动效只动 transform/opacity/filter。
-4. **工程落点（Q1/Q4/Q5/Q6/Q8/Q9 已锁定）**：设计语言迁入 `apps/web`（Vite+React），引入 Tailwind v4 为样式底座，token/语义类原样搬运；深色唯一主题；桌面优先（1280px 下不崩，移动端不进验收）；无路由库（视图状态 + localStorage）；技能胶囊数据源接 CapabilityRegistry（风格胶囊延后）；面板词汇遵守 CONTEXT.md 规范词（Context Receipt/装配看板，禁用 Context Viewer）。
+4. **工程落点（Q1/Q4/Q5/Q6/Q8/Q9 已锁定）**：设计语言迁入 `apps/web`（Vite+React），引入 Tailwind v4 为样式底座，token/语义类原样搬运；深色唯一主题；桌面优先（1280px 下不崩，移动端不进验收）；无路由库（视图状态 + localStorage）；技能胶囊数据源接 CapabilityRegistry（风格胶囊延后）；面板词汇遵守 GLOSSARY.md 规范词（Context Receipt/装配看板，禁用 Context Viewer）。
 5. **实施切片**：骨架票先行（Tailwind v4 接入 + Ink Orbit 材质体系 + 航道/管线/检视塔框架 + 存量 QualityPanel/实体网格/账本迁入换肤），随后 Story Brain、装配看板 + Wizard、变更矩阵（唯一新增后端能力 `assembleChangeMatrix`，t75 契约）、中栏写作对话流（`runDraftStep` 流式端点 + provider 配置，排三面板之后，未配 provider 显式 unavailable）。
 
 ## Consequences

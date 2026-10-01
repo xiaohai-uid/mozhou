@@ -54,7 +54,7 @@ tags:
 | 工作树 | 5 项未提交（2 自动块 + 2 图谱产物 + 1 未跟踪文档） | `git status --porcelain=v1` |
 | 远端 | https://github.com/xiaohai-uid/mozhou | `.gitnexus/meta.json` 的 remoteUrl |
 | 主线形态 | apps/web（Vite + React + TipTap AST + Tailwind）+ packages/*（8 个库）+ src-tauri（桌面壳） | `README.md:120-136` |
-| 已删除的遗留面 | app/（旧 Next.js 应用，750 个跟踪文件）已于 2026-09-20 移出仓库 | `CONTEXT.md:284-286` |
+| 已删除的遗留面 | app/（旧 Next.js 应用，750 个跟踪文件）已于 2026-09-20 移出仓库 | `GLOSSARY.md:284-286` |
 
 **主线与遗留面不要再混淆**：旧文档 `docs/handoff/HANDOFF-20260917.md` 仍把 apps/web
 描述为 Next.js、把门禁说成 11 项、列出 app/ 目录——**这三处均已过时**。
@@ -873,7 +873,7 @@ const endpoint = resolveChatEndpoint(process.env, principal.userId)
 
 | 想了解 | 去读 |
 |---|---|
-| 领域术语规范（本项目的「宪法」） | `CONTEXT.md`（286 行，术语 + _Avoid_ 反义词表） |
+| 领域术语规范（本项目的「宪法」） | `GLOSSARY.md`（286 行，术语 + _Avoid_ 反义词表） |
 | 当前 API 契约全集 | `.scratch/mozhou-mvp/contracts/api-contract.md`（第 27 节是最新 DELTA-006） |
 | 工单体系（23 个） | `.scratch/mozhou-mvp/issues/NN-<slug>.md` |
 | 决策记录（30 个，**编号有重复，引用须带完整文件名**） | `docs/adr/`，例如 `docs/adr/0008-evaluation-engine-as-first-class-system.md` |

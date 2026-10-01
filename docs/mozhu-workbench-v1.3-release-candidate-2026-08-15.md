@@ -7,7 +7,7 @@
 
 | Commit | 内容 |
 |---|---|
-| c5c012c | docs: workbench-a spec/tickets + ADR-0006（Skill 运行时契约 FROZEN + A 版决策落仓库） |
+| c5c012c | docs: workbench-a spec/tickets + ADR-A-0006（Skill 运行时契约 FROZEN + A 版决策落仓库） |
 | c32885a | 工单 01：Skill 运行时骨架 + 故事状态技能（四表 0022/0023 + 种子 + lib/runtime + 接线 + 证据端点） |
 | c5b2da4 | 工单 02：章节规划技能（chapter_task_card + planner 区段 + 讨论期跳过） |
 | f355716 | 工单 03：质量门技能（post_write 两组检查 + check_report 落 runtime_artifacts 0024） |

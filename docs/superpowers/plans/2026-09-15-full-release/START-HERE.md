@@ -12,7 +12,7 @@
 
 ## 2. 必须依次读取
 
-1. 当前仓库 AGENTS.md、CONTEXT.md；C:/zcode/.governance/SKILL-ROUTER.md。
+1. 当前仓库 AGENTS.md、GLOSSARY.md；C:/zcode/.governance/SKILL-ROUTER.md。
 2. 本目录 SPEC.md、CONTRACTS.md、tasks.json。
 3. 01-core.md → 02-features.md → 03-public-billing.md → 04-release.md。
 4. EXTERNAL-INPUTS.json（只记录非秘密状态；null 是真实缺少的外部输入，不允许编造）。

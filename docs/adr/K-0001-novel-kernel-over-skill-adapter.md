@@ -1,4 +1,4 @@
-# 0001. Novel Kernel Architecture over Skill Adapters and Multi-Agent Panels
+# K-0001. Novel Kernel Architecture over Skill Adapters and Multi-Agent Panels
 
 ## Context
 

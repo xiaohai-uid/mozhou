@@ -1,4 +1,4 @@
-# ADR-0001：统一写作上下文边界与模型输入分层
+# A-0001：统一写作上下文边界与模型输入分层
 
 日期：2026-08-12  
 状态：Accepted for Gate 1；Gate 2 tickets review pending  

@@ -10,7 +10,7 @@ status: wontfix
 ## 问题
 
 `proposal-port.ts:2-6` 宣告「一个 Port，两个调用方 … 共用同一确认协议 confirm/reject/editAccept，逐条粒度」，
-CONTEXT.md 也把 Proposal Port 定义成两条流程**统一**的确认 API。生产代码不是这样：
+GLOSSARY.md 也把 Proposal Port 定义成两条流程**统一**的确认 API。生产代码不是这样：
 
 - `pipelineRoutes.ts:858-865` 走 port ✓
 - `reconciliationRoutes.ts:437` **直接调** `service.decideItems(proposalId, acceptedItemIds)`，
@@ -25,7 +25,7 @@ CONTEXT.md 也把 Proposal Port 定义成两条流程**统一**的确认 API。�
 它触及 **ADR-0010 / ADR-0023**（两条都默认了「按书根的进程级 runtime」），
 而它本质是**产品形态问题**：hosted 模式下对账 runtime 该不该有主体。
 
-CONTEXT.md 的定位是 *local-first novel operating system*——**单机优先**。
+GLOSSARY.md 的定位是 *local-first novel operating system*——**单机优先**。
 「墨舟是单机软件还是多租户服务」是战略选择，不该混在一次重构里。
 
 ## 事实（已核实）

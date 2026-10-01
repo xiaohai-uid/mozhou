@@ -8,11 +8,11 @@ tags:
 
 # 0020. Two-Phase Reserved Token Budget Assembly with Story-Text Quota
 
-> 相关笔记：[[token-budget-assembly-spec]] · [[ADR-0004 Context Compiler and Receipts]] · [[ADR-0019 Research-Driven Amendments]] · [[kernel-schema-draft]]
+> 相关笔记：[[token-budget-assembly-spec]] · [[ADR-K-0004 Context Compiler and Receipts]] · [[ADR-0019 Research-Driven Amendments]] · [[kernel-schema-draft]]
 
 ## Context
 
-The Context Compiler (ADR-0004) needs a concrete, deterministic budgeting algorithm. The two-volume reference retrospective surfaced NovelAI's two-phase Reserved allocation as the only battle-tested lorebook budget mechanism (reserve tokens in descending Insertion Order first, then place), alongside three of its documented hazards: hand-tuned single-scalar priority that does not survive million-character libraries (retrospective vol2 §D.2③), atomic entries whose interaction with eviction is undefined, and the officially acknowledged "lorebook can cancel out story text" failure — settings entries starving prose of context because no quota protects it. The frozen kernel schema (`kernel-schema.draft.ts` §8) already reserves the receipt surface this algorithm must populate: `AssemblyChannel`, `ExclusionReason` (including `story_text_quota_protected`), `ReceiptEntry.trimType`, and `storyTextQuota`. Deterministic recomputation (`recomputationHash`) is a frozen requirement, so every ordering and accounting rule below must be a pure function.
+The Context Compiler (ADR-K-0004) needs a concrete, deterministic budgeting algorithm. The two-volume reference retrospective surfaced NovelAI's two-phase Reserved allocation as the only battle-tested lorebook budget mechanism (reserve tokens in descending Insertion Order first, then place), alongside three of its documented hazards: hand-tuned single-scalar priority that does not survive million-character libraries (retrospective vol2 §D.2③), atomic entries whose interaction with eviction is undefined, and the officially acknowledged "lorebook can cancel out story text" failure — settings entries starving prose of context because no quota protects it. The frozen kernel schema (`kernel-schema.draft.ts` §8) already reserves the receipt surface this algorithm must populate: `AssemblyChannel`, `ExclusionReason` (including `story_text_quota_protected`), `ReceiptEntry.trimType`, and `storyTextQuota`. Deterministic recomputation (`recomputationHash`) is a frozen requirement, so every ordering and accounting rule below must be a pure function.
 
 ## Decision
 

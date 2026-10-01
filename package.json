@@ -26,7 +26,10 @@
     "graph:snapshot": "node scripts/export-code-graph.mjs",
     "audit:unreferenced": "node scripts/audit-unreferenced.mjs",
     "graph:check": "node .gitnexus/run.cjs check --cycles --json -r .",
-    "test:real-model": "node scripts/run-real-model-tests.mjs"
+    "test:real-model": "node scripts/run-real-model-tests.mjs",
+    "gen:architecture": "node scripts/gen-architecture.mjs",
+    "check:architecture": "node scripts/gen-architecture.mjs --check",
+    "gen:adr-refs": "node scripts/gen-adr-refs.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

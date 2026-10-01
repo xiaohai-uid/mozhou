@@ -200,7 +200,7 @@ R1–R4 未全部满足前，状态保持 `RELEASE CANDIDATE — NORMAL PUBLIC_F
 - Free Tier 覆盖：Cloud Run 200 万请求/月、36 万 GB-秒、18 万 vCPU-秒；Artifact Registry 0.5GB；Secret Manager 6 版本
 
 
-## 任务运行时部署说明（2026-08-17，ADR-0007 / 票 01-10）
+## 任务运行时部署说明（2026-08-17，ADR-A-0007 / 票 01-10）
 
 - 形态：选项 A——请求内执行 + PostgreSQL 全持久化 + 事件补发 + 失败人工重试。Cloud Run 无常驻 worker，不部署后台进程。
 - 数据：generation_jobs/steps/attempts/events + usage_ledger（迁移 0027-0030）。

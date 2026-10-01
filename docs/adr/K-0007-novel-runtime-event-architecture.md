@@ -1,4 +1,4 @@
-# 0007. Novel Runtime Event Architecture: Event Bus, Session Replay, and Auditability
+# K-0007. Novel Runtime Event Architecture: Event Bus, Session Replay, and Auditability
 
 ## Context
 

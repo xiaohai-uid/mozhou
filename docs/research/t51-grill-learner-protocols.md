@@ -65,7 +65,7 @@ tags: [mozhou]
 
 ### A4 · 特征最小面 7 标量冻结 ——【终裁】批准冻结
 
-**理由**：f1-f7 全部确定性可算（replacementText 瞬时读取 + CandidateCreated.chars join，无 LLM、无重型 NLP，F5）；动作动词密度/心理描写占比需封闭词表资产，全仓不存在（t47 §2.1 grep 证据），引入即超范围。sceneType:null 占位与归属划分一致——场景归因协议归 #48（t47 §2.2），CONTEXT.md:67-69 的「parameterized by scene type」由 #48 兑现。
+**理由**：f1-f7 全部确定性可算（replacementText 瞬时读取 + CandidateCreated.chars join，无 LLM、无重型 NLP，F5）；动作动词密度/心理描写占比需封闭词表资产，全仓不存在（t47 §2.1 grep 证据），引入即超范围。sceneType:null 占位与归属划分一致——场景归因协议归 #48（t47 §2.2），GLOSSARY.md:67-69 的「parameterized by scene type」由 #48 兑现。
 
 **定案**：f1-f7 按 t47 §2.1 表逐字冻结（含 TTR 双重计数取均、delete 块仅贡献 f4 行跨度统计、f6 按 level 分桶）。显式出界：动作动词密度、心理/描写占比、一切需词表资产的量、一切 LLM 参与的特征计算。伴生验收 = R1 标量红线扫描（preference 目录全文不含 events.jsonl 中 ≥8 字符正文子串，t47 §3.2）。
 
@@ -103,7 +103,7 @@ tags: [mozhou]
 
 ### B4 · 注入范围：四场景型全注入 vs top-2 ——【终裁】批准全注入；否决 top-2
 
-**理由**：①预算充裕：4 section 估算 ≤800 token << structuralCapTokens 默认 4096（assemble.ts:117,128），省 token 收益趋零；②top-2 需要「本章属哪两个场景型」的运行期预测器——恰是 B3 里最不可靠的组件，把它插进注入路径等于把分类误差放大成上下文系统性缺失，是 ADR-0012 反交叉污染初衷的漏洞版；③全注入保持确定性：Receipt 按 identifier diff 可定位单一场景型的画像变更（StructuralSection 契约 assemble.ts:84-89），top-2 的动态选择集会让 replayInputs 依赖预测器状态，伤可复算性。CONTEXT.md:69 avoid「prompt prefix」不妨碍量化结果经 structural 通道注入——该通道定义原文即含风格段（compile.ts:116-117、kernel-schema.ts:362-364）。
+**理由**：①预算充裕：4 section 估算 ≤800 token << structuralCapTokens 默认 4096（assemble.ts:117,128），省 token 收益趋零；②top-2 需要「本章属哪两个场景型」的运行期预测器——恰是 B3 里最不可靠的组件，把它插进注入路径等于把分类误差放大成上下文系统性缺失，是 ADR-0012 反交叉污染初衷的漏洞版；③全注入保持确定性：Receipt 按 identifier diff 可定位单一场景型的画像变更（StructuralSection 契约 assemble.ts:84-89），top-2 的动态选择集会让 replayInputs 依赖预测器状态，伤可复算性。GLOSSARY.md:69 avoid「prompt prefix」不妨碍量化结果经 structural 通道注入——该通道定义原文即含风格段（compile.ts:116-117、kernel-schema.ts:362-364）。
 
 **定案**：renderStyleSections(profiles) 恒输出 4 条，identifier=`style_profile:<scenarioType>`，content 为分面的人读指令渲染；渲染器自带总量断言 ≤800 token（chars/1.7 近似估算即可），超限抛错不静默截断（宁败不猜——超限说明画像膨胀是 bug）；编排方 Prepare 后读文风.md → 渲染 → 填 RunCompileRequest.structuralSections（compile-step.ts:48,118 缝已预留）。
 

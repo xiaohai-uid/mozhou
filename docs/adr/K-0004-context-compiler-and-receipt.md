@@ -1,4 +1,4 @@
-# 0004. Two-Stage Context Architecture: Story Bible vs. Context Compiler with Transparent Receipts
+# K-0004. Two-Stage Context Architecture: Story Bible vs. Context Compiler with Transparent Receipts
 
 ## Context
 

@@ -8,7 +8,7 @@ tags:
 
 # 0022. Deterministic K-Hop Graph Recall over the POV-Visible Temporal Canon Subgraph
 
-> 相关笔记：[[khop-graph-recall-spec]] · [[token-budget-assembly-spec]] · [[context-receipt-physical-format-spec]] · [[ADR-0002 Temporal Canon and Candidate-to-Canon Fact Lifecycle]] · [[ADR-0011 Temporal Fact Compaction and Scene-Level POV Slicing]]
+> 相关笔记：[[khop-graph-recall-spec]] · [[token-budget-assembly-spec]] · [[context-receipt-physical-format-spec]] · [[ADR-K-0002 Temporal Canon and Candidate-to-Canon Fact Lifecycle]] · [[ADR-0011 Temporal Fact Compaction and Scene-Level POV Slicing]]
 
 ## Context
 

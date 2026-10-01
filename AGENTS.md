@@ -2,6 +2,28 @@
 
 Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS.md` (symlinked from `~/.zcode/AGENTS.md`) — this file only adds project-scoped conventions.
 
+## 0. 流程权威与优先级（2026-10-01 裁决）
+
+> 本文件此前由两条产品线的指令**拼接**而成：`## Agent skills`（应用线）出现在第 66–78 行，`# 内核线增补：Wayfinder 追踪操作` 又在第 82–97 行重复了一遍同样三个小节。两者在 Issue tracker / Triage labels / Domain docs 三处**互相矛盾**，且**没有任何优先级规则**。本节是那次拼接的裁决结果。
+
+**本仓现在只有一套流程权威：mattpocock/skills。** 六条历史工作流线的裁决：
+
+| 线 | 裁决 | 家 |
+|---|---|---|
+| **mattpocock/skills** | **保留，唯一流程权威** | `docs/agents/` + 本文件 |
+| 应用线 UVSD | 并入 matt 线，受本节优先级规则裁决 | 本文件 §1–§8 |
+| 内核线 Wayfinder | 并入 matt 线，受本节优先级规则裁决 | 本文件 §9 |
+| spec-kit / speckit | **降级为产物目录**，其模板不再产生新约束 | `.specify/`、`specs/` |
+| superpowers | **降级为历史层**，brief/report 不再是新工作的单位 | `docs/superpowers/`、`.superpowers/` |
+| DSH `.dwf.ts` | **降级为任务级脚本**，不是流程 | `.zcode/workflow-drafts/` |
+
+**优先级规则**：
+
+- §1–§8（UVSD 工程纪律）与 §9（Wayfinder 追踪操作）**互补而非竞争**：前者管"能不能做"，后者管"记在哪"。
+- 二者冲突时，**§1–§8 的范围纪律优先**。宁可停下并报告依赖，不得自行扩大范围。
+- **术语**：任何产物中的领域词一律以 [`GLOSSARY.md`](./GLOSSARY.md) 为准。本文件不定义术语，只定义流程。
+- **决策**：以 `docs/adr/` 为准，入口 `docs/adr/INDEX.md`。
+
 ## Engineering Rules - UVSD Protocol v2.2.1 Final
 
 > 生效：2026-08-11（替换旧《全局开发规范 v1.0.0》禁锢规约；V1.0 已归档，12 接口全部真实化，范围锁死解除）。
@@ -46,12 +68,16 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 26. Preserve failed work and diffs in an isolated branch/worktree for developer inspection rather than destructively cleaning it.
 27. Produce a structured Morning Report detailing commits, verification results, contract deltas, pending migrations, blocked tickets, external side effects, and retained diffs.
 
-### 7. 项目基建（V1.0 已固化，勿删）
+### 7. 项目基建
+- 术语：**[`GLOSSARY.md`](./GLOSSARY.md)**（原 `CONTEXT.md`，2026-10-01 迁正）
+- 架构地图：`docs/architecture.md`；决策地图：`docs/adr/INDEX.md`；决策记录：`docs/adr/`
 - 契约全集：`.scratch/mozhou-mvp/contracts/api-contract.md`（已实现端点以后端发射端 + 契约测试为准，UI 消费是协议子集）
-- Ticket tracker：`.scratch/mozhou-mvp/issues/NN-<slug>.md`；spec 见 `.scratch/mozhou-mvp/spec.md`
-- 决策记录：OB `10_Projects/墨舟.md`；spike 结论：`docs/spikes/`（见 0.5 探针）
+- 执行跟踪：GitHub Issues（见 §9）；本地规格文档：`.scratch/<feature-slug>/`（**不是**执行状态的家）
+- spike 结论：`docs/spikes/`（见 0.5 探针）
 - 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
-- 遗留切片（V1.1 未做项，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，工单 14/15）
+- 挂账项（Deferred Item，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，议题 #14/#15）
+
+> **已废止**：本节原写作「Ticket tracker：`.scratch/mozhou-mvp/issues/NN-<slug>.md`」，并把「遗留切片」当作 Deferred Item 的名称。两者均已按 `GLOSSARY.md` Part 2 §2.3 与 §2.1 更正。原「决策记录：OB `10_Projects/墨舟.md`」指向已退役的 Obsidian 库，一并更正为 `docs/adr/`。
 
 ### 8. Git 分支与提交约定（2026-09-23 起生效）
 - 本仓库采用六分支模型，完整手册见 WinClaw `knowledge/GIT-BRANCHING-AND-COMMIT-STANDARD.md`：
@@ -63,43 +89,28 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 - 提交信息：Conventional Commits 八类前缀（`feat`/`fix`/`docs`/`style`/`refactor`/`perf`/`test`/`chore`）；单次提交同一类别、问题不超过 3 个；不合规用 `git commit --amend` 修正，禁用 `git reset --hard`。
 - 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
 
-## Agent skills
+## 9. Wayfinder 追踪操作（内核线并入）
 
 ### Issue tracker
 
-Local markdown — tickets live at `.scratch/<feature-slug>/issues/NN-<slug>.md` (e.g. `.scratch/mozhou-mvp/`). See `docs/agents/issue-tracker.md`.
+**执行状态的唯一权威是 GitHub Issues**，用 `gh` CLI 操作。本地 `.scratch/` 下的 markdown 承载**规格与决策**，不是执行状态。两者分工、命令约定与 ID 方案见 `docs/agents/issue-tracker.md`。
 
 ### Triage labels
 
-Default five canonical roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+五个规范标签（canonical，非 "default"）：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。存放于 GitHub 议题标签。映射见 `docs/agents/triage-labels.md`。
+
+> **已更正**：本节与旧的 `## Agent skills` 块曾分别写作 "Default five canonical roles" 与 "Canonical 5-role triage label vocabulary" —— 同一套五个标签，两种措辞。现统一为 **canonical**。
 
 ### Domain docs
 
-Single-context — one `CONTEXT.md` at repo root; ADRs under `docs/adr/` (created lazily). See `docs/agents/domain.md`.
+Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY-MAP.md`）；决策记录在 `docs/adr/`（惰性创建）。消费规则见 `docs/agents/domain.md`。
 
----
-
-# 内核线增补：Wayfinder 追踪操作
-
-
-## Agent skills
-
-### Issue tracker
-
-GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Canonical 5-role triage label vocabulary. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context layout at repo root (`CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
+> **已更正**：本节曾出现三次措辞不同的同义描述，且 `docs/agents/domain.md` 还要求读一个本仓不存在的 `CONTEXT-MAP.md` 并援引一个两系都不存在的 `ADR-0007 (event-sourced orders)` 作为示例。示例已改为占位形式。
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mozhou** (9615 symbols, 21244 relationships, 508 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mozhou** (9653 symbols, 21363 relationships, 516 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -132,11 +143,11 @@ This project is indexed by GitNexus as **mozhou** (9615 symbols, 21244 relations
 
 | Task | Read this skill file |
 | --- | --- |
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
+| Understand architecture / "How does X work?" | `.agents/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.agents/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.agents/skills/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.agents/skills/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.agents/skills/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.agents/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->

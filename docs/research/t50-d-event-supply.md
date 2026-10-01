@@ -57,7 +57,7 @@ UsageRecord = {entryId, taskRef(会话侧), chapterIndex, commitId, kind(usage\|
 账面对照：
 - ① 已满足且质量高：accepted/rejected 双路强制同账、id 必须可回溯到 CandidateCreated（宁败不猜），机械校验挡单路假信号（multi-candidate.ts:110-136；ADR-0013:13-16 的主偏好信号设计）。
 - ③ 半满足：呈现顺序可由**同 taskRef 的 CandidateCreated 行序**推导（presentCandidates 按入参序串行 publish，multi-candidate.ts:69-83；PublishBus 单实例串行 append，eventBus.ts:73-76 注释 + 107-111），无需新字段；level 两级动作位在账。
-- ② **有洞**：编辑块的插入侧文本（replacementText）入账，但**被删除/被替换的原文本不入账**——applyEditBlocks 后旧正文被 atomicReplace 覆盖、无任何快照留存（user-edit-step.ts:211-219；草稿 phase 内 revision 只在 frontmatter 步进）。作者"删了什么"是 Tier-1/Tier-2 最强的负向风格信号（ADR-0005:25「abstracting edits into style delta rules」；data-flywheel-spec.md:53 明列 prose deletions 为数据源；ADR-0007(novel):20 对 UserEditRecorded 的原始设想就是「diffs between candidate and user final text」——两侧都要）。现状只有半边 diff。
+- ② **有洞**：编辑块的插入侧文本（replacementText）入账，但**被删除/被替换的原文本不入账**——applyEditBlocks 后旧正文被 atomicReplace 覆盖、无任何快照留存（user-edit-step.ts:211-219；草稿 phase 内 revision 只在 frontmatter 步进）。作者"删了什么"是 Tier-1/Tier-2 最强的负向风格信号（ADR-0005:25「abstracting edits into style delta rules」；data-flywheel-spec.md:53 明列 prose deletions 为数据源；ADR-K-0007(novel):20 对 UserEditRecorded 的原始设想就是「diffs between candidate and user final text」——两侧都要）。现状只有半边 diff。
 
 ### 2.2 StyleLearner（R2 · #48）
 
@@ -106,7 +106,7 @@ FlywheelRecorded 加 recipeId 只是症状贴膏药：evaluator 还需要 provid
 ### P2 编辑 delta 统计与删除侧文本补丁
 
 - **位置**：user-edit-step.recordUserEdit 发布 payload 增 `deltaStats: { opsInsert; opsDelete; opsReplace; insertedChars; removedChars }`（步内在应用前机械计数，仿 UsageFact 盖章先例 record-step.ts:86-102）；delete/replace 块增可选 `removedText?: string`（应用前从行数组截取，零时钟零成本）。
-- **含义**：规模量（edit_distance_ratio 的分子原料）无需重放正文即可得；removedText 补齐 diff 另半边，激活「作者删什么」的内容级负向信号（ADR-0007(novel):20 原始意图、ADR-0005:25、flywheel-spec:53 三重规格背书）。
+- **含义**：规模量（edit_distance_ratio 的分子原料）无需重放正文即可得；removedText 补齐 diff 另半边，激活「作者删什么」的内容级负向信号（ADR-K-0007(novel):20 原始意图、ADR-K-0005:25、flywheel-spec:53 三重规格背书）。
 - **兼容策略**：deltaStats 新行恒有；removedText 可选。历史行两字段皆缺——读取侧 `?? null` 缺省，特征提取容忍缺省是 R1 冷启动设计的一部分（归 #47）。隐私面：events.jsonl 本就在本地运行时区且已携带 replacementText（user-edit-step.ts:4「payload 原样落账」），removedText 未开辟任何新出口通道；体量增长交 grilling 确认。
 
 ### P3 生成时长补丁
@@ -148,4 +148,4 @@ FlywheelRecorded 加 recipeId 只是症状贴膏药：evaluator 还需要 provid
 
 ## 附：关键证据索引（快速复核路径）
 
-词表与形状 domain-events.ts:19-51 · 候选双路 multi-candidate.ts:69-149 · 编辑块与覆盖丢失 user-edit-step.ts:65-100, 211-238 · 收尾与 usage record-step.ts:23-52, 86-140 · 引擎命名空间断裂 engine.ts:113-141 + draft-step.ts:324-330 + t17-pipeline.test.ts:109 · M14 缝未接线 loader.ts:203-213（生产未用；recipe.test.ts:267-272 仅测试形态） · 双读面 eventBus.ts:30-65 vs ledger.ts:13-63 · 指针行 receipt-file.ts:99-131 · 规格 data-flywheel-spec.md:53, 82-104 · ADR-0005:20-30 · ADR-0007(novel):14-22 · ADR-0012:11-22 · ADR-0013:13-16 · 六指标 benchmark/src/types.ts:11-39 · 入册判例 kernel-schema.ts:544-568 + chapter-pipeline-spec.md:116-120 + domain-events.test.ts:11-54
+词表与形状 domain-events.ts:19-51 · 候选双路 multi-candidate.ts:69-149 · 编辑块与覆盖丢失 user-edit-step.ts:65-100, 211-238 · 收尾与 usage record-step.ts:23-52, 86-140 · 引擎命名空间断裂 engine.ts:113-141 + draft-step.ts:324-330 + t17-pipeline.test.ts:109 · M14 缝未接线 loader.ts:203-213（生产未用；recipe.test.ts:267-272 仅测试形态） · 双读面 eventBus.ts:30-65 vs ledger.ts:13-63 · 指针行 receipt-file.ts:99-131 · 规格 data-flywheel-spec.md:53, 82-104 · ADR-0005:20-30 · ADR-K-0007(novel):14-22 · ADR-0012:11-22 · ADR-0013:13-16 · 六指标 benchmark/src/types.ts:11-39 · 入册判例 kernel-schema.ts:544-568 + chapter-pipeline-spec.md:116-120 + domain-events.test.ts:11-54

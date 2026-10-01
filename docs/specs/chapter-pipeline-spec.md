@@ -53,7 +53,7 @@ tags:
 
 ### S5 Continuity Gate 组成（M15 推论正式拍板）
 
-**Gate = 纯机械核检**：M2 时间线单调 + 四族行校验 + POV 秘密零泄漏 + dependency 引用完整性（均已实现或为实现票机械项）。LLM 审查只许做**旁路建议**（独立可选调用，结论不入 Gate 判定）。`AutomatedReviewCompleted` 从 ADR-0007 词表删除（不留死事件）。Gate 失败输出 = Result 字段 `hardConflicts[] {factId, assertion, suggestion}`。
+**Gate = 纯机械核检**：M2 时间线单调 + 四族行校验 + POV 秘密零泄漏 + dependency 引用完整性（均已实现或为实现票机械项）。LLM 审查只许做**旁路建议**（独立可选调用，结论不入 Gate 判定）。`AutomatedReviewCompleted` 从 ADR-K-0007 词表删除（不留死事件）。Gate 失败输出 = Result 字段 `hardConflicts[] {factId, assertion, suggestion}`。
 
 ### S6 Canon Proposal 确认面
 
@@ -115,7 +115,7 @@ V1 **全局单飞**：同时最多一个活动 session（消灭一类并发 bug�
 
 ## 4. 对既有规格的受控增补清单
 
-1. ADR-0007 词表：删 AutomatedReviewCompleted；增任务族（TaskStarted/TaskStepTransitioned/CandidateDeltaExtracted）与配对约束
+1. ADR-K-0007 词表：删 AutomatedReviewCompleted；增任务族（TaskStarted/TaskStepTransitioned/CandidateDeltaExtracted）与配对约束
 2. #8 tier 表：增 CHAPTER_DRAFTING 档行
 3. kernel-schema：TaskResult/HARD_CONFLICT 类型入册（沿 #31 ResolutionSnapshot 同族）
 

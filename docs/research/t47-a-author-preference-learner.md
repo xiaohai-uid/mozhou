@@ -7,7 +7,7 @@ tags: [mozhou]
 # T47-A · AuthorPreferenceLearner：信号面与推理面研究
 
 > 对应 issue：xiaohai-uid/mozhou#47（Phase 4 数据飞轮四研究票之一，地图票 #46）
-> 规范性输入：[[data-flywheel-spec]] §2/§3.1/§4 · [[0005-policy-flywheel-and-privacy-tiering]] · [[0013-generation-concurrency-and-preference-sampling]] · CONTEXT.md 词条 ScenarioStyleProfile(L67)/Policy Flywheel(L247)/Author Model(L251)/Event Ledger(L259)/Privacy Tier(L263)/Task Projection(L203)
+> 规范性输入：[[data-flywheel-spec]] §2/§3.1/§4 · [[0005-policy-flywheel-and-privacy-tiering]] · [[0013-generation-concurrency-and-preference-sampling]] · GLOSSARY.md 词条 ScenarioStyleProfile(L67)/Policy Flywheel(L247)/Author Model(L251)/Event Ledger(L259)/Privacy Tier(L263)/Task Projection(L203)
 > 代码真源：packages/kernel/src/domain-events.ts（词表）· packages/pipeline/src/{multi-candidate,user-edit-step,record-step,ledger}.ts（生成与落账）
 > 调查方式：纯本地只读取证，不改代码不动 git。日期 2026-08-24。所有行号以当日工作树为准。
 
@@ -68,7 +68,7 @@ data-flywheel-spec.md:84-104 定义了带 privacy_tier/user_action/edit_distance
 
 ## 2. Q2 特征 schema：结构化编辑块的量化特征最小面
 
-CONTEXT.md:68 对 ScenarioStyleProfile 的冻结描述：「quantified, archetype-specific … parameterized by scene type (action, dialogue, romance_emotion, exposition_worldbuilding)」。特征必须能按场景型分桶计算，但**场景归因协议本身归 #48**（ADR-0012 领域），本票只预留 sceneType 可空位。
+GLOSSARY.md:68 对 ScenarioStyleProfile 的冻结描述：「quantified, archetype-specific … parameterized by scene type (action, dialogue, romance_emotion, exposition_worldbuilding)」。特征必须能按场景型分桶计算，但**场景归因协议本身归 #48**（ADR-0012 领域），本票只预留 sceneType 可空位。
 
 ### 2.1 V1 最小特征面（7 个，全部确定性计算）
 
@@ -85,7 +85,7 @@ CONTEXT.md:68 对 ScenarioStyleProfile 的冻结描述：「quantified, archetyp
 
 ### 2.2 与 StyleProfile 的关系边界
 
-Author Model（CONTEXT.md:251）= 偏好画像本体；ScenarioStyleProfile（CONTEXT.md:67）= 其文风维度的场景型参数化。本票产出的观测流（f1-f7 带 sceneType:null）是两者共同的原料；「观测→StyleProfile vN 快照」的演化规则归 #48。实现票不得在本票范围内写任何场景分类器。
+Author Model（GLOSSARY.md:251）= 偏好画像本体；ScenarioStyleProfile（GLOSSARY.md:67）= 其文风维度的场景型参数化。本票产出的观测流（f1-f7 带 sceneType:null）是两者共同的原料；「观测→StyleProfile vN 快照」的演化规则归 #48。实现票不得在本票范围内写任何场景分类器。
 
 ---
 
@@ -101,7 +101,7 @@ Author Model（CONTEXT.md:251）= 偏好画像本体；ScenarioStyleProfile（CO
   profile.json         # 当前画像快照：特征均值/n_eff/cursor/漂移状态
 ~~~
 
-选文件不选 SQLite 的理由：状态量级是个位数 KB；usage.jsonl 已验证同构 IO（append-only 写 record-step.ts:160-165、entryId 先到先得读 :180-203、撕裂行容忍 :187-198）；runtime.sqlite 的投影全是可弃重建面而画像是累积态，混入会破坏「投影皆可重建」的心智模型（推断，但与 Task Projection 词条 CONTEXT.md:203-205 的职责划分一致）。
+选文件不选 SQLite 的理由：状态量级是个位数 KB；usage.jsonl 已验证同构 IO（append-only 写 record-step.ts:160-165、entryId 先到先得读 :180-203、撕裂行容忍 :187-198）；runtime.sqlite 的投影全是可弃重建面而画像是累积态，混入会破坏「投影皆可重建」的心智模型（推断，但与 Task Projection 词条 GLOSSARY.md:203-205 的职责划分一致）。
 
 ### 3.2 三条隔离铁律（实现票可直接写成断言）
 
@@ -111,7 +111,7 @@ Author Model（CONTEXT.md:251）= 偏好画像本体；ScenarioStyleProfile（CO
 
 ### 3.3 与既有隐私面的接缝
 
-embeddings/ 目录（create-book.test.ts:64）与 ADR-0005:19 把 local embedding 索引同列 P1——preference/ 与之同级同待遇。P0 片段只在计算瞬间被内存读取（f1/f3/f5 的原料 replacementText 已在事件里，无需额外打开正文文件），即算即弃。
+embeddings/ 目录（create-book.test.ts:64）与 ADR-K-0005:19 把 local embedding 索引同列 P1——preference/ 与之同级同待遇。P0 片段只在计算瞬间被内存读取（f1/f3/f5 的原料 replacementText 已在事件里，无需额外打开正文文件），即算即弃。
 
 ---
 
@@ -144,7 +144,7 @@ M_d ← (1−α)·M_d + α·x                      # α=0.15 固定，漂移检�
 - **冷启动**：κ₀=8、m₀ 取中性常数（sent_len_mean=42、dlg_char_ratio=0.30、ttr_win500=0.55 等，推断值，grilling 定案）。kernel 无 archetype/genre 字段（grep kernel 为空），V1 **不做**按题材初始化——等 book 元数据出现后再作为 m₀ 查表升级，不阻塞 V1。
 - **漂移**：|M_d − mean_d| > 2σ_d 且连续 ≥10 条 → 该维度 κ_eff 减半（置信衰减保留历史和），记入 profile.driftLog。**不做硬重置**：风格自然演化应被缓慢跟随，清空等于丢掉已积累的数据资产。
 - **手动重置**：删 .mozhou/preference/（R3），UI 语义即「清除我的画像」。
-- **幂等消费**：observation 行携带 sourcePosition（readPipelineLedger 的 position，ledger.ts:13-14 权威时序），profile 存 cursor:lastPosition；重启续读、重放去重——对齐 Task Projection「行对齐账本序号」先例（CONTEXT.md:204）。全量重建 rebuildPreference(bookRoot) 必须幂等，验收指纹用**排序后的内容集合哈希**而非物理行序（交错写入与重扫描行序不同，物理行序指纹假红是已知陷阱）。
+- **幂等消费**：observation 行携带 sourcePosition（readPipelineLedger 的 position，ledger.ts:13-14 权威时序），profile 存 cursor:lastPosition；重启续读、重放去重——对齐 Task Projection「行对齐账本序号」先例（GLOSSARY.md:204）。全量重建 rebuildPreference(bookRoot) 必须幂等，验收指纹用**排序后的内容集合哈希**而非物理行序（交错写入与重扫描行序不同，物理行序指纹假红是已知陷阱）。
 
 ---
 
@@ -170,5 +170,5 @@ M_d ← (1−α)·M_d + α·x                      # α=0.15 固定，漂移检�
 ## 7. 证据索引
 
 代码：packages/kernel/src/domain-events.ts:19-34,38-44 · packages/pipeline/src/multi-candidate.ts:6-8,69-83,101-107,121-136,138-148 · user-edit-step.ts:36,59-71,73-100,172-176,203-209,226-238 · record-step.ts:23,54-55,120-124,126-137,159-165,180-203 · ledger.ts:4-14,21-24,31-75 · packages/runtime/src/eventBus.ts:3,80 · packages/data-plane/src/manifest.ts:24 · packages/data-plane/src/layout.ts:8,11 · packages/data-plane/test/create-book.test.ts:40-64
-规格：docs/specs/data-flywheel-spec.md:11-16(§2),20-49(§3),51-58(§3.1),82-104(§4) · docs/specs/chapter-pipeline-spec.md:27,32,48-51 · CONTEXT.md:67-69,203-205,247-249,251-253,259-261,263-265
+规格：docs/specs/data-flywheel-spec.md:11-16(§2),20-49(§3),51-58(§3.1),82-104(§4) · docs/specs/chapter-pipeline-spec.md:27,32,48-51 · GLOSSARY.md:67-69,203-205,247-249,251-253,259-261,263-265
 ADR：docs/adr/0005-policy-flywheel-and-privacy-tiering.md:14-30 · docs/adr/0013-generation-concurrency-and-preference-sampling.md:9-20

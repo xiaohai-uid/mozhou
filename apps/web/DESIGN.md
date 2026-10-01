@@ -24,7 +24,7 @@ This section is the current visual baseline approved for the desktop product. It
 
 When a design decision is made, use this order of authority:
 
-1. Product vocabulary and domain rules in `/mnt/c/zcode/novel-ai/CONTEXT.md` and `/mnt/c/zcode/novel-ai/AGENTS.md`.
+1. Product vocabulary and domain rules in `/mnt/c/zcode/novel-ai/GLOSSARY.md` and `/mnt/c/zcode/novel-ai/AGENTS.md`.
 2. Accepted product baseline in `/mnt/c/zcode/novel-ai/docs/adr/0027-ui-baseline-ink-orbit.md`.
 3. Live Ink Orbit tokens and component rules in `/mnt/c/zcode/novel-ai/apps/web/src/styles/globals.css` and `/mnt/c/zcode/novel-ai/apps/web/src/styles/ink-orbit.css`.
 4. Real interaction and data semantics in the current React components.
@@ -333,7 +333,7 @@ There is no current mobile media query and mobile is outside the ADR-0027 accept
 
 ### Do
 
-- Read this file, `/mnt/c/zcode/novel-ai/AGENTS.md`, `/mnt/c/zcode/novel-ai/CONTEXT.md`, ADR-0027, and the relevant live component/style files before changing UI.
+- Read this file, `/mnt/c/zcode/novel-ai/AGENTS.md`, `/mnt/c/zcode/novel-ai/GLOSSARY.md`, ADR-0027, and the relevant live component/style files before changing UI.
 - Reuse the existing `globals.css` and `ink-orbit.css` tokens, class language, layout regions, and state semantics.
 - Preserve the domain terms Author Intent, Active Draft, Candidate, Approval, Chapter Commit, Context Receipt / 装配看板, Quality Gate, Story Brain, Change Impact, Stale Marker, Protected Author Content, and Write Verification.
 - Make unavailable, placeholder, stale, failed, refused, and blocked states explicit and honest.

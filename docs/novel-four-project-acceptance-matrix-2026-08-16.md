@@ -140,7 +140,7 @@
 
 - 四份深度报告：DeterminFlow/ArcReel/inkos/oh-story（研究会话产出，可回读 /tmp/inkos-report.md、/tmp/gh-four/ArcReel_code_structure_report.md）
 - 墨舟代码：app/lib/runtime/（types/generation-plan/skill-run/context-assembler/service）、app/lib/pipeline/（engine/reducer/validate）、app/lib/novels/（chapter-candidate/chapter-chat/chapter-replay）、app/lib/story/（tracking/checks/capabilities/deconstruction-pipeline/rankings）、app/lib/schema.ts（27 表）
-- 既有文档：docs/novel-production-stack-comparison-2026-08-16.md（本矩阵为源码级修订版）、docs/mozhu-commercial-readiness-final-2026-08-12.md、docs/launch-readiness-2026-08-16.md、CONTEXT.md、ADR-0006
+- 既有文档：docs/novel-production-stack-comparison-2026-08-16.md（本矩阵为源码级修订版）、docs/mozhu-commercial-readiness-final-2026-08-12.md、docs/launch-readiness-2026-08-16.md、GLOSSARY.md、ADR-0006
 ## 7. OpenWrite 炼化补充（非 GitHub 四项目；OB 逆向资产 + 本地 v1.3.2 客户端，检查 2026-08-16）
 
 > 语料：OB 15 篇（完整产品逆向资产/黑客无痕提取数据包/客户端逆向/动态分析/竞品分析/官网定价/红队审计/会员破解验证/复现实战/08-16 三篇墨舟吸收笔记），全部精读。OpenWrite = Flutter 桌面/移动 AI 小说写作助手（PHP API + New API 网关 + 发卡 VIP + WebDAV 坚果云）。
