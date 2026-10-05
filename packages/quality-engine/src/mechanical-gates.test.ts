@@ -6,7 +6,7 @@ import {
   isInsideQuotes,
 } from './mechanical-gates.js'
 
-describe('mechanical-gates 机械门禁与算术方差算法测试', () => {
+describe('mechanical-gates 机械门与算术方差算法测试', () => {
   it('正确识别中英文成对引号内的对话片段', () => {
     const text = '陆玄冷冷说道：“白磷乃是天地奇物，不可轻慢。”'
     expect(isInsideQuotes(text, '白磷乃是')).toBe(true)
@@ -36,7 +36,7 @@ describe('mechanical-gates 机械门禁与算术方差算法测试', () => {
     expect(res.detail).toContain('高频出现')
   })
 
-  it('evaluateMechanicalGates 完整门禁审查（红线拦截、占位符拦截）', () => {
+  it('evaluateMechanicalGates 完整门审查（红线拦截、占位符拦截）', () => {
     const badProse = '陆玄盘坐在破庙中，TODO 补充道具。他终于明白，这一夜注定无人入眠。'
     const report = evaluateMechanicalGates(badProse, { minWords: 10, maxWords: 1000 })
     expect(report.passed).toBe(false)

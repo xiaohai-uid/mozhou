@@ -1,9 +1,9 @@
 /**
  * 不变量：`@mozhou/quality-engine/de-ai` 必须能进浏览器包。
  *
- * 背景（工单 7）：包根 ./index.js 重导出 policy.ts（node:crypto）与
+ * 背景（见提交 005d898）：包根 ./index.js 重导出 policy.ts（node:crypto）与
  * staleness.ts（node:fs），渲染进程导入即炸。所以浏览器侧改走子路径 ./de-ai。
- * 本测试把「子路径的静态导入闭包无 Node 依赖」变成可执行门禁——不靠人肉 review，
+ * 本测试把「子路径的静态导入闭包无 Node 依赖」变成可执行门——不靠人肉 review，
  * 也不靠「dist 恰好构建成功」这种一次性事实。
  *
  * 断言：

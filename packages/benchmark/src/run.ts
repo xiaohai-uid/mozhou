@@ -20,8 +20,8 @@ import type {
   ChapterDependencyPinView,
   UserEditReductionInput,
 } from './metrics.js';
-import { BENCHMARK_VERSION, evaluateMetricGate } from './types.js';
-import type { MetricId, MetricReading } from './types.js';
+import { BENCHMARK_VERSION, evaluateMetricGate } from '@mozhou/quality-engine';
+import type { MetricId, MetricReading } from '@mozhou/quality-engine';
 
 /** 单章基准夹具：字段一一对应十步管线产物类型面（缺面宁败不猜）。 */
 export interface BenchmarkCase {

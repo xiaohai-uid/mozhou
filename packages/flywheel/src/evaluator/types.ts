@@ -11,8 +11,8 @@
  *   - R5 单变量单 cell = 一条建议只动一个 cell 的一个 tier 叶子（providerId+model
  *     成对整体替换，尊重 TierRoute 复合键）。
  *
- * 阈值表零复制纪律（C1）：六指标机械判定一律消费 @mozhou/benchmark 的
- * evaluateMetricGate——本模块不出现任何门限数值。
+ * 阈值表零复制纪律（C1）：六指标机械判定一律消费 @mozhou/quality-engine 的
+ * evaluateMetricGate（W6 迁移终点：benchmark 已退生产依赖图）——本模块不出现任何门限数值。
  */
 
 /** R2：acceptance 决策样本下限（不足 ⇒ insufficient_sample 观察条目，不出建议）。 */

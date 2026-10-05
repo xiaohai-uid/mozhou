@@ -65,7 +65,7 @@
     ]
   },
   {
-    "description": "L2-GOLDEN-005: 机械门禁红线拦截（章末总结体与预告体）",
+    "description": "L2-GOLDEN-005: 机械门红线拦截（章末总结体与预告体）",
     "vars": {
       "prompt": "撰写第三章结尾正文。"
     },

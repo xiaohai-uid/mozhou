@@ -4,7 +4,7 @@ import {
   METRIC_GATES,
   METRIC_IDS,
   evaluateMetricGate,
-} from './types.js';
+} from '@mozhou/quality-engine';
 
 describe('benchmark 六指标词表与 ADR-0008 门限', () => {
   it('词表恰好六个指标（沿 Long Novel Benchmark 命名）', () => {

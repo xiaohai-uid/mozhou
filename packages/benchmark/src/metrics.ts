@@ -8,7 +8,7 @@
  */
 import type { ContextReceipt, DependencyManifestEntry, KnowledgeHolder } from '@mozhou/kernel';
 import type { ActivePromiseView, CandidateDeltaBatch, ContinuityGateOutcome } from '@mozhou/pipeline';
-import type { LiteraryQualitySignals } from './types.js';
+import type { LiteraryQualitySignals } from '@mozhou/quality-engine';
 
 /** 正典知情视图（KnowledgeState 结构子集——真实行可直接赋值）。 */
 export type CanonKnowledgeView = readonly {

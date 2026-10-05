@@ -2,13 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PublishBus, RuntimeEngine, toGenerationStartedPayload } from '@mozhou/runtime';
+import { PublishBus, RuntimeEngine, readRecipeVersionFromPayload, toGenerationStartedPayload } from '@mozhou/runtime';
 import type { CapabilityRecipeDocument } from '@mozhou/runtime';
 import { readPipelineLedger } from '@mozhou/pipeline';
 import type { BenchmarkRunReport } from './run.js';
-import { BENCHMARK_VERSION } from './types.js';
-import type { MetricId, MetricReading } from './types.js';
-import { matrixRowFor, readRecipeVersionFromPayload } from './version-matrix.js';
+import { BENCHMARK_VERSION, matrixRowFor } from '@mozhou/quality-engine';
+import type { MetricId, MetricReading } from '@mozhou/quality-engine';
 
 /** 报告桩：数值全 1 全过——本文件只验版本钩子联动与行形状。 */
 function stubReport(): BenchmarkRunReport {

@@ -1,5 +1,5 @@
 /**
- * @mozhou/quality-engine · 5 项机械门禁与 4-gram 纯算术机检引擎
+ * @mozhou/quality-engine · 5 项机械门与 4-gram 纯算术机检引擎
  * 移植自 storyrepo/checks.py 并修复中英文引号栈嵌套悬空与跨引号边界片段误判。
  */
 
@@ -144,7 +144,7 @@ export function detect4GramRepetition(text: string, maxAllowed = 5): { repeated:
   return { repeated: false, detail: '4-gram 词频分布均匀' }
 }
 
-/** 运行全部纯算术机械门禁 */
+/** 运行全部纯算术机械门 */
 export function evaluateMechanicalGates(
   prose: string,
   options: {
