@@ -36,7 +36,7 @@ function newTmpPath(absolutePath: string): string {
 }
 
 /**
- * 写入 = 独占创建同目录唯一临时文件 → 写 → fsync → close → rename。
+ * 写入 = 独占创建同目录唯一临时文件 → 写全循环 → fsync → close → rename。
  * 失败路径只清理**本次调用拥有**的临时文件（自己的唯一名），绝不触碰他人文件。
  */
 export function atomicWriteFileSync(absolutePath: string, content: string): void {
@@ -45,7 +45,7 @@ export function atomicWriteFileSync(absolutePath: string, content: string): void
   try {
     // 'wx' = 独占创建：同名临时文件已存在即失败，绝不截断别人正在写的临时文件
     fd = openSync(tmp, 'wx')
-    writeSync(fd, content)
+    writeFullSync(fd, content)
     fsyncSync(fd)
     closeSync(fd)
     fd = undefined
@@ -64,6 +64,25 @@ export function atomicWriteFileSync(absolutePath: string, content: string): void
       // 本次未创建成功或已 rename 走：无需清理
     }
     throw error
+  }
+}
+
+/**
+ * 写全循环（规划《墨舟架构规划与分阶段执行方案》§6.2 W1）：
+ * writeSync 允许短写（磁盘紧张/信号中断只写入部分字节），单次调用不保证写完；
+ * 必须按返回字节数推进偏移补写，直到全部字节落盘。
+ * 单次调用零进展（返回 ≤0）即失败——继续重试只会空转，宁可显式报错走清理路径，
+ * 也不留下被截断的半份临时内容。
+ */
+function writeFullSync(fd: number, content: string): void {
+  const bytes = Buffer.from(content, 'utf8')
+  let written = 0
+  while (written < bytes.length) {
+    const n = writeSync(fd, bytes, written, bytes.length - written)
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error(`atomic write: writeSync 停滞（已写 ${written}/${bytes.length} 字节），拒绝留下半份内容`)
+    }
+    written += n
   }
 }
 
