@@ -14,7 +14,7 @@
 
 import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,13 +67,12 @@ const { PublishBus, RuntimeEngine } = await import(
   new URL('../packages/runtime/dist/index.js', import.meta.url).href
 );
 
-const { newUlid, TimelineOrderViolationError } = await import(
+const { newUlid } = await import(
   new URL('../packages/kernel/dist/index.js', import.meta.url).href
 );
 
 const {
   assembleBudgetedContext,
-  mergeChannelsWithRRF,
   createLocalTokenizer,
   persistReceipt
 } = await import(new URL('../packages/context-compiler/dist/index.js', import.meta.url).href);
@@ -331,7 +330,6 @@ for (const novel of allNovels) {
   // -------------------------------------------------------------
   // 维度 1 & 维度 2: 十步流水线批量灌入 + 文风蒸馏与风格飞轮演进
   // -------------------------------------------------------------
-  let prevCommitId = null;
 
   for (let idx = 0; idx < novel.chapters.length; idx++) {
     const ch = novel.chapters[idx];
@@ -347,7 +345,7 @@ for (const novel of allNovels) {
     // 1. 文风蒸馏与拆解
     const styleMetrics = evaluateStyleMetrics(chBody);
     const breakdown = analyzeNovelBreakdown(chBody);
-    const gates = evaluateMechanicalGates(chBody);
+    evaluateMechanicalGates(chBody);
 
     log(`      [文风指标] 对白率: ${(styleMetrics.dialogueRatio * 100).toFixed(1)}%, 感官密度: ${styleMetrics.sensoryDensity.toFixed(2)}, 动作节奏: ${styleMetrics.actionPacing.toFixed(2)}, 平均句长: ${styleMetrics.avgSentenceLength}字, De-AI纯净度: ${styleMetrics.sepiaNarrativeScore.pass3SurfacePurity}/100`);
     log(`      [故事拆解] 核心: ${breakdown.storyCore.protagonist || novel.protagonist}, 情感节拍: ${breakdown.beats.length} 处, 捕获角色: ${breakdown.characters.map(c => c.name).join(', ') || novel.protagonist}`);
@@ -367,7 +365,7 @@ for (const novel of allNovels) {
     });
 
     // Step 1: Prepare
-    const preparedInputs = prepareChapterInputs(bookDir, chIndex);
+    prepareChapterInputs(bookDir, chIndex);
     session.advance('compile');
 
     // Step 2: Compile (模拟装配)
@@ -384,7 +382,7 @@ for (const novel of allNovels) {
       text: chBody.slice(0, 200),
       totalTokens: 50,
     };
-    const draftOutcome = await runDraftStep({
+    await runDraftStep({
       engine: draftCtx.engine,
       bookRoot: bookDir,
       chapterIndex: chIndex,
@@ -421,7 +419,7 @@ for (const novel of allNovels) {
 
     // Step 5: User Edit 作者审校编辑
     session.advance('user_edit');
-    const edit = recordUserEdit({
+    recordUserEdit({
       bus,
       bookRoot: bookDir,
       taskRef: session.taskRef,
@@ -456,7 +454,7 @@ for (const novel of allNovels) {
           provenance: { origin: 'author', protectedUserContent: false }
         }
       ],
-      relationshipState: novel.relationships.slice(0, 2).map((r, rIdx) => ({
+      relationshipState: novel.relationships.slice(0, 2).map((r) => ({
         id: 'rels_' + newUlid(),
         bookId,
         revision: 0,
@@ -539,7 +537,6 @@ for (const novel of allNovels) {
     });
     commitPlane.close();
     session.markCommitted(committed.commitId);
-    prevCommitId = committed.commitId;
 
     // Step 10: Flywheel Record 闭环记录与飞轮画像写入
     session.advance('flywheel_record');

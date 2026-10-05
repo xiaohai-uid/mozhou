@@ -33,7 +33,7 @@ vi.mock('node:fs', async (importOriginal) => {
         return (actual.writeSync as (...args: unknown[]) => number)(fd, data, offset, length)
       }
       if ('stall' in gate) return 0
-      const buf = typeof data === 'string' ? Buffer.from(data, 'utf8') : (data as Buffer)
+      const buf = typeof data === 'string' ? Buffer.from(data, 'utf8') : (data)
       const off = typeof data === 'string' ? 0 : (offset ?? 0)
       const remaining = buf.length - off
       const n = Math.min(gate.maxBytes, remaining)

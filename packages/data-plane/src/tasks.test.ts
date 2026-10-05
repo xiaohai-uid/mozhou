@@ -122,6 +122,7 @@ describe('W4-2a 任务记录', () => {
     expect(() => readTaskRecord(root, 'task_future')).toThrow(/TASK_RECORD_UNSUPPORTED/)
     expect(() => beginTaskAttempt(root, 'task_future', { attemptId: 'a' })).toThrow(/TASK_RECORD_UNSUPPORTED/)
     // 文件原样保留（不降级覆盖）
-    expect(JSON.parse(readFileSync(path, 'utf8')).recordVersion).toBe(99)
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
+    expect((parsed as { recordVersion: number }).recordVersion).toBe(99)
   })
 })

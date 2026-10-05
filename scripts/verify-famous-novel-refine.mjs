@@ -5,10 +5,9 @@
  * 拆文炼化、文风画像提炼、故事核拆解与正典实体导入全流程实测脚本。
  */
 import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const { LocalDataPlane, createBook, readStyleProfiles } = await import(
   new URL('../packages/data-plane/dist/index.js', import.meta.url).href

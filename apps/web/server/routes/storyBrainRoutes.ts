@@ -34,7 +34,7 @@ function absorbAuthorIntentWrite(root: string): void {
   })
 }
 
-export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, json, principal, authorizedBook, bookRoot }) => {
+export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, json, principal, bookRoot }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null

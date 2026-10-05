@@ -243,7 +243,7 @@ describe('DialogueStream（T44）', () => {
   it('W4-2c-2b：视图代次在新生成/停止/切章三处各 +1（触发点接线）', async () => {
     // 受控流：保持打开，组件停在 drafting（停止按钮在位）
     const encoder = new TextEncoder()
-    let streamController: any = null
+    let streamController: ReadableStreamDefaultController<Uint8Array> | null = null
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         streamController = controller
@@ -273,8 +273,8 @@ describe('DialogueStream（T44）', () => {
     await waitFor(() => {
       expect(viewGeneration.current()).toBeGreaterThan(beforeSend)
     })
-    streamController?.enqueue(encoder.encode(JSON.stringify({ ok: true, event: 'start', chapterIndex: 1, receiptId: null }) + '\n'))
-    streamController?.enqueue(encoder.encode(JSON.stringify({ ok: true, event: 'delta', text: '第一段' }) + '\n'))
+    streamController!.enqueue(encoder.encode(JSON.stringify({ ok: true, event: 'start', chapterIndex: 1, receiptId: null }) + '\n'))
+    streamController!.enqueue(encoder.encode(JSON.stringify({ ok: true, event: 'delta', text: '第一段' }) + '\n'))
     await waitFor(() => {
       expect(screen.getByTestId('draft-text').textContent).toContain('第一段')
     })

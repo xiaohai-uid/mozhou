@@ -8,6 +8,7 @@
  * 3. 新格式任务记录 (recordVersion: 1 / 未知未来版本) 降级 fail-closed 拒写保护；
  * 4. 提交 journal v2 降级 fail-closed 保护，宁败不脏，盘上数据原样保留。
  */
+import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -133,8 +134,9 @@ describe('RELEASE-01 兼容、回退与降级拒写保护', () => {
     expect(() => appendCandidateDelta(bookRoot, candidateId, '新文字')).toThrow(CandidateError)
     try {
       appendCandidateDelta(bookRoot, candidateId, '新文字')
-    } catch (err: any) {
-      expect(err.code).toBe('CANDIDATE_RECORD_UNSUPPORTED')
+    } catch (err) {
+      expect(err).toBeInstanceOf(CandidateError)
+      expect((err as CandidateError).code).toBe('CANDIDATE_RECORD_UNSUPPORTED')
     }
 
     // 尝试采纳该未来候选（accept）
@@ -169,8 +171,7 @@ describe('RELEASE-01 兼容、回退与降级拒写保护', () => {
     ) + '\n'
 
     // tasks.ts 使用 sha256Hex(taskId).json 命名
-    const crypto = require('node:crypto')
-    const hash = crypto.createHash('sha256').update(taskId).digest('hex')
+    const hash = createHash('sha256').update(taskId).digest('hex')
     const taskPath = join(tasksDir, `${hash}.json`)
     writeFileSync(taskPath, futureTaskJson, 'utf8')
 
@@ -181,8 +182,9 @@ describe('RELEASE-01 兼容、回退与降级拒写保护', () => {
 
     try {
       beginTaskAttempt(bookRoot, taskId, { attemptId: 'att_cannot_write' })
-    } catch (err: any) {
-      expect(err.code).toBe('TASK_RECORD_UNSUPPORTED')
+    } catch (err) {
+      expect(err).toBeInstanceOf(TaskRecordError)
+      expect((err as TaskRecordError).code).toBe('TASK_RECORD_UNSUPPORTED')
     }
 
     // 核心断言：未知任务文件逐字节原样保留
@@ -191,7 +193,6 @@ describe('RELEASE-01 兼容、回退与降级拒写保护', () => {
 
   it('4. 提交 journal v2 降级保护：遇新格式 journal (v2) 严格拒写防冲脏，正文与日志数据零损坏', () => {
     const bookRoot = newBook()
-    const chapter = readProseChapter(bookRoot, proseChapterPath(1))
     const journalDir = join(bookRoot, '.mozhou/journals')
     mkdirSync(journalDir, { recursive: true })
     const journalPath = join(journalDir, 'commit-ch0001.json')
@@ -219,8 +220,8 @@ describe('RELEASE-01 兼容、回退与降级拒写保护', () => {
 
     // 模拟只支持 v1 的旧版降级程序在读取/恢复该 journal 时：
     // 旧版规格断言：journal.journalVersion === 1，遇到未知版本立即抛出拒收异常
-    const parsed = JSON.parse(readFileSync(journalPath, 'utf8'))
-    function simulateLegacyJournalRecovery(journal: any) {
+    const parsed = JSON.parse(readFileSync(journalPath, 'utf8')) as { journalVersion: number }
+    function simulateLegacyJournalRecovery(journal: { journalVersion: number }) {
       if (journal.journalVersion !== 1) {
         throw new Error('FAIL_CLOSED: unknown journalVersion ' + journal.journalVersion + ', refusing recovery write')
       }

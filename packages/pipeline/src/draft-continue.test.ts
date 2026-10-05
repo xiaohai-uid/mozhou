@@ -121,7 +121,7 @@ describe('W4-2c-3 『续写』新操作契约', () => {
     const baseHash = proseFileSha256(root, 1)
 
     const candidateId = createCandidateId()
-    const candidate = createDraftCandidate(root, {
+    createDraftCandidate(root, {
       id: candidateId,
       generationId: 'op_web_' + candidateId,
       bookId: 'book-local',

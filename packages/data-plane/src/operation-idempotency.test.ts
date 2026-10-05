@@ -4,11 +4,11 @@
  *
  * 隔离夹具（tmpdir 建书），不读写真实书稿。摘要由服务端计算，故本层直接注入 digest。
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { PendingCommitConflictError, commitChapter, normalizeProseBody, readProseChapter, recoverPendingCommit, saveProseDraft } from './chapter.js'
+import { normalizeProseBody, readProseChapter, recoverPendingCommit } from './chapter.js'
 import { createBook } from './create-book.js'
 import { RUNTIME_EVENTS_PATH, proseChapterPath } from './layout.js'
 import { LocalDataPlane } from './local-data-plane.js'
@@ -163,7 +163,7 @@ describe('W3 操作幂等 · 草稿保存', () => {
         Promise.resolve().then(() => plane.saveProseDraft({ chapterIndex: 1, body: '并发', expectedRevision: 0, operation: op })),
         Promise.resolve().then(() => plane.saveProseDraft({ chapterIndex: 1, body: '并发', expectedRevision: 0, operation: op })),
       ])
-      const ok = outcomes.filter((o) => o.status === 'fulfilled') as PromiseFulfilledResult<ReturnType<typeof plane.saveProseDraft>>[]
+      const ok = outcomes.filter((o) => o.status === 'fulfilled')
       expect(ok.length).toBeGreaterThanOrEqual(1)
       expect(readProseChapter(bookRoot, proseChapterPath(1)).revision).toBe(1)
       const record = readOperationRecord(bookRoot, 'op_race')

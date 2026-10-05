@@ -1,7 +1,7 @@
 /**
  * W4-2c-3 半稿采纳显式 revision 校验与落账审计测试。
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'

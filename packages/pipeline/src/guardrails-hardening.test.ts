@@ -18,12 +18,13 @@ import {
   detect4GramRepetition,
   findCommon5Gram,
   isInsideQuotes,
-  BUILTIN_REDLINES,
   REV_001_ID,
   evaluateDeterministicRules,
   runQualityReview,
   hashProse,
   isQualityReviewCurrent,
+  type QualityPolicy,
+  type QualityReviewAnchor,
 } from '@mozhou/quality-engine';
 import {
   assertAutomationReadOnly,
@@ -35,10 +36,18 @@ import {
   queryKnowledgePerspective,
   assertNoProtectedSupersession,
   TrackingRowError,
+  type AuthorProvenance,
+  type BookId,
+  type EntityRef,
+  type FactId,
+  type KnowledgeHolder,
+  type KnowledgeState,
+  type KnowledgeStateId,
+  type NarrativeStateSnapshot,
+  type PovEntity,
   type TemporalFact,
   type TimelineEvent,
-  type NarrativeStateSnapshot,
-  type KnowledgeState,
+  type TimelineEventId,
 } from '@mozhou/kernel';
 import {
   ChapterProductionSession,
@@ -46,7 +55,6 @@ import {
   SessionAlreadyActiveError,
   QualityReviewNotPassError,
   QualityReworkLimitExceededError,
-  QualityReworkNotDrivenError,
   ReworkNotDrivenError,
   HardConflictUnresolvedError,
   readPipelineLedger,
@@ -75,6 +83,85 @@ function makeBook(prefix: string): { root: string; bus: PublishBus } {
 
 function deps(root: string, bus: PublishBus, chapterIndex: number, tag: string) {
   return { bus, root, chapterIndex, newTaskRef: () => 'tsk_' + tag };
+}
+
+const ISO = '2026-10-02T00:00:00.000Z';
+
+/** 空策略：evaluateDeterministicRules/runQualityReview 只读 .rules。 */
+function emptyPolicy(): QualityPolicy {
+  return { schemaVersion: 1, projectId: 'test', rules: [], maxAutomaticReworks: 2 };
+}
+
+/** 审查锚点：runQualityReview 只读 draftContentHash，其余字段保持契约完整。 */
+function reviewAnchor(draftContentHash: string): QualityReviewAnchor {
+  return {
+    chapterIndex: 1,
+    draftRevision: 1,
+    draftContentHash,
+    receiptId: 'rcpt_test',
+    ruleSetDigest: 'test',
+  };
+}
+
+interface FactSeed {
+  readonly id: string;
+  readonly subject: string;
+  readonly predicate: string;
+  readonly value: string | number | boolean;
+  readonly provenance?: AuthorProvenance;
+}
+
+/** 构造契约完整的 TemporalFact 夹具；未被断言函数读取的字段用稳定缺省值填充。 */
+function makeFact(seed: FactSeed): TemporalFact {
+  return {
+    id: seed.id as FactId,
+    bookId: 'book_1' as BookId,
+    revision: 0,
+    createdAt: ISO,
+    updatedAt: ISO,
+    subject: seed.subject as EntityRef,
+    predicate: seed.predicate,
+    value: seed.value,
+    validFrom: 1,
+    validUntil: null,
+    importance: 'notable',
+    riskClass: 'low',
+    source: { kind: 'chapter', chapterIndex: 1 },
+    status: 'confirmed',
+    compactedIntoVolumeId: null,
+    provenance: seed.provenance ?? { origin: 'author', protectedUserContent: true },
+  };
+}
+
+interface KnowledgeSeed {
+  readonly id: string;
+  readonly factId: string;
+  readonly holder: string;
+  readonly level: 'knows' | 'suspects' | 'believes';
+  readonly knownSinceChapter: number;
+}
+
+/** 构造契约完整的 KnowledgeState 夹具；查询路径只读 holder/level/factId/knownSinceChapter。 */
+function makeKnowledgeState(seed: KnowledgeSeed): KnowledgeState {
+  return {
+    id: seed.id as KnowledgeStateId,
+    bookId: 'book_1' as BookId,
+    revision: 0,
+    createdAt: ISO,
+    updatedAt: ISO,
+    factId: seed.factId as FactId,
+    holder: seed.holder as KnowledgeHolder,
+    level: seed.level,
+    knownSinceChapter: seed.knownSinceChapter,
+  };
+}
+
+/** 收窄为查询芯所需的叙事状态切片，保留调用方传入的真实 Map。 */
+function narrativeState(
+  facts: ReadonlyMap<FactId, TemporalFact>,
+  knowledgeStates: ReadonlyMap<KnowledgeStateId, KnowledgeState>,
+): Pick<NarrativeStateSnapshot, 'facts' | 'knowledgeStates'> {
+  return { facts, knowledgeStates };
 }
 
 describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
@@ -185,7 +272,6 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       expect(detect4GramRepetition(clean, 5).repeated).toBe(false);
 
       // 同一 4 字短语出现 6 次（maxAllowed 缺省为 5）
-      const phrase = '万象森罗';
       const repeatProse = [
         '他看见万象森罗在眼前浮现。',
         '所谓万象森罗，不过是虚妄。',
@@ -209,7 +295,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
     const trueHash = hashProse(prose);
 
     it('2.1 哈希严格一致时 REV-001 通过', () => {
-      const evals = evaluateDeterministicRules(prose, { rules: [] } as any, {
+      const evals = evaluateDeterministicRules(prose, emptyPolicy(), {
         proseContentHash: trueHash,
         anchorDraftContentHash: trueHash,
       });
@@ -224,12 +310,8 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
 
       const report = await runQualityReview({
         prose,
-        policy: { rules: [] } as any, // 即使策略未显式声明，REV-001 也是结构性不变量
-        anchor: {
-          draftRevision: 1,
-          draftContentHash: tamperedAnchorHash, // 篡改后的锚点
-          receiptId: 'rcpt_test',
-        } as any,
+        policy: emptyPolicy(), // 即使策略未显式声明，REV-001 也是结构性不变量
+        anchor: reviewAnchor(tamperedAnchorHash), // 篡改后的锚点
         reviewer: { providerId: 'test', model: 'test', recipeVersion: '1.0' },
         failurePatterns: [],
       });
@@ -242,27 +324,27 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
     });
 
     it('2.3 Fail-Closed 纪律：语义审查提供方异常/未覆盖时，unknown 绝不升格为 pass', async () => {
+      const semanticPolicy: QualityPolicy = {
+        schemaVersion: 1,
+        projectId: 'test',
+        maxAutomaticReworks: 2,
+        rules: [
+          {
+            id: 'SEM-001',
+            version: '1.0.0',
+            scope: 'project',
+            kind: 'semantic',
+            severity: 'advisory',
+            description: '剧情张力审查',
+            evidenceRequired: false,
+            enabled: true,
+          },
+        ],
+      };
       const report = await runQualityReview({
         prose,
-        policy: {
-          rules: [
-            {
-              id: 'SEM-001',
-              version: '1.0.0',
-              scope: 'project',
-              kind: 'semantic',
-              severity: 'advisory',
-              description: '剧情张力审查',
-              evidenceRequired: false,
-              enabled: true,
-            },
-          ],
-        } as any,
-        anchor: {
-          draftRevision: 1,
-          draftContentHash: trueHash,
-          receiptId: 'rcpt_test',
-        } as any,
+        policy: semanticPolicy,
+        anchor: reviewAnchor(trueHash),
         reviewer: { providerId: 'test', model: 'test', recipeVersion: '1.0' },
         failurePatterns: [],
         // 未提供 semanticEvaluator
@@ -277,12 +359,8 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
     it('2.4 时效性守卫：草稿改动后旧 PASS 立即失效（isQualityReviewCurrent 为 false）', async () => {
       const report = await runQualityReview({
         prose,
-        policy: { rules: [] } as any,
-        anchor: {
-          draftRevision: 1,
-          draftContentHash: trueHash,
-          receiptId: 'rcpt_test',
-        } as any,
+        policy: emptyPolicy(),
+        anchor: reviewAnchor(trueHash),
         reviewer: { providerId: 'test', model: 'test', recipeVersion: '1.0' },
         failurePatterns: [],
       });
@@ -390,28 +468,19 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       }).not.toThrow();
 
       // 追踪流防自动化取代守卫（assertNoProtectedSupersession）
-      const protectedFact = {
+      const protectedFact = makeFact({
         id: 'fact_prot_01',
-        bookId: 'book_1',
-        revision: 0,
-        createdAt: '2026-10-02T00:00:00.000Z',
-        updatedAt: '2026-10-02T00:00:00.000Z',
-        chapterIndex: 1,
-        validFrom: 1,
-        validUntil: null,
-        status: 'confirmed',
         subject: 'char:protagonist',
         predicate: 'mastery',
         value: 'sword',
-        compactedIntoVolumeId: null,
         provenance: { origin: 'author', protectedUserContent: true },
-      } as any;
-      const aiAttemptFact = {
+      });
+      const aiAttemptFact: TemporalFact = {
         ...protectedFact,
         value: 'magic',
         provenance: { origin: 'ai', protectedUserContent: false },
-      } as any;
-      const liveMap = new Map([[protectedFact.id, protectedFact]]);
+      };
+      const liveMap = new Map<FactId, TemporalFact>([[protectedFact.id, protectedFact]]);
       expect(() => {
         assertNoProtectedSupersession(liveMap, [aiAttemptFact]);
       }).toThrow(ProtectedContentViolationError);
@@ -428,9 +497,9 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
     });
 
     it('4.3 M2：时间线序数严格单调硬门，乱序插入直接拦截', () => {
-      const ev1: any = {
-        id: 'tle_1',
-        bookId: 'book_1',
+      const ev1: TimelineEvent = {
+        id: 'tle_1' as TimelineEventId,
+        bookId: 'book_1' as BookId,
         revision: 0,
         createdAt: '2026-10-02T00:00:00.000Z',
         updatedAt: '2026-10-02T00:00:00.000Z',
@@ -441,9 +510,9 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
         summary: '事件1',
         impactFactIds: [],
       };
-      const ev2: any = {
-        id: 'tle_2',
-        bookId: 'book_1',
+      const ev2: TimelineEvent = {
+        id: 'tle_2' as TimelineEventId,
+        bookId: 'book_1' as BookId,
         revision: 0,
         createdAt: '2026-10-02T00:00:00.000Z',
         updatedAt: '2026-10-02T00:00:00.000Z',
@@ -461,7 +530,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       }).toThrow(TimelineOrderViolationError);
 
       // 单调递增批次放行
-      const ev2Correct: any = { ...ev2, worldTimeOrder: 110 };
+      const ev2Correct: TimelineEvent = { ...ev2, worldTimeOrder: 110 };
       expect(() => {
         assertTimelineBatchOrdered([ev1, ev2Correct], 95);
       }).not.toThrow();
@@ -475,121 +544,89 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
     it('5.1 视角秘密隔离：未知情角色对 secret 事实零泄漏；全知 reader 视角拒答', () => {
       // 拒绝 reader 视角
       expect(() => {
+        const invalidPov: string = 'reader';
         queryActiveFacts(
-          { facts: new Map(), knowledgeStates: new Map() } as any,
-          { chapter: 1, pov: 'reader' as any },
+          narrativeState(
+            new Map<FactId, TemporalFact>(),
+            new Map<KnowledgeStateId, KnowledgeState>(),
+          ),
+          { chapter: 1, pov: invalidPov as PovEntity },
         );
       }).toThrow(TrackingRowError);
 
-      const secretFact = {
+      const secretFact = makeFact({
         id: 'fact_secret_01',
-        bookId: 'book_1',
-        revision: 0,
-        createdAt: '2026-10-02T00:00:00.000Z',
-        updatedAt: '2026-10-02T00:00:00.000Z',
-        chapterIndex: 1,
-        validFrom: 1,
-        validUntil: null,
-        status: 'confirmed',
         subject: 'char:master',
         predicate: 'secret.real_identity',
         value: '魔尊转世',
-        compactedIntoVolumeId: null,
-        provenance: { origin: 'author', protectedUserContent: true },
-      } as any;
+      });
 
-      const publicFact = {
+      const publicFact = makeFact({
         id: 'fact_public_01',
-        bookId: 'book_1',
-        revision: 0,
-        createdAt: '2026-10-02T00:00:00.000Z',
-        updatedAt: '2026-10-02T00:00:00.000Z',
-        chapterIndex: 1,
-        validFrom: 1,
-        validUntil: null,
-        status: 'confirmed',
         subject: 'char:master',
         predicate: 'sect_rank',
         value: '掌门',
-        compactedIntoVolumeId: null,
-        provenance: { origin: 'author', protectedUserContent: true },
-      } as any;
+      });
 
-      const facts = new Map([
+      const facts = new Map<FactId, TemporalFact>([
         [secretFact.id, secretFact],
         [publicFact.id, publicFact],
-      ]) as any;
+      ]);
 
       // 角色 A 未获知秘密
-      const knowledgeStatesA = new Map<string, KnowledgeState>() as any;
-      const resultA = queryActiveFacts({ facts, knowledgeStates: knowledgeStatesA } as any, {
+      const knowledgeStatesA = new Map<KnowledgeStateId, KnowledgeState>();
+      const resultA = queryActiveFacts(narrativeState(facts, knowledgeStatesA), {
         chapter: 1,
-        pov: 'char:disciple_a' as any,
+        pov: 'char:disciple_a',
       });
       // 仅能看到公开事实，秘密事实彻底隔离
-      expect(resultA.map((f: any) => f.id)).toEqual(['fact_public_01']);
+      expect(resultA.map((f) => f.id)).toEqual(['fact_public_01']);
 
       // 角色 B 在第 2 章获知秘密 (level: 'knows')
-      const knowledgeStatesB = new Map<string, any>([
+      const knowledgeStatesB = new Map<KnowledgeStateId, KnowledgeState>([
         [
-          'ks_01',
-          {
+          'ks_01' as KnowledgeStateId,
+          makeKnowledgeState({
             id: 'ks_01',
-            bookId: 'book_1',
-            revision: 0,
-            createdAt: '2026-10-02T00:00:00.000Z',
-            updatedAt: '2026-10-02T00:00:00.000Z',
-            chapterIndex: 2,
             factId: secretFact.id,
             holder: 'char:disciple_b',
             level: 'knows',
             knownSinceChapter: 2,
-            assertionChapter: 2,
-            distortion: undefined,
-            provenance: { origin: 'author', protectedUserContent: true },
-          },
+          }),
         ],
-      ]) as any;
+      ]);
 
       // 第 1 章时依然看不到
-      const resultB_Ch1 = queryActiveFacts({ facts, knowledgeStates: knowledgeStatesB } as any, {
+      const resultB_Ch1 = queryActiveFacts(narrativeState(facts, knowledgeStatesB), {
         chapter: 1,
-        pov: 'char:disciple_b' as any,
+        pov: 'char:disciple_b',
       });
-      expect(resultB_Ch1.map((f: any) => f.id)).toEqual(['fact_public_01']);
+      expect(resultB_Ch1.map((f) => f.id)).toEqual(['fact_public_01']);
 
       // 第 2 章时合法可见
-      const resultB_Ch2 = queryActiveFacts({ facts, knowledgeStates: knowledgeStatesB } as any, {
+      const resultB_Ch2 = queryActiveFacts(narrativeState(facts, knowledgeStatesB), {
         chapter: 2,
-        pov: 'char:disciple_b' as any,
+        pov: 'char:disciple_b',
       });
-      expect(resultB_Ch2.map((f: any) => f.id)).toContain('fact_secret_01');
+      expect(resultB_Ch2.map((f) => f.id)).toContain('fact_secret_01');
 
       // 非权威通道 queryKnowledgePerspective 秘密事实绝不泄露正典值
       const suspectsPerspective = queryKnowledgePerspective(
-        {
+        narrativeState(
           facts,
-          knowledgeStates: new Map([
+          new Map<KnowledgeStateId, KnowledgeState>([
             [
-              'ks_suspect',
-              {
+              'ks_suspect' as KnowledgeStateId,
+              makeKnowledgeState({
                 id: 'ks_suspect',
-                bookId: 'book_1',
-                revision: 0,
-                createdAt: '2026-10-02T00:00:00.000Z',
-                updatedAt: '2026-10-02T00:00:00.000Z',
-                chapterIndex: 1,
                 factId: secretFact.id,
                 holder: 'char:disciple_a',
                 level: 'suspects',
                 knownSinceChapter: 1,
-                assertionChapter: 1,
-                distortion: undefined,
-                provenance: { origin: 'author', protectedUserContent: true },
-              },
+              }),
             ],
-          ]) as any,
-        },
+          ]),
+        ),
         { chapter: 1, pov: 'char:disciple_a' },
       );
       // 绝不包含真实 value '魔尊转世'

@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   // 交回包是归档证据与仓库外脚本副本，不属于产品 TypeScript 工程。
   { ignores: ['handoff-results/**'] },
-  { ignores: ['**/dist/**', '**/dist-server/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**'] },
+  { ignores: ['**/dist/**', '**/dist-server/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
@@ -21,6 +21,17 @@ export default tseslint.config(
           allowDefaultProject: [
             'scripts/*.d.mts',
             'scripts/*.mjs',
+            // 2026-10-05：scripts 新增子目录（语料库/共享库）同样不被任何 tsconfig project
+            // 发现；allowDefaultProject 不支持递归 glob，按目录逐行登记。
+            'scripts/corpus/*.mjs',
+            'scripts/lib/*.mjs',
+            // 2026-10-05：apps/web/shared 的手维护 js 子集不被 app 工程（include: src）发现，
+            // 与 scripts 同属「不入任何 TS project」的独立文件。同目录 .ts 已被项目服务
+            // 传递发现（src 引用），登记进白名单反而报「重复包含」——故只登记 .js。
+            'apps/web/shared/*.js',
+            // operations.schema.ts 是孤儿 schema（无传递引用者），与 productionServer.ts
+            // 同类：按单文件登记；同目录其余 .ts 被项目服务发现，不能用 glob（见上）。
+            'apps/web/shared/operations.schema.ts',
             'apps/web/server/productionServer.ts',
             'apps/web/server/observability.ts',
             'apps/web/server/*.test.ts',
@@ -40,6 +51,8 @@ export default tseslint.config(
             // 与它自己的确定性测试 realModelGate.test.ts —— 两者都要登记，
             // 只登记 *.test.ts 会让实现文件本身继续报 Parsing error。
             'apps/web/server/test-support/*.ts',
+            // 2026-10-05：写锁平台层测试目录同样不被任何 project 发现，按目录补登记。
+            'apps/web/server/platform/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，
@@ -58,7 +71,11 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/*.mjs'],
+    // 根 scripts/ 的独立运维脚本（含 corpus/、lib/ 等子目录）：同属不入任何 tsconfig
+    // project 的一次性脚本，与顶层 scripts/*.mjs 同一策略——保留类型化 lint，
+    // 豁免 unsafe 家族（2026-10-05 由 scripts/*.mjs 扩到递归，corpus/lib 首次进入
+    // 类型化检查后暴露同类错误，按既有策略对齐而非新增豁免）。
+    files: ['scripts/**/*.mjs'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',

@@ -15,7 +15,17 @@ import * as qualityEngine from './index.js';
 
 // 注：quality-engine 不得依赖 @mozhou/runtime（§3.3 依赖图 Q→K，无 Q→R 边）。
 // 测试面以动态相对路径加载 runtime 源（沿 W6-2 等价测试先例，不入包依赖图）。
-const runtimeImport = async (): Promise<any> => await import('../../runtime/src/index.js' as any);
+// 说明符经变量传入：避免 tsc 将 runtime 源解析进 quality-engine 项目的 rootDir；
+// 消费面收窄为本地结构类型（仅本测试用到的两个出口）。
+interface RuntimeRecipePayloadModule {
+  readonly RECIPE_SNAPSHOT_KEY: string;
+  readonly readRecipeVersionFromPayload: (
+    payload: Readonly<Record<string, unknown>>,
+  ) => string | null;
+}
+const RUNTIME_SRC = '../../runtime/src/index.js';
+const runtimeImport = async (): Promise<RuntimeRecipePayloadModule> =>
+  (await import(RUNTIME_SRC)) as RuntimeRecipePayloadModule;
 
 /** 各门限 op 的机械判定语义（独立期望，不复用 evaluateMetricGate 推导）。 */
 function expectedByOp(

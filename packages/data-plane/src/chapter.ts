@@ -50,7 +50,6 @@ import {
 import { readManifest, refreshManifestEntries, writeManifest, type HashManifest } from './manifest.js'
 import {
   OPERATION_RECORD_VERSION,
-  OperationIdReusedError,
   findReplayableOperation,
   writeOperationRecordIfAbsent,
   type OperationIntent,
@@ -355,7 +354,7 @@ function assertJournalShape(value: unknown, relPath: string): PendingCommitJourn
     }
     const intent = operation as Record<string, unknown>
     for (const key of ['operationType', 'operationId', 'principalId', 'bookId', 'requestDigest'] as const) {
-      if (typeof intent[key] !== 'string' || (intent[key] as string).length === 0) {
+      if (typeof intent[key] !== 'string' || (intent[key]).length === 0) {
         throw new PendingCommitConflictError(relPath, `journal operation.${key} must be a non-empty string`)
       }
     }

@@ -53,12 +53,12 @@ describe('W4-2c-3 outcome_unknown 契约与自动重试链关闭', () => {
       failurePolicy: { timeoutMs: 1000, fallbackProviderIds: ['fallback-provider'] },
     })
 
-    const primaryBinding: ProviderBinding = async () => {
+    const primaryBinding: ProviderBinding = () => {
       throw new OutcomeUnknownError('外部调用失联，结果不明')
     }
-    const fallbackBinding: ProviderBinding = async () => {
+    const fallbackBinding: ProviderBinding = () => {
       fallbackCalled = true
-      return 'fallback text'
+      return Promise.resolve('fallback text')
     }
 
     engine.registerProviderBinding('primary-provider', primaryBinding)
@@ -84,12 +84,12 @@ describe('W4-2c-3 outcome_unknown 契约与自动重试链关闭', () => {
       failurePolicy: { timeoutMs: 1000, fallbackProviderIds: ['fallback-target'] },
     })
 
-    const primaryBinding: ProviderBinding = async () => {
+    const primaryBinding: ProviderBinding = () => {
       throw new RecoverableError('正常可重试失败（如格式坏字段）')
     }
-    const fallbackBinding: ProviderBinding = async () => {
+    const fallbackBinding: ProviderBinding = () => {
       fallbackCalled = true
-      return 'fallback success'
+      return Promise.resolve('fallback success')
     }
 
     engine.registerProviderBinding('primary-recoverable', primaryBinding)
