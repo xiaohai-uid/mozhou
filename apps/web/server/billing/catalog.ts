@@ -150,18 +150,13 @@ export function buildSellableManaged(budget: ManagedBudget, input: MaxIncludedCa
   }
 }
 
-/**
- * 权益周期：UTC 自然月，月末钳制（1月31日开档 → 2月末 23:59:59Z）。
- * 规则：start + 1 个日历月；若该日不存在（如 2月31日）则钳制到该月最后一天。
- * 同一订单（同 planId + 同 start）周期确定不变——订单权益不重复延长。
- */
+/** 同计划月末结束点（UTC）：1月31日 → 2月28/29日 23:59:59Z；月中跨月同日。 */
 export function monthPeriodEnd(startIso: string): string {
   const start = new Date(startIso)
   if (Number.isNaN(start.getTime())) throw new Error('INVALID_PERIOD_START')
   const year = start.getUTCFullYear()
-  const month = start.getUTCMonth() // 0-based
+  const month = start.getUTCMonth()
   const day = start.getUTCDate()
-  // 下月最后一天（month+2 月的第 0 日 = 下月最后一日）；day 溢出则钳制
   const nextMonthLastDay = new Date(Date.UTC(year, month + 2, 0)).getUTCDate()
   const endDay = Math.min(day, nextMonthLastDay)
   return new Date(Date.UTC(year, month + 1, endDay, 23, 59, 59)).toISOString()

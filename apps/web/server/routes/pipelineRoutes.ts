@@ -14,12 +14,14 @@ import {
   CHAPTER_SCAFFOLD_FAILED,
   INVALID_BOOK_REQUEST,
   NO_COMPILED_RECEIPT,
+  OPERATION_ID_CANNOT_REUSE_CANDIDATE,
   PROVIDER_UNAVAILABLE,
   PROPOSAL_DECISION_REJECTED,
   PROPOSAL_DISCARD_REJECTED,
   QUALITY_REWORK_LIMIT_EXCEEDED,
 } from '../routeCodes.js'
 import { decodeBookRequest, noOpenProductionSessionError } from '../bookRequest.js'
+import { withBookWriteLock } from '../bookAccess.js'
 import { emptyDraftStream, mockDraftStream } from './draftStreamEmulation.js'
 import {
   AcceptConflictError,
@@ -29,6 +31,7 @@ import {
   ProposalPortError,
   acceptDraft,
   cancelCandidate,
+  estimateContinueCost,
   createCandidateId,
   executeChapterReview,
   loadCanonProposal,
@@ -54,6 +57,7 @@ import {
   ChapterExistsError,
   chapterOutlinePath,
   proseChapterPath,
+  readBookRecord,
   readProseChapter,
   withStrictBook,
 } from '@mozhou/data-plane'
@@ -68,7 +72,6 @@ import { resolveGenerationTarget } from '../llm/generationTarget.js'
 import type { GenerationUnavailableReason } from '../llm/generationTarget.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
-import { defaultBookAccessManager } from '../bookAccess.js'
 import { canonProposalView } from '../proposals.js'
 
 const DIALOGUE_CAPABILITIES = [
@@ -229,9 +232,11 @@ function chapterScaffoldAbsent(root: string, chapterIndex: number): boolean {
  */
 async function ensureChapterScaffold(root: string, chapterIndex: number, bookKey: string): Promise<void> {
   if (!chapterScaffoldAbsent(root, chapterIndex)) return
-  // 书级锁内串行：check-then-create 不是原子的，两请求同刻进来会各自看到
-  // 「两件都缺」然后争抢同一对文件。锁只圈这一次建章，不圈整段生成。
-  await defaultBookAccessManager.queue.withBookLock(bookKey, async () => {
+  // 书级锁内串行（W2-3 起为统一书稿锁：进程内 FIFO + 跨进程命名管道）：
+  // check-then-create 不是原子的，两请求同刻进来会各自看到「两件都缺」然后争抢同一对文件。
+  // 锁只圈这一次建章，不圈整段生成——模型等待在锁外。
+  void bookKey
+  await withBookWriteLock(root, async () => {
     await Promise.resolve()
     if (!chapterScaffoldAbsent(root, chapterIndex)) return
     try {
@@ -272,7 +277,7 @@ async function makeStreamEngine(
   onDelta: (text: string) => void,
   candidate: {
     id: string
-    operationId: string
+    generationId: string
     bookId: string
     base: WriteBase
     mode: CandidateMode
@@ -427,6 +432,28 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         json(409, { ok: false, error: 'session already at terminal step ' + session.currentStep })
         return true
       }
+      if (target === 'draft') {
+        // advance 只移步光标、不执行步内工作；而 web 侧草稿步的唯一工作入口
+        // /api/draft.stream 有自己的 provider 前置闸。若在这里放行一个
+        // 「无任何 provider」的会话进入 draft 步，作者会在 review→user_edit 撞上
+        // QualityReviewNotPassError（verdict '<none>'）——一个 fail-closed 守卫的
+        // 内部术语错误，且会话除了 abandon 无路可走。
+        // 语义与 draft.stream 前置闸（本文件 :558 注释）对齐：仅
+        // no_provider_configured 笼统收口并拒绝推进；配了但解析不出
+        // （provider_config_invalid / endpoint_blocked）照常放行——那不是死端，
+        // 生成入口会给出带键路径的精确病因。
+        const availability = await draftProviderAvailability(process.env, principal?.userId)
+        if (!availability.available && availability.reason === 'no_provider_configured') {
+          json(409, {
+            ok: false,
+            code: PROVIDER_UNAVAILABLE,
+            error: 'provider unavailable: no draft provider configured — draft step refused; see providerUnavailableReason/providerDetail',
+            providerUnavailableReason: availability.reason,
+            providerDetail: availability.detail,
+          })
+          return true
+        }
+      }
       const previousStep = session.currentStep
       session.advance(target)
       json(200, { ok: true, previousStep, currentStep: session.currentStep })
@@ -555,6 +582,25 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       }
     }
 
+    // W4-2c-3：『续写』作为新 operationId 的显式新操作
+    const requestedOperationId = typeof body['operationId'] === 'string' ? body['operationId'] : undefined
+    const sourceCandidateId = typeof body['sourceCandidateId'] === 'string'
+      ? body['sourceCandidateId']
+      : (typeof body['candidateId'] === 'string' ? body['candidateId'] : undefined)
+    if (mode === 'continue' && sourceCandidateId !== undefined) {
+      const sourceCandidate = readDraftCandidate(safeRoot, sourceCandidateId)
+      if (sourceCandidate !== null) {
+        if (requestedOperationId === sourceCandidate.id || requestedOperationId === sourceCandidate.generationId) {
+          json(400, {
+            ok: false,
+            code: OPERATION_ID_CANNOT_REUSE_CANDIDATE,
+            error: 'continue operationId cannot reuse candidateId or generationId',
+          })
+          return true
+        }
+      }
+    }
+
     if (!isMockDraftProviderMode(process.env)) {
       // 工单06：闸与真实生成走**同一个**解析缝（resolveGenerationTarget）。
       // 仅「真没配任何 provider」（no_provider_configured）才用笼统 PROVIDER_UNAVAILABLE 收口；
@@ -602,6 +648,18 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       const candidateId = createCandidateId()
       const abortController = new AbortController()
       res.on('close', () => abortController.abort())
+      // F-04：候选身份用**盘上真实书 ID**（book.json）——accept 据此落操作记录（主体/
+      // 书作用域），/api/chapter.operation.status 按 readBookRecord(root).id 核对作用域；
+      // 此前固定 'book-local' 使成功后的状态查询永远 not_found/safeToRetrySameId。
+      // 注意本地模式 authorizedBook.bookId 只是 basename 别名（bookAccess.ts:616），
+      // 不能当真源；book.json 缺席才回退授权别名 / 占位值。
+      const candidateBookId = (() => {
+        try {
+          return readBookRecord(safeRoot).id
+        } catch {
+          return authorizedBook?.bookId ?? 'book-local'
+        }
+      })()
       const { engine, recipe, real } = await makeStreamEngine(
         safeRoot,
         chapterIndex,
@@ -610,8 +668,10 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         (delta) => ndjson({ ok: true, event: 'delta', candidateId, text: delta }),
         {
           id: candidateId,
-          operationId: 'op_web_' + candidateId,
-          bookId: 'book-local',
+          // W4-2a：候选生成标识。值沿用历史形态（op_web_ 前缀）但**不得据此判定**——
+          // 它是不透明标识，与 W3 写入操作身份 operationId 无任何关系。
+          generationId: 'op_web_' + candidateId,
+          bookId: candidateBookId,
           base,
           mode,
           ...(selection === undefined ? {} : { selection }),
@@ -681,6 +741,24 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     return true
   }
 
+  /* ---- W4-2c-3：续写成本发起前可见 ---- */
+  if (path === '/api/draft.continue.estimate') {
+    const root = resolvedRoot
+    const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
+    if (root === null || candidateId === null) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root and candidateId required' })
+      return true
+    }
+    const candidate = readDraftCandidate(assertSafeBookRoot(root), candidateId)
+    if (candidate === null) {
+      json(404, { ok: false, code: CANDIDATE_NOT_FOUND, error: 'candidate not found' })
+      return true
+    }
+    const estimate = estimateContinueCost(candidate)
+    json(200, { ok: true, candidateId, estimate })
+    return true
+  }
+
   if (path === '/api/draft.cancel') {
     const root = resolvedRoot
     const candidateId = typeof body['candidateId'] === 'string' ? body['candidateId'] : null
@@ -715,7 +793,11 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     }
     const bookId = typeof body['bookId'] === 'string' ? body['bookId'] : undefined
     const requestedChapterIndex = chapterIndex ?? undefined
-    const allowPartial = Boolean(body['allowPartial'] ?? body['confirmPartial'])
+    const confirmPartial = Boolean(body['confirmPartial'] ?? body['allowPartial'])
+    const allowPartial = confirmPartial
+    const operationId = typeof body['operationId'] === 'string' ? body['operationId'] : undefined
+    const expectedRevision = typeof body['expectedRevision'] === 'number' ? body['expectedRevision'] : undefined
+    const taskId = typeof body['taskId'] === 'string' ? body['taskId'] : undefined
     try {
       const result = acceptDraft({
         bookRoot: root,
@@ -725,7 +807,11 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         bookId,
         chapterIndex: requestedChapterIndex,
         allowPartial,
-        confirmPartial: allowPartial,
+        confirmPartial,
+        expectedRevision,
+        operationId,
+        principalId: principal?.userId,
+        taskId,
       })
       json(200, { ok: true, ...result })
     } catch (error) {

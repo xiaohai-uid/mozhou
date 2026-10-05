@@ -26,7 +26,7 @@ import type { AddressInfo } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { newFactId, newKnowledgeStateId, newUlid, parseKnowledgeStateRow } from '@mozhou/kernel'
 import type { BookId } from '@mozhou/kernel'
 import type { ContextReceiptId } from '@mozhou/kernel'
@@ -50,6 +50,13 @@ import type { DeltaExtractionResult } from '../analysis/deltaExtractor.js'
 
 let servers: ReturnType<typeof createServer>[] = []
 let roots: string[] = []
+// 本夹具要走会话窗口（advance compile→draft）；advance 进入 draft 步现要求存在
+// 草稿 provider（与 /api/draft.stream 前置闸同缝）。mock 是既有显式测试开关——
+// 夹具的真实性不受影响：编译、审查、提交、落盘全部走真路径。
+const ORIGINAL_DRAFT_PROVIDER = process.env['MOZHOU_DRAFT_PROVIDER']
+beforeEach(() => {
+  process.env.MOZHOU_DRAFT_PROVIDER = 'mock'
+})
 afterEach(() => {
   fixture.result = null
   for (const s of servers) s.close()
@@ -62,6 +69,11 @@ afterEach(() => {
     }
   }
   roots = []
+  if (ORIGINAL_DRAFT_PROVIDER === undefined) {
+    delete process.env['MOZHOU_DRAFT_PROVIDER']
+  } else {
+    process.env['MOZHOU_DRAFT_PROVIDER'] = ORIGINAL_DRAFT_PROVIDER
+  }
 })
 
 function listen(): Promise<string> {

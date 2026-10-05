@@ -11,18 +11,26 @@
 import {
   closeSync,
   existsSync,
+  ftruncateSync,
   lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
   realpathSync,
-  unlinkSync,
   writeFileSync,
   readdirSync,
 } from 'node:fs'
 import { resolve, sep, basename } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { RequestBoundaryError, assertSafeBookRoot } from './security.js'
+import {
+  BookWriteLockError,
+  acquireBookWriteLock,
+  assertLocalWritableBookRoot,
+  canonicalBookKey,
+  type BookWriteLock,
+} from './platform/writerLock.js'
 import { createBook } from '@mozhou/data-plane'
 import { resolveDefaultDataRoot } from './dataRoot.js'
 import type { VerifiedPrincipal } from './auth/session.js'
@@ -38,6 +46,67 @@ export interface AuthorizedBook {
  * 进程级排他启动锁 (DataRoot Process Lock)
  * ========================================================================== */
 
+/** 本进程当前持有的 dataRoot 锁文件（同进程第二实例据此拒绝，不依赖盘上文件）。 */
+const heldDataRootLocks = new Set<string>()
+
+/** 锁记录格式 v2：只信任本格式判「现有墨舟实例在跑」；旧版裸 PID = 历史遗留记录。 */
+interface DataRootLockRecord {
+  readonly schemaVersion: 2
+  readonly pid: number
+  readonly holder: 'mozhou-service'
+  readonly startedAtIso: string
+}
+
+const DATA_ROOT_LOCK_SCHEMA_VERSION = 2
+
+/**
+ * 读锁记录。返回 null = 文件缺席 / 损坏 / **旧版裸 PID 格式**。
+ * F-02 负样本（历史 dataRoot 锁）：旧格式只剩一个 PID 数字——PID 会被无关进程复用，
+ * 「历史锁文件 + 活着的无关 PID」不能证明现有墨舟实例在跑，必须允许接管。
+ */
+function readDataRootLockRecord(lockPath: string): DataRootLockRecord | null {
+  try {
+    const parsed = JSON.parse(readFileSync(lockPath, 'utf8')) as Partial<DataRootLockRecord> | null
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      parsed.schemaVersion !== DATA_ROOT_LOCK_SCHEMA_VERSION ||
+      typeof parsed.pid !== 'number' ||
+      !Number.isInteger(parsed.pid) ||
+      parsed.pid <= 0 ||
+      parsed.holder !== 'mozhou-service' ||
+      typeof parsed.startedAtIso !== 'string'
+    ) {
+      return null
+    }
+    return parsed as DataRootLockRecord
+  } catch {
+    return null
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    // EPERM = 进程存在但无权限发信号；其余（ESRCH）= 已退出
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+/**
+ * dataRoot 进程级启动守卫。
+ *
+ * W2-2 修正两处既有缺陷：
+ * 1. 旧实现用 `openSync(lockPath, 'w')`——截断式且**非独占**，已改为 `'wx'`（已存在即失败）；
+ * 2. 旧实现 release() 用 `unlinkSync` 删除锁文件——与规划 §6.3「锁文件保持稳定身份、
+ *    不在解锁后删除并重建同名文件」相反，已去掉删除；文件被就地接管（`'r+'` + 截断改写）。
+ *
+ * 说明：真正的**每书**排他由 platform/writerLock.ts 的命名管道锁承担（W2-2 新增）；
+ * 本类只是「同一 dataRoot 不并发起两个服务实例」的启动守卫，其判定含 PID 存活启发式，
+ * 因此保留其既有同步签名与 DATA_ROOT_LOCKED 错误语义。
+ */
 export class DataRootProcessLock {
   private _lockFd: number | null = null
   private _lockPath: string | null = null
@@ -46,37 +115,59 @@ export class DataRootProcessLock {
     const lockPath = resolve(dataRoot, '.mozhou_instance.lock')
     mkdirSync(dataRoot, { recursive: true })
 
-    if (existsSync(lockPath)) {
-      try {
-        const raw = readFileSync(lockPath, 'utf8').trim()
-        const pid = parseInt(raw, 10)
-        if (!isNaN(pid) && pid > 0) {
-          try {
-            process.kill(pid, 0)
-            // 目标进程仍在存活，拒绝争夺
-            throw new Error(`DATA_ROOT_LOCKED: another service instance (PID ${pid}) is running on dataRoot: ${dataRoot}`)
-          } catch (killErr: unknown) {
-            if ((killErr as NodeJS.ErrnoException).code !== 'ESRCH') {
-              throw killErr
-            }
-            // ESRCH 说明是已死进程遗留的失效锁，可以接管
-          }
-        }
-      } catch (err) {
-        if ((err as Error).message.startsWith('DATA_ROOT_LOCKED')) {
-          throw err
-        }
+    if (heldDataRootLocks.has(lockPath)) {
+      throw new Error(`DATA_ROOT_LOCKED: another service instance in this process is already running on dataRoot: ${dataRoot}`)
+    }
+
+    // 独占创建：'wx' 在文件已存在时失败（旧 'w' 会截断且非独占）
+    try {
+      const fd = openSync(lockPath, 'wx')
+      this._adopt(lockPath, fd)
+      return
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw new Error(`DATA_ROOT_LOCKED: failed to acquire exclusive lock on ${lockPath}: ${(err as Error).message}`)
       }
     }
 
-    try {
-      const fd = openSync(lockPath, 'w')
-      writeFileSync(fd, `${process.pid}\n`, 'utf8')
-      this._lockFd = fd
-      this._lockPath = lockPath
-    } catch (err) {
-      throw new Error(`DATA_ROOT_LOCKED: failed to acquire exclusive lock on ${lockPath}: ${(err as Error).message}`)
+    // 锁文件已存在：身份保持稳定——就地改写占用记录，绝不 unlink 重建同名文件。
+    // F-02/W2 负样本：只信任 v2 JSON 记录判「现有实例在跑」；旧版裸 PID / 损坏记录
+    // 视为历史遗留（活着的无关 PID 不应把历史 dataRoot 锁误判为现有墨舟实例）。
+    const holder = readDataRootLockRecord(lockPath)
+    if (holder !== null && holder.pid !== process.pid && isProcessAlive(holder.pid)) {
+      throw new Error(`DATA_ROOT_LOCKED: another service instance (PID ${holder.pid}) is running on dataRoot: ${dataRoot}`)
     }
+    // 本进程已释放的稳定锁文件 / 已死进程遗留 / 无有效 PID：接管
+    try {
+      const fd = openSync(lockPath, 'r+')
+      ftruncateSync(fd, 0)
+      this._adopt(lockPath, fd)
+    } catch (err) {
+      throw new Error(`DATA_ROOT_LOCKED: failed to take over lock ${lockPath}: ${(err as Error).message}`)
+    }
+  }
+
+  private _adopt(lockPath: string, fd: number): void {
+    try {
+      // 锁记录 v2（JSON）：`holder: 'mozhou-service'` 是「记录来自现行墨舟实例」的
+      // 标记——旧版裸 PID 记录在 readDataRootLockRecord 判 null 后直接接管。
+      writeFileSync(
+        fd,
+        JSON.stringify({
+          schemaVersion: DATA_ROOT_LOCK_SCHEMA_VERSION,
+          pid: process.pid,
+          holder: 'mozhou-service',
+          startedAtIso: new Date().toISOString(),
+        }) + '\n',
+        'utf8',
+      )
+    } catch (err) {
+      try { closeSync(fd) } catch { /* ignore */ }
+      throw new Error(`DATA_ROOT_LOCKED: failed to record holder pid in ${lockPath}: ${(err as Error).message}`)
+    }
+    this._lockFd = fd
+    this._lockPath = lockPath
+    heldDataRootLocks.add(lockPath)
   }
 
   release(): void {
@@ -84,35 +175,231 @@ export class DataRootProcessLock {
       try { closeSync(this._lockFd) } catch { /* ignore */ }
       this._lockFd = null
     }
-    if (this._lockPath && existsSync(this._lockPath)) {
-      try { unlinkSync(this._lockPath) } catch { /* ignore */ }
+    if (this._lockPath !== null) {
+      // 锁文件保持稳定身份：不删除、不重建（规划 §6.3）
+      heldDataRootLocks.delete(this._lockPath)
       this._lockPath = null
     }
   }
 }
 
 /* ============================================================================
- * 每书并发操作队列 (Per-Book Execution Queue)
+ * 每书并发操作队列 (Per-Book Execution Queue · W2-3 改为显式 FIFO)
  * ========================================================================== */
 
-export class BookOperationQueue {
-  private readonly _locks = new Map<string, Promise<void>>()
+/** 409：同书已有写入者（进程内队列或跨进程命名管道被占）——客户端可重试。 */
+export const BOOK_WRITE_BUSY = 'BOOK_WRITE_BUSY'
 
-  async withBookLock<T>(bookId: string, fn: () => Promise<T>): Promise<T> {
-    while (this._locks.has(bookId)) {
-      await this._locks.get(bookId)
+export class BookWriteBusyError extends Error {
+  override readonly name = 'BookWriteBusyError'
+
+  constructor(
+    readonly code: 'BOOK_WRITE_BUSY' | 'BOOK_WRITE_TIMEOUT' | 'BOOK_WRITE_ABORTED',
+    readonly bookKey: string,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+/** 排队等待者：显式 FIFO 数组元素，带超时/取消句柄。 */
+interface BookQueueWaiter {
+  readonly resolve: (release: () => void) => void
+  readonly reject: (error: Error) => void
+  readonly signal: AbortSignal | undefined
+  timer: NodeJS.Timeout | null
+  onAbort: (() => void) | null
+}
+
+/**
+ * 每书进程内互斥（显式 FIFO）。
+ *
+ * 旧实现是 `while (Map.has) await` 自旋：既不保证 FIFO，也无法取消/超时。
+ * 现改为显式队列数组：先到先得、队首释放后唤醒下一个；超时/取消把自己从
+ * 队列中摘除，不会留下幽灵占位；任何路径最终都会 release（释放幂等）。
+ */
+export class BookOperationQueue {
+  private readonly _queues = new Map<string, BookQueueWaiter[]>()
+  private readonly _held = new Set<string>()
+
+  /** 取锁；返回幂等 release。timeoutMs<=0 时被占用立即以 BOOK_WRITE_BUSY 拒绝。 */
+  acquire(bookKey: string, options: { timeoutMs?: number | undefined; signal?: AbortSignal | undefined } = {}): Promise<() => void> {
+    const timeoutMs = options.timeoutMs ?? 0
+    const waiting = this._queues.get(bookKey)
+    if (!this._held.has(bookKey) && (waiting === undefined || waiting.length === 0)) {
+      this._held.add(bookKey)
+      return Promise.resolve(this._makeRelease(bookKey))
     }
-    let resolveLock!: () => void
-    const lockPromise = new Promise<void>((resolve) => {
-      resolveLock = resolve
+    if (timeoutMs <= 0) {
+      return Promise.reject(
+        new BookWriteBusyError('BOOK_WRITE_BUSY', bookKey, `another writer in this process already holds book ${bookKey} — retry later or pass timeoutMs to queue`),
+      )
+    }
+    return new Promise<() => void>((resolve, reject) => {
+      let queue = this._queues.get(bookKey)
+      if (queue === undefined) {
+        queue = []
+        this._queues.set(bookKey, queue)
+      }
+      const waiter: BookQueueWaiter = {
+        resolve: (release) => resolve(release),
+        reject,
+        signal: options.signal,
+        timer: null,
+        onAbort: null,
+      }
+      const settle = (fn: () => void): void => {
+        this._detach(bookKey, waiter)
+        fn()
+      }
+      waiter.timer = setTimeout(() => {
+        settle(() =>
+          reject(new BookWriteBusyError('BOOK_WRITE_TIMEOUT', bookKey, `timed out after ${timeoutMs}ms queuing for book ${bookKey}`)),
+        )
+      }, timeoutMs)
+      const signal = options.signal
+      if (signal !== undefined) {
+        waiter.onAbort = () => {
+          settle(() => reject(new BookWriteBusyError('BOOK_WRITE_ABORTED', bookKey, `queuing for book ${bookKey} was aborted`)))
+        }
+        if (signal.aborted) {
+          waiter.onAbort()
+          return
+        }
+        signal.addEventListener('abort', waiter.onAbort, { once: true })
+      }
+      queue.push(waiter)
     })
-    this._locks.set(bookId, lockPromise)
+  }
+
+  /** 兼容入口：取锁 → 执行 → 必然释放。 */
+  async withBookLock<T>(bookKey: string, fn: () => Promise<T> | T, options: { timeoutMs?: number | undefined; signal?: AbortSignal | undefined } = {}): Promise<T> {
+    const release = await this.acquire(bookKey, options)
     try {
       return await fn()
     } finally {
-      this._locks.delete(bookId)
-      resolveLock()
+      release()
     }
+  }
+
+  private _detach(bookKey: string, waiter: BookQueueWaiter): void {
+    if (waiter.timer !== null) {
+      clearTimeout(waiter.timer)
+      waiter.timer = null
+    }
+    const queue = this._queues.get(bookKey)
+    if (queue === undefined) return
+    const index = queue.indexOf(waiter)
+    if (index >= 0) queue.splice(index, 1)
+    if (queue.length === 0) this._queues.delete(bookKey)
+  }
+
+  private _makeRelease(bookKey: string): () => void {
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this._held.delete(bookKey)
+      const queue = this._queues.get(bookKey)
+      // FIFO：队首先到先得；超时/取消的等待者已在 _detach 中摘除，队列里只有活等待者
+      const next = queue?.shift()
+      if (queue !== undefined && queue.length === 0) {
+        this._queues.delete(bookKey)
+      }
+      if (next === undefined) return
+      if (next.timer !== null) {
+        clearTimeout(next.timer)
+        next.timer = null
+      }
+      if (next.onAbort !== null) {
+        next.signal?.removeEventListener('abort', next.onAbort)
+        next.onAbort = null
+      }
+      this._held.add(bookKey)
+      next.resolve(this._makeRelease(bookKey))
+    }
+  }
+}
+
+/* ============================================================================
+ * 统一书稿写锁 (W2-3)：进程内 FIFO 队列 + 跨进程命名管道锁 + 同调用链可重入
+ * ========================================================================== */
+
+/**
+ * 同一次异步调用链内已持有的书键。嵌套取锁（路由 → 编排 → 数据面）直接放行，
+ * 否则命名管道锁不可重入会把同一次提交自己锁死。
+ */
+const heldBookWriteKeys = new AsyncLocalStorage<Set<string>>()
+
+export interface BookWriteLeaseOptions {
+  /** 0/缺省 = 已有写入者立即失败；>0 = 排队最多等待这么久。 */
+  readonly timeoutMs?: number | undefined
+  readonly signal?: AbortSignal | undefined
+}
+
+export interface BookWriteLease {
+  readonly bookKey: string
+  /** 幂等释放：先放命名管道（跨进程），再放进程内队列槽。 */
+  release(): Promise<void>
+}
+
+/** 同书已有写入者类错误（路由据此转 409/423，而不是 500）。 */
+export function isBookWriteBusyError(error: unknown): boolean {
+  if (error instanceof BookWriteBusyError) return true
+  if (error instanceof BookWriteLockError) {
+    return error.code === 'WRITER_LOCK_HELD' || error.code === 'WRITER_LOCK_TIMEOUT' || error.code === 'WRITER_LOCK_ABORTED'
+  }
+  return false
+}
+
+/**
+ * 取一次书稿写租约：进程内 FIFO 排队 → 跨进程命名管道排他。
+ * 同调用链已持有时返回空租约（可重入，由外层释放）。
+ */
+export async function acquireBookWriteLease(root: string, options: BookWriteLeaseOptions = {}): Promise<BookWriteLease> {
+  const bookKey = canonicalBookKey(root)
+  const held = heldBookWriteKeys.getStore()
+  if (held !== undefined && held.has(bookKey)) {
+    return { bookKey, release: async () => { /* 外层持有者负责释放 */ } }
+  }
+  const releaseQueueSlot = await defaultBookAccessManager.queue.acquire(bookKey, options)
+  let lock: BookWriteLock
+  try {
+    lock = await acquireBookWriteLock(root, { timeoutMs: options.timeoutMs, signal: options.signal })
+  } catch (error) {
+    releaseQueueSlot()
+    throw error
+  }
+  let released = false
+  return {
+    bookKey,
+    release: async () => {
+      if (released) return
+      released = true
+      await lock.release()
+      releaseQueueSlot()
+    },
+  }
+}
+
+/** 统一书稿写入口：取租约 → 执行 → 必然释放（异常/超时/取消路径同样释放）。 */
+export async function withBookWriteLock<T>(
+  root: string,
+  fn: () => Promise<T> | T,
+  options: BookWriteLeaseOptions = {},
+): Promise<T> {
+  const bookKey = canonicalBookKey(root)
+  const held = heldBookWriteKeys.getStore()
+  if (held !== undefined && held.has(bookKey)) {
+    return await fn()
+  }
+  const lease = await acquireBookWriteLease(root, options)
+  const next = new Set<string>(held ?? [])
+  next.add(bookKey)
+  try {
+    return await heldBookWriteKeys.run(next, fn)
+  } finally {
+    await lease.release()
   }
 }
 
@@ -148,6 +435,8 @@ export class BookAccessManager {
    */
   registerLocalBook(root: string, bookId?: string): AuthorizedBook {
     const safeRoot = assertSafeBookRoot(root)
+    // W2-2：可写书根必须是本机固定盘——命名管道锁对 UNC / 映射网络盘不适用（返回可定位错误）
+    assertLocalWritableBookRoot(safeRoot)
     const id = bookId ?? ('bk_loc_' + randomBytes(8).toString('hex'))
     let title = '未命名作品'
     try {

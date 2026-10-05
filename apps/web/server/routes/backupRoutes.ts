@@ -12,10 +12,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { createBookBackup, restoreBookBackup } from '@mozhou/data-plane'
-import { defaultBookAccessManager } from '../bookAccess.js'
+import { defaultBookAccessManager, withBookWriteLock } from '../bookAccess.js'
 import { RequestBoundaryError } from '../security.js'
 
-export const backupRoutes: RouteHandler = (req, res, { path, body, json, principal, bookRoot }) => {
+export const backupRoutes: RouteHandler = async (req, res, { path, body, json, principal, bookRoot }) => {
   const dataRoot = defaultBookAccessManager.getDataRoot()
   const backupsDir = resolve(dataRoot, 'backups')
   mkdirSync(backupsDir, { recursive: true })
@@ -29,7 +29,8 @@ export const backupRoutes: RouteHandler = (req, res, { path, body, json, princip
     }
 
     try {
-      const result = createBookBackup(root)
+      // W2-3：备份是「一致性快照」，必须与书稿写入互斥——同一书稿锁内取快照。
+      const result = await withBookWriteLock(root, () => createBookBackup(root), { timeoutMs: 60_000 })
       const backupId = 'bup_' + randomBytes(12).toString('hex')
       const backupFilePath = resolve(backupsDir, `${backupId}.zip`)
       writeFileSync(backupFilePath, result.buffer)
@@ -115,11 +116,16 @@ export const backupRoutes: RouteHandler = (req, res, { path, body, json, princip
       targetDir = resolve(dataRoot, 'books', newBookId)
     }
 
+    // W2-3：恢复会写出一整本新书。目标书根此刻不存在（无法 canonicalBookKey），
+    // 故以**数据根**为锁键串行化恢复；同书并发写由目标书创建后的书稿锁接管。
     try {
-      const restored = restoreBookBackup(archiveBuffer, targetDir)
-      if (!defaultBookAccessManager.isHostedMode()) {
-        defaultBookAccessManager.registerLocalBook(targetDir, newBookId)
-      }
+      const restored = await withBookWriteLock(resolve(dataRoot), () => {
+        const written = restoreBookBackup(archiveBuffer, targetDir)
+        if (!defaultBookAccessManager.isHostedMode()) {
+          defaultBookAccessManager.registerLocalBook(targetDir, newBookId)
+        }
+        return written
+      }, { timeoutMs: 120_000 })
       json(200, {
         ok: true,
         bookId: newBookId,

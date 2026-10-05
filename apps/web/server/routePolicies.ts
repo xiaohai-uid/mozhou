@@ -94,6 +94,12 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/chapter.reopen': 'book',
   '/api/chapter.resubmit': 'book',
   '/api/chapter.commit': 'book',
+  // W4-2c-2：任务事件流补发/快照——book 作用域、同样鉴权、只读不改盘
+  '/api/tasks.events': 'book',
+  // W4-2c-3：outcome_unknown 显式新 attempt 重试——需显式确认重复计费
+  '/api/tasks.retry': 'book',
+  // W3：按 operationId 的状态查询——book 作用域、同样鉴权、只读不改盘
+  '/api/chapter.operation.status': 'book',
   '/api/receipts': 'book',
   '/api/receipt': 'book',
   '/api/change-matrix': 'book',
@@ -109,6 +115,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/draft.candidate': 'book',
   '/api/draft.cancel': 'book',
   '/api/draft.accept': 'book',
+  '/api/draft.continue.estimate': 'book',
   '/api/chapter.review': 'book',
   '/api/chapter.rework': 'book',
   '/api/chapter.corrections': 'book',

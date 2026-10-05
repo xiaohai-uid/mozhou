@@ -62,6 +62,18 @@ export const CONTINUITY_HARD_CONFLICT = 'CONTINUITY_HARD_CONFLICT'
 /** 409：409 CHAPTER_ALREADY_COMMITTED——重复提交 / 成功响应丢失后重试（工单05 契约）。 */
 export const CHAPTER_ALREADY_COMMITTED = 'CHAPTER_ALREADY_COMMITTED'
 
+/** 400：operationId 形状不合法（W3 操作幂等）。 */
+export const OPERATION_ID_INVALID = 'OPERATION_ID_INVALID'
+
+/** 400：schemaVersion 未知——不得静默解释（W3）。 */
+export const OPERATION_SCHEMA_UNSUPPORTED = 'OPERATION_SCHEMA_UNSUPPORTED'
+
+/** 409：同 operationId 但请求摘要不同（身份复用，零盘上变更）。 */
+export const OPERATION_ID_REUSED = 'OPERATION_ID_REUSED'
+
+/** 404：同 operationId 但作用域（主体/书）不同——形态同 not_found，不暴露他人操作的存在性（t32 §C.4）。 */
+export const OPERATION_SCOPE_MISMATCH = 'OPERATION_SCOPE_MISMATCH'
+
 /** 409：409 RESUBMIT_SESSION_CONFLICT——重提交被单飞/已有活动会话拒绝。 */
 export const RESUBMIT_SESSION_CONFLICT = 'RESUBMIT_SESSION_CONFLICT'
 
@@ -89,3 +101,15 @@ export const QUALITY_REWORK_LIMIT_EXCEEDED = 'QualityReworkLimitExceeded'
  * 只有补齐本身失败才落到这里。
  */
 export const CHAPTER_SCAFFOLD_FAILED = 'CHAPTER_SCAFFOLD_FAILED'
+
+/** 400：续写 operationId 不得复用候选 id 或 generationId。 */
+export const OPERATION_ID_CANNOT_REUSE_CANDIDATE = 'OPERATION_ID_CANNOT_REUSE_CANDIDATE'
+
+/** 400：outcome_unknown 重试必须显式确认重复计费风险。 */
+export const BILLING_CONFIRMATION_REQUIRED = 'BILLING_CONFIRMATION_REQUIRED'
+
+/** 409：outcome_unknown 状态下禁止自动重试。 */
+export const OUTCOME_UNKNOWN_RETRY_BLOCKED = 'OUTCOME_UNKNOWN_RETRY_BLOCKED'
+
+/** 404：404 TASK_NOT_FOUND——任务记录不存在。 */
+export const TASK_NOT_FOUND = 'TASK_NOT_FOUND'

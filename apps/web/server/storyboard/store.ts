@@ -19,6 +19,7 @@ import {
   withBook,
 } from '@mozhou/data-plane'
 import { newUlid } from '@mozhou/kernel'
+import { withBookWriteLock } from '../bookAccess.js'
 import {
   STORYBOARD_ID_PATTERN,
   STORYBOARD_LIMITS,
@@ -46,17 +47,14 @@ export class StoryboardNotFoundError extends Error {
 }
 
 /* ---------------------------------------------------------------------------
- * 单书进程内串行：同一书根的保存/列表读改竞争排队（本地单进程语义）。
+ * 单书串行：W2-3 起并入统一书稿写锁（进程内 FIFO + 跨进程命名管道），
+ * 本文件原先自持的 bookSaveChains 承诺链已删除——三套互斥收敛为一套。
+ * 保留导出名与签名，store.ts / generate.ts 的调用点不变。
  * ------------------------------------------------------------------------- */
 
-const bookSaveChains = new Map<string, Promise<unknown>>()
-
-/** 单书进程内串行执行（保存与生成都走它：brief 并发约束 concurrentPerBook=1）。 */
+/** 单书串行执行（保存与生成都走它：brief 并发约束 concurrentPerBook=1）。 */
 export function withBookLock<T>(root: string, task: () => Promise<T> | T): Promise<T> {
-  const prev = bookSaveChains.get(root) ?? Promise.resolve()
-  const next = prev.then(task, task)
-  bookSaveChains.set(root, next.catch(() => undefined))
-  return next
+  return withBookWriteLock(root, task, { timeoutMs: 60_000 })
 }
 
 /* ---------------------------------------------------------------------------

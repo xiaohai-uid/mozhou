@@ -32,13 +32,21 @@ const charTok = { version: 'fake-char-v1', count: (text: string) => text.length 
 
 let servers: ReturnType<typeof createServer>[] = []
 let tempDirs: string[] = []
+let originalDraftProvider: string | undefined
 
 beforeEach(() => {
   defaultBookAccessManager.clear()
   defaultBookAccessManager.setHostedMode(false)
+  originalDraftProvider = process.env.MOZHOU_DRAFT_PROVIDER
+  process.env.MOZHOU_DRAFT_PROVIDER = 'mock'
 })
 
 afterEach(() => {
+  if (originalDraftProvider === undefined) {
+    delete process.env.MOZHOU_DRAFT_PROVIDER
+  } else {
+    process.env.MOZHOU_DRAFT_PROVIDER = originalDraftProvider
+  }
   for (const s of servers) s.close()
   servers = []
   for (const d of tempDirs) {

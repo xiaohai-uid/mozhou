@@ -17,7 +17,7 @@ import {
 import type { WizardAuthorIntentInput } from '@mozhou/data-plane'
 import type { EntityRef } from '@mozhou/kernel'
 import { assertSafeBookRoot } from '../security.js'
-import { defaultBookAccessManager } from '../bookAccess.js'
+import { defaultBookAccessManager, withBookWriteLock } from '../bookAccess.js'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
@@ -94,8 +94,7 @@ export const storyBrainRoutes: RouteHandler = async (req, res, { path, body, jso
       json(413, { ok: false, error: 'author intent fields must be at most 20000 characters' })
       return true
     }
-    const bookKey = authorizedBook?.bookId ?? root
-    await defaultBookAccessManager.queue.withBookLock(bookKey, async () => {
+    await withBookWriteLock(root, async () => {
       await Promise.resolve()
       try {
         const revision = writeWizardAuthorIntent(root, fields)

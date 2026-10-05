@@ -22,6 +22,7 @@ import { billingRoutes } from './routes/billingRoutes.js'
 import { managedModelRoutes } from './routes/managedModelRoutes.js'
 import { exportRoutes } from './routes/exportRoutes.js'
 import { memoRoutes } from './routes/memoRoutes.js'
+import { taskStreamRoutes } from './routes/taskStreamRoutes.js'
 import { namingRoutes } from './routes/namingRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
@@ -621,6 +622,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(managedModelRoutes)
     .use(exportRoutes)
     .use(memoRoutes)
+    .use(taskStreamRoutes)
     .use(namingRoutes)
 }
 

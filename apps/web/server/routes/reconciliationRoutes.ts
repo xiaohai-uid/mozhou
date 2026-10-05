@@ -35,6 +35,7 @@ import type { ReconciliationService, ReconciliationSettledPayload, ScanOutcome }
 import type { DependencyManifestEntry } from '@mozhou/kernel'
 import type { ApiRouter, RouteHandler } from '../router.js'
 import { assertSafeBookRoot, RequestBoundaryError } from '../security.js'
+import { withBookWriteLock } from '../bookAccess.js'
 import { dispatchSettledSemanticAnalysis } from '../semanticSettled.js'
 
 /* ----------------------------------------------------------------------------
@@ -369,7 +370,7 @@ function runtimeView(root: string): Record<string, unknown> {
   }
 }
 
-export const reconciliationRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
+export const reconciliationRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST') return false
   if (!path.startsWith('/api/reconciliation')) return false
 
@@ -439,7 +440,14 @@ export const reconciliationRoutes: RouteHandler = (req, res, { path, body, json,
     try {
       resolved = resolveService(root)
       if (!proposalExists(resolved.service, proposalId, json)) return true
-      const proposal = resolved.service.decideItems(proposalId, rawAccepted as string[])
+      // W2-3：decide 会把已接受项写进正典（onSettled → reloadManifest → propagateStaleMarkers），
+      // 整段落定传播在同一书稿锁内；本段是本地写、无模型等待，可整段持锁。
+      const service = resolved.service
+      const proposal = await withBookWriteLock(
+        root,
+        () => service.decideItems(proposalId, rawAccepted as string[]),
+        { timeoutMs: 30_000 },
+      )
       json(200, { ok: true, proposal })
     } catch (error) {
       sendError(json, error)

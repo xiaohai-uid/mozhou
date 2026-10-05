@@ -146,17 +146,44 @@ import {
   CHAPTER_NOT_COMMITTED,
   CONTINUITY_HARD_CONFLICT,
   INVALID_BOOK_REQUEST,
+  OPERATION_ID_INVALID,
+  OPERATION_ID_REUSED,
+  OPERATION_SCOPE_MISMATCH,
   PROSE_EXTERNAL_CHANGE,
   PROSE_REVISION_CONFLICT,
   RESUBMIT_SESSION_CONFLICT,
 } from '../routeCodes.js'
 import { decodeBookRequest } from '../bookRequest.js'
+import { RequestBoundaryError, assertSafeBookRoot } from '../security.js'
+import {
+  BOOK_WRITE_BUSY,
+  acquireBookWriteLease,
+  isBookWriteBusyError,
+  withBookWriteLock,
+  type BookWriteLease,
+} from '../bookAccess.js'
+import {
+  OperationRequestError,
+  buildOperationIntent,
+  computeRequestDigest,
+  parseOperationIntent,
+} from '../operationIdempotency.js'
+
+/**
+ * W2-3：HTTP 书稿写路径的排队上限。写路径现在很短（模型等待已在锁外），
+ * 同书并发请求正常情况毫秒级让行；超过上限即 409 明确拒绝，不无限挂住请求。
+ */
+const BOOK_WRITE_QUEUE_TIMEOUT_MS = 30_000
 import {
   ChapterExistsError,
   ChapterPhaseError,
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
+  OperationIdReusedError,
+  OperationScopeMismatchError,
   proseChapterPath,
+  readBookRecord,
+  readOperationRecord,
   readProseChapter,
   withBook,
 } from '@mozhou/data-plane'
@@ -313,31 +340,68 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       return true
     }
     try {
-      withBook(root, (plane) => {
+      // W3 操作幂等：先解析身份（形状/schemaVersion 不合法一律 400，绝不静默降级）
+      const operationKey = parseOperationIntent(body)
+      // W2-3：书稿写路径在统一书稿锁内执行——同书第二写入者排队（超时 409），不同书并发。
+      // 本段全是本地写（saveProseDraft + 编辑信号落账），没有模型等待，可整段持锁。
+      await withBookWriteLock(root, () => withBook(root, (plane) => {
         // 作者编辑信号的基线：更新语义 = 盘上当前正文（作者读取后据以改写）；
         // 新建语义 = ''（建章占位标题不是作者内容，作者实际从空白起笔）。
         // 读取失败（盘上缺章）由 saveProseDraft 同款抛 ENOENT → 外层 404，零写入。
         const beforeBody = expectedRevision === null
           ? ''
           : readProseChapter(root, proseChapterPath(chapterIndex)).body
-        const result = plane.saveProseDraft({ chapterIndex, body: rawBody, expectedRevision, title, confirmExternalOverwrite })
+        const result = plane.saveProseDraft({
+          chapterIndex,
+          body: rawBody,
+          expectedRevision,
+          title,
+          confirmExternalOverwrite,
+          // W3：身份 + 服务端计算的规范化摘要（正文经 normalizeProseBody 后入摘要，
+          // 与写入器共用同一函数——「少一个末尾换行」的重试因此仍判同摘要）
+          ...(operationKey === null
+            ? {}
+            : {
+                operation: buildOperationIntent(
+                  'prose.save',
+                  operationKey.operationId,
+                  { principalId: principal?.userId ?? 'local_user', bookId: plane.book.id },
+                  computeRequestDigest({
+                    operationType: 'prose.save',
+                    bookId: plane.book.id,
+                    chapterIndex,
+                    expectedRevision,
+                    body: rawBody,
+                    title,
+                    confirmExternalOverwrite,
+                  }),
+                ),
+              }),
+        })
         // 步 5 User Edit 接线：保存已由受守卫的权威写路径落定，编辑信号是派生面——
         // 落账失败不阻断保存（S12 同款降级），但必须在响应里可见（绝不静默）。
         // taskRef 与提交侧窗口锚同源（webCommitWindowTaskRef），否则 StyleLearner 读不到。
+        // W3/F-09：**历史操作回放零事件副作用**——回放没有发生新的作者编辑，绝不为一
+        // 条「把当前正文改回旧文」的旧请求伪造 UserEditRecorded（学习器会把它当成真实
+        // 回改信号）。审查负样本 W3 锁定此行为。
         let authorEditSignal: AuthorEditSignalView
-        try {
-          const outcome = recordWholeBodyAuthorEdit({
-            bus: new PublishBus(),
-            bookRoot: root,
-            taskRef: webCommitWindowTaskRef(chapterIndex, result.revision),
-            chapterIndex,
-            beforeBody,
-            afterBody: rawBody,
-            revision: result.revision,
-          })
-          authorEditSignal = { published: outcome.published, blocks: outcome.blocks.length, errorDetail: null }
-        } catch (cause) {
-          authorEditSignal = { published: false, blocks: 0, errorDetail: (cause as Error).message }
+        if (result.replayed) {
+          authorEditSignal = { published: false, blocks: 0, errorDetail: null }
+        } else {
+          try {
+            const outcome = recordWholeBodyAuthorEdit({
+              bus: new PublishBus(),
+              bookRoot: root,
+              taskRef: webCommitWindowTaskRef(chapterIndex, result.revision),
+              chapterIndex,
+              beforeBody,
+              afterBody: rawBody,
+              revision: result.revision,
+            })
+            authorEditSignal = { published: outcome.published, blocks: outcome.blocks.length, errorDetail: null }
+          } catch (cause) {
+            authorEditSignal = { published: false, blocks: 0, errorDetail: (cause as Error).message }
+          }
         }
         json(200, {
           ok: true,
@@ -346,9 +410,31 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           phase: result.phase,
           created: result.created,
           authorEditSignal,
+          // W3：回放标志 + 历史/当前双 revision（向后兼容：老客户端忽略即可）
+          replayed: result.replayed,
+          appliedRevision: result.appliedRevision,
+          currentRevision: result.currentRevision,
         })
-      })
+      }), { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS })
     } catch (cause) {
+      // W3：作用域不匹配（他人 operationId）→ 404 形态同 not_found（t32 §C.4，不暴露存在性）
+      if (cause instanceof OperationScopeMismatchError) {
+        json(404, { ok: false, code: OPERATION_SCOPE_MISMATCH, error: 'operation scope mismatch' })
+        return true
+      }
+      // W3：同 ID 不同摘要 = 身份复用冲突（零盘上变更）；非法 ID / 未知 schemaVersion = 400
+      if (cause instanceof OperationIdReusedError) {
+        json(409, { ok: false, code: OPERATION_ID_REUSED, operationId: cause.operationId, error: cause.message })
+        return true
+      }
+      if (cause instanceof OperationRequestError) {
+        json(400, { ok: false, code: cause.code, error: cause.message })
+        return true
+      }
+      if (isBookWriteBusyError(cause)) {
+        json(409, { ok: false, code: BOOK_WRITE_BUSY, error: (cause as Error).message })
+        return true
+      }
       if (cause instanceof ChapterPhaseError) {
         // committed 章拒绝普通保存；带出 commitId 供界面呈现定稿身份
         let commitId: string | null = null
@@ -395,7 +481,11 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     }
     const { root, chapterIndex } = decoded.value
     try {
-      const result = withBook(root, (plane) => plane.reopenChapter(chapterIndex))
+      const result = await withBookWriteLock(
+        root,
+        () => withBook(root, (plane) => plane.reopenChapter(chapterIndex)),
+        { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS },
+      )
       json(200, {
         ok: true,
         chapterIndex: result.chapterIndex,
@@ -403,6 +493,10 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         proseRelPath: result.proseRelPath,
       })
     } catch (cause) {
+      if (isBookWriteBusyError(cause)) {
+        json(409, { ok: false, code: BOOK_WRITE_BUSY, error: (cause as Error).message })
+        return true
+      }
       if (cause instanceof ChapterPhaseError) {
         json(409, { ok: false, code: CHAPTER_NOT_COMMITTED, error: '章节不是 committed 态——无定稿可重开' })
         return true
@@ -472,6 +566,67 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     return true
   }
 
+  /**
+   * W3 状态查询：book 作用域、按 operationId 查（非按章节）、**只读不改盘**、同样鉴权。
+   * 越权（主体不匹配）返回与 not_found 同形，不暴露他人操作的存在性。
+   */
+  if (path === '/api/chapter.operation.status') {
+    // 状态查询是 **book 作用域、按 operationId** 的查询——不要求 chapterIndex，
+    // 故不走 decodeBookRequest（那个形状要求 chapterIndex 在场）。
+    let root: string
+    try {
+      const rawRoot = resolvedRoot ?? (typeof body['root'] === 'string' ? body['root'] : null)
+      if (rawRoot === null) {
+        json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root is required for the operation status query' })
+        return true
+      }
+      root = assertSafeBookRoot(rawRoot)
+    } catch (cause) {
+      if (cause instanceof RequestBoundaryError) {
+        json(cause.status, { ok: false, code: cause.code, error: cause.message })
+        return true
+      }
+      throw cause
+    }
+    const operationKey = parseOperationIntent(body)
+    if (operationKey === null) {
+      json(400, { ok: false, code: OPERATION_ID_INVALID, error: 'operationId is required for the status query' })
+      return true
+    }
+    const notFound = (): void => json(200, { ok: true, state: 'not_found', safeToRetrySameId: true })
+    const record = readOperationRecord(root, operationKey.operationId)
+    if (record === null) {
+      notFound()
+      return true
+    }
+    // 作用域核对：主体或书身份不匹配 → 与 not_found 同形（不泄露存在性）
+    const principalId = principal?.userId ?? 'local_user'
+    if (record.principalId !== principalId || record.bookId !== readBookRecord(root).id) {
+      notFound()
+      return true
+    }
+    let currentRevision = record.result.appliedRevision
+    try {
+      currentRevision = readProseChapter(root, proseChapterPath(record.chapterIndex)).revision
+    } catch {
+      // 读不到正文（章被删）：仍如实返回历史 appliedRevision
+    }
+    json(200, {
+      ok: true,
+      state: 'succeeded',
+      operationId: record.operationId,
+      result: {
+        appliedRevision: record.result.appliedRevision,
+        appliedBodyHash: record.result.appliedBodyHash,
+        ...(record.result.commitId === undefined ? {} : { commitId: record.result.commitId }),
+      },
+      currentRevision,
+      // 查询结果**不是**新的提交授权
+      replayed: true,
+    })
+    return true
+  }
+
   if (path === '/api/chapter.commit') {
     const decoded = decodeBookRequest(body, resolvedRoot, { principal })
     if (!decoded.ok) {
@@ -510,29 +665,73 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     }
 
     try {
+      // W3 操作幂等：解析身份（400 on 非法/未知版本）并按**规范化字段集**算摘要。
+      // bookId 从 book.json 读（不必为算摘要多开一次平面）。
+      const operationKey = parseOperationIntent(body)
+      const operation =
+        operationKey === null
+          ? undefined
+          : (() => {
+              const bookId = readBookRecord(root).id
+              return buildOperationIntent(
+                'chapter.commit',
+                operationKey.operationId,
+                { principalId: principal?.userId ?? 'local_user', bookId },
+                computeRequestDigest({
+                  operationType: 'chapter.commit',
+                  bookId,
+                  chapterIndex,
+                  expectedRevision,
+                  summary,
+                  usage: usageFacts,
+                }),
+              )
+            })()
       // 步 6-10 编排已收进管线边界（工单04 · packages/pipeline/src/commit-orchestration.ts）：
       // 相位守卫、依赖钉版回读、窗口键、提案续接/stale/待决规则、门禁两道、commitChapter
       // 收口、飞轮记账、会话驱动与作废收口全部是 module 侧单一实现——路由只保留输入解码、
       // 身份/书权限与响应契约映射。提取缝（真实模型调用）与 StyleLearner 窗口闭合钩子在
       // 此注入（依赖方向：pipeline 不 import web 提取器与 flywheel）；web_commit_* 窗口键
       // 形状冻结不变。
-      const outcome = await runChapterCommit({
-        root,
-        chapterIndex,
-        summary,
-        expectedRevision,
-        usage: usageFacts,
-        extractDelta: ({ bookId, chapterIndex: extractChapter, prose }) =>
-          extractChapterDelta(root, bookId, extractChapter, prose, {
-            // 工单06：提取与草稿走同一个解析缝（注册表 → BYOK → 带原因 Unavailable），
-            // 注册表-only 部署的提取不再回落 BYOK 或静默失败；hosted 下按 principal 隔离。
-            resolveTarget: (env) =>
-              resolveGenerationTarget({ taskType: 'FINAL_EXTRACT', principal: principal ?? undefined, env }),
-          }),
-        afterRecord: ({ taskRef }) => {
-          runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
-        },
-      })
+      // W2-3：模型等待不占书稿锁。缝选在 extractDelta 是刻意的——pipeline 在提取返回后
+      // 到 commitChapter 之间不再 await 模型（commit-orchestration.ts:348 → :386/:473），
+      // 因此「提取返回后立刻取租约」等价于「只锁写回段」，且无需改 packages/pipeline。
+      const writeLease: { current: BookWriteLease | null } = { current: null }
+      let outcome: Awaited<ReturnType<typeof runChapterCommit>>
+      try {
+        outcome = await runChapterCommit({
+          root,
+          chapterIndex,
+          summary,
+          expectedRevision,
+          usage: usageFacts,
+          // W3：身份随请求进入 commitChapter（journal v2）——操作结果与正文同一恢复单元
+          ...(operation === undefined ? {} : { operation }),
+          // 工单06：提取与草稿走同一个解析缝（注册表 → BYOK → 带原因 Unavailable），
+          // 注册表-only 部署的提取不再回落 BYOK 或静默失败；hosted 下按 principal 隔离。
+          // W2-3/F-03：取/还书稿写锁已移入编排层的写回段缝（acquireWriteLease/
+          // releaseWriteLease）——提取缝只做提取；提案续接分支同样被锁覆盖。
+          extractDelta: async ({ bookId, chapterIndex: extractChapter, prose }) =>
+            extractChapterDelta(root, bookId, extractChapter, prose, {
+              resolveTarget: (env) =>
+                resolveGenerationTarget({ taskType: 'FINAL_EXTRACT', principal: principal ?? undefined, env }),
+            }),
+          acquireWriteLease: async () => {
+            // 模型已返回/写回段开始：此刻取书稿写锁（同书第二写入者排队，超时 409 BOOK_WRITE_BUSY）
+            writeLease.current = await acquireBookWriteLease(root, { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS })
+          },
+          releaseWriteLease: async () => {
+            const lease = writeLease.current
+            writeLease.current = null
+            if (lease !== null) await lease.release()
+          },
+          afterRecord: ({ taskRef }) => {
+            runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
+          },
+        })
+      } finally {
+        if (writeLease.current !== null) await writeLease.current.release()
+      }
       if (outcome.kind === 'proposal_stale') {
         const stale = outcome.staleProposals
         json(409, {
@@ -587,8 +786,31 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         flywheelRecord: outcome.flywheelRecord,
         sessionWindow: outcome.sessionWindow,
         resubmitWindowCleanup: outcome.resubmitWindowCleanup,
+        // W3：回放标志 + 历史/当前双 revision（向后兼容：老客户端忽略即可）
+        replayed: outcome.replayed,
+        appliedRevision: outcome.appliedRevision,
+        currentRevision: outcome.currentRevision,
       })
     } catch (cause) {
+      // W3：作用域不匹配（他人 operationId）→ 404 形态同 not_found（t32 §C.4，不暴露存在性）
+      if (cause instanceof OperationScopeMismatchError) {
+        json(404, { ok: false, code: OPERATION_SCOPE_MISMATCH, error: 'operation scope mismatch' })
+        return true
+      }
+      // W3：同 ID 不同摘要 = 身份复用冲突（零盘上变更）；非法 ID / 未知 schemaVersion = 400
+      if (cause instanceof OperationIdReusedError) {
+        json(409, { ok: false, code: OPERATION_ID_REUSED, operationId: cause.operationId, error: cause.message })
+        return true
+      }
+      if (cause instanceof OperationRequestError) {
+        json(400, { ok: false, code: cause.code, error: cause.message })
+        return true
+      }
+      // W2-3：同书已有写入者（跨进程管道或进程内队列）——409 明确拒绝，客户端可重试。
+      if (isBookWriteBusyError(cause)) {
+        json(409, { ok: false, code: BOOK_WRITE_BUSY, error: (cause as Error).message })
+        return true
+      }
       // 工单 01：与 /api/prose.save（:384-387）同一物理条件、同一错误码。漏这条时作者看到的是
       // 裸 500 + 英文内部消息（无 code 字段），无法据此行动——违反 AGENTS.md 规则 15。
       if (cause instanceof PreWriteHashMismatchError) {

@@ -42,15 +42,9 @@ export default tseslint.config(
             'apps/web/server/test-support/*.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
-          // 2026-09-29 由 70 上调至 80：本票的 P1 首章回归测试
-          // （routes/pipelineRoutes.firstChapter{,.realModel}.test.ts）走
-          // defaultProject，与根 scripts/*.mjs、既有 server 测试共用这一个计数。
-          // 上调前实测占用 70 —— 正好卡在阈值上，本票新增 2 个文件即溢出，
-          // 报「Too many files (>70) have matched the default project」并让
-          // 整条 `eslint .` 失败（连带 scripts/verify-usability-evidence.mjs
-          // 一起报 Parsing error，是连带受害者而非自身有问题）。
-          // 按实际占用抬到 80，与前两次（64→70）同一处置口径。
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 80,
+          // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，
+          // 上调至 120 恢复 pnpm lint 门禁。
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 120,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -105,6 +99,33 @@ export default tseslint.config(
         {
           selector: 'CallExpression[callee.type="MemberExpression"][callee.object.name="LocalDataPlane"][callee.property.name=/^(open|openOrRebuild)$/]',
           message: '裸 LocalDataPlane.open/openOrRebuild 会让 SQLite 句柄泄漏（不报错、不崩、测试照样全绿）。改用 withBook(root, fn) / withStrictBook(root, fn)；确需长活句柄则用 retainBook/releaseBook 成对转移（packages/data-plane/src/with-plane.ts）。',
+        },
+      ],
+    },
+  },
+  {
+    // W5 接口防护 (Plan §6.6)：阻断 apps/web/src 生产源码对 server/ 私有实现的跨层引用
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/src/**/*.test.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/server',
+                '**/server/**',
+                '../server/**',
+                '../../server/**',
+                'apps/web/server/**',
+              ],
+              message:
+                '架构禁令 (Plan §6.6)：apps/web/src 下的 UI 模块禁止 import server 内部代码。请使用 apps/web/shared/ 共享 DTO 或通过 HTTP 客户端通信。',
+            },
+          ],
         },
       ],
     },

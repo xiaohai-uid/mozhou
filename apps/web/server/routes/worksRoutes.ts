@@ -2,7 +2,7 @@
  * apps/web · 作品详情、章节目录、装配凭据、变更矩阵与书架路由控制器。
  */
 import type { RouteHandler } from '../router.js'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import {
   withBook,
   withStrictBook,
@@ -15,6 +15,7 @@ import {
   runTraversal,
   scanLibrary,
 } from '@mozhou/data-plane'
+import { withBookWriteLock } from '../bookAccess.js'
 import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-compiler'
 import {
   buildRevisionBriefsForMatrix,
@@ -36,7 +37,7 @@ function sanitizeDirName(title: string): string {
   return cleaned.length > 0 ? cleaned : '未命名之书'
 }
 
-export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot }) => {
+export const worksRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot }) => {
   if (req.method !== 'POST') return false
 
   const resolvedRoot = bookRoot ?? null
@@ -289,27 +290,34 @@ export const worksRoutes: RouteHandler = (req, res, { path, body, json, bookRoot
       return true
     }
     const { targetDir } = assertSafeParentDirectory(rawParent, sanitizeDirName(title))
+    const targetRoot = targetDir ?? join(rawParent, sanitizeDirName(title))
+    // W2-3：建书是书稿写入。书根此刻尚不存在（canonicalBookKey 需要 realpath），
+    // 故以**已存在的父目录**为锁键：同一父目录下的并发建书被串行化，
+    // 建书后紧随的建章草稿写在同一锁内。
     try {
-      const result = createBook({ dir: targetDir ?? join(rawParent, sanitizeDirName(title)), title })
-      if (initialBody !== undefined && initialBody.length > 0) {
-        try {
-          withStrictBook(result.root, (plane) => {
-            plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
-            const scan = readProseChapter(result.root, proseChapterPath(1))
-            const updatedContent = renderProseChapter({
-              mozhouId: scan.mozhouId,
-              revision: scan.revision,
-              chapterIndex: 1,
-              phase: 'draft',
-              body: `# 第一章\n\n${initialBody}\n`,
+      const result = await withBookWriteLock(resolve(rawParent), () => {
+        const created = createBook({ dir: targetRoot, title })
+        if (initialBody !== undefined && initialBody.length > 0) {
+          try {
+            withStrictBook(created.root, (plane) => {
+              plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+              const scan = readProseChapter(created.root, proseChapterPath(1))
+              const updatedContent = renderProseChapter({
+                mozhouId: scan.mozhouId,
+                revision: scan.revision,
+                chapterIndex: 1,
+                phase: 'draft',
+                body: `# 第一章\n\n${initialBody}\n`,
+              })
+              const absPath = join(created.root, proseChapterPath(1))
+              atomicWriteFileSync(absPath, updatedContent)
             })
-            const absPath = join(result.root, proseChapterPath(1))
-            atomicWriteFileSync(absPath, updatedContent)
-          })
-        } catch {
-          // 容错处理
+          } catch {
+            // 容错处理
+          }
         }
-      }
+        return created
+      }, { timeoutMs: 30_000 })
       json(200, {
         ok: true,
         root: result.root,
