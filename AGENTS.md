@@ -1,6 +1,8 @@
 # 墨舟 (MoZhou) — AI 小说写作平台
 
-Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS.md` (symlinked from `~/.zcode/AGENTS.md`) — this file only adds project-scoped conventions.
+> **本会话第一个动作：先读 `C:\zcode\AGENTS.md`（符号链接自 `~/.zcode/AGENTS.md`），再调任何工具、再作答——包括看起来只是「查一下资料」的问题。** 本文件只是在它之上追加项目级约定，任何时候都不替代它。判断权不在你：这条闸门没有"任务太小所以跳过"这一档。
+>
+> Repo-level agent instructions; the global contract above always wins, and this file never replaces it.
 
 ## 0. 流程权威与优先级（2026-10-01 裁决）
 
@@ -71,6 +73,7 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
 ### 7. 项目基建
 - 术语：**[`GLOSSARY.md`](./GLOSSARY.md)**（原 `CONTEXT.md`，2026-10-01 迁正）
 - 架构地图：`docs/architecture.md`；决策地图：`docs/adr/INDEX.md`；决策记录：`docs/adr/`
+- 变更记录地图：[`PROJECT-MAP.md`](./PROJECT-MAP.md)（全局指令《项目地图与变更溯源》要求的 canonical 入口）——变更 ID、基线、验收、证据索引；专项细节归上列各图，本图不重复维护
 - 契约全集：`.scratch/mozhou-mvp/contracts/api-contract.md`（已实现端点以后端发射端 + 契约测试为准，UI 消费是协议子集）
 - 执行跟踪：GitHub Issues（见 §9）；本地规格文档：`.scratch/<feature-slug>/`（**不是**执行状态的家）
 - spike 结论：`docs/spikes/`（见 0.5 探针）
@@ -86,7 +89,7 @@ Repo-level agent instructions. Global user instructions live at `C:\zcode\AGENTS
   - `test` = FAT 测试分支；`release` = UAT 预上线分支（发版时从 `test` 拉，惰性创建）；
   - `hotfix/<desc>` 基于 `main`，修复后双合回 `main` + `develop`；
   - AI 代理工作分支可用 `feature/<agent>-<module>` 前缀，但合入语义必须遵守六分支模型（功能只进 `develop`，不直接进 `main`）。
-- 提交信息：Conventional Commits 八类前缀（`feat`/`fix`/`docs`/`style`/`refactor`/`perf`/`test`/`chore`）；单次提交同一类别、问题不超过 3 个；不合规用 `git commit --amend` 修正，禁用 `git reset --hard`。
+- 提交信息：按全局指令（文件头 `C:\zcode\AGENTS.md`）「Git 分支与提交 → 提交信息与历史保护」章执行（八类 Conventional Commits 前缀、单提交同一类别不超过 3 个问题）；破坏性 Git 操作的禁令以全局同章与本文件 §6 第 23 条为准。本节只保留项目级差异，不重复全局条文。
 - 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
 
 ## 9. Wayfinder 追踪操作（内核线并入）
@@ -110,7 +113,7 @@ Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mozhou** (9653 symbols, 21363 relationships, 516 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mozhou** (10007 symbols, 21780 relationships, 516 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -143,11 +146,11 @@ This project is indexed by GitNexus as **mozhou** (9653 symbols, 21363 relations
 
 | Task | Read this skill file |
 | --- | --- |
-| Understand architecture / "How does X work?" | `.agents/skills/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.agents/skills/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.agents/skills/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.agents/skills/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.agents/skills/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.agents/skills/gitnexus-cli/SKILL.md` |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
