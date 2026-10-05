@@ -85,6 +85,6 @@ tags:
 
 - **旧程序遇 v2 journal 拒写**：仅**源码阅读证据**（assertJournalShape 的版本守卫），**未搭回退实验验证**。
 - **hosted 跨主体作用域拒绝未端到端**：hosted 模式按主体隔离书根，该路径不可达；local 多主体共用 dataRoot 的作用域拒绝已由 data-plane 与路由两级用例覆盖。
-- **保存路径是否引入 journal**：本 ADR 的记录按"提交路径"落地；草稿保存的原子性范围以 W3 实施报告为准。
+- **保存路径是否引入 journal**：本 ADR 的记录按"提交路径"落地；草稿保存的原子性范围以 W3 实施报告为准。**（2026-10-05 已关闭：见 [docs/w3-operations-implementation-report-2026-10-05.md](../w3-operations-implementation-report-2026-10-05.md)——保存路径已引入轻量 v2 journal（单空载荷 events 目标），线性化点为正文原子替换，恢复机制与提交路径共用；残余未验证项见该报告 §4.3。）**
 - **开销**：实测为**下界证据**（data-plane 级、不含 HTTP/UI/commit），p95 差值属噪声主导；有信息量的是 p50 增量约 3.6ms。
 - **清理策略**：初版不做自动清理（沿用规划 §6.4.5），仅提供 countOperationRecords 观测口径；触发压缩的条件（单书超过约 1 万条 / 目录超过约 50MB / 出现保留期需求）需后续卡确认。
