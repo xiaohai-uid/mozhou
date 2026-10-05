@@ -167,7 +167,7 @@ describe('POST /api/tasks.events', () => {
     )
     expect(handled).toBe(true)
     expect(captured).not.toBeNull()
-    const data = (captured as { body: { mode: string; snapshot: { tasks: { taskId: string }[] } } }).body
+    const data = (captured as unknown as { body: { mode: string; snapshot: { tasks: { taskId: string }[] } } }).body
     expect(data.mode).toBe('snapshot')
     // 快照来自 A 的账本（task_A/task_B），而非 body.root 指向的空账本 B
     expect(data.snapshot.tasks.map((t) => t.taskId).sort()).toEqual(['task_A', 'task_B'])
