@@ -38,6 +38,7 @@ import type {
   ReceiptEntry,
   ReplayCandidate,
   ReplayInputs,
+  ChannelContribution,
 } from '@mozhou/kernel'
 import type { RecallResult, RecallTier } from './recall.js'
 
@@ -201,6 +202,47 @@ export interface AssemblyResult {
 /* ----------------------------------------------------------------------------
  * 内部件：canonicalJson / sha256 / 截断原语 / desirability 全序
  * -------------------------------------------------------------------------- */
+
+/**
+ * 按召回通道归约 entries（T2）。纯函数、无 IO、顺序确定。
+ *
+ * 导出供回放面与测试复用同一归约公式——派生字段的算法只此一份，
+ * 免得 UI 与重放各算一套而对不上。
+ */
+export function summarizeByChannel(entries: readonly ReceiptEntry[]): readonly ChannelContribution[] {
+  const acc = new Map<AssemblyChannel, {
+    entries: number
+    included: number
+    tokens: number
+    reasons: Map<ExclusionReason, number>
+  }>()
+  for (const entry of entries) {
+    const channel = entry.assemblySource
+    if (channel === undefined) continue
+    const bucket = acc.get(channel) ?? { entries: 0, included: 0, tokens: 0, reasons: new Map() }
+    bucket.entries += 1
+    if (entry.included) {
+      bucket.included += 1
+      bucket.tokens += entry.tokens ?? 0
+    } else {
+      const reason = entry.exclusionReason
+      if (reason !== undefined) bucket.reasons.set(reason, (bucket.reasons.get(reason) ?? 0) + 1)
+    }
+    acc.set(channel, bucket)
+  }
+  return [...acc.entries()]
+    .map(([channel, b]) => ({
+      channel,
+      entries: b.entries,
+      included: b.included,
+      excluded: b.entries - b.included,
+      tokens: b.tokens,
+      exclusionReasons: [...b.reasons.entries()]
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => (a.reason < b.reason ? -1 : a.reason > b.reason ? 1 : 0)),
+    }))
+    .sort((a, b) => (a.channel < b.channel ? -1 : a.channel > b.channel ? 1 : 0))
+}
 
 const ENTRY_DELIMITER = '\n'
 
@@ -638,6 +680,21 @@ export function assembleBudgetedContext(input: AssembleInput): AssemblyResult {
     }),
   )
 
+  /**
+   * 通道贡献汇总（T2 派生）：恒由上面这份 entries 逐条归约得出，不引入任何新事实。
+   *
+   * 口径如实声明：
+   * - 只统计 entries 里带 assemblySource 的条目。structural 条目按定义不经召回，
+   *   没有通道标记，因此不计入任何通道（它们在 totalTokens 里）。
+   * - converge 阶段的出局条目不带 assemblySource（assemble.ts:563-572 的既定形状），
+   *   故这部分落选**无法归因到通道**，会表现为各通道 excluded 之和小于总落选数。
+   *   UI 必须能显示这个差额，否则「合计对不上」会被误读成数据损坏。
+   * - story_text 是正文保底配额槽位，不是召回通道，同样不进汇总。
+   *
+   * 刻意**不**并入 recomputationHash：见 kernel-schema.ts 中 channelSummary 的注释。
+   */
+  const channelSummary = summarizeByChannel(entries)
+
   const receipt: ContextReceipt = {
     id: input.receiptIdentity.receiptId,
     bookId: input.receiptIdentity.bookId,
@@ -656,6 +713,7 @@ export function assembleBudgetedContext(input: AssembleInput): AssemblyResult {
     replayInputs,
     inputsDigest,
     recomputationHash,
+    channelSummary,
   }
 
   return { packet, receipt }

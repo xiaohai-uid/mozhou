@@ -84,3 +84,19 @@ export type {
   DeAiSeverity,
 } from './de-ai-engine.js';
 
+export {
+  BENCHMARK_VERSION,
+  METRIC_GATES,
+  METRIC_IDS,
+  evaluateMetricGate,
+  matrixRowFor,
+} from './metrics-gates.js';
+export type {
+  LiteraryQualitySignals,
+  MatrixRowInput,
+  MetricId,
+  MetricReading,
+  MetricThreshold,
+  VersionMatrixRow,
+} from './metrics-gates.js';
+

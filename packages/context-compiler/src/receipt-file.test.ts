@@ -133,13 +133,15 @@ describe('AC1 同输入字节级一致 + 序列化确定性', () => {
     const text = serializeReceiptFile(receipt)
     expect(text.endsWith('\n')).toBe(true)
     expect(text).toContain('\n  "assembledBy"')
-    const keys = ['assembledBy', 'bookId', 'createdAt', 'entries', 'id', 'inputsDigest', 'parseFailures', 'recomputationHash', 'replayInputs', 'revision', 'storyTextQuota', 'taskType', 'totalTokens', 'updatedAt']
-    let last = -1
-    for (const key of keys) {
-      const at = text.indexOf(`"${key}":`)
-      expect(at).toBeGreaterThan(last)
-      last = at
-    }
+    // 顶层键序：解析后按 Object.keys 取**顶层**顺序比较。
+    //
+    // 为什么不再用字符串 indexOf：那是全文首个出现位置，嵌套对象里的同名字段会被误当作
+    // 顶层键。T2 给回执加了 channelSummary（其每项含 entries），`indexOf('"entries":')`
+    // 先命中嵌套那处，于是断言测的已经不是本用例声明的「顶层键」不变式。
+    // 改成顶层比较后覆盖面反而更大：不再依赖硬编码的键清单，新增字段乱序一样报警。
+    const topLevelKeys = Object.keys(JSON.parse(text) as Record<string, unknown>)
+    expect(topLevelKeys).toEqual([...topLevelKeys].sort())
+    expect(topLevelKeys).toContain('channelSummary')
   })
 })
 

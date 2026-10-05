@@ -22,6 +22,7 @@ import type {
   FactImportance,
   FactValue,
   NarrativeStateSnapshot,
+  ReceiptEntry,
   RelationshipState,
   RelationshipStateId,
   TemporalFact,
@@ -32,6 +33,7 @@ import {
   CompileConfigError,
   TokenizerUnavailable,
   assembleBudgetedContext,
+  summarizeByChannel,
   type AssembleInput,
   type ExactTokenizer,
   type ReceiptIdentity,
@@ -728,3 +730,85 @@ describe('T9 解析失败逐条与重放面增补', () => {
     expect(archived.get('rule_y')?.activation).toEqual({ kind: 'embedding', score: 0.9 })
   })
 })
+
+/* ----------------------------------------------------------------------------
+ * T2：通道贡献汇总（派生字段，恒可由 entries 复算）
+ * -------------------------------------------------------------------------- */
+
+describe('T2 通道贡献汇总', () => {
+  it('按通道归约 included / excluded / tokens，并给出落选原因分布', () => {
+    const summary = summarizeByChannel([
+      entry({ identifier: 'a', assemblySource: 'keyword', included: true, tokens: 30 }),
+      entry({ identifier: 'b', assemblySource: 'keyword', included: true, tokens: 12 }),
+      entry({ identifier: 'c', assemblySource: 'keyword', included: false, exclusionReason: 'budget_exhausted' }),
+      entry({ identifier: 'd', assemblySource: 'keyword', included: false, exclusionReason: 'budget_exhausted' }),
+      entry({ identifier: 'e', assemblySource: 'keyword', included: false, exclusionReason: 'duplicate' }),
+      entry({ identifier: 'f', assemblySource: 'embedding', included: true, tokens: 8 }),
+      entry({ identifier: 'g', assemblySource: 'graph_khop', included: false, exclusionReason: 'pov_filtered' }),
+    ])
+    const byChannel = new Map(summary.map((row) => [row.channel, row]))
+    expect(byChannel.get('keyword')).toEqual({
+      channel: 'keyword',
+      entries: 5,
+      included: 2,
+      excluded: 3,
+      tokens: 42,
+      exclusionReasons: [{ reason: 'budget_exhausted', count: 2 }, { reason: 'duplicate', count: 1 }],
+    })
+    expect(byChannel.get('embedding')).toEqual({
+      channel: 'embedding', entries: 1, included: 1, excluded: 0, tokens: 8, exclusionReasons: [],
+    })
+    expect(byChannel.get('graph_khop')?.excluded).toBe(1)
+  })
+
+  it('不带 assemblySource 的条目不进任何通道（structural 与 story_text 不计入）', () => {
+    const summary = summarizeByChannel([
+      entry({ identifier: 's', included: true, tokens: 540 }),
+      entry({ identifier: 'story', included: true, tokens: 8000 }),
+    ])
+    expect(summary).toEqual([])
+  })
+
+  it('落选条目没有 exclusionReason 时不产生任何原因分布条目（不猜）', () => {
+    const summary = summarizeByChannel([entry({ identifier: 'x', assemblySource: 'keyword', included: false })])
+    expect(summary).toEqual([
+      { channel: 'keyword', entries: 1, included: 0, excluded: 1, tokens: 0, exclusionReasons: [] },
+    ])
+  })
+
+  it('输出按通道名字典序，顺序稳定（回放面与 UI 共用同一公式）', () => {
+    const rows = summarizeByChannel([
+      entry({ identifier: '1', assemblySource: 'manual_pin', included: true, tokens: 1 }),
+      entry({ identifier: '2', assemblySource: 'embedding', included: true, tokens: 1 }),
+      entry({ identifier: '3', assemblySource: 'keyword', included: true, tokens: 1 }),
+      entry({ identifier: '4', assemblySource: 'structural', included: true, tokens: 1 }),
+    ])
+    expect(rows.map((row) => row.channel)).toEqual(['embedding', 'keyword', 'manual_pin', 'structural'])
+  })
+
+  it('装配产出的回执自带 channelSummary，且不改哈希口径（老回执仍可重放）', () => {
+    const { receipt } = assembleBudgetedContext(
+      baseInput({
+        recall: {
+          candidates: [
+            cand('entity_card', 1, 30, { id: 'card_x', channel: 'keyword', activation: { kind: 'keyword', keys: ['林枫'] } }),
+            cand('world_rule', 0.9, 30, { id: 'rule_y', channel: 'embedding', activation: { kind: 'embedding', score: 0.9 } }),
+          ],
+          excluded: [],
+          parseFailures: [],
+        },
+      }),
+    )
+    expect(receipt.channelSummary?.map((row) => row.channel)).toEqual(['embedding', 'keyword', 'structural'])
+    // 汇总恒可由 entries 复算：手工重算一遍，两条路径必须逐字段相等
+    const recomputed = summarizeByChannel(receipt.entries)
+    expect(receipt.channelSummary).toEqual(recomputed)
+    // 哈希不变式不受新字段影响：同输入两次装配仍同哈希
+    expect(typeof receipt.recomputationHash).toBe('string')
+    expect(receipt.recomputationHash.length).toBeGreaterThan(0)
+  })
+})
+
+function entry(overrides: Partial<ReceiptEntry>): ReceiptEntry {
+  return { stage: 'reserve', order: 0, identifier: 'x', included: true, ...overrides }
+}

@@ -496,6 +496,33 @@ export interface ContextReceipt extends KernelEntityHead {
   readonly inputsDigest: string;
   /** 同输入重算装配应得到同哈希；receipt 间 diff 即审计（可复算可 diff） */
   readonly recomputationHash: string;
+  /**
+   * 各召回通道的贡献汇总（T2 派生字段，可选）。
+   *
+   * 回答两个作者真正会问的问题：「到底是哪条通道把这段上下文排到了前面」与
+   * 「为什么这条重要设定没进来」。前者看 included/tokens，后者看 exclusionReasons。
+   *
+   * **为什么可选**：恒可由 `entries` 逐条复算得出，老回执（字段缺席）语义不变，
+   * 不需要迁移。**为什么不进 recomputationHash**：该哈希的不变式是「同输入 ⇒ 同哈希」，
+   * 而本字段被 entries 完全决定、entries 已在哈希内；把它塞进哈希只会让**已落盘的
+   * 历史回执全部重放失败**，却不增强任何不变式。故显式排除，并在 assemble 侧留注释。
+   */
+  readonly channelSummary?: readonly ChannelContribution[] | undefined;
+}
+
+/** 单通道对本次装配的贡献账（T2）。恒可由 ContextReceipt.entries 复算，故非独立事实源。 */
+export interface ChannelContribution {
+  readonly channel: AssemblyChannel;
+  /** entries 中带该通道标记的条目数（含落选者）。 */
+  readonly entries: number;
+  /** 最终进入 packet 的条目数。 */
+  readonly included: number;
+  /** 落选条目数（含被预算挤出、去重、召回期滤除）。 */
+  readonly excluded: number;
+  /** 进入 packet 的条目占用 token 合计。 */
+  readonly tokens: number;
+  /** 落选原因分布；空数组表示该通道本次无落选。 */
+  readonly exclusionReasons: readonly { readonly reason: ExclusionReason; readonly count: number }[];
 }
 
 /* ----------------------------------------------------------------------------
