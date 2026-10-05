@@ -7,7 +7,7 @@
  */
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CloudSyncResponse } from '../../server/api'
+import type { CloudSyncResponse } from '../../shared/api'
 import { okJson } from '../test/http'
 import { CloudSyncView } from './CloudSyncView'
 

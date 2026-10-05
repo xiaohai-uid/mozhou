@@ -10,7 +10,7 @@
  * Traversal 记录展示触发源、上游改动项与受影响章清单。
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { TasksResponse, TaskEventSummary } from '../../server/api'
+import type { TasksResponse, TaskEventSummary } from '../../shared/api'
 import { post } from '../lib/post'
 
 const CATEGORY_LABELS: Record<TaskEventSummary['category'], { label: string; cls: string }> = {

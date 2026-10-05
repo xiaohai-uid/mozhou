@@ -7,7 +7,7 @@
  * - POST /api/novel-breakdown {root?, sampleText?} → NovelBreakdownResponse
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { NovelBreakdownResponse, NovelBreakdownResult } from '../../server/api'
+import type { NovelBreakdownResponse, NovelBreakdownResult } from '../../shared/api'
 import { post } from '../lib/post'
 
 const SAMPLE_BREAKDOWNS = [

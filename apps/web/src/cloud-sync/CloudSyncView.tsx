@@ -7,7 +7,7 @@
  * 数据面：POST /api/cloud-sync {root?} → CloudSyncResponse
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { CloudSyncResponse } from '../../server/api'
+import type { CloudSyncResponse } from '../../shared/api'
 import { post } from '../lib/post'
 
 export function CloudSyncView({

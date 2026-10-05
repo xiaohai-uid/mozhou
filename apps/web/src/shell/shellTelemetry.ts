@@ -4,7 +4,7 @@
  * quality 审查时效 / matrix 影响矩阵）；无证据的阶段保持未标记——
  * 被点击 ≠ 执行成功，无证据 ≠ done。纯函数，无副作用，可单测。
  */
-import type { WorksChapterSummary, ReceiptListItem } from '../../server/api'
+import type { WorksChapterSummary, ReceiptListItem } from '../../shared/api'
 import type { PipelineStageId, PipelineStageState } from './PipelineStrip'
 
 export type { PipelineStageState }

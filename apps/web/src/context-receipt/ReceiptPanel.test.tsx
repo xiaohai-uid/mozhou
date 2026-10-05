@@ -9,7 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BookId, ContextReceipt, ContextReceiptId, ExclusionReason, ReceiptEntry } from '@mozhou/kernel'
-import type { ReceiptListResponse, ReceiptDetailResponse } from '../../server/api'
+import type { ReceiptListResponse, ReceiptDetailResponse } from '../../shared/api'
 import { okJson } from '../test/http'
 import { ReceiptPanel } from './ReceiptPanel'
 
@@ -36,6 +36,7 @@ function seedReceipt(fields: {
   contextWindow: number
   entries: SeedEntry[]
   resume?: ReceiptDetailResponse['resume']
+  channelSummary?: ContextReceipt['channelSummary']
 }): ReceiptDetailResponse {
   const entries = fields.entries.map((entry, order): ReceiptEntry => ({
     stage: entry.stage,
@@ -72,6 +73,7 @@ function seedReceipt(fields: {
     },
     inputsDigest: 'c820a91f',
     recomputationHash: 'h',
+    ...(fields.channelSummary === undefined ? {} : { channelSummary: fields.channelSummary }),
   }
   return {
     ok: true,
@@ -104,12 +106,12 @@ const DETAIL = seedReceipt({
   ],
 })
 
-function stubReceiptFetch(list: ReceiptListResponse['receipts'] = LIST): void {
+function stubReceiptFetch(list: ReceiptListResponse['receipts'] = LIST, detail: ReceiptDetailResponse = DETAIL): void {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation((path: string) => {
       if (path === '/api/receipts') return okJson({ ok: true, receipts: list })
-      if (path === '/api/receipt') return okJson(DETAIL)
+      if (path === '/api/receipt') return okJson(detail)
       return okJson({ ok: false, error: 'unexpected path: ' + path })
     }),
   )
@@ -228,5 +230,70 @@ describe('ReceiptPanel（T42）', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain('receipts 读取失败')
     })
+  })
+
+  /* ----------------------------------------------------------------
+   * T2: 通道贡献汇总 + 正文侧预选入口
+   * ---------------------------------------------------------------- */
+
+  it('通道贡献：逐通道呈现入/总、token 与落选原因分布', async () => {
+    const detail = seedReceipt({
+      receiptId: 'rcpt_t4201',
+      chapterIndex: 1,
+      contextWindow: 32000,
+      entries: [
+        { stage: 'structural', identifier: 'book_identity', included: true, tokens: 540 },
+        { stage: 'reserve', identifier: 'char:lin-wan', included: true, tokens: 201 },
+        { stage: 'recall_filter', identifier: 'fact:x', included: false, exclusionReason: 'budget_exhausted' },
+      ],
+      channelSummary: [
+        { channel: 'keyword', entries: 2, included: 1, excluded: 1, tokens: 201, exclusionReasons: [{ reason: 'budget_exhausted', count: 1 }] },
+        { channel: 'structural', entries: 1, included: 1, excluded: 0, tokens: 540, exclusionReasons: [] },
+      ],
+    })
+    stubReceiptFetch(LIST, detail)
+    render(<ReceiptPanel root={'C:\\tmp\\book-a'} />)
+    await waitFor(() => expect(screen.getByTestId('receipt-list').textContent).toContain('rcpt_t4201'))
+    await userEvent.click(document.querySelector('[data-receipt-id="rcpt_t4201"]') as HTMLElement)
+    const summary = await screen.findByTestId('receipt-channel-summary')
+    const keyword = summary.querySelector('[data-channel="keyword"]') as HTMLElement
+    expect(keyword.textContent).toContain('关键词通道')
+    expect(keyword.textContent).toContain('入 1/2')
+    expect(keyword.textContent).toContain('budget_exhausted×1')
+    expect(keyword.textContent).toContain('落选 1')
+    const structural = summary.querySelector('[data-channel="structural"]') as HTMLElement
+    expect(structural.textContent).toContain('落选 0')
+    // 未出现在本次汇总里的通道不得凭空渲染
+    expect(summary.querySelector('[data-channel="graph_khop"]')).toBeNull()
+  })
+
+  it('旧回执没有 channelSummary 时如实说明，不渲染空表冒充「无落选」', async () => {
+    const detail = seedReceipt({
+      receiptId: 'rcpt_t4201',
+      chapterIndex: 1,
+      contextWindow: 32000,
+      entries: [{ stage: 'structural', identifier: 'book_identity', included: true, tokens: 540 }],
+    })
+    stubReceiptFetch(LIST, detail)
+    render(<ReceiptPanel root={'C:\\tmp\\book-a'} />)
+    await waitFor(() => expect(screen.getByTestId('receipt-list').textContent).toContain('rcpt_t4201'))
+    await userEvent.click(document.querySelector('[data-receipt-id="rcpt_t4201"]') as HTMLElement)
+    expect((await screen.findByTestId('receipt-channel-summary')).textContent).toContain('没有通道汇总')
+  })
+
+  it('initialReceiptId：正文侧「为什么这么写」直接预选该条，不必在列表里再点一次', async () => {
+    const detail = seedReceipt({
+      receiptId: 'rcpt_t4202',
+      chapterIndex: 2,
+      contextWindow: 32000,
+      entries: [{ stage: 'structural', identifier: 'book_identity', included: true, tokens: 540 }],
+    })
+    stubReceiptFetch(LIST, detail)
+    render(<ReceiptPanel root={'C:\\tmp\\book-a'} initialReceiptId={'rcpt_t4202'} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('receipt-replay').textContent).toContain('fake-char-v1')
+    })
+    const row = document.querySelector('[data-receipt-id="rcpt_t4202"]') as HTMLElement
+    expect(row.getAttribute('aria-pressed')).toBe('true')
   })
 })

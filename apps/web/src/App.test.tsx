@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from './App'
+import { App, ErrorBoundary } from './App'
 import { okJson } from './test/http'
 import { emptyCanonState } from './test/fixtures'
 
@@ -269,6 +269,14 @@ describe('App 首次建书 Wizard（T42）', () => {
     expect(screen.getByTestId('wizard-overlay')).not.toBeNull()
   })
 
+  it('移动端首启无书：同样挂载 WizardOverlay 建书向导（修复移动端向导截断）', () => {
+    window.localStorage.removeItem('mozhou.wizard.done')
+    vi.stubGlobal('innerWidth', 375)
+    stubAppFetch()
+    render(<App />)
+    expect(screen.getByTestId('wizard-overlay')).not.toBeNull()
+  })
+
   it('Wizard 完成后进入常驻工作台；刷新不再自动弹出（localStorage 记忆）', async () => {
     window.localStorage.removeItem('mozhou.wizard.done')
     stubAppFetch()
@@ -499,5 +507,40 @@ describe('App 首次建书 Wizard（T42）', () => {
       expect(screen.getByLabelText('membership-view')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('membership-view').textContent).toContain('会员与授权中心')
+  })
+})
+
+describe('React Error Boundary（前端白屏防护与韧性兜底）', () => {
+  it('子组件异常时不白屏，渲染错误提示并支持重试恢复', () => {
+    const originalConsoleError = console.error
+    console.error = vi.fn()
+
+    function ProblemChild({ shouldThrow }: { shouldThrow: boolean }) {
+      if (shouldThrow) {
+        throw new Error('测试渲染抛错')
+      }
+      return <div>恢复正常渲染</div>
+    }
+
+    const { rerender } = render(
+      <ErrorBoundary>
+        <ProblemChild shouldThrow={true} />
+      </ErrorBoundary>,
+    )
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByText('页面遇到意外错误')).toBeInTheDocument()
+    expect(screen.getByText('测试渲染抛错')).toBeInTheDocument()
+
+    // 触发重试并传入正常子组件
+    rerender(
+      <ErrorBoundary>
+        <ProblemChild shouldThrow={false} />
+      </ErrorBoundary>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(screen.getByText('恢复正常渲染')).toBeInTheDocument()
+
+    console.error = originalConsoleError
   })
 })

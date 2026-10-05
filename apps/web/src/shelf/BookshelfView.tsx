@@ -11,7 +11,7 @@
  * skipped（坏 book.json 书）显式提示，不静默。
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { LibraryResponse, LibraryOpenResponse } from '../../server/api'
+import type { LibraryResponse, LibraryOpenResponse } from '../../shared/api'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
 

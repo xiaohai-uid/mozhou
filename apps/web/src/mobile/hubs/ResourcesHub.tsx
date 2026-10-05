@@ -3,7 +3,7 @@ import { SearchIcon } from '../components/MobileIcons'
 import { post } from '../../lib/post'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
-import type { BookSourceSearchResponse, CrawledBook } from '../../../server/api'
+import type { BookSourceSearchResponse, CrawledBook } from '../../../shared/api'
 
 export interface ResourcesHubProps {
   book: BookInfo | null

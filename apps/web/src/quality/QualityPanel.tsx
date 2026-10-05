@@ -5,6 +5,8 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { post } from '../lib/post'
+// W3 操作幂等契约：共享层类型
+import type { OperationResponseFields } from '../../shared/operations'
 
 export interface QualitySummary {
   readonly ok: boolean
@@ -161,6 +163,10 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
       const res = await post<{
         ok: boolean
         commitId: string
+        /** W3 幂等字段（可选，向后兼容） */
+        replayed?: boolean
+        appliedRevision?: number
+        currentRevision?: number
         deltaExtraction?: {
           extractor: 'llm' | 'none'
           counts: Record<string, number>
@@ -173,6 +179,8 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
         summary: commitSummary,
         expectedRevision: expected,
       })
+      const idempotency = res as Partial<OperationResponseFields>
+      void idempotency
       if (res.ok) {
         setChapterPhase('committed')
         setCommitNotice(`✓ 本章已成功定稿入账 (${res.commitId.slice(0, 12)})`)

@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { post } from '../lib/post'
-import type { WorksOverviewResponse, ReceiptListItem } from '../../server/api'
+import type { WorksOverviewResponse, ReceiptListItem } from '../../shared/api'
 import type { MatrixRowsLite, QualityStatusLite } from './shellTelemetry'
 
 export interface ShellTelemetry {

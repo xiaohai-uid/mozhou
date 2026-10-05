@@ -10,9 +10,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
+import type { CapabilitiesResponse, DraftQuestionResponse } from '../../shared/api'
 import { okJson } from '../test/http'
 import { DialogueStream } from './DialogueStream'
+import { viewGeneration } from '../../shared/taskStream'
 import type { BookInfo } from '../shell/workbenchStorage'
 
 afterEach(() => {
@@ -229,5 +230,65 @@ describe('DialogueStream（T44）', () => {
   it('未建书：显式建书引导，不渲染对话流', () => {
     render(<DialogueStream book={null} />)
     expect(screen.getByTestId('dialogue-no-book').textContent).toContain('先建书')
+  })
+
+  /**
+   * W4-2c-2b：视图代次触发点接线（新生成 / 停止 / 切章各 +1）。
+   *
+   * 为什么断言共享代次而不是「构造一次真实的迟到 chunk 竞态」：停止路径本身也会
+   * cancel reader（第一层），组件harness 里无法确定性地让一个 chunk 恰好落在
+   * 「停止之后、cancel 生效之前」。判定本身（旧代次/已见序号丢弃）已由
+   * apps/web/src/taskStream.test.ts 的纯函数用例锁定；这里锁定的是**触发点真的调用了**。
+   */
+  it('W4-2c-2b：视图代次在新生成/停止/切章三处各 +1（触发点接线）', async () => {
+    // 受控流：保持打开，组件停在 drafting（停止按钮在位）
+    const encoder = new TextEncoder()
+    let streamController: any = null
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller
+      },
+    })
+    const fetchMock = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/capabilities') {
+        return okJson({ ...CAPS, providerAvailable: true, providerUnavailableReason: null, providerBlockedHost: null, providerDetail: '' })
+      }
+      if (path === '/api/draft.question') return okJson(QUESTION)
+      if (path === '/api/draft.stream') {
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' } })
+      }
+      return okJson({ ok: false, error: 'unexpected path: ' + path })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { rerender } = render(<DialogueStream book={BOOK} />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '两者递进' })).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('button', { name: '两者递进' }))
+
+    const beforeSend = viewGeneration.current()
+    await userEvent.click(screen.getByLabelText('发送'))
+    // 新生成 ⇒ 代次 +1
+    await waitFor(() => {
+      expect(viewGeneration.current()).toBeGreaterThan(beforeSend)
+    })
+    streamController?.enqueue(encoder.encode(JSON.stringify({ ok: true, event: 'start', chapterIndex: 1, receiptId: null }) + '\n'))
+    streamController?.enqueue(encoder.encode(JSON.stringify({ ok: true, event: 'delta', text: '第一段' }) + '\n'))
+    await waitFor(() => {
+      expect(screen.getByTestId('draft-text').textContent).toContain('第一段')
+    })
+
+    // 停止 ⇒ 代次再 +1
+    const beforeStop = viewGeneration.current()
+    await userEvent.click(screen.getByRole('button', { name: '停止生成' }))
+    expect(viewGeneration.current()).toBeGreaterThan(beforeStop)
+
+    // 切章 ⇒ 代次再 +1
+    const beforeSwitch = viewGeneration.current()
+    rerender(<DialogueStream book={BOOK} chapterIndex={2} />)
+    await waitFor(() => {
+      expect(viewGeneration.current()).toBeGreaterThan(beforeSwitch)
+    })
   })
 })

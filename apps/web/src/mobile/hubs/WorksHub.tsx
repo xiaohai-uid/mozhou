@@ -3,7 +3,7 @@ import { ExportIcon } from '../components/MobileIcons'
 import { post } from '../../lib/post'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
-import type { WorksOverviewResponse } from '../../../server/api'
+import type { WorksOverviewResponse } from '../../../shared/api'
 
 export interface WorksHubProps {
   book: BookInfo | null

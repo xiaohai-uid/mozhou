@@ -7,7 +7,7 @@
  * 因此 Sheet 不提供任何假按钮。无 Level/稀有度/战力等无数据数值。
  */
 import { useEffect, useState } from 'react'
-import type { CapabilitySquareResponse, CapabilityStatus } from '../../server/api'
+import type { CapabilitySquareResponse, CapabilityStatus } from '../../shared/api'
 import { post } from '../lib/post'
 import { useSheetA11y } from '../shell/useSheetA11y'
 import { detailOf } from './capabilityDetails'

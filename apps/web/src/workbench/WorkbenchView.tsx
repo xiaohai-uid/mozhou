@@ -10,7 +10,8 @@ import { ProseEditorPanel } from './editor/ProseEditorPanel'
 import { syncSha256Hex } from './lib/sha256'
 import { DesktopToolModals, type DesktopModalType } from '../shell/DesktopToolModals'
 import type { BookInfo } from '../shell/workbenchStorage'
-import type { WorksChapterSummary } from '../../server/api'
+import type { WorksChapterSummary } from '../../shared/api'
+import { WhyThisWritingButton } from '../context-receipt/WhyThisWritingButton'
 
 interface BookCreated {
   ok: true
@@ -30,6 +31,7 @@ export function WorkbenchView({
   chapterIndex = 1,
   onChapterIndexChange,
   chapters,
+  onExplainContext,
 }: {
   book: BookInfo | null
   onBookCreated: (book: BookInfo) => void
@@ -37,6 +39,8 @@ export function WorkbenchView({
   onChapterIndexChange?: (chapterIndex: number) => void
   /** 章节轨数据（/api/works 真实章节摘要）；未提供时不渲染（测试/无书面）。 */
   chapters?: readonly WorksChapterSummary[] | undefined
+  /** 「为什么这么写」入口的落点；未提供则该按钮不渲染（测试/无书面场景）。 */
+  onExplainContext?: ((receiptId: string) => void) | undefined
 }): JSX.Element {
   const [title, setTitle] = useState('未命名之书')
   const [createError, setCreateError] = useState<string | null>(null)
@@ -133,6 +137,13 @@ export function WorkbenchView({
                 style={{ width: 74, padding: '4px 6px' }}
               />
             </label>
+          )}
+          {onExplainContext !== undefined && (
+            <WhyThisWritingButton
+              root={book?.root ?? null}
+              chapterIndex={chapterIndex}
+              onOpen={onExplainContext}
+            />
           )}
           <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('history')}>
             <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9Z" /></svg>

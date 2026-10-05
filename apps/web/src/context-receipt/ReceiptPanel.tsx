@@ -15,7 +15,7 @@
  *   全由 entries + replayInputs 纯函数聚合，不依赖任何估算。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ReceiptDetailResponse, ReceiptListResponse } from '../../server/api'
+import type { ReceiptDetailResponse, ReceiptListResponse } from '../../shared/api'
 import { post } from '../lib/post'
 
 const STAGE_TOK: Record<string, 'reserved' | 'story' | 'fixed'> = {
@@ -33,13 +33,29 @@ const STAGE_LABEL: Record<string, string> = {
   recall_filter: 'recall_filter',
 }
 
+const CHANNEL_LABEL: Record<string, string> = {
+  structural: '结构层注入',
+  keyword: '关键词通道',
+  graph_khop: '因果图 k-hop',
+  embedding: '向量兜底通道',
+  manual_pin: '作者手动钉选',
+}
+
 export function ReceiptPanel({
   root,
   onResume,
+  initialReceiptId,
 }: {
   root: string
   /** 续跑入口：会话可恢复时显示「回到工作台继续」，由 App 切 view 到工作台。 */
   onResume?: () => void
+  /**
+   * 正文侧「为什么这么写」带来的预选回执（T2）。
+   *
+   * 面板挂载即拉取该条详情，而不是等作者在列表里再点一次；切章不会改写它——
+   * 父级每次换 id 才重新加载，换成 null 则回到「未选中」态。
+   */
+  initialReceiptId?: string | null | undefined
 }): JSX.Element {
   const [list, setList] = useState<ReceiptListResponse['receipts']>([])
   const [detail, setDetail] = useState<ReceiptDetailResponse | null>(null)
@@ -78,6 +94,13 @@ export function ReceiptPanel({
   )
 
   useEffect(() => { void loadList() }, [loadList])
+
+  // T2：正文侧点「为什么这么写」带 id 进来时直接拉详情，不必在列表里再点一次。
+  // 失败不回退成空态——错误走既有的 error 通道，作者看得到「读不到」而不是「没有」。
+  useEffect(() => {
+    if (initialReceiptId === null || initialReceiptId === undefined) return
+    void loadDetail(initialReceiptId)
+  }, [initialReceiptId, loadDetail])
 
   const budget = useMemo(() => {
     if (detail === null) return null
@@ -172,6 +195,42 @@ export function ReceiptPanel({
               </div>
               <div className="mono muted" data-testid="receipt-budget-text">
                 reserved {budget.reserved.toLocaleString()} · story {budget.story.toLocaleString()} · fixed {budget.fixed.toLocaleString()} · slack {budget.slack.toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          <div className="card-shell">
+            <div className="card">
+              <div className="card-title">
+                <b>通道贡献</b>
+                <span className="muted">哪条召回把什么送进了窗口</span>
+              </div>
+              <div data-testid="receipt-channel-summary">
+                {(detail.receipt.channelSummary ?? []).length === 0 && (
+                  <p className="muted" style={{ margin: 0 }}>
+                    本次回执没有通道汇总——多为装配早于该字段的旧回执。
+                  </p>
+                )}
+                {(detail.receipt.channelSummary ?? []).map((row) => (
+                  <div className="receipt-row" key={row.channel} data-channel={row.channel}>
+                    <span>
+                      {CHANNEL_LABEL[row.channel] ?? row.channel}
+                      {row.exclusionReasons.length > 0 && (
+                        <em className="muted" style={{ display: 'block', fontStyle: 'normal' }}>
+                          落选 {row.exclusionReasons
+                            .map((reason) => reason.reason + '×' + reason.count)
+                            .join(' · ')}
+                        </em>
+                      )}
+                    </span>
+                    <code>
+                      入 {row.included}/{row.entries} · {(row.tokens).toLocaleString()} tok
+                    </code>
+                    <b className={row.excluded > 0 ? 'verdict blocking' : 'verdict pass'}>
+                      落选 {row.excluded}
+                    </b>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

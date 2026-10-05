@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { SceneLayer } from '../shell/scene/SceneLayer'
 import { loadScenePreference, resolveSceneProfile } from '../shell/scene/scenePreference'
 import { MobileStatusBar } from './components/MobileStatusBar'
+// W4-2c-2b：视图代次（切章 +1）
+import { viewGeneration } from '../../shared/taskStream'
 import { MobileChaptersDrawer } from './drawers/MobileChaptersDrawer'
 import { MobileTabBar, type MobileHubId } from './components/MobileTabBar'
 import { MobileDrawerSheet } from './components/MobileDrawerSheet'
@@ -150,7 +152,11 @@ export function MobileShell({
           <MobileChaptersDrawer
             book={book}
             chapterIndex={chapterIndex ?? 1}
-            onSelectChapter={(index) => onSelectChapter?.(index)}
+            onSelectChapter={(index) => {
+              // W4-2c-2b：切章 = 视图代次 +1
+              viewGeneration.bump('chapter-switch')
+              onSelectChapter?.(index)
+            }}
             onClose={handleCloseDrawer}
           />
         )}

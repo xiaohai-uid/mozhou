@@ -15,4 +15,4 @@ export type {
   Shot,
   StoryboardContent,
   StoryboardDocument,
-} from '../../server/storyboard/contract.js'
+} from '../../shared/storyboard.js'

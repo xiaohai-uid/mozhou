@@ -15,8 +15,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
-import type { WorksOverviewResponse } from '../../server/api'
+import type { WorksOverviewResponse } from '../../shared/api'
 import { setStoryboardSaveState } from './dirtyGuard'
+// W4-2c-2b：视图代次（切章/切书 +1）
+import { viewGeneration } from '../../shared/taskStream'
 import type {
   AdaptationOptions,
   Shot,
@@ -295,6 +297,8 @@ export function StoryboardView({
 
   const handleSelectChapter = (next: number): void => {
     if (dirty && doc !== null && !window.confirm('当前分镜有未保存修改——切换章节将丢弃。继续？')) return
+    // W4-2c-2b：切章 = 视图代次 +1（在飞的旧生成流此后不得更新编辑器）
+    viewGeneration.bump('chapter-switch')
     setChapterIndex(next)
     setSource(null)
     setDoc(null)

@@ -9,7 +9,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TasksResponse } from '../../server/api'
+import type { TasksResponse } from '../../shared/api'
 import { okJson } from '../test/http'
 import { TasksView } from './TasksView'
 

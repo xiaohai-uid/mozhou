@@ -10,7 +10,7 @@
  * 相位（草稿/已提交）与字数统计；统计面板展示总字数、章数与实体数。
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { WorksOverviewResponse } from '../../server/api'
+import type { WorksOverviewResponse } from '../../shared/api'
 import { post } from '../lib/post'
 
 export function WorksView({

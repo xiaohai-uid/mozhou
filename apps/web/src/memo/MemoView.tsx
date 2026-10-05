@@ -6,7 +6,7 @@
  * - 本地模式跟随 local_user 主体；hosted 模式按登录用户隔离。
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { MemoListResponse, MemoMutationResponse, MemoNote } from '../../server/api'
+import type { MemoListResponse, MemoMutationResponse, MemoNote } from '../../shared/api'
 import { post } from '../lib/post'
 
 const FIELD_STYLE = {

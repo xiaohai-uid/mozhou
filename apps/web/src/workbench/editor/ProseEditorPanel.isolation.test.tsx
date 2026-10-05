@@ -202,4 +202,31 @@ describe('ProseEditorPanel（R1/R2 冲突保护与定稿边界）', () => {
     const cached = loadDraftCache(chapterDraftKey(BOOK_A, 1))
     expect(cached).toBe('夜幕降临，钟声在海港回荡。')
   })
+
+  it('防误关丢稿守卫：正文有未保存修改（dirty）时挂载 beforeunload 提示拦截，保存后取消拦截', async () => {
+    stubApi({})
+    const user = userEvent.setup()
+    render(<ProseEditorPanel book={BOOK_A} chapterIndex={1} />)
+    const textarea = screen.getByRole<HTMLTextAreaElement>('textbox')
+
+    // 初始空内容不拦截
+    const cleanEvent = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(cleanEvent)
+    expect(cleanEvent.defaultPrevented).toBe(false)
+
+    // 输入内容（处于 dirty 状态）
+    await user.type(textarea, '这是作者正在编写的未保存文字。')
+    const dirtyEvent = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(dirtyEvent)
+    expect(dirtyEvent.defaultPrevented).toBe(true)
+
+    // 保存为草稿后（更新 baseline，转为 clean 状态）不拦截
+    await user.click(screen.getByTestId('prose-accept-draft'))
+    await waitFor(() => {
+      expect(screen.getByText(/已落为当前章草稿/)).toBeInTheDocument()
+    })
+    const savedEvent = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(savedEvent)
+    expect(savedEvent.defaultPrevented).toBe(false)
+  })
 })

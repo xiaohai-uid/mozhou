@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { post } from '../../lib/post'
 import type { BookInfo } from '../../shell/workbenchStorage'
-import type { WorksChapterSummary } from '../../../server/api'
+import type { WorksChapterSummary } from '../../../shared/api'
 
 export interface MobileChaptersDrawerProps {
   book: BookInfo | null

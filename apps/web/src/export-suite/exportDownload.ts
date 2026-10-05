@@ -1,6 +1,6 @@
 import type { ChapterExportItem } from './txtCleanExporter'
 import { post } from '../lib/post'
-import type { WorksOverviewResponse } from '../../server/api'
+import type { WorksOverviewResponse } from '../../shared/api'
 
 export interface ExportDownloadOptions {
   bookTitle: string

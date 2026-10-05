@@ -7,7 +7,7 @@
  * - POST /api/rank-scan {} → RankScanResponse
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { RankScanResponse, RankBoard } from '../../server/api'
+import type { RankScanResponse, RankBoard } from '../../shared/api'
 import { post } from '../lib/post'
 
 export function RankScanView(): JSX.Element {

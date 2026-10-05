@@ -24,7 +24,7 @@ import type {
   TasksResponse,
   WebSearchResponse,
   WorksOverviewResponse,
-} from '../../server/api'
+} from '../../shared/api'
 import type { QualityPolicy } from '@mozhou/quality-engine'
 
 export interface ApiClientConfig {

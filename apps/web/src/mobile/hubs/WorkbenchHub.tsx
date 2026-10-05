@@ -9,7 +9,7 @@ import { chapterDraftKey, loadDraftCache } from '../../shell/workbenchStorage'
 import { describeContextMode, describeDraftResult, readDraftStream } from '../../draftStream'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
-import type { DraftQuestionResponse, WorksChapterSummary } from '../../../server/api'
+import type { DraftQuestionResponse, WorksChapterSummary } from '../../../shared/api'
 
 export interface WorkbenchHubProps {
   book: BookInfo | null

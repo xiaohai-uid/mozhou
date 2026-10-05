@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import type { ChangeMatrix, ChangeMatrixRow } from '@mozhou/data-plane'
-import type { ChangeMatrixResponse } from '../../server/api'
+import type { ChangeMatrixResponse } from '../../shared/api'
 import { post } from '../lib/post'
 
 const CELL_LABEL: Record<ChangeMatrixRow['cells'][number]['state'], string> = {

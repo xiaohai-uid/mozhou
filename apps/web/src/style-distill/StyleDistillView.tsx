@@ -8,7 +8,7 @@
  * - POST /api/style.distill {text, root?} → StyleDistillResponse
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { StyleDistillResponse } from '../../server/api'
+import type { StyleDistillResponse } from '../../shared/api'
 import { post } from '../lib/post'
 
 const SAMPLE_TEXTS = [

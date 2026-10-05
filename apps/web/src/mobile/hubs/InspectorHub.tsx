@@ -3,7 +3,7 @@ import { ShieldCheckIcon } from '../components/MobileIcons'
 import { post } from '../../lib/post'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
-import type { StoryBrainFactsResponse, ReceiptListResponse, ChangeMatrixResponse } from '../../../server/api'
+import type { StoryBrainFactsResponse, ReceiptListResponse, ChangeMatrixResponse } from '../../../shared/api'
 
 export interface InspectorHubProps {
   book: BookInfo | null

@@ -20,7 +20,9 @@ import { NovelEditorCanvas } from './NovelEditorCanvas'
 import { EditorQualityTelemetry } from './EditorQualityTelemetry'
 import { chapterDraftKey, draftCacheMatchesBaseline, loadDraftCache, saveDraftBaseline, saveDraftCache } from '../../shell/workbenchStorage'
 import type { BookInfo } from '../../shell/workbenchStorage'
-import type { ChapterProseResponse, ChapterProseSaveResponse } from '../../../server/api'
+import type { ChapterProseResponse, ChapterProseSaveResponse } from '../../../shared/api'
+// W4-2c-2b：视图代次（切书/切章 +1，供在飞生成流的第二层判定）
+import { viewGeneration } from '../../../shared/taskStream'
 
 export interface ProseEditorPanelProps {
   book: BookInfo | null
@@ -92,6 +94,9 @@ function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEdit
       }
     }
     window.addEventListener('mozhou:prose-adopted', handleProseAdopted)
+    // W4-2c-2b：切书/切章 = 视图代次 +1（本 effect 的依赖同时覆盖两者）——
+    // 在飞的旧生成流此后到达的 chunk 不得再更新编辑器。
+    viewGeneration.bump('chapter-switch')
     return () => {
       window.removeEventListener('mozhou:prose-adopted', handleProseAdopted)
     }
@@ -106,6 +111,22 @@ function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEdit
     saveDraftBaseline(snapshot.body, draftKey)
     setText(snapshot.body)
   }, [draftKey, snapshot])
+
+  // 防误关丢稿守卫：正文处于未保存（dirty）状态时拦截页面卸载
+  useEffect(() => {
+    if (typeof window === 'undefined' || draftKey === null) return
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!draftCacheMatchesBaseline(text, draftKey)) {
+        if (text.trim() === '') return
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [draftKey, text])
 
   const handleChange = useCallback(
     (next: string) => {

@@ -4,7 +4,7 @@ import { post } from '../../lib/post'
 import { ProviderSettingsForm, useProviderSettings } from '../../settings/ProviderSettingsForm'
 import type { BookInfo } from '../../shell/workbenchStorage'
 import type { ActiveDrawerType } from '../types'
-import type { TasksResponse, MembershipResponse, LibraryResponse } from '../../../server/api'
+import type { TasksResponse, MembershipResponse, LibraryResponse } from '../../../shared/api'
 
 export interface SystemHubProps {
   book: BookInfo | null

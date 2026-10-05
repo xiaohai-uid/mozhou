@@ -4,7 +4,7 @@
  * 不渲染可操作的许可证激活入口，不宣称任何付费授权已生效。
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { MembershipResponse } from '../../server/api'
+import type { MembershipResponse } from '../../shared/api'
 import { post } from '../lib/post'
 import { AccountView } from '../account/AccountView'
 

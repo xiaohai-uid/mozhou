@@ -9,7 +9,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { WorksOverviewResponse } from '../../server/api'
+import type { WorksOverviewResponse } from '../../shared/api'
 import { okJson } from '../test/http'
 import { WorksView } from './WorksView'
 

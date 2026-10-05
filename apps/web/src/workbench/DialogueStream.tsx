@@ -13,10 +13,20 @@ import {
   saveDraftBaseline,
   saveDraftCache,
 } from '../shell/workbenchStorage'
-import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
+import type { CapabilitiesResponse, DraftQuestionResponse } from '../../shared/api'
+// W3 操作幂等契约：共享层类型（UI 不 import server 私有实现）
+import type { OperationResponseFields } from '../../shared/operations'
 import type { BookInfo } from '../shell/workbenchStorage'
 import { describeContextMode, describeDraftResult, isDegradedContextMode, readDraftStream } from '../draftStream'
 import { providerGuidance } from './providerGuidance'
+// W4-2c-2b：客户端第二层判定（代次/序号/任务身份）与视图代次触发点
+import {
+  applyTaskEvent,
+  bumpGenerationEpoch,
+  shouldApplyTaskEvent,
+  viewGeneration,
+  type TaskStreamViewState,
+} from '../../shared/taskStream'
 import type { ProviderUnavailableReason } from './providerGuidance'
 
 type DialoguePhase = 'ask' | 'answered' | 'drafting' | 'draft_done' | 'error'
@@ -108,6 +118,9 @@ export function DialogueStream({
   /** 发起流请求时的书/章现场：迟到响应与切书后身份不符时丢弃（T05 切书隔离）。 */
   const requestSiteRef = useRef<{ bookId: string; chapterIndex: number } | null>(null)
   const requestIdRef = useRef(0)
+  // W4-2c-2b：本组件的任务事件视图状态（taskId=本次请求 id；generationEpoch 由触发点推进）
+  const taskStreamRef = useRef<TaskStreamViewState>({ taskId: null, generationEpoch: 0, lastSequence: 0 })
+  const prevSiteKeyRef = useRef<string | null>(null)
   const currentSiteRef = useRef({ bookId: book?.bookId ?? null, chapterIndex, root: book?.root ?? null })
 
   useEffect(() => {
@@ -148,6 +161,13 @@ export function DialogueStream({
   useEffect(() => {
     // 切书或切章：取消正在读取的流
     ++requestIdRef.current
+    // W4-2c-2b：切书/切章 = 视图代次 +1——在飞的旧流随后到达的 chunk 必须被丢弃（第二层判定）
+    const siteKey = `${book?.bookId ?? ''}#${chapterIndex}`
+    const prevSiteKey = prevSiteKeyRef.current
+    prevSiteKeyRef.current = siteKey
+    const switchReason = prevSiteKey === null || !prevSiteKey.startsWith(`${book?.bookId ?? ''}#`) ? 'book-switch' : 'chapter-switch'
+    taskStreamRef.current = bumpGenerationEpoch(taskStreamRef.current, switchReason)
+    viewGeneration.bump(switchReason)
     requestControllerRef.current?.abort()
     requestControllerRef.current = null
     void readerRef.current?.cancel().catch(() => {})
@@ -207,6 +227,12 @@ export function DialogueStream({
 
     // 切书/切章隔离：递增请求 ID，捕获发起时的具体书/章现场
     const reqId = ++requestIdRef.current
+    // W4-2c-2b：新生成 = 新代次（任务身份 = 本次请求 id），并记录视图代次基线
+    const streamEpoch = bumpGenerationEpoch(taskStreamRef.current, 'new-generation', String(reqId)).generationEpoch
+    taskStreamRef.current = { taskId: String(reqId), generationEpoch: streamEpoch, lastSequence: 0 }
+    viewGeneration.bump('new-generation')
+    const streamViewGeneration = viewGeneration.current()
+    let streamSequence = 0
     const site = { bookId: book.bookId, chapterIndex, root: book.root }
     requestSiteRef.current = site
 
@@ -303,6 +329,13 @@ export function DialogueStream({
         shouldStop: () => !stillOnSite(),
         onDelta: (chunk) => {
           if (!stillOnSite()) return
+          // W4-2c-2b 第二层判定：视图代次已变（别处切了书/章或停止）⇒ 丢弃；
+          // 旧代次 / 已见序号 / 任务身份不符 ⇒ 丢弃。迟到流绝不更新当前正文。
+          if (viewGeneration.current() !== streamViewGeneration) return
+          streamSequence += 1
+          const row = { taskId: String(reqId), generationEpoch: streamEpoch, sequence: streamSequence }
+          if (!shouldApplyTaskEvent(taskStreamRef.current, row)) return
+          taskStreamRef.current = applyTaskEvent(taskStreamRef.current, row)
           accumulatedDraftText += chunk
           setDraftText((prev) => prev + chunk)
         },
@@ -382,6 +415,9 @@ export function DialogueStream({
 
   const handleStop = (): void => {
     ++requestIdRef.current
+    // W4-2c-2b：停止 = 代次 +1——已缓冲/在飞的旧流 chunk 从此不再更新正文
+    taskStreamRef.current = bumpGenerationEpoch(taskStreamRef.current, 'stop')
+    viewGeneration.bump('stop')
     requestControllerRef.current?.abort()
     requestControllerRef.current = null
     void readerRef.current?.cancel().catch(() => {})
@@ -434,8 +470,10 @@ export function DialogueStream({
   /** C2（T05）Accept：调用 /api/draft.accept 真实落盘（不再先改 localStorage 却称已落盘）。
    *  成功 → 刷新章快照到本地写作缓存 + 通知 Reading Slate + 记录一次可逆 Undo；
    *  409 冲突 → 保留两份文本（候选 vs 最新盘面），交作者裁决。 */
-  const handleAccept = useCallback(async (): Promise<void> => {
-    if (book === null || candidate === null || accepting || draftTerminal?.partial === true) return
+  const handleAccept = useCallback(async (opts?: { confirmPartial?: boolean }): Promise<void> => {
+    const isPartial = draftTerminal?.partial === true
+    if (book === null || candidate === null || accepting) return
+    if (isPartial && !opts?.confirmPartial) return
     const site = { bookId: book.bookId, chapterIndex, root: book.root }
     setError(null)
     setAdoptState(null)
@@ -466,6 +504,9 @@ export function DialogueStream({
           candidateId: candidate.candidateId,
           base: candidate.base,
           idempotencyKey: 'ui_accept_' + candidate.candidateId,
+          confirmPartial: Boolean(opts?.confirmPartial),
+          expectedRevision: oldSnapshot.revision ?? undefined,
+          operationId: 'op_accept_' + candidate.candidateId,
         }),
       })
 
@@ -627,7 +668,9 @@ export function DialogueStream({
         }),
       })
       if (!stillOnSite()) return
-      const data = (await res.json()) as { ok?: boolean; revision?: number; error?: string }
+      // W3 契约类型：保存响应携带 replayed/appliedRevision/currentRevision（向后兼容）
+      const data = (await res.json()) as { ok?: boolean; revision?: number; error?: string } &
+        Partial<OperationResponseFields>
       if (!stillOnSite()) return
       if (res.ok && data.ok === true) {
         saveDraftCache(undo.oldText, chapterDraftKey(book, chapterIndex))
@@ -798,6 +841,28 @@ export function DialogueStream({
                 >
                   {accepting ? '采纳落盘中…' : '采纳进正文（Accept → Active Draft）'}
                 </button>
+                {draftTerminal?.partial === true && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-warning btn-sm"
+                      data-testid="adopt-partial-into-slate"
+                      onClick={() => { void handleAccept({ confirmPartial: true }) }}
+                      disabled={candidate === null || accepting}
+                    >
+                      {accepting ? '采纳落盘中…' : '确认采纳半稿（经作者核准）'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      data-testid="continue-draft"
+                      onClick={() => { void handleSend() }}
+                      disabled={accepting}
+                    >
+                      续写（预计 ~1000 tokens · 新操作）
+                    </button>
+                  </>
+                )}
                 {undo !== null && (
                   <button type="button" className="btn btn-sm" data-testid="undo-accept" onClick={() => { void handleUndoAccept() }}>
                     撤销采纳（Undo）

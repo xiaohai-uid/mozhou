@@ -17,7 +17,7 @@ import {
 import { runLocalComplianceCheck } from '../shared/complianceCheck'
 import { executeExportWorkflow } from '../export-suite/exportDownload'
 import { post } from '../lib/post'
-import type { NamingSuccessResponse, NamingSuggestion } from '../../server/api'
+import type { NamingSuccessResponse, NamingSuggestion } from '../../shared/api'
 
 export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'compliance'
 

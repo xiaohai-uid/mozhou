@@ -9,7 +9,7 @@
  * - 不包含任何系统 Secret 或凭据。
  */
 import React, { useState } from 'react'
-import { billingCatalog } from '../../server/billing/catalog'
+import { billingCatalog } from '../../shared/billing'
 
 export const PublicSite: React.FC = () => {
   const [tab, setTab] = useState<'intro' | 'pricing' | 'download' | 'terms'>('intro')

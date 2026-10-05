@@ -4,7 +4,7 @@
  * truthfulPreviewRoutes 501 语义）；服务端变更时本表需同步——
  * 漂移由 capability-square 测试的 evidence 断言兜底。
  */
-import type { CapabilityStatus } from '../../server/api'
+import type { CapabilityStatus } from '../../shared/api'
 
 export interface CapabilityDetail {
   /** 启用前提（真实数据面/配置前提）。 */

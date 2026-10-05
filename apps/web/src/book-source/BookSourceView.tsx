@@ -14,7 +14,7 @@ import type {
   BookSourceSearchResponse,
   CrawlerExtractResponse,
   LibraryOpenResponse,
-} from '../../server/api'
+} from '../../shared/api'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
 

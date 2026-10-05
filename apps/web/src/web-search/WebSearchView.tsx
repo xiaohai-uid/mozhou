@@ -6,7 +6,7 @@
  * - POST /api/web-search {query?} → WebSearchResponse
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { WebSearchResponse } from '../../server/api'
+import type { WebSearchResponse } from '../../shared/api'
 import { post } from '../lib/post'
 
 export function WebSearchView(): JSX.Element {

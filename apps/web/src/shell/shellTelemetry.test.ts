@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { deriveStageStates, deriveSummary } from './shellTelemetry'
-import type { WorksChapterSummary, ReceiptListItem } from '../../server/api'
+import type { WorksChapterSummary, ReceiptListItem } from '../../shared/api'
 
 const chapter = (index: number, phase: 'committed' | 'draft'): WorksChapterSummary => ({
   chapterIndex: index,

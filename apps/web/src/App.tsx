@@ -1,7 +1,8 @@
 /**
  * 墨舟 Ink Orbit 工作台壳（实现票 T40 · ADR-0027 · 商业化双端全景）。
  */
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import type { ErrorInfo, ReactNode } from 'react'
 import { CapabilityChannels } from './shell/CapabilityChannels'
 import { ChangeMatrixPanel } from './change-matrix/ChangeMatrixPanel'
 import { SceneLayer } from './shell/scene/SceneLayer'
@@ -77,11 +78,95 @@ function wizardCompleted(): boolean {
   }
 }
 
+export interface ErrorBoundaryProps {
+  children: ReactNode
+  fallback?: ((error: Error, reset: () => void) => ReactNode) | ReactNode
+}
+
+export interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  override state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error }
+  }
+
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('[ErrorBoundary caught error]', error, errorInfo)
+  }
+
+  reset = (): void => {
+    this.setState({ hasError: false, error: null })
+  }
+
+  override render(): ReactNode {
+    if (this.state.hasError) {
+      if (typeof this.props.fallback === 'function') {
+        return this.props.fallback(this.state.error ?? new Error('未知错误'), this.reset)
+      }
+      if (this.props.fallback) {
+        return this.props.fallback
+      }
+      return (
+        <div
+          className="app-error-boundary"
+          role="alert"
+          style={{
+            padding: '32px 24px',
+            textAlign: 'center',
+            color: '#e6edf3',
+            background: '#0d1117',
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+          }}
+        >
+          <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>页面遇到意外错误</h2>
+          <p style={{ color: '#8b949e', maxWidth: '560px', margin: 0, fontSize: '14px', lineHeight: 1.6 }}>
+            {this.state.error?.message || '组件渲染异常，已启用安全模式拦截白屏。'}
+          </p>
+          <button
+            type="button"
+            onClick={this.reset}
+            style={{
+              padding: '8px 20px',
+              cursor: 'pointer',
+              borderRadius: '6px',
+              border: '1px solid #30363d',
+              background: '#21262d',
+              color: '#c9d1d9',
+              fontSize: '14px',
+              fontWeight: 500,
+            }}
+          >
+            重试
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export function App(): JSX.Element {
   const [initial] = useState(loadWorkbenchState)
   const [book, setBook] = useState<BookInfo | null>(initial.book)
   const [view, setView] = useState<ViewId>(initial.view)
   const [chapterIndex, setChapterIndex] = useState(1)
+  // T2：「为什么这么写」落点。正文侧点一次即带 receiptId 跳到装配看板并预选该条，
+  // 免去「切视图 + 在列表里翻找本章」两步。作者不必知道回执 id 长什么样。
+  const [receiptFocus, setReceiptFocus] = useState<string | null>(null)
   const [stage, setStage] = useState(DEFAULT_STAGE)
   const [inspectorTab, setInspectorTab] = useState<InspectorTabId>('quality')
   const [wizardOpen, setWizardOpen] = useState(
@@ -175,17 +260,6 @@ export function App(): JSX.Element {
     setView('workbench')
   }
 
-  if (isMobile) {
-    return (
-      <MobileShell
-        book={book}
-        onSwitchBook={handleBookSwitch}
-        chapterIndex={chapterIndex}
-        onSelectChapter={setChapterIndex}
-      />
-    )
-  }
-
   const panels = {
     quality:
       book === null ? (
@@ -203,7 +277,11 @@ export function App(): JSX.Element {
       book === null ? (
         <InspectorEmpty note="建书后可用——先在工作台建书，装配看板随后挂载 Context Receipt 列表。" />
       ) : (
-        <ReceiptPanel root={book.root} onResume={() => setView('workbench')} />
+        <ReceiptPanel
+          root={book.root}
+          initialReceiptId={receiptFocus}
+          onResume={() => setView('workbench')}
+        />
       ),
     'change-matrix':
       book === null ? (
@@ -214,104 +292,131 @@ export function App(): JSX.Element {
   }
 
   return (
-    <>
-      <SceneLayer
-        profile={resolveSceneProfile(scenePreference, book?.bookId ?? null)}
-        focus={stageToFocus(stage)}
-      />
-      <div
-        className={
-          'app app-grain' +
-          (view === 'storyboard' ? ' app-storyboard' : '') +
-          (view === 'code-graph' ? ' app-code-graph' : '')
-        }
-      >
-        <TopBar
+    <ErrorBoundary>
+      {isMobile ? (
+        <MobileShell
           book={book}
-          onHome={() => handleSelectView('workbench')}
-          onReplayWizard={() => setWizardOpen(true)}
-          onOpenModal={setDesktopModal}
-          onOpenScene={() => setSceneSheetOpen(true)}
+          onSwitchBook={handleBookSwitch}
+          chapterIndex={chapterIndex}
+          onSelectChapter={setChapterIndex}
         />
-        <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
-        {/* U01：分镜页不挂小说生产管线与质量塔（独立创作任务面） */}
-        {view !== 'storyboard' && view !== 'code-graph' && (
-          <PipelineStrip activeStage={stage} onSelect={setStage} stageStates={stageStates} />
-        )}
-        {/* U03：写作对话并入真实写作入口——dialogue 与 workbench 同元素同 key（状态不丢），仅滚动到对话面板 */}
-        {(view === 'workbench' || view === 'dialogue') ? (
-          <WorkbenchView
-            key={book?.root ?? 'no-book'}
-            book={book}
-            chapterIndex={chapterIndex}
-            onChapterIndexChange={setChapterIndex}
-            onBookCreated={handleBookCreated}
-            chapters={telemetry.works?.chapters}
+      ) : (
+        <>
+          <SceneLayer
+            profile={resolveSceneProfile(scenePreference, book?.bookId ?? null)}
+            focus={stageToFocus(stage)}
           />
-        ) : view === 'book-shelf' ? (
-          <BookshelfView
-            parentDir={parentDir}
-            currentRoot={book?.root ?? null}
-            onSwitchBook={handleBookSwitch}
-          />
-        ) : view === 'book-source' ? (
-          <BookSourceView
-            parentDir={parentDir}
-            onSwitchBook={handleBookSwitch}
-            onGoToWorkbench={() => setView('workbench')}
-          />
-        ) : view === 'capability-square' ? (
-          <CapabilitySquareView />
-        ) : view === 'works' ? (
-          <WorksView
-            root={book?.root ?? null}
-            onGoToWorkbench={() => setView('workbench')}
-            onOpenStoryboard={(ch) => { setStoryboardChapter(ch); handleSelectView('storyboard') }}
-          />
-        ) : view === 'storyboard' ? (
-          <StoryboardView
-            key={book?.root ?? 'no-book'}
-            book={book}
-            initialChapterIndex={storyboardChapter ?? undefined}
-            onGoToShelf={() => { setStoryboardChapter(null); handleSelectView('book-shelf') }}
-            onCreateBook={() => setWizardOpen(true)}
-          />
-        ) : view === 'tasks' ? (
-          <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
-        ) : view === 'memo' ? (
-          <MemoView />
-        ) : view === 'genre-kits' ? (
-          <GenreKitMarketplaceView book={book} />
-        ) : view === 'canon-graph' ? (
-          <CanonGraphView book={book} />
-        ) : view === 'code-graph' ? (
-          <Suspense fallback={<div className="code-graph-loading">正在载入本地代码图谱…</div>}>
-            <CodeGraphView />
-          </Suspense>
-        ) : view === 'style-distill' ? (
-          <StyleDistillView root={book?.root ?? null} />
-        ) : view === 'novel-breakdown' ? (
-          <NovelBreakdownView root={book?.root ?? null} />
-        ) : view === 'rank-scan' ? (
-          <RankScanView />
-        ) : view === 'web-search' ? (
-          <WebSearchView />
-        ) : view === 'cloud-sync' ? (
-          <CloudSyncView root={book?.root ?? null} />
-        ) : view === 'membership' ? (
-          <MembershipView />
-        ) : view === 'model-settings' ? (
-          <ModelSettingsView />
-        ) : view === ('account' as ViewId) ? (
-          <AccountView />
-        ) : (
-          <PlaceholderView view={view} />
-        )}
-        {/* U01：质量塔/检视塔在分镜页不挂载 */}
-        {view !== 'storyboard' && view !== 'code-graph' && (
-          <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
-        )}
-      </div>
+          <div
+            className={
+              'app app-grain' +
+              (view === 'storyboard' ? ' app-storyboard' : '') +
+              (view === 'code-graph' ? ' app-code-graph' : '')
+            }
+          >
+            <TopBar
+              book={book}
+              onHome={() => handleSelectView('workbench')}
+              onReplayWizard={() => setWizardOpen(true)}
+              onOpenModal={setDesktopModal}
+              onOpenScene={() => setSceneSheetOpen(true)}
+            />
+            <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={0} />
+            {/* U01：分镜页不挂小说生产管线与质量塔（独立创作任务面） */}
+            {view !== 'storyboard' && view !== 'code-graph' && (
+              <PipelineStrip activeStage={stage} onSelect={setStage} stageStates={stageStates} />
+            )}
+            {/* U03：写作对话并入真实写作入口——dialogue 与 workbench 同元素同 key（状态不丢），仅滚动到对话面板 */}
+            {(view === 'workbench' || view === 'dialogue') ? (
+              <WorkbenchView
+                key={book?.root ?? 'no-book'}
+                book={book}
+                chapterIndex={chapterIndex}
+                onChapterIndexChange={setChapterIndex}
+                onBookCreated={handleBookCreated}
+                chapters={telemetry.works?.chapters}
+                onExplainContext={(receiptId) => {
+                  setReceiptFocus(receiptId)
+                  // F-08：走 handleSelectView 让 INSPECTOR_VIEW_TO_TAB 映射生效——此前
+                  // 直接 setView('context-receipt')，检视塔不切到装配看板，中央内容
+                  // 又没有该视图分支，用户只看到 PlaceholderView。
+                  handleSelectView('context-receipt')
+                }}
+              />
+            ) : view === 'book-shelf' ? (
+              <BookshelfView
+                parentDir={parentDir}
+                currentRoot={book?.root ?? null}
+                onSwitchBook={handleBookSwitch}
+              />
+            ) : view === 'book-source' ? (
+              <BookSourceView
+                parentDir={parentDir}
+                onSwitchBook={handleBookSwitch}
+                onGoToWorkbench={() => setView('workbench')}
+              />
+            ) : view === 'capability-square' ? (
+              <CapabilitySquareView />
+            ) : view === 'works' ? (
+              <WorksView
+                root={book?.root ?? null}
+                onGoToWorkbench={() => setView('workbench')}
+                onOpenStoryboard={(ch) => { setStoryboardChapter(ch); handleSelectView('storyboard') }}
+              />
+            ) : view === 'storyboard' ? (
+              <StoryboardView
+                key={book?.root ?? 'no-book'}
+                book={book}
+                initialChapterIndex={storyboardChapter ?? undefined}
+                onGoToShelf={() => { setStoryboardChapter(null); handleSelectView('book-shelf') }}
+                onCreateBook={() => setWizardOpen(true)}
+              />
+            ) : view === 'tasks' ? (
+              <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
+            ) : view === 'memo' ? (
+              <MemoView />
+            ) : view === 'genre-kits' ? (
+              <GenreKitMarketplaceView book={book} />
+            ) : view === 'canon-graph' ? (
+              <CanonGraphView book={book} />
+            ) : view === 'code-graph' ? (
+              <Suspense fallback={<div className="code-graph-loading">正在载入本地代码图谱…</div>}>
+                <CodeGraphView />
+              </Suspense>
+            ) : view === 'style-distill' ? (
+              <StyleDistillView root={book?.root ?? null} />
+            ) : view === 'novel-breakdown' ? (
+              <NovelBreakdownView root={book?.root ?? null} />
+            ) : view === 'rank-scan' ? (
+              <RankScanView />
+            ) : view === 'web-search' ? (
+              <WebSearchView />
+            ) : view === 'cloud-sync' ? (
+              <CloudSyncView root={book?.root ?? null} />
+            ) : view === 'membership' ? (
+              <MembershipView />
+            ) : view === 'model-settings' ? (
+              <ModelSettingsView />
+            ) : view === ('account' as ViewId) ? (
+              <AccountView />
+            ) : (
+              <PlaceholderView view={view} />
+            )}
+            {/* U01：质量塔/检视塔在分镜页不挂载 */}
+            {view !== 'storyboard' && view !== 'code-graph' && (
+              <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
+            )}
+          </div>
+          <DesktopToolModals activeModal={desktopModal} book={book} onClose={() => setDesktopModal(null)} />
+          {sceneSheetOpen && (
+            <SceneSettingsSheet
+              preference={scenePreference}
+              book={book}
+              onChange={setScenePreference}
+              onClose={() => setSceneSheetOpen(false)}
+            />
+          )}
+        </>
+      )}
       {wizardOpen && (
         <WizardOverlay
           precreated={book}
@@ -319,15 +424,6 @@ export function App(): JSX.Element {
           onReplay={handleWizardDismiss}
         />
       )}
-      <DesktopToolModals activeModal={desktopModal} book={book} onClose={() => setDesktopModal(null)} />
-      {sceneSheetOpen && (
-        <SceneSettingsSheet
-          preference={scenePreference}
-          book={book}
-          onChange={setScenePreference}
-          onClose={() => setSceneSheetOpen(false)}
-        />
-      )}
-    </>
+    </ErrorBoundary>
   )
 }

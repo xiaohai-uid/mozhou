@@ -9,7 +9,11 @@ describe('CodeGraphView', () => {
     render(<CodeGraphView />)
     expect(screen.getByRole('heading', { name: '墨舟代码图谱' })).toBeInTheDocument()
     const metrics = screen.getByLabelText('代码图谱统计')
-    expect(metrics.textContent).toContain(String(CODE_GRAPH_SNAPSHOT.stats.files))
+    // 三个统计量一律与渲染同口径（zh-CN 千分位）。原先只有 files 这一条拿未格式化数字
+    // 去比含分隔符的串，此前 files<1000 时两者恰好同形、断言一直绿；索引首次跨过 1000
+    // （997 → 1000）就必然红。那是断言本身无效，不是产品缺陷，故与同文件另两条对齐，
+    // 而不是放宽成「包含任一形式」。
+    expect(metrics.textContent).toContain(CODE_GRAPH_SNAPSHOT.stats.files.toLocaleString('zh-CN'))
     expect(metrics.textContent).toContain(
       CODE_GRAPH_SNAPSHOT.stats.nodes.toLocaleString('zh-CN'),
     )

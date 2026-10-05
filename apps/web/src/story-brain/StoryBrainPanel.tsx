@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CanonState, EntityCardScan, EntityRefPrefix } from '@mozhou/data-plane'
-import type { StoryBrainFactsResponse } from '../../server/api'
+import type { StoryBrainFactsResponse } from '../../shared/api'
 import { post } from '../lib/post'
 import { CreateEntityModal } from './CreateEntityModal'
 
