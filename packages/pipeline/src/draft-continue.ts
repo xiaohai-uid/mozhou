@@ -18,6 +18,20 @@ import {
 } from '@mozhou/data-plane'
 import { readDraftCandidate, type DraftCandidate } from './draft-candidate.js'
 
+/**
+ * 续写成本估算口径常量（出处：t41 §E.2 / 主方案 §6.5——『续写』必须在发起前把
+ * 将产生的供应商调用与计费呈现给用户；下列数值是满足该要求的本地中文场景估算基准，
+ * 非供应商官方 tokenizer 结果，值与估算公式不得随实现漂移）。
+ */
+/** 缺省供应商：与 apps/web 侧既有的 'deepseek' 直码档保持一致。 */
+const DEFAULT_CONTINUE_PROVIDER = 'deepseek'
+/** 中文场景粗估比值：1 token ≈ 1.5 个中文字符。 */
+const CHARS_PER_INPUT_TOKEN = 1.5
+/** 提示词固定开销：基底字数之外的预估输入 tokens。 */
+const CONTINUE_PROMPT_OVERHEAD_TOKENS = 300
+/** 单次续写的预估输出 tokens。 */
+const CONTINUE_ESTIMATED_OUTPUT_TOKENS = 1000
+
 export interface ContinueCostEstimate {
   readonly baseChars: number
   readonly estimatedInputTokens: number
@@ -54,12 +68,15 @@ export class ContinueOperationError extends Error {
   }
 }
 
-/** 估算续写成本（发起前可见）。 */
-export function estimateContinueCost(candidate: DraftCandidate, provider = 'deepseek'): ContinueCostEstimate {
+/** 估算续写成本（发起前可见，估算口径见文件顶部常量注释）。 */
+export function estimateContinueCost(
+  candidate: DraftCandidate,
+  provider: string = DEFAULT_CONTINUE_PROVIDER,
+): ContinueCostEstimate {
   const baseChars = candidate.text.length
-  // 中文场景估算：基底字符 + 提示词开销，预估输出 1000 tokens
-  const estimatedInputTokens = Math.ceil(baseChars / 1.5) + 300
-  const estimatedOutputTokens = 1000
+  // 中文场景估算：基底字符（按 CHARS_PER_INPUT_TOKEN 换算）+ 提示词开销，预估输出见常量
+  const estimatedInputTokens = Math.ceil(baseChars / CHARS_PER_INPUT_TOKEN) + CONTINUE_PROMPT_OVERHEAD_TOKENS
+  const estimatedOutputTokens = CONTINUE_ESTIMATED_OUTPUT_TOKENS
   return {
     baseChars,
     estimatedInputTokens,
@@ -113,7 +130,7 @@ export function prepareDraftContinue(request: PrepareDraftContinueRequest): Prep
   })
   task = linkTaskOperation(bookRoot, taskId, operationId)
 
-  const costEstimate = estimateContinueCost(candidate, request.provider ?? 'deepseek')
+  const costEstimate = estimateContinueCost(candidate, request.provider ?? DEFAULT_CONTINUE_PROVIDER)
 
   return {
     taskId,
