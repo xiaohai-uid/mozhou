@@ -109,32 +109,58 @@ describe('RuntimeEngine.execute', () => {
   });
 });
 
-describe('T12 timeout+fallback 降级链', () => {
+describe('T12 timeout+fallback 降级链（F-05 语义修订）', () => {
   const CAP_FB = {
     ...CAP,
     failurePolicy: { timeoutMs: 5, fallbackProviderIds: ['glm'] },
   };
 
-  it('超时触发降级：主 provider 永挂 → glm 成功', async () => {
+  it('超时 = 结果不明：关闭 fallback 链，不烧下一候选（旧语义已由审查探针证伪）', async () => {
     const { engine } = makeEngine();
     engine.registerCapability(CAP_FB);
+    let glmCalled = 0;
     engine.registerProviderBinding('deepseek', () => new Promise(() => {}));
-    engine.registerProviderBinding('glm', () => Promise.resolve({ ok: true }));
+    engine.registerProviderBinding('glm', () => {
+      glmCalled += 1;
+      return Promise.resolve({ ok: true });
+    });
     const r = await engine.execute('CHAPTER_DRAFTING', {});
-    expect(r.outcome).toBe('succeeded');
-    expect(r.snapshot.providerId).toBe('glm');
-    // 纪律声明：attempt 事件只记「降级切换」，首试由 GenerationStarted+快照覆盖
+    // 在途主调用未取消 ⇒ 结果不明（可能已计费）：绝不叠加 fallback 产生双调用
+    expect(r.outcome).toBe('failed_terminal');
+    expect(r.snapshot.providerId).toBe('deepseek');
+    expect(glmCalled).toBe(0);
     const attempts = engine
       .replaySession()
       .events.filter((e) => e.event.type === 'TaskAttemptRegistered');
-    expect(attempts).toHaveLength(1);
-    expect(attempts[0]?.event.payload).toMatchObject({ providerId: 'glm' });
+    expect(attempts).toHaveLength(0);
+    const finished = engine
+      .replaySession()
+      .events.find((e) => e.event.type === 'GenerationFinished');
+    expect(finished?.event.payload).toMatchObject({ outcome: 'failed_terminal' });
+    expect(String((finished?.event.payload as Record<string, unknown>)?.['reason'])).toContain('outcome_unknown');
   });
 
-  it('候选全灭 ⇒ failed_recoverable + triedProviders 列表', async () => {
+  it('超时后主调用迟到完成：单次结算，fallback 仍零启动（审查探针 timeout-unknown-fallback 镜像）', async () => {
     const { engine } = makeEngine();
     engine.registerCapability(CAP_FB);
-    engine.registerProviderBinding('deepseek', () => new Promise(() => {}));
+    let fallbackStarted = 0;
+    engine.registerProviderBinding(
+      'deepseek',
+      () => new Promise<string>((resolve) => setTimeout(() => resolve('late primary result'), 30)),
+    );
+    engine.registerProviderBinding('glm', () => {
+      fallbackStarted += 1;
+      return Promise.resolve('fallback result');
+    });
+    const r = await engine.execute('CHAPTER_DRAFTING', {});
+    expect(r.outcome).toBe('failed_terminal');
+    expect(fallbackStarted).toBe(0);
+  });
+
+  it('可恢复失败仍烧 fallback：候选全灭 ⇒ failed_recoverable + triedProviders 列表', async () => {
+    const { engine } = makeEngine();
+    engine.registerCapability(CAP_FB);
+    engine.registerProviderBinding('deepseek', () => Promise.reject(new RecoverableError('主渠道挂了')));
     engine.registerProviderBinding('glm', () =>
       Promise.reject(new RecoverableError('glm 也挂了')),
     );

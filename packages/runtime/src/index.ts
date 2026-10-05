@@ -11,3 +11,4 @@ export * from './tierConfig.js';
 export * from './tierRouting.js';
 export * from './recipe/index.js';
 export { createDraftRecipe } from './canonical-recipes.js';
+export * from './recipe-payload.js';

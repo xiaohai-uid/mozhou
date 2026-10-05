@@ -42,12 +42,32 @@ export class ProviderBindingMissingError extends Error {
   }
 }
 
-/** 超时属可重试类失败（T12）：触发 fallback 链，穷尽后随链交 failed_recoverable。 */
+/**
+ * 超时（F-05 语义修正）：超时只意味着「等待放弃」，在途调用**没有被取消**——结果
+ * 不明（可能已计费、可能已产生效果）。因此超时按 outcome_unknown 纪律处理：关闭
+ * 自动重试链、不再叠加 fallback（两个 provider 并行 = 重复计费/重复效果），由上层
+ * 经显式新 attempt（tasks.retry + 计费确认）重发。旧语义（TimeoutError 触发 fallback
+ * 链）已被审查合成探针证伪：主调用完成的同时 fallback 也完成。
+ */
 export class TimeoutError extends RecoverableError {
   override name = 'TimeoutError';
 }
 
-/** 竞速包装：timeoutMs 内未决即 TimeoutError；定时器用后即清（不留悬挂句柄）。 */
+/**
+ * 结果不明异常（W4-2c-3）：外部调用已发出，但无法证明未被计费或未执行。
+ * 必须立即关闭自动重试链（禁止二级定向重生/空流回落），不再尝试后续 fallback provider，
+ * 避免跨服务商造成重复计费；由上层通过显式新 attemptId 发起。
+ */
+export class OutcomeUnknownError extends Error {
+  override readonly name = 'OutcomeUnknownError';
+  readonly outcomeUnknown = true;
+  constructor(message: string, readonly originalCause?: unknown) {
+    super(message);
+  }
+}
+
+/** 竞速包装：timeoutMs 内未决即 TimeoutError；定时器用后即清（不留悬挂句柄）。
+ * 注意：超时不取消在途调用（ProviderBinding 无中止通道）——见 TimeoutError 的 F-05 注。 */
 function withTimeout<T>(p: Promise<T>, timeoutMs: number, providerId: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(
@@ -165,8 +185,9 @@ export class RuntimeEngine {
       },
     });
 
-    // T12：主 provider + fallback 链依序尝试；每次尝试前发 TaskAttemptRegistered
-    //（票面纪律：attempt 事件数=尝试次数）。普通（非超时非可恢复）异常直通 terminal 不烧候选。
+    // T12（F-05 修订）：主 provider + fallback 链依序尝试；每次尝试前发 TaskAttemptRegistered
+    //（票面纪律：attempt 事件数=尝试次数）。普通（非可恢复）异常直通 terminal 不烧候选；
+    // 超时 = 结果不明，同 outcome_unknown 关闭整条链；仅 RecoverableError 烧下一候选。
     const candidates = [resolution.providerId, ...resolution.failurePolicy.fallbackProviderIds];
     const triedProviders: string[] = [];
     let lastReason = '';
@@ -205,9 +226,32 @@ export class RuntimeEngine {
         return { outcome: 'succeeded', value, snapshot: servedSnapshot, taskRef };
       } catch (err) {
         lastReason = err instanceof Error ? err.message : String(err);
-        // 普通异常直通 failed_terminal；超时/可恢复才值得烧下一个候选。
+        // outcome_unknown 结果不明：关闭自动重试链，不继续尝试 fallback provider，
+        // 区分正常重生（RecoverableError）与结果不明，不误伤正常重试。
+        // F-05：TimeoutError（在途调用未取消、结果不明）同列——绝不叠加 fallback。
+        if (
+          err instanceof TimeoutError ||
+          err instanceof OutcomeUnknownError ||
+          (typeof err === 'object' && err !== null && (err as { outcomeUnknown?: boolean }).outcomeUnknown === true)
+        ) {
+          this.#bus.publish(this.#ctx, {
+            type: 'GenerationFinished',
+            taskRef,
+            ...chapterSlot,
+            payload: {
+              outcome: 'failed_terminal' satisfies Outcome,
+              reason: `outcome_unknown: ${lastReason}`,
+              durationMs: this.#nowMs() - startedAtMs,
+              ...parentPatch,
+            },
+          });
+          return { outcome: 'failed_terminal', snapshot, taskRef };
+        }
+
+        // 普通异常直通 failed_terminal；仅可恢复才值得烧下一个候选（超时已在上方按
+        // outcome_unknown 收口，不会走到这里）。
         if (err instanceof RecoverableError) lastRepairHint = err.repairHint;
-        if (!(err instanceof TimeoutError) && !(err instanceof RecoverableError)) {
+        if (!(err instanceof RecoverableError)) {
           this.#bus.publish(this.#ctx, {
             type: 'GenerationFinished',
             taskRef,

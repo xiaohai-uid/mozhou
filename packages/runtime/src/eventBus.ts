@@ -18,9 +18,34 @@ export interface LedgerCtx {
   readonly root: string;
 }
 
+/**
+ * W4-2c：任务事件行 schema 版本。**只加在任务事件行上**，平铺领域行不动
+ * （平铺行由 T3/T9 等先于 runtime 存在的写入方产生，动它会波及它们）。
+ */
+export const TASK_ROW_SCHEMA_VERSION = 1;
+
+/**
+ * W4-2c：任务事件行的身份块（与 seq/event 同级平铺）。
+ *
+ * **两个序号不是一回事，禁止混用**：
+ * - seq（外层，账本级）：全账本单调递增，由 PublishBus 按行数分配，供 **SSE 游标补发**；
+ * - sequence（内层，单任务级）：单任务内从 1 起，配合 generationEpoch 用于**丢弃旧代次的迟到 chunk**。
+ */
+export interface TaskRowIdentity {
+  readonly taskId: string;
+  /** 单次外部调用（计费归因）；与 taskId 不是一回事。 */
+  readonly attemptId?: string;
+  /** 客户端视图切换代次；与 attemptId 不是一回事（客户端驱动 vs 服务端驱动）。 */
+  readonly generationEpoch: number;
+  /** 单任务内序号（从 1 起）。 */
+  readonly sequence: number;
+}
+
 interface StoredLine {
   readonly seq: number;
   readonly event: DomainEvent;
+  /** 仅任务事件行携带（平铺领域行为 undefined）。 */
+  readonly task?: TaskRowIdentity & { readonly schemaVersion: number };
 }
 
 function eventsFilePath(ctx: LedgerCtx): string {
@@ -58,10 +83,38 @@ function readStoredLines(ctx: LedgerCtx): StoredLine[] {
         if (typeof row.seq !== 'number' || !row.event) {
           return;
         }
-        stored.push({ seq: row.seq, event: row.event });
+        const identity = parseTaskRowIdentity(parsed as Record<string, unknown>);
+        stored.push({ seq: row.seq, event: row.event, ...(identity === undefined ? {} : { task: identity }) });
       }
     });
   return stored;
+}
+
+/**
+ * 解析任务行身份块：五项齐全才算任务行携带身份；缺项按「平铺/旧行」处理（不猜测、不补默认值）。
+ * 旧账本里的任务行没有身份块 ⇒ 返回 undefined，读端行为与 W4 之前一致。
+ */
+function parseTaskRowIdentity(row: Record<string, unknown>): (TaskRowIdentity & { readonly schemaVersion: number }) | undefined {
+  const schemaVersion = row['schemaVersion'];
+  const taskId = row['taskId'];
+  const generationEpoch = row['generationEpoch'];
+  const sequence = row['sequence'];
+  if (
+    typeof schemaVersion !== 'number' ||
+    typeof taskId !== 'string' ||
+    typeof generationEpoch !== 'number' ||
+    typeof sequence !== 'number'
+  ) {
+    return undefined;
+  }
+  const attemptId = row['attemptId'];
+  return {
+    schemaVersion,
+    taskId,
+    generationEpoch,
+    sequence,
+    ...(typeof attemptId === 'string' ? { attemptId } : {}),
+  };
 }
 
 /** 全量读账本（replaySession/投影重建共用入口）。 */
@@ -77,7 +130,7 @@ export class PublishBus {
   /** key = `${headType}#${taskRef}` → head 已开未闭。 */
   readonly #openHeads = new Map<string, DomainEventType>();
 
-  publish(ctx: LedgerCtx, event: DomainEvent): void {
+  publish(ctx: LedgerCtx, event: DomainEvent, task?: TaskRowIdentity): void {
     if (!(DOMAIN_EVENT_TYPES as readonly string[]).includes(event.type)) {
       throw new Error(`未知事件类型 ${String(event.type)}——词表由 kernel 类型库统一持有（@mozhou/kernel domain-events.ts，T16 上收）`);
     }
@@ -104,11 +157,22 @@ export class PublishBus {
         this.#openHeads.delete(key);
       }
     }
+    // 外层 seq：账本级全局序号（既有语义，供 SSE 游标补发）；内层 sequence 由调用方按任务给。
     const seq = readStoredLines(ctx).length + 1;
-    appendFileSync(
-      eventsFilePath(ctx),
-      Buffer.from(`${JSON.stringify({ seq, event })}\n`, 'utf8'),
-    );
+    // 未提供任务身份 ⇒ 写出的行与 W4 之前**逐字节相同**（平铺领域行与旧调用方零影响）
+    const row =
+      task === undefined
+        ? { seq, event }
+        : {
+            seq,
+            schemaVersion: TASK_ROW_SCHEMA_VERSION,
+            taskId: task.taskId,
+            ...(task.attemptId === undefined ? {} : { attemptId: task.attemptId }),
+            generationEpoch: task.generationEpoch,
+            sequence: task.sequence,
+            event,
+          };
+    appendFileSync(eventsFilePath(ctx), Buffer.from(`${JSON.stringify(row)}\n`, 'utf8'));
   }
 
   /**
