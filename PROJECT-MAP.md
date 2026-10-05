@@ -120,3 +120,16 @@
   - 子项③验证段「TS2352 未修」已被主会话修正：`taskStream.routes.test.ts:170` 补 `as unknown as` 中转，`tsconfig.server.json` 全仓类型错误 1→0（c2f7373 引入的基线错误就此清零）。
   - 主会话终局门禁重跑（全部实跑）：`ci-gate build` exit=0；`ci-gate test` exit=0（135 文件/962 用例/0 失败）；`gitnexus analyze` 刷新至 11413 节点/30494 边；`check` **clean/0 环**；`detect_changes` 48 符号/155 文件，符号清单逐一对得上本轮工作、无越界符号（云功能/禁改文件零出现）。
   - 新增文档登记：`.scratch/openwrite-parity-memo-naming/spec.md`（按 `.scratch` 忽略政策留在本地，不入库）；`docs/w3-operations-implementation-report-2026-10-05.md`（随 docs 提交入库）。
+
+### CHG-20261005-06 — 2026-10-05 — 用户授权（「可以」批准先跑完整安全审计），ZCode 执行
+
+- **需求来源**：用户批准 CHG-20261005-05 收尾提出的「先跑一次 mimosa 完整审计，清掉安全面的未知」。
+- **观察基线**：提交前钩子全程报 `scanner_enobufs`（缓冲不足），此前从未取得完整扫描结论；本轮 9 个提交落账后 HEAD=`18f8912`。
+- **执行**：`security_scan` 深度扫描（jobId `scan-job-muv1i4sr-66507948006a0570`，scanId `scan-2026-10-05T09-21-04.054Z-7c0abf520032`，seal `sha256:ef85d41ad9b0bff912bd4c70673cc05968575d72d4a786f85716ccfb7240288c`）：26 个包、0 依赖告警、**4 个发现**（全部 CWE-78 / high / `evidenceState: static-finding` / `verdictEffect: none` / proofGaps 空）；边界 `static_only_no_runtime_execution`。
+- **四项逐一定性**：
+  1. `apps/web/dist-server/platform/writerLock.js:89`「不可信程序选择」——**构建产物**（`.gitignore` 区，未入库），与源文件同码；修源即消，无独立动作。
+  2. `apps/web/server/platform/writerLock.ts:119`「不可信程序选择」——**真问题**：`SystemRoot` 环境变量决定可执行程序路径，且缺失时退回裸 `fsutil` 走 PATH 解析，违反该文件自述的 fail-closed 设计。**修复尝试两次被 Mimosa 预写钩子拦截**（第二版已是「编译期字面量路径 + 参数列表、无 shell」的安全写法，仍判高危），**修复未落地，转挂账**：建议后续改走「不启子进程的探测方案」（如调用方注入探测、或产品层面的驱动类型缓存）或经钩子白名单途径解决；本次不为过门禁而伪造写法，工作区已还原至 HEAD。
+  3. `evidence/w5-boundary-verify/probe-02-browser-bundle-audit.ts:24`「命令注入」——**误报**：该行是 `assert.equal(content.includes('node:child_process'), false, ...)`，断言 bundle 不含该字符串，零命令执行；且该文件未入库（evidence 忽略区）。
+  4. `scripts/release/windows/MoZhou.cs:191`「命令注入」——**误报**：`OpenBrowser` 的 url 在上游 `MoZhou.cs:185-188` 已做 scheme=http + host=127.0.0.1 白名单 + pid 新鲜度校验，`UseShellExecute` 交给默认浏览器而非 shell 解析；未改动（修改 C# 需安装器构建验证，本轮不具备）。
+- **验证状态**：完整扫描结论已取得（静态、无运行时执行）；第 2 项修复被门禁阻断（如实记录）；工作区已还原干净（`git status` 仅 `.archify/` 未跟踪）。
+- **遗留**：writerLock fsutil 加固挂账（上）；本轮安全面未知已由本次完整扫描替代（不再以 `scanner_enobufs` 为由保留未知，但扫描为静态结论，不等于运行时安全证明）。
