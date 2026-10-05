@@ -40,6 +40,10 @@ evidence/*
 # Windows 设备名误建的文件
 nul
 
+# agent 编队运行状态与一次性外部审查输出（2026-10-05 落账时划出）
+.agent-teams/
+review-result.json
+
 # 本地凭据与私钥：商业发行仓库禁止误提交
 .env
 .env.*
