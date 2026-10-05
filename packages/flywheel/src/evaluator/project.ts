@@ -20,7 +20,7 @@
  * 窗口→cell 取**首个**匹配代次（账本行序权威；一窗多代的 V1 口径=首代定归属）。
  * 纯函数零时钟零外部服务；Date.parse 仅解析显式注入的 ISO 字符串，不取当下。
  */
-import { readRecipeVersionFromPayload } from '@mozhou/benchmark';
+import { readRecipeVersionFromPayload } from '@mozhou/runtime';
 import type { PipelineLedgerRow } from '@mozhou/pipeline';
 import type { UsageRecord } from '@mozhou/pipeline';
 import { cellIdOf, emptySignals } from './types.js';

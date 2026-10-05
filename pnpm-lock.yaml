@@ -152,9 +152,6 @@ importers:
 
   packages/flywheel:
     dependencies:
-      '@mozhou/benchmark':
-        specifier: workspace:*
-        version: link:../benchmark
       '@mozhou/data-plane':
         specifier: workspace:*
         version: link:../data-plane
@@ -164,6 +161,9 @@ importers:
       '@mozhou/pipeline':
         specifier: workspace:*
         version: link:../pipeline
+      '@mozhou/quality-engine':
+        specifier: workspace:*
+        version: link:../quality-engine
       '@mozhou/runtime':
         specifier: workspace:*
         version: link:../runtime

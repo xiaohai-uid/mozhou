@@ -11,8 +11,8 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { METRIC_IDS } from '@mozhou/benchmark';
-import type { MetricId, VersionMatrixRow } from '@mozhou/benchmark';
+import { METRIC_IDS } from '@mozhou/quality-engine';
+import type { MetricId, VersionMatrixRow } from '@mozhou/quality-engine';
 import type { RoutingSuggestion } from './types.js';
 
 /** 建议派生目录与文件（规格 §5 R3 点名 suggestions 派生目录）。 */

@@ -5,15 +5,22 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc -p .",
     "test": "vitest run"
   },
   "dependencies": {
-    "@mozhou/benchmark": "workspace:*",
     "@mozhou/data-plane": "workspace:*",
     "@mozhou/kernel": "workspace:*",
     "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
     "@mozhou/runtime": "workspace:*"
   },
   "devDependencies": {

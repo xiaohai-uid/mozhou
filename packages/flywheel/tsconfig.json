@@ -9,7 +9,7 @@
     { "path": "../kernel" },
     { "path": "../data-plane" },
     { "path": "../pipeline" },
-    { "path": "../runtime" },
-    { "path": "../benchmark" }
+    { "path": "../quality-engine" },
+    { "path": "../runtime" }
   ]
 }

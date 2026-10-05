@@ -4,7 +4,7 @@
  * 全部纯夹具零时钟零 IO；六指标判定消费 evaluateMetricGate 的结论作对照。
  */
 import { describe, expect, it } from 'vitest';
-import { METRIC_IDS, evaluateMetricGate } from '@mozhou/benchmark';
+import { METRIC_IDS, evaluateMetricGate } from '@mozhou/quality-engine';
 import {
   acceptanceWilson,
   baselineFailureRate,

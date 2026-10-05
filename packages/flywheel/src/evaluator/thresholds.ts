@@ -15,8 +15,8 @@
  * demote 反向信号：incumbent 最近两存档行连续跌破资格门，或 S6 失败率 ≥2× 既有
  * 基线且窗口 ≥10。全部纯函数零时钟零 IO。
  */
-import { evaluateMetricGate, METRIC_IDS } from '@mozhou/benchmark';
-import type { MetricId, VersionMatrixRow } from '@mozhou/benchmark';
+import { evaluateMetricGate, METRIC_IDS } from '@mozhou/quality-engine';
+import type { MetricId, VersionMatrixRow } from '@mozhou/quality-engine';
 import { wilsonInterval } from './wilson.js';
 import type { ArchivedMatrixRow } from './storage.js';
 import { EDIT_RATIO_FLOOR, EDIT_RATIO_REL_REDUCTION } from './types.js';
