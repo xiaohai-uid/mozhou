@@ -34,3 +34,13 @@
 - **验证状态**：已执行（文件落盘 + `git diff` 重读核对）；**未提交**（提交需另行授权）。
 - **追记（2026-10-05，Mimosa L2 收尾复查）**：安全复查对本轮 `AGENTS.md:92` 报「指令含不可逆删除/重置命令」。判定为误报——被命中的字符串位于「禁」子句内，属禁令条文而非待执行命令，且同一禁令早已存在于全局共享规则「Git 分支与提交」章与本文件 §6 第 23 条（后者本轮未改动，扫描器仅因本轮 diff 命中）。但该枚举与全局条文逐字重复，与本变更的去重目标相悖，故将命令字面量从 §8 移除，禁令权威归属全局章与 §6 第 23 条。
 - **遗留**：`.agents/skills` 与 `.claude/skills` 双副本逐字同步性未核验；GitHub Issues 现状未核查；数据所有权细分条目待需要时补。
+
+### CHG-20261005-02 — 2026-10-05 — 用户授权（「开始提交」），ZCode 执行
+
+- **需求来源**：承接同日 `CHG-20261005-01` 会话的图谱体检结论（detect_changes 报 risk_level: critical，实为 171 项改动未落账），用户授权分批提交。
+- **观察基线**：脏区 119 M + 52 ??（另 2 项暂存区遗留）；基线验证 `pnpm build`（tsc -b）通过、`pnpm test` 全绿——测试文件 134 通过/1 跳过，用例 959 通过/14 跳过/0 失败，整链退出码 0。
+- **目标行为**：工作区清零，改动按能力域进入逻辑提交（Conventional Commits 八类前缀）。
+- **实际变更**：`c86132b`…`353b669` 共 12 个提交——chore(.gitignore)、feat(data-plane)、feat(pipeline)、feat(runtime)、feat(kernel/context-compiler/quality-engine)、chore(benchmark/flywheel+锁文件)、feat(server)、feat(web)、test(scripts)、docs(audit)、docs(agents)、chore(接线)。
+- **排除与定性**：`.agent-teams/`、`review-result.json` 入 .gitignore 不入库；`apps/web/shared/*.js` 经核验为手维护最小子集（非构建产物），随源入库，重复问题留待 /code-review。
+- **验证状态**：已执行（基线全绿 + 每批 staged diff-stat 核对 + 收尾 detect_changes/gitnexus check）；**未 push、未合并回 develop**（需另行授权）。
+- **遗留/风险**：Mimosa 提交前扫描多次报 `scanner_enobufs`（扫描器缓冲不足），按兼容策略放行——**本轮未取得完整安全扫描结论，不宣称项目安全**，建议尽快重跑 mimosa 完整审计；推送前本地 CI 门禁与六分支合流仍需单独授权。
