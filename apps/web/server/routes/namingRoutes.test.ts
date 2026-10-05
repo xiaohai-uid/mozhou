@@ -1,9 +1,9 @@
 // @vitest-environment node
 /**
- * AI 起名路由测试（OpenWrite 对标切片 · 工单 22）：
+ * AI 起名路由测试（OpenWrite 对标切片）：
  * - mock provider（MOZHOU_NAMING_PROVIDER=mock，对齐 MOZHOU_DRAFT_PROVIDER 先例）：
  *   happy path 返回确定性名称；
- * - 未配置模型 → 501 NAMING_NOT_CONFIGURED（真实性门禁：不伪造名称）；
+ * - 未配置模型 → 501 NAMING_NOT_CONFIGURED（真实性门：不伪造名称）；
  * - mode/category/count 校验 400；
  * - prompt 构造与容错解析为纯函数单元测试。
  * AI 真实网络调用不在此覆盖：SSRF 守卫禁止私网目标，控制流由 mock provider
@@ -73,7 +73,7 @@ afterEach(() => {
   }
 })
 
-describe('POST /api/naming（AI 起名 · 工单 22）', () => {
+describe('POST /api/naming（AI 起名 · OpenWrite 对标切片）', () => {
   it('mock provider：确定性返回 category/count 对应名称', async () => {
     root = mkdtempSync(join(tmpdir(), 'mozhou-naming-'))
     defaultBookAccessManager.setDataRoot(root)

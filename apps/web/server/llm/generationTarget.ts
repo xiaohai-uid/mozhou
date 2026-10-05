@@ -1,5 +1,5 @@
 /**
- * apps/web/server/llm · 生成端点统一解析（工单06 ·「我在跟哪个模型说话」）。
+ * apps/web/server/llm · 生成端点统一解析（深化 06 provider-resolution ·「我在跟哪个模型说话」）。
  *
  * 领域规则只有一处权威表述——`llm/tierRouting.ts:146-158`：端点身份 = providerId，
  * 账本记录的 providerId 必然就是实际服务的那一个。此前只有 draft 一条路径遵守它；
@@ -76,20 +76,20 @@ export type GenerationUnavailableReason =
   | 'hosted_no_principal'
   /** 注册表无路由且 BYOK 无凭据：真没配任何 provider。 */
   | 'no_provider_configured'
-  /** 配了但不可用（注册表结构非法/歧义/未登记/SSRF/密钥缺失，或 BYOK 端点未过门禁）：
+  /** 配了但不可用（注册表结构非法/歧义/未登记/SSRF/密钥缺失，或 BYOK 端点未过门）：
    *  detail 携带带键路径的病因。绝不回落到另一个端点。 */
   | 'provider_config_invalid'
   /**
-   * 配了，但端点被 SSRF 门禁拒绝（环回/本机名/私有/保留地址/协议不合），而部署者
+   * 配了，但端点被 SSRF 门拒绝（环回/本机名/私有/保留地址/协议不合），而部署者
    * **没有**显式设 MOZHOU_ALLOW_PRIVATE_LLM=1。
    *
    * 为什么要从 provider_config_invalid 里分出来（P2 缺陷「本机模型接入指引误导」）：
    * 这两类的下一步**完全相反**。provider_config_invalid 一般是配置写错了，改配置；
-   * 而本类是配置没写错、门禁按设计默认收紧，部署者显式放行即可。原先两者同码，
+   * 而本类是配置没写错、门按设计默认收紧，部署者显式放行即可。原先两者同码，
    * UI 只能对两者说同一句话，于是本机部署的用户被指引去「账户 → 模型设置」填
    * BYOK 密钥——那是本机部署根本不该走的路，照着做也接不上本地模型。
    *
-   * 分支不是放宽：门禁仍在同一处按同一条件拒绝；本 reason 只在拒绝**已经发生后**
+   * 分支不是放宽：门仍在同一处按同一条件拒绝；本 reason 只在拒绝**已经发生后**
    * 给它一个可分类的名字。
    */
   | 'provider_endpoint_blocked'
@@ -161,10 +161,10 @@ function unavailable(
 }
 
 /**
- * 从任意失败面识别「这确实是 SSRF 门禁拒绝」。
+ * 从任意失败面识别「这确实是 SSRF 门拒绝」。
  *
  * 为什么要跨两层找（注册表层的 TierProviderError 包了它，BYOK 层直接抛）：
- * 两条解析路径都会把门禁拒绝**包成**自己的错误类型再上抛（注册表层要附加
+ * 两条解析路径都会把门拒绝**包成**自己的错误类型再上抛（注册表层要附加
  * 配置文件与键路径，TierProviderError 的既有契约；改包装会动到 tierRoute 测试
  * 逐字断言的 message）。所以分类必须能穿过包装。
  *
@@ -186,7 +186,7 @@ function ssrfBlockedHost(error: unknown): string | undefined {
 /**
  * 把一次解析失败收口成 Unavailable，并按病因分流 reason。
  *
- * 分流只发生在**门禁已经拒绝之后**：本函数不调用、不重跑、也不放宽任何门禁判定，
+ * 分流只发生在**门已经拒绝之后**：本函数不调用、不重跑、也不放宽任何门判定，
  * 它只把既成事实的拒绝归到一个能被 UI 正确指引的类别里。
  */
 function unavailableFromError(
@@ -250,8 +250,8 @@ export async function resolveGenerationTarget(
     }
   }
 
-  // 3. BYOK 层：产品内配置（按 userId 隔离）优先，再退环境变量。SSRF 门禁失败归
-  //    provider_endpoint_blocked（配了、门禁按设计拒绝，部署者显式放行即可），其余
+  // 3. BYOK 层：产品内配置（按 userId 隔离）优先，再退环境变量。SSRF 门失败归
+  //    provider_endpoint_blocked（配了、门按设计拒绝，部署者显式放行即可），其余
   //    失败归 provider_config_invalid。两者都**不**静默当「没配」。
   try {
     const endpoint = resolveChatEndpoint(env, principal?.userId)

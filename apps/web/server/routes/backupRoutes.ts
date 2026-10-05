@@ -5,7 +5,7 @@
  * - POST /api/backups {bookId} → {backupId, bytes, sha256}；
  * - POST /api/backups/download {backupId} → 重新鉴权并下载 ZIP 归档；
  * - POST /api/backups/restore {backupId} → 在当前用户沙箱下安全恢复为新作品，禁止任意目标路径注入；
- * - 严格执行 C5 资源限制与防穿越门禁。
+ * - 严格执行 C5 资源限制与防穿越门。
  */
 import type { RouteHandler } from '../router.js'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

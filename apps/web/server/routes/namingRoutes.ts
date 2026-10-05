@@ -2,7 +2,7 @@
  * AI 起名路由（OpenWrite 对标切片 · 工单 22）：
  * - POST /api/naming {mode:'ai', category, count?, hint?} → 模型生成名称+释义。
  * - 端点解析走 resolveChatEndpoint（BYOK：环境变量或用户设置）；未配置 → 501
- *   NAMING_NOT_CONFIGURED 诚实报错，绝不返回伪造名称（真实性门禁同族）。
+ *   NAMING_NOT_CONFIGURED 诚实报错，绝不返回伪造名称（真实性门同族）。
  * - 本地随机摇号（零 AI）在灵感面板 DesktopToolModals，不经过本路由。
  * - 测试接缝：MOZHOU_NAMING_PROVIDER=mock（对齐 MOZHOU_DRAFT_PROVIDER 先例），
  *   仅测试环境使用；生产不设置该变量。
@@ -119,8 +119,9 @@ export const namingRoutes: RouteHandler = async (req, res, { path, body, json, p
     return true
   }
 
-  // 测试接缝（对齐 MOZHOU_DRAFT_PROVIDER 先例）：仅显式 mock 时返回固定样本。
-  if (process.env['MOZHOU_NAMING_PROVIDER'] === 'mock') {
+  // 测试接缝（对齐 MOZHOU_DRAFT_PROVIDER 先例）：仅显式 mock 且**非生产**时返回固定样本
+  // （UVSD §4-13：mock 只属于 dev/test/demo；生产里开关被忽略，走真实端点解析）。
+  if (process.env['NODE_ENV'] !== 'production' && process.env['MOZHOU_NAMING_PROVIDER'] === 'mock') {
     json(200, { ok: true, mode: 'ai', names: mockNamingNames(category as NamingCategory, count) })
     return true
   }

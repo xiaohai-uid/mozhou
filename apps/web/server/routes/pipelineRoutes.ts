@@ -89,12 +89,15 @@ const DIALOGUE_CAPABILITIES = [
 
 /**
  * mock 开关族判据（hasDraftProvider / draft.stream 前置闸 / makeStreamEngine 三处共用，
- * 工单06 收敛）：`MOZHOU_DRAFT_PROVIDER=mock` 恒成立；`mock-empty` 仅非生产成立
- * （空流回归测试缝，生产不生效以免「探针报可用、生成都失败」的假可用）。
+ * 深化 06（provider-resolution）收敛）：`mock` 与 `mock-empty` 都**仅非生产成立**
+ * （UVSD §4-13：mock 只属于 dev/test/demo 环境）。`mock-empty` 是空流回归测试缝，
+ * 生产不生效以免「探针报可用、生成都失败」的假可用；`mock` 同理——生产里开关被
+ * 忽略，探针走真实解析缝如实报状态，绝不因显式开关产出伪造可用性。
  */
 function isMockDraftProviderMode(env: NodeJS.ProcessEnv): boolean {
+  if (env['NODE_ENV'] === 'production') return false
   const configured = env['MOZHOU_DRAFT_PROVIDER']
-  return configured === 'mock' || (configured === 'mock-empty' && env['NODE_ENV'] !== 'production')
+  return configured === 'mock' || configured === 'mock-empty'
 }
 
 /**
@@ -124,8 +127,9 @@ export interface DraftProviderAvailability {
  * 草稿 provider 可用性判据（`/api/capabilities`、`/api/capability-square` 的 `providerAvailable`
  * 与 `/api/draft.stream` 前置闸共用）——回答「现在能不能真的生成」：
  *   - `MOZHOU_DRAFT_PROVIDER=mock` ⇒ true（既有显式开关，不参与分级路由选档）；
- *   - `MOZHOU_DRAFT_PROVIDER=mock-empty` ⇒ true，**但仅非生产环境**（空流回归测试缝）；
- *   - 否则 = `resolveGenerationTarget` 是否可用（工单06 单缝）：注册表可解析 ∥ BYOK 凭据齐备。
+ *   - `MOZHOU_DRAFT_PROVIDER=mock-empty` ⇒ true；
+ *   - 两者都**仅非生产环境**（UVSD §4-13；生产里开关被忽略，探针走真实解析缝）；
+ *   - 否则 = `resolveGenerationTarget` 是否可用（深化 06 单缝）：注册表可解析 ∥ BYOK 凭据齐备。
  *
  * 为什么要认注册表：端点身份已由 providerId 决定（见 llm/tierRouting.ts），所以「有没有可用的
  * 草稿 provider」的判据必须把注册表算进去——否则「只用注册表、不配 BYOK」的部署会被挡在门外，
@@ -142,11 +146,11 @@ export async function hasDraftProvider(env: NodeJS.ProcessEnv = process.env, use
  *
  * 为什么需要（P2 缺陷「本机模型接入指引误导」）：hasDraftProvider 回答的是布尔量，
  * 而 UI 要回答「下一步做什么」。真没配 provider（该去设置页填密钥）与端点被 SSRF
- * 门禁按设计拒绝（该让部署者显式放行本机网络）的下一步**相反**；压成 false 之后
+ * 门按设计拒绝（该让部署者显式放行本机网络）的下一步**相反**；压成 false 之后
  * 两者共用一句话，于是本机部署的用户被指引去填 BYOK 密钥——本机部署根本不该走那条
  * 路，照着做也接不上本地模型。
  *
- * 探针不重跑解析、不重跑门禁：只是把 resolveGenerationTarget 本来就算好的
+ * 探针不重跑解析、不重跑门的判定：只是把 resolveGenerationTarget 本来就算好的
  * reason / detail / blockedHost 如实带出来。故 mock 档没有「病因」可言，
  * 按 available=true、reason='mock' 报（mock 是显式测试/演示开关，不是诊断类别）。
  */
@@ -257,7 +261,7 @@ async function ensureChapterScaffold(root: string, chapterIndex: number, bookKey
  * C2（T04）：stream 只 append 候选（candidate 上下文必传，缺省拒绝绑定）；
  * signal 在请求断开/显式取消时中止上游。
  *
- * T14 接线 + 工单06 收敛：真实分支的 providerId/model/端点由
+ * T14 接线 + 深化 06（provider-resolution）收敛：真实分支的 providerId/model/端点由
  * `llm/generationTarget.resolveGenerationTarget`（单缝）解析——注册表 → BYOK → 带原因的
  * Unavailable：
  *   - source='registry' ⇒ providerId ⇒ CapabilityRegistry.setGlobalOverride（包内默认
@@ -322,7 +326,7 @@ async function makeStreamEngine(
     const defaultProviderId = 'deepseek'
     const providerVersion = '1.0.0'
 
-    // 工单06：解析收敛到 llm/generationTarget.resolveGenerationTarget 单缝——注册表 → BYOK
+    // 深化 06：解析收敛到 llm/generationTarget.resolveGenerationTarget 单缝——注册表 → BYOK
     // → 带原因的 Unavailable。providerId 与实际出站端点由**同一次解析**产生（providerId 既作
     // 下方 registerProviderBinding 绑定键与账本快照，又决定 baseURL/apiKey），账本与出站
     // 因此强制同源（tierRouting.ts:146-158 不变量）。注册表解析失败绝不回落 BYOK；
@@ -468,7 +472,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
    *
    * 为何需要：requestResubmit / session.open 开的窗口只能由本会话第 9 步
    * CanonCommitted 或 TaskFinished 闭合，而 web 侧没有会话内 commit/finish 路由
-   * （session.advance 也不携带门禁 verdict，故 continuity_gate→canon_proposal 恒被
+   * （session.advance 也不携带门 verdict，故 continuity_gate→canon_proposal 恒被
    * GateNotPassedError 拒）——窗口一旦开出就占住 V1 全局单飞，别章开卷恒 409。
    * 作废是「放弃未完成」，与「完成」正交：发布 TaskFinished{outcome:'abandoned', reason}
    * 闭合 TaskStarted 配对并释放单飞，**绝不发 CanonCommitted**（完成态语义不动）。
@@ -602,10 +606,10 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     }
 
     if (!isMockDraftProviderMode(process.env)) {
-      // 工单06：闸与真实生成走**同一个**解析缝（resolveGenerationTarget）。
+      // 深化 06：闸与真实生成走**同一个**解析缝（resolveGenerationTarget）。
       // 仅「真没配任何 provider」（no_provider_configured）才用笼统 PROVIDER_UNAVAILABLE 收口；
       // 「配了但解析不出来」（provider_config_invalid，注册表带键路径的病因 / BYOK 端点未过
-      // 门禁）放行进真实分支，让 makeStreamEngine 的同一次解析抛出带原因的精确错误帧
+      // 门）放行进真实分支，让 makeStreamEngine 的同一次解析抛出带原因的精确错误帧
       // （NDJSON error 帧），而不是用笼统码掩盖病因。
       const probe = await resolveGenerationTarget({
         taskType: DRAFT_TASK_TYPE,
