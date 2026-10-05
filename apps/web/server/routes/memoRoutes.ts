@@ -1,5 +1,5 @@
 /**
- * 备忘录路由（OpenWrite 对标切片 · 工单 22）：
+ * 备忘录路由（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：
  * - POST /api/memo 单端点 action 分发：list / create / update / delete。
  * - 策略 'account'（routePolicies）：本地模式回退 local_user 主体，
  *   hosted 模式必须持有效 Session——便签永远跟随主体，不跟随书。

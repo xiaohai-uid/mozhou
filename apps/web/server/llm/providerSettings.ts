@@ -283,7 +283,7 @@ export class ProviderSettingsManager {
   /**
    * 「有没有配好凭据」的单一判据：产品内配置优先，其次进程环境变量。
    *
-   * 只回答「配了没有」，**不**做 SSRF/DNS 门禁——那是 resolveEndpointForUser 的活，
+   * 只回答「配了没有」，**不**做 SSRF/DNS 门——那是 resolveEndpointForUser 的活，
    * 它会抛异常，而能力探针抛异常会打断整条路由。getSettings 也可能抛（getSettingsPath
    * 会 mkdirSync：数据根 EACCES/ENOSPC），就地吞掉折成「未配置」：探针 fail-closed。
    *

@@ -160,7 +160,7 @@ describe('ProposalPort 统一确认面', () => {
     expect(appends.relationshipState).toBeUndefined();
   });
 
-  it('Commit 门禁：pending 未清（含 high 未显式确认）即拒——confirmedCanonicalRows 宁败不静默', () => {
+  it('Commit 门：pending 未清（含 high 未显式确认）即拒——confirmedCanonicalRows 宁败不静默', () => {
     const { root } = newBook();
     const seeded = seedPipelineProposal(root, new PublishBus());
     const ref = { port: 'pipeline', proposalId: seeded.proposalId } as const;

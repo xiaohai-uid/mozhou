@@ -93,7 +93,7 @@ function readdirSafe(dir: string): string[] {
 }
 
 /** 建一本带一章已提交正文 + 两条事实增量的书。 */
-/** 构造一条通过 T4 语义门禁的 TemporalFact 行（应用内提交与外部编辑模拟共用同一形状）。 */
+/** 构造一条通过 T4 语义门的 TemporalFact 行（应用内提交与外部编辑模拟共用同一形状）。 */
 function makeFactRow(plane: LocalDataPlane, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const now = new Date().toISOString()
   return {

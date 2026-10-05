@@ -114,9 +114,9 @@ export interface ContractAuditIssue {
 }
 
 /**
- * 因果合约门禁审计：
+ * 因果合约门审计：
  * 终审严格决议：违约（breached）是合法且核心的叙事走向！
- * 门禁只拦截“期限已过且无任何履约/违约/延期记录（expired_without_disposition）”或互斥状态。
+ * 门只拦截“期限已过且无任何履约/违约/延期记录（expired_without_disposition）”或互斥状态。
  */
 export function auditCausalContract(
   contract: CausalContract,

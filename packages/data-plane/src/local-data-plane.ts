@@ -224,7 +224,7 @@ export class LocalDataPlane {
 
   /**
    * T4：结构化查询芯（#7 冻结形态 `queryActiveFacts(chapter, entityIds, pov)`）——
-   * 第 chapter 章时点上、对 pov 视角可见的活跃事实。秘密门禁零泄漏：
+   * 第 chapter 章时点上、对 pov 视角可见的活跃事实。秘密门零泄漏：
    * 未授权视角的结果集与「秘密不存在」不可区分。
    */
   queryActiveFacts(request: QueryActiveFactsRequest): TemporalFact[] {

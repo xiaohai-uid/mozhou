@@ -1,6 +1,6 @@
 /**
  * S10 测试（T19 · #43）：watcher × S3 写前校验交互——管线在步边界检查点响应
- * EXTERNAL_MODIFIED（步内不打断，避免半步状态 × 对账叠加）；对账软门禁
+ * EXTERNAL_MODIFIED（步内不打断，避免半步状态 × 对账叠加）；对账软门
  * （警告不硬阻塞）适用于整条管线。零时钟零外部服务。
  */
 import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -79,13 +79,13 @@ describe('S10 步边界检查点：EXTERNAL_MODIFIED 只在边界响应', () => 
   });
 });
 
-describe('S10 对账软门禁（整条管线）：警告不硬阻塞', () => {
+describe('S10 对账软门（整条管线）：警告不硬阻塞', () => {
   it('pass-through：面内改动只折算为警告返回，调用方照常拿到结果、永不抛', () => {
     const dir = makeDraftBook('mozhou-t19-w4-');
     commitChapter2(dir);
     appendFileSync(join(dir, proseChapterPath(2)), '外部改动\n');
 
-    // 直接调用（不经 expect 的异常通道）——软门禁必须原样返回值
+    // 直接调用（不经 expect 的异常通道）——软门必须原样返回值
     const warnings = pipelineReconciliationGate(dir);
     expect(warnings.length).toBeGreaterThanOrEqual(1);
     expect(warnings[0]).toMatchObject({ relPath: proseChapterPath(2), kind: 'external_modified' });

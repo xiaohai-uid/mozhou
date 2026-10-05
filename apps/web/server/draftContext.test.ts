@@ -431,7 +431,7 @@ describe('buildDraftContext · 风格画像注入（t51:B4）', () => {
     // 每场景型 14 个句长桶（share 归一）。旧的 chars/1.5 估算器在这里报 1012 > 800
     // 直接抛错把整章生成阻断；随仓 WordPiece 词表实测 712 ≤ 800，本应放行。
     // 落盘膨胀走句长桶而非禁用词：文风.md 解析器（style-profiles.ts:248）把
-    // tabooWords 子表排除在 fields 计数外，非空禁用词当前无法 round-trip（本工单范围外）。
+    // tabooWords 子表排除在 fields 计数外，非空禁用词当前无法 round-trip（不在本轮改动范围内）。
     const buckets = Array.from({ length: 14 }, (_, index) => ({
       maxLengthChars: (index + 1) * 10,
       share: 1 / 14,

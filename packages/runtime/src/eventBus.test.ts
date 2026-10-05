@@ -114,7 +114,7 @@ describe('PublishBus.adoptOpenHeads · 从账本重建未闭合 head', () => {
 });
 
 /**
- * 工单 02 缺陷 B（.scratch/mozhou-deepening-20260928/issues/02-adopt-open-heads-latent-defect.md）：
+ * 深化 02 缺陷 B（.scratch/mozhou-deepening-20260928/issues/02-adopt-open-heads-latent-defect.md）：
  * adoptOpenHeads 对全账本无窗口、无 position 门控地折叠所有 head——把「按设计永不闭合」的
  * 历史悬挂 head（web 提交路径的 CanonProposalCreated，见 proseRoutes.ts 成对账目注；事件
  * 形状 = createCanonProposal 的发布载荷，packages/pipeline/src/proposal-step.ts）灌进本实例
@@ -126,7 +126,7 @@ describe('PublishBus.adoptOpenHeads · 从账本重建未闭合 head', () => {
  * （packages/pipeline/src/projection.ts：openedAtPosition 恒 null + position 比较两道闸）。
  * abandon 的跨请求闭合能力（认领当前窗口 TaskStarted）不回退——本组用例逐一钉住。
  */
-describe('PublishBus.adoptOpenHeads · 工单 02B position 门控', () => {
+describe('PublishBus.adoptOpenHeads · 深化 02B position 门控', () => {
   /** web 提案头的真实事件形状（packages/pipeline/src/proposal-step.ts createCanonProposal）。 */
   const webProposalHead = (taskRef: string) => ({
     type: 'CanonProposalCreated' as const,

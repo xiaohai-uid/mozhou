@@ -1,6 +1,6 @@
 /**
  * T4（实现票 #19）行为黑盒：全部经 LocalDataPlane 接缝打——
- * 提交期语义门禁（宁败不脏：坏增量零盘上副作用）/
+ * 提交期语义门（宁败不脏：坏增量零盘上副作用）/
  * POV 秘密零泄漏（验收①：与「秘密不存在」不可区分）/
  * knownSinceChapter 生效（验收②）/ M2 时间线序数单调拦截（验收③）。
  */
@@ -152,7 +152,7 @@ function expectDiskUntouchedByFailedCommit(plane: LocalDataPlane): void {
   expect(plane.verifyBaseline()).toMatchObject({ modified: [], missing: [], untracked: [] })
 }
 
-describe('提交期语义门禁：坏增量在动第一字节前被拦截（宁败不脏）', () => {
+describe('提交期语义门：坏增量在动第一字节前被拦截（宁败不脏）', () => {
   it('合法四族混合增量正常落流', () => {
     const plane = newBook()
     try {
@@ -286,7 +286,7 @@ describe('提交期语义门禁：坏增量在动第一字节前被拦截（宁�
   })
 })
 
-describe('M2 时间线单调硬门禁：乱序插入被序数校验拦截（验收③）', () => {
+describe('M2 时间线单调硬门：乱序插入被序数校验拦截（验收③）', () => {
   it('新序数必须严格大于存量活跃最大值；批内严格递增', () => {
     const plane = newBook()
     try {

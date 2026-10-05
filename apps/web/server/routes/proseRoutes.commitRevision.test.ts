@@ -1,13 +1,13 @@
 // @vitest-environment node
 /**
- * 工单 05 Contract Delta 验收（.scratch/mozhou-deepening-20260928/issues/05-commit-idempotency-contract-delta.md）：
+ * 深化 05 Contract Delta 验收（.scratch/mozhou-deepening-20260928/issues/05-commit-idempotency-contract-delta.md）：
  * POST /api/chapter.commit 携带 expectedRevision（作者实际读取的章版本，形状照搬
  * /api/chapter.prose.save 冻结契约）——匹配才继续；过期 ⇒ 409 PROSE_REVISION_CONFLICT
  * 且在提取缝（真实 LLM 调用）之前拒绝：模型调用增量 0，正文/正典/账本零写入。
  *
- * 覆盖（工单验收清单）：首次请求 / 重复请求 / 过期 revision / 缺失与非法字段 /
+ * 覆盖（深化 05 验收清单）：首次请求 / 重复请求 / 过期 revision / 缺失与非法字段 /
  * 双窗口 / 成功响应丢失后重试。不同输入不视为幂等成功：重复提交落在相位 409
- * （CHAPTER_ALREADY_COMMITTED，工单 02 缺陷 A 语义不变），不回 200。
+ * （CHAPTER_ALREADY_COMMITTED，深化 02 缺陷 A 语义不变），不回 200。
  *
  * 确定性与夹具边界：提取缝替换为计数夹具（真实归一语义归 deltaExtractor.test.ts，
  * 夹具行由真实 normalizeDelta 产出）——夹具只证明控制流（过期提交 0 次提取调用、
@@ -118,7 +118,7 @@ async function seedDraftChapter(): Promise<{ base: string; root: string; bookId:
   return { base, root, bookId: String(created.data.bookId), revision: revision as number }
 }
 
-describe('POST /api/chapter.commit · expectedRevision 提交幂等契约（工单05）', () => {
+describe('POST /api/chapter.commit · expectedRevision 提交幂等契约（深化 05）', () => {
   it('首次请求：expectedRevision 与盘上一致 ⇒ 200 committed（契约照常走完）', async () => {
     const { base, root, bookId, revision } = await seedDraftChapter()
     fixture.result = lowExtraction(bookId)

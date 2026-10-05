@@ -13,11 +13,11 @@
  * 接口刻意做成「把句柄借出去」而不是「返回一个句柄」：借出的句柄没有名字，
  * 调用点就没法忘记还。裸 `LocalDataPlane.open/openOrRebuild` 由
  * `eslint.config.js` 的 `no-restricted-syntax` 变成 error——守卫从 245 行正则
- * 源码扫描退化成一条常规门禁规则。
+ * 源码扫描退化成一条常规门规则。
  *
  * ## 为什么两个入口而不是一个
  *
- * 工单 08 的目标形态是 `withBook(root, fn)`。但 `open` 与 `openOrRebuild` 的
+ * 深化 08 的目标形态是 `withBook(root, fn)`。但 `open` 与 `openOrRebuild` 的
  * 失败语义**不同**（前者要求投影就位、缺投影照抛，由调用方决定是否重建），
  * 把二者合成一个名字只会逼调用点写「开两次去 catch」这种怪形态。故保留：
  *
@@ -99,7 +99,7 @@ export function withBook<T>(root: string, fn: (plane: LocalDataPlane) => T): T {
  * 由 `stopReconciliationRuntime` 显式停机时归还。这类持有者是真实的，但它必须
  * **写在代码里**而不是靠默认行为蒙混：
  *
- *   - 句柄只在 with-plane.ts 内被 open（eslint 常规门禁把裸 open 变成 error）；
+ *   - 句柄只在 with-plane.ts 内被 open（eslint 常规门把裸 open 变成 error）；
  *   - 长活持有者必须成对出现 retain/release，且 release 面可枚举。
  *
  * 相比裸 open 的净收益是：以前「这个句柄谁关」只存在于注释里，现在由

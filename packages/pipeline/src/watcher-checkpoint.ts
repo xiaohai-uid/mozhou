@@ -1,7 +1,7 @@
 /**
  * S10 watcher × S3 写前校验交互（T19 · #43）：管线在步边界检查点响应
  * EXTERNAL_MODIFIED——挂起（抛 CheckpointSuspendedError），步内不打断（避免
- * 半步状态 × 对账叠加）；整条管线的对账软门禁 = 警告不硬阻塞（pass-through）。
+ * 半步状态 × 对账叠加）；整条管线的对账软门 = 警告不硬阻塞（pass-through）。
  *
  * 检测底座复用 data-plane 启动必检的 verifyBaseline()（盘上现状 vs 哈希基线，
  * mtime/尺寸预筛 + SHA-256 复核同一实现），并按 S2 分面取 reconcileSurface：
@@ -30,7 +30,7 @@ export class CheckpointSuspendedError extends Error {
   }
 }
 
-/** 软门禁警告：对账面逐文件折算，调用方自行决定上报/展示（永不硬阻塞）。 */
+/** 软门警告：对账面逐文件折算，调用方自行决定上报/展示（永不硬阻塞）。 */
 export interface ReconciliationWarning {
   readonly relPath: string;
   readonly kind: 'external_modified' | 'missing';
@@ -67,7 +67,7 @@ export async function guardedPipelineStep<T>(
 }
 
 /**
- * 整条管线的对账软门禁（pass-through）：把对账面折算为警告返回，永不抛——
+ * 整条管线的对账软门（pass-through）：把对账面折算为警告返回，永不抛——
  * 「警告不硬阻塞」适用于全管线；硬挂起语义只在显式的 stepBoundaryCheckpoint。
  */
 export function pipelineReconciliationGate(root: string): readonly ReconciliationWarning[] {

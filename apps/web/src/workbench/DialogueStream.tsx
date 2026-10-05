@@ -722,7 +722,7 @@ export function DialogueStream({
 
       {providerUnavailable &&
         (() => {
-          // 指引按病因现算（P2）：本机端点被门禁拦下时，说的是「让部署者显式放行」，
+          // 指引按病因现算（P2）：本机端点被门拦下时，说的是「让部署者显式放行」，
           // 而不是把人送去填 BYOK 密钥——后者对本机部署是条走不通的路。
           const guidance = providerGuidance({ reason: providerReason, blockedHost: providerBlockedHost })
           return (

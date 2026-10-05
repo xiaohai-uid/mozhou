@@ -166,18 +166,18 @@ describe('DialogueStream（T44）', () => {
   /* --------------------------------------------------------------------------
    * P2 缺陷「本机模型接入指引误导」的组件级回归。
    *
-   * 现象：本机部署（MOZHOU_API_BASE=http://127.0.0.1:8317）失败的真因是 SSRF 门禁
+   * 现象：本机部署（MOZHOU_API_BASE=http://127.0.0.1:8317）失败的真因是 SSRF 门
    * 按设计拒绝环回地址，但横幅一律说「请到『账户 → 模型设置』填入你的 API 密钥」——
    * 把本机用户指引去填 BYOK 密钥，而那是本机部署不该走、也走不通的路。
    *
    * 下面两条把「两类病因 ⇒ 两套指引」钉在渲染层（分类逻辑本身另见 providerGuidance.test.ts）。
    * ------------------------------------------------------------------------ */
-  it('本机端点被门禁拦下（provider_endpoint_blocked）：横幅讲放行开关，不叫用户去填 BYOK 密钥', async () => {
+  it('本机端点被门拦下（provider_endpoint_blocked）：横幅讲放行开关，不叫用户去填 BYOK 密钥', async () => {
     const fetchMock = stubDialogueFetch({
       providerAvailable: false,
       providerUnavailableReason: 'provider_endpoint_blocked',
       providerBlockedHost: '127.0.0.1',
-      providerDetail: 'SSRF 门禁：拒绝调用私有/环回/保留地址 127.0.0.1',
+      providerDetail: 'SSRF 门：拒绝调用私有/环回/保留地址 127.0.0.1',
     })
     render(<DialogueStream book={BOOK} />)
 

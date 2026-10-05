@@ -107,7 +107,7 @@ export async function buildDraftContext(input: {
 }): Promise<DraftContextResult> {
   // 句柄只借到「盘上事实读齐」为止：下面 `prepared` 之后的整段是纯 CPU/模型调用，
   // 句柄在 await 期间没有任何用途。旧写法 `try { …await… } finally { plane.close() }`
-  // 会在第一个 await 之前就把句柄关掉（工单 08 修掉的正是这个）。
+  // 会在第一个 await 之前就把句柄关掉（深化 08 修掉的正是这个）。
   const { book, cards, snapshot, storyText, alwaysCards, prepared, styleSections } = withBook(input.root, (plane) => {
     const bookRecord = plane.book
     const entityCards = plane.getEntityCards()

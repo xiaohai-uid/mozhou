@@ -377,7 +377,7 @@ function firstActScripts(bookId: BookId): ChapterScript[] {
  * 第二幕（7–50）：把六类母题拉伸到 50 章规模
  *
  * 每章至少一条时间线行（worldTimeOrder = 章序，天然严格递增且 > 第一幕末序 3），
- * 于是「50 章」不是空洞填充：每章都真实穿过 commitChapter 的提交期语义门禁
+ * 于是「50 章」不是空洞填充：每章都真实穿过 commitChapter 的提交期语义门
  *（行形状 / 引用完整性 / M2 时间线单调）。章内事实按弧设计分布：
  * 空间移动八段区间、伤情三起三落、第二秘密（揭密前零泄漏）、第二次规则突变、
  * 第二/第三条伏笔、道具易主与归主。
@@ -406,7 +406,7 @@ interface ArcChapter {
   readonly locationRef?: EntityRef
   /** 本章事实增量（含区间闭合行：同 id + revision+1，末行胜出折叠）。 */
   readonly facts: readonly FactSpec[]
-  /** 本章授予的认知行（秘密门禁的授权侧）。 */
+  /** 本章授予的认知行（秘密门的授权侧）。 */
   readonly knowledge?: readonly ArcKnowledge[]
   /** 本章落盘的伏笔行。 */
   readonly promises?: readonly ArcPromiseRow[]
@@ -1137,7 +1137,7 @@ async function runScenario(root: string): Promise<Omit<LifecycleBenchReport, 'du
   // ── 50 章生命周期：全部行为只经 LocalDataPlane 接缝 ──
   // 句柄必须活过下方全部探针与两次删库重建（它自己控制重建时序，故走严格打开：
   // openOrRebuild 会在台架毫不知情时把刚删掉的投影重建掉，毁掉要测的指纹）。
-  // 工单 08：显式所有权转移，acquire/release 成对，句柄没有名字可忘。
+  // 深化 08：显式所有权转移，acquire/release 成对，句柄没有名字可忘。
   let plane = retainStrictBook(root)
   const chaptersCommitted: number[] = []
   const appendedTotals: Record<string, number> = {}

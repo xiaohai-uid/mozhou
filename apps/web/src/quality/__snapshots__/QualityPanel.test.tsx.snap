@@ -134,7 +134,7 @@ exports[`QualityPanel（初载契约修复后语义保全） > 契约快照：�
           <b
             style="font-size: 13px;"
           >
-            正典门禁与定稿提交
+            正典门与定稿提交
           </b>
           <span
             class="cap-badge pending"
@@ -168,7 +168,7 @@ exports[`QualityPanel（初载契约修复后语义保全） > 契约快照：�
             class="mono muted"
             style="font-size: 10px; margin: 0px;"
           >
-            定稿将执行门禁终验，生成不可变提交并更新章节状态。
+            定稿将执行终验门，生成不可变提交并更新章节状态。
           </p>
         </div>
       </div>

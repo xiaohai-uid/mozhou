@@ -96,7 +96,7 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
     root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
   })
   expect(saved.status).toBe(200)
-  // 工单05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值；挂起类 409 不改 revision）。
+  // 深化 05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值；挂起类 409 不改 revision）。
   return { base, root, bookId: String(created.data.bookId), expectedRevision: Number(saved.data.revision) }
 }
 
@@ -368,7 +368,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal 分流与挂起', () 
   })
 
   it('外部改盘后提交：409 PROSE_EXTERNAL_CHANGE，不是裸 500', async () => {
-    // 工单 01：commit 自己的 catch 链（proseRoutes.ts:734-750）漏了 PreWriteHashMismatchError，
+    // 深化 01：commit 自己的 catch 链（proseRoutes.ts:734-750）漏了 PreWriteHashMismatchError，
     // 而 /api/prose.save 在 :384-387 对同一条件返回 409。同条件两种契约 ⇒ 作者看到「服务器错误」
     // 却无法据此行动（真实原因是「你的章节在别处被改过」）。违反 AGENTS.md 规则 15。
     const { base, root, bookId, expectedRevision } = await makeDraftChapter()

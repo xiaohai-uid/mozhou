@@ -36,7 +36,7 @@ export interface SessionProjection {
   /**
    * 本窗口内最近一次进 continuity_gate 步的 Result 字段 verdict（T19 · #43）：
    * 'pass' | 'hard_conflict' | null（尚未走到）。回环显式驱动的判据——只有
-   * hard_conflict 悬置中的门禁才允许 requestRework（S7：每次循环由作者驱动）。
+   * hard_conflict 悬置中的门才允许 requestRework（S7：每次循环由作者驱动）。
    */
   readonly lastGateVerdict: 'pass' | 'hard_conflict' | null;
   /**
@@ -106,7 +106,7 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
             if (typeof to === 'string' && isPipelineStep(to)) {
               currentStep = to;
             }
-            // 门禁 Result 字段留痕：verdict 是回环显式驱动的机械判据（S7/S8 Gate 后行）
+            // 门 Result 字段留痕：verdict 是回环显式驱动的机械判据（S7/S8 Gate 后行）
             if (to === 'continuity_gate') {
               const verdict = event.payload?.['verdict'];
               lastGateVerdict = verdict === 'pass' || verdict === 'hard_conflict' ? verdict : lastGateVerdict;

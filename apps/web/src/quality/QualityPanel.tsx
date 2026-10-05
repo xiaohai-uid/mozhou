@@ -113,7 +113,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
   const [note, setNote] = useState('')
   const [correctionSaved, setCorrectionSaved] = useState(false)
   const [chapterPhase, setChapterPhase] = useState<'draft' | 'committed'>('draft')
-  // 作者实际读取的章版本（工单05 提交幂等契约）：定稿请求必须携带它作为 expectedRevision，
+  // 作者实际读取的章版本（深化 05 提交幂等契约）：定稿请求必须携带它作为 expectedRevision，
   // 服务端与盘上 revision 失配即 409——禁止把作者没读过的正文静默提交。
   const [proseRevision, setProseRevision] = useState<number | null>(null)
   const [commitSummary, setCommitSummary] = useState('')
@@ -149,7 +149,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
     setError(null)
     setCommitNotice(null)
     try {
-      // 提交幂等契约（工单05）：携带作者实际读取的章版本。面板从未读到 revision
+      // 提交幂等契约（深化 05）：携带作者实际读取的章版本。面板从未读到 revision
       // （refresh 的 prose 快照失败）时补读一次——仍拿不到就显式拒绝，不盲发。
       let expected = proseRevision
       if (expected === null) {
@@ -205,7 +205,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
     } catch (cause) {
       const error = cause as Error
       if (error.name === 'PROSE_REVISION_CONFLICT') {
-        // 提交幂等契约（工单05）：所读 revision 已过期（他端保存/双窗口）——正文零写入，
+        // 提交幂等契约（深化 05）：所读 revision 已过期（他端保存/双窗口）——正文零写入，
         // 与 prose.save 冲突同款处置：刷新面板对账（refresh 会重置 error，故报错在后），
         // 绝不静默改带新 revision 重发。
         await refresh()
@@ -408,10 +408,10 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
           )}
         </div>
 
-        {/* 正典门禁与定稿提交 (F04 十步管线终局) */}
+        {/* 正典门与定稿提交 (F04 十步管线终局) */}
         <div style={{ marginTop: 14, borderTop: '1px solid var(--hairline-strong)', paddingTop: 12 }} data-testid="canon-commit-section">
           <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <b style={{ fontSize: 13 }}>正典门禁与定稿提交</b>
+            <b style={{ fontSize: 13 }}>正典门与定稿提交</b>
             <span className={chapterPhase === 'committed' ? 'cap-badge native' : 'cap-badge pending'}>
               {chapterPhase === 'committed' ? '● 已定稿' : '○ 草稿期'}
             </span>
@@ -473,7 +473,7 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
                 </button>
               </div>
               <p className="mono muted" style={{ fontSize: 10, margin: 0 }}>
-                定稿将执行门禁终验，生成不可变提交并更新章节状态。
+                定稿将执行终验门，生成不可变提交并更新章节状态。
               </p>
             </div>
           )}

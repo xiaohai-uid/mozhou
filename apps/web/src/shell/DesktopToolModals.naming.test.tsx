@@ -1,5 +1,5 @@
 /**
- * 灵感面板 AI 起名区测试（OpenWrite 对标切片 · 工单 22）：
+ * 灵感面板 AI 起名区测试（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：
  * - AI 起名区在 inspiration Sheet 内渲染，本地摇号预设区不受影响；
  * - 生成成功 → 渲染名称与释义；
  * - 服务端 501 NAMING_NOT_CONFIGURED → 显式提示（不伪造结果）。
@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('DesktopToolModals · AI 起名（工单 22）', () => {
+describe('DesktopToolModals · AI 起名（.scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）', () => {
   it('inspiration Sheet 渲染本地预设区与 AI 起名区；生成成功显示名称释义', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okJson({
       ok: true,

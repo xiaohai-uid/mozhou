@@ -142,7 +142,7 @@ describe('POST /api/chapter.prose.save · 步 5 User Edit 接线', () => {
     })
 
     // 提交：窗口锚 taskRef = web_commit_ch1_rev<盘上 revision> —— 与上面同键
-    // 工单05 Contract Delta：提交携带作者所读 revision（最近一次保存响应回带的值）。
+    // 深化 05 Contract Delta：提交携带作者所读 revision（最近一次保存响应回带的值）。
     const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(saved.data['revision']) })
     expect(committed.status, JSON.stringify(committed.data)).toBe(200)
     expect(committed.data['flywheelRecord']).toMatchObject({ status: 'succeeded', afterRecordError: null })

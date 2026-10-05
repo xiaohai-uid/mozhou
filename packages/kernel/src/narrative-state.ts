@@ -1,14 +1,14 @@
 /**
- * 叙事状态流语义层（实现票 #19 / T4；T6 增补保护门禁与级联失效查询）。
+ * 叙事状态流语义层（实现票 #19 / T4；T6 增补保护门与级联失效查询）。
  *
  * T3 的 commitChapter 只做不解释的字节级追加；本模块补上行的语义半边：
  *   1. 行级校验——TemporalFact / KnowledgeState / RelationshipState / TimelineEvent
  *      四族记录落流前的冻结 Schema 校验（宁败不脏：坏行在动第一字节前被拦截）；
  *   2. 增量折叠——append-only 流按 id 末行胜出折叠成当前活跃视图（旧 commit
  *      痕迹永不改写，I5 ⇒ 折叠是纯读派生，不回写任何行）；
- *   3. queryActiveFacts 读路径——章区间过滤 + POV/秘密零泄漏门禁 +
+ *   3. queryActiveFacts 读路径——章区间过滤 + POV/秘密零泄漏门 +
  *      knownSinceChapter 生效（Q7/Q10/US24/US25）；
- *   4. 时间线 worldTimeOrder 全书严格单调硬门禁（Q12/M2：乱序插入即拦截）；
+ *   4. 时间线 worldTimeOrder 全书严格单调硬门（Q12/M2：乱序插入即拦截）；
  *   5. T6 增补——assertNoProtectedSupersession（I1：protectedUserContent
  *      事实行不可被自动化来源同 id 取代）+ invalidatedKnowledgeStates
  *      （I3：引用事实 rejected 的认知行级联失效可查询）。
@@ -16,7 +16,7 @@
  * 零依赖纯函数域：输入是已 JSON.parse 的普通对象，输出品牌化类型或抛错。
  * 文件 IO 归数据面（@mozhou/data-plane），本模块不做任何 IO。
  *
- * 零泄漏门禁纪律（验收①）：`secret.*` 事实对未授权视角**不存在**而非被隐藏——
+ * 零泄漏门纪律（验收①）：`secret.*` 事实对未授权视角**不存在**而非被隐藏——
  * 查询结果里没有计数、没有占位、没有可区分痕迹；下游 k-hop 建边只能看见
  * 本函数返回的事实，被滤秘密天然零候选零建边。
  */
@@ -56,7 +56,7 @@ export class TrackingRowError extends Error {
   }
 }
 
-/** M2 时间线单调硬门禁触发：新序数必须严格大于当前活跃最大序数。 */
+/** M2 时间线单调硬门触发：新序数必须严格大于当前活跃最大序数。 */
 export class TimelineOrderViolationError extends TrackingRowError {
   override readonly name = 'TimelineOrderViolationError'
 
@@ -455,7 +455,7 @@ export function foldNarrativeRows(rows: NarrativeStreamRows): NarrativeStateSnap
 }
 
 /* ----------------------------------------------------------------------------
- * M2 时间线单调硬门禁
+ * M2 时间线单调硬门
  * -------------------------------------------------------------------------- */
 
 /** 当前活跃时间线的最大序数；空时间线返回 null。 */
@@ -491,7 +491,7 @@ export function assertTimelineBatchOrdered(events: readonly TimelineEvent[], liv
 export interface QueryActiveFactsRequest {
   /** 查询章索引（含端点的生效区间判断锚点）。 */
   readonly chapter: number
-  /** 视角主体：主角或具名角色；reader 不是可查询视角（零泄漏门禁不接受全知视角）。 */
+  /** 视角主体：主角或具名角色；reader 不是可查询视角（零泄漏门不接受全知视角）。 */
   readonly pov: PovEntity
   /** 限定断言主体；缺省 = 全部主体。 */
   readonly entityIds?: readonly EntityRef[]
@@ -513,7 +513,7 @@ function assertQueryRequest(request: QueryActiveFactsRequest): void {
  * 可见性规则：
  * - 区间：validFrom ≤ chapter ≤ (validUntil ?? ∞)，含端点；
  * - 生命周期：status=rejected 即出局（I3 级联失效的查询侧投影）；
- * - 秘密门禁（Q7/US25 零泄漏）：`secret.*` 事实仅当存在一条授权认知行——
+ * - 秘密门（Q7/US25 零泄漏）：`secret.*` 事实仅当存在一条授权认知行——
  *   holder 与 pov 完全相等且 knownSinceChapter ≤ chapter——才可见；
  *   无认知行的秘密对所有视角不可见（默认拒绝）。非秘密事实是世界客观真，
  *   不要求认知行。被滤秘密在结果集中与不存在不可区分（验收①）。
@@ -615,14 +615,14 @@ export function queryKnowledgePerspective(
 }
 
 /* ----------------------------------------------------------------------------
- * T6：I1 追踪流保护门禁 + I3 知识状态级联失效查询
+ * T6：I1 追踪流保护门 + I3 知识状态级联失效查询
  * -------------------------------------------------------------------------- */
 
 /**
- * 追踪流保护门禁（T6 / I1）：protectedUserContent = true 的事实行是作者亲笔
+ * 追踪流保护门（T6 / I1）：protectedUserContent = true 的事实行是作者亲笔
  * 正典断言，自动化通道（origin = ai | external 的增量来源）不得以同 id 行取代。
  * 作者修订自己的断言（author → author）始终合法。四族之中仅 TemporalFact
- * 携带 provenance，故本门禁只作用于事实流；其余三族的行语义校验归各自实现票。
+ * 携带 provenance，故本门只作用于事实流；其余三族的行语义校验归各自实现票。
  */
 export function assertNoProtectedSupersession(
   liveFacts: ReadonlyMap<FactId, TemporalFact>,

@@ -128,7 +128,7 @@ describe('S7 回环停止策略（显式驱动，全量重提取）', () => {
     expect(() => h.session.advance('canon_proposal')).toThrow(HardConflictUnresolvedError);
     // 逆向跳跃同样非法（advance 只认后继）
     expect(() => h.session.advance('user_edit')).toThrow(StepTransitionError);
-    // 提取/门禁没有任何自动重跑通道：账本零增长、调用数不变、光标悬置原地
+    // 提取与门两步没有任何自动重跑通道：账本零增长、调用数不变、光标悬置原地
     expect(readLedger({ root: h.root })).toHaveLength(ledgerLenBefore);
     expect(h.extractorCalls()).toBe(callsBefore);
     expect(h.session.currentStep).toBe('continuity_gate');
@@ -152,7 +152,7 @@ describe('S7 回环停止策略（显式驱动，全量重提取）', () => {
     }
     expect(reworkCount).toBe(3); // 无次数上限——有显式驱动即无失控
 
-    // 第四轮作者改对了：门禁通过后前进出口恢复开放
+    // 第四轮作者改对了：门通过后前进出口恢复开放
     h.session.requestRework();
     h.session.advance('final_extract');
     runFinalExtract({ bus: h.bus, bookRoot: h.root, taskRef: h.session.taskRef, chapterIndex: 2, extract: () => ({}) });
@@ -169,10 +169,10 @@ describe('S7 回环停止策略（显式驱动，全量重提取）', () => {
     expect(reasons).toHaveLength(4);
   });
 
-  it('非法驱动响亮拒绝：pass 后 requestRework 拒、未到门禁拒、回炉后再 requestRework 拒', () => {
+  it('非法驱动响亮拒绝：pass 后 requestRework 拒、未到门拒、回炉后再 requestRework 拒', () => {
     const h = harnessToConflictedGate('mozhou-t19-rw4-');
 
-    // 回炉一次后立刻再 requestRework：光标已不在门禁（StepGuardError）
+    // 回炉一次后立刻再 requestRework：光标已不在门（StepGuardError）
     h.session.requestRework();
     expect(() => h.session.requestRework()).toThrow(StepGuardError);
 
@@ -183,7 +183,7 @@ describe('S7 回环停止策略（显式驱动，全量重提取）', () => {
     h.session.advance('continuity_gate', { verdict: gated.verdict, hardConflicts: gated.hardConflicts });
     expect(() => h.session.requestRework()).toThrow(ReworkNotDrivenError);
 
-    // 未走到门禁的新会话（另一本书，光标停在 prepare）同样拒绝
+    // 未走到门的新会话（另一本书，光标停在 prepare）同样拒绝
     const dir2 = mkdtempSync(join(tmpdir(), 'mozhou-t19-rw4b-'));
     roots.push(dir2);
     createBook({ dir: dir2, title: '第二册' });

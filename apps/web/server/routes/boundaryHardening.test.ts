@@ -1,13 +1,13 @@
 // @vitest-environment node
 /**
- * W5 接口防护与边界隔离自动化门禁测试 (Plan §6.6 / t56 §3.2)。
+ * W5 接口防护与边界隔离自动化门测试 (Plan §6.6 / t56 §3.2)。
  *
- * 正向门禁：
+ * 正向门：
  * 1. 验证 apps/web/shared/ 中的 api、billing、storyboard 等模块能被合法加载，常量与结构真实可用；
  * 2. 静态扫描 apps/web/src/ 生产源码（排除测试文件），断言 server/ 跨层引用计数严格为 0；
  * 3. 验证 packages/ 下 6 个核心生产包均已配置标准 package.json exports 字段。
  *
- * 负向门禁：
+ * 负向门：
  * 4. 验证 ESLint 配置中 no-restricted-imports 模式定义，确认其覆盖所有层级的 server/ 导入；
  * 5. 验证包私有模块导入受阻机制。
  */
@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('W5 接口防护与跨层隔离门禁 (Plan §6.6)', () => {
+describe('W5 接口防护与跨层隔离门 (Plan §6.6)', () => {
   it('正向：apps/web/shared 中的公开模块正常加载，常量与结构完备', async () => {
     // 动态加载 shared 模块，避免 tsconfig.server.json 将 shared 引入其独立 rootDir
     const sharedBillingPath = resolve(import.meta.dirname, '../../shared/billing.ts')

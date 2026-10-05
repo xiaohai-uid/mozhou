@@ -7,7 +7,7 @@
  *   2. 硬编码本机代理端口与模型名；
  *   3. 没读到 key 时在 beforeAll 里提前 return、在每个 it() 里提前 return——
  *      vitest 把这两种都记为 passing，于是"CI 全绿"根本不能证明真实链路跑过；
- *   4. 自己写 MOZHOU_ALLOW_PRIVATE_LLM=1，等于测试替部署者放宽 SSRF 门禁。
+ *   4. 自己写 MOZHOU_ALLOW_PRIVATE_LLM=1，等于测试替部署者放宽 SSRF 门。
  *
  * ## 本模块的门控契约
  * - 开关：只有 MOZHOU_RUN_REAL_MODEL_TESTS=1 才允许真实模型用例执行。

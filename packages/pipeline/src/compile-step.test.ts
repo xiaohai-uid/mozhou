@@ -1,6 +1,6 @@
 /**
  * T16 验收测试（#40）：Compile 衔接——
- * stale 警告继续 + Receipt 留痕（对账软门禁先例）/ CHAPTER_DRAFTING 档行 /
+ * stale 警告继续 + Receipt 留痕（对账软门先例）/ CHAPTER_DRAFTING 档行 /
  * Compile 后按 receiptId 续跑（INV-R1/R2）。
  * D06（change-impact-engine-spec §2）：编译入包实体钉版产出 → 暂存 → 提交钉版 →
  * findReaders 圈定（依赖图生产侧数据源，含「无钉版即无读者」的诚实负例）。

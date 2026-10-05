@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 工单03（session 走完第 9/10 步）：/api/chapter.commit 会话窗口驱动 黑盒真实 HTTP 测试。
+ * 深化 03（session 走完第 9/10 步）：/api/chapter.commit 会话窗口驱动 黑盒真实 HTTP 测试。
  *
  * 被测行为（ADR-0024 决策 4 的可观察证据）：作者把会话窗口走到 user_edit 及之后
  * （/api/session.advance + /api/chapter.review 驱动步 2-5），提交即沿十步收口窗口——
@@ -8,10 +8,10 @@
  * 事件进账）→ 步 8 提案步锚 → 步 9 markCommitted → 步 10 finish。走完的窗口不占
  * abandon 路径，第 10 步后单飞释放、下一章可开卷。
  *
- * 覆盖矩阵（工单验收）：
+ * 覆盖矩阵（深化 03 验收）：
  *   1. 正常完成：1→10 全链走完（TaskStarted 在第 1 步）、verdict 进账、
  *      TaskFinished{succeeded}、单飞释放、下一章 session.open 200、同章可再重提交；
- *   2. 拒绝门禁：verdict='hard_conflict' 进账、窗口悬置（单飞仍被占）、正典零写入；
+ *   2. 门拒绝：verdict='hard_conflict' 进账、窗口悬置（单飞仍被占）、正典零写入；
  *      崩溃恢复：作者改文再提交 → requestRework 回炉重走 → 从步边界续跑到完成
  *      （这是 ADR-0024 决策 4 唯一的可观察证据在 HTTP 层的形态）；
  *   3. 取消：abandon 仍是未走完窗口的出路（走了一半的窗口同样可作废）；
@@ -194,7 +194,7 @@ async function makeBookWithWalkedWindow(title: string): Promise<{ base: string; 
   expect(saved.status).toBe(200)
 
   fixture.result = emptyExtraction()
-  // 工单05 Contract Delta：提交携带作者所读 revision（保存响应回带的值）。
+  // 深化 05 Contract Delta：提交携带作者所读 revision（保存响应回带的值）。
   const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '首稿定稿', expectedRevision: Number(saved.data.revision) })
   expect(committed.status).toBe(200)
   expect((committed.data.sessionWindow as Record<string, unknown>)).toMatchObject({ driven: false, taskRef: null })
@@ -235,19 +235,19 @@ async function makeBookWithWalkedWindow(title: string): Promise<{ base: string; 
   expect(review.status).toBe(200)
   expect(review.data.verdict).toBe('pass')
 
-  // 步 4→5：review→user_edit（门禁守卫对 quality verdict='pass' 放行）
+  // 步 4→5：review→user_edit（门守卫对 quality verdict='pass' 放行）
   const toUserEdit = await post(base, '/api/session.advance', { root, chapterIndex: 1 })
   expect(toUserEdit.data).toMatchObject({ ok: true, previousStep: 'review', currentStep: 'user_edit' })
 
   return { base, root, bookId, taskRef }
 }
 
-describe('POST /api/chapter.commit · 会话窗口驱动走完第 1→10 步（工单03）', () => {
+describe('POST /api/chapter.commit · 会话窗口驱动走完第 1→10 步（深化 03）', () => {
   it('正常完成（无候选直提分支）：十步全链走完、verdict 进账、TaskFinished{succeeded}、单飞释放', async () => {
     const { base, root, taskRef } = await makeBookWithWalkedWindow('走完之书')
     fixture.result = emptyExtraction()
 
-    // 工单05 Contract Delta：重提交后携带作者所读 revision（重开快照回带的值）。
+    // 深化 05 Contract Delta：重提交后携带作者所读 revision（重开快照回带的值）。
     const snap = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
     const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '重提交定稿', expectedRevision: Number(snap.data.revision) })
     expect(committed.status).toBe(200)
@@ -301,12 +301,12 @@ describe('POST /api/chapter.commit · 会话窗口驱动走完第 1→10 步（�
     expect((await post(base, '/api/chapter.resubmit', { root, chapterIndex: 1 })).status).toBe(200)
   })
 
-  it('拒绝门禁：verdict=hard_conflict 进账、窗口悬置（单飞仍被占）、正典零写入', async () => {
+  it('门拒绝：verdict=hard_conflict 进账、窗口悬置（单飞仍被占）、正典零写入', async () => {
     const { base, root, bookId, taskRef } = await makeBookWithWalkedWindow('悬置之书')
     const committedBefore = flatEventsOf(root, 'ChapterCommitted').length
     fixture.result = danglingKnowledgeExtraction(bookId)
 
-    // 工单05 Contract Delta：携带当前所读 revision（门禁拒绝，不是版本失配）。
+    // 深化 05 Contract Delta：携带当前所读 revision（门拒绝，不是版本失配）。
     const snap = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
     const rejected = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(snap.data.revision) })
     expect(rejected.status).toBe(409)
@@ -331,7 +331,7 @@ describe('POST /api/chapter.commit · 会话窗口驱动走完第 1→10 步（�
   it('崩溃恢复：悬置窗口经作者改文再提交 → requestRework 回炉重走 → 从步边界续跑到完成', async () => {
     const { base, root, bookId, taskRef } = await makeBookWithWalkedWindow('续跑之书')
     fixture.result = danglingKnowledgeExtraction(bookId)
-    // 工单05 Contract Delta：携带当前所读 revision（门禁拒绝，不是版本失配）。
+    // 深化 05 Contract Delta：携带当前所读 revision（门拒绝，不是版本失配）。
     const presnap = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
     expect((await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(presnap.data.revision) })).status).toBe(409)
 
@@ -405,7 +405,7 @@ describe('POST /api/chapter.commit · 会话窗口驱动走完第 1→10 步（�
     const staleTaskRef = String((resubmitted.data.resubmitSession as Record<string, unknown>)['taskRef'])
 
     fixture.result = emptyExtraction()
-    // 工单05 Contract Delta：重提交后携带作者所读 revision（重开快照回带的值）。
+    // 深化 05 Contract Delta：重提交后携带作者所读 revision（重开快照回带的值）。
     const snap = await post(base, '/api/chapter.prose', { root, chapterIndex: 1 })
     const committed = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '重提交定稿', expectedRevision: Number(snap.data.revision) })
     expect(committed.status).toBe(200)

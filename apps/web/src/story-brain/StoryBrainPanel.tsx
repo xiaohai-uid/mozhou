@@ -9,7 +9,7 @@
  *   suspects-believes（ADR-0026 安全通道文本，秘密正典值零泄漏）/ invalidated
  *
  * 呈现纪律：suspects/believes 行只输出 kernel 通道文本，不拼接任何事实值；
- * POV 固定主角（与装配器同门禁，与「秘密不存在」不可区分）。
+ * POV 固定主角（与装配器共用同一道门，与「秘密不存在」不可区分）。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CanonState, EntityCardScan, EntityRefPrefix } from '@mozhou/data-plane'

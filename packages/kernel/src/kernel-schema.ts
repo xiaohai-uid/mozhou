@@ -1,13 +1,13 @@
 /**
  * ============================================================================
- * MoZhou Story Kernel — 冻结领域 Schema 草案 v1（工单 #4 产出）
+ * MoZhou Story Kernel — 冻结领域 Schema 草案 v1（议题 #4 产出）
  * ============================================================================
  *
  * 来源约束（全部为规范性输入）：
  *   - docs/specs/story-kernel-and-domain-spec.md §2 九柱字段清单
  *   - ADR-0002 / 0004 / 0010 / 0011 及修订案 ADR-0019
  *   - Gate A 行为冻结条目 M1-M20 / N1-N12（卷二终章）
- *   - wayfinder 工单 #4 两轮 grilling 决策（Q1-Q14，见 kernel-schema-decisions.md）
+ *   - wayfinder 议题 #4 两轮 grilling 决策（Q1-Q14，见 kernel-schema-decisions.md）
  *
  * 编译假设：`strict: true` + `exactOptionalPropertyTypes: true`。
  * 零 import、零运行时依赖；可变体（readonly 数组）与 ISO 字符串时间戳
@@ -182,7 +182,7 @@ export type PovEntity = 'protagonist' | `char:${string}`;
 
 export interface SceneBeat {
   readonly description: string;
-  /** 该拍的表达意图备注（供编译器与作者复查；不参与确定性门禁） */
+  /** 该拍的表达意图备注（供编译器与作者复查；不参与确定性门） */
   readonly intentionNote?: string | undefined;
 }
 
@@ -229,7 +229,7 @@ export type FactImportance = 'trivial' | 'notable' | 'critical';
 export type FactStatus = 'planned' | 'candidate' | 'confirmed' | 'rejected';
 export type FactRiskClass = 'low' | 'medium' | 'high';
 
-/** 原子标量值。数值断言保持 number，使 M2 硬门禁可做确定性数值比较而无需解析。 */
+/** 原子标量值。数值断言保持 number，使 M2 硬门可做确定性数值比较而无需解析。 */
 export type FactValue = string | number | boolean;
 
 export type FactSource =
@@ -337,7 +337,7 @@ export interface RelationshipState extends KernelEntityHead {
 }
 
 /** 世界时间：历法不可解析（修仙纪年等），故双字段（Q12）——
- *  label 给人读，order 承载 M2 时间线单调性硬门禁的确定性比较。 */
+ *  label 给人读，order 承载 M2 时间线单调性硬门的确定性比较。 */
 export interface TimelineEvent extends KernelEntityHead {
   readonly id: TimelineEventId;
   readonly worldTimeLabel: string;
@@ -378,7 +378,7 @@ export interface StyleProfile extends KernelEntityHead {
 
 /* ----------------------------------------------------------------------------
  * 8. ContextReceipt（Phase 2 一等产物的预留冻结；Q6 冻结条目 schema 与枚举，
- *    Q15/Q16 为工单 #9 收敛定案的受控增补：activation / replayInputs）
+ *    Q15/Q16 为议题 #9 收敛定案的受控增补：activation / replayInputs）
  * -------------------------------------------------------------------------- */
 
 /** T16 受控增补（#40，chapter-pipeline-spec §4 第 2 条）：#8 tier 表增
@@ -391,7 +391,7 @@ export type CompileTaskType =
   | 'fact_extraction'
   | 'CHAPTER_DRAFTING';
 
-/** 装配来源（工单要求预留字段①）：该条目经哪条召回通道进入候选。 */
+/** 装配来源（议题 #4 要求预留字段①）：该条目经哪条召回通道进入候选。 */
 export type AssemblyChannel =
   | 'structural' // 宪法层/任务框架/风格等结构性注入
   | 'keyword' // 关键词快通道（NAI activation 对应物）
@@ -399,7 +399,7 @@ export type AssemblyChannel =
   | 'embedding' // 本地向量兜底长尾（M5 双轨第二路）
   | 'manual_pin'; // 作者手动钉选
 
-/** 淘汰原因（工单要求预留字段②；NAI Inclusion/Reason 产品化的对应枚举）。 */
+/** 淘汰原因（议题 #4 要求预留字段②；NAI Inclusion/Reason 产品化的对应枚举）。 */
 export type ExclusionReason =
   | 'budget_exhausted'
   | 'relevance_below_threshold'
@@ -436,7 +436,7 @@ export interface ReceiptEntry {
   readonly trimType?: 'none' | 'atomic' | 'truncated' | undefined;
 }
 
-/** 解析失败记录（工单要求预留字段③；NovelForge budget_stats 桩的反面教材）。 */
+/** 解析失败记录（议题 #4 要求预留字段③；NovelForge budget_stats 桩的反面教材）。 */
 export interface ParseFailure {
   readonly source: string; // 失败的输入源（DSL 表达式/文件路径/引用串）
   readonly detail: string; // 失败原因
@@ -562,13 +562,13 @@ export interface ChapterCommit extends KernelEntityHead {
 }
 
 /* ----------------------------------------------------------------------------
- * 10. 实体目录层（工单 #13 受控增补；规划·宪法层工件，非九柱实体——#4 决策：
+ * 10. 实体目录层（议题 #13 受控增补；规划·宪法层工件，非九柱实体——#4 决策：
  *     "Codex 实体不在九柱内，以稳定字符串引用"。不进追踪 jsonl、不扩 EntityKind；
  *     落盘为 设定/<类型>/*.md frontmatter，规格见 entity-directory-spec.md）
  * -------------------------------------------------------------------------- */
 
 /** AI Context 装配策略四档（#7 决议③；对齐 Novelcrafter AI Context）。
- *  仅裁决激活与否——secret.* 授权行与 POV 切片门禁中央强制，
+ *  仅裁决激活与否——secret.* 授权行与 POV 切片门中央强制，
  *  任何档位含 always / never / manual_pin 均不得绕过（entity-directory-spec D1）。 */
 export type AiContextTier = 'always' | 'detected' | 'detectedOff' | 'never';
 

@@ -63,7 +63,7 @@ export const PublicSite: React.FC = () => {
             <div className="space-y-3">
               <h1 className="text-4xl font-extrabold text-white">长篇网文操作系统</h1>
               <p className="text-neutral-400 text-lg leading-relaxed">
-                本地优先、工业级长程因果契约、5 项机械门禁与真模型流式创作工作台。
+                本地优先、工业级长程因果契约、5 项机械门与真模型流式创作工作台。
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
@@ -116,7 +116,7 @@ export const PublicSite: React.FC = () => {
                     <li>✓ 包含基础版所有能力</li>
                     <li>✓ 动态分镜改编流水线</li>
                     <li>✓ 原文风格画像蒸馏</li>
-                    <li>✓ 叙事架构与质量门禁审查</li>
+                    <li>✓ 叙事架构与质量门审查</li>
                     <li>✓ 资料检索与全网榜单扫描</li>
                   </ul>
                 </div>

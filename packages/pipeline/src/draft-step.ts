@@ -28,7 +28,9 @@
  *
  * T21 受控增补（#54 · t52）：execute 第三参 meta 桥接会话窗口——parentTaskRef/
  * chapterIndex/eventPayload（M14 形状 recipeSnapshot）；业务 payload 删平铺
- * recipeId/recipeVersion 两键（唯一消费方走嵌套路径 version-matrix.ts，t52:B1）；
+ * recipeId/recipeVersion 两键（唯一消费方走嵌套路径，t52:B1；消费面 W6 起在
+ * @mozhou/runtime recipe-payload 与 @mozhou/quality-engine metrics-gates，原
+ * benchmark version-matrix.ts 兼容层已删）；
  * 失败原因折叠改按本次 taskRef 精确匹配（Q-E，替代「最近一条」邻接启发式）。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -436,8 +438,9 @@ export interface DraftStepRequest {
   /**
    * 配方原档（T21 · P1a，t52:B1 定案值；loadRecipeById/loadRecipeFile 所得）：可得时
    * 经 meta.eventPayload = toGenerationStartedPayload(doc) 把 M14 形状解析快照挂进
-   * GenerationStarted.payload.recipeSnapshot（三级嵌套，version-matrix 消费面）；
-   * 缺省行不含 recipeSnapshot（读侧 ?? null 容缺是既定行为 version-matrix.ts）。
+   * GenerationStarted.payload.recipeSnapshot（三级嵌套，版本矩阵消费面——W6 起
+   * 在 @mozhou/runtime recipe-payload / @mozhou/quality-engine metrics-gates）；
+   * 缺省行不含 recipeSnapshot（读侧 ?? null 容缺是既定行为）。
    */
   readonly recipeDoc?: CapabilityRecipeDocument;
 }
@@ -474,7 +477,8 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
   const mode: DraftMode = request.mode ?? 'generate';
   // T21（t52:B1）桥接：会话窗口 taskRef→parentTaskRef（payload 层）、chapterIndex→顶层槽；
   // recipeDoc 可得时铸 M14 形状 eventPayload。业务 payload 不再携带平铺 recipeId/
-  // recipeVersion 两键——唯一消费方 version-matrix.ts 只走 recipeSnapshot 嵌套路径。
+  // recipeVersion 两键——唯一消费方只走 recipeSnapshot 嵌套路径（W6 起消费面在
+  // @mozhou/runtime recipe-payload / @mozhou/quality-engine metrics-gates）。
   const result = await request.engine.execute(
     request.recipe.taskType,
     {

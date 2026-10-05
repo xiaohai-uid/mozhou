@@ -15,7 +15,7 @@ const API_KEY_VARS = ['MOZHOU_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY']
 const BASE_VARS = ['MOZHOU_API_BASE', 'DEEPSEEK_API_BASE', 'OPENAI_API_BASE']
 const MODEL_VARS = ['MOZHOU_MODEL', 'DEEPSEEK_MODEL']
 
-/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门禁），拼接构造保持确定性。 */
+/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门），拼接构造保持确定性。 */
 const FAKE_ENV_KEY = ['env', 'openai', 'key'].join('-')
 
 afterEach(() => {

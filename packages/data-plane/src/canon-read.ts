@@ -192,7 +192,7 @@ function titleFromHeading(body: string, relPath: string): string {
 const OUTLINE_NODE_TYPES = ['book', 'volume', 'arc', 'chapter'] as const
 
 /* ----------------------------------------------------------------------------
- * 实体目录卡扫描（entity-directory-spec §3/§4；工单 #16 / T2）
+ * 实体目录卡扫描（entity-directory-spec §3/§4；议题 #16 / T2）
  * -------------------------------------------------------------------------- */
 
 const AI_CONTEXT_TIERS = ['always', 'detected', 'detectedOff', 'never'] as const

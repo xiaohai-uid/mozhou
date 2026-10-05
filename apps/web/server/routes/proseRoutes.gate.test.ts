@@ -8,7 +8,7 @@
  * 提取缝在本文件内被替换为夹具（真实提取缝的归一语义归 deltaExtractor.test.ts，
  * 真实空批路径归 proseRoutes.test.ts）——本文件只考路由对 Gate 判定的忠实执行。
  * 夹具行要么由真实 normalizeDelta 产出，要么手工构造后**用冻结 Schema 解析器自证
- * 结构合法**，否则「门禁报冲突」与「行形状本就坏」无法区分，测试就失去证伪力。
+ * 结构合法**，否则「门报冲突」与「行形状本就坏」无法区分，测试就失去证伪力。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -85,13 +85,13 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
   const base = await listen()
   const root = mkdtempSync(join(tmpdir(), 'mozhou-web-gate-'))
   roots.push(root)
-  const created = await post(base, '/api/book', { title: '门禁接线测试书', dir: root })
+  const created = await post(base, '/api/book', { title: '门接线测试书', dir: root })
   expect(created.status).toBe(200)
   const saved = await post(base, '/api/chapter.prose.save', {
     root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
   })
   expect(saved.status).toBe(200)
-  // 工单05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值）。
+  // 深化 05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值）。
   return { base, root, bookId: String(created.data.bookId), expectedRevision: Number(saved.data.revision) }
 }
 
@@ -104,7 +104,7 @@ function trackingLines(root: string, name: string): string[] {
   return readFileSync(tracking(root, name), 'utf8').trim().split('\n').filter((line) => line.length > 0)
 }
 
-/** 门禁拒绝/失败后必须成立的不变量：相位未翻转、四族零写入、无提交事件行。 */
+/** 门拒绝/失败后必须成立的不变量：相位未翻转、四族零写入、无提交事件行。 */
 function assertCanonUntouched(root: string): void {
   const prose = readFileSync(join(root, proseChapterPath(1)), 'utf8')
   expect(prose).toContain('phase: draft')
@@ -141,7 +141,7 @@ function cleanExtraction(bookId: string): DeltaExtractionResult {
 }
 
 describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
-  it('门禁通过：delta 写正典，响应带 continuityGate.verdict=pass', async () => {
+  it('门通过：delta 写正典，响应带 continuityGate.verdict=pass', async () => {
     const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = cleanExtraction(bookId)
 
@@ -257,10 +257,10 @@ describe('POST /api/chapter.commit · 步 7 Continuity Gate 接线', () => {
     assertCanonUntouched(root)
   })
 
-  it('不变量：门禁读不到存量（追踪流坏行）→ 显式 500，绝不静默跳过门禁放行', async () => {
+  it('不变量：门读不到存量（追踪流坏行）→ 显式 500，绝不静默跳过门放行', async () => {
     const { base, root, bookId, expectedRevision } = await makeDraftChapter()
     fixture.result = cleanExtraction(bookId)
-    // 存量正典被外部弄坏：门禁无法建立「存量活跃 ∪ 本批」事实集
+    // 存量正典被外部弄坏：门无法建立「存量活跃 ∪ 本批」事实集
     writeFileSync(tracking(root, '事实.jsonl'), '{ not json\n')
 
     const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision })

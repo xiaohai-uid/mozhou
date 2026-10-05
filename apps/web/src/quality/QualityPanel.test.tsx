@@ -222,7 +222,7 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
     })
   })
 
-  it('正典门禁与定稿提交：草稿期可提交定稿，定稿后可显式重开草稿', async () => {
+  it('正典门与定稿提交：草稿期可提交定稿，定稿后可显式重开草稿', async () => {
     const fetchMock = vi.fn().mockImplementation((path: string) => {
       if (path === '/api/chapter.quality') return Promise.resolve(okJson(NO_REVIEW_STATUS))
       if (path === '/api/chapter.prose') return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision: 2 }))
@@ -246,7 +246,7 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
       expect(screen.getByText('● 已定稿')).toBeInTheDocument()
     })
 
-    // 工单05 提交幂等契约：定稿请求必须携带作者所读 revision（面板 prose 快照回带的值）
+    // 深化 05 提交幂等契约：定稿请求必须携带作者所读 revision（面板 prose 快照回带的值）
     const commitCall = fetchMock.mock.calls.find(([path]) => path === '/api/chapter.commit')
     expect(JSON.parse((commitCall?.[1] as { body: string }).body)).toMatchObject({ expectedRevision: 2 })
 
@@ -261,7 +261,7 @@ describe('QualityPanel（初载契约修复后语义保全）', () => {
 })
 
 /**
- * 工单05 提交幂等契约（UI 侧）：服务端对过期 expectedRevision 回 409 PROSE_REVISION_CONFLICT
+ * 深化 05 提交幂等契约（UI 侧）：服务端对过期 expectedRevision 回 409 PROSE_REVISION_CONFLICT
  * 时，面板必须显式报错并刷新对账——不得静默改带最新 revision 重发，也不得误报成功。
  */
 describe('定稿版本冲突（PROSE_REVISION_CONFLICT）显式处置', () => {

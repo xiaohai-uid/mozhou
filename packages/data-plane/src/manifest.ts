@@ -1,5 +1,5 @@
 /**
- * `.mozhou/manifest.json` hash 基线（工单 #6 Q5 冻结落点）：
+ * `.mozhou/manifest.json` hash 基线（议题 #6 Q5 冻结落点）：
  * SQLite 投影可弃 ⇒ 基线必须在文件侧；记录「应用自己最后一次写入」的
  * 每一个 canon 文件指纹，用于区分外部修改与自身写入（Hash Baseline 词条）。
  *

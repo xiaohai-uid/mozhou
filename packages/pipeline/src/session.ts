@@ -93,8 +93,8 @@ export class StepTransitionError extends Error {
 }
 
 /**
- * 回环未被显式驱动（T19 · #43；S7 回环停止策略）：requestRework 只在门禁
- * hard_conflict 悬置时合法——无冲突可回炉、或门禁已通过，都不是「作者承认
+ * 回环未被显式驱动（T19 · #43；S7 回环停止策略）：requestRework 只在门
+ * hard_conflict 悬置时合法——无冲突可回炉、或门已通过，都不是「作者承认
  * 错误改文」的显式动作。循环无自动迭代，缺这一票就停。
  */
 export class ReworkNotDrivenError extends Error {
@@ -108,7 +108,7 @@ export class ReworkNotDrivenError extends Error {
 }
 
 /**
- * 硬冲突未决、前进出口关闭（T19 · #43；S7 停止策略）：门禁 hard_conflict
+ * 硬冲突未决、前进出口关闭（T19 · #43；S7 停止策略）：门 hard_conflict
  * 悬置期间禁止步进 canon_proposal——带冲突的 delta 进不了确认面。唯一出路是
  * 作者显式动作：requestRework 承认错误改文回炉，别无自动通道。
  */
@@ -140,9 +140,9 @@ export class QualityReviewNotPassError extends Error {
 }
 
 /**
- * 连续性门禁未通过即试图步进 canon_proposal（C3 会话收口）：出口只对
+ * 连续性门未通过即试图步进 canon_proposal（C3 会话收口）：出口只对
  * verdict='pass' 开放——hard_conflict 悬置走 HardConflictUnresolvedError 的
- * 显式回炉；verdict=null（门禁从未运行）同样是跳步，不能把未经校验的 delta
+ * 显式回炉；verdict=null（门从未运行）同样是跳步，不能把未经校验的 delta
  * 盲推进确认面。C3 契约：session.advance 不得成为跳过质量门的通道。
  */
 export class GateNotPassedError extends Error {
@@ -331,7 +331,7 @@ export class ChapterProductionSession {
         throw new QualityReviewNotPassError(this.#chapterIndex, this.#taskRef, verdict);
       }
     }
-    // S7 停止策略与 C3 会话收口：硬冲突悬置或门禁未跑时前进出口关闭
+    // S7 停止策略与 C3 会话收口：硬冲突悬置或门未跑时前进出口关闭
     if (to === 'canon_proposal') {
       const gateVerdict = this.project().lastGateVerdict;
       if (gateVerdict === 'hard_conflict') {
@@ -355,13 +355,13 @@ export class ChapterProductionSession {
   }
 
   /**
-   * 回炉边（T19 · #43；S7 回环停止策略 / S8 Gate 后行的显式驱动面）：门禁
+   * 回炉边（T19 · #43；S7 回环停止策略 / S8 Gate 后行的显式驱动面）：门
    * hard_conflict 悬置时，作者「承认错误」改文 ⇒ 光标移回 user_edit，随后沿
    * 线性序重走 Final Extract 全量重提取（一致性优先于增量成本）。纪律：
    *   - 这是唯一的逆向步转换——且必须由作者显式调用本方法驱动（无自动迭代、
    *     无次数上限：有显式驱动即无失控）；advance() 的线性后继守卫不变；
    *   - 判据读当下投影（lastGateVerdict='hard_conflict'），不是内存光标——
-   *     崩溃恢复后同样可判；verdict=pass 或未走到门禁即拒（ReworkNotDrivenError）；
+   *     崩溃恢复后同样可判；verdict=pass 或未走到门即拒（ReworkNotDrivenError）；
    *   - 回炉事件照常落账：TaskStepTransitioned{from:'continuity_gate',to:'user_edit'}
    *     携带 reason 字段，投影折叠自然回到 user_edit（无第三处真源）。
    */

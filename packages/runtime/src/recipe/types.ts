@@ -1,6 +1,6 @@
 /**
  * Capability Recipe Schema v1 类型层（T15 · #39）。
- * 规格真源：docs/specs/capability-recipe-schema-v1.md（工单 #33 冻结，九问 R1-R9 全采 A）。
+ * 规格真源：docs/specs/capability-recipe-schema-v1.md（议题 #33 冻结，九问 R1-R9 全采 A）。
  * 纪律：词表常量由本文件统一持有，各模块不得散写（沿 runtime/types.ts Q5 先例）；
  * JSON Schema 校验面见 ./schema.ts，装载管线见 ./loader.ts。
  * 命名边界（规格 §3）：recipe=方法论配方（本 Schema 管辖）；SkillDefinition/SkillRun=

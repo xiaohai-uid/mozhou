@@ -33,7 +33,7 @@ export function ModelSettingsView(): JSX.Element {
         {/*
           本机模型接入说明（P2 缺陷「本机模型接入指引误导」）。
           为什么写在这里：写作区此前对**所有** provider 失败都只说「去填 API 密钥」，
-          而本机部署（MOZHOU_API_BASE=http://127.0.0.1:8317）失败的真因是 SSRF 门禁
+          而本机部署（MOZHOU_API_BASE=http://127.0.0.1:8317）失败的真因是 SSRF 门
           按设计拒绝环回地址——填密钥接不上，照做只会被当成产品坏了。本页是该说明
           唯一的常驻落点：作者被指引到设置页时，正好在这里读到本机路径；也顺带回答
           「这台机器明明有模型，为什么它不要我填密钥」。
@@ -47,7 +47,7 @@ export function ModelSettingsView(): JSX.Element {
           在启动墨舟的环境里设 <code>MOZHOU_API_BASE</code> 指向它的 OpenAI 兼容地址（如{' '}
           <code>http://127.0.0.1:8317/v1</code>）与 <code>MOZHOU_API_KEY</code>（本机服务通常任意非空值即可）。
           <br />
-          <b>还需额外一个开关：</b>本机/私有地址默认被出站安全门禁拒绝（防 SSRF）。只有确定要让墨舟
+          <b>还需额外一个开关：</b>本机/私有地址默认被出站安全门拒绝（防 SSRF）。只有确定要让墨舟
           访问本机网络时才设 <code>MOZHOU_ALLOW_PRIVATE_LLM=1</code> 并重启——只设 base 会被拦下。
           该开关只把范围放到 http/https，仍需显式开启，不设即保持拒绝。
         </p>

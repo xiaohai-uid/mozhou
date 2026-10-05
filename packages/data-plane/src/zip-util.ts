@@ -1,6 +1,6 @@
 /**
  * packages/data-plane · 零外部依赖标准 ZIP 打包与解包工具 (Zip Util · C5)。
- * 基于 Node.js 原生 node:zlib 实现，严格执行 SPEC C5 资源与安全门禁：
+ * 基于 Node.js 原生 node:zlib 实现，严格执行 SPEC C5 资源与安全门：
  * - 限制单包最多 10,000 个文件；
  * - 限制单包解压最大 1 GiB；
  * - 限制单文件解压最大 100 MiB；

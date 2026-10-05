@@ -23,6 +23,6 @@
 
 - **本包必须保持浏览器安全。** 它不能引入 `node:fs` / `node:os`：
   `apps/web/server/llm/tierRouting.ts` 从本包 import `selectTierRoute`，把 IO 层塞进来会
-  打爆 Vite 客户端包并反转依赖方向。IO、SSRF 闸门、环境变量密钥解析都属于 web 层。
+  打爆 Vite 客户端包并反转依赖方向。IO、SSRF 门、环境变量密钥解析都属于 web 层。
 - `src/adapter/openai-compat.ts` 与 `anthropic-events.ts` **只做解析，不做传输**；
   真实出网只有 `apps/web/server/llm/openaiStream.ts` 一条路径。这是刻意的单出网口设计。

@@ -1,5 +1,5 @@
 /**
- * AI 起名路由（OpenWrite 对标切片 · 工单 22）：
+ * AI 起名路由（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：
  * - POST /api/naming {mode:'ai', category, count?, hint?} → 模型生成名称+释义。
  * - 端点解析走 resolveChatEndpoint（BYOK：环境变量或用户设置）；未配置 → 501
  *   NAMING_NOT_CONFIGURED 诚实报错，绝不返回伪造名称（真实性门同族）。

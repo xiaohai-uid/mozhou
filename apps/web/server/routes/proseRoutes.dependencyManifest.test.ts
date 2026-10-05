@@ -93,7 +93,7 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
     root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
   })
   expect(saved.status).toBe(200)
-  // 工单05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值）。
+  // 深化 05 Contract Delta：提交必须携带作者所读 revision（保存响应回带的值）。
   return { base, root, bookId: String(created.data.bookId), expectedRevision: Number(saved.data.revision) }
 }
 

@@ -11,7 +11,7 @@
  *   draftText ──recallCandidates 三通道───┼─▶ assembleBudgetedContext ─▶ persistReceipt ─▶ CompileResult
  *   structural / storyText / snapshot ────┘
  *
- * 四档激活语义（D1：仅裁决激活与否；secret.* 与 POV 门禁中央强制，任何档位不得绕过）：
+ * 四档激活语义（D1：仅裁决激活与否；secret.* 与 POV 门中央强制，任何档位不得绕过）：
  *   - always      ⇒ 结构层注入（section = `entity:<ref>`，ref 升序稳定排版——文件名只是
  *                   皮，重命名不影响 Receipt diff），受 structuralCapTokens 约束，
  *                   超出 = CompileConfigError（D5）；不进候选池——结构层+候选池双吃预算
@@ -27,7 +27,7 @@
  *
  * 【这里反转过一个刻意的决定，理由留下】此前本文件镜像一份 RESEARCH_DIRS 字面量，
  * 注释写「包边界解耦，不跨包依赖」。镜像的代价是：日后新增研究目录，data-plane 那侧
- * 认得、这份名单不认，US17 的硬隔离闸会按旧名单放行——闸门看着在，其实是敞的。
+ * 认得、这份名单不认，US17 的硬隔离门会按旧名单放行——门看着在，其实是敞的。
  * 镜像换来的「解耦」不值这个价，故改为直接依赖。
  * 因此 @mozhou/data-plane 从 devDependencies 移入 dependencies：它现在是**运行期**
  * 依赖，留在 devDeps 里会让本包 dist 带一个未声明的运行期 require（打包即炸）。
@@ -198,7 +198,7 @@ export function activateCards(cards: readonly CompileCard[]): CardActivation {
  *
  * 判据直接取 @mozhou/data-plane 的 layout 单一实现：本文件此前**镜像**了一份
  * RESEARCH_DIRS 字面量。镜像意味着「给 data-plane 加一个研究目录」这条改动
- * 不会传导到这里，于是编译期的硬隔离闸仍按旧名单放行——研究区材料就会进入
+ * 不会传导到这里，于是编译期的硬隔离门仍按旧名单放行——研究区材料就会进入
  * 生成 prompt，而 US17 要求永不进入。依赖已存在（package.json 声明了
  * @mozhou/data-plane），无需为同一件事再建一个归属地。
  * -------------------------------------------------------------------------- */
@@ -222,7 +222,7 @@ const mintReceiptId = (): ContextReceiptId => `rcpt_${newUlid()}` as ContextRece
 
 /**
  * 编译一章的完整上下文并落盘服务端 Receipt：
- *   Research 守卫 → 四档激活 → 三通道召回 → 空召回门禁 → 预算装配 → persistReceipt。
+ *   Research 守卫 → 四档激活 → 三通道召回 → 空召回门 → 预算装配 → persistReceipt。
  * 任一失败路径显式抛错（见模块头），绝不产出半成品凭证。
  */
 export async function compile(input: CompileInput): Promise<CompileResult> {

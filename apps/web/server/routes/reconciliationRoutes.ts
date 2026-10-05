@@ -83,7 +83,7 @@ export function ensureReconciliationRuntime(
   if (existing !== undefined) return existing
 
   const safeRoot = assertSafeBookRoot(key)
-  // 所有权转移（工单 08）：此处的句柄**本就该长活**——它要活过请求边界，供
+  // 所有权转移（深化 08）：此处的句柄**本就该长活**——它要活过请求边界，供
   // stopReconciliationRuntime / stopAllReconciliationRuntimes 显式停机时归还。
   // 用 retainBook/releaseBook 成对表达，替代此前「裸 open + 远端 close」的隐式持有。
   const plane = retainBook(safeRoot)

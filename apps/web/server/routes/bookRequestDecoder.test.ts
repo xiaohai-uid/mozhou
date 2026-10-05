@@ -1,13 +1,13 @@
 // @vitest-environment node
 /**
- * 工单07 的端点级回归：证明**每个**书级端点都走了同一个解码缝，且旧代码里五种
+ * 深化 07 的端点级回归：证明**每个**书级端点都走了同一个解码缝，且旧代码里五种
  * 互不一致的 chapterIndex 校验已被收为一条。
  *
  * 三层证据，逐层加码：
  *   A. 表驱动：16 个书级端点 × 非法章号集合（0 / 小数 / 缺字段）全部 400
  *      INVALID_BOOK_REQUEST，且章号非法在**任何动盘之前**（盘面与账本零变更）。
  *   B. hosted 主体闸：无 session 的书级请求在 hosted 下 401 UNAUTHORIZED_PRINCIPAL，
- *      在 local 下照常走到业务分支（这条证明我们没有把 401 当成一刀切的门禁）。
+ *      在 local 下照常走到业务分支（这条证明我们没有把 401 当成一刀切的门）。
  *   C. 合法请求未被误伤：每端点的正常形状仍然 2xx/既有语义（不是只测拒绝路径）。
  */
 import { createServer } from 'node:http'
@@ -93,7 +93,7 @@ function seedCandidateArtifact(root: string, candidateId: string): void {
 }
 
 /**
- * 全部走同一个解码缝的 16 个书级端点（工单点数：pipelineRoutes 9 / proseRoutes 5 /
+ * 全部走同一个解码缝的 16 个书级端点（深化 07 点数：pipelineRoutes 9 / proseRoutes 5 /
  * storyboardRoutes 2）。`extra` 是各端点自己那部分的必填字段——只为让「非法章号」
  * 这一条成为**唯一**的失败原因，否则测的是别的守卫。
  */
@@ -179,7 +179,7 @@ describe('A. 16 个书级端点全部使用统一解码：非法章号一律 400
 
 describe('B. hosted 无 session 的分层事实：解码层的 401 不可端到端触发（如实记录而非伪造）', () => {
   /**
-   * 如实记录的门禁顺序（读码得出，本测试**不改**它）：
+   * 如实记录的门通过顺序（读码得出，本测试**不改**它）：
    *   router.ts:100-114 在 hosted 下会话解析失败即 401 UNAUTHORIZED，请求**根本不进路由处理器**。
    *   故端到端拿不到 bookRequest 的 401 UNAUTHORIZED_PRINCIPAL；那是**双层防护的内层**
    *   （语义与 router 那层一致，不同码），在「路由器已放行但处理器手上没有主体」时可达成
@@ -243,7 +243,7 @@ describe('C. 合法章号未被误伤：既有语义原样保留', () => {
     expect(opened.data['currentStep']).toBe('prepare')
   })
 
-  it('/api/session.advance 与 /api/chapter.review 在同一无会话形状下给出同一契约错误（工单点名的三处重复已收口）', async () => {
+  it('/api/session.advance 与 /api/chapter.review 在同一无会话形状下给出同一契约错误（深化 07 点名的三处重复已收口）', async () => {
     const base = await listen()
     const root = makeBook('三处重复收口')
     for (const path of ['/api/session.advance', '/api/chapter.review', '/api/chapter.rework']) {

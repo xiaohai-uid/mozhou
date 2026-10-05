@@ -1,5 +1,5 @@
 /**
- * EditorQualityTelemetry 组件回归 + 浏览器安全接线门禁（工单 7）。
+ * EditorQualityTelemetry 组件回归 + 浏览器安全接线门（见提交 005d898）。
  *
  * 覆盖：
  * - happy path：字数/段落/复读/Tier1/Tier2 来自真实计算，非示例值；
@@ -7,7 +7,7 @@
  * - 失败路径 2：4-gram 复读但 De-AI 满分 → 复合 isClean 仍为假（复合量词不塌缩为分数）；
  * - 边界：空/纯空白正文 → 全零指标 + 满分纯净，不产生 NaN；
  * - 不变量：whitelistWords 贯通到引擎（Tier2 聚集被白名单压制）；
- * - 接线门禁：本组件必须走 @mozhou/quality-engine/de-ai 子路径，禁止回退包根
+ * - 接线门：本组件必须走 @mozhou/quality-engine/de-ai 子路径，禁止回退包根
  *   （包根携 node:crypto/node:fs，会让渲染进程 bundle 直接炸）。
  */
 import { readFileSync } from 'node:fs';
@@ -97,7 +97,7 @@ describe('EditorQualityTelemetry（真实指标）', () => {
   });
 });
 
-describe('EditorQualityTelemetry（浏览器安全接线门禁）', () => {
+describe('EditorQualityTelemetry（浏览器安全接线门）', () => {
   it('必须从 @mozhou/quality-engine/de-ai 子路径导入，禁止回退包根', () => {
     const src = readFileSync(COMPONENT_SRC, 'utf8');
     const importLines = src

@@ -230,7 +230,8 @@ describe('流式写入候选（C2：正文只能经 accept 落盘）', () => {
       mode: 'generate',
     });
     // t52:B1：业务 payload 删平铺 recipeId/recipeVersion 两键——唯一消费方
-    // version-matrix.ts 只走 recipeSnapshot 嵌套路径，平铺身份=冗余投影
+    // （W6 起为 @mozhou/runtime recipe-payload / @mozhou/quality-engine metrics-gates）
+    // 只走 recipeSnapshot 嵌套路径，平铺身份=冗余投影
     expect(seenPayload).not.toHaveProperty('recipeId');
     expect(seenPayload).not.toHaveProperty('recipeVersion');
   });
@@ -442,7 +443,7 @@ describe('T21 事件供给面增补（#54 · t52 B1/Q-E）', () => {
     expect(started.chapterIndex).toBe(7); // 顶层既有槽
     expect(started.payload?.['recipeSnapshot']).toEqual(RECIPE_DOC); // M14 形状整档入账
     const snapshot = started.payload?.['recipeSnapshot'] as { recipe: { recipeVersion: string } };
-    expect(snapshot.recipe.recipeVersion).toBe('0.1.0'); // 三级嵌套收窄（version-matrix 同款路径）
+    expect(snapshot.recipe.recipeVersion).toBe('0.1.0'); // 三级嵌套收窄（recipe-payload 同款路径）
 
     const finished = events.find((event) => event.type === 'GenerationFinished')!;
     expect(finished.chapterIndex).toBe(7);

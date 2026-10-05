@@ -4,7 +4,7 @@
  * Gate = 纯机械核检的编排整合（M15 拍板）：四项核检全部是对 kernel/data-plane
  * 既有实现的调用组合，本模块不发明任何新校验语义——
  *   1. 四族行校验：kernel 冻结 Schema 解析器逐行过（TrackingRowError 收集而非
- *      首错即断，区别于 commitChapter 的写前门禁）；伏笔流原样字节透传
+ *      首错即断，区别于 commitChapter 的写前门）；伏笔流原样字节透传
  *      （narrativePromise 行语义随其实现票扩张，data-plane T4 既有裁定）；
  *   2. dependency 引用完整性：认知行 factId 与时间线 impactFactIds 必须解析到
  *      「存量活跃 ∪ 本批」事实集；
@@ -13,7 +13,7 @@
  *   4. POV 秘密零泄漏：每个候选 secret.* 事实必须存在授权认知行（holder 匹配 ∧
  *      knownSinceChapter ≤ 本章）——判据与 queryActiveFacts 读路径同源；可查询视角
  *      （protagonist/char:*）直接经 queryActiveFacts 探针复核，reader 不是可查询
- *      视角（零泄漏门禁不接受全知视角），按同款授权判据并入可见集。
+ *      视角（零泄漏门不接受全知视角），按同款授权判据并入可见集。
  *
  * 失败输出 = Result 字段 hardConflicts[] {factId, assertion, suggestion}——由编排方
  * 随 session.advance('continuity_gate', result) 进 TaskStepTransitioned payload，
@@ -150,7 +150,7 @@ export function runContinuityGate(request: ContinuityGateRequest): ContinuityGat
         conflicts.push({
           factId: rowLocator(row, family, index),
           assertion: error.message,
-          suggestion: '将该候选行修正至冻结 Schema 后重跑提取与门禁（回炉 Final Extract 全量重提取）',
+          suggestion: '将该候选行修正至冻结 Schema 后重跑提取与门校验（回炉 Final Extract 全量重提取）',
         });
       }
     });
@@ -187,7 +187,7 @@ export function runContinuityGate(request: ContinuityGateRequest): ContinuityGat
     conflicts.push({
       factId: 'timeline:max:' + String(error.offendingOrder),
       assertion: error.message,
-      suggestion: '重排 worldTimeOrder 使批内严格递增且大于存量活跃最大序数（M2 硬门禁不许乱序插入）',
+      suggestion: '重排 worldTimeOrder 使批内严格递增且大于存量活跃最大序数（M2 硬门不许乱序插入）',
     });
   }
 
@@ -210,7 +210,7 @@ export function runContinuityGate(request: ContinuityGateRequest): ContinuityGat
     }
   }
 
-  /* ---- 5. 因果合约门禁审计（P1-1 · 违约合法，超期未处置判定为硬冲突） ---- */
+  /* ---- 5. 因果合约门审计（P1-1 · 违约合法，超期未处置判定为硬冲突） ---- */
   if (request.causalContracts && request.causalContracts.length > 0) {
     for (const contract of request.causalContracts) {
       const issue = auditCausalContract(contract, request.chapterIndex);
@@ -218,7 +218,7 @@ export function runContinuityGate(request: ContinuityGateRequest): ContinuityGat
         conflicts.push({
           factId: contract.id,
           assertion: issue.message,
-          suggestion: '在正文中登记合约履约、违约、展期或放弃处置，方可通过连续性门禁',
+          suggestion: '在正文中登记合约履约、违约、展期或放弃处置，方可通过连续性门',
         });
       }
     }

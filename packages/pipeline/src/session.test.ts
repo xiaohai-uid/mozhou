@@ -208,7 +208,7 @@ describe('一 session ↔ 一 commit 与重提交', () => {
     expect(commits).toHaveLength(1); // 第二届尚未走到 commit
   });
 
-  it('门禁未通过禁止步进 canon_proposal；未提交禁止步进 flywheel_record (C3)', () => {
+  it('门未通过禁止步进 canon_proposal；未提交禁止步进 flywheel_record (C3)', () => {
     const root = hermeticRoot();
     const session = ChapterProductionSession.start(makeDeps(root));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract'] as const) {
@@ -219,7 +219,7 @@ describe('一 session ↔ 一 commit 与重提交', () => {
     session.advance('continuity_gate');
     expect(() => session.advance('canon_proposal')).toThrowError(GateNotPassedError);
 
-    // 重新建立会话测试正常过门禁但未 markCommitted 试图步进 flywheel_record
+    // 重新建立会话测试正常过门但未 markCommitted 试图步进 flywheel_record
     const root2 = hermeticRoot();
     const session2 = ChapterProductionSession.start(makeDeps(root2));
     for (const step of ['compile', 'draft', 'review', 'user_edit', 'final_extract', 'continuity_gate'] as const) {

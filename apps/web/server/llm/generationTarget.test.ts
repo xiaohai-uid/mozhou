@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 生成端点统一解析（工单06 · llm/generationTarget.ts）单测。
+ * 生成端点统一解析（深化 06 · llm/generationTarget.ts）单测。
  *
  * 本模块是「我在跟哪个模型说话」的唯一提问口，测试只钉四件事：
  *
@@ -225,7 +225,7 @@ describe('resolveGenerationTarget · BYOK 层（source=byok）', () => {
     expect(resolution.detail).toBe(NO_PROVIDER_CONFIGURED_DETAIL)
   })
 
-  it('BYOK 端点 baseUrl 未过 SSRF 门禁 ⇒ provider_endpoint_blocked（配了但不可用，不是没配）', async () => {
+  it('BYOK 端点 baseUrl 未过 SSRF 门 ⇒ provider_endpoint_blocked（配了但不可用，不是没配）', async () => {
     const resolution = await resolveGenerationTarget({
       taskType: 'STORYBOARD',
       env: absentConfigEnv({ MOZHOU_API_KEY: PLACEHOLDER, MOZHOU_API_BASE: 'http://127.0.0.1:9/v1' }),
@@ -235,7 +235,7 @@ describe('resolveGenerationTarget · BYOK 层（source=byok）', () => {
     if (resolution.available) return
     // P2 缺陷修复：原先这里与「配置非法」同码 provider_config_invalid，UI 因此把
     // 本机部署的用户指引去填 BYOK 密钥。仍**不是** no_provider_configured（原断言
-    // 成立：配了但不可用），只是另立了「门禁按设计拒绝」这一类，好让 UI 讲放行开关。
+    // 成立：配了但不可用），只是另立了「门按设计拒绝」这一类，好让 UI 讲放行开关。
     expect(resolution.reason).not.toBe('no_provider_configured')
     expect(resolution.reason).toBe('provider_endpoint_blocked')
     // 被拒主机如实带出，UI 靠它点名，不靠解析 detail 散文
@@ -246,27 +246,27 @@ describe('resolveGenerationTarget · BYOK 层（source=byok）', () => {
 })
 
 /* ----------------------------------------------------------------------------
- * SSRF 门禁拒绝的分类（P2 · 本机模型接入指引误导）。
+ * SSRF 门拒绝的分类（P2 · 本机模型接入指引误导）。
  *
- * 门禁**未放宽**：这些用例里环回端点一律仍然被拒（available=false）。
+ * 门**未放宽**：这些用例里环回端点一律仍然被拒（available=false）。
  * 变的只是拒绝被归到哪个 reason，好让 UI 给出与真实可行的下一步一致的指引。
  * 全部不发网络请求：拒绝发生在解析期，早于任何出站。
  * ------------------------------------------------------------------------- */
 describe('resolveGenerationTarget · SSRF 拒绝的分类', () => {
-  it('环回地址 + 未设放行位 ⇒ 仍被拒，且归为 provider_endpoint_blocked（门禁未被放宽）', async () => {
+  it('环回地址 + 未设放行位 ⇒ 仍被拒，且归为 provider_endpoint_blocked（门未被放宽）', async () => {
     for (const base of ['http://127.0.0.1:8317/v1', 'http://localhost:8317/v1', 'http://192.168.1.10:8317/v1']) {
       const resolution = await resolveGenerationTarget({
         taskType: 'CHAPTER_DRAFTING',
         env: absentConfigEnv({ MOZHOU_API_KEY: PLACEHOLDER, MOZHOU_API_BASE: base }),
       })
 
-      expect(resolution.available, `门禁必须继续拒绝 ${base}`).toBe(false)
+      expect(resolution.available, `门必须继续拒绝 ${base}`).toBe(false)
       if (resolution.available) return
       expect(resolution.reason).toBe('provider_endpoint_blocked')
     }
   })
 
-  it('注册表层被门禁拒绝 ⇒ 同样归 provider_endpoint_blocked（穿过 TierProviderError 包装）', async () => {
+  it('注册表层被门拒绝 ⇒ 同样归 provider_endpoint_blocked（穿过 TierProviderError 包装）', async () => {
     const file = writeConfig(
       'loopback.yaml',
       [
@@ -289,7 +289,7 @@ describe('resolveGenerationTarget · SSRF 拒绝的分类', () => {
     expect(resolution.available).toBe(false)
     if (resolution.available) return
     // 关键：注册表路径的错误被 TierProviderError 包了一层，分类必须能穿过包装，
-    // 否则同一个门禁拒绝会因来源不同而拿到两个 reason —— UI 又要开始猜。
+    // 否则同一个门拒绝会因来源不同而拿到两个 reason —— UI 又要开始猜。
     expect(resolution.reason).toBe('provider_endpoint_blocked')
     expect(resolution.blockedHost).toBe('127.0.0.1')
     // detail 仍保留 TierProviderError 的 code 与键路径（既有契约，下游逐字依赖）
@@ -297,7 +297,7 @@ describe('resolveGenerationTarget · SSRF 拒绝的分类', () => {
     expect(resolution.detail).toContain('providers.local.baseURL')
   })
 
-  it('非门禁类配置错误仍是 provider_config_invalid（不放宽分类：该分开的不合并）', async () => {
+  it('非门拒绝类配置错误仍是 provider_config_invalid（不放宽分类：该分开的不合并）', async () => {
     const file = writeConfig(
       'missing-key.yaml',
       [
@@ -319,7 +319,7 @@ describe('resolveGenerationTarget · SSRF 拒绝的分类', () => {
 
     expect(resolution.available).toBe(false)
     if (resolution.available) return
-    // 密钥缺失不是门禁拒绝：不该被 endpoint_blocked 吞掉（否则 UI 会教用户去设放行开关）
+    // 密钥缺失不是门拒绝：不该被 endpoint_blocked 吞掉（否则 UI 会教用户去设放行开关）
     expect(resolution.reason).toBe('provider_config_invalid')
     expect(resolution.blockedHost).toBeUndefined()
   })

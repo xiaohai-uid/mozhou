@@ -173,7 +173,7 @@ const SCOPE = { chapterIndex: 5, pov: 'protagonist' as PovEntity }
  * INV-K6：建图与候选资格仅认 confirmed + 区间活跃（event 边除外）
  * -------------------------------------------------------------------------- */
 
-describe('INV-K6 建图与候选资格生命周期门禁', () => {
+describe('INV-K6 建图与候选资格生命周期门', () => {
   it('planned/candidate/rejected 事实零候选零建边；区间失效事实只留诊断记录', async () => {
     const neighborRefs = [SU, 'char:zhao-qian', 'location:bei-mo', 'faction:xuantian'] as EntityRef[]
     const linOwn = mkFact(LIN, { importance: 'critical' })
@@ -213,10 +213,10 @@ describe('INV-K6 建图与候选资格生命周期门禁', () => {
 })
 
 /* ----------------------------------------------------------------------------
- * INV-K1：strict POV 门禁——被滤秘密零候选零建边
+ * INV-K1：strict POV 门——被滤秘密零候选零建边
  * -------------------------------------------------------------------------- */
 
-describe('INV-K1 POV 可见子图单一门禁点', () => {
+describe('INV-K1 POV 可见子图单一门', () => {
   const secretBridge = () =>
     mkFact(LIN, { predicate: 'secret.trueIdentity', value: SU, importance: 'critical' })
   const suCritical = () => mkFact(SU, { importance: 'critical' })
@@ -760,10 +760,10 @@ describe('AC③ 相似度阈值以配置注入', () => {
   })
 })
 
-describe('INV-K1 G0 单一门禁点跨通道同构（embedding 语料）', () => {
+describe('INV-K1 G0 单一门跨通道同构（embedding 语料）', () => {
   const cfg = { ...DEFAULT_KHOP_RECALL_CONFIG, embedding: { thresh: 0.5 } }
 
-  it('strict POV 门禁：未授权秘密零候选零痕迹；授权视角经兜底直达', async () => {
+  it('strict POV 门：未授权秘密零候选零痕迹；授权视角经兜底直达', async () => {
     const secret = mkFact(LIN, { id: factAt(1130), predicate: 'secret.trueIdentity', value: SU })
     const provider = stubEmbeddingProvider(
       [{ text: factText(LIN, String(SU), 'secret.trueIdentity'), vector: basisVector(0) }],

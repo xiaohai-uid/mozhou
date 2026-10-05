@@ -85,7 +85,7 @@ export const storyboardRoutes: RouteHandler = async (req, res, { path, body, jso
       return true
     }
     try {
-      // 工单06：端点解析走统一缝并携带 principal（hosted 下按用户隔离凭据；此前无主体
+      // 深化 06：端点解析走统一缝并携带 principal（hosted 下按用户隔离凭据；此前无主体
       // 解析在 hosted 下会落到共享档——与 semanticSettled 同源的跨用户串号隐患）。
       const { document } = await generateStoryboardCandidate(safeRoot, chapterIndex, expectedSourceHash, {
         aspectRatio: record['aspectRatio'] as AspectRatio,

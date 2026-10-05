@@ -37,7 +37,7 @@
  *   - embedding 通道（T8b-2）：score = clamp01(内积)——provider 契约已 L2 归一化，
  *     内积即 cosine；阈值 config.embedding.thresh 仅作入选门（spec §6/T9 R3：
  *     相对排序优先于绝对值），语料 = POV 可见子图事实 + 目录卡（brief 缺省回退
- *     name，双空不入语料）——G0 单一门禁点跨通道同构，strict 滤除者零候选
+ *     name，双空不入语料）——G0 单一门跨通道同构，strict 滤除者零候选
  *     （INV-K1 不因兜底软化）；子阈值条目从未成为候选，不记 excluded
  *     （记录范围裁决与 cap 落选同类）。
  */
@@ -316,7 +316,7 @@ export function detectKeywordTriggers(
 }
 
 /* ----------------------------------------------------------------------------
- * k-hop 图通道（POV 可见子图；G0 门禁 → G1 触发层 → G2 邻域扩展 → G3 收口）
+ * k-hop 图通道（POV 可见子图；G0 门 → G1 触发层 → G2 邻域扩展 → G3 收口）
  * -------------------------------------------------------------------------- */
 
 export interface GraphRecallScope {
@@ -346,14 +346,14 @@ interface VisibleCanon {
   readonly factsBySubject: ReadonlyMap<string, readonly TemporalFact[]>
   readonly relationships: readonly RelationshipState[]
   readonly events: readonly TimelineEvent[]
-  /** 视角授权的秘密事实集合（secret.* 门禁行）。 */
+  /** 视角授权的秘密事实集合（secret.* 门授权行）。 */
   readonly authorizedSecrets: ReadonlySet<string>
 }
 
 /**
- * G0 子图过滤（单一门禁点，遍历与候选共用，INV-K1）：
+ * G0 子图过滤（单一门，遍历与候选共用，INV-K1）：
  * confirmed ∧ 区间活跃 ∧ secret.* 需当前视角授权认知行（非秘密公开；
- * distortion 只改渲染不改门禁）。被滤事实同时失去候选资格与建桥资格。
+ * distortion 只改渲染不改门）。被滤事实同时失去候选资格与建桥资格。
  */
 function buildVisibleCanon(snapshot: NarrativeStateSnapshot, scope: GraphRecallScope): VisibleCanon {
   const authorizedSecrets = new Set<string>()
@@ -659,9 +659,9 @@ function dotProduct(a: readonly number[], b: readonly number[]): number {
  * 语料两族（spec §8 tier 表的直达面）：
  *   - 目录卡：passage = brief（缺省回退 name——空 brief 卡仍有语义身份；
  *     双空卡无语义面可嵌，不入语料），tier=entity_card（「embedding 直达亦入」）；
- *   - 事实：经 buildVisibleCanon 复用 G0 单一门禁点（confirmed ∧ 区间活跃 ∧
+ *   - 事实：经 buildVisibleCanon 复用 G0 单一门（confirmed ∧ 区间活跃 ∧
  *     secret.* 视角授权）——strict 滤除者不进语料，零软泄漏跨通道成立（INV-K1），
- *     「门禁滤除造成的漏召由兜底补位」补的是同子图内的语义可达性，不是被滤材料。
+ *     「门滤除造成的漏召由兜底补位」补的是同子图内的语义可达性，不是被滤材料。
  *
  * 记录范围裁决：子阈值条目从未成为候选，不记 excluded（与 branchCap/khopCap
  * 落选同类）；跨通道救援靠「新增条目」生效，无需淘汰记录参与抑制。

@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 工单 02 缺陷 A 验收（.scratch/mozhou-deepening-20260928/issues/02-adopt-open-heads-latent-defect.md）：
+ * 深化 02 缺陷 A 验收（.scratch/mozhou-deepening-20260928/issues/02-adopt-open-heads-latent-defect.md）：
  * 同 revision 重复提交必须在 0 消耗处拒绝——合法相位检查前移到 extractChapterDelta
  * （真实 LLM 调用缝）之前。
  *
@@ -98,7 +98,7 @@ function lowExtraction(bookId: string): DeltaExtractionResult {
   return result
 }
 
-describe('POST /api/chapter.commit · 同 revision 重复提交（工单 02 缺陷 A）', () => {
+describe('POST /api/chapter.commit · 同 revision 重复提交（深化 02 缺陷 A）', () => {
   it('首次提交成功后重复提交：409、0 次提取调用、无第二次提案写入', async () => {
     const base = await listen()
     const root = mkdtempSync(join(tmpdir(), 'mozhou-web-repeat-commit-'))
@@ -109,7 +109,7 @@ describe('POST /api/chapter.commit · 同 revision 重复提交（工单 02 缺�
       root, chapterIndex: 1, body: '　　中平元年，黄巾起事。', expectedRevision: null,
     })
     expect(saved.status).toBe(200)
-    // 工单05 Contract Delta：提交必须携带作者所读 revision（此处即保存响应回带的值）。
+    // 深化 05 Contract Delta：提交必须携带作者所读 revision（此处即保存响应回带的值）。
     const expectedRevision = Number(saved.data.revision)
 
     fixture.result = lowExtraction(String(created.data.bookId))

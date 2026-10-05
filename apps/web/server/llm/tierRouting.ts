@@ -15,7 +15,7 @@
  *     `resolveTierEndpoint` 从注册表 + 叶子声明一次构造完成。
  *
  * 安全（配置文件是外部输入，不是可信来源）：
- *   - 注册表 baseURL 必须过既有 SSRF 门禁 `assertSafeEndpointUrl`（openaiStream.ts；BYOK
+ *   - 注册表 baseURL 必须过既有 SSRF 门 `assertSafeEndpointUrl`（openaiStream.ts；BYOK
  *     走同一个函数），真正发请求前 `streamOpenAiChat` 还会用 `assertSafeRemoteTarget`
  *     补上 DNS 解析结果那一半；
  *   - 密钥本体永不入配置文件：注册表只写环境变量**名**（apiKeyEnv），该变量缺失即显式拒绝。
@@ -72,7 +72,7 @@ export class TierRouteUnsupportedError extends Error {
 export type TierProviderErrorCode =
   /** 叶子声明的 providerId 不在 `providers:` 注册表里。 */
   | 'TIER_ROUTE_PROVIDER_NOT_REGISTERED'
-  /** 注册表 baseURL 未过出站 SSRF 门禁（协议 / 本机名 / 私有保留地址）。 */
+  /** 注册表 baseURL 未过出站 SSRF 门（协议 / 本机名 / 私有保留地址）。 */
   | 'TIER_ROUTE_PROVIDER_ENDPOINT_REJECTED'
   /** apiKeyEnv 指向的环境变量未设置或为空。 */
   | 'TIER_ROUTE_PROVIDER_KEY_MISSING';
@@ -90,7 +90,7 @@ export class TierProviderError extends Error {
     this.configPath = configPath;
     this.keyPath = keyPath;
     // 原样挂上被包装的底层错误（如 SsrfBlockedError）。分类方（generationTarget 的
-    // unavailableFromError）要能穿过这层包装认出「门禁拒绝」——message 里只有中文
+    // unavailableFromError）要能穿过这层包装认出「门拒绝」——message 里只有中文
     // 散文，类型链才是稳定的判据。不挂 cause 就只能改 message 来传递类型信息，而
     // 既有测试逐字断言了那段文案。
     if (cause !== undefined) this.cause = cause
@@ -154,7 +154,7 @@ export async function resolveDraftTierRoute(
  * 三个出口全部是显式拒绝，没有任何回落：
  *   1. 注册表无该 providerId ⇒ NOT_REGISTERED（绝不回落到 BYOK 端点——那正是要消灭的
  *      「账本 providerId ≠ 实际端点」不一致）；
- *   2. baseURL 未过既有 SSRF 门禁 ⇒ ENDPOINT_REJECTED（复用 `assertSafeEndpointUrl`）；
+ *   2. baseURL 未过既有 SSRF 门 ⇒ ENDPOINT_REJECTED（复用 `assertSafeEndpointUrl`）；
  *   3. apiKeyEnv 指向的环境变量缺失/为空 ⇒ KEY_MISSING（不静默用别的密钥）。
  *
  * 返回端点的 providerId 归属由调用方原样写进账本：`pipelineRoutes.ts` 把
@@ -189,7 +189,7 @@ export function resolveTierEndpoint(
       'TIER_ROUTE_PROVIDER_ENDPOINT_REJECTED',
       route.configPath,
       `providers.${leaf.providerId}.baseURL`,
-      `baseURL '${entry.baseURL}' 未过出站 SSRF 门禁：${err instanceof Error ? err.message : String(err)}`,
+      `baseURL '${entry.baseURL}' 未过出站 SSRF 门：${err instanceof Error ? err.message : String(err)}`,
       err,
     )
   }

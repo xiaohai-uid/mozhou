@@ -14,7 +14,7 @@ function okJson(value: unknown): Response {
   return { ok: true, status: 200, json: () => Promise.resolve(value) } as unknown as Response
 }
 
-/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门禁），拼接构造保持确定性。 */
+/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门），拼接构造保持确定性。 */
 const FAKE_PASTED_KEY = ['user', 'pasted', 'key'].join('-')
 
 afterEach(() => {

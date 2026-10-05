@@ -11,7 +11,7 @@
  *   - **端点由 providers 注册表按 providerId 解析**（resolveTierEndpoint）：
  *       · 命中 ⇒ baseURL/apiKey 取自注册表，与账本 providerId 同源；
  *       · providerId 未登记 ⇒ TierProviderError NOT_REGISTERED（绝不回落 BYOK）；
- *       · baseURL 未过 SSRF 门禁（非 http(s) / 本地主机名 / 环回 / 私有 / 保留）⇒ 拒绝；
+ *       · baseURL 未过 SSRF 门（非 http(s) / 本地主机名 / 环回 / 私有 / 保留）⇒ 拒绝；
  *       · apiKeyEnv 指向的环境变量缺失/空白 ⇒ KEY_MISSING（不静默用别的密钥）；
  *       · 私有地址仅在部署者显式 MOZHOU_ALLOW_PRIVATE_LLM=1 时放行（配置文件无权设置）。
  */
@@ -281,7 +281,7 @@ describe('resolveTierEndpoint（providerId → 实际出站端点，账本一致
     const badUrls = [
       'ftp://api.example.test/v1',
       'not-a-url',
-      'http://api.example.test/v1', // 公网也强制 HTTPS（既有门禁语义）
+      'http://api.example.test/v1', // 公网也强制 HTTPS（既有门语义）
       'http://localhost:8080/v1',
       'http://foo.localhost/v1',
       'http://127.0.0.1:8080/v1',

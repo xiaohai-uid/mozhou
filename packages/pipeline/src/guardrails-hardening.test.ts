@@ -1,9 +1,9 @@
 /**
  * @mozhou/pipeline · 安全守卫与规则契约护栏固化测试（Hardened Guardrails）
  * 覆盖：
- * 1. 5 项纯算术机械门禁极端对抗性测试（字数窗口边界、占位符全变体、AI红线正则、相邻段落复读回环、4-gram 方差）
+ * 1. 5 项纯算术机械门极端对抗性测试（字数窗口边界、占位符全变体、AI红线正则、相邻段落复读回环、4-gram 方差）
  * 2. Fail-Closed 审查报告哈希防篡改（REV-001 任意单字节篡改、hash 不一致时的 blocking_fail、unknown fail closed）
- * 3. 生产流水线双回炉风控（审查回炉上限 2 次硬熔断、连续性门禁作者显式回炉）
+ * 3. 生产流水线双回炉风控（审查回炉上限 2 次硬熔断、连续性门作者显式回炉）
  * 4. I1-I6 核心不变量与 M2 时间线单调性硬拦截
  * 5. 视角秘密隔离与单飞并发互斥锁（零泄漏无知情隔离、单飞跨章互斥锁）
  */
@@ -79,9 +79,9 @@ function deps(root: string, bus: PublishBus, chapterIndex: number, tag: string) 
 
 describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
   // ──────────────────────────────────────────────────────────────────────────
-  // 1. 5 项纯算术机械门禁
+  // 1. 5 项纯算术机械门
   // ──────────────────────────────────────────────────────────────────────────
-  describe('1. 5 项纯算术机械门禁（字数窗口、占位符、AI红线、相邻段落复读、4-gram方差）', () => {
+  describe('1. 5 项纯算术机械门（字数窗口、占位符、AI红线、相邻段落复读、4-gram方差）', () => {
     it('1.1 字数窗口：严格以中文字符统计，超出或不足精准拦截', () => {
       const min = 50;
       const max = 100;
@@ -301,7 +301,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
   // ──────────────────────────────────────────────────────────────────────────
   // 3. 生产流水线双回炉风控
   // ──────────────────────────────────────────────────────────────────────────
-  describe('3. 生产流水线双回炉风控（审查回炉上限 2 次、连续性门禁作者显式回炉）', () => {
+  describe('3. 生产流水线双回炉风控（审查回炉上限 2 次、连续性门作者显式回炉）', () => {
     it('3.1 文学审查回炉：blocking_fail 拦截前进；自动回炉严格限 2 次，第 3 次抛出 QualityReworkLimitExceededError', () => {
       const { root, bus } = makeBook('mozhou-guard-rework-');
       LocalDataPlane.open(root).createChapterDraft({ chapterIndex: 1, title: '第一章' });
@@ -342,7 +342,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       expect(session.currentStep).toBe('review');
     });
 
-    it('3.2 连续性门禁回炉：hard_conflict 拦截前进；必须作者显式 requestRework 回炉至 user_edit', () => {
+    it('3.2 连续性门回炉：hard_conflict 拦截前进；必须作者显式 requestRework 回炉至 user_edit', () => {
       const { root, bus } = makeBook('mozhou-guard-gate-');
       LocalDataPlane.open(root).createChapterDraft({ chapterIndex: 1, title: '第一章' });
       const session = ChapterProductionSession.start(deps(root, bus, 1, 'gate_rework'));
@@ -362,7 +362,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       session.requestRework();
       expect(session.currentStep).toBe('user_edit');
 
-      // 门禁若为 pass，禁止乱调 requestRework（防非法逆向）
+      // 门若为 pass，禁止乱调 requestRework（防非法逆向）
       session.advance('final_extract');
       session.advance('continuity_gate', { verdict: 'pass' });
       expect(() => session.requestRework()).toThrow(ReworkNotDrivenError);
@@ -427,7 +427,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       expect(marker.upstreamRefs).toHaveLength(1);
     });
 
-    it('4.3 M2：时间线序数严格单调硬门禁，乱序插入直接拦截', () => {
+    it('4.3 M2：时间线序数严格单调硬门，乱序插入直接拦截', () => {
       const ev1: any = {
         id: 'tle_1',
         bookId: 'book_1',

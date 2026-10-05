@@ -1,5 +1,5 @@
 /**
- * L1 确定性生命周期台架 CI 门禁（ADR-0016；实现票 #27 + 50 章扩模）。
+ * L1 确定性生命周期台架 CI 门（ADR-0016；实现票 #27 + 50 章扩模）。
  *
  * 台架（l1-lifecycle-bench.ts）负责跑场景采观测；本文件持全部断言：
  *   - AC① hermetic 可重入：两次独立运行（各自临时目录）报告逐字段一致；
@@ -52,7 +52,7 @@ describe('L1 确定性生命周期台架（ADR-0016 · 50 章全弧）', () => {
     // 受伤：ch2 起可见、ch4 末痊愈（validUntil 含端点）、ch5 查无此事实（第一幕冻结语义）
     expect(report.injuryVisibleChapters).toEqual([2, 3, 4])
 
-    // 秘密揭示：knownSinceChapter 门禁——揭示前零泄漏、认知生效章含端点、
+    // 秘密揭示：knownSinceChapter 门——揭示前零泄漏、认知生效章含端点、
     // 未授权视角（沈巍）全程与「秘密不存在」不可区分
     expect(report.secret.protagonistSeesAtChapters).toEqual([4, 5, 6])
     expect(report.secret.shenWeiEverSees).toBe(false)

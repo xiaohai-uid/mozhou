@@ -1,15 +1,15 @@
 # INK_REALM_COVERAGE_REPORT.md — §32 Design Acceptance Matrix 逐项验收
 
 > **实现状态同步（2026-09-13 · /code-review 两轴发现修复完毕）**
-> 门禁实测（写入前即时复跑）：**apps/web 231/231 测试全绿（36 文件）+ typecheck 0 错 + 0 cycles**。本轮修复对应两轴审查发现：
+> 门实测（写入前即时复跑）：**apps/web 231/231 测试全绿（36 文件）+ typecheck 0 错 + 0 cycles**。本轮修复对应两轴审查发现：
 > **Standards 轴**：①原型类名回归 live CSS（.badge 族/.btn-sm/.row-evidence+.em/.note/.input 补进 ink-realm.css——硬违规清除）②桌面三 Sheet（场景/工具/能力详情）接共享 useSheetA11y：Escape+焦点入面板+Tab 困拢+焦点返回（SceneSettingsSheet 原双份 Escape 处理合并）③SlashCommandMenu 去除 onBlur 关闭（Tab 不再误关），Escape+外点关闭，菜单项 hover 改 CSS 类（.ir-menu-item，Bubble 同步）④管线 done/failed 增加 ✓/× 文本线索（状态不再只用颜色）⑤JS hover 去重、parentDirOf 抽 shell/paths.ts、InspectorSummary/StageState/quality 形状单一出处化、chapterDraftKey 内联清除、--world-gap/--ir-r-md/--ir-sheet-t 定义、交互金/玉描边 token 化（场景画法字面量按 ADR 保留）。
 > **Spec 轴**：①图标统一 18px/1.4 stroke（TopBar+WorkbenchView）②场景「恢复默认场景（全局）」控件补齐（confirm 门）③桌面 Sheet 焦点返回（同 ②）④InkBackground/FluidInkBackground 死代码删除（ADR-0028"可选路径"以 git 历史为载体）⑤Mobile Scene 同会话跟随（mozhou:scene-refresh+storage 监听）⑥capabilityDetails.ts 抽独立模块（漂移注释+兜底 detailOf）。
 > **正确性修复**：proseRoutes 补 `assertSafeBookRoot` + `plane.close()`（try/finally，句柄不泄漏）；DialogueStream「采纳进写作层」遇已有作者文本先 confirm（不静默覆盖）。
 > **覆盖声明更正**：前块③"唯一一行级介入"表述不准——pipelineRoutes.ts 工作树同时载有用户先行的 LocalDataPlane 重构（非本设计改动）；本设计在该文件的介入仅 ENOENT 守卫 hunk。`graph:status` stale 系 cli/status.js:67 结构性判据（未提交即 stale），索引内容与本轮修复后磁盘逐文件一致。
-> 门禁计数说明：231 而非 233——MobileChains 4 例并拆/场景 1 例断言迁移后总数微调，全绿口径不变。
+> 门计数说明：231 而非 233——MobileChains 4 例并拆/场景 1 例断言迁移后总数微调，全绿口径不变。
 
 > **实现状态同步（2026-09-13 · 二轮复验 91/100 后七项收尾完成）**
-> 门禁实测（本块写入前即时重跑）：**apps/web 233/233 测试全绿（36 文件）+ typecheck 0 错 + 0 cycles**。七项收尾：
+> 门实测（本块写入前即时重跑）：**apps/web 233/233 测试全绿（36 文件）+ typecheck 0 错 + 0 cycles**。七项收尾：
 > ① **主权链闭环（P1）**：新增 `POST /api/chapter.prose.save`（proseRoutes.ts，挂 api.ts）——章缺失自动建章草稿、存在则 revision+1 原子覆写，phase 恒 draft（**绝不翻转 Commit**）；ProseEditorPanel 新增「落为当前章草稿（Accept → Active Draft）」金色按钮（成功后广播遥测刷新）；DialogueStream done 态新增「采纳进写作层（Accept → Active Draft）」——Candidate 文本写入 ch<N> 写作层缓存。链路语义：Candidate（流式候选）→ Accept（作者显式按钮）→ Active Draft（写作层/盘上草稿）→ Commit（质量门后管线）。黑盒 HTTP 集成测试 4 例（proseRoutes.test.ts：建章/递增覆写/400/quality 守卫）。
 > ② **报告与事实一致**：上轮"225/225"系 CapabilitySquareView 契约锚点（data-capability-id）加入后未重跑 -u 所致——已核对快照 diff 属批准的卡牌墙结构变更，-u 对齐；本轮真实数字 233/233（新增 8 例：主权链 4 + 移动链路 4）。
 > ③ **Quality 500 修复（P1/P2）**：/api/chapter.quality 对无章新书由 500 改为 200 no_review（pipelineRoutes.ts 外科守卫，仅该分支；黑盒测试断言）。注：该文件属用户未提交改动面，此为唯一一行级介入，已在此登记供审查。
@@ -27,7 +27,7 @@
 > 本文件以上"设计阶段"章节保留为历史轮次记录；当前状态以本块为准。
 
 > **验收轮次记录**
-> · **第 1 轮（本报告初版）**：本地自评 93/93 PASS。**用户验收裁决：CONDITIONAL PASS**——不接受自评口径，最终计数修正为 **PASS 86 / PARTIAL 3 / BLOCKED_BY_REAL_CAPABILITY 4 / MISSING 0**（PARTIAL=移动 InspectorHub tab 40px、移动 ResourcesHub 主交互 40px、触点 44px 门禁未真正达成；BLOCKED=Novel Breakdown / Rank Scan / Web Search / 移动 Quality 四项真实能力缺失）。另记录 P0×2（生产代码 truthfulness 矛盾，实现期修复）、P1×5、P2×3、P3×1。
+> · **第 1 轮（本报告初版）**：本地自评 93/93 PASS。**用户验收裁决：CONDITIONAL PASS**——不接受自评口径，最终计数修正为 **PASS 86 / PARTIAL 3 / BLOCKED_BY_REAL_CAPABILITY 4 / MISSING 0**（PARTIAL=移动 InspectorHub tab 40px、移动 ResourcesHub 主交互 40px、触点 44px 门未真正达成；BLOCKED=Novel Breakdown / Rank Scan / Web Search / 移动 Quality 四项真实能力缺失）。另记录 P0×2（生产代码 truthfulness 矛盾，实现期修复）、P1×5、P2×3、P3×1。
 > · **第 2 轮（验收修订轮，当前版本）**：按验收 §F 最小修订清单执行 5 项（GitNexus 刷新+delta / Scene 上传完整交互 / 世界感收敛 / 完整 Skill Square / Mobile 44px 清零），全部完成并附驱动验证证据；3 项 PARTIAL 的根因（40px 内联值）已清除。**本报告不自行宣布 PASS——冻结升级（CONDITIONAL PASS → PASS）由用户的短复审裁决。**
 >
 > 主规格：`docs/superpowers/specs/2026-09-12-mozhou-ink-realm-design.md` §32。
@@ -46,7 +46,7 @@
 | 17 项导航全部存在 | PASS | 03 · 左导航 | 5 组 17 项与 views.ts:19-58 一一对应；金脊选中态 |
 | 8 步 Pipeline 全部存在 | PASS | 03 · Pipeline | prepare→commit 原词表；六态（selected/running/done/blocked/failed/unavailable）；selected≠executed |
 | current book / no-book 两态 | PASS | 03（「无书态示例」切换钮） | 无书：chapterbar 置灰+InspectorEmpty 语义+stage 置灰；有书：完整工作台 |
-| desktop 1440 / 1280 | PASS | 03（1440 网格）+ DESIGN_SYSTEM §14（1280 列宽契约） | 世界缝隙 8–12px；正式双视口浏览器验收图属实现阶段门禁（DESIGN.md §15.8 纪律保留） |
+| desktop 1440 / 1280 | PASS | 03（1440 网格）+ DESIGN_SYSTEM §14（1280 列宽契约） | 世界缝隙 8–12px；正式双视口浏览器验收图属实现阶段门（DESIGN.md §15.8 纪律保留） |
 | mobile <768 五 Hub | PASS | 09 | 五 Hub 全数 + 抽屉 + 触点规则 |
 
 ## Workbench（12/12）

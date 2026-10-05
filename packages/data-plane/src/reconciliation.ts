@@ -18,7 +18,7 @@
  *
  * 刻意取舍（后续票领地，勿在此扩权）：
  * - 追踪行的字段级 Schema 校验与「逻辑退役」默认建议需要 T4 的行 Schema；
- * - 对账未决期间的 Context 编译软门禁归编译器票；
+ * - 对账未决期间的 Context 编译软门归编译器票；
  * - 章节大纲文件的物理删除无法从路径反解 mozhouId（身份在 frontmatter），批准即响亮
  *   拒绝并提示走 rebuildProjectionFromCanon（S5 确定性恢复兜底）。
  */

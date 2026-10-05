@@ -431,7 +431,7 @@ const abandonDeps = (root: string, chapterIndex: number, taskRef: string) => ({
   newTaskRef: () => taskRef,
 });
 
-/** 走到 commit 步（含门禁 pass 的 Result 字段）——markCommitted 前置。 */
+/** 走到 commit 步（含门 pass 的 Result 字段）——markCommitted 前置。 */
 function advanceToCommitStep(session: ChapterProductionSession): void {
   session.advance('compile');
   session.advance('draft');

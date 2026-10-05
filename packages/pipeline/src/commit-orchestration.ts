@@ -1,5 +1,5 @@
 /**
- * 章节提交编排（步 6-10 单一事实源 · 工单04 2026-09-28）。
+ * 章节提交编排（步 6-10 单一事实源 · 深化 04 2026-09-28）。
  *
  * 背景：web 提交路由（proseRoutes /api/chapter.commit）曾就地实现 260 行步 6-10 编排，
  * 与本包 module 实现是同一套规则的第二份（ADR-0024 说一遍，module 写一遍，route 又写
@@ -7,8 +7,8 @@
  * 步序规则在此只出现一次。
  *
  * 职责边界（编排规则全部在此，路由不做第二步实现）：
- *   - 步 6 前置守卫：合法相位检查（draft）先于提取缝（工单 02 缺陷 A——重复提交必须
- *     在 0 消耗处拒绝，不得先跑提取再撞 409）；expectedRevision 比对（工单05 Contract
+ *   - 步 6 前置守卫：合法相位检查（draft）先于提取缝（深化 02 缺陷 A——重复提交必须
+ *     在 0 消耗处拒绝，不得先跑提取再撞 409）；expectedRevision 比对（深化 05 Contract
  *     Delta）同列前置守卫——作者所读 revision 与盘不符即在 0 消耗处 409；
  *   - 结果契约 / commitChapter 透传 expectedRevision（TOCTOU 兜底，提取 await 期间的
  *     并发保存由数据平面写路守卫拦截）；
@@ -21,9 +21,9 @@
  *     显式 stale（不静默丢弃作者逐条决策）；
  *   - 步 6 提取（**注入缝**）：管线不 import web 提取器——真实模型调用由调用方注入
  *     （extractDelta），管线供 bookId/chapterIndex/prose 上下文；
- *   - 会话窗口驱动（工单03）：adoptOpenHeads → resume → 回炉判定 → 步锚 → 步进 →
+ *   - 会话窗口驱动（深化 03）：adoptOpenHeads → resume → 回炉判定 → 步锚 → 步进 →
  *     markCommitted → finish；未行走窗口维持作废收口；
- *   - 步 7 门禁（初始 + 已确认集重核检两处）→ 步 8 提案/待决 → 步 9 commitChapter →
+ *   - 步 7 门（初始 + 已确认集重核检两处）→ 步 8 提案/待决 → 步 9 commitChapter →
  *     ProposalPort.markConsumed（提交成功后才翻 consumed）；
  *   - 步 10 收尾记账（**注入缝** afterRecord）：飞轮窗口锚 + 调用方钩子（StyleLearner
  *     在 @mozhou/flywheel，依赖方向 flywheel→pipeline 禁止反向 import，故由编排方注入，
@@ -155,7 +155,7 @@ export type ChapterCommitOutcome =
   | {
       readonly kind: 'gate_conflict';
       readonly hardConflicts: readonly HardConflict[];
-      /** 已确认集重核检失败时携带提案身份；初始门禁失败为 null。 */
+      /** 已确认集重核检失败时携带提案身份；初始门失败为 null。 */
       readonly proposalId: string | null;
       readonly deltaExtraction: ChapterCommitDeltaSummary | null;
     };
@@ -165,7 +165,7 @@ export interface RunChapterCommitRequest {
   readonly chapterIndex: number;
   readonly summary: string;
   /**
-   * 作者实际读取的章版本（工单05 Contract Delta，照搬 /api/prose.save 冻结契约——
+   * 作者实际读取的章版本（深化 05 Contract Delta，照搬 /api/prose.save 冻结契约——
    * 路由已保证在场且为整数）。与盘上 revision 失配即在提取缝之前抛
    * ProseRevisionConflictError（模型调用增量 0、正文/正典零写入），并随
    * plane.commitChapter 透传兜住提取 await 期间的并发保存（TOCTOU）。
@@ -247,7 +247,7 @@ function replayOutcomeFromRecord(root: string, chapterIndex: number, record: Ope
  */
 export async function runChapterCommit(request: RunChapterCommitRequest): Promise<ChapterCommitOutcome> {
   const { root, chapterIndex } = request;
-  // 句柄所有权跨 await 显式转移（工单 08）：提取缝（真实模型调用）与门禁都在
+  // 句柄所有权跨 await 显式转移（深化 08）：提取缝（真实模型调用）与连续性门都在
   // await 之下，而 commitChapter 必须在同一句柄上完成——句柄必须活过 await，
   // 词法借用的 withBook 表达不了（它承诺 await 前就归还）。故走 retain/release：
   // acquire 在函数入口、release 在 finally，二者成对且都在本函数内可见。
@@ -275,15 +275,15 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
     }
     const proseFile = readProseChapter(root, proseChapterPath(chapterIndex));
     const prose = proseFile.body;
-    // 工单 02 缺陷 A：合法相位检查前移到提取缝（真实 LLM 调用）之前——committed 章
+    // 深化 02 缺陷 A：合法相位检查前移到提取缝（真实 LLM 调用）之前——committed 章
     // 的重复提交必须在 0 消耗处拒绝（同一错误类型 + commitChapter 的同一 detail 文案，
     // 响应契约由调用方渲染）。
     if (proseFile.phase !== 'draft') {
       throw new ChapterPhaseError(chapterIndex, 'chapter is committed — reopen it before re-committing');
     }
-    // 工单05 Contract Delta：作者所读 revision 与盘不符 ⇒ 在提取缝（真实 LLM 调用）之前
+    // 深化 05 Contract Delta：作者所读 revision 与盘不符 ⇒ 在提取缝（真实 LLM 调用）之前
     // 拒绝——过期提交必须 0 消耗 409，正文/正典/账本零写入。相位守卫在前（照搬
-    // saveProseDraft 的检查顺序，chapter.ts:802-806）：已提交章仍回相位 409（工单02
+    // saveProseDraft 的检查顺序，chapter.ts:802-806）：已提交章仍回相位 409（深化 02
     // 缺陷 A 语义不变）。expectedRevision 同时随 commitChapter 透传（TOCTOU 兜底）。
     if (proseFile.revision !== request.expectedRevision) {
       throw new ProseRevisionConflictError(chapterIndex, request.expectedRevision, proseFile.revision);
@@ -347,7 +347,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       }
     };
 
-    // 工单03（session 走完第 9/10 步）：会话窗口驱动器。本章存在活动会话窗口时
+    // 深化 03（session 走完第 9/10 步）：会话窗口驱动器。本章存在活动会话窗口时
     // （requestResubmit / session.open 开出，TaskStarted 已在第 1 步落账、findOpenSessionWindow
     // 由此看见它），作者已把会话走到 user_edit 及之后（session.advance / chapter.review
     // 驱动步 2-5），本次提交即沿十步收口该窗口；光标停在 prepare..review 的未行走窗口
@@ -365,7 +365,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
         drive.currentStep === 'canon_proposal' ||
         drive.currentStep === 'commit');
 
-    // 工单03 步 9/10 收口：markCommitted（窗口内 CanonProposalCreated 的配对尾）→
+    // 深化 03 步 9/10 收口：markCommitted（窗口内 CanonProposalCreated 的配对尾）→
     // 步进 flywheel_record → finish（TaskFinished{outcome:'succeeded'}）。仅在驱动
     // 生效时执行；失败不回退已落定的提交（派生面，S12 同款），errorDetail 如实上报。
     const completeDrivenSession = (commitId: string): ChapterCommitSessionWindowView => {
@@ -386,7 +386,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       }
     };
 
-    // 工单03 步 8 步锚：会话窗口内的 CanonProposalCreated 配对头（markCommitted 的
+    // 深化 03 步 8 步锚：会话窗口内的 CanonProposalCreated 配对头（markCommitted 的
     // CanonCommitted 是它的配对尾，发布总线当场强制）。幂等：头已在账（上一请求落了
     // 锚、本次崩溃恢复续跑）则跳过——重复开锚即 PAIRING_HEAD_UNCLOSED。这是窗口内
     // 的任务事件步锚（payload 携带 web 提案记录 proposalId 作关联），不落 .mozhou/
@@ -408,7 +408,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
         return { kind: 'proposal_stale', staleProposals: stale };
       }
 
-      // 工单03 步 5→6 边界：门禁 hard_conflict 悬置的窗口，作者改文再提交即显式
+      // 深化 03 步 5→6 边界：门 hard_conflict 悬置的窗口，作者改文再提交即显式
       // 回炉驱动（S7：requestRework 承认错误改文，回炉重走 Final Extract 全量重提取
       // ——S7 无自动迭代，重提交就是作者的显式动作）；光标在 user_edit 的窗口步进
       // final_extract。悬置判据读当下投影（崩溃恢复后同样可判），不是内存光标。
@@ -434,7 +434,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       // 内取锁的时点一致。
       await takeLease();
 
-      // 工单03 步 6 步锚：复用管线 extract-step 模块（runFinalExtract）把提取产物以
+      // 深化 03 步 6 步锚：复用管线 extract-step 模块（runFinalExtract）把提取产物以
       // 会话 taskRef 落账 CandidateDeltaExtracted（成败都落，账面可审计）；注入缝的
       // 提取产物作为显式注入（ADR-0004 语义缝），单次提取双消费。
       // 光标已越过 final_extract 的崩溃恢复续跑不再补锚（步锚只归属所属步）。
@@ -451,7 +451,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       if (Object.keys(delta.appends).length === 0) {
         // 无候选可路由：步 8 不落空提案（无内容的 CanonProposalCreated 只会污染
         // 悬挂扫描），直接提交——叙事层零增长由 deltaExtraction 如实报出。
-        // 工单03 驱动面：步 7 空批空过（与响应 continuityGate.verdict='pass'
+        // 深化 03 驱动面：步 7 空批空过（与响应 continuityGate.verdict='pass'
         // 同一判据——零候选无冲突可检，不为此强拉快照）→ 步 8 空步锚（只进窗口
         // 事件流配对 markCommitted，不落提案文件）→ 步 9。
         if (drive !== null && driveEngaged && drive.currentStep === 'final_extract') {
@@ -487,11 +487,11 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
         };
       }
 
-      // 步 7 Continuity Gate：候选 delta 写正典前过机械核检。冲突 = 硬门禁，
+      // 步 7 Continuity Gate：候选 delta 写正典前过机械核检。冲突 = 硬门，
       // 提案不落盘、commitChapter 一步不调（正典零写入），冲突清单经调用方
       // 回给作者——回炉重提取是唯一出路，不许静默放行。
       const gate = runContinuityGate({ bookRoot: root, chapterIndex, delta: delta.appends, prose });
-      // 工单03 步 7 步进：verdict 与 hardConflicts 随 TaskStepTransitioned 的 Result
+      // 深化 03 步 7 步进：verdict 与 hardConflicts 随 TaskStepTransitioned 的 Result
       // 字段进账（§1 表第 7 行）——pass / hard_conflict 都落（悬置窗口的回炉判据读
       // 投影，S7/S8）；冲突时正典零写入、窗口悬置在 continuity_gate。
       if (drive !== null && driveEngaged && drive.currentStep === 'final_extract') {
@@ -501,7 +501,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
         return { kind: 'gate_conflict', hardConflicts: gate.hardConflicts, proposalId: null, deltaExtraction };
       }
 
-      // 工单03 步 7→8 步进（含崩溃恢复续跑：光标已在 continuity_gate 且 pass 的
+      // 深化 03 步 7→8 步进（含崩溃恢复续跑：光标已在 continuity_gate 且 pass 的
       // 窗口——上次请求在步进 canon_proposal 前中断——直接前进，不重复步 7 步进）。
       if (drive !== null && driveEngaged && drive.currentStep === 'continuity_gate') {
         drive.advance('canon_proposal');
@@ -522,7 +522,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       }
     }
 
-    // 工单03 步 8 步锚（汇聚点）：新建提案与崩溃恢复续跑（record 已存在）两条路径
+    // 深化 03 步 8 步锚（汇聚点）：新建提案与崩溃恢复续跑（record 已存在）两条路径
     // 都在此落窗口内的提案配对头。
     // W2-3/F-03：提案续接分支没有提取缝可借位取锁——进入写回段前同样必须持锁。
     // 此前该分支完全绕过跨进程书锁，外部进程持锁期间仍可 200 并提交（审查负样本 W2）。
@@ -541,7 +541,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
     // rejected 排除在外。ProposalPort 在仍有未决条目时拒读（上方已拦）。
     const appends = confirmedAppendsForCommit(root, record.proposalId);
 
-    // 写前门禁：续接路径的载荷可能经作者 editAccept 改动，写正典前必须重过核检
+    // 写前门：续接路径的载荷可能经作者 editAccept 改动，写正典前必须重过核检
     // （Gate 是确定性纯核检，幂等重算；此处不通过则提案保持未收口，正典零写入）。
     const confirmedGate = runContinuityGate({ bookRoot: root, chapterIndex, delta: appends, prose });
     if (confirmedGate.verdict === 'hard_conflict') {
@@ -554,7 +554,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
     }
 
     const hasAppends = Object.keys(appends).length > 0;
-    // 工单03 步 8→9 步进：先步进 commit 再动盘——崩溃窗口不留「盘已提交、
+    // 深化 03 步 8→9 步进：先步进 commit 再动盘——崩溃窗口不留「盘已提交、
     // 光标未步进」的不可续跑态（光标停在 commit 的窗口恢复后直接 markCommitted）。
     if (drive !== null && driveEngaged && drive.currentStep === 'canon_proposal') {
       drive.advance('commit');

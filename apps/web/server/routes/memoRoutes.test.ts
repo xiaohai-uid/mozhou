@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 备忘录路由集成测试（OpenWrite 对标切片 · 工单 22 · 真实 HTTP + 磁盘回读）：
+ * 备忘录路由集成测试（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md · 真实 HTTP + 磁盘回读）：
  * - create → list → update → delete 全链路（本地模式回退主体 local_user）；
  * - 校验失败 400 / 便签缺失 404 / 超上限 409（MEMO_LIMIT_EXCEEDED）；
  * - 损坏文件 → 500 MEMO_PERSIST_FAILED（不静默丢数据）；
@@ -58,7 +58,7 @@ afterEach(() => {
   root = ''
 })
 
-describe('POST /api/memo（备忘录 · 工单 22）', () => {
+describe('POST /api/memo（备忘录 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）', () => {
   it('create → list → update → delete 全链路（本地回退主体 local_user）', async () => {
     root = mkdtempSync(join(tmpdir(), 'mozhou-memo-'))
     defaultMemoStore.setDataRoot(root)

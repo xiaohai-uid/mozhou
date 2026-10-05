@@ -1,5 +1,5 @@
 /**
- * 实体卡目录层 CRUD（工单 #16 / T2；冻结语义见 entity-directory-spec）：
+ * 实体卡目录层 CRUD（议题 #16 / T2；冻结语义见 entity-directory-spec）：
  *
  *   - canon 文件真源：设定/<五目>/<slug>.md，frontmatter 即目录卡 Schema（§3）；
  *     文件名只是皮——文件名取 ref 的 slug 段，重命名/移动不断链（§4.5）。

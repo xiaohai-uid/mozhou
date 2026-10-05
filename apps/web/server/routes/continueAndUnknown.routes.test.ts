@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * W4-2c-3 HTTP 路由测试：半稿采纳、续写成本估算与 outcome_unknown 显式重试门禁。
+ * W4-2c-3 HTTP 路由测试：半稿采纳、续写成本估算与 outcome_unknown 显式重试门。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -81,7 +81,7 @@ function makeBook(): string {
   return root
 }
 
-describe('W4-2c-3 路由验收：半稿采纳、续写成本估算与 outcome_unknown 重试门禁', () => {
+describe('W4-2c-3 路由验收：半稿采纳、续写成本估算与 outcome_unknown 重试门', () => {
   it('POST /api/draft.accept：未确认半稿返回 409；显式确认 confirmPartial=true 返回 200', async () => {
     const base = await listen()
     const root = makeBook()

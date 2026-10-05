@@ -44,7 +44,7 @@ function newBook(): LocalDataPlane {
 
 const T0 = '2026-08-24T00:00:00.000Z'
 
-/** 合法 TemporalFact 行（T4 语义门禁起，增量必须是冻结 Schema 的完整形状）。 */
+/** 合法 TemporalFact 行（T4 语义门起，增量必须是冻结 Schema 的完整形状）。 */
 function factRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: newFactId(),
@@ -458,7 +458,7 @@ describe('S3 写前校验与相位守卫', () => {
     }
   })
 
-  it('工单05：expectedRevision 与盘上 revision 失配 ⇒ ProseRevisionConflictError，写盘一步不进', () => {
+  it('深化 05：expectedRevision 与盘上 revision 失配 ⇒ ProseRevisionConflictError，写盘一步不进', () => {
     const plane = newBook()
     try {
       plane.createChapterDraft({ chapterIndex: 1, title: '风起' })

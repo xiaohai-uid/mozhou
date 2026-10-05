@@ -1,5 +1,5 @@
 /**
- * W1 恢复重入安全（REC-01…REC-04）：pending-commit 恢复的收敛性、终态门禁与原子写清理。
+ * W1 恢复重入安全（REC-01…REC-04）：pending-commit 恢复的收敛性、终态门与原子写清理。
  *
  * 与 chapter.test.ts 同构的隔离夹具（tmpdir 建书 + LocalDataPlane.open），
  * 不读写真实书稿与 mozhou_rt。刻意不 mock 模块内部：
@@ -71,7 +71,7 @@ function newBook(): LocalDataPlane {
   return plane
 }
 
-/** 合法 TemporalFact 行（T4 语义门禁要求冻结 Schema 的完整形状）。 */
+/** 合法 TemporalFact 行（T4 语义门要求冻结 Schema 的完整形状）。 */
 function factRow(): Record<string, unknown> {
   return {
     id: newFactId(),

@@ -269,7 +269,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
   }
 
   // 采纳全程在同一次借用内完成：读相位 → 写 intent → 落正文 → 落 done intent。
-  // 中途任何抛出都经 seam 的 catch 归还句柄（工单 08）——此前靠手写 finally。
+  // 中途任何抛出都经 seam 的 catch 归还句柄（深化 08）——此前靠手写 finally。
   return withBook(bookRoot, (plane) => {
     // F-01（W3 操作幂等）：操作身份冲突检查必须前置到**任何盘面副作用之前**。
     // 此前只依赖落账末端的 writeOperationRecordIfAbsent——同 operationId 换候选时，

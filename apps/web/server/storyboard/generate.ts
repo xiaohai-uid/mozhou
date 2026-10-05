@@ -63,7 +63,7 @@ const defaultStoryboardTarget = (env: NodeJS.ProcessEnv): Promise<GenerationTarg
 
 /** 依赖注入（仅测试用；生产走真实传输）。 */
 export interface GenerateDeps {
-  /** 工单06 统一解析缝：注入方携带自己的 principal（缺省无主体解析）。 */
+  /** 深化 06 统一解析缝：注入方携带自己的 principal（缺省无主体解析）。 */
   readonly resolveTarget?: (env: NodeJS.ProcessEnv) => GenerationTargetResolution | Promise<GenerationTargetResolution>
   readonly streamChat?: typeof streamOpenAiChat
   readonly env?: NodeJS.ProcessEnv
@@ -117,7 +117,7 @@ export async function generateStoryboardCandidate(
   deps: GenerateDeps = {},
 ): Promise<StoryboardCandidate> {
   return withBookLock(root, async () => {
-    // 工单06：端点解析走统一缝（注册表 → BYOK → 带原因 Unavailable），Unavailable 的
+    // 深化 06：端点解析走统一缝（注册表 → BYOK → 带原因 Unavailable），Unavailable 的
     // reason/detail 透传给 ProviderUnavailableError，路由 503 如实呈现病因。
     const resolveTarget = deps.resolveTarget ?? defaultStoryboardTarget
     const streamChat = deps.streamChat ?? streamOpenAiChat

@@ -152,7 +152,7 @@ describe('验收① 自动化入口穷举保护断言', () => {
     expect(after.size).toBeGreaterThan(before.size)
   })
 
-  it('commitChapter 拒绝 ai 来源取代保护位事实行——门禁在动第一字节前抛出，零盘上副作用', () => {
+  it('commitChapter 拒绝 ai 来源取代保护位事实行——门在动第一字节前抛出，零盘上副作用', () => {
     const plane = newBook()
     plane.createChapterDraft({ chapterIndex: 1, title: '一' })
     const protectedFactId = newFactId()
@@ -176,7 +176,7 @@ describe('验收① 自动化入口穷举保护断言', () => {
       }),
     ).toThrow(ProtectedContentViolationError)
 
-    // 宁败不脏：门禁先于 pending-commit 日志，全部 canon 字节原样
+    // 宁败不脏：门先于 pending-commit 日志，全部 canon 字节原样
     expectSameBytes(before, canonBytes(bookRoot))
     expect(existsSync(join(bookRoot, '.mozhou/pending-commit.json'))).toBe(false)
   })

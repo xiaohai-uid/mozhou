@@ -98,7 +98,7 @@ interface ResolvedDeps {
 }
 
 /**
- * 缺省适配器装配（工单06 收敛）：走统一解析缝 `resolveGenerationTarget`——
+ * 缺省适配器装配（深化 06 收敛）：走统一解析缝 `resolveGenerationTarget`——
  *   - available ⇒ 端点适配器（source 与草稿同一条解析：注册表 → BYOK）；
  *   - Unavailable ⇒ 原样透传（带 reason/detail），调用方按 L0 显式跳过收口。
  *
@@ -113,7 +113,7 @@ interface ResolvedDeps {
  * 曾经的写法是无条件 resolveChatEndpoint(process.env)（不传 userId），在 hosted 下
  * 落到共享/本地那一档配置：用户的落定语义分析会用别人的 Key 去调 LLM。这是静默的
  * 跨用户串号，而且没有任何一行日志会提示它。4423db4 在本调用点打了 hosted 闸补丁；
- * 工单06 把该闸收进解析 module 本体（hosted_no_principal），任何调用方不再各自记得它。
+ * 深化 06 把该闸收进解析 module 本体（hosted_no_principal），任何调用方不再各自记得它。
  *
  * 要真正支持 hosted 旁路，得先把 reconciliation runtime 按用户拆开，那是重设计，不在本次范围。
  */
@@ -141,7 +141,7 @@ export async function runSettledSemanticAnalysis(request: SettledSemanticRequest
   const deps = request.deps ?? (resolved?.available === true ? resolved.deps : null)
   const provider = resolved?.available === true ? resolved.provider : 'byok'
   if (deps === null) {
-    // 工单06：跳过原因直接取统一解析的 reason——hosted_no_principal（凭据隔离拒答）与
+    // 深化 06：跳过原因直接取统一解析的 reason——hosted_no_principal（凭据隔离拒答）与
     // provider_unavailable（真没配/配了不可用）是两回事，处置完全不同，不得互相掩盖。
     const unavailable = resolved !== null && !resolved.available ? resolved : undefined
     const hosted = unavailable?.reason === 'hosted_no_principal'

@@ -1,5 +1,5 @@
 /**
- * 备忘录（MemoView）视图（OpenWrite 对标切片 · 工单 22）：
+ * 备忘录（MemoView）视图（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：
  * - 与书无关的作者便签：灵感、大纲碎片、待办备忘；跨作品常驻。
  * - 数据面（/api/memo 中间件直出，本地持久化）：
  *   POST {action:'list'} → MemoListResponse；create/update/delete → MemoMutationResponse。

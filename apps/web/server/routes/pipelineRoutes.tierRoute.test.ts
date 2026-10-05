@@ -18,7 +18,7 @@
  *     「能不能真的生成」同源（注册表可解析 ⇒ true；密钥缺失/覆盖层缺失 ⇒ false）；
  *   - 叶子声明 model ⇒ 上游收到该 model，且留痕日志出现；
  *   - providerId 未登记 ⇒ error 帧含码与键路径，上游零请求（绝不回落 BYOK 端点）；
- *   - baseURL 未过 SSRF 门禁（环回且未开逃生位）⇒ error 帧，上游零请求；
+ *   - baseURL 未过 SSRF 门（环回且未开逃生位）⇒ error 帧，上游零请求；
  *   - apiKeyEnv 指向的环境变量缺失 ⇒ error 帧含变量名，上游零请求；
  *   - 多叶子未指定 tier ⇒ 流以 error 帧收口、消息含键路径、候选与补救操作位，上游零请求；
  *   - 叶子声明 api_key_ref ⇒ 显式拒绝（密钥只来自注册表 apiKeyEnv），上游零请求；
@@ -181,7 +181,7 @@ function armRealProvider(upstream: Upstream): void {
   process.env['MOZHOU_API_KEY'] = 'sk-tier-route-test'
   process.env['MOZHOU_API_BASE'] = upstream.baseUrl
   process.env['MOZHOU_MODEL'] = BYOK_MODEL
-  // SSRF 门禁的既有显式逃生位（部署者授权本机私有 LLM）；仅本测试内使用。
+  // SSRF 门的既有显式逃生位（部署者授权本机私有 LLM）；仅本测试内使用。
   process.env[PRIVATE_NETWORK_ENV] = '1'
   process.env[TIER_KEY_ENV] = TIER_KEY_VALUE
   delete process.env[TIER_NAME_ENV]
@@ -376,7 +376,7 @@ describe('分级模型路由 · 注册表 fail-fast（绝不回落 BYOK 端点�
   it('注册表 baseURL 是环回地址且未开逃生位：error 帧含 SSRF 拒绝与键路径，上游零请求', async () => {
     const upstream = await startUpstream()
     armRealProvider(upstream)
-    // 关掉部署者逃生位 ⇒ 环回端点必须被 SSRF 门禁拒绝
+    // 关掉部署者逃生位 ⇒ 环回端点必须被 SSRF 门拒绝
     delete process.env[PRIVATE_NETWORK_ENV]
     process.env[TIER_CONFIG_ENV] = writeConfig(
       'private.yaml',

@@ -38,7 +38,7 @@ export const CAPABILITY_DETAILS: Record<string, CapabilityDetail> = {
     contract: 'POST /api/novel-breakdown：带 allowHeuristic:true 返回本地启发式结果（origin=local-heuristic）；不带则 fail-closed 501',
     landing: 'nav 05 → NovelBreakdownView（启发式结果，界面标注为非 LLM）',
   },
-  'story-brain': { requirement: ['已建书（/api/book.state · /api/story-brain.entities · /api/story-brain.facts）'], contract: '只读面板+过滤/刷新；POV/秘密门禁不可被视觉绕过（ADR-0026）', landing: 'InspectorTower tab / nav SB → StoryBrainPanel' },
+  'story-brain': { requirement: ['已建书（/api/book.state · /api/story-brain.entities · /api/story-brain.facts）'], contract: '只读面板+过滤/刷新；POV/秘密门不可被视觉绕过（ADR-0026）', landing: 'InspectorTower tab / nav SB → StoryBrainPanel' },
   'context-receipt': { requirement: ['完成一次装配（compile）后产生 Receipt'], contract: '只读+选择+回工作台；hashMatch 为服务端 sha256 复算真值（INV-R6）', landing: 'InspectorTower tab / nav CR → ReceiptPanel' },
   'change-matrix': { requirement: ['上游变更经 Traversal 传播后形成矩阵'], contract: 'rerun POST /api/change-matrix.rerun 仅 stale 行可用（幂等）；revisionBriefs 已在契约', landing: 'InspectorTower tab / nav CM → ChangeMatrixPanel' },
   'quality-gate': {

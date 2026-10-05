@@ -322,7 +322,7 @@ describe('POST /api/chapter.commit · 五族增量提取接线（步 6 Final Ext
         body: '第一章正文。',
         expectedRevision: null,
       })
-      // 工单05 Contract Delta：提交携带作者所读 revision。
+      // 深化 05 Contract Delta：提交携带作者所读 revision。
       const { status, data } = await post(base, '/api/chapter.commit', {
         root,
         chapterIndex: 1,
@@ -338,7 +338,7 @@ describe('POST /api/chapter.commit · 五族增量提取接线（步 6 Final Ext
         reason?: string
       }
       expect(delta.extractor).toBe('none')
-      // 工单06：失败原因改由统一解析的 reason+detail 携带（不再是笼统一句「未配置可用
+      // 深化 06：失败原因改由统一解析的 reason+detail 携带（不再是笼统一句「未配置可用
       // provider」）。可观察行为不变——提交成功、extractor=none、追踪层零行；变的只是
       // 病因文本更精确（并区分「没配」与「配了不可用」）。
       expect(delta.reason).toContain('no_provider_configured')
@@ -374,7 +374,7 @@ describe('POST /api/chapter.commit · 步 8 Canon Proposal（无候选可路由�
         body: '第一章正文。',
         expectedRevision: null,
       })
-      // 工单05 Contract Delta：提交携带作者所读 revision。
+      // 深化 05 Contract Delta：提交携带作者所读 revision。
       const { status, data } = await post(base, '/api/chapter.commit', {
         root,
         chapterIndex: 1,

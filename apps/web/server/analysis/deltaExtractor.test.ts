@@ -46,7 +46,7 @@ function fakeStream(text: string): NonNullable<DeltaExtractorDeps['streamChat']>
 }
 
 /**
- * 工单06：deps 的端点缝由 `resolveEndpoint`（裸端点/null）换成统一解析缝
+ * 深化 06：deps 的端点缝由 `resolveEndpoint`（裸端点/null）换成统一解析缝
  * `resolveTarget`（GenerationTargetResolution）。这里注入的是**成功的解析结果**，
  * 传输仍由 streamChat 桩接管——解析层与传输层各自独立可断言。
  */

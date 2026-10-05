@@ -8,7 +8,7 @@
  *   - tracking_lines：追踪五族 jsonl 的原始行镜像（append-only）
  *   - meta：投影级簿记
  *
- * T2 表面（工单 #16；entity-directory-spec D8——目录卡入投影）：
+ * T2 表面（议题 #16；entity-directory-spec D8——目录卡入投影）：
  *   - entity_cards / entity_alias_rules / entity_excluded_phrases：
  *     设定/<五目>/ 目录卡的结构化行。tags 刻意不入投影（D4 永不入包）。
  *

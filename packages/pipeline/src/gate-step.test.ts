@@ -89,7 +89,7 @@ function greenBatch(): CandidateDeltaBatch {
 function newBook(chapterIndexes: number[] = [2]): { root: string; plane: LocalDataPlane } {
   const dir = mkdtempSync(join(tmpdir(), 'mozhou-t18-gate-'));
   roots.push(dir);
-  createBook({ dir, title: '门禁之书' });
+  createBook({ dir, title: '门之书' });
   const plane = LocalDataPlane.open(dir);
   for (const index of chapterIndexes) {
     plane.createChapterDraft({ chapterIndex: index, title: '第' + index + '章' });
@@ -350,10 +350,10 @@ describe('ADR-0026 认知层级与秘密授权', () => {
   });
 
   /* -------------------------------------------------------------------------
-   * P1-1（因果合约门禁）：违约合法，超期未处置判定为硬冲突
+   * P1-1（因果合约门）：违约合法，超期未处置判定为硬冲突
    * ------------------------------------------------------------------------- */
 
-  it('P1-1 因果合约：超期无处置阻断门禁，已处置违约与履约合法放行', () => {
+  it('P1-1 因果合约：超期无处置阻断门，已处置违约与履约合法放行', () => {
     const { root } = newBook();
     const contract: CausalContract = {
       id: 'contract_01J_tian_dao' as ContractId,

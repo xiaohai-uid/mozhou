@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 作品归档备份与恢复重建测试 (T10 · C5 门禁验证)。
+ * 作品归档备份与恢复重建测试 (T10 · C5 门验证)。
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -69,7 +69,7 @@ describe('Book Backup & Restore (T10 / C5)', () => {
     restoredPlane.close()
   })
 
-  it('C5 门禁：拦截路径穿越 (Path Traversal) 归档包', () => {
+  it('C5 门：拦截路径穿越 (Path Traversal) 归档包', () => {
     const dstDir = mkdtempSync(join(tmpdir(), 'mozhou-backup-sec-'))
     tempDirs.push(dstDir)
 
@@ -83,7 +83,7 @@ describe('Book Backup & Restore (T10 / C5)', () => {
     }).toThrow(/SECURITY_ERROR/)
   })
 
-  it('C5 门禁：拦截单文件超限归档包', () => {
+  it('C5 门：拦截单文件超限归档包', () => {
     const dstDir = mkdtempSync(join(tmpdir(), 'mozhou-backup-limit-'))
     tempDirs.push(dstDir)
 

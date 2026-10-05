@@ -13,14 +13,14 @@
  *     整份 suite 失败、vitest 退出码非零。绝不退化成 skip。
  *  4. 启用后上游不可达 / 鉴权失败 ⇒ 被测链路自身抛错或断言失败 ⇒ 同样非零。
  *  5. MOZHOU_ALLOW_PRIVATE_LLM **本文件绝不设置**：是否授权环回端点由部署者决定，
- *     测试不替部署者放宽 SSRF 门禁。
+ *     测试不替部署者放宽 SSRF 门。
  *
  * 凭据处置：key 只在本测试进程内注入 process.env（providerSettings.resolveEnvEndpoint
  * 只读环境变量），afterAll 逐项恢复原值；全程不写盘、不打印、不落任何产物。
  *
- * SSRF 门禁：下方第一个用例是**确定性守卫**，不依赖任何凭据、不发网络请求，
+ * SSRF 门：下方第一个用例是**确定性守卫**，不依赖任何凭据、不发网络请求，
  * 因此**不受门控开关影响，任何时候都跑**——它反向断言未授权时环回端点被拒，
- * 证明本切片没有借道放宽门禁。
+ * 证明本切片没有借道放宽门。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -123,8 +123,8 @@ function assertRealNames(names: unknown, maxCount: number): Array<{ name: string
 
 describe('P1 真实模型 · /api/naming AI 起名', () => {
   // 确定性守卫：不依赖凭据、不发网络请求，任何时候都执行。
-  it('SSRF 门禁未被本切片放宽：未授权时环回端点被拒', () => {
-    expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, false)).toThrowError(/SSRF 门禁/)
+  it('SSRF 门未被本切片放宽：未授权时环回端点被拒', () => {
+    expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, false)).toThrowError(/SSRF 门/)
     expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, true)).not.toThrow()
   })
 

@@ -69,7 +69,7 @@ export interface CreateLocalEmbeddingProviderOptions {
 /**
  * 安装环境守卫（票面 AC）：onnxruntime-node 的 postinstall 会强拉 GPU 二进制，
  * 无 CUDA 工具链时解压失败并整体回滚安装（T9 R1）。运行期置默认值兜底；
- * 安装期硬门禁见 scripts/check-install-env.mjs 与 docs/install.md。
+ * 安装期硬门见 scripts/check-install-env.mjs 与 docs/install.md。
  */
 export function ensureCudaSkipEnv(): void {
   process.env.ONNXRUNTIME_NODE_INSTALL_CUDA ??= 'skip'

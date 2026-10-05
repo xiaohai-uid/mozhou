@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * 工单 08：迁移到句柄 seam 之后的**生产路径回归**。
+ * 深化 08：迁移到句柄 seam 之后的**生产路径回归**。
  *
  * packages/data-plane/src/with-plane.test.ts 判的是 seam 自身的语义；本文件判的是
  * 真实调用点在换掉 `const plane = open(); try {} finally { close() }` 之后**行为不变**。

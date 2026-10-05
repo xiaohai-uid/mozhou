@@ -1,10 +1,10 @@
 /**
- * 叙事状态流读取与提交期语义门禁（实现票 #19 / T4）。
+ * 叙事状态流读取与提交期语义门（实现票 #19 / T4）。
  *
  * 真源纪律：读路径直读追踪 jsonl（投影可弃 ⇒ 语义层不依赖 SQLite）。
  * - readNarrativeSnapshot：四族行逐行校验 + 增量折叠成活跃视图；
  *   坏行宁败不脏（TrackingRowError 指明流与字段），重建扫描不受影响；
- * - assertCommitAppendsLegal：commitChapter 的写前语义门禁——行形状、
+ * - assertCommitAppendsLegal：commitChapter 的写前语义门——行形状、
  *   认知/时间线对事实的引用完整性、M2 时间线序数单调；任何违例在
  *   pending-commit 日志写下第一字节之前抛出，零盘上副作用；
  * - queryActiveFacts：结构化查询芯的 IO 接线（POV/秘密零泄漏在 kernel 纯函数域）。
@@ -86,7 +86,7 @@ export function readNarrativeSnapshot(root: string): NarrativeStateSnapshot {
 }
 
 /**
- * 提交期语义门禁（T4；T6 增补保护位半边）：在相位机动第一字节之前拦截非法增量。
+ * 提交期语义门（T4；T6 增补保护位半边）：在相位机动第一字节之前拦截非法增量。
  * - 行形状：四族各自冻结 Schema 校验（含 secret.* ⇒ riskClass high 同现律，Q7）；
  * - 保护位：protectedUserContent 事实行不可被 ai/external 来源同 id 取代
  *   （T6 / I1，assertNoProtectedSupersession——违例零盘上副作用）；
@@ -125,7 +125,7 @@ export function assertCommitAppendsLegal(
   assertTimelineBatchOrdered(batch.timelineEvent, liveMaxTimelineOrder(snapshot))
 }
 
-/** 结构化查询芯（#7 冻结形态）的 IO 接线：直读真源 → 折叠 → POV 门禁过滤。 */
+/** 结构化查询芯（#7 冻结形态）的 IO 接线：直读真源 → 折叠 → POV 门过滤。 */
 export function queryActiveFacts(root: string, request: QueryActiveFactsRequest): TemporalFact[] {
   const snapshot = readNarrativeSnapshot(root)
   return filterVisibleFacts(snapshot, request)

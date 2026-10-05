@@ -1,5 +1,5 @@
 /**
- * 备忘录（MemoView）组件测试（OpenWrite 对标切片 · 工单 22）：
+ * 备忘录（MemoView）组件测试（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：
  * - 契约快照：输入形状 = server/api 导出类型（MemoListResponse / MemoMutationResponse），
  *   包类型漂移即 typecheck + 快照双报警；
  * - 便签列表渲染、空态；

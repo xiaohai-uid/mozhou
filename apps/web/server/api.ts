@@ -121,7 +121,7 @@ export interface CapabilitiesResponse {
    * providerAvailable=false 时的病因分类（可用时为 null）。
    *
    * 为什么要有（P2「本机模型接入指引误导」）：`providerAvailable` 是布尔量，
-   * 「真没配 provider」与「本机端点被 SSRF 门禁按设计拒绝」在它眼里同形，但两者的
+   * 「真没配 provider」与「本机端点被 SSRF 门按设计拒绝」在它眼里同形，但两者的
    * 下一步相反。UI 据此分支才能给出**可行**的指引，而不是一律指向 BYOK 设置页。
    * 取值与 server/llm/generationTarget.ts 的 GenerationUnavailableReason 同源。
    * 可选字段：只读 providerAvailable 的老消费方行为不变。

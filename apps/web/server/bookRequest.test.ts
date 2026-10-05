@@ -1,12 +1,12 @@
 // @vitest-environment node
 /**
- * 书级请求解码（工单07）· 表驱动回归。
+ * 书级请求解码（深化 07）· 表驱动回归。
  *
  * 为什么这些用例值得单独钉住：chapterIndex 的冻结规则（≥ 1 的整数）此前在 16 个调用点
  * 各写一份，校验条件有五种不同写法。结果是「0 能穿过一部分端点、小数能穿过另一部分」。
  * 本文件把不变式钉在**一处**，并逐条证明旧代码里真实存在的洞已经关上。
  *
- * 覆盖（对应工单验收：整数、范围、缺字段、授权 root、principal、无 session）：
+ * 覆盖（对应深化 07 验收：整数、范围、缺字段、授权 root、principal、无 session）：
  *   1. 合法：1 / 大数 / 字符串 root 的规范化结果（绝对路径）。
  *   2. 范围：0、-1、小数、NaN、Infinity、字符串 '3'、布尔、数组、对象 ⇒ 全部 400。
  *   3. 缺字段：root 缺失、chapterIndex 缺失/undefined/null。
@@ -256,7 +256,7 @@ describe('7. optional 章号（/api/draft.accept 语义）', () => {
 })
 
 describe('8. 「无开放生产会话」的契约错误：文案逐字保留，另带 code', () => {
-  it('文案仍是旧客户端匹配的英文，code 另给（工单07 点名的三处重复）', () => {
+  it('文案仍是旧客户端匹配的英文，code 另给（深化 07 点名的三处重复）', () => {
     const contract = noOpenProductionSessionError(7)
     expect(contract.status).toBe(409)
     expect(contract.code).toBe(NO_OPEN_PRODUCTION_SESSION)

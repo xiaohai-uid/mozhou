@@ -809,7 +809,7 @@ export interface CommitChapterRequest {
   /** 提交摘要：进事件行，供书架/时间线速览。 */
   readonly summary: string
   /**
-   * 作者实际读取的章版本（工单05 Contract Delta，与 saveProseDraft.expectedRevision
+   * 作者实际读取的章版本（深化 05 Contract Delta，与 saveProseDraft.expectedRevision
    * 同构照搬）。携带时必须等于盘上 revision——不匹配即抛 ProseRevisionConflictError，
    * 写盘一步不进（正文/正典/账本零写入）。缺省（undefined）= 不启用该守卫：
    * 模块内部既有调用方不受影响；HTTP 契约面由路由强制在场（缺失 400）。
@@ -961,7 +961,7 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
   if (before.phase !== 'draft') {
     throw new ChapterPhaseError(request.chapterIndex, 'chapter is committed — reopen it before re-committing')
   }
-  // 工单05 Contract Delta：作者所读 revision 与盘不符 ⇒ 拒绝（与 saveProseDraft 同码
+  // 深化 05 Contract Delta：作者所读 revision 与盘不符 ⇒ 拒绝（与 saveProseDraft 同码
   // ProseRevisionConflictError、同顺序——相位守卫在前，revision 比对在后）。编排层在
   // 提取缝之前已做同判，本守卫兜住提取 await 期间的并发保存窗口（TOCTOU）：任何写盘
   // 发生在 journal 落盘之后，此处先行比对即正文/正典/账本零写入。
@@ -975,7 +975,7 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
   })
   const streamTargets = TRACKING_STREAMS.filter((stream) => touchedKinds.includes(stream.kind))
 
-  // T4 语义门禁：行校验 + 引用完整性 + M2 时间线单调——任何违例在写前
+  // T4 语义门：行校验 + 引用完整性 + M2 时间线单调——任何违例在写前
   // 校验乃至 pending-commit 日志之前抛出，零盘上副作用（宁败不脏）。
   if (touchedKinds.length > 0) {
     assertCommitAppendsLegal(ctx.root, request.appends ?? {})

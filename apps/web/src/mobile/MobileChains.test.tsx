@@ -16,7 +16,7 @@ afterEach(() => {
 
 const BOOK = { root: 'C:\\tmp\\test-book', bookId: 'bk_test', title: '假神真显灵' }
 
-/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门禁），拼接构造保持确定性。 */
+/** 测试夹具假凭据：凭据位不写纯字面量（Mimosa 扫描门），拼接构造保持确定性。 */
 const FAKE_MOBILE_KEY = ['user', 'mobile', 'key'].join('-')
 
 describe('MobileChaptersDrawer（链 1 · 章节切换）', () => {

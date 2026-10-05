@@ -54,7 +54,7 @@ export async function crawlWithCrawl4ai(
   targetPageUrl: string,
   waitFor?: string | { type: 'css' | 'js'; query: string; timeout?: number },
 ): Promise<Crawl4aiOutcome> {
-  // 严格安全门禁：仅允许经过安全检查的公网 HTTP/HTTPS URL
+  // 严格安全门：仅允许经过安全检查的公网 HTTP/HTTPS URL
   if (!isSafePublicUrl(targetPageUrl)) {
     return {
       ok: false,
@@ -123,7 +123,7 @@ export async function crawlWithCrawl4ai(
 export async function smartExtractContent(
   targetPageUrl: string,
 ): Promise<{ ok: boolean; title: string; content: string; channel: 'crawl4ai' | 'http_fallback'; error?: string }> {
-  // 安全门禁：拒绝私网、环回与非法协议
+  // 安全门：拒绝私网、环回与非法协议
   if (!isSafePublicUrl(targetPageUrl)) {
     return {
       ok: false,

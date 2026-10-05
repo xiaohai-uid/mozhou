@@ -273,7 +273,7 @@ describe('模型通道与端点设置 (T07)', () => {
 /**
  * 商业化阻断 2：产品内配置的密钥必须真的接上生成链路。
  *
- * 缺陷：ProviderSettingsManager（加密落盘 + 掩码 + SSRF 门禁）与
+ * 缺陷：ProviderSettingsManager（加密落盘 + 掩码 + SSRF 门）与
  * resolveChatEndpoint(env, userId?) 的接线都已就位，但生成路径只传
  * process.env、从不传 userId（pipelineRoutes.ts 的 makeStreamEngine），
  * 可用性判据 hasDraftProvider 也只读环境变量。

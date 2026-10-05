@@ -74,15 +74,15 @@ function isPrivateOrReservedAddress(address: string): boolean {
 }
 
 /**
- * SSRF 门禁拒绝的**结构化标记**（P2 缺陷「本机模型接入指引误导」）。
+ * SSRF 门拒绝的**结构化标记**（P2 缺陷「本机模型接入指引误导」）。
  *
- * 为什么需要：门禁的失败此前只有一个 Error，其 message 是中文散文。上层
- * （generationTarget → 能力探针 → UI）要区分「本机模型被门禁拦下，部署者显式
+ * 为什么需要：门的失败此前只有一个 Error，其 message 是中文散文。上层
+ * （generationTarget → 能力探针 → UI）要区分「本机模型被门拦下，部署者显式
  * 放行即可」与「配置本身非法」，只能去正则匹配 message 文本——文案一改就断。
  * 这里给拒绝**加一个字段**而不是改一个字：message 逐字不变（既有测试与日志继续
- * 按 `SSRF 门禁` 断言），上层按 `code` 分支，不依赖措辞。
+ * 按 `SSRF 门` 断言），上层按 `code` 分支，不依赖措辞。
  *
- * 门禁本身**不因此放宽**：`code` 只是给既有的拒绝附加可编程的分类，不改变任何
+ * 门本身**不因此放宽**：`code` 只是给既有的拒绝附加可编程的分类，不改变任何
  * 判定条件。`targetHost` 如实带上被拒主机，便于 UI 提示具体是哪个端点被拦。
  */
 export const SSRF_BLOCKED_CODE = 'SSRF_BLOCKED' as const
@@ -99,7 +99,7 @@ export class SsrfBlockedError extends Error {
   }
 }
 
-/** 门禁拒绝的统一出口：文案与抛出点解耦，但 message 内容与抛出点自写时逐字相同。 */
+/** 门拒绝的统一出口：文案与抛出点解耦，但 message 内容与抛出点自写时逐字相同。 */
 function rejectSsrf(message: string, target: URL): never {
   throw new SsrfBlockedError(message, normalizeAddress(target.hostname))
 }
@@ -107,24 +107,24 @@ function rejectSsrf(message: string, target: URL): never {
 function assertProtocol(target: URL, allowPrivateNetwork: boolean): void {
   if (allowPrivateNetwork) {
     if (target.protocol !== 'https:' && target.protocol !== 'http:') {
-      rejectSsrf(`SSRF 门禁：仅允许 http/https 上游，实际为 ${target.protocol}`, target)
+      rejectSsrf(`SSRF 门：仅允许 http/https 上游，实际为 ${target.protocol}`, target)
     }
     return
   }
   if (target.protocol !== 'https:') {
-    rejectSsrf('SSRF 门禁：公网模型端点必须使用 HTTPS', target)
+    rejectSsrf('SSRF 门：公网模型端点必须使用 HTTPS', target)
   }
 }
 
 /**
- * 出站端点基址的**同步** SSRF 门禁：协议白名单 + 字面 IP / 本机名判定。
+ * 出站端点基址的**同步** SSRF 门：协议白名单 + 字面 IP / 本机名判定。
  * DNS 解析结果那一半由 `assertSafeRemoteTarget` 在真正发请求前补做（发请求前必过）。
  *
  * 复用点（唯一一处端点校验实现，勿另写一套）：
  *   - BYOK 端点：`resolveChatEndpoint`（本文件下方）调用本函数；
  *   - 配置注册表端点：`llm/tierRouting.ts` 的 `resolveTierEndpoint` 调用本函数；
  *   - 真正出站前：`streamOpenAiChat` / `testConnection` 仍调 `assertSafeRemoteTarget` 兜底。
- * 配置来源（文件）不是可信输入，因此必须走同一门禁；`allowPrivateNetwork` 只能由
+ * 配置来源（文件）不是可信输入，因此必须走同一门；`allowPrivateNetwork` 只能由
  * 部署者环境变量（MOZHOU_ALLOW_PRIVATE_LLM）授权，配置文件本身无权设置。
  */
 export function assertSafeEndpointUrl(baseUrl: string, allowPrivateNetwork = false): URL {
@@ -134,10 +134,10 @@ export function assertSafeEndpointUrl(baseUrl: string, allowPrivateNetwork = fal
 
   const hostname = normalizeAddress(target.hostname)
   if (isIP(hostname) !== 0 && isPrivateOrReservedAddress(hostname)) {
-    rejectSsrf(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`, target)
+    rejectSsrf(`SSRF 门：拒绝调用私有/环回/保留地址 ${hostname}`, target)
   }
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    rejectSsrf(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`, target)
+    rejectSsrf(`SSRF 门：拒绝调用本地主机名 ${hostname}`, target)
   }
   return target
 }
@@ -157,22 +157,22 @@ export async function assertSafeRemoteTarget(
   const hostname = normalizeAddress(target.hostname)
   if (isIP(hostname) !== 0) {
     if (isPrivateOrReservedAddress(hostname)) {
-      rejectSsrf(`SSRF 门禁：拒绝调用私有/环回/保留地址 ${hostname}`, target)
+      rejectSsrf(`SSRF 门：拒绝调用私有/环回/保留地址 ${hostname}`, target)
     }
     return
   }
 
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    rejectSsrf(`SSRF 门禁：拒绝调用本地主机名 ${hostname}`, target)
+    rejectSsrf(`SSRF 门：拒绝调用本地主机名 ${hostname}`, target)
   }
 
   const addresses = await lookupAll(hostname)
   if (addresses.length === 0) {
-    rejectSsrf(`SSRF 门禁：DNS 未解析出可验证地址 ${hostname}`, target)
+    rejectSsrf(`SSRF 门：DNS 未解析出可验证地址 ${hostname}`, target)
   }
   const blocked = addresses.find((entry) => isPrivateOrReservedAddress(entry.address))
   if (blocked !== undefined) {
-    rejectSsrf(`SSRF 门禁：${hostname} 解析到私有/环回/保留地址 ${blocked.address}`, target)
+    rejectSsrf(`SSRF 门：${hostname} 解析到私有/环回/保留地址 ${blocked.address}`, target)
   }
 }
 
@@ -273,7 +273,7 @@ export async function* streamOpenAiChat(
         try {
           chunk = JSON.parse(payload) as typeof chunk
         } catch {
-          // 上游 SSE 可能包含心跳/非 JSON 行；忽略单行，不放宽目标地址门禁。
+          // 上游 SSE 可能包含心跳/非 JSON 行；忽略单行，不放宽目标地址门。
           continue
         }
         // 上游可能把错误塞进 HTTP 200 的 SSE 流（限流/内容拦截等）。若不显式抛出，

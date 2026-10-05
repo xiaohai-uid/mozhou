@@ -125,7 +125,7 @@
 | 卡 | 用于 | 材质/密度 | 证据锚 |
 |---|---|---|---|
 | **Narrative Card** | 作品、章节、世界观摘要 | Surface-02 渐变 + 14px radius + hover 2px lift | `.card-narrative` |
-| **Character / Lore Card** | 人物/物品/地点/势力/概念 | Surface-01 + 10px + hover Jade 描边；POV 门禁不动摇 | `.card-character` |
+| **Character / Lore Card** | 人物/物品/地点/势力/概念 | Surface-01 + 10px + hover Jade 描边；POV 门不动摇 | `.card-character` |
 | **System Card** | Quality/Receipt/Task/Cloud 状态 | Ink Deep + 8px + dense | `.card-system` |
 | **Capability Card** | Skill/capability/provider | Surface-03 渐变 + 14px + hover 3px lift；selected=Metal Rim 金脊局部 | `.card-capability` |
 | **Evidence Row** | hash/revision/event/traversal/receipt entry | Mono 单行 + hairline 分隔，无边框卡 | `.row-evidence` |

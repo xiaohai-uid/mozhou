@@ -4,7 +4,7 @@
 > **代码图谱**：GitNexus repo `mozhou` @ `C:\zcode\novel-ai`，索引 commit = `b2a0930` = 本地 HEAD（934 files / 41,588 nodes / 84,715 edges / 509 communities / 496 processes）。图谱交叉查询确认主线 UI 注册表为 `apps/web/src/shell/views.ts`，图谱中其余 UI 命中均属 `app/` 冻结遗留面（ADR-0025 出主线）。
 > **未提交工作处理**：工作区存在 15 个未提交文件（`server/draftContext.ts`、`routes/{pipeline,storyBrain,works}Routes.ts`、`src/api.test.ts`、4 个 package 文件、2 个新 runtime 文件）。本矩阵按用户指令以 **HEAD 为最终事实源**；已逐一核对未提交 diff：全部为"文件系统直读 → LocalDataPlane 方法"的内部实现替换，路由路径、响应契约与诚实不可用行为不变。设计与实现均不需要为其分支。
 > **证据纪律**：每行均带 `file:line` 证据。探查执行日 2026-09-12。
-> **本文件是视觉设计的前置门禁**（主规格 §33 步骤 4；handoff §1）。视觉设计产物见同目录其余文件。
+> **本文件是视觉设计的前置门**（主规格 §33 步骤 4；handoff §1）。视觉设计产物见同目录其余文件。
 
 ---
 
@@ -125,7 +125,7 @@
 | 域 | no/empty | loading | error | blocked | current/stale | committed/verified | 设计落点 |
 |---|---|---|---|---|---|---|---|
 | Quality Gate | 无书 InspectorEmpty；初载 `no_review`（现状误显 stale——DESIGN_DELTA Q1） | 无初载 spinner（点击 Run 后无 busy 显示——DESIGN_DELTA） | role=alert（:132-136） | REFUSED+语义 provider banner | current=false→stale 行（no_review 误触发） | PASS=verified 语义（但 PASS 不自动动作） | 03+05 |
-| Story Brain | entities-empty / 尚无正文章 / 无关联事实 | 仅刷新按钮文案 | 单一 alert | POV/秘密门禁（canon 主角 POV、suspects/believes 仅 presentation） | currentChapterIndex 高亮 | canon=主角 POV 授权通道 | 03+05 |
+| Story Brain | entities-empty / 尚无正文章 / 无关联事实 | 仅刷新按钮文案 | 单一 alert | POV/秘密门（canon 主角 POV、suspects/believes 仅 presentation） | currentChapterIndex 高亮 | canon=主角 POV 授权通道 | 03+05 |
 | Context Receipt | receipts-empty | busy 标签+「读取 …」 | 单一 alert | hash mismatch=显式红（非静默） | resume.sessionOpen/currentStep | hash match=绿；committed 分支 | 03+05 |
 | Change Matrix | matrix-empty | busy 标签 | 单一 alert | — | stale {n} 徽标；rerun 仅 stale 行 | resolved=绿 | 03+05 |
 
@@ -298,7 +298,7 @@ WorkbenchHub:44,95,97；InspectorHub:53；ResourcesHub:42,48,49,51；Inspiration
 
 ## 11. Delta Re-audit（验收修订轮 · 2026-09-12，GitNexus 刷新后）
 
-**背景**：第一轮验收（CONDITIONAL PASS）指出「图谱索引时间停在 2026-09-06，工作树已有新的生产代码修改，HEAD 不能完全代表当前工作树」——P1-1 硬门禁。本节为刷新后的 delta 复核记录。
+**背景**：第一轮验收（CONDITIONAL PASS）指出「图谱索引时间停在 2026-09-06，工作树已有新的生产代码修改，HEAD 不能完全代表当前工作树」——P1-1 硬门。本节为刷新后的 delta 复核记录。
 
 **执行**：
 1. `node .gitnexus/run.cjs analyze` 全量重建（2026-09-12 17:58，27.3s，8,345 nodes / 18,448 edges / 509 clusters / 496 flows，该轮无 `--pdg`；随后已用 `--pdg` 重建恢复与原索引同层的 CFG/PDG 能力，见 §11.2 终轮记录）。

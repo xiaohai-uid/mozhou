@@ -51,7 +51,7 @@ describe('QuotaManager 额度事务、断路器与并发测试 (T15)', () => {
     await quota.reserve('user_1', 'op_concurrent_1', 1)
     await quota.reserve('user_2', 'op_concurrent_2', 1)
 
-    // 第 3 个在途请求被并发门禁拒绝
+    // 第 3 个在途请求被并发门拒绝
     await expect(quota.reserve('user_3', 'op_concurrent_3', 1)).rejects.toThrow(
       /CONCURRENCY_LIMIT_EXCEEDED/,
     )

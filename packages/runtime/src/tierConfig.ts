@@ -35,7 +35,7 @@ export interface ProviderModelEntry {
  * `apiKeyEnv` 是环境变量**名**，密钥本体永不入配置文件（credentials refs 模式）。
  */
 export interface ProviderEntry {
-  /** 出站端点基址；发请求前仍由 web 侧既有 SSRF 门禁复检（配置不是可信来源）。 */
+  /** 出站端点基址；发请求前仍由 web 侧既有 SSRF 门复检（配置不是可信来源）。 */
   readonly baseURL: string;
   /** 密钥所在环境变量名（引用名，不是密钥本体）。 */
   readonly apiKeyEnv: string;

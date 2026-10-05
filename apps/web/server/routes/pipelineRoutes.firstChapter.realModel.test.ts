@@ -16,9 +16,9 @@
  * 凭据处置：key 只在本测试进程内注入 process.env，afterAll 逐项恢复原值；
  * 全程不写盘、不打印、不落任何产物。
  *
- * SSRF 门禁：下方第一个用例是**确定性守卫**（纯 URL 判定，不发请求），
+ * SSRF 门：下方第一个用例是**确定性守卫**（纯 URL 判定，不发请求），
  * 不依赖凭据，任何时候都执行——反向断言未授权时环回端点仍被拒，
- * 以证明本次修复没有借道放宽门禁。
+ * 以证明本次修复没有借道放宽门。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -100,10 +100,10 @@ async function post(path: string, body: Record<string, unknown>) {
 
 describe('P1 真实模型 · 建书后第一次点生成', () => {
   // 确定性守卫：不依赖凭据、不发请求，任何时候都执行。
-  it('SSRF 门禁未被本次修复放宽：未授权时环回端点被拒（且与章脚手架无关）', () => {
-    // 直接打门禁本体，而不是靠生成请求顺带触发——生成请求还要穿 provider 解析，
-    // 一旦别处先拒，断言就测不到门禁本身了。
-    expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, false)).toThrowError(/SSRF 门禁/)
+  it('SSRF 门未被本次修复放宽：未授权时环回端点被拒（且与章脚手架无关）', () => {
+    // 直接打门本体，而不是靠生成请求顺带触发——生成请求还要穿 provider 解析，
+    // 一旦别处先拒，断言就测不到门本身了。
+    expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, false)).toThrowError(/SSRF 门/)
     // 显式授权后才放行（与 openaiStream.ts 的部署者环境变量口径一致）
     expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, true)).not.toThrow()
     // 非 http/https 协议无论是否授权都拒绝

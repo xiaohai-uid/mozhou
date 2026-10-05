@@ -3,7 +3,7 @@
  *
  * 这是 `AnalyzeDeps.evaluate`（packages/flywheel/src/semantic/analyze.ts）在生产端的
  * 唯一实现：把「受影响章引用 + receipt 锚点」发到 BYOK 真实端点，收严格 JSON 判定，
- * 回填 verdict / findings / outputTokens。传输层复用既有 SSRF 门禁流式代理
+ * 回填 verdict / findings / outputTokens。传输层复用既有 SSRF 门流式代理
  * （./openaiStream.js streamOpenAiChat），不新增第二条出网路径。
  *
  * 纪律（与 analyze.ts 头注同源，字面落代码）：
@@ -146,7 +146,7 @@ export interface SemanticEvaluatorOptions {
 
 /**
  * 构造 `AnalyzeDeps.evaluate` 的生产实现。
- * 上游错误、SSRF 门禁拒绝、非 JSON 回复均以抛错收口（analyzeSemantic 负责重试与 refusal）。
+ * 上游错误、SSRF 门拒绝、非 JSON 回复均以抛错收口（analyzeSemantic 负责重试与 refusal）。
  */
 export function createSemanticEvaluator(
   options: SemanticEvaluatorOptions,

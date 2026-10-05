@@ -5,7 +5,7 @@
  *   - task 恒为 {type:'CHAPTER_DRAFTING', chapterIndex}（#8 tier 表受控增补档）；
  *   - Prepare 结果集携带 StaleMarker ⇒ 追加确定性 stale_warning 结构层段：
  *     警告继续、留痕进 Receipt（packet.structural + entries + replayInputs
- *     摘要全链可见）——对账软门禁先例，绝不因此阻塞或改写装配语义；
+ *     摘要全链可见）——对账软门先例，绝不因此阻塞或改写装配语义；
  *   - 其余编译输入（目录卡/快照/模型面）由组合根供给，本模块不重复扫描。
  *
  * Compile 后恢复按 receiptId 续（INV-R1/R2 既有）：指针事件存在即凭证必在盘上，
@@ -74,7 +74,7 @@ export interface CompileStepOutcome {
   readonly packet: ContextPacket;
   readonly receipt: ContextReceipt;
   readonly location: PersistedReceiptLocation;
-  /** 本次编译留痕进 Receipt 的 stale 警告（S2 软门禁；空数组 = 无标记）。 */
+  /** 本次编译留痕进 Receipt 的 stale 警告（S2 软门；空数组 = 无标记）。 */
   readonly staleWarnings: readonly StaleMarker[];
   /** 本次编译真正入包的版本化实体钉版（D06；空清单 = 未消费任何版本化实体）。 */
   readonly dependencyManifest: DependencyManifest;

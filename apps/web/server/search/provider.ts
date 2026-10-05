@@ -89,7 +89,7 @@ export class ApiSearchProvider implements ISearchProvider {
 
     try {
       if (!isSafePublicUrl(this._endpoint)) {
-        throw new Error(`SSRF 门禁：拒绝调用非安全或私有目标 ${this._endpoint}`)
+        throw new Error(`SSRF 门：拒绝调用非安全或私有目标 ${this._endpoint}`)
       }
 
       const controller = new AbortController()

@@ -1,5 +1,5 @@
 /**
- * apps/web/server · 书级请求解码（工单07 ·「同一份请求被就地重写了 16 次」）。
+ * apps/web/server · 书级请求解码（深化 07 ·「同一份请求被就地重写了 16 次」）。
  *
  * 为什么收口：截至本票，`typeof body['chapterIndex'] === 'number' ? … : null` 这条
  * 解析在 pipelineRoutes 9 处 / proseRoutes 5 处 / storyboardRoutes 2 处各写一份，
@@ -145,7 +145,7 @@ export function decodeBookRequest(
 }
 
 /**
- * 「本章没有开放的生产会话」——pipelineRoutes 三处逐字重复的 409（工单07 点名）。
+ * 「本章没有开放的生产会话」——pipelineRoutes 三处逐字重复的 409（深化 07 点名）。
  * 文案逐字保留（productionRoutes.test.ts 断言 'no open production session'），
  * 差别在于现在带上了契约 code，客户端可按码分支而不必匹配英文。
  */

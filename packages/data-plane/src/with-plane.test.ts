@@ -1,11 +1,11 @@
 /**
- * 工单 08：句柄 seam 的生命周期与所有权语义（替代 245 行正则守卫的那条真实测试）。
+ * 深化 08：句柄 seam 的生命周期与所有权语义（替代 245 行正则守卫的那条真实测试）。
  *
  * 为什么这文件存在而旧的 planeHandles.test.ts 被删：旧守卫判的是**源码形状**
  * （这个 open 配没配到 close），所以它得维护 7 条合成源码自检、还得处理正则的
  * 误报面。本文件判的是**句柄的真实生死**——借出的句柄在四条出口上是否都还回去了：
  * 正常返回、同步抛错、异步拒绝、以及重入/竞争。形状由 eslint 的
- * `no-restricted-syntax` 常驻门禁把守（见 eslint.config.js），生死在这里把守。
+ * `no-restricted-syntax` 常驻门把守（见 eslint.config.js），生死在这里把守。
  *
  * 判据用 `plane.db.open`（better-sqlite3 的真实句柄状态，close 后为 false）而不是
  * mock 计数：漏 close 的真实后果正是「句柄还开着」，用真句柄判才不会自欺。

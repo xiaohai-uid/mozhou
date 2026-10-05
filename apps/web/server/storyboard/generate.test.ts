@@ -78,7 +78,7 @@ function fakeStream(chunks: string[], opts: { recordAbort?: (s: string) => void 
 }
 
 /**
- * 工单06：deps 的端点缝换成统一解析缝 `resolveTarget`（带 reason 的显式结果）。
+ * 深化 06：deps 的端点缝换成统一解析缝 `resolveTarget`（带 reason 的显式结果）。
  * 注入的是**成功解析结果**（providerId 与端点由同一次解析产出，测试即按此形状构造），
  * 传输仍由 fakeStream 桩接管。
  */

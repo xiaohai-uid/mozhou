@@ -185,7 +185,7 @@ export class PublishBus {
    * 里仍悬挂的 head 认领进本实例，使「跨请求闭合一个已开的窗口」成为可能
    * （如 S9 重提交窗口的作废）。
    *
-   * position 门控（工单 02B）：只认领「当前开卷窗口」内的 head——最后一个未闭合
+   * position 门控（深化 02B）：只认领「当前开卷窗口」内的 head——最后一个未闭合
    * TaskStarted 及其后的事件；窗口被 TaskFinished 闭合后、下个 TaskStarted 之前
    * 的 head 属于窗口间历史，不被认领；新 TaskStarted 取代旧窗口时清零重来（与
    * projectSession.openHeads 的窗口闸同源：openedAtPosition 闸 + position 比较，

@@ -112,7 +112,7 @@ function fixtureDelta(prose: string): Record<string, unknown[]> {
 }
 
 describe('T18 三步挂进十步状态机（Extract/Gate/Proposal × ProposalPort）', () => {
-  it('终稿→提取→门禁→分流提案→逐条确认→原子提交：事件链同账闭合、追踪流入正典、提案收口', () => {
+  it('终稿→提取→门→分流提案→逐条确认→原子提交：事件链同账闭合、追踪流入正典、提案收口', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-t18-flow-'));
     roots.push(dir);
     createBook({ dir, title: '集成之书' });

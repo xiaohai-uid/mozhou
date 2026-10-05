@@ -4,7 +4,7 @@
  * 缺陷本体：/api/capabilities 只回一个布尔 providerAvailable，UI 对所有失败原因
  * 共用一句「请到『账户 → 模型设置』填入你的 API 密钥」。但本机部署
  * （MOZHOU_API_BASE=http://127.0.0.1:8317）失败的原因根本不是「没填密钥」——
- * 是 SSRF 门禁按设计拒绝了环回地址，要部署者显式设 MOZHOU_ALLOW_PRIVATE_LLM=1。
+ * 是 SSRF 门按设计拒绝了环回地址，要部署者显式设 MOZHOU_ALLOW_PRIVATE_LLM=1。
  * 把本机用户指引去填 BYOK 密钥，是让一个本机部署走它不该走的路；照着做也接不上本地模型。
  *
  * 为什么是纯函数而不是组件里的三元：这是**判据 → 文案**的映射，只有它可被单测
@@ -13,7 +13,7 @@
  *
  * 纪律：**不得**据此给普通云端用户塞本机放行提示。云端用户（没配 provider、配置非法）
  * 只看到与自己相关的指引；本机放行提示只出现在 reason='provider_endpoint_blocked'
- * 这一条已被服务端门禁确认的路径上。
+ * 这一条已被服务端门确认的路径上。
  */
 
 /** 服务端给出的病因分类（与 server/llm/generationTarget.ts 同源；此处按值枚举，零运行时依赖）。 */
@@ -54,13 +54,13 @@ const BYOK_HEADLINE = '尚未接入大模型'
 const BYOK_BODY =
   '写作对话暂不可用。请到「账户 → 模型设置」填入你的 API 密钥，保存后回到这里重新生成即可。'
 
-const BLOCKED_HEADLINE = '本机模型端点被安全门禁拦下'
+const BLOCKED_HEADLINE = '本机模型端点被安全门拦下'
 
 /**
  * 按病因分类给出**与真实可行的下一步一致**的指引。
  *
  * 分支语义（每条都对应服务端一次真实的判定，不是文案口味）：
- *   - `provider_endpoint_blocked`：门禁已拒绝，配置本身没写错。要部署者显式放行。
+ *   - `provider_endpoint_blocked`：门已拒绝，配置本身没写错。要部署者显式放行。
  *     这是本缺陷的核心分支——它必须与 BYOK 指引**逐字不同**，否则本机用户仍被误导。
  *   - `provider_config_invalid`：配了但解析不出来（注册表结构非法/未登记/密钥缺失等）。
  *     下一步是查配置，不是去设置页重新填一遍。
@@ -79,9 +79,9 @@ export function providerGuidance(input: ProviderGuidanceInput): ProviderGuidance
     return {
       headline: BLOCKED_HEADLINE,
       body:
-        `${hostClause} 位于本机/私有网络，出站安全门禁默认拒绝——这不是密钥问题，改填 API 密钥也接不上。` +
+        `${hostClause} 位于本机/私有网络，出站安全门默认拒绝——这不是密钥问题，改填 API 密钥也接不上。` +
         `接本机模型请在启动墨舟的环境里设 ${ALLOW_PRIVATE_ENV}=1（与 MOZHOU_API_BASE 一起），重启后生效。` +
-        `该开关只放宽到 http/https 且仍需显式开启；不确定就不设，门禁会继续拦下。`,
+        `该开关只放宽到 http/https 且仍需显式开启；不确定就不设，门会继续拦下。`,
       detail,
       reason,
     }

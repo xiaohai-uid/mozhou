@@ -1,5 +1,5 @@
 /**
- * 备忘录本地存储（OpenWrite 对标切片 · 工单 22）：
+ * 备忘录本地存储（OpenWrite 对标切片 · .scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：
  * - 与书无关的作者便签，跨作品常驻；对照 OpenWrite「备忘录」独立空间。
  * - 按 principal.userId 的 SHA-256 分文件持久化在 <dataRoot>/memo/ 下：
  *   不把身份明文写进目录名，也不信任 userId 字符集（hosted 下来自身份提供方）。

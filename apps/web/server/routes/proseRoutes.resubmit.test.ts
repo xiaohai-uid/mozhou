@@ -30,7 +30,7 @@
  * 已知依赖（**故意不写成不变量**）：成功重提交开出的会话窗口按 S9 由本会话第 9 步
  * CanonCommitted 或 TaskFinished 闭合，而 web 侧当前只有 session.open/advance/review/
  * rework 面，没有会话内 commit/finish 路由（apps/web 全仓无 markCommitted/finish 调用；
- * /api/session.advance 也不携带门禁 verdict，故 continuity_gate→canon_proposal 恒被
+ * /api/session.advance 也不携带门 verdict，故 continuity_gate→canon_proposal 恒被
  * GateNotPassedError 拒绝）——即该窗口在 web 可达路径上无法闭合，占住全局单飞后
  * 别章 /api/session.open 恒 409。此处不写「窗口粘滞」断言（把缺陷写成不变量等于写进
  * 契约），该依赖记录在实现报告的 escalation/caveats。

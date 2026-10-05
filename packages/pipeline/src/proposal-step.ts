@@ -2,7 +2,7 @@
  * Canon Proposal 步（T18 · #42；chapter-pipeline-spec §1 表第 8 行 / S6）。
  *
  * 通过 Gate 的候选 delta → 按风险分级的提案记录。分流判据全部数据化（N1：
- * 门禁输入必须是数据不是现场判断）——
+ * 门输入必须是数据不是现场判断）——
  *   - temporalFact：行自带 riskClass（冻结 Schema 字段）；
  *   - knowledgeState：继承被引事实的 riskClass（知悉秘密=秘密暴露同险）；
  *   - relationshipState：规格 Risk-Graded 阈值表「关系变动」恒 medium；

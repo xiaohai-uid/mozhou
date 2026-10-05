@@ -55,7 +55,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/membership.activate': 'account',
   '/api/cloud-sync': 'account',
   '/api/cloud-sync.backup': 'account',
-  // OpenWrite 对标切片（工单 22）：备忘录跟随登录主体（本地回退 local_user）；
+  // OpenWrite 对标切片（.scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md）：备忘录跟随登录主体（本地回退 local_user）；
   // AI 起名走 BYOK 模型调用，必须挂主体避免 hosted 匿名滥用。
   '/api/memo': 'account',
   '/api/naming': 'account',

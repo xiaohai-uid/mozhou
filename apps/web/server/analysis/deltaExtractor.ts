@@ -53,7 +53,7 @@ const defaultExtractionTarget = (env: NodeJS.ProcessEnv): Promise<GenerationTarg
 
 /** 依赖注入（仅测试用；生产走真实传输）。 */
 export interface DeltaExtractorDeps {
-  /** 工单06 统一解析缝：注入方携带自己的 principal（缺省无主体解析）。 */
+  /** 深化 06 统一解析缝：注入方携带自己的 principal（缺省无主体解析）。 */
   readonly resolveTarget?: ((env: NodeJS.ProcessEnv) => GenerationTargetResolution | Promise<GenerationTargetResolution>) | undefined
   readonly streamChat?: typeof streamOpenAiChat | undefined
   readonly env?: NodeJS.ProcessEnv | undefined
@@ -390,7 +390,7 @@ export function normalizeDelta(
 /**
  * 生产提取入口：终稿正文 → 五族增量。
  *
- * 端点解析走工单06 统一缝 `resolveGenerationTarget`（注册表 → BYOK → Unavailable），
+ * 端点解析走深化 06 统一缝 `resolveGenerationTarget`（注册表 → BYOK → Unavailable），
  * 与草稿同一条解析——注册表-only 的部署不再出现「写增量的是 A 端点、账本 providerId
  * 是 B」。Unavailable 时返回 `extractor:'none'` 与空批，reason 携带统一解析的
  * `<reason>: <detail>`（诚实降级，不伪造）；模型输出不可解析或调用失败同样返回空批 +

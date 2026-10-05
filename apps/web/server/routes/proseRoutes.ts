@@ -12,12 +12,12 @@
  *   语义：phase 恒 draft；Commit 仍只经管线质量门后的 commitChapter。
  * 不触碰 Protected Author Content 以外的任何正典工件。
  *
- * 步 6-10 提交编排单一事实源（工单04 2026-09-28）：/api/chapter.commit 的编排规则已收进
+ * 步 6-10 提交编排单一事实源（深化 04 2026-09-28）：/api/chapter.commit 的编排规则已收进
  * packages/pipeline/src/commit-orchestration.ts（runChapterCommit）——本路由只保留输入解码、
  * 身份/书权限与响应契约映射；提取缝（真实模型调用）与 StyleLearner 窗口闭合钩子在此注入，
  * web_commit_* 窗口键形状冻结。以下各步接线注释描述的行为语义不变，实现归属以管线 module 为准。
  *
- * 提交幂等契约（工单05 Contract Delta 2026-09-28）：POST /api/chapter.commit 请求
+ * 提交幂等契约（深化 05 Contract Delta 2026-09-28）：POST /api/chapter.commit 请求
  * {root, chapterIndex, summary, expectedRevision, usage?}——expectedRevision 为作者实际
  * 读取的章版本（/api/chapter.prose 读回的 revision），形状照搬 /api/chapter.prose.save
  * 冻结契约（必填整数 >= 0；缺失/非法 400）。与盘上 revision 失配 ⇒ 409
@@ -40,10 +40,10 @@
  *   有相位无匹配事件行 = 账实不符：显式 500 失败（宁败不猜），绝不返回假锚。
  *   I5：旧 commit 的物理痕迹（追踪流行 + ChapterCommitted 事件行）只增不改。
  * 该会话窗口按 S9 设计由本会话第 9 步 CanonCommitted 或 TaskFinished 闭合。窗口的
- * 闭合路径自工单 03（2026-09-28）起分两种形态（详见下方步 9 收口注释）：
+ * 闭合路径自深化 03（2026-09-28）起分两种形态（详见下方步 9 收口注释）：
  *   - 完成收口：作者把会话走到 user_edit 及之后（/api/session.advance 与
  *     /api/chapter.review 驱动步 2-5），/api/chapter.commit 即沿十步驱动窗口走完
- *     步 6-10（步 7 门禁 verdict 随 TaskStepTransitioned Result 字段进账），以
+ *     步 6-10（步 7 门 verdict 随 TaskStepTransitioned Result 字段进账），以
  *     TaskFinished{outcome:'succeeded'} 闭合——走完的窗口不再需要 abandon；
  *   - 作废收口：未被行走的窗口（光标停在 prepare..review）在作者重新定稿后就地
  *     作废（POST /api/session.abandon 或提交出口的 resubmitWindowCleanup）。
@@ -73,8 +73,8 @@
  *   通过 → 200，响应带 continuityGate.verdict='pass'；
  *   冲突 → 409 CONTINUITY_HARD_CONFLICT，Result 顶层 hardConflicts[] {factId,
  *   assertion, suggestion} 原样回给作者（回炉 Final Extract 重提取），正典零写入。
- * Gate 读不到存量叙事状态时同样显式失败（500），绝不降级为「跳过门禁」——
- * 跳过门禁等于把未经核检的 delta 盲写正典。
+ * Gate 读不到存量叙事状态时同样显式失败（500），绝不降级为「跳过门」——
+ * 跳过门等于把未经核检的 delta 盲写正典。
  *
  * 步 8 Canon Proposal 接线（chapter-pipeline-spec §1 表第 8 行 / S6）：
  * 通过 Gate 的 delta 不再直接进 commitChapter——先经 createCanonProposal 按
@@ -87,7 +87,7 @@
  *   - 无候选可路由时不落空提案（空 CanonProposalCreated 只会污染悬挂扫描）；
  *   - 落盘时哈希基线失配（正文被外部改过）⇒ 409 PROSE_EXTERNAL_CHANGE，与
  *     /api/prose.save（:384-387）同一条件同一码——漏这条会退化成裸 500 且把英文
- *     内部消息吐给作者（工单 01）。
+ *     内部消息吐给作者（深化 01）。
  * 未决提案的盘面凭据落在 .mozhou/proposals/，跨重启待决（S8 Proposal 后行）。
  *
  * D06 依赖钉版消费（change-impact-engine-spec §2 D06 / ADR-0003 §2.1）：
@@ -115,7 +115,7 @@
  *   窗口闭合后触发 afterRecord 钩子（T23 · #56 触发点）：StyleLearner 自读本窗口
  *   author 编辑更新派生画像；钩子失败同样不阻断（S12 同款），但错误文本进响应。
  *
- * 步 9 S9 收口（本章补完；工单 03 起完成优先）：/api/chapter.commit 在 commitChapter
+ * 步 9 S9 收口（本章补完；深化 03 起完成优先）：/api/chapter.commit 在 commitChapter
  * 落定后（两条提交分支各自调用点）按窗口形态二选一收口——
  *   - 完成收口（驱动路径）：窗口已被作者走到 user_edit 及之后 ⇒ 本次提交沿十步驱动
  *     它走完：步 6 runFinalExtract（web 提取器作注入缝，CandidateDeltaExtracted 以
@@ -209,7 +209,7 @@ import {
 } from '../proposals.js'
 
 /**
- * web 路径的窗口键 `web_commit_ch<N>_rev<R>` 的生成器已随提交编排收口（工单04）
+ * web 路径的窗口键 `web_commit_ch<N>_rev<R>` 的生成器已随提交编排收口（深化 04）
  * 移至 @mozhou/pipeline（webCommitWindowTaskRef）——提交路径与保存路径的编辑信号
  * 必须同源（runStyleLearnerForWindow 按 taskRef 精确匹配本窗口），键形状冻结不改。
  */
@@ -638,7 +638,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       ? body['summary'].trim()
       : `第 ${chapterIndex} 章定稿`
 
-    // 工单05 Contract Delta：expectedRevision 必须在场（作者实际读取的章版本，与
+    // 深化 05 Contract Delta：expectedRevision 必须在场（作者实际读取的章版本，与
     // /api/chapter.prose.save 的冻结契约同构——commit 无新建语义，故不收 null）。
     // 缺失/非法在动盘之前 400 拒绝，杜绝旧客户端静默提交作者未读过的正文。
     const rawExpected = body['expectedRevision']
@@ -687,8 +687,8 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
                 }),
               )
             })()
-      // 步 6-10 编排已收进管线边界（工单04 · packages/pipeline/src/commit-orchestration.ts）：
-      // 相位守卫、依赖钉版回读、窗口键、提案续接/stale/待决规则、门禁两道、commitChapter
+      // 步 6-10 编排已收进管线边界（深化 04 · packages/pipeline/src/commit-orchestration.ts）：
+      // 相位守卫、依赖钉版回读、窗口键、提案续接/stale/待决规则、两道门、commitChapter
       // 收口、飞轮记账、会话驱动与作废收口全部是 module 侧单一实现——路由只保留输入解码、
       // 身份/书权限与响应契约映射。提取缝（真实模型调用）与 StyleLearner 窗口闭合钩子在
       // 此注入（依赖方向：pipeline 不 import web 提取器与 flywheel）；web_commit_* 窗口键
@@ -707,7 +707,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           usage: usageFacts,
           // W3：身份随请求进入 commitChapter（journal v2）——操作结果与正文同一恢复单元
           ...(operation === undefined ? {} : { operation }),
-          // 工单06：提取与草稿走同一个解析缝（注册表 → BYOK → 带原因 Unavailable），
+          // 深化 06：提取与草稿走同一个解析缝（注册表 → BYOK → 带原因 Unavailable），
           // 注册表-only 部署的提取不再回落 BYOK 或静默失败；hosted 下按 principal 隔离。
           // W2-3/F-03：取/还书稿写锁已移入编排层的写回段缝（acquireWriteLease/
           // releaseWriteLease）——提取缝只做提取；提案续接分支同样被锁覆盖。
@@ -752,7 +752,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
           code: CONTINUITY_HARD_CONFLICT,
           chapterIndex,
           ...(outcome.proposalId === null ? {} : { proposalId: outcome.proposalId }),
-          error: `连续性门禁未通过：${outcome.hardConflicts.length} 项硬冲突——本章正典零写入`,
+          error: `连续性门未通过：${outcome.hardConflicts.length} 项硬冲突——本章正典零写入`,
           hardConflicts: outcome.hardConflicts,
           ...(outcome.deltaExtraction === null ? {} : { deltaExtraction: outcome.deltaExtraction }),
         })
@@ -811,7 +811,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         json(409, { ok: false, code: BOOK_WRITE_BUSY, error: (cause as Error).message })
         return true
       }
-      // 工单 01：与 /api/prose.save（:384-387）同一物理条件、同一错误码。漏这条时作者看到的是
+      // 深化 01：与 /api/prose.save（:384-387）同一物理条件、同一错误码。漏这条时作者看到的是
       // 裸 500 + 英文内部消息（无 code 字段），无法据此行动——违反 AGENTS.md 规则 15。
       if (cause instanceof PreWriteHashMismatchError) {
         json(409, { ok: false, code: PROSE_EXTERNAL_CHANGE, error: '磁盘内容已被外部修改（或与基线不一致）——拒绝静默覆盖，请先读取最新内容' })
@@ -821,7 +821,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         json(409, { ok: false, code: CHAPTER_ALREADY_COMMITTED, error: (cause as Error).message })
         return true
       }
-      // 工单05 Contract Delta：作者所读 revision 已过期（他端保存/双窗口）——与
+      // 深化 05 Contract Delta：作者所读 revision 已过期（他端保存/双窗口）——与
       // /api/chapter.prose.save 同码同形（409 PROSE_REVISION_CONFLICT + 双 revision），
       // 本章正文/正典/账本零写入、提取缝零调用（编排层在提取之前比对）。
       if (cause instanceof ProseRevisionConflictError) {

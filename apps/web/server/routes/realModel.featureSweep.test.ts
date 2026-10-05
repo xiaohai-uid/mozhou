@@ -19,7 +19,7 @@
  * - 探针：技能市场 /api/capability-square 的 providerAvailable
  * - 本地能力（零模型）：拆书（本地面启发式）、风格蒸馏（本地指标）、
  *   质量门查询、TXT 导出、备忘录
- * - 真实性门禁（未接外部源时必须 501，不伪造数据）：web-search、rank-scan
+ * - 真实性门（未接外部源时必须 501，不伪造数据）：web-search、rank-scan
  * - 诚实离线状态：cloud-sync
  *
  * 章节生成用的模型现在**由部署者经 MOZHOU_MODEL 指定**（整改前此处硬编码
@@ -61,7 +61,7 @@ beforeAll(async () => {
     MOZHOU_MODEL: config.model,
     MOZHOU_DRAFT_PROVIDER: undefined,
     MOZHOU_NAMING_PROVIDER: undefined,
-    // 扫榜门禁必须保持 501，不真爬站点
+    // 扫榜门必须保持 501，不真爬站点
     MOZHOU_LIVE_RANKINGS: undefined,
   })
 
@@ -250,14 +250,14 @@ describe('逐功能真实扫描（模型由 MOZHOU_MODEL 指定）', () => {
     const res = await postJson('/api/web-search', { query: '测试' })
     expect(res.status).toBe(501)
     expect(res.data['code']).toBe('WEB_SEARCH_NOT_CONFIGURED')
-    console.log('[sweep] web-search: 501 WEB_SEARCH_NOT_CONFIGURED（真实性门禁生效）')
+    console.log('[sweep] web-search: 501 WEB_SEARCH_NOT_CONFIGURED（真实性门生效）')
   })
 
   it.skipIf(!realModelEnabled)('rank-scan：未开启实时榜单源时 501 诚实报错', async () => {
     const res = await postJson('/api/rank-scan', {})
     expect(res.status).toBe(501)
     expect(res.data['code']).toBe('RANK_SOURCE_NOT_CONFIGURED')
-    console.log('[sweep] rank-scan: 501 RANK_SOURCE_NOT_CONFIGURED（真实性门禁生效）')
+    console.log('[sweep] rank-scan: 501 RANK_SOURCE_NOT_CONFIGURED（真实性门生效）')
   })
 
   it.skipIf(!realModelEnabled)('cloud-sync：如实报告本地离线状态（不伪装云同步）', async () => {

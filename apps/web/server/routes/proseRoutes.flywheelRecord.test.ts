@@ -109,7 +109,7 @@ async function makeDraftChapter(): Promise<{ base: string; root: string; bookId:
   expect(saved.status).toBe(200)
   // taskRef 与路由同源（步 8 提案绑定 / 步 10 窗口锚共用）：revision 从盘上读，不硬编码
   const revision = readProseChapter(root, proseChapterPath(1)).revision
-  // 工单05 Contract Delta：提交必须携带作者所读 revision。
+  // 深化 05 Contract Delta：提交必须携带作者所读 revision。
   return { base, root, bookId: String(created.data.bookId), taskRef: 'web_commit_ch1_rev' + revision, expectedRevision: revision }
 }
 

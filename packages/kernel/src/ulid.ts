@@ -1,5 +1,5 @@
 /**
- * 零依赖 ULID（工单 #4 Q4：26 位 Crockford Base32，字典序 = 时间序；
+ * 零依赖 ULID（议题 #4 Q4：26 位 Crockford Base32，字典序 = 时间序；
  * 本地文件内可 grep）。内核保持零 npm 依赖——随机源用 Web Crypto 全局
  * （Node ≥19 / 浏览器均内建），不引入任何运行时依赖。
  *

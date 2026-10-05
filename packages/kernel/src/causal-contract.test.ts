@@ -7,7 +7,7 @@ import {
   type ContractId,
 } from './causal-contract.js';
 
-describe('P1-1 CausalContract 领域扩展与门禁审计', () => {
+describe('P1-1 CausalContract 领域扩展与因果合约门审计', () => {
   const contractFixture: CausalContract = {
     id: 'contract_01J_tian_dao' as ContractId,
     bookId: 'book_01J' as BookId,
@@ -48,23 +48,23 @@ describe('P1-1 CausalContract 领域扩展与门禁审计', () => {
     expect(breachedFacts.some((f) => f.value === '雷劫噬心道基尽毁')).toBe(true);
   });
 
-  it('超期且无任何处置（未履约/未违约/未延期）被门禁硬拦截', () => {
+  it('超期且无任何处置（未履约/未违约/未延期）被门硬拦截', () => {
     const issue = auditCausalContract(contractFixture, 4); // 当前第 4 章，截止第 3 章
     expect(issue).not.toBeNull();
     expect(issue?.code).toBe('expired_without_disposition');
   });
 
-  it('违约（Breach）是合法剧情走向：已登记违约状态则门禁放行', () => {
+  it('违约（Breach）是合法剧情走向：已登记违约状态则门放行', () => {
     const breachedContract: CausalContract = {
       ...contractFixture,
       status: 'breached',
       breachDisposed: true,
     };
     const issue = auditCausalContract(breachedContract, 4);
-    expect(issue).toBeNull(); // 违约合法，门禁放行
+    expect(issue).toBeNull(); // 违约合法，门放行
   });
 
-  it('履约、展期、豁免均视为合法处置，门禁放行', () => {
+  it('履约、展期、豁免均视为合法处置，门放行', () => {
     expect(auditCausalContract({ ...contractFixture, status: 'fulfilled' }, 4)).toBeNull();
     expect(auditCausalContract({ ...contractFixture, status: 'amended' }, 4)).toBeNull();
     expect(auditCausalContract({ ...contractFixture, status: 'waived' }, 4)).toBeNull();
