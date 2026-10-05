@@ -4,7 +4,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
-const AMBIG = new Set(["0001","0002","0003","0004","0005","0006","0007"]);
 const LINEAGE = {
   "0001": { K: ["Novel Kernel", "Skill Adapter"], A: ["写作上下文边界", "模型输入分层"] },
   "0002": { K: ["Temporal Canon", "Candidate-to-Canon"], A: ["写作上下文", "模型传输", "候选生命周期"] },

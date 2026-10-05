@@ -3,6 +3,7 @@
  * 严格遵循 WinClaw 知识库 APP-ENGINEERING-PLAYBOOK.md 与 AI-REPAIR-DELIVERY-MANUAL.md 规范：
  * 绝不依赖口头宣称，真实在物理磁盘执行全链路创建、读取、断言，并固化取证结果。
  */
+import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
 import { mkdtempSync, readFileSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -25,7 +26,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = dirname(scriptDir)
 const evidencePath = join(repoRoot, 'evidence', 'usability-fixes-20260921', 'result.json')
 
-function runEvidenceCollection() {
+async function runEvidenceCollection() {
   const tempDir = mkdtempSync(join(tmpdir(), 'mozhou-evidence-20260921-'))
   console.log(`[Evidence] 临时沙箱初始化: ${tempDir}`)
 
@@ -35,9 +36,14 @@ function runEvidenceCollection() {
     slices: {},
   }
 
+  // F-10：锁句柄在 try 外声明——finally 里无论建书/占锁是否成功都要尝试释放
+  let releaseWriterLock = null
   try {
     // 1. 建立基准测试书
     const book = createBook({ dir: tempDir, title: '真实证据作品' })
+    // W2-3/F-10：占书稿命名管道写锁；**必须显式释放**——管道 server 句柄会挂住事件循环，
+    // 不释放则脚本做完事也退不出进程（锁生命周期探针）。finally 中与 rmSync 成对收尾。
+    releaseWriterLock = await holdBookWriteLock(book.root)
     console.log(`[Evidence] 1. 物理建书完成: bookId=${book.book.id}, root=${book.root}`)
 
     // ----------------------------------------------------
@@ -163,6 +169,8 @@ function runEvidenceCollection() {
     plane.close()
     return results
   } finally {
+    // F-10：先释放书稿写锁（否则管道 server 挂住进程），再清理沙箱
+    await releaseWriterLock?.()
     try {
       rmSync(tempDir, { recursive: true, force: true })
     } catch {
@@ -171,7 +179,7 @@ function runEvidenceCollection() {
   }
 }
 
-const evidence = runEvidenceCollection()
+const evidence = await runEvidenceCollection()
 mkdirSync(dirname(evidencePath), { recursive: true })
 writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8')
 console.log(`\n[Evidence] 纯 JSON 证据已写入: ${evidencePath}`)

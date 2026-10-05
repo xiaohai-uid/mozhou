@@ -16,6 +16,7 @@
  * 10. 关闭后端重新启动回读
  * 11. 定稿仍只读且显式重开
  */
+import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -68,6 +69,9 @@ const tempBookRoot = mkdtempSync(join(tmpdir(), 'mozhou-r05-book-'));
 log(`Created dedicated temp book directory: ${tempBookRoot}`);
 
 const bookRes = createBook({ dir: tempBookRoot, title: 'R05真实编辑旅程' });
+// W2-3：本脚本是书稿写入者——经同一命名管道入口占锁；已有写入者（服务在跑）则明确拒绝。
+// 进程退出时 OS 自动回收管道名，无需显式释放。
+await holdBookWriteLock(bookRes.root)
 const bookId = bookRes.book.id;
 log(`Book created: id=${bookId}, root=${tempBookRoot}`);
 

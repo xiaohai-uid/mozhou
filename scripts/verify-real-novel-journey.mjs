@@ -15,6 +15,7 @@
  *
  * 注：请使用**公有领域**文本（如 Project Gutenberg 的中国古典小说）以避免版权问题。
  */
+import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
 import { execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -98,6 +99,7 @@ const { createBook, LocalDataPlane } = await import(
 let server = null;
 let bookRoot = null;
 let serverCwd = null;
+let releaseWriterLock = null;
 const findings = [];
 
 try {
@@ -127,6 +129,8 @@ try {
   // ---- 2. 建书 + 导入真实章节 ----
   bookRoot = mkdtempSync(join(tmpdir(), 'mozhou-realnovel-'));
   const created = createBook({ dir: bookRoot, title: '真实长篇验收·三国' });
+  // W2-3：占书稿写锁并在 finally 中显式释放，避免 net.Server 挂住事件循环
+  releaseWriterLock = await holdBookWriteLock(created.root)
   log(`建书: id=${created.book.id}`);
 
   const plane = LocalDataPlane.openOrRebuild(bookRoot);
@@ -322,6 +326,7 @@ try {
   });
   process.exitCode = 1;
 } finally {
+  if (releaseWriterLock) await releaseWriterLock();
   if (server) server.kill();
   if (!process.env.MOZHOU_VERIFY_KEEP_BOOK) {
     if (bookRoot) rmSync(bookRoot, { recursive: true, force: true });

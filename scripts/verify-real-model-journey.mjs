@@ -18,6 +18,7 @@
  *   不带该参数时行为与 result.json / run.log / stdout 逐字节不变。
  *   约定全文见 docs/gates.md。
  */
+import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
 import { execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -200,6 +201,9 @@ try {
   // 1. 建书 + 建章
   bookRoot = mkdtempSync(join(tmpdir(), 'mozhou-realmodel-'));
   const created = createBook({ dir: bookRoot, title: '真实模型验收书' });
+// W2-3：本脚本是书稿写入者——经同一命名管道入口占锁；已有写入者（服务在跑）则明确拒绝。
+// 进程退出时 OS 自动回收管道名，无需显式释放。
+await holdBookWriteLock(created.root)
   log(`book created: id=${created.book.id} root=${bookRoot}`);
 
   const plane = LocalDataPlane.openOrRebuild(bookRoot);
