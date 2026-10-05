@@ -207,7 +207,7 @@ describe('scripts/*.mjs 与 TS 原语同一入口', () => {
     expect(() => helper.assertLocalWritableBookRoot('\\\\fileserver\\novels\\book1')).toThrow(/UNC|network share/)
     // 盘符 + 探测不可判定：脚本侧与 TS 侧同输入同结论（fail-closed）
     expect(() => helper.assertLocalWritableBookRoot(root, () => null)).toThrow(/could not be verified/)
-    expect(() => assertLocalWritableBookRoot(root, () => null)).toThrow(/could not be verified/)
+    expect(() => assertLocalWritableBookRoot(root, { driveTypeProbe: () => null })).toThrow(/could not be verified/)
     // 未知语言输出同样不认
     expect(() => helper.assertLocalWritableBookRoot(root, () => 'Z: - Volume in drive Z is NOVELS')).toThrow(
       /could not be verified/,

@@ -354,7 +354,7 @@ describe('网络共享书根拒绝', () => {
     const root = makeBookRoot()
     const unknownLocale = (): string => 'Z: - Volume in drive Z is NOVELS'
     expect(classifyBookRootKind(root, unknownLocale)).toBe('unverified')
-    expect(() => assertLocalWritableBookRoot(root, unknownLocale)).toThrow(/could not be verified/)
+    expect(() => assertLocalWritableBookRoot(root, { driveTypeProbe: unknownLocale })).toThrow(/could not be verified/)
   })
 
   it('显式 opt-in 覆盖：参数与 MOZHOU_ALLOW_UNVERIFIED_BOOK_ROOT=1 均放行（默认仍 fail-closed）', async () => {
@@ -362,7 +362,7 @@ describe('网络共享书根拒绝', () => {
     const nullProbe = (): string | null => null
 
     // 参数覆盖
-    expect(assertLocalWritableBookRoot(root, nullProbe, { allowUnverifiedRoot: true })).toBe(canonicalBookKey(root))
+    expect(assertLocalWritableBookRoot(root, { driveTypeProbe: nullProbe, allowUnverifiedRoot: true })).toBe(canonicalBookKey(root))
     const held = await acquireBookWriteLock(root, { driveTypeProbe: nullProbe, allowUnverifiedRoot: true })
     expect(held.held).toBe(true)
     await held.release()
@@ -371,16 +371,16 @@ describe('网络共享书根拒绝', () => {
     const previous = process.env[ALLOW_UNVERIFIED_BOOK_ROOT_ENV]
     process.env[ALLOW_UNVERIFIED_BOOK_ROOT_ENV] = '1'
     try {
-      expect(assertLocalWritableBookRoot(root, nullProbe)).toBe(canonicalBookKey(root))
+      expect(assertLocalWritableBookRoot(root, { driveTypeProbe: nullProbe })).toBe(canonicalBookKey(root))
     } finally {
       if (previous === undefined) delete process.env[ALLOW_UNVERIFIED_BOOK_ROOT_ENV]
       else process.env[ALLOW_UNVERIFIED_BOOK_ROOT_ENV] = previous
     }
     // 还原后重新 fail-closed
-    expect(() => assertLocalWritableBookRoot(root, nullProbe)).toThrow(/could not be verified/)
+    expect(() => assertLocalWritableBookRoot(root, { driveTypeProbe: nullProbe })).toThrow(/could not be verified/)
 
     // 硬拒绝不可被 opt-in 覆盖：UNC 永远拒绝
-    expect(() => assertLocalWritableBookRoot('\\\\fileserver\\novels\\book1', nullProbe, { allowUnverifiedRoot: true })).toThrow(
+    expect(() => assertLocalWritableBookRoot('\\\\fileserver\\novels\\book1', { driveTypeProbe: nullProbe, allowUnverifiedRoot: true })).toThrow(
       /UNC|network share/,
     )
   })

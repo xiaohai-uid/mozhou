@@ -181,7 +181,7 @@ export function classifyBookRootKind(root: string, probe: DriveTypeProbe = defau
 }
 
 export interface LocalWritableBookRootOptions {
-  /** 测试注入点：驱动器类型探测。 */
+  /** 测试注入点：驱动器类型探测（唯一注入通道；缺省用系统 fsutil 探测）。 */
   readonly driveTypeProbe?: DriveTypeProbe | undefined
   /**
    * 显式 opt-in：允许**探测不可判定**的盘符书根。默认 false = fail-closed。
@@ -194,14 +194,17 @@ export interface LocalWritableBookRootOptions {
 /**
  * 断言书根是**本机可写**的，返回规范化书籍身份（bookKey）。
  *
+ * 探测注入只有单一通道：`options.driveTypeProbe`（缺省用系统 fsutil 探测）。
+ * 旧版允许位置参数第二位传 probe 的双通道已删除——同一注入点两条路会让 API 形状含糊。
+ *
  * 三档判定（规划 §6.3「未验证网络共享先拒绝为可写书根」「锁状态不明保守拒绝写入」）：
  * - `unc` / `network-drive` → 硬拒绝 `BOOK_ROOT_NOT_LOCAL`（UNC 为纯语法判定，不依赖探测）；
  * - `unverified`（探测返回 null / 未知语言输出）→ **默认拒绝** `BOOK_ROOT_UNVERIFIED`，
  *   只有显式 opt-in（参数或环境变量）才放行——绝不把「没认出远端」当作「就是本地」；
  * - `local`（正向本地标记命中）→ 放行。
  */
-export function assertLocalWritableBookRoot(root: string, probe?: DriveTypeProbe, options: LocalWritableBookRootOptions = {}): string {
-  const kind = classifyBookRootKind(root, options.driveTypeProbe ?? probe ?? defaultDriveTypeProbe)
+export function assertLocalWritableBookRoot(root: string, options: LocalWritableBookRootOptions = {}): string {
+  const kind = classifyBookRootKind(root, options.driveTypeProbe ?? defaultDriveTypeProbe)
   if (kind === 'unverified') {
     // 探测不可判定（fsutil 不可用 / 未知语言输出 / 空输出）：**默认拒绝**，绝不当作 local。
     if (options.allowUnverifiedRoot === true || process.env[ALLOW_UNVERIFIED_BOOK_ROOT_ENV] === '1') {
@@ -325,7 +328,8 @@ export async function acquireBookWriteLock(
   root: string,
   options: BookWriteLockOptions = {},
 ): Promise<BookWriteLock> {
-  const bookKey = assertLocalWritableBookRoot(root, options.driveTypeProbe, {
+  const bookKey = assertLocalWritableBookRoot(root, {
+    driveTypeProbe: options.driveTypeProbe,
     allowUnverifiedRoot: options.allowUnverifiedRoot,
   })
   const pipeName = writerPipeName(bookKey)
