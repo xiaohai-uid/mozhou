@@ -18,12 +18,22 @@
  * - 掉电级 fsync 屏障已由 atomicWriteFileSync 统一承担（tmp → fsync → rename），
  *   测试仍以进程内故障注入为主，掉电语义靠该原语保证而非测试复现。
  */
-import { appendFileSync, existsSync, readFileSync, rmSync, statSync, truncateSync, unlinkSync } from 'node:fs'
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  statSync,
+  truncateSync,
+  unlinkSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { newChapterCommitId, newChapterNodeId, parseDependencyManifest } from '@mozhou/kernel'
 import type { DependencyManifest } from '@mozhou/kernel'
 import type Database from 'better-sqlite3'
-import { atomicWriteFileSync } from './atomic-write.js'
+import { atomicWriteFileSync, removeAtomicTmpFilesFor } from './atomic-write.js'
 import { CanonStructureError } from './canon-read.js'
 import { openDatabase } from './database.js'
 import {
@@ -37,7 +47,15 @@ import {
   proseChapterPath,
   type TrackingKind,
 } from './layout.js'
-import { refreshManifestEntries, writeManifest, type HashManifest } from './manifest.js'
+import { readManifest, refreshManifestEntries, writeManifest, type HashManifest } from './manifest.js'
+import {
+  OPERATION_RECORD_VERSION,
+  OperationIdReusedError,
+  findReplayableOperation,
+  writeOperationRecordIfAbsent,
+  type OperationIntent,
+  type OperationRecord,
+} from './operations.js'
 import { assertCommitAppendsLegal } from './narrative-state.js'
 import { sha256FileHex, sha256Hex } from './sha256.js'
 import { emitFrontmatter, parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
@@ -245,7 +263,9 @@ interface JournalAppendTarget {
 }
 
 interface PendingCommitJournal {
-  readonly journalVersion: 1
+  /** v1 = 无操作身份（旧格式，读端兼容）；v2 = 携带 operation（W3 操作幂等）。 */
+  readonly journalVersion: 1 | 2
+  /** v2 的 save 路径没有 commitId，用空串占位（字段形状不变）。 */
   readonly commitId: string
   readonly chapterIndex: number
   readonly proseRelPath: string
@@ -254,6 +274,41 @@ interface PendingCommitJournal {
   /** 前滚向判别锚：盘上正文等于此摘要 ⇒ 线性化点已过，补齐收尾。 */
   readonly stagedProseSha256: string
   readonly appends: readonly JournalAppendTarget[]
+  /** v2 必填：操作身份（结果文件在删 journal 之前写，同一恢复单元）。 */
+  readonly operation?: OperationIntent
+}
+
+/**
+ * 正文规范化：末尾无换行则补一个（写入器与**请求摘要**必须共用这一个函数——
+ * 否则「少一个末尾换行」的重试会被判成不同意图，幂等直接失效）。
+ */
+export function normalizeProseBody(body: string): string {
+  return body.endsWith('\n') || body.length === 0 ? body : `${body}\n`
+}
+
+/** 回放既有操作结果：正文/版本/事件零变更，只把当时的结果与当前盘上版本一并返回。 */
+function replayCommitResult(
+  root: string,
+  proseRel: string,
+  record: OperationRecord,
+  chapterIndex: number,
+): ChapterCommitResult {
+  let currentRevision = record.result.appliedRevision
+  try {
+    currentRevision = readProseChapter(root, proseRel).revision
+  } catch {
+    // 章此后被删除：仍回放历史结果，currentRevision 退回 appliedRevision
+  }
+  return {
+    commitId: record.result.commitId ?? '',
+    chapterIndex,
+    proseRelPath: proseRel,
+    contentSha256: record.result.appliedBodyHash,
+    appendedCounts: {},
+    replayed: true,
+    appliedRevision: record.result.appliedRevision,
+    currentRevision,
+  }
 }
 
 function journalPath(root: string): string {
@@ -264,11 +319,183 @@ function writeJournal(root: string, journal: PendingCommitJournal): void {
   atomicReplace(root, PENDING_COMMIT_PATH, `${JSON.stringify(journal, null, 2)}\n`)
 }
 
+/** kind → 追踪流路径（TRACKING_STREAMS 是布局唯一真源，此处只做反查）。 */
+const TRACKING_PATH_BY_KIND = new Map<string, string>(TRACKING_STREAMS.map((stream) => [stream.kind, stream.path]))
+
+/** payloadBase64 必须能严格往返解码：重编码与原文一致（拒绝空白、非法字符、缺填充）。 */
+function isStrictBase64(value: string): boolean {
+  return Buffer.from(value, 'base64').toString('base64') === value
+}
+
+/**
+ * 日志形状校验：坏日志一律抛**可定位**冲突（含 journal 路径与具体原因），
+ * 绝不把 SyntaxError/TypeError 漏给调用方——恢复路径的失败必须指向具体文件。
+ *
+ * 语义校验（kind ∈ 五族、relPath 与 kind 对应、baseSeq 非负整数、base64 严格往返）
+ * 同样在此完成：形状合法的越界 kind 会让投影 INSERT 撞 CHECK 约束并被
+ * INSERT OR IGNORE 静默丢弃（静默丢行），必须在动盘之前拦下。
+ * 注意：kind=null 的 events 账本目标 baseSeq 是占位 -1，非负整数规则只对追踪族生效。
+ */
+function assertJournalShape(value: unknown, relPath: string): PendingCommitJournal {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new PendingCommitConflictError(relPath, 'journal must be a JSON object')
+  }
+  const record = value as Record<string, unknown>
+  const journalVersion = record['journalVersion']
+  if (journalVersion !== 1 && journalVersion !== 2) {
+    throw new PendingCommitConflictError(
+      relPath,
+      `journal journalVersion must be 1 or 2, got ${JSON.stringify(journalVersion)}`,
+    )
+  }
+  if (journalVersion === 2) {
+    const operation = record['operation']
+    if (typeof operation !== 'object' || operation === null || Array.isArray(operation)) {
+      throw new PendingCommitConflictError(relPath, 'journal v2 requires an operation object')
+    }
+    const intent = operation as Record<string, unknown>
+    for (const key of ['operationType', 'operationId', 'principalId', 'bookId', 'requestDigest'] as const) {
+      if (typeof intent[key] !== 'string' || (intent[key] as string).length === 0) {
+        throw new PendingCommitConflictError(relPath, `journal operation.${key} must be a non-empty string`)
+      }
+    }
+    if (intent['operationType'] !== 'prose.save' && intent['operationType'] !== 'chapter.commit') {
+      throw new PendingCommitConflictError(relPath, `journal operation.operationType must be prose.save|chapter.commit`)
+    }
+  }
+  for (const key of ['commitId', 'proseRelPath', 'originalProseSha256', 'stagedProseSha256'] as const) {
+    if (typeof record[key] !== 'string') {
+      throw new PendingCommitConflictError(relPath, `journal field '${key}' must be a string`)
+    }
+  }
+  const appends = record['appends']
+  if (!Array.isArray(appends)) {
+    throw new PendingCommitConflictError(relPath, "journal field 'appends' must be an array")
+  }
+  // 集合不变量：正常提交恒为「N 个唯一追踪族目标（N≥0）+ 恰好 1 个 events 账本目标」。
+  // 空集合会让恢复零目标地走完并移除 journal（静默把残缺事务当终态）。
+  if (appends.length === 0) {
+    throw new PendingCommitConflictError(
+      relPath,
+      'journal appends must contain at least one target (the events ledger target is always present)',
+    )
+  }
+  appends.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new PendingCommitConflictError(relPath, `journal appends[${index}] must be an object`)
+    }
+    const target = entry as Record<string, unknown>
+    const kind = target['kind']
+    const trackingKind = kind === null ? null : TRACKING_PATH_BY_KIND.has(kind as string) ? (kind as string) : undefined
+    if (trackingKind === undefined) {
+      throw new PendingCommitConflictError(
+        relPath,
+        `journal appends[${index}].kind must be null or one of ${TRACKING_STREAMS.map((stream) => stream.kind).join('|')}, got ${JSON.stringify(kind)}`,
+      )
+    }
+    const targetRelPath = target['relPath']
+    if (typeof targetRelPath !== 'string') {
+      throw new PendingCommitConflictError(relPath, `journal appends[${index}].relPath must be a string`)
+    }
+    if (trackingKind !== null) {
+      const expectedPath = TRACKING_PATH_BY_KIND.get(trackingKind)
+      if (targetRelPath !== expectedPath) {
+        throw new PendingCommitConflictError(
+          relPath,
+          `journal appends[${index}].relPath must be '${expectedPath}' for kind '${trackingKind}', got '${targetRelPath}'`,
+        )
+      }
+    } else if (targetRelPath !== RUNTIME_EVENTS_PATH) {
+      // kind=null = events 审计账本，落点是布局常量；篡改后会把事件行静默写进追踪流并丢掉 events
+      throw new PendingCommitConflictError(
+        relPath,
+        `journal appends[${index}].relPath must be '${RUNTIME_EVENTS_PATH}' for the kind=null events ledger, got '${targetRelPath}'`,
+      )
+    }
+    if (typeof target['baseBytes'] !== 'number' || !Number.isFinite(target['baseBytes'])) {
+      throw new PendingCommitConflictError(relPath, `journal appends[${index}].baseBytes must be a finite number`)
+    }
+    const baseSeq = target['baseSeq']
+    if (typeof baseSeq !== 'number' || !Number.isFinite(baseSeq)) {
+      throw new PendingCommitConflictError(relPath, `journal appends[${index}].baseSeq must be a finite number`)
+    }
+    if (trackingKind !== null && (!Number.isInteger(baseSeq) || baseSeq < 0)) {
+      throw new PendingCommitConflictError(
+        relPath,
+        `journal appends[${index}].baseSeq must be a non-negative integer for kind '${trackingKind}', got ${JSON.stringify(baseSeq)}`,
+      )
+    }
+    if (trackingKind === null && baseSeq !== -1) {
+      // events 账本无投影行序号：-1 是冻结占位约定，改成别的值即语义越界
+      throw new PendingCommitConflictError(
+        relPath,
+        `journal appends[${index}].baseSeq must be -1 (events-ledger placeholder), got ${JSON.stringify(baseSeq)}`,
+      )
+    }
+    const payloadBase64 = target['payloadBase64']
+    if (typeof payloadBase64 !== 'string') {
+      throw new PendingCommitConflictError(relPath, `journal appends[${index}].payloadBase64 must be a string`)
+    }
+    if (!isStrictBase64(payloadBase64)) {
+      throw new PendingCommitConflictError(
+        relPath,
+        `journal appends[${index}].payloadBase64 is not strictly decodable base64 (re-encode mismatch)`,
+      )
+    }
+  })
+
+  // 集合不变量（逐项校验通过后）：events 账本目标恰好一个；追踪族目标不得重复 kind。
+  // 0 个 events 目标会让事件行无处落、丢审计；重复 kind 会让同一流出现两个基线偏移，
+  // 恢复时按目标顺序追加即产生错位字节。
+  const eventsTargetCount = appends.filter((entry) => (entry as Record<string, unknown>)['kind'] === null).length
+  if (eventsTargetCount !== 1) {
+    throw new PendingCommitConflictError(
+      relPath,
+      `journal appends must contain exactly one kind=null events-ledger target, got ${eventsTargetCount}`,
+    )
+  }
+  const seenTrackingKinds = new Set<string>()
+  for (const entry of appends) {
+    const kind = (entry as Record<string, unknown>)['kind']
+    if (kind === null) {
+      continue
+    }
+    if (seenTrackingKinds.has(kind as string)) {
+      throw new PendingCommitConflictError(
+        relPath,
+        `journal appends must not repeat tracking kind '${kind as string}' (at most one append target per stream per commit)`,
+      )
+    }
+    seenTrackingKinds.add(kind as string)
+  }
+  return value as PendingCommitJournal
+}
+
+/**
+ * 读日志：缺失 = null（无待恢复事务）；不可读/非 JSON/形状非法一律抛
+ * PendingCommitConflictError（带 journal 路径），journal 与原件保持原样。
+ */
 function readJournalIfExists(root: string): PendingCommitJournal | null {
-  if (!existsSync(journalPath(root))) {
+  const path = journalPath(root)
+  if (!existsSync(path)) {
     return null
   }
-  return JSON.parse(readFileSync(journalPath(root), 'utf8')) as PendingCommitJournal
+  let raw: string
+  try {
+    raw = readFileSync(path, 'utf8')
+  } catch (error) {
+    throw new PendingCommitConflictError(PENDING_COMMIT_PATH, `journal unreadable at ${path}: ${(error as Error).message}`)
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new PendingCommitConflictError(
+      PENDING_COMMIT_PATH,
+      `journal is not valid JSON at ${path}: ${(error as Error).message}`,
+    )
+  }
+  return assertJournalShape(parsed, PENDING_COMMIT_PATH)
 }
 
 /**
@@ -354,6 +581,125 @@ export function recoverPendingCommit(root: string): void {
   )
 }
 
+/** 追加目标尾部（baseBytes 之后）必须与日志载荷逐字节相同，否则可定位冲突。 */
+function assertAppendPayloadOnDisk(root: string, target: JournalAppendTarget): void {
+  const disk = readFileSync(join(root, target.relPath))
+  const payload = Buffer.from(target.payloadBase64, 'base64')
+  const suffix = disk.subarray(target.baseBytes)
+  if (suffix.length !== payload.length || !suffix.equals(payload)) {
+    throw new PendingCommitConflictError(
+      target.relPath,
+      `disk bytes after journaled offset do not equal staged payload (${suffix.length}B != ${payload.length}B)`,
+    )
+  }
+}
+
+/** 回滚终点核对：目标必须只剩 baseBytes 前缀，多一字节即未收敛。 */
+function assertAppendRolledBackOnDisk(root: string, target: JournalAppendTarget): void {
+  const size = readFileSync(join(root, target.relPath)).length
+  if (size !== target.baseBytes) {
+    throw new PendingCommitConflictError(
+      target.relPath,
+      `rollback left ${size}B, expected journaled base ${target.baseBytes}B`,
+    )
+  }
+}
+
+/** flush 屏障：已写入的追加字节先落介质，journal 才允许消失。 */
+function fsyncFile(absolutePath: string): void {
+  const fd = openSync(absolutePath, 'r+')
+  try {
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+}
+
+/**
+ * 清扫本次事务可能残留的临时文件（正文 / 日志 / manifest 三个原子写落点）。
+ * 按「该目标路径 + .mozhou-tmp」前缀匹配，不触碰其他目标的临时文件。
+ */
+function sweepJournalTmpFiles(root: string, journal: PendingCommitJournal): void {
+  for (const rel of [journal.proseRelPath, MANIFEST_PATH, PENDING_COMMIT_PATH]) {
+    removeAtomicTmpFilesFor(join(root, rel))
+  }
+}
+
+/** 立基线后回读核对：manifest 记录必须与盘上字节一致，否则不算终态。 */
+function assertManifestMatchesDisk(root: string, relPaths: readonly string[]): void {
+  const manifest = readManifest(root)
+  for (const rel of relPaths) {
+    const entry = manifest.files[rel]
+    const absolute = join(root, rel)
+    if (entry === undefined || entry.sha256 !== sha256FileHex(absolute) || entry.bytes !== statSync(absolute).size) {
+      throw new PendingCommitConflictError(rel, 'manifest baseline does not match recovered disk bytes')
+    }
+  }
+}
+
+/**
+ * 投影重放：既有行内容必须与本次载荷一致，且新插入必须**确实生效**——
+ * INSERT OR IGNORE 的「被忽略」不等于成功，行内容不一致或插入被忽略
+ * 都抛冲突（journal 保留），绝不静默跳过、绝不静默丢行。
+ */
+function projectTrackingLines(db: Database.Database, targets: readonly JournalAppendTarget[]): void {
+  const select = db.prepare('SELECT line_sha256, payload FROM tracking_lines WHERE kind = ? AND seq = ?')
+  const insert = db.prepare(
+    'INSERT OR IGNORE INTO tracking_lines (kind, seq, line_sha256, payload) VALUES (?, ?, ?, ?)',
+  )
+  db.transaction(() => {
+    for (const target of targets) {
+      if (target.kind === null) {
+        continue
+      }
+      const payload = Buffer.from(target.payloadBase64, 'base64').toString('utf8')
+      jsonlLines(payload).forEach((line, offset) => {
+        const seq = target.baseSeq + offset
+        const lineSha = sha256Hex(line)
+        const existing = select.get(target.kind, seq) as { line_sha256: string; payload: string } | undefined
+        if (existing === undefined) {
+          // 插入必须生效：INSERT OR IGNORE 撞约束（如 CHECK(kind IN …)）时会静默丢行，
+          // 把「被忽略」当成功正是 W1 要消灭的静默丢行路径——changes !== 1 一律抛冲突。
+          const inserted = insert.run(target.kind, seq, lineSha, line)
+          if (inserted.changes !== 1) {
+            throw new PendingCommitConflictError(
+              target.relPath,
+              `projection insert for ${target.kind}#${seq} was ignored (changes=${inserted.changes}) — refusing to treat a dropped tracking row as success`,
+            )
+          }
+          return
+        }
+        if (existing.line_sha256 !== lineSha || existing.payload !== line) {
+          throw new PendingCommitConflictError(
+            target.relPath,
+            `projection row ${target.kind}#${seq} disagrees with journaled payload — INSERT OR IGNORE would have silently skipped it`,
+          )
+        }
+      })
+    }
+  })()
+}
+
+/**
+ * 前滚的投影步骤。投影文件缺失时无既有行可核对（ADR-0006 可弃投影），交给
+ * 重建从已补齐的 jsonl 派生；投影存在则必须核对通过，冲突照抛。
+ */
+function replayProjection(root: string, targets: readonly JournalAppendTarget[]): void {
+  if (!targets.some((target) => target.kind !== null)) {
+    return
+  }
+  const dbPath = join(root, RUNTIME_DB_PATH)
+  if (!existsSync(dbPath)) {
+    return
+  }
+  const db = openDatabase({ path: dbPath })
+  try {
+    projectTrackingLines(db, targets)
+  } finally {
+    db.close()
+  }
+}
+
 function recoverBackward(
   root: string,
   journal: PendingCommitJournal,
@@ -365,8 +711,13 @@ function recoverBackward(
       truncateSync(join(root, target.relPath), target.baseBytes)
     }
   }
-  // 清扫可能残留的正文临时文件（翻转前的写临时窗口）
-  rmSync(`${join(root, journal.proseRelPath)}.mozhou-tmp`, { force: true })
+  // 回滚终点核对 + flush：目标只剩基线前缀，且字节已落介质
+  for (const { target } of diskStates) {
+    assertAppendRolledBackOnDisk(root, target)
+    fsyncFile(join(root, target.relPath))
+  }
+  // 清扫本次事务可能残留的临时文件（翻转前的写临时窗口）
+  sweepJournalTmpFiles(root, journal)
   unlinkSync(journalPath(root))
 }
 
@@ -375,49 +726,69 @@ function recoverForward(
   journal: PendingCommitJournal,
   diskStates: readonly { target: JournalAppendTarget; disk: Buffer }[],
 ): void {
-  // 1) 补齐半截追加（partial ⇒ 归零重放，保证逐字节确定性）
+  // 1) 补齐追加目标：untouched ⇒ 补写整段载荷；partial ⇒ 归零重放（逐字节确定性）
   for (const { target, disk } of diskStates) {
     const classified = classifyAppendDiskState(disk, target)
-    if (classified.state === 'partial') {
+    if (classified.state === 'untouched') {
+      appendFileSync(join(root, target.relPath), Buffer.from(target.payloadBase64, 'base64'))
+    } else if (classified.state === 'partial') {
       truncateSync(join(root, target.relPath), target.baseBytes)
       appendFileSync(join(root, target.relPath), Buffer.from(target.payloadBase64, 'base64'))
     }
   }
 
-  // 2) 幂等重放投影行（INSERT OR IGNORE：正常路径已插入过则跳过）
-  if (journal.appends.some((target) => target.kind !== null)) {
-    const db = openDatabase({ path: join(root, RUNTIME_DB_PATH) })
-    try {
-      const insert = db.prepare(
-        'INSERT OR IGNORE INTO tracking_lines (kind, seq, line_sha256, payload) VALUES (?, ?, ?, ?)',
-      )
-      db.transaction(() => {
-        for (const target of journal.appends) {
-          if (target.kind === null) {
-            continue
-          }
-          const payload = Buffer.from(target.payloadBase64, 'base64').toString('utf8')
-          jsonlLines(payload).forEach((line, offset) => {
-            insert.run(target.kind, target.baseSeq + offset, sha256Hex(line), line)
-          })
-        }
-      })()
-    } finally {
-      db.close()
-    }
+  // 2) 盘上字节核对 + flush：每个目标的尾部必须与日志载荷逐字节相同，
+  //    不符即抛可定位冲突并保留 journal 与原件，绝不静默确认完成
+  for (const { target } of diskStates) {
+    assertAppendPayloadOnDisk(root, target)
+    fsyncFile(join(root, target.relPath))
   }
 
-  // 3) 立基线（正文 + 被触的 canon 流；events 在运行时区自动跳过）
-  const staleManifest = JSON.parse(readFileSync(join(root, MANIFEST_PATH), 'utf8')) as HashManifest
-  writeManifest(
-    root,
-    refreshManifestEntries(staleManifest, root, [
-      journal.proseRelPath,
-      ...journal.appends.filter((target) => target.kind !== null).map((target) => target.relPath),
-    ]),
-  )
+  // 3) 投影重放：核对既有行内容（INSERT OR IGNORE 的忽略不等于成功）
+  replayProjection(root, journal.appends)
 
+  // 4) 立基线（正文 + 被触的 canon 流；events 在运行时区自动跳过）并回读核对
+  const canonTouched = [
+    journal.proseRelPath,
+    ...journal.appends.filter((target) => target.kind !== null).map((target) => target.relPath),
+  ]
+  const staleManifest = readManifest(root)
+  writeManifest(root, refreshManifestEntries(staleManifest, root, canonTouched))
+  assertManifestMatchesDisk(root, canonTouched)
+
+  // 4.5) W3 操作结果（同一恢复单元）：线性化点之后、删 journal 之前幂等补写——
+  //      进程死在第 4~7 步之间时，由这里补上请求身份与结果，绝不丢身份
+  if (journal.operation !== undefined) {
+    writeOperationRecordIfAbsent(root, buildOperationRecord(root, journal.operation, journal))
+  }
+
+  // 5) 目标完整 + flush 成功 + 投影匹配 + manifest 一致 + 操作结果落盘 ⇒ 才移除日志与残留临时文件
+  sweepJournalTmpFiles(root, journal)
   unlinkSync(journalPath(root))
+}
+
+/**
+ * 由 journal 重建操作结果记录（恢复路径专用）：正文已在线性化点落盘，
+ * 故 appliedRevision/appliedBodyHash 从**盘上正文**读取，与正常路径同源。
+ */
+function buildOperationRecord(root: string, intent: OperationIntent, journal: PendingCommitJournal): OperationRecord {
+  const prose = readProseChapter(root, journal.proseRelPath)
+  return {
+    recordVersion: OPERATION_RECORD_VERSION,
+    operationId: intent.operationId,
+    operationType: intent.operationType,
+    principalId: intent.principalId,
+    bookId: intent.bookId,
+    requestDigest: intent.requestDigest,
+    chapterIndex: journal.chapterIndex,
+    state: 'succeeded',
+    result: {
+      appliedRevision: prose.revision,
+      appliedBodyHash: sha256Hex(prose.body),
+      ...(journal.commitId === '' ? {} : { commitId: journal.commitId }),
+    },
+    recordedAt: new Date().toISOString(),
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -459,6 +830,8 @@ export interface CommitChapterRequest {
   readonly dependencyManifest?: DependencyManifest
   /** 测试注入点：每阶段执行前回调，抛错即模拟该阶段中途失败。 */
   readonly onStage?: ((stage: CommitStage) => void) | undefined
+  /** W3 操作幂等：携带时先查结果记录（同 ID 同摘要回放、不同摘要拒绝），并把身份写进 journal v2。 */
+  readonly operation?: OperationIntent | undefined
 }
 
 export interface ChapterCommitResult {
@@ -467,6 +840,12 @@ export interface ChapterCommitResult {
   readonly proseRelPath: string
   readonly contentSha256: string
   readonly appendedCounts: Partial<Record<TrackingKind, number>>
+  /** W3：本次是回放既有结果（true）还是新执行（false）。 */
+  readonly replayed: boolean
+  /** W3：该操作**当时**落定的 revision（回放时是历史值，不是当前盘上值）。 */
+  readonly appliedRevision: number
+  /** W3：当前盘上 revision——UI 不得把它当成自己那次操作的基线。 */
+  readonly currentRevision: number
 }
 
 export interface CreateChapterDraftRequest {
@@ -568,6 +947,16 @@ function writeManifestFor(ctx: PlaneContext): void {
 /** 提交章节：原子三件套（正文翻转 + 追踪流增量 + 事件行），线性化点 = 相位翻转。 */
 export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest): ChapterCommitResult {
   const proseRel = proseChapterPath(request.chapterIndex)
+
+  // W3 幂等前置检查必须**先于**相位/revision 守卫：同一操作的成功结果不因章节此后
+  // 被提交或再编辑而否认（否则重试会撞 ChapterPhaseError/ProseRevisionConflictError）。
+  if (request.operation !== undefined) {
+    const replayed = findReplayableOperation(ctx.root, request.operation)
+    if (replayed !== null) {
+      return replayCommitResult(ctx.root, proseRel, replayed, request.chapterIndex)
+    }
+  }
+
   const before = readProseChapter(ctx.root, proseRel)
   if (before.phase !== 'draft') {
     throw new ChapterPhaseError(request.chapterIndex, 'chapter is committed — reopen it before re-committing')
@@ -608,7 +997,7 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
     chapterIndex: before.chapterIndex,
     phase: 'committed',
     commitId,
-    body: finalProse.endsWith('\n') || finalProse.length === 0 ? finalProse : `${finalProse}\n`,
+    body: normalizeProseBody(finalProse),
   })
 
   const appendedCounts: Partial<Record<TrackingKind, number>> = {}
@@ -657,13 +1046,14 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
   })
 
   const journal: PendingCommitJournal = {
-    journalVersion: 1,
+    journalVersion: request.operation === undefined ? 1 : 2,
     commitId,
     chapterIndex: before.chapterIndex,
     proseRelPath: proseRel,
     originalProseSha256: sha256FileHex(join(ctx.root, proseRel)),
     stagedProseSha256: sha256Hex(stagedProse),
     appends: appendTargets,
+    ...(request.operation === undefined ? {} : { operation: request.operation }),
   }
 
   request.onStage?.('journal-durable')
@@ -679,19 +1069,44 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
   request.onStage?.('event-append')
   appendFileSync(join(ctx.root, RUNTIME_EVENTS_PATH), Buffer.from(eventLine, 'utf8'))
 
+  // flush 屏障：追加字节先落介质，才允许进入线性化点与 journal 移除
+  for (const target of appendTargets) {
+    fsyncFile(join(ctx.root, target.relPath))
+  }
+
   // —— 线性化点：此后任何中断由 recoverPendingCommit 前滚收尾 ——
   request.onStage?.('prose-flip')
   atomicReplace(ctx.root, proseRel, stagedProse)
 
   request.onStage?.('projection')
-  insertTrackingLines(ctx.db, appendTargets)
+  projectTrackingLines(ctx.db, appendTargets)
 
   request.onStage?.('manifest')
-  ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, [
+  const canonTouched = [
     proseRel,
     ...appendTargets.filter((target) => target.kind !== null).map((target) => target.relPath),
-  ])
+  ]
+  ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, canonTouched)
   writeManifestFor(ctx)
+
+  // 终态核对：manifest 与盘上字节一致才移除日志（journal 只在满足终态后消失）
+  assertManifestMatchesDisk(ctx.root, canonTouched)
+
+  // W3 第 7 步：操作结果记录（线性化点之后、删 journal 之前；fsync 由 atomicWriteFileSync 承担）
+  if (request.operation !== undefined) {
+    writeOperationRecordIfAbsent(ctx.root, {
+      recordVersion: OPERATION_RECORD_VERSION,
+      operationId: request.operation.operationId,
+      operationType: request.operation.operationType,
+      principalId: request.operation.principalId,
+      bookId: request.operation.bookId,
+      requestDigest: request.operation.requestDigest,
+      chapterIndex: before.chapterIndex,
+      state: 'succeeded',
+      result: { appliedRevision: before.revision + 1, appliedBodyHash: sha256Hex(finalProse), commitId },
+      recordedAt: new Date().toISOString(),
+    })
+  }
 
   unlinkSync(journalPath(ctx.root))
 
@@ -701,24 +1116,10 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
     proseRelPath: proseRel,
     contentSha256: sha256Hex(finalProse),
     appendedCounts,
+    replayed: false,
+    appliedRevision: before.revision + 1,
+    currentRevision: before.revision + 1,
   }
-}
-
-function insertTrackingLines(db: Database.Database, targets: readonly JournalAppendTarget[]): void {
-  const insert = db.prepare(
-    'INSERT OR IGNORE INTO tracking_lines (kind, seq, line_sha256, payload) VALUES (?, ?, ?, ?)',
-  )
-  db.transaction(() => {
-    for (const target of targets) {
-      if (target.kind === null) {
-        continue
-      }
-      const payload = Buffer.from(target.payloadBase64, 'base64').toString('utf8')
-      jsonlLines(payload).forEach((line, offset) => {
-        insert.run(target.kind, target.baseSeq + offset, sha256Hex(line), line)
-      })
-    }
-  })()
 }
 
 export interface ChapterReopenResult {
@@ -784,6 +1185,8 @@ export interface SaveProseDraftRequest {
    * 「我已核对最新内容」按钮——外部改盘后 revision 不变，无此确认位冲突永远无法解决。
    */
   readonly confirmExternalOverwrite?: boolean | undefined
+  /** W3 操作幂等：携带时先查结果记录（同 ID 同摘要回放、不同摘要拒绝），并走轻量 journal。 */
+  readonly operation?: OperationIntent | undefined
 }
 
 export interface SaveProseDraftResult {
@@ -792,6 +1195,12 @@ export interface SaveProseDraftResult {
   readonly phase: 'draft'
   readonly created: boolean
   readonly proseRelPath: string
+  /** W3：本次是回放既有结果（true）还是新执行（false）。 */
+  readonly replayed: boolean
+  /** W3：该操作**当时**落定的 revision（回放时是历史值）。 */
+  readonly appliedRevision: number
+  /** W3：当前盘上 revision——UI 不得把它当成自己那次操作的基线。 */
+  readonly currentRevision: number
 }
 
 /**
@@ -804,6 +1213,31 @@ export interface SaveProseDraftResult {
  */
 export function saveProseDraft(ctx: PlaneContext, request: SaveProseDraftRequest): SaveProseDraftResult {
   const proseRel = proseChapterPath(request.chapterIndex)
+
+  // W3 幂等前置检查：先于新建/相位/revision 守卫——同一操作的成功结果不因章节此后
+  // 被再编辑或被提交而否认。
+  if (request.operation !== undefined) {
+    const replayed = findReplayableOperation(ctx.root, request.operation)
+    if (replayed !== null) {
+      let currentRevision = replayed.result.appliedRevision
+      try {
+        currentRevision = readProseChapter(ctx.root, proseRel).revision
+      } catch {
+        // 章此后被删除：仍回放历史结果
+      }
+      return {
+        chapterIndex: request.chapterIndex,
+        revision: currentRevision,
+        phase: 'draft',
+        created: false,
+        proseRelPath: proseRel,
+        replayed: true,
+        appliedRevision: replayed.result.appliedRevision,
+        currentRevision,
+      }
+    }
+  }
+
   const isNew = request.expectedRevision === null
 
   if (isNew) {
@@ -827,7 +1261,7 @@ export function saveProseDraft(ctx: PlaneContext, request: SaveProseDraftRequest
     }
   }
 
-  const normalizedBody = request.body.endsWith('\n') ? request.body : `${request.body}\n`
+  const normalizedBody = normalizeProseBody(request.body)
   const content = renderProseChapter({
     mozhouId: existing.mozhouId,
     revision: existing.revision + 1,
@@ -835,9 +1269,49 @@ export function saveProseDraft(ctx: PlaneContext, request: SaveProseDraftRequest
     phase: 'draft',
     body: normalizedBody,
   })
+
+  // W3：草稿保存同样要有可恢复的意图/结果记录（规划 §6.4.4）。用轻量 v2 journal：
+  // 正文翻转退化为覆盖写，appends 只放一个**空载荷**的 events 目标——既满足 journal
+  // 集合不变量（恰好一个 kind=null 目标），又不产生任何字节变化。
+  if (request.operation !== undefined) {
+    const emptyEventsTarget: JournalAppendTarget = {
+      kind: null,
+      relPath: RUNTIME_EVENTS_PATH,
+      baseBytes: statSync(join(ctx.root, RUNTIME_EVENTS_PATH)).size,
+      baseSeq: -1,
+      payloadBase64: '',
+    }
+    writeJournal(ctx.root, {
+      journalVersion: 2,
+      commitId: '',
+      chapterIndex: existing.chapterIndex,
+      proseRelPath: proseRel,
+      originalProseSha256: sha256FileHex(join(ctx.root, proseRel)),
+      stagedProseSha256: sha256Hex(content),
+      appends: [emptyEventsTarget],
+      operation: request.operation,
+    })
+  }
+
   atomicReplace(ctx.root, proseRel, content)
   ctx.manifest = refreshManifestEntries(ctx.manifest, ctx.root, [proseRel])
   writeManifestFor(ctx)
+
+  if (request.operation !== undefined) {
+    writeOperationRecordIfAbsent(ctx.root, {
+      recordVersion: OPERATION_RECORD_VERSION,
+      operationId: request.operation.operationId,
+      operationType: request.operation.operationType,
+      principalId: request.operation.principalId,
+      bookId: request.operation.bookId,
+      requestDigest: request.operation.requestDigest,
+      chapterIndex: existing.chapterIndex,
+      state: 'succeeded',
+      result: { appliedRevision: existing.revision + 1, appliedBodyHash: sha256Hex(normalizedBody) },
+      recordedAt: new Date().toISOString(),
+    })
+    unlinkSync(journalPath(ctx.root))
+  }
 
   return {
     chapterIndex: existing.chapterIndex,
@@ -845,6 +1319,9 @@ export function saveProseDraft(ctx: PlaneContext, request: SaveProseDraftRequest
     phase: 'draft',
     created: isNew,
     proseRelPath: proseRel,
+    replayed: false,
+    appliedRevision: existing.revision + 1,
+    currentRevision: existing.revision + 1,
   }
 }
 

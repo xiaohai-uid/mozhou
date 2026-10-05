@@ -11,6 +11,12 @@ export const RUNTIME_DB_PATH = `${RUNTIME_DIR}/runtime.sqlite`
 export const RUNTIME_EVENTS_PATH = `${RUNTIME_DIR}/events.jsonl`
 /** 对账提案存档（T5）：五态状态机的持久化落点。运行时区，非 canon、不参与对账。 */
 export const RUNTIME_RECONCILIATIONS_DIR = `${RUNTIME_DIR}/reconciliations`
+/** 任务记录仓（W4 · t41 §A）：一任务一文件，文件名 = sha256(taskId)。运行时区，非 canon。 */
+export const RUNTIME_TASKS_DIR = `${RUNTIME_DIR}/tasks`
+
+/** 操作结果仓（W3 · t32 §C.1）：一操作一文件，文件名 = sha256(operationId)。运行时区，非 canon。 */
+export const RUNTIME_OPERATIONS_DIR = `${RUNTIME_DIR}/operations`
+
 /** 管线提案仓（T18 · #42）：Canon Proposal 记录与 ProposalPort 逐条决策账的持久化落点。
  *  运行时区，非 canon、不参与对账；未确认提案跨重启待决的盘面凭据（S8 Proposal 后行）。 */
 export const RUNTIME_PROPOSALS_DIR = `${RUNTIME_DIR}/proposals`
