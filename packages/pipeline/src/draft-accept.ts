@@ -18,11 +18,16 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path'
 import {
   ChapterPhaseError,
+  OPERATION_RECORD_VERSION,
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
+  findReplayableOperation,
+  linkTaskOperation,
   proseChapterPath,
   renderProseChapter,
+  sha256Hex,
   withBook,
+  writeOperationRecordIfAbsent,
 } from '@mozhou/data-plane'
 import { CandidateError, acceptDraftCandidate as markAccepted, readDraftCandidate, type WriteBase } from './draft-candidate.js'
 
@@ -37,6 +42,10 @@ export interface AcceptDraftRequest {
   readonly chapterIndex?: number | undefined
   readonly allowPartial?: boolean | undefined
   readonly confirmPartial?: boolean | undefined
+  readonly expectedRevision?: number | undefined
+  readonly operationId?: string | undefined
+  readonly principalId?: string | undefined
+  readonly taskId?: string | undefined
 }
 
 export interface AcceptDraftResult {
@@ -46,6 +55,7 @@ export interface AcceptDraftResult {
   readonly sha256: string
   /** true = 本次请求未重新写入（幂等重放/崩溃恢复命中）。 */
   readonly alreadyApplied: boolean
+  readonly confirmPartial?: boolean | undefined
 }
 
 export class AcceptConflictError extends Error {
@@ -66,6 +76,7 @@ interface AcceptIntent {
   readonly before: WriteBase
   readonly after: WriteBase
   readonly state: 'intent' | 'done'
+  readonly confirmPartial?: boolean | undefined
 }
 
 function intentPath(root: string, candidateId: string): string {
@@ -227,24 +238,30 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
   if (keyHit !== null && keyHit.candidateId !== candidateId) {
     throw new AcceptConflictError('KEY_REUSED', 'KEY_REUSED: idempotencyKey already used for another candidate')
   }
+  const isPartialConfirmed = Boolean(request.allowPartial || request.confirmPartial)
   const existingIntent = readIntent(bookRoot, candidateId)
   if (existingIntent?.state === 'done') {
-    markAccepted(bookRoot, candidateId, existingIntent.after.revision, true)
+    markAccepted(bookRoot, candidateId, existingIntent.after.revision, true, { confirmPartial: isPartialConfirmed || Boolean(existingIntent.confirmPartial) })
     return {
       candidateId,
       chapterIndex: candidate.chapterIndex,
       revision: existingIntent.after.revision,
       sha256: existingIntent.after.sha256,
       alreadyApplied: true,
+      confirmPartial: isPartialConfirmed || Boolean(existingIntent.confirmPartial),
     }
   }
 
-  // C2 / R01：落盘前终态与合法性校验，拒绝 streaming/cancelled/failed；partial 必须显式确认
-  if (candidate.status === 'streaming' || candidate.status === 'cancelled' || candidate.status === 'failed') {
+  // C2 / R01 / W4-2b / W4-2c-3：落盘前终态与正交合法性校验
+  // 失败或取消产物一律拒绝；流中/取消请求中一律拒绝
+  if (candidate.taskState === 'failed' || candidate.taskState === 'cancelled') {
+    throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in taskState ${candidate.taskState} cannot be accepted`)
+  }
+  if (candidate.contentState === 'streaming' || candidate.taskState === 'running' || candidate.taskState === 'cancel_requested') {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status ${candidate.status} cannot be accepted`)
   }
-  const isPartialConfirmed = Boolean(request.allowPartial || request.confirmPartial)
-  if (candidate.status === 'partial' && !isPartialConfirmed) {
+  // 半稿必须经显式确认（confirmPartial / allowPartial）才可采纳
+  if (candidate.contentState === 'partial' && !isPartialConfirmed) {
     throw new CandidateError('CANDIDATE_NOT_ACCEPTABLE', `CANDIDATE_NOT_ACCEPTABLE: candidate ${candidateId} in status partial requires explicit confirmation`)
   }
   if (candidate.status !== 'ready' && candidate.status !== 'partial' && candidate.status !== 'accepted') {
@@ -254,6 +271,32 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
   // 采纳全程在同一次借用内完成：读相位 → 写 intent → 落正文 → 落 done intent。
   // 中途任何抛出都经 seam 的 catch 归还句柄（工单 08）——此前靠手写 finally。
   return withBook(bookRoot, (plane) => {
+    // F-01（W3 操作幂等）：操作身份冲突检查必须前置到**任何盘面副作用之前**。
+    // 此前只依赖落账末端的 writeOperationRecordIfAbsent——同 operationId 换候选时，
+    // 正文已被候选 B 改写、候选已标 accepted，之后才抛冲突，409 与盘面事实不一致。
+    // 同 ID 同摘要 ⇒ 回放既有成功结果（零写入，补齐 accepted 标记）；同 ID 不同
+    // 摘要（或主体/书不匹配）⇒ 此处即抛，正文/候选/intent 零变更。
+    if (request.operationId !== undefined) {
+      const replayHit = findReplayableOperation(bookRoot, {
+        operationType: 'draft.accept',
+        operationId: request.operationId,
+        principalId: request.principalId ?? 'local_user',
+        bookId: candidate.bookId,
+        requestDigest: sha256Hex(`${idempotencyKey}:${candidateId}:${isPartialConfirmed}`),
+      })
+      if (replayHit !== null) {
+        // acceptDraftCandidate 对同 revision 的重复采纳幂等返回（draft-candidate.ts:519）
+        markAccepted(bookRoot, candidateId, replayHit.result.appliedRevision, isPartialConfirmed, { confirmPartial: isPartialConfirmed })
+        return {
+          candidateId,
+          chapterIndex: candidate.chapterIndex,
+          revision: replayHit.result.appliedRevision,
+          sha256: replayHit.result.appliedBodyHash,
+          alreadyApplied: true,
+          ...(isPartialConfirmed ? { confirmPartial: true } : {}),
+        }
+      }
+    }
     const scan = plane.getProseChapter(candidate.chapterIndex)
     if (scan.phase !== 'draft') {
       throw new ChapterPhaseError(candidate.chapterIndex, 'accept requires phase=draft, got ' + scan.phase)
@@ -283,8 +326,15 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
       }
     }
 
+    // 最新 revision 显式校验：客户端声称 expectedRevision、候选 base.revision、磁盘现场三方必须一致
+    if (request.expectedRevision !== undefined && scan.revision !== request.expectedRevision) {
+      throw new ProseRevisionConflictError(candidate.chapterIndex, request.expectedRevision, scan.revision)
+    }
     if (scan.revision !== candidate.base.revision) {
       throw new ProseRevisionConflictError(candidate.chapterIndex, candidate.base.revision, scan.revision)
+    }
+    if (scan.revision !== base.revision) {
+      throw new ProseRevisionConflictError(candidate.chapterIndex, base.revision, scan.revision)
     }
     if (currentHash !== candidate.base.sha256) {
       // revision 相同但盘面 hash 已变：外部编辑器改盘——候选保留，拒绝静默覆盖
@@ -313,6 +363,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
       before: { revision: scan.revision, sha256: candidate.base.sha256 },
       after: { revision: afterRevision, sha256: afterSha256 },
       state: 'intent',
+      ...(isPartialConfirmed ? { confirmPartial: true } : {}),
     }
     writeIntent(bookRoot, intent)
 
@@ -324,11 +375,41 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
       expectedRevision: scan.revision,
     })
 
-    // 落盘后以盘面实据刷新 after（防规范化差异）；再标记候选 accepted
+    // 落盘后以盘面实据刷新 after（防规范化差异）；再标记候选 accepted（带落账审计）
     const finalRevision = afterRevision
     const finalSha256 = proseFileSha256(bookRoot, candidate.chapterIndex)
     writeIntent(bookRoot, { ...intent, after: { revision: finalRevision, sha256: finalSha256 }, state: 'done' })
-    markAccepted(bookRoot, candidateId, finalRevision, isPartialConfirmed)
-    return { candidateId, chapterIndex: candidate.chapterIndex, revision: finalRevision, sha256: finalSha256, alreadyApplied: false }
+    markAccepted(bookRoot, candidateId, finalRevision, isPartialConfirmed, { confirmPartial: isPartialConfirmed })
+
+    // W3 操作记录：若携带 operationId 则以 'draft.accept' 落账审计
+    if (request.operationId !== undefined) {
+      writeOperationRecordIfAbsent(bookRoot, {
+        recordVersion: OPERATION_RECORD_VERSION,
+        operationId: request.operationId,
+        operationType: 'draft.accept',
+        principalId: request.principalId ?? 'local_user',
+        bookId: candidate.bookId,
+        requestDigest: sha256Hex(`${idempotencyKey}:${candidateId}:${isPartialConfirmed}`),
+        chapterIndex: candidate.chapterIndex,
+        state: 'succeeded',
+        result: {
+          appliedRevision: finalRevision,
+          appliedBodyHash: finalSha256,
+        },
+        recordedAt: new Date().toISOString(),
+      })
+      if (request.taskId !== undefined) {
+        linkTaskOperation(bookRoot, request.taskId, request.operationId)
+      }
+    }
+
+    return {
+      candidateId,
+      chapterIndex: candidate.chapterIndex,
+      revision: finalRevision,
+      sha256: finalSha256,
+      alreadyApplied: false,
+      ...(isPartialConfirmed ? { confirmPartial: true } : {}),
+    }
   })
 }

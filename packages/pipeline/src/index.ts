@@ -22,6 +22,18 @@ export type { CandidateMode, CandidateStatus, DraftCandidate, DraftCandidateRequ
 export { AcceptConflictError, acceptDraft, findIntentByKey, proseFileSha256 } from './draft-accept.js';
 export type { AcceptDraftRequest, AcceptDraftResult } from './draft-accept.js';
 
+/** W4-2c-3 『续写』操作（新 operationId / taskKind='draft.continue' / 成本可见 / 禁止静默 / 全新 attemptId）。 */
+export {
+  ContinueOperationError,
+  estimateContinueCost,
+  prepareDraftContinue,
+} from './draft-continue.js';
+export type {
+  ContinueCostEstimate,
+  PrepareDraftContinueRequest,
+  PrepareDraftContinueResult,
+} from './draft-continue.js';
+
 /** 十步步进词表与序关系。 */
 export { PIPELINE_STEPS, isPipelineStep, nextStepOf, stepIndex } from './steps.js';
 export type { PipelineStep } from './steps.js';

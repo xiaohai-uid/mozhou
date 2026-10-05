@@ -53,12 +53,14 @@ import {
   CandidateError,
   CANDIDATE_TERMINAL,
   appendCandidateDelta,
-  cancelCandidate,
   createDraftCandidate,
+  requestCandidateCancel,
+  resolveCandidateCancel,
   finishCandidate,
   readDraftCandidate,
   type CandidateMode,
   type WriteBase,
+  resolveCandidateGenerationId,
 } from './draft-candidate.js';
 
 /** Draft 运行态目录：.mozhou 运行时区（非 canon、不参与对账）。 */
@@ -161,7 +163,10 @@ export interface DraftBindingOptions {
   /** C2（T04）：候选上下文。未提供候选即拒绝绑定——绝无「直接正文落盘」旁路。 */
   readonly candidate: {
     readonly id: string;
-    readonly operationId: string;
+    /** W4-2a：候选生成标识（新名）。 */
+    readonly generationId?: string | undefined;
+    /** @deprecated W4-2a 旧名，保留为可选输入别名（既有测试仍传它）。 */
+    readonly operationId?: string | undefined;
     readonly bookId: string;
     readonly base: WriteBase;
     readonly mode: CandidateMode;
@@ -171,6 +176,11 @@ export interface DraftBindingOptions {
   };
   /** 取消信号：HTTP 请求断开/显式 cancel 时中止上游流；延迟 chunk 不再写盘。 */
   readonly signal?: AbortSignal;
+  /**
+   * W4-2b：客户端视图代次。提供时，**旧代次**的迟到 chunk 在写盘之前被丢弃
+   * （未提供则只按序号丢弃，保持既有调用方行为不变）。
+   */
+  readonly generationEpoch?: number;
 }
 
 function assertDraftPhase(bookRoot: string, chapterIndex: number): void {
@@ -206,7 +216,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
     if (candidate === null) {
       candidate = createDraftCandidate(opts.bookRoot, {
         id: opts.candidate.id,
-        operationId: opts.candidate.operationId,
+        generationId: resolveCandidateGenerationId(opts.candidate),
         bookId: opts.candidate.bookId,
         chapterIndex: opts.chapterIndex,
         base: opts.candidate.base,
@@ -224,32 +234,78 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
       candidateId: candidate.id,
     });
     const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
+    // 闭包收窄边界：此后 candidate 会在循环内被 appendCandidateDelta 重赋值，闭包里
+    // 只依赖不变的候选 id（同 invocation 内 id 恒定）。
+    const candidateIdRef = candidate.id;
+    // F-09 取消单次结算：外部 /api/draft.cancel 可能已把候选直接终态化为 cancelled——
+    // 此时 requestCandidateCancel 会抛 CANDIDATE_NOT_CANCELLABLE，该 CandidateError 带
+    // code 字段，曾被 catch 里的 provider 错误归一误判成 PROVIDER_TERMINAL_UNKNOWN
+    // （审查探针 cancel-midstream）。竞态落败方幂等让位：已终态即读回现场，
+    // 绝不二次结算、绝不改判他人已定的结局。
+    const settleAbort = (outcome: { readonly upstreamCompleted: boolean }) => {
+      try {
+        requestCandidateCancel(opts.bookRoot, candidateIdRef);
+        return resolveCandidateCancel(opts.bookRoot, candidateIdRef, outcome);
+      } catch (error) {
+        if (!(error instanceof CandidateError && error.code === 'CANDIDATE_NOT_CANCELLABLE')) throw error;
+        // 竞态落败方读盘取已定结局；此刻候选必须存在（本 invocation 刚建/读过），
+        // 读不到 = 盘面异常，宁败不脏
+        const settledElsewhere = readDraftCandidate(opts.bookRoot, candidateIdRef);
+        if (settledElsewhere === null) {
+          throw new CandidateError('CANDIDATE_NOT_FOUND', `CANDIDATE_NOT_FOUND: candidate ${candidateIdRef} vanished during cancel race`);
+        }
+        return settledElsewhere;
+      }
+    };
+    // W4-2b：单任务内序号——从候选当前序号续起（跨进程续用不倒退），供丢弃迟到 chunk。
+    let streamSequence = candidate.lastSequence;
     try {
       if (aborted()) {
-        cancelCandidate(opts.bookRoot, candidate.id);
-        return candidate.text;
+        // 上游从未开始：判定点即此刻，未完成 ⇒ cancelled（F-09：幂等结算）
+        const settled = settleAbort({ upstreamCompleted: false });
+        return settled.text;
       }
       for await (const delta of opts.stream()) {
         if (aborted()) {
-          // 取消后的延迟 chunk 不写盘、不继续付费重试
-          cancelCandidate(opts.bookRoot, candidate.id);
-          break;
+          // 取消后的延迟 chunk 不写盘、不继续付费重试；上游被我们中止 ⇒ 未完成 ⇒ cancelled。
+          // F-09：此处直接结算并返回——旧实现 break 后会再撞下方「上游已结束」判定点，
+          // 二次 requestCandidateCancel 抛错并被误判成 PROVIDER_TERMINAL_UNKNOWN。
+          const settled = settleAbort({ upstreamCompleted: false });
+          writeDraftState(opts.bookRoot, {
+            chapterIndex: opts.chapterIndex,
+            proseRelPath: relPath,
+            status: 'partial',
+            chars: settled.text.length,
+            appendedChars: producedChars,
+            candidateId: settled.id,
+          });
+          return settled.text;
         }
         if (delta.length === 0) continue;
-        candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta);
+        streamSequence += 1;
+        // 迟到 chunk 守卫：**写盘之前**双校验（旧代次 / 已见序号一律丢弃，不落盘不报错）
+        candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta, {
+          ...(opts.generationEpoch === undefined ? {} : { generationEpoch: opts.generationEpoch }),
+          sequence: streamSequence,
+        });
         // 纯空白帧（换行、缩进）不计入：它们不构成可采纳的正文
         producedChars += delta.trim().length;
       }
       if (aborted()) {
+        // **判定点：上游流已经结束**（循环自然退出）——完成先于取消生效 ⇒ succeeded（规划 §6.5），
+        // 不因「客户端在此期间按了停止」就把一次完整生成改判为取消。
+        // F-09：若外部 cancelCandidate 已抢先终态化（cancelled），settleAbort 幂等让位——
+        // 保留已结算的 cancelled（单次结算），状态文件按实际终态写 partial。
+        const settled = settleAbort({ upstreamCompleted: true });
         writeDraftState(opts.bookRoot, {
           chapterIndex: opts.chapterIndex,
           proseRelPath: relPath,
-          status: 'partial',
-          chars: candidate.text.length,
+          status: settled.taskState === 'succeeded' ? 'complete' : 'partial',
+          chars: settled.text.length,
           appendedChars: producedChars,
-          candidateId: candidate.id,
+          candidateId: settled.id,
         });
-        return candidate.text;
+        return settled.text;
       }
       // 零增量流 = 上游静默空输出。抛 RecoverableError 交引擎二级定向重生
       // （M17），候选穷尽后随链报 failed_recoverable；由下方 catch 统一

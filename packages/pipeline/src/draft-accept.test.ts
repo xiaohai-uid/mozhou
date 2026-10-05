@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID, createHash } from 'node:crypto'
-import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane'
+import { LocalDataPlane, createBook, proseChapterPath, OperationIdReusedError } from '@mozhou/data-plane'
 import {
   createDraftCandidate,
   appendCandidateDelta,
@@ -721,6 +721,61 @@ describe('draft-accept (C2 / R01): 写前校验与终态保护', () => {
       expect(planeAfter.getProseChapter(1).body).toBe('作者外部新修改内容。\n')
       planeAfter.close()
       expect(readDraftCandidate(root, id)?.status).toBe('ready')
+    })
+  })
+
+  describe('F-01 操作幂等前置（审查回归锁）', () => {
+    it('同 operationId 同候选重试 → 回放原结果；换候选 → 冲突在任何盘面副作用之前抛出', () => {
+      const a = createFixtureCandidate('replace')
+      finishCandidate(root, a.id, 'ready')
+      const first = acceptDraft({
+        bookRoot: root,
+        candidateId: a.id,
+        base: a.base,
+        idempotencyKey: 'f01-key',
+        operationId: 'f01-operation',
+        bookId: a.bookId,
+      })
+      expect(first.alreadyApplied).toBe(false)
+
+      const planeAfterA = LocalDataPlane.open(root)
+      const afterA = planeAfterA.getProseChapter(1)
+      planeAfterA.close()
+
+      // 同 operationId 同候选重试 → 回放（零新写入）
+      const replay = acceptDraft({
+        bookRoot: root,
+        candidateId: a.id,
+        base: a.base,
+        idempotencyKey: 'f01-key',
+        operationId: 'f01-operation',
+        bookId: a.bookId,
+      })
+      expect(replay.alreadyApplied).toBe(true)
+      expect(replay.revision).toBe(first.revision)
+      expect(replay.sha256).toBe(first.sha256)
+
+      // 候选 B（现场 base）复用同 operationId → 冲突必须先于正文写入/accepted 标记
+      const b = createFixtureCandidate('replace')
+      finishCandidate(root, b.id, 'ready')
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: b.id,
+          base: b.base,
+          idempotencyKey: 'f01-key-b',
+          operationId: 'f01-operation',
+          bookId: b.bookId,
+        }),
+      ).toThrow(OperationIdReusedError)
+
+      const planeAfterConflict = LocalDataPlane.open(root)
+      const afterConflict = planeAfterConflict.getProseChapter(1)
+      planeAfterConflict.close()
+      expect(afterConflict.revision).toBe(afterA.revision)
+      expect(afterConflict.body).toBe(afterA.body)
+      expect(readDraftCandidate(root, b.id)?.canonState).toBe('unaccepted')
+      expect(existsSync(join(root, '.mozhou', 'accept-intents', b.id + '.json'))).toBe(false)
     })
   })
 })

@@ -37,11 +37,13 @@
 import {
   ChapterPhaseError,
   ProseRevisionConflictError,
+  findReplayableOperation,
   proseChapterPath,
   readProseChapter,
   releaseBook,
   retainBook,
 } from '@mozhou/data-plane';
+import type { OperationIntent, OperationRecord } from '@mozhou/data-plane';
 import { PublishBus } from '@mozhou/runtime';
 import { readPendingDependencyManifest } from './compile-step.js';
 import type { CandidateDeltaBatch } from './extract-step.js';
@@ -137,6 +139,12 @@ export type ChapterCommitOutcome =
       readonly flywheelRecord: ChapterCommitFlywheelRecordView;
       readonly sessionWindow: ChapterCommitSessionWindowView;
       readonly resubmitWindowCleanup: ChapterCommitCleanupView;
+      /** W3：本次是回放既有操作结果（true）还是新执行（false）；未携带 operation 的旧请求恒为 false。 */
+      readonly replayed: boolean;
+      /** W3：该操作**当时**落定的 revision（回放时是历史值）。 */
+      readonly appliedRevision: number;
+      /** W3：当前盘上 revision——UI 不得当成自己那次操作的基线。 */
+      readonly currentRevision: number;
     }
   | { readonly kind: 'proposal_stale'; readonly staleProposals: readonly CanonProposalRecord[] }
   | {
@@ -182,6 +190,55 @@ export interface RunChapterCommitRequest {
    * flywheelRecord.afterRecordError 如实上报。
    */
   readonly afterRecord?: (window: { readonly taskRef: string }) => void;
+  /**
+   * W3 操作幂等：操作身份随本请求进入 commitChapter（journal v2），使「操作结果」与
+   * 「正文变更」处于**同一恢复单元**（规划 §6.4.4）。缺省 = 旧请求，保持既有语义。
+   */
+  readonly operation?: OperationIntent | undefined;
+  /**
+   * W2-3/F-03 注入缝：跨进程书稿写租约的取还由调用方提供（依赖方向：pipeline 不 import
+   * web 的 bookAccess）。编排保证在**每个进入写回段的分支**（提取缝返回后的新提交分支、
+   * 以及没有提取缝的提案续接分支）先取租约、出口必还——此前提案续接分支绕过了
+   * extract 回调里的取锁位，外部进程持锁期间仍可提交。缺省 = 不取锁（保持旧调用方兼容）。
+   */
+  readonly acquireWriteLease?: () => Promise<void>;
+  readonly releaseWriteLease?: () => Promise<void>;
+}
+
+/**
+ * F-04（W3）：成功提交的同号重试必须回放**原结果**（200 + 原 commitId + replayed:true），
+ * 而不是撞相位守卫变 409 CHAPTER_ALREADY_COMMITTED——丢失确认的调用方将永远无法安全收敛。
+ * 判定放在相位守卫与正文读取之前：回放不需要读正文，章此后被删/已提交都不影响回放。
+ * 同 ID 不同摘要/他人作用域仍按 findReplayableOperation 的既有冲突语义抛出。
+ */
+function replayOutcomeFromRecord(root: string, chapterIndex: number, record: OperationRecord): ChapterCommitOutcome {
+  let currentRevision = record.result.appliedRevision;
+  try {
+    currentRevision = readProseChapter(root, proseChapterPath(chapterIndex)).revision;
+  } catch {
+    // 章此后被删除：仍回放历史结果，currentRevision 退回 appliedRevision
+  }
+  return {
+    kind: 'committed',
+    commitId: record.result.commitId ?? '',
+    chapterIndex,
+    contentSha256: record.result.appliedBodyHash,
+    canonProposal: null,
+    deltaExtraction: null,
+    replayed: true,
+    appliedRevision: record.result.appliedRevision,
+    currentRevision,
+    // 回放**不**新落 FlywheelRecorded（单次结算：原提交时已恰一条）。两态词表里没有
+    // 「跳过」，用 state_degraded + 明确 errorDetail 如实呈现，绝不伪造 recorded。
+    flywheelRecord: {
+      status: 'state_degraded',
+      recordedCount: 0,
+      errorDetail: 'operation replay: flywheel record was settled at the original commit; no new record written',
+      afterRecordError: null,
+    },
+    sessionWindow: { driven: false, taskRef: null, completed: false, errorDetail: null },
+    resubmitWindowCleanup: { abandoned: false, taskRef: null, errorDetail: null },
+  };
 }
 
 /**
@@ -195,7 +252,27 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
   // 词法借用的 withBook 表达不了（它承诺 await 前就归还）。故走 retain/release：
   // acquire 在函数入口、release 在 finally，二者成对且都在本函数内可见。
   const plane = retainBook(root);
+  // W2-3/F-03：写租约只在「模型等待结束 → 写回段结束」持有；takeLease 幂等，
+  // 两个进入写回段的分支（新提交 / 提案续接）各调一次，出口 finally 统一归还。
+  let leaseHeld = false;
+  const takeLease = async (): Promise<void> => {
+    if (leaseHeld || request.acquireWriteLease === undefined) return;
+    await request.acquireWriteLease();
+    leaseHeld = true;
+  };
+  const dropLease = async (): Promise<void> => {
+    if (!leaseHeld) return;
+    leaseHeld = false;
+    await request.releaseWriteLease?.();
+  };
   try {
+    // F-04：操作回放判定先行（不需要读正文），其后才是相位/revision 守卫。
+    if (request.operation !== undefined) {
+      const replayHit = findReplayableOperation(root, request.operation);
+      if (replayHit !== null) {
+        return replayOutcomeFromRecord(root, chapterIndex, replayHit);
+      }
+    }
     const proseFile = readProseChapter(root, proseChapterPath(chapterIndex));
     const prose = proseFile.body;
     // 工单 02 缺陷 A：合法相位检查前移到提取缝（真实 LLM 调用）之前——committed 章
@@ -352,6 +429,10 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
         dropped: delta.dropped,
         ...(delta.reason === undefined ? {} : { reason: delta.reason }),
       };
+      // W2-3/F-03：模型等待在锁外；从提取返回起本请求进入书稿写入段——先取跨进程
+      // 写租约（同书第二写入者排队，超时 409 BOOK_WRITE_BUSY），与旧 extract 回调
+      // 内取锁的时点一致。
+      await takeLease();
 
       // 工单03 步 6 步锚：复用管线 extract-step 模块（runFinalExtract）把提取产物以
       // 会话 taskRef 落账 CandidateDeltaExtracted（成败都落，账面可审计）；注入缝的
@@ -388,6 +469,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
           summary: request.summary,
           expectedRevision: request.expectedRevision,
           ...dependencyManifestFields,
+          ...(request.operation === undefined ? {} : { operation: request.operation }),
         });
         return {
           kind: 'committed',
@@ -396,6 +478,9 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
           contentSha256: result.contentSha256,
           canonProposal: null,
           deltaExtraction,
+          replayed: result.replayed,
+          appliedRevision: result.appliedRevision,
+          currentRevision: result.currentRevision,
           flywheelRecord: recordFlywheel(result.commitId),
           sessionWindow: completeDrivenSession(result.commitId),
           resubmitWindowCleanup: cleanupStaleResubmitWindow(),
@@ -439,6 +524,10 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
 
     // 工单03 步 8 步锚（汇聚点）：新建提案与崩溃恢复续跑（record 已存在）两条路径
     // 都在此落窗口内的提案配对头。
+    // W2-3/F-03：提案续接分支没有提取缝可借位取锁——进入写回段前同样必须持锁。
+    // 此前该分支完全绕过跨进程书锁，外部进程持锁期间仍可 200 并提交（审查负样本 W2）。
+    // takeLease 幂等：新提交分支已在此前取过时是空操作。
+    await takeLease();
     if (drive !== null && driveEngaged && record !== null) {
       anchorDrivenProposal({ proposalId: record.proposalId });
     }
@@ -476,6 +565,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       expectedRevision: request.expectedRevision,
       ...(hasAppends ? { appends } : {}),
       ...dependencyManifestFields,
+      ...(request.operation === undefined ? {} : { operation: request.operation }),
     });
 
     // 提案收口：commitChapter 成功之后才翻 consumed——提交失败时作者的逐条决策
@@ -489,11 +579,16 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       contentSha256: result.contentSha256,
       canonProposal: loadCanonProposal(root, record.proposalId) ?? record,
       deltaExtraction,
+      replayed: result.replayed,
+      appliedRevision: result.appliedRevision,
+      currentRevision: result.currentRevision,
       flywheelRecord: recordFlywheel(result.commitId),
       sessionWindow: completeDrivenSession(result.commitId),
       resubmitWindowCleanup: cleanupStaleResubmitWindow(),
     };
   } finally {
+    // W2-3/F-03：写租约与 plane 句柄同界归还——所有 return/throw 路径都经此处。
+    await dropLease();
     releaseBook(plane);
   }
 }
