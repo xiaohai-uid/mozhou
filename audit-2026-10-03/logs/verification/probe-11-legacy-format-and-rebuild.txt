@@ -1,0 +1,11 @@
+=== Probe 11: 旧数据格式打开及迁移失败后的处理 ===
+测试时间: 2026-10-02T17:28:37.439Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-11-HyBCDv
+人工构造旧版 SQLite: PRAGMA user_version = 1 (当前代码期望=2)
+LocalDataPlane.open() 结果: 预期抛出异常 -> ProjectionVersionMismatchError: projection user_version=1, expected 2 — rebuild projection from canon
+是否为 ProjectionVersionMismatchError: true
+子项 11A 判定: 严格模式下拒绝执行增量迁移，强制 fail-fast (true)
+openOrRebuild() 结果: 自动从正典 Markdown 重建成功，新 PRAGMA user_version = 2
+重建后数据完备性: 正文读回成功 -> "【正典内容】用于测试旧格式重建。" (revision=1)
+子项 11B 判定: 删库/版本错配幂等自愈重建机制 100% 成立

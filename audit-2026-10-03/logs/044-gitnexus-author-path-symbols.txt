@@ -1,0 +1,654 @@
+=== GitNexus Symbol Contexts for Author Path ===
+--- Symbol: assembleBudgetedContext ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "assembleBudgetedContext",
+    "startLine": 399,
+    "endLine": 720
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Class:apps/web/server/account/store.ts:AccountStore",
+        "name": "AccountStore",
+        "filePath": "apps/web/server/account/store.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/bookAccess.ts:BookAccessManager",
+        "name": "BookAccessManager",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      }
+    ],
+    "uses": [
+      {
+        "uid": "File:apps/web/server/draftContext.test.ts",
+        "name": "draftContext.test.ts",
+        "filePath": "apps/web/server/draftContext.test.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:ProviderUnavailableError",
+        "name": "ProviderUnavailableError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:SourceChangedError",
+        "name": "SourceChangedError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:SourceTooLargeError",
+        "name": "SourceTooLargeError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_1_makestreamengine",
+      "name": "MakeStreamEngine → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_6_acceptdraft",
+      "name": "AcceptDraft → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_6_acceptdraft",
+      "name": "AcceptDraft → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    }
+  ]
+}
+--- Symbol: saveProseDraft ---
+{
+  "status": "ambiguous",
+  "message": "Found 2 symbols matching 'saveProseDraft'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.saveProseDraft#1",
+      "name": "saveProseDraft",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 221,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "saveProseDraft",
+      "kind": "",
+      "filePath": "",
+      "line": 805,
+      "score": 0.5
+    }
+  ]
+}
+--- Symbol: acceptDraft ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "acceptDraft",
+    "startLine": 184,
+    "endLine": 334
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/novelBreakdown.test.ts",
+        "name": "novelBreakdown.test.ts",
+        "filePath": "apps/web/server/analysis/novelBreakdown.test.ts"
+      }
+    ],
+    "uses": [
+      {
+        "uid": "File:apps/web/server/draftContext.test.ts",
+        "name": "draftContext.test.ts",
+        "filePath": "apps/web/server/draftContext.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/draftContext.test.ts",
+        "name": "draftContext.test.ts",
+        "filePath": "apps/web/server/draftContext.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/semanticSettled.hosted.test.ts",
+        "name": "semanticSettled.hosted.test.ts",
+        "filePath": "apps/web/server/semanticSettled.hosted.test.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    }
+  ]
+}
+--- Symbol: commitChapter ---
+{
+  "status": "ambiguous",
+  "message": "Found 4 symbols matching 'commitChapter'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmit.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmit.test.ts",
+      "line": 96,
+      "score": 0.56
+    },
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts",
+      "line": 77,
+      "score": 0.56
+    },
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.commitChapter#1",
+      "name": "commitChapter",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 211,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "commitChapter",
+      "kind": "",
+      "filePath": "",
+      "line": 569,
+      "score": 0.5
+    }
+  ]
+}
+--- Symbol: recoverPendingCommit ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "recoverPendingCommit",
+    "startLine": 320,
+    "endLine": 355
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Class:apps/web/server/account/store.ts:AccountStore",
+        "name": "AccountStore",
+        "filePath": "apps/web/server/account/store.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/bookAccess.ts:BookAccessManager",
+        "name": "BookAccessManager",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "name": "makeBook"
+      }
+    ],
+    "uses": [
+      {
+        "name": "useEditorSelection"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "name": "bookIdOf"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    }
+  ]
+}
+--- Symbol: rebuildProjectionFromCanon ---
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:packages/data-plane/src/local-data-plane.ts:rebuildProjectionFromCanon",
+    "name": "rebuildProjectionFromCanon",
+    "kind": "Function",
+    "filePath": "packages/data-plane/src/local-data-plane.ts",
+    "startLine": 451,
+    "endLine": 465
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:packages/data-plane/src/entity-cards.test.ts",
+        "name": "entity-cards.test.ts",
+        "filePath": "packages/data-plane/src/entity-cards.test.ts"
+      },
+      {
+        "uid": "File:packages/data-plane/src/local-data-plane.test.ts",
+        "name": "local-data-plane.test.ts",
+        "filePath": "packages/data-plane/src/local-data-plane.test.ts"
+      },
+      {
+        "uid": "File:packages/data-plane/src/stale.test.ts",
+        "name": "stale.test.ts",
+        "filePath": "packages/data-plane/src/stale.test.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "name": "readCanonState"
+      },
+      {
+        "name": "openDatabase"
+      },
+      {
+        "name": "buildManifest"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_150_restorebookbackup",
+      "name": "RestoreBookBackup → RemoveProjectionFiles",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_151_restorebookbackup",
+      "name": "RestoreBookBackup → InitProjection",
+      "step_index": 4,
+      "step_count": 5
+    }
+  ]
+}
+--- Symbol: executeChapterReview ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "executeChapterReview",
+    "startLine": 232,
+    "endLine": 349
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "name": "makeBook"
+      },
+      {
+        "name": "styleSectionOf"
+      },
+      {
+        "name": "makeBookWithSemanticOnlyFact"
+      }
+    ],
+    "uses": [
+      {
+        "name": "useEditorSelection"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    }
+  ]
+}
+--- Symbol: exportSubmissionDocx ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "exportSubmissionDocx",
+    "startLine": 23,
+    "endLine": 128
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/novelBreakdown.test.ts",
+        "name": "novelBreakdown.test.ts",
+        "filePath": "apps/web/server/analysis/novelBreakdown.test.ts"
+      }
+    ],
+    "uses": [
+      {
+        "uid": "File:apps/web/server/draftContext.test.ts",
+        "name": "draftContext.test.ts",
+        "filePath": "apps/web/server/draftContext.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/storyboard/generate.test.ts",
+        "name": "generate.test.ts",
+        "filePath": "apps/web/server/storyboard/generate.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/storyboard/generate.test.ts",
+        "name": "generate.test.ts",
+        "filePath": "apps/web/server/storyboard/generate.test.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    }
+  ]
+}
+--- Symbol: createBookBackup ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "createBookBackup",
+    "startLine": 94,
+    "endLine": 156
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Class:apps/web/server/account/store.ts:AccountStore",
+        "name": "AccountStore",
+        "filePath": "apps/web/server/account/store.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/bookAccess.ts:BookAccessManager",
+        "name": "BookAccessManager",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      }
+    ],
+    "uses": [
+      {
+        "uid": "File:apps/web/server/draftContext.test.ts",
+        "name": "draftContext.test.ts",
+        "filePath": "apps/web/server/draftContext.test.ts"
+      },
+      {
+        "name": "useEditorSelection"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    }
+  ]
+}
+--- Symbol: restoreBookBackup ---
+{
+  "status": "found",
+  "symbol": {
+    "name": "restoreBookBackup",
+    "startLine": 161,
+    "endLine": 245
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/embedding.ts:createLocalEmbeddingProvider.queryEmbed@177:4#1",
+        "name": "queryEmbed",
+        "filePath": "packages/context-compiler/src/embedding.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/embedding.ts:createLocalEmbeddingProvider.passageEmbed@184:4#1",
+        "name": "passageEmbed",
+        "filePath": "packages/context-compiler/src/embedding.ts"
+      }
+    ],
+    "uses": [
+      {
+        "name": "useEditorSelection"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    }
+  ]
+}

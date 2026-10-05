@@ -1,0 +1,167 @@
+=== gitnexus query: accept draft candidate ===
+{
+  "processes": [
+    {
+      "id": "proc_443_attachreconciliation",
+      "summary": "AttachReconciliationForDataRoot → ReaddirSafe",
+      "priority": 0.104,
+      "symbol_count": 2,
+      "process_type": "intra_community",
+      "step_count": 3
+    },
+    {
+      "id": "proc_244_attachreconciliation",
+      "summary": "AttachReconciliationForDataRoot → RequestBoundaryError",
+      "priority": 0.094,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 4
+    },
+    {
+      "id": "proc_495_workbenchview",
+      "summary": "WorkbenchView → CandidateDraftKey",
+      "priority": 0.084,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 3
+    },
+    {
+      "id": "proc_496_workbenchview",
+      "summary": "WorkbenchView → LoadCandidateCache",
+      "priority": 0.084,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 3
+    },
+    {
+      "id": "proc_497_workbenchview",
+      "summary": "WorkbenchView → ProviderGuidance",
+      "priority": 0.084,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+
+=== gitnexus context: acceptDraft ===
+{
+  "status": "found",
+  "symbol": {
+    "name": "acceptDraft",
+    "startLine": 184,
+    "endLine": 334
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/novelBreakdown.test.ts",
+        "name": "novelBreakdown.test.ts",
+        "filePath": "apps/web/server/analysis/novelBreakdown.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/styleAnalysis.test.ts",
+        "name": "styleAnalysis.test.ts",
+        "filePath": "apps/web/server/analysis/styleAnalysis.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/styleAnalysis.test.ts",
+        "name": "styleAnalysis.test.ts",
+        "filePath": "apps/web/server/analysis/styleAnalysis.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/styleAnalysis.test.ts",
+        "name": "styleAnalysis.test.ts",
+        "filePath": "apps/web/server/analysis/styleAnalysis.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/catalog.test.ts",
+        "name": "catalog.test.ts",
+        "filePath": "apps/web/server/billing/catalog.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/catalog.test.ts",
+        "name": "catalog.test.ts",
+        "filePath": "apps/web/server/billing/catalog.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/catalog.test.ts",
+        "name": "catalog.test.ts",
+        "filePath": "apps/web/server/billing/catalog.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/catalog.test.ts",
+        "name": "catalog.test.ts",
+        "filePath": "apps/web/server/billing/catalog.test.ts"
+      },
+
+=== gitnexus context: saveProseDraft ===
+{
+  "status": "ambiguous",
+  "message": "Found 2 symbols matching 'saveProseDraft'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.saveProseDraft#1",
+      "name": "saveProseDraft",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 221,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "saveProseDraft",
+      "kind": "",
+      "filePath": "",
+      "line": 805,
+      "score": 0.5
+    }
+  ]
+}
+
+=== gitnexus context: commitChapter ===
+{
+  "status": "ambiguous",
+  "message": "Found 4 symbols matching 'commitChapter'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmit.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmit.test.ts",
+      "line": 96,
+      "score": 0.56
+    },
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts",
+      "line": 77,
+      "score": 0.56
+    },
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.commitChapter#1",
+      "name": "commitChapter",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 211,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "commitChapter",
+      "kind": "",
+      "filePath": "",
+      "line": 569,
+      "score": 0.5
+    }
+  ]
+}

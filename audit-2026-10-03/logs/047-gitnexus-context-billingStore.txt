@@ -1,0 +1,130 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Method:apps/web/server/billing/store.ts:BillingStore.createOrder#1",
+    "name": "createOrder",
+    "kind": "Method",
+    "filePath": "apps/web/server/billing/store.ts",
+    "startLine": 141,
+    "endLine": 223
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/billing/billingStore.test.ts",
+        "name": "billingStore.test.ts",
+        "filePath": "apps/web/server/billing/billingStore.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/billingStore.test.ts",
+        "name": "billingStore.test.ts",
+        "filePath": "apps/web/server/billing/billingStore.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/billingStore.test.ts",
+        "name": "billingStore.test.ts",
+        "filePath": "apps/web/server/billing/billingStore.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/billingStore.test.ts",
+        "name": "billingStore.test.ts",
+        "filePath": "apps/web/server/billing/billingStore.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/billingStore.test.ts",
+        "name": "billingStore.test.ts",
+        "filePath": "apps/web/server/billing/billingStore.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/billingStore.test.ts",
+        "name": "billingStore.test.ts",
+        "filePath": "apps/web/server/billing/billingStore.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/entitlements.test.ts",
+        "name": "entitlements.test.ts",
+        "filePath": "apps/web/server/billing/entitlements.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/entitlements.test.ts",
+        "name": "entitlements.test.ts",
+        "filePath": "apps/web/server/billing/entitlements.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/pollingWorker.test.ts",
+        "name": "pollingWorker.test.ts",
+        "filePath": "apps/web/server/billing/pollingWorker.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/pollingWorker.test.ts",
+        "name": "pollingWorker.test.ts",
+        "filePath": "apps/web/server/billing/pollingWorker.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/routes/billingRoutes.test.ts",
+        "name": "billingRoutes.test.ts",
+        "filePath": "apps/web/server/routes/billingRoutes.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/routes/billingRoutes.test.ts",
+        "name": "billingRoutes.test.ts",
+        "filePath": "apps/web/server/routes/billingRoutes.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/routes/billingRoutes.test.ts",
+        "name": "billingRoutes.test.ts",
+        "filePath": "apps/web/server/routes/billingRoutes.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/routes/billingRoutes.test.ts",
+        "name": "billingRoutes.test.ts",
+        "filePath": "apps/web/server/routes/billingRoutes.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/routes/billingRoutes.test.ts",
+        "name": "billingRoutes.test.ts",
+        "filePath": "apps/web/server/routes/billingRoutes.test.ts"
+      },
+      {
+        "uid": "Function:apps/web/server/routes/billingRoutes.ts:billingRoutes",
+        "name": "billingRoutes",
+        "filePath": "apps/web/server/routes/billingRoutes.ts"
+      }
+    ],
+    "has_method": [
+      {
+        "uid": "Class:apps/web/server/billing/store.ts:BillingStore",
+        "name": "BillingStore",
+        "filePath": "apps/web/server/billing/store.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:apps/web/server/security.ts:RequestBoundaryError",
+        "name": "RequestBoundaryError",
+        "filePath": "apps/web/server/security.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/billing/store.ts:BillingStore.getDb#0",
+        "name": "getDb",
+        "filePath": "apps/web/server/billing/store.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/billing/store.ts:BillingStore.mapOrderRow#1",
+        "name": "mapOrderRow",
+        "filePath": "apps/web/server/billing/store.ts"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_171_billingroutes",
+      "name": "BillingRoutes → GetDataRoot",
+      "step_index": 2,
+      "step_count": 4
+    }
+  ]
+}

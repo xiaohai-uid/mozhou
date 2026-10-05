@@ -1,0 +1,46 @@
+=== SELF-CHECK / CORRECTION LOG (2026-10-03) ===
+
+[A] INTEGRITY: did this audit modify the product?  -> NO
+  HEAD before/after            : 90b45a1a1bf15a97b1cc690ad0b9872018aeebcb  (unchanged)
+  branch before/after          : feature/windows-local-release  (unchanged)
+  git diff --stat AGENTS.md    : 18 +-   (same as captured in logs/014; NOT touched by audit)
+  git diff --stat CLAUDE.md    : 14 +-   (same as captured in logs/015; NOT touched by audit)
+  AGENTS.md mtime              : 2026-10-02 21:22:03  (predates audit start 00:48)
+  CLAUDE.md mtime              : 2026-10-02 21:22:03  (predates audit start 00:48)
+  MOZHOU_MODULE_ARCHITECTURE_AUDIT.md mtime : 2026-10-03 00:23:36  (unchanged; NOT overwritten)
+  No commit / push / reset / clean / stash / branch switch was executed.
+  No product file, config, test, or lockfile was created, edited, or deleted.
+  Only writes performed: audit-2026-10-03/** (this audit's own deliverables).
+
+[B] CORRECTION: uncommitted-count reconciliation
+  Empirical test (isolated git repo under %TEMP%, since removed):
+      empty untracked dir present  -> git status --porcelain count = 0
+      after adding one file in it  -> count = 1  ("?? emptydir/")
+    => git does NOT report empty untracked directories.
+  Timeline therefore is:
+    t0  audit-2026-10-03/ created but EMPTY  -> NOT reported -> porcelain = 42  (all pre-existing)
+    t1  first log file written                -> dir now non-empty -> porcelain = 43
+        logs/010 was captured at t1, so it holds 43 lines (1 of which is the audit dir).
+  MEASURED raw line counts:
+      logs/010 = 43 lines  (1 line = ?? audit-2026-10-03/)
+      logs/011 = 51 lines  (1 line = the audit log file itself)
+      => pre-audit baseline = 42 default entries / 50 untracked+tracked file entries
+  CORRECTION: an earlier draft of 01-baseline-and-graph-gate.md asserted the briefing's "42"
+  was wrong and should be "41". THAT WAS INCORRECT. The briefing was right.
+  01 and inventory.json have been corrected to 42 / 50, with the empty-dir pitfall documented.
+  Lesson applied to the whole team: the task briefing's numbers were independently re-verified,
+  and where they were confirmed they are now cited as CONFIRMED rather than "corrected".
+
+[C] DELIVERABLES
+  00-audit-charter.md            口径（授权边界/证据标签/强度分级/未知项写法/判定词/图谱与数据库口径）
+  01-baseline-and-graph-gate.md  基线事实 + 图谱门禁 + DB 通道 + 版本/数据目录矩阵
+  inventory.json                 41 个运行单元（结构化）
+  logs/010-033                   原始命令输出
+
+[D] UNTOUCHED-BY-AUDIT CONFIRMED
+  - .mozhou_data\ and apps\web\.mozhou_data\   (real billing.sqlite + WAL): listed only, never opened
+  - %LOCALAPPDATA%\MoZhou (absent), %LOCALAPPDATA%\Programs\MoZhou (listed only)
+  - no running process was stopped; port 4173 owner left untouched
+  - no database query executed; no driver installed; no direct DB connection
+  - gitnexus: only status/list/doctor/check/query/context/impact/detect-changes/help were run.
+    analyze / clean / remove / wiki / publish / mcp / serve / setup / uninstall were NOT run.

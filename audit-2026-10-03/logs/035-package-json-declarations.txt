@@ -1,0 +1,284 @@
+===== 035: workspace package.json declarations (WORKTREE) =====
+
+---------- package.json ----------
+{
+  "name": "mozhou",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "preinstall": "node scripts/check-install-env.mjs",
+    "build": "tsc -b",
+    "start": "node scripts/launcher.mjs",
+    "build:release": "node scripts/build-release.mjs",
+    "package:windows": "pnpm build && pnpm --filter @mozhou/web build && node scripts/release/windows/build.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "package": "node scripts/build-release.mjs",
+    "lint": "eslint .",
+    "test": "pnpm run test:packages && pnpm run test:web",
+    "test:packages": "vitest run",
+    "test:web": "pnpm --filter @mozhou/web test",
+    "verify:real-model": "node scripts/verify-real-model-journey.mjs",
+    "verify:journey": "node scripts/verify-mock-journey.mjs",
+    "graph:status": "node .gitnexus/run.cjs status",
+    "graph:analyze": "node .gitnexus/run.cjs analyze",
+    "graph:snapshot": "node scripts/export-code-graph.mjs",
+    "audit:unreferenced": "node scripts/audit-unreferenced.mjs",
+    "graph:check": "node .gitnexus/run.cjs check --cycles --json -r .",
+    "test:real-model": "node scripts/run-real-model-tests.mjs",
+    "gen:architecture": "node scripts/gen-architecture.mjs",
+    "check:architecture": "node scripts/gen-architecture.mjs --check",
+    "gen:adr-refs": "node scripts/gen-adr-refs.mjs",
+    "check:glossary": "node scripts/verify-glossary.mjs",
+    "check:gates": "node scripts/verify-gates-contract.mjs",
+    "gen:term-map": "node scripts/gen-term-map.mjs",
+    "check:term-map": "node scripts/gen-term-map.mjs --self-test && node scripts/gen-term-map.mjs --check",
+    "check:readmes": "node scripts/verify-package-readmes.mjs",
+    "duplication": "npx --yes jscpd@3.5.10 --config .jscpd.json",
+    "coverage:check": "node scripts/report-coverage-status.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "eslint": "^9.17.0",
+    "typescript": "~5.5.4",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^3.2.7"
+  },
+  "pnpm": {
+    "overrides": {
+      "tar": "7.5.22",
+      "js-yaml": "4.3.2",
+      "fast-uri": "3.1.7",
+      "brace-expansion@^1.0.0": "1.1.20",
+      "brace-expansion@^5.0.0": "5.0.11"
+    },
+    "patchedDependencies": {
+      "fastembed@2.1.0": "patches/fastembed@2.1.0.patch"
+    }
+  }
+}
+
+
+---------- packages/kernel/package.json ----------
+{
+  "name": "@mozhou/kernel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  }
+}
+
+
+---------- packages/quality-engine/package.json ----------
+{
+  "name": "@mozhou/quality-engine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./de-ai": {
+      "types": "./dist/de-ai.d.ts",
+      "default": "./dist/de-ai.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}
+
+
+---------- packages/data-plane/package.json ----------
+{
+  "name": "@mozhou/data-plane",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "dependencies": {
+    "@mozhou/kernel": "workspace:*",
+    "better-sqlite3": "^12.2.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12"
+  }
+}
+
+
+---------- packages/context-compiler/package.json ----------
+{
+  "name": "@mozhou/context-compiler",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "fastembed": "^2.1.0"
+  }
+}
+
+
+---------- packages/pipeline/package.json ----------
+{
+  "name": "@mozhou/pipeline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
+  }
+}
+
+
+---------- packages/runtime/package.json ----------
+{
+  "name": "@mozhou/runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "yaml": "^2.6.1"
+  }
+}
+
+
+---------- packages/flywheel/package.json ----------
+{
+  "name": "@mozhou/flywheel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mozhou/benchmark": "workspace:*",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}
+
+
+---------- packages/benchmark/package.json ----------
+{
+  "name": "@mozhou/benchmark",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "test:continuity": "vitest run src/continuity-assertions.test.ts"
+  },
+
+  "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
+    "@mozhou/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}
+
+
+---------- apps/web/package.json ----------
+{
+  "name": "@mozhou/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && tsc -p tsconfig.server.json",
+    "preview": "vite preview",
+    "serve": "node dist-server/productionServer.js",
+    "test": "vitest run",
+    "test:real-model": "node ../../scripts/run-real-model-tests.mjs",
+    "typecheck": "tsc -b && tsc -p tsconfig.server.json --noEmit"
+  },
+  "dependencies": {
+    "@mozhou/context-compiler": "workspace:*",
+    "@mozhou/data-plane": "workspace:*",
+    "@mozhou/flywheel": "workspace:*",
+    "@mozhou/kernel": "workspace:*",
+    "@mozhou/pipeline": "workspace:*",
+    "@mozhou/quality-engine": "workspace:*",
+    "@mozhou/runtime": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.5.4",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.7"
+  }
+}

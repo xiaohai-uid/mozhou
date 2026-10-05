@@ -1,0 +1,11 @@
+=== Probe 01: 保存中断后重开 ===
+测试时间: 2026-10-02T17:28:36.488Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-01-MBNW7k
+初始状态: revision=1, phase=draft
+注入故障: 临时文件 C:\Users\a1691\AppData\Local\Temp\mozhou-probe-01-MBNW7k\正文\第一卷\第0001章.md.mozhou-tmp 残留在盘上
+重开回读: revision=1, phase=draft
+正文完整性: 完美保持原正文未损坏
+临时文件残留状态: 仍在磁盘上（未自动清理）
+后续保存: 成功写入新版本 revision=2
+新正文回读: 成功覆盖更新

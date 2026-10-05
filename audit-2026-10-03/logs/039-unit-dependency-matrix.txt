@@ -1,0 +1,72 @@
+===== 039: per-unit @mozhou/* dependency matrix (prod vs test) =====
+
+UNIT packages/kernel  [pkg-kernel]
+    @mozhou/kernel   - / TEST
+
+UNIT packages/quality-engine  [pkg-quality-engine]
+
+UNIT packages/data-plane  [pkg-data-plane]
+    @mozhou/kernel   PROD / TEST
+
+UNIT packages/context-compiler  [pkg-context-compiler]
+    @mozhou/context-compiler   - / TEST
+    @mozhou/data-plane   PROD / TEST
+    @mozhou/kernel   PROD / TEST
+
+UNIT packages/pipeline  [pkg-pipeline]
+    @mozhou/context-compiler   PROD / TEST
+    @mozhou/data-plane   PROD / TEST
+    @mozhou/kernel   PROD / TEST
+    @mozhou/quality-engine   PROD / TEST
+    @mozhou/runtime   PROD / TEST
+
+UNIT packages/runtime  [pkg-runtime]
+    @mozhou/data-plane   PROD / -
+    @mozhou/kernel   PROD / -
+
+UNIT packages/flywheel  [pkg-flywheel]
+    @mozhou/benchmark   PROD / TEST
+    @mozhou/data-plane   PROD / TEST
+    @mozhou/kernel   PROD / TEST
+    @mozhou/pipeline   PROD / TEST
+    @mozhou/runtime   PROD / TEST
+
+UNIT packages/benchmark  [pkg-benchmark]
+    @mozhou/context-compiler   PROD / TEST
+    @mozhou/kernel   PROD / TEST
+    @mozhou/pipeline   PROD / TEST
+    @mozhou/quality-engine   - / TEST
+    @mozhou/runtime   - / TEST
+
+UNIT apps/web/server  [bff-server]
+    @mozhou/context-compiler   PROD / TEST
+    @mozhou/data-plane   PROD / TEST
+    @mozhou/flywheel   PROD / TEST
+    @mozhou/kernel   PROD / TEST
+    @mozhou/pipeline   PROD / TEST
+    @mozhou/quality-engine   PROD / -
+    @mozhou/runtime   PROD / TEST
+
+UNIT apps/web/src  [web-client-src]
+    @mozhou/context-compiler   - / TEST
+    @mozhou/data-plane   PROD / TEST
+    @mozhou/kernel   - / TEST
+    @mozhou/pipeline   - / TEST
+    @mozhou/quality-engine   PROD / TEST
+    @mozhou/quality-engine/de-ai   PROD / TEST
+    @mozhou/runtime   - / TEST
+
+UNIT apps/web  [app-web-root]
+    @mozhou/context-compiler   PROD / TEST
+    @mozhou/data-plane   PROD / TEST
+    @mozhou/flywheel   PROD / TEST
+    @mozhou/kernel   PROD / TEST
+    @mozhou/pipeline   PROD / TEST
+    @mozhou/quality-engine   PROD / TEST
+    @mozhou/quality-engine/de-ai   PROD / TEST
+    @mozhou/runtime   PROD / TEST
+
+UNIT scripts  [scripts]
+    @mozhou/web   PROD / -
+
+UNIT src-tauri  [tauri-host]

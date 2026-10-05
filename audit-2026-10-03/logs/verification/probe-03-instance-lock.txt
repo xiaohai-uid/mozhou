@@ -1,0 +1,13 @@
+=== Probe 03: 同数据根双实例启动 ===
+测试时间: 2026-10-02T17:28:36.623Z
+基线版本: WORKTREE(未提交)
+隔离数据根: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-03-bflczv
+实例 1 获取锁成功: lockPath=C:\Users\a1691\AppData\Local\Temp\mozhou-probe-03-bflczv/.mozhou_instance.lock
+实例 2 获取锁结果: 预期抛出异常 -> DATA_ROOT_LOCKED: another service instance (PID 53720) is running on dataRoot: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-03-bflczv
+场景 3A 判定: 排他锁正常生效，拒绝第二实例
+注入故障: 写入无效/已死 PID 99999999
+实例 2 探测到 ESRCH 并成功接管旧锁
+场景 3B 判定: 失效锁自动接管机制生效
+注入故障: 模拟 PID 复用，写入当前存活系统的 PID=53720
+实例尝试启动: 捕获拒绝异常 -> DATA_ROOT_LOCKED: another service instance (PID 53720) is running on dataRoot: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-03-bflczv
+场景 3C 判定: PID 复用时确会引发假死死锁，拒绝新实例启动（验证了 t5 报告裁定）

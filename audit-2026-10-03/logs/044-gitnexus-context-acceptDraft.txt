@@ -1,0 +1,5383 @@
+{
+  "status": "found",
+  "symbol": {
+    "name": "acceptDraft",
+    "startLine": 184,
+    "endLine": 334
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Method:packages/data-plane/src/yaml-frontmatter.ts:FlowParser.readScalar#1",
+        "name": "readScalar",
+        "filePath": "packages/data-plane/src/yaml-frontmatter.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/yaml-frontmatter.ts:FlowParser.readScalar#1",
+        "name": "readScalar",
+        "filePath": "packages/data-plane/src/yaml-frontmatter.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/embedding.ts:createLocalEmbeddingProvider.queryEmbed@177:4#1",
+        "name": "queryEmbed",
+        "filePath": "packages/context-compiler/src/embedding.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/embedding.ts:createLocalEmbeddingProvider.passageEmbed@184:4#1",
+        "name": "passageEmbed",
+        "filePath": "packages/context-compiler/src/embedding.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/tokenizer.ts:createLocalTokenizer.count@238:4#1",
+        "name": "count",
+        "filePath": "packages/context-compiler/src/tokenizer.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/tokenizer.ts:createLocalTokenizer.count@238:4#1",
+        "name": "count",
+        "filePath": "packages/context-compiler/src/tokenizer.ts"
+      },
+      {
+        "uid": "Method:packages/context-compiler/src/tokenizer.ts:createLocalTokenizer.count@238:4#1",
+        "name": "count",
+        "filePath": "packages/context-compiler/src/tokenizer.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/auth/deviceFlow.ts:DeviceFlowManager.createAuthorizationRequest#1",
+        "name": "createAuthorizationRequest",
+        "filePath": "apps/web/server/auth/deviceFlow.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/auth/deviceFlow.ts:DeviceFlowManager.exchangeCode#1",
+        "name": "exchangeCode",
+        "filePath": "apps/web/server/auth/deviceFlow.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/auth/session.ts:InMemoryAuthProvider.signUp#2",
+        "name": "signUp",
+        "filePath": "apps/web/server/auth/session.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/auth/session.ts:InMemoryAuthProvider.signIn#2",
+        "name": "signIn",
+        "filePath": "apps/web/server/auth/session.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/auth/session.ts:InMemoryAuthProvider.updatePasswordForUser#2",
+        "name": "updatePasswordForUser",
+        "filePath": "apps/web/server/auth/session.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.open#1",
+        "name": "open",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.open#1",
+        "name": "open",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.open#1",
+        "name": "open",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.open#1",
+        "name": "open",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.open#1",
+        "name": "open",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.absorbAppWrite#1",
+        "name": "absorbAppWrite",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.absorbAppWrite#1",
+        "name": "absorbAppWrite",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.verifyBaseline#0",
+        "name": "verifyBaseline",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.verifyBaseline#0",
+        "name": "verifyBaseline",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.verifyBaseline#0",
+        "name": "verifyBaseline",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.verifyBaseline#0",
+        "name": "verifyBaseline",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.queryActiveFacts#1",
+        "name": "queryActiveFacts",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.queryInvalidatedKnowledgeStates#0",
+        "name": "queryInvalidatedKnowledgeStates",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.propagateStaleMarkers#1",
+        "name": "propagateStaleMarkers",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.reloadManifest#0",
+        "name": "reloadManifest",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.getBookRecord#0",
+        "name": "getBookRecord",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.getCanonState#0",
+        "name": "getCanonState",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.getProseChapter#1",
+        "name": "getProseChapter",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:ProviderUnavailableError",
+        "name": "ProviderUnavailableError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:SourceChangedError",
+        "name": "SourceChangedError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:SourceTooLargeError",
+        "name": "SourceTooLargeError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:ModelOutputError",
+        "name": "ModelOutputError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:apps/web/server/storyboard/generate.ts:ModelOutputError",
+        "name": "ModelOutputError",
+        "filePath": "apps/web/server/storyboard/generate.ts"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetUnavailableError",
+        "name": "BudgetUnavailableError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/accounting.mjs:BudgetExhaustedError",
+        "name": "BudgetExhaustedError",
+        "filePath": "handoff-results/review-fix/harness/accounting.mjs"
+      },
+      {
+        "uid": "Class:handoff-results/review-fix/harness/transport.mjs:ChannelRefusedError",
+        "name": "ChannelRefusedError",
+        "filePath": "handoff-results/review-fix/harness/transport.mjs"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      },
+      {
+        "uid": "Class:packages/data-plane/src/canon-read.ts:CanonStructureError",
+        "name": "CanonStructureError",
+        "filePath": "packages/data-plane/src/canon-read.ts"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_0_commitchapter",
+      "name": "CommitChapter → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_1_makestreamengine",
+      "name": "MakeStreamEngine → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_2_createchapterdraft",
+      "name": "CreateChapterDraft → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_2_createchapterdraft",
+      "name": "CreateChapterDraft → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_2_createchapterdraft",
+      "name": "CreateChapterDraft → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_2_createchapterdraft",
+      "name": "CreateChapterDraft → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_3_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_3_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_3_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 7,
+      "step_count": 7
+    },
+    {
+      "id": "proc_3_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_4_applystructuredupser",
+      "name": "ApplyStructuredUpsert → FlowParser",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_4_applystructuredupser",
+      "name": "ApplyStructuredUpsert → FlowParser",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_4_applystructuredupser",
+      "name": "ApplyStructuredUpsert → FlowParser",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_4_applystructuredupser",
+      "name": "ApplyStructuredUpsert → FlowParser",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_4_applystructuredupser",
+      "name": "ApplyStructuredUpsert → FlowParser",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_5_applystructuredupser",
+      "name": "ApplyStructuredUpsert → Dedent",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_5_applystructuredupser",
+      "name": "ApplyStructuredUpsert → Dedent",
+      "step_index": 7,
+      "step_count": 7
+    },
+    {
+      "id": "proc_5_applystructuredupser",
+      "name": "ApplyStructuredUpsert → Dedent",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_5_applystructuredupser",
+      "name": "ApplyStructuredUpsert → Dedent",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_5_applystructuredupser",
+      "name": "ApplyStructuredUpsert → Dedent",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_5_applystructuredupser",
+      "name": "ApplyStructuredUpsert → Dedent",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_6_acceptdraft",
+      "name": "AcceptDraft → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_6_acceptdraft",
+      "name": "AcceptDraft → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_6_acceptdraft",
+      "name": "AcceptDraft → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_6_acceptdraft",
+      "name": "AcceptDraft → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_7_deleteentitycard",
+      "name": "DeleteEntityCard → FlowParser",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_7_deleteentitycard",
+      "name": "DeleteEntityCard → FlowParser",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_7_deleteentitycard",
+      "name": "DeleteEntityCard → FlowParser",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_7_deleteentitycard",
+      "name": "DeleteEntityCard → FlowParser",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_7_deleteentitycard",
+      "name": "DeleteEntityCard → FlowParser",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_7_deleteentitycard",
+      "name": "DeleteEntityCard → FlowParser",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 7,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_8_deleteentitycard",
+      "name": "DeleteEntityCard → Dedent",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 7,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_9_deleteentitycard",
+      "name": "DeleteEntityCard → ParseBlockScalar",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_10_deleteentitycard",
+      "name": "DeleteEntityCard → CanonStructureError",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_10_deleteentitycard",
+      "name": "DeleteEntityCard → CanonStructureError",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_10_deleteentitycard",
+      "name": "DeleteEntityCard → CanonStructureError",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_10_deleteentitycard",
+      "name": "DeleteEntityCard → CanonStructureError",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_10_deleteentitycard",
+      "name": "DeleteEntityCard → CanonStructureError",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_10_deleteentitycard",
+      "name": "DeleteEntityCard → CanonStructureError",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_12_readentitycard",
+      "name": "ReadEntityCard → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_12_readentitycard",
+      "name": "ReadEntityCard → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_12_readentitycard",
+      "name": "ReadEntityCard → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_12_readentitycard",
+      "name": "ReadEntityCard → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_13_readplanningartifact",
+      "name": "ReadPlanningArtifact → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_13_readplanningartifact",
+      "name": "ReadPlanningArtifact → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_13_readplanningartifact",
+      "name": "ReadPlanningArtifact → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_13_readplanningartifact",
+      "name": "ReadPlanningArtifact → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_14_summarizestructured",
+      "name": "SummarizeStructured → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_14_summarizestructured",
+      "name": "SummarizeStructured → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_16_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_16_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_16_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_16_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_17_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_17_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 6,
+      "step_count": 7
+    },
+    {
+      "id": "proc_17_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 7,
+      "step_count": 7
+    },
+    {
+      "id": "proc_17_onsettled",
+      "name": "OnSettled → Sha256Hex",
+      "step_index": 5,
+      "step_count": 7
+    },
+    {
+      "id": "proc_18_readoutlinenode",
+      "name": "ReadOutlineNode → SendJson",
+      "step_index": 3,
+      "step_count": 7
+    },
+    {
+      "id": "proc_18_readoutlinenode",
+      "name": "ReadOutlineNode → SendJson",
+      "step_index": 4,
+      "step_count": 7
+    },
+    {
+      "id": "proc_18_readoutlinenode",
+      "name": "ReadOutlineNode → SendJson",
+      "step_index": 1,
+      "step_count": 7
+    },
+    {
+      "id": "proc_18_readoutlinenode",
+      "name": "ReadOutlineNode → SendJson",
+      "step_index": 2,
+      "step_count": 7
+    },
+    {
+      "id": "proc_26_updateentitycard",
+      "name": "UpdateEntityCard → CanonStructureError",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_26_updateentitycard",
+      "name": "UpdateEntityCard → CanonStructureError",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_26_updateentitycard",
+      "name": "UpdateEntityCard → CanonStructureError",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_26_updateentitycard",
+      "name": "UpdateEntityCard → CanonStructureError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_26_updateentitycard",
+      "name": "UpdateEntityCard → CanonStructureError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_27_updateentitycard",
+      "name": "UpdateEntityCard → SendJson",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_27_updateentitycard",
+      "name": "UpdateEntityCard → SendJson",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_27_updateentitycard",
+      "name": "UpdateEntityCard → SendJson",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_28_readstyleprofiles",
+      "name": "ReadStyleProfiles → SendJson",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_28_readstyleprofiles",
+      "name": "ReadStyleProfiles → SendJson",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_28_readstyleprofiles",
+      "name": "ReadStyleProfiles → SendJson",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_29_onsettled",
+      "name": "OnSettled → JsonlLines",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_29_onsettled",
+      "name": "OnSettled → JsonlLines",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_29_onsettled",
+      "name": "OnSettled → JsonlLines",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_30_onsettled",
+      "name": "OnSettled → IsRecord",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_30_onsettled",
+      "name": "OnSettled → IsRecord",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_30_onsettled",
+      "name": "OnSettled → IsRecord",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_31_onsettled",
+      "name": "OnSettled → JsonlLineCount",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_31_onsettled",
+      "name": "OnSettled → JsonlLineCount",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_31_onsettled",
+      "name": "OnSettled → JsonlLineCount",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_32_onsettled",
+      "name": "OnSettled → StaleBudgetError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_32_onsettled",
+      "name": "OnSettled → StaleBudgetError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_33_onsettled",
+      "name": "OnSettled → ChapterFileStem",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_33_onsettled",
+      "name": "OnSettled → ChapterFileStem",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_33_onsettled",
+      "name": "OnSettled → ChapterFileStem",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_34_onsettled",
+      "name": "OnSettled → PreWriteHashMismatchError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_34_onsettled",
+      "name": "OnSettled → PreWriteHashMismatchError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_36_applystructuredupser",
+      "name": "ApplyStructuredUpsert → CanonStructureError",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_36_applystructuredupser",
+      "name": "ApplyStructuredUpsert → CanonStructureError",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_36_applystructuredupser",
+      "name": "ApplyStructuredUpsert → CanonStructureError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_36_applystructuredupser",
+      "name": "ApplyStructuredUpsert → CanonStructureError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_37_createentitycard",
+      "name": "CreateEntityCard → CanonStructureError",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_37_createentitycard",
+      "name": "CreateEntityCard → CanonStructureError",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_37_createentitycard",
+      "name": "CreateEntityCard → CanonStructureError",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_37_createentitycard",
+      "name": "CreateEntityCard → CanonStructureError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_37_createentitycard",
+      "name": "CreateEntityCard → CanonStructureError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_38_phasecreal",
+      "name": "PhaseCReal → ChannelRefusedError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_39_extractchapterdelta",
+      "name": "ExtractChapterDelta → SendJson",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_39_extractchapterdelta",
+      "name": "ExtractChapterDelta → SendJson",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_39_extractchapterdelta",
+      "name": "ExtractChapterDelta → SendJson",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_40_builddefaultextracto",
+      "name": "BuildDefaultExtractor → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_40_builddefaultextracto",
+      "name": "BuildDefaultExtractor → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_40_builddefaultextracto",
+      "name": "BuildDefaultExtractor → UnescapeQuoted",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_40_builddefaultextracto",
+      "name": "BuildDefaultExtractor → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_41_builddefaultextracto",
+      "name": "BuildDefaultExtractor → CanonStructureError",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_41_builddefaultextracto",
+      "name": "BuildDefaultExtractor → CanonStructureError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_41_builddefaultextracto",
+      "name": "BuildDefaultExtractor → CanonStructureError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_42_extractdelta",
+      "name": "ExtractDelta → IsHostedMode",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_42_extractdelta",
+      "name": "ExtractDelta → IsHostedMode",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_43_extractdelta",
+      "name": "ExtractDelta → TierConfigPath",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_43_extractdelta",
+      "name": "ExtractDelta → TierConfigPath",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_44_extractdelta",
+      "name": "ExtractDelta → TierRouteUnsupportedError",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_44_extractdelta",
+      "name": "ExtractDelta → TierRouteUnsupportedError",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_45_extractdelta",
+      "name": "ExtractDelta → SsrfBlockedHost",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_45_extractdelta",
+      "name": "ExtractDelta → SsrfBlockedHost",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_46_extractdelta",
+      "name": "ExtractDelta → Unavailable",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_46_extractdelta",
+      "name": "ExtractDelta → Unavailable",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_47_intakepaths",
+      "name": "IntakePaths → FactRow",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_47_intakepaths",
+      "name": "IntakePaths → FactRow",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_47_intakepaths",
+      "name": "IntakePaths → FactRow",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_49_runqualityreview",
+      "name": "RunQualityReview → IsWhitespace",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_49_runqualityreview",
+      "name": "RunQualityReview → IsWhitespace",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_49_runqualityreview",
+      "name": "RunQualityReview → IsWhitespace",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_49_runqualityreview",
+      "name": "RunQualityReview → IsWhitespace",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_49_runqualityreview",
+      "name": "RunQualityReview → IsWhitespace",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_49_runqualityreview",
+      "name": "RunQualityReview → IsWhitespace",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_50_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → TrackingRowError",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_50_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → TrackingRowError",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_50_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → TrackingRowError",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_50_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → TrackingRowError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_50_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → TrackingRowError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_51_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → SendJson",
+      "step_index": 1,
+      "step_count": 6
+    },
+    {
+      "id": "proc_51_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → SendJson",
+      "step_index": 2,
+      "step_count": 6
+    },
+    {
+      "id": "proc_51_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → SendJson",
+      "step_index": 3,
+      "step_count": 6
+    },
+    {
+      "id": "proc_52_onsettled",
+      "name": "OnSettled → JsonlLines",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_52_onsettled",
+      "name": "OnSettled → JsonlLines",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_52_onsettled",
+      "name": "OnSettled → JsonlLines",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_53_onsettled",
+      "name": "OnSettled → IsRecord",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_53_onsettled",
+      "name": "OnSettled → IsRecord",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_53_onsettled",
+      "name": "OnSettled → IsRecord",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_54_onsettled",
+      "name": "OnSettled → JsonlLineCount",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_54_onsettled",
+      "name": "OnSettled → JsonlLineCount",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_54_onsettled",
+      "name": "OnSettled → JsonlLineCount",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_55_onsettled",
+      "name": "OnSettled → StaleBudgetError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_55_onsettled",
+      "name": "OnSettled → StaleBudgetError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_56_onsettled",
+      "name": "OnSettled → ChapterFileStem",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_56_onsettled",
+      "name": "OnSettled → ChapterFileStem",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_56_onsettled",
+      "name": "OnSettled → ChapterFileStem",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_57_onsettled",
+      "name": "OnSettled → PreWriteHashMismatchError",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_57_onsettled",
+      "name": "OnSettled → PreWriteHashMismatchError",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_60_intakefrombaseline",
+      "name": "IntakeFromBaseline → FactRow",
+      "step_index": 4,
+      "step_count": 6
+    },
+    {
+      "id": "proc_60_intakefrombaseline",
+      "name": "IntakeFromBaseline → FactRow",
+      "step_index": 5,
+      "step_count": 6
+    },
+    {
+      "id": "proc_60_intakefrombaseline",
+      "name": "IntakeFromBaseline → FactRow",
+      "step_index": 6,
+      "step_count": 6
+    },
+    {
+      "id": "proc_65_runchaptercommit",
+      "name": "RunChapterCommit → StepIndex",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_65_runchaptercommit",
+      "name": "RunChapterCommit → StepIndex",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_65_runchaptercommit",
+      "name": "RunChapterCommit → StepIndex",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_66_systemroutes",
+      "name": "SystemRoutes → SendJson",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_68_commitchapter",
+      "name": "CommitChapter → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_68_commitchapter",
+      "name": "CommitChapter → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_68_commitchapter",
+      "name": "CommitChapter → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_68_commitchapter",
+      "name": "CommitChapter → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_68_commitchapter",
+      "name": "CommitChapter → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_69_commitchapter",
+      "name": "CommitChapter → CanonStructureError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_69_commitchapter",
+      "name": "CommitChapter → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_69_commitchapter",
+      "name": "CommitChapter → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_69_commitchapter",
+      "name": "CommitChapter → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_74_memoroutes",
+      "name": "MemoRoutes → ResolveDefaultDataRoot",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_80_saveprosedraft",
+      "name": "SaveProseDraft → FlowParser",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_80_saveprosedraft",
+      "name": "SaveProseDraft → FlowParser",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_80_saveprosedraft",
+      "name": "SaveProseDraft → FlowParser",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_80_saveprosedraft",
+      "name": "SaveProseDraft → FlowParser",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_81_reopenchapter",
+      "name": "ReopenChapter → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_81_reopenchapter",
+      "name": "ReopenChapter → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_81_reopenchapter",
+      "name": "ReopenChapter → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_81_reopenchapter",
+      "name": "ReopenChapter → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_81_reopenchapter",
+      "name": "ReopenChapter → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_82_reopenchapter",
+      "name": "ReopenChapter → CanonStructureError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_82_reopenchapter",
+      "name": "ReopenChapter → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_82_reopenchapter",
+      "name": "ReopenChapter → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_82_reopenchapter",
+      "name": "ReopenChapter → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_84_runscenario",
+      "name": "RunScenario → Slot",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_84_runscenario",
+      "name": "RunScenario → Slot",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_84_runscenario",
+      "name": "RunScenario → Slot",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_84_runscenario",
+      "name": "RunScenario → Slot",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_84_runscenario",
+      "name": "RunScenario → Slot",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_86_createchapterdraft",
+      "name": "CreateChapterDraft → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_86_createchapterdraft",
+      "name": "CreateChapterDraft → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_86_createchapterdraft",
+      "name": "CreateChapterDraft → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_86_createchapterdraft",
+      "name": "CreateChapterDraft → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_86_createchapterdraft",
+      "name": "CreateChapterDraft → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_87_createchapterdraft",
+      "name": "CreateChapterDraft → CanonStructureError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_87_createchapterdraft",
+      "name": "CreateChapterDraft → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_87_createchapterdraft",
+      "name": "CreateChapterDraft → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_87_createchapterdraft",
+      "name": "CreateChapterDraft → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_88_readstyleprofiles",
+      "name": "ReadStyleProfiles → CanonStructureError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_88_readstyleprofiles",
+      "name": "ReadStyleProfiles → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_88_readstyleprofiles",
+      "name": "ReadStyleProfiles → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_88_readstyleprofiles",
+      "name": "ReadStyleProfiles → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_93_completedrivensessio",
+      "name": "CompleteDrivenSession → RowType",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_94_completedrivensessio",
+      "name": "CompleteDrivenSession → RowChapterIndex",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_95_completedrivensessio",
+      "name": "CompleteDrivenSession → IsRecord",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_95_completedrivensessio",
+      "name": "CompleteDrivenSession → IsRecord",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_95_completedrivensessio",
+      "name": "CompleteDrivenSession → IsRecord",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_96_count",
+      "name": "Count → SendJson",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_97_rebuildpreference",
+      "name": "RebuildPreference → SentenceLengths",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_97_rebuildpreference",
+      "name": "RebuildPreference → SentenceLengths",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_97_rebuildpreference",
+      "name": "RebuildPreference → SentenceLengths",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_97_rebuildpreference",
+      "name": "RebuildPreference → SentenceLengths",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_97_rebuildpreference",
+      "name": "RebuildPreference → SentenceLengths",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_98_rebuildpreference",
+      "name": "RebuildPreference → NearestRankPercentile",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_98_rebuildpreference",
+      "name": "RebuildPreference → NearestRankPercentile",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_98_rebuildpreference",
+      "name": "RebuildPreference → NearestRankPercentile",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_98_rebuildpreference",
+      "name": "RebuildPreference → NearestRankPercentile",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_98_rebuildpreference",
+      "name": "RebuildPreference → NearestRankPercentile",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_103_builddefaultextracto",
+      "name": "BuildDefaultExtractor → FlowParser",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_103_builddefaultextracto",
+      "name": "BuildDefaultExtractor → FlowParser",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_104_builddefaultextracto",
+      "name": "BuildDefaultExtractor → Dedent",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_104_builddefaultextracto",
+      "name": "BuildDefaultExtractor → Dedent",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_104_builddefaultextracto",
+      "name": "BuildDefaultExtractor → Dedent",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_105_builddefaultextracto",
+      "name": "BuildDefaultExtractor → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_105_builddefaultextracto",
+      "name": "BuildDefaultExtractor → ParseBlockScalar",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_105_builddefaultextracto",
+      "name": "BuildDefaultExtractor → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_108_extractdelta",
+      "name": "ExtractDelta → AsString",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_108_extractdelta",
+      "name": "ExtractDelta → AsString",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_108_extractdelta",
+      "name": "ExtractDelta → AsString",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_108_extractdelta",
+      "name": "ExtractDelta → AsString",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_119_phaseguard",
+      "name": "PhaseGuard → BudgetUnavailableError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_119_phaseguard",
+      "name": "PhaseGuard → BudgetUnavailableError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_120_phaseguard",
+      "name": "PhaseGuard → LedgerPath",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_120_phaseguard",
+      "name": "PhaseGuard → LedgerPath",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_120_phaseguard",
+      "name": "PhaseGuard → LedgerPath",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_121_readentitycard",
+      "name": "ReadEntityCard → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_121_readentitycard",
+      "name": "ReadEntityCard → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_121_readentitycard",
+      "name": "ReadEntityCard → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_121_readentitycard",
+      "name": "ReadEntityCard → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_121_readentitycard",
+      "name": "ReadEntityCard → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_122_readplanningartifact",
+      "name": "ReadPlanningArtifact → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_122_readplanningartifact",
+      "name": "ReadPlanningArtifact → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_122_readplanningartifact",
+      "name": "ReadPlanningArtifact → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_122_readplanningartifact",
+      "name": "ReadPlanningArtifact → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_122_readplanningartifact",
+      "name": "ReadPlanningArtifact → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_123_readplanningartifact",
+      "name": "ReadPlanningArtifact → CanonStructureError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_123_readplanningartifact",
+      "name": "ReadPlanningArtifact → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_123_readplanningartifact",
+      "name": "ReadPlanningArtifact → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_123_readplanningartifact",
+      "name": "ReadPlanningArtifact → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_124_querystorybrain",
+      "name": "QueryStoryBrain → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_124_querystorybrain",
+      "name": "QueryStoryBrain → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_124_querystorybrain",
+      "name": "QueryStoryBrain → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_124_querystorybrain",
+      "name": "QueryStoryBrain → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_125_querystorybrain",
+      "name": "QueryStoryBrain → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_125_querystorybrain",
+      "name": "QueryStoryBrain → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_125_querystorybrain",
+      "name": "QueryStoryBrain → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_126_summarizestructured",
+      "name": "SummarizeStructured → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_126_summarizestructured",
+      "name": "SummarizeStructured → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_126_summarizestructured",
+      "name": "SummarizeStructured → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_128_tick",
+      "name": "Tick → AtomicWriteFileSync",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_130_retryextraction",
+      "name": "RetryExtraction → FactRow",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_130_retryextraction",
+      "name": "RetryExtraction → FactRow",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_130_retryextraction",
+      "name": "RetryExtraction → FactRow",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_131_queryactivefacts",
+      "name": "QueryActiveFacts → SendJson",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_131_queryactivefacts",
+      "name": "QueryActiveFacts → SendJson",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_132_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → SendJson",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_132_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → SendJson",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_133_requestresubmit",
+      "name": "RequestResubmit → IsRecord",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_133_requestresubmit",
+      "name": "RequestResubmit → IsRecord",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_133_requestresubmit",
+      "name": "RequestResubmit → IsRecord",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_134_requestresubmit",
+      "name": "RequestResubmit → RowType",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_135_requestresubmit",
+      "name": "RequestResubmit → RowChapterIndex",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_136_requestresubmit",
+      "name": "RequestResubmit → StepIndex",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_136_requestresubmit",
+      "name": "RequestResubmit → StepIndex",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_136_requestresubmit",
+      "name": "RequestResubmit → StepIndex",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_137_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → Describe",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_137_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → Describe",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_137_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → Describe",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_137_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → Describe",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_137_parsetemporalfactrow",
+      "name": "ParseTemporalFactRow → Describe",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_142_finalize",
+      "name": "Finalize → Sha256Hex",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_142_finalize",
+      "name": "Finalize → Sha256Hex",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_142_finalize",
+      "name": "Finalize → Sha256Hex",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_146_spendrealcall",
+      "name": "SpendRealCall → BudgetUnavailableError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_146_spendrealcall",
+      "name": "SpendRealCall → BudgetUnavailableError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_146_spendrealcall",
+      "name": "SpendRealCall → BudgetUnavailableError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_146_spendrealcall",
+      "name": "SpendRealCall → BudgetUnavailableError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_147_restorebookbackup",
+      "name": "RestoreBookBackup → SendJson",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_147_restorebookbackup",
+      "name": "RestoreBookBackup → SendJson",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_148_restorebookbackup",
+      "name": "RestoreBookBackup → ProjectionMissingError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_148_restorebookbackup",
+      "name": "RestoreBookBackup → ProjectionMissingError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_149_restorebookbackup",
+      "name": "RestoreBookBackup → OpenDatabase",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_149_restorebookbackup",
+      "name": "RestoreBookBackup → OpenDatabase",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_149_restorebookbackup",
+      "name": "RestoreBookBackup → OpenDatabase",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_150_restorebookbackup",
+      "name": "RestoreBookBackup → RemoveProjectionFiles",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_150_restorebookbackup",
+      "name": "RestoreBookBackup → RemoveProjectionFiles",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_151_restorebookbackup",
+      "name": "RestoreBookBackup → InitProjection",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_151_restorebookbackup",
+      "name": "RestoreBookBackup → InitProjection",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_151_restorebookbackup",
+      "name": "RestoreBookBackup → InitProjection",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_152_restorebookbackup",
+      "name": "RestoreBookBackup → StopWatcher",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_152_restorebookbackup",
+      "name": "RestoreBookBackup → StopWatcher",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_152_restorebookbackup",
+      "name": "RestoreBookBackup → StopWatcher",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_153_readoutlinenode",
+      "name": "ReadOutlineNode → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_153_readoutlinenode",
+      "name": "ReadOutlineNode → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_153_readoutlinenode",
+      "name": "ReadOutlineNode → UnescapeQuoted",
+      "step_index": 5,
+      "step_count": 5
+    },
+    {
+      "id": "proc_153_readoutlinenode",
+      "name": "ReadOutlineNode → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_153_readoutlinenode",
+      "name": "ReadOutlineNode → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_154_readoutlinenode",
+      "name": "ReadOutlineNode → CanonStructureError",
+      "step_index": 1,
+      "step_count": 5
+    },
+    {
+      "id": "proc_154_readoutlinenode",
+      "name": "ReadOutlineNode → CanonStructureError",
+      "step_index": 2,
+      "step_count": 5
+    },
+    {
+      "id": "proc_154_readoutlinenode",
+      "name": "ReadOutlineNode → CanonStructureError",
+      "step_index": 3,
+      "step_count": 5
+    },
+    {
+      "id": "proc_154_readoutlinenode",
+      "name": "ReadOutlineNode → CanonStructureError",
+      "step_index": 4,
+      "step_count": 5
+    },
+    {
+      "id": "proc_159_pipelineroutes",
+      "name": "PipelineRoutes → IsRecord",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_159_pipelineroutes",
+      "name": "PipelineRoutes → IsRecord",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_160_pipelineroutes",
+      "name": "PipelineRoutes → StepIndex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_160_pipelineroutes",
+      "name": "PipelineRoutes → StepIndex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_163_runchaptercommit",
+      "name": "RunChapterCommit → EventsFilePath",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_164_runchaptercommit",
+      "name": "RunChapterCommit → RowType",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_165_runchaptercommit",
+      "name": "RunChapterCommit → RowChapterIndex",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_166_runchaptercommit",
+      "name": "RunChapterCommit → IsRecord",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_166_runchaptercommit",
+      "name": "RunChapterCommit → IsRecord",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_166_runchaptercommit",
+      "name": "RunChapterCommit → IsRecord",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_169_storyboardroutes",
+      "name": "StoryboardRoutes → ChapterMissingError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_170_storyboardroutes",
+      "name": "StoryboardRoutes → StoryboardValidationError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_174_commitchapter",
+      "name": "CommitChapter → FlowParser",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_174_commitchapter",
+      "name": "CommitChapter → FlowParser",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_174_commitchapter",
+      "name": "CommitChapter → FlowParser",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_175_commitchapter",
+      "name": "CommitChapter → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_175_commitchapter",
+      "name": "CommitChapter → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_175_commitchapter",
+      "name": "CommitChapter → Dedent",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_175_commitchapter",
+      "name": "CommitChapter → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_176_commitchapter",
+      "name": "CommitChapter → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_176_commitchapter",
+      "name": "CommitChapter → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_176_commitchapter",
+      "name": "CommitChapter → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_176_commitchapter",
+      "name": "CommitChapter → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_183_saveprosedraft",
+      "name": "SaveProseDraft → ChapterFileStem",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_183_saveprosedraft",
+      "name": "SaveProseDraft → ChapterFileStem",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_183_saveprosedraft",
+      "name": "SaveProseDraft → ChapterFileStem",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_183_saveprosedraft",
+      "name": "SaveProseDraft → ChapterFileStem",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_184_saveprosedraft",
+      "name": "SaveProseDraft → CanonStructureError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_184_saveprosedraft",
+      "name": "SaveProseDraft → CanonStructureError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_184_saveprosedraft",
+      "name": "SaveProseDraft → CanonStructureError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_185_saveprosedraft",
+      "name": "SaveProseDraft → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_185_saveprosedraft",
+      "name": "SaveProseDraft → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_185_saveprosedraft",
+      "name": "SaveProseDraft → Dedent",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_185_saveprosedraft",
+      "name": "SaveProseDraft → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_186_saveprosedraft",
+      "name": "SaveProseDraft → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_186_saveprosedraft",
+      "name": "SaveProseDraft → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_186_saveprosedraft",
+      "name": "SaveProseDraft → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_186_saveprosedraft",
+      "name": "SaveProseDraft → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_188_reopenchapter",
+      "name": "ReopenChapter → FlowParser",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_188_reopenchapter",
+      "name": "ReopenChapter → FlowParser",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_188_reopenchapter",
+      "name": "ReopenChapter → FlowParser",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_189_reopenchapter",
+      "name": "ReopenChapter → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_189_reopenchapter",
+      "name": "ReopenChapter → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_189_reopenchapter",
+      "name": "ReopenChapter → Dedent",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_189_reopenchapter",
+      "name": "ReopenChapter → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_190_reopenchapter",
+      "name": "ReopenChapter → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_190_reopenchapter",
+      "name": "ReopenChapter → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_190_reopenchapter",
+      "name": "ReopenChapter → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_190_reopenchapter",
+      "name": "ReopenChapter → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_191_reopenchapter",
+      "name": "ReopenChapter → Sha256Hex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_191_reopenchapter",
+      "name": "ReopenChapter → Sha256Hex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_191_reopenchapter",
+      "name": "ReopenChapter → Sha256Hex",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_191_reopenchapter",
+      "name": "ReopenChapter → Sha256Hex",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_196_runscenario",
+      "name": "RunScenario → FactRow",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_196_runscenario",
+      "name": "RunScenario → FactRow",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_196_runscenario",
+      "name": "RunScenario → FactRow",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_196_runscenario",
+      "name": "RunScenario → FactRow",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_200_createchapterdraft",
+      "name": "CreateChapterDraft → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_200_createchapterdraft",
+      "name": "CreateChapterDraft → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_200_createchapterdraft",
+      "name": "CreateChapterDraft → Dedent",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_200_createchapterdraft",
+      "name": "CreateChapterDraft → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_201_createchapterdraft",
+      "name": "CreateChapterDraft → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_201_createchapterdraft",
+      "name": "CreateChapterDraft → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_201_createchapterdraft",
+      "name": "CreateChapterDraft → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_201_createchapterdraft",
+      "name": "CreateChapterDraft → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_202_runpreferencelearnin",
+      "name": "RunPreferenceLearning → CandidateKey",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_202_runpreferencelearnin",
+      "name": "RunPreferenceLearning → CandidateKey",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_202_runpreferencelearnin",
+      "name": "RunPreferenceLearning → CandidateKey",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_202_runpreferencelearnin",
+      "name": "RunPreferenceLearning → CandidateKey",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_203_runpreferencelearnin",
+      "name": "RunPreferenceLearning → StringArray",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_203_runpreferencelearnin",
+      "name": "RunPreferenceLearning → StringArray",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_203_runpreferencelearnin",
+      "name": "RunPreferenceLearning → StringArray",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_203_runpreferencelearnin",
+      "name": "RunPreferenceLearning → StringArray",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_204_runpreferencelearnin",
+      "name": "RunPreferenceLearning → LevelBit",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_204_runpreferencelearnin",
+      "name": "RunPreferenceLearning → LevelBit",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_204_runpreferencelearnin",
+      "name": "RunPreferenceLearning → LevelBit",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_204_runpreferencelearnin",
+      "name": "RunPreferenceLearning → LevelBit",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_205_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowBlock",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_205_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowBlock",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_205_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowBlock",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_205_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowBlock",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_206_updateentitycard",
+      "name": "UpdateEntityCard → Sha256Hex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_206_updateentitycard",
+      "name": "UpdateEntityCard → Sha256Hex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_206_updateentitycard",
+      "name": "UpdateEntityCard → Sha256Hex",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_206_updateentitycard",
+      "name": "UpdateEntityCard → Sha256Hex",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_207_updateentitycard",
+      "name": "UpdateEntityCard → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_207_updateentitycard",
+      "name": "UpdateEntityCard → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_207_updateentitycard",
+      "name": "UpdateEntityCard → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_207_updateentitycard",
+      "name": "UpdateEntityCard → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_208_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → Count",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_208_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → Count",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_208_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → Count",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_209_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CutsSurrogatePair",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_209_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CutsSurrogatePair",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_209_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CutsSurrogatePair",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_209_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CutsSurrogatePair",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_210_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → Sha256Hex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_210_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → Sha256Hex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_210_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → Sha256Hex",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_210_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → Sha256Hex",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_211_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → AtomicWriteFileSync",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_211_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → AtomicWriteFileSync",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_211_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → AtomicWriteFileSync",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_211_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → AtomicWriteFileSync",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_212_readstyleprofiles",
+      "name": "ReadStyleProfiles → UnescapeQuoted",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_212_readstyleprofiles",
+      "name": "ReadStyleProfiles → UnescapeQuoted",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_212_readstyleprofiles",
+      "name": "ReadStyleProfiles → UnescapeQuoted",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_212_readstyleprofiles",
+      "name": "ReadStyleProfiles → UnescapeQuoted",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_216_judgepair",
+      "name": "JudgePair → S2Condition",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_216_judgepair",
+      "name": "JudgePair → S2Condition",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_216_judgepair",
+      "name": "JudgePair → S2Condition",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_216_judgepair",
+      "name": "JudgePair → S2Condition",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_220_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EncodeReplacementText",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_220_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EncodeReplacementText",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_220_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EncodeReplacementText",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_220_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EncodeReplacementText",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_221_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EditBlockShapeError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_221_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EditBlockShapeError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_221_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → EditBlockShapeError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_222_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ReplacementLines",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_222_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ReplacementLines",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_222_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ReplacementLines",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_222_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ReplacementLines",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_224_khopgraphrecall",
+      "name": "KhopGraphRecall → SendJson",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_225_completedrivensessio",
+      "name": "CompleteDrivenSession → StepIndex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_225_completedrivensessio",
+      "name": "CompleteDrivenSession → StepIndex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_225_completedrivensessio",
+      "name": "CompleteDrivenSession → StepIndex",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_226_canongraphview",
+      "name": "CanonGraphView → SendJson",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_228_createentitycard",
+      "name": "CreateEntityCard → EntityCardValidationError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_228_createentitycard",
+      "name": "CreateEntityCard → EntityCardValidationError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_228_createentitycard",
+      "name": "CreateEntityCard → EntityCardValidationError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_229_rebuildpreference",
+      "name": "RebuildPreference → CandidateKey",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_229_rebuildpreference",
+      "name": "RebuildPreference → CandidateKey",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_229_rebuildpreference",
+      "name": "RebuildPreference → CandidateKey",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_229_rebuildpreference",
+      "name": "RebuildPreference → CandidateKey",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_230_rebuildpreference",
+      "name": "RebuildPreference → StringArray",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_230_rebuildpreference",
+      "name": "RebuildPreference → StringArray",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_230_rebuildpreference",
+      "name": "RebuildPreference → StringArray",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_230_rebuildpreference",
+      "name": "RebuildPreference → StringArray",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_231_rebuildpreference",
+      "name": "RebuildPreference → LevelBit",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_231_rebuildpreference",
+      "name": "RebuildPreference → LevelBit",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_231_rebuildpreference",
+      "name": "RebuildPreference → LevelBit",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_231_rebuildpreference",
+      "name": "RebuildPreference → LevelBit",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_232_rebuildpreference",
+      "name": "RebuildPreference → NarrowBlock",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_232_rebuildpreference",
+      "name": "RebuildPreference → NarrowBlock",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_232_rebuildpreference",
+      "name": "RebuildPreference → NarrowBlock",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_232_rebuildpreference",
+      "name": "RebuildPreference → NarrowBlock",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_236_acceptdraft",
+      "name": "AcceptDraft → CandidateError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_236_acceptdraft",
+      "name": "AcceptDraft → CandidateError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_236_acceptdraft",
+      "name": "AcceptDraft → CandidateError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_237_extractdelta",
+      "name": "ExtractDelta → AsArray",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_237_extractdelta",
+      "name": "ExtractDelta → AsArray",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_237_extractdelta",
+      "name": "ExtractDelta → AsArray",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_238_extractdelta",
+      "name": "ExtractDelta → AsRecord",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_238_extractdelta",
+      "name": "ExtractDelta → AsRecord",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_238_extractdelta",
+      "name": "ExtractDelta → AsRecord",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_250_deleteentitycard",
+      "name": "DeleteEntityCard → Sha256Hex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_250_deleteentitycard",
+      "name": "DeleteEntityCard → Sha256Hex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_250_deleteentitycard",
+      "name": "DeleteEntityCard → Sha256Hex",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_250_deleteentitycard",
+      "name": "DeleteEntityCard → Sha256Hex",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_255_phaseguard",
+      "name": "PhaseGuard → ChannelRefusedError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_256_readplanningartifact",
+      "name": "ReadPlanningArtifact → FlowParser",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_256_readplanningartifact",
+      "name": "ReadPlanningArtifact → FlowParser",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_256_readplanningartifact",
+      "name": "ReadPlanningArtifact → FlowParser",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_257_readplanningartifact",
+      "name": "ReadPlanningArtifact → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_257_readplanningartifact",
+      "name": "ReadPlanningArtifact → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_257_readplanningartifact",
+      "name": "ReadPlanningArtifact → Dedent",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_257_readplanningartifact",
+      "name": "ReadPlanningArtifact → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_258_readplanningartifact",
+      "name": "ReadPlanningArtifact → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_258_readplanningartifact",
+      "name": "ReadPlanningArtifact → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_258_readplanningartifact",
+      "name": "ReadPlanningArtifact → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_258_readplanningartifact",
+      "name": "ReadPlanningArtifact → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_259_absorbappwrite",
+      "name": "AbsorbAppWrite → Sha256Hex",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_259_absorbappwrite",
+      "name": "AbsorbAppWrite → Sha256Hex",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_259_absorbappwrite",
+      "name": "AbsorbAppWrite → Sha256Hex",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_260_querystorybrain",
+      "name": "QueryStoryBrain → FlowParser",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_260_querystorybrain",
+      "name": "QueryStoryBrain → FlowParser",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_261_querystorybrain",
+      "name": "QueryStoryBrain → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_261_querystorybrain",
+      "name": "QueryStoryBrain → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_261_querystorybrain",
+      "name": "QueryStoryBrain → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_262_querystorybrain",
+      "name": "QueryStoryBrain → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_262_querystorybrain",
+      "name": "QueryStoryBrain → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_262_querystorybrain",
+      "name": "QueryStoryBrain → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_263_querystorybrain",
+      "name": "QueryStoryBrain → JsonlLines",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_263_querystorybrain",
+      "name": "QueryStoryBrain → JsonlLines",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_263_querystorybrain",
+      "name": "QueryStoryBrain → JsonlLines",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_264_querystorybrain",
+      "name": "QueryStoryBrain → TrackingRowError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_264_querystorybrain",
+      "name": "QueryStoryBrain → TrackingRowError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_265_summarizestructured",
+      "name": "SummarizeStructured → CanonStructureError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_265_summarizestructured",
+      "name": "SummarizeStructured → CanonStructureError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_266_summarizestructured",
+      "name": "SummarizeStructured → FlowParser",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_267_summarizestructured",
+      "name": "SummarizeStructured → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_267_summarizestructured",
+      "name": "SummarizeStructured → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_268_summarizestructured",
+      "name": "SummarizeStructured → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_268_summarizestructured",
+      "name": "SummarizeStructured → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_269_tick",
+      "name": "Tick → ListAllFiles",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_270_tick",
+      "name": "Tick → IsCanonRelPath",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_271_intakepaths",
+      "name": "IntakePaths → AtomicWriteFileSync",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_273_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → IsFiniteNumber",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_273_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → IsFiniteNumber",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_273_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → IsFiniteNumber",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_273_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → IsFiniteNumber",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_274_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → CandidateError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_274_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → CandidateError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_274_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → CandidateError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_275_requestresubmit",
+      "name": "RequestResubmit → SessionAlreadyActiveError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_276_requestresubmit",
+      "name": "RequestResubmit → FindOpenSessionWindow",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_278_runqualityreview",
+      "name": "RunQualityReview → Flush",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_278_runqualityreview",
+      "name": "RunQualityReview → Flush",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_278_runqualityreview",
+      "name": "RunQualityReview → Flush",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_278_runqualityreview",
+      "name": "RunQualityReview → Flush",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_281_compile",
+      "name": "Compile → FindExactSpans",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_281_compile",
+      "name": "Compile → FindExactSpans",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_281_compile",
+      "name": "Compile → FindExactSpans",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_281_compile",
+      "name": "Compile → FindExactSpans",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_282_compile",
+      "name": "Compile → FindRegexSpans",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_282_compile",
+      "name": "Compile → FindRegexSpans",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_282_compile",
+      "name": "Compile → FindRegexSpans",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_282_compile",
+      "name": "Compile → FindRegexSpans",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_283_compile",
+      "name": "Compile → Overlaps",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_283_compile",
+      "name": "Compile → Overlaps",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_283_compile",
+      "name": "Compile → Overlaps",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_283_compile",
+      "name": "Compile → Overlaps",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_284_compile",
+      "name": "Compile → Clamp01",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_284_compile",
+      "name": "Compile → Clamp01",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_284_compile",
+      "name": "Compile → Clamp01",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_284_compile",
+      "name": "Compile → Clamp01",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_285_compile",
+      "name": "Compile → BuildVisibleCanon",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_285_compile",
+      "name": "Compile → BuildVisibleCanon",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_285_compile",
+      "name": "Compile → BuildVisibleCanon",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_285_compile",
+      "name": "Compile → BuildVisibleCanon",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_286_compile",
+      "name": "Compile → ImportanceWeight",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_286_compile",
+      "name": "Compile → ImportanceWeight",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_286_compile",
+      "name": "Compile → ImportanceWeight",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_286_compile",
+      "name": "Compile → ImportanceWeight",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_287_compile",
+      "name": "Compile → RelStrength",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_287_compile",
+      "name": "Compile → RelStrength",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_287_compile",
+      "name": "Compile → RelStrength",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_287_compile",
+      "name": "Compile → RelStrength",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_288_compile",
+      "name": "Compile → FactTier",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_288_compile",
+      "name": "Compile → FactTier",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_288_compile",
+      "name": "Compile → FactTier",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_288_compile",
+      "name": "Compile → FactTier",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_289_runtraversal",
+      "name": "RunTraversal → JsonlLines",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_289_runtraversal",
+      "name": "RunTraversal → JsonlLines",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_289_runtraversal",
+      "name": "RunTraversal → JsonlLines",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_289_runtraversal",
+      "name": "RunTraversal → JsonlLines",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_290_runtraversal",
+      "name": "RunTraversal → IsRecord",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_290_runtraversal",
+      "name": "RunTraversal → IsRecord",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_290_runtraversal",
+      "name": "RunTraversal → IsRecord",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_290_runtraversal",
+      "name": "RunTraversal → IsRecord",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_291_runtraversal",
+      "name": "RunTraversal → JsonlLineCount",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_291_runtraversal",
+      "name": "RunTraversal → JsonlLineCount",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_291_runtraversal",
+      "name": "RunTraversal → JsonlLineCount",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_291_runtraversal",
+      "name": "RunTraversal → JsonlLineCount",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_292_runtraversal",
+      "name": "RunTraversal → StaleBudgetError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_292_runtraversal",
+      "name": "RunTraversal → StaleBudgetError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_292_runtraversal",
+      "name": "RunTraversal → StaleBudgetError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_294_finalize",
+      "name": "Finalize → IsCanonRelPath",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_294_finalize",
+      "name": "Finalize → IsCanonRelPath",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_295_finalize",
+      "name": "Finalize → AtomicWriteFileSync",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_295_finalize",
+      "name": "Finalize → AtomicWriteFileSync",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_301_update",
+      "name": "Update → ResolveDefaultDataRoot",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_302_remove",
+      "name": "Remove → ResolveDefaultDataRoot",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_313_createbookbackup",
+      "name": "CreateBookBackup → ShouldIncludeInBackup",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_313_createbookbackup",
+      "name": "CreateBookBackup → ShouldIncludeInBackup",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_313_createbookbackup",
+      "name": "CreateBookBackup → ShouldIncludeInBackup",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_313_createbookbackup",
+      "name": "CreateBookBackup → ShouldIncludeInBackup",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_314_restorebookbackup",
+      "name": "RestoreBookBackup → IsCorruptProjectionError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_314_restorebookbackup",
+      "name": "RestoreBookBackup → IsCorruptProjectionError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_315_readoutlinenode",
+      "name": "ReadOutlineNode → FlowParser",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_315_readoutlinenode",
+      "name": "ReadOutlineNode → FlowParser",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_315_readoutlinenode",
+      "name": "ReadOutlineNode → FlowParser",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_316_readoutlinenode",
+      "name": "ReadOutlineNode → Dedent",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_316_readoutlinenode",
+      "name": "ReadOutlineNode → Dedent",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_316_readoutlinenode",
+      "name": "ReadOutlineNode → Dedent",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_316_readoutlinenode",
+      "name": "ReadOutlineNode → Dedent",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_317_readoutlinenode",
+      "name": "ReadOutlineNode → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_317_readoutlinenode",
+      "name": "ReadOutlineNode → ParseBlockScalar",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_317_readoutlinenode",
+      "name": "ReadOutlineNode → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_317_readoutlinenode",
+      "name": "ReadOutlineNode → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_318_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → JsonlLines",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_318_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → JsonlLines",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_318_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → JsonlLines",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_318_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → JsonlLines",
+      "step_index": 4,
+      "step_count": 4
+    },
+    {
+      "id": "proc_319_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → TrackingRowError",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_319_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → TrackingRowError",
+      "step_index": 2,
+      "step_count": 4
+    },
+    {
+      "id": "proc_319_assertcommitappendsl",
+      "name": "AssertCommitAppendsLegal → TrackingRowError",
+      "step_index": 3,
+      "step_count": 4
+    },
+    {
+      "id": "proc_324_runchaptercommit",
+      "name": "RunChapterCommit → ChapterProductionSession",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_325_runchaptercommit",
+      "name": "RunChapterCommit → StepGuardError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_326_runchaptercommit",
+      "name": "RunChapterCommit → ReworkNotDrivenError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_328_systemroutes",
+      "name": "SystemRoutes → Sha256",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_328_systemroutes",
+      "name": "SystemRoutes → Sha256",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_331_storyboardroutes",
+      "name": "StoryboardRoutes → WithBookLock",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_332_storyboardroutes",
+      "name": "StoryboardRoutes → ProviderUnavailableError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_333_storyboardroutes",
+      "name": "StoryboardRoutes → SourceChangedError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_334_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → NarrowArchivedRow",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_334_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → NarrowArchivedRow",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_334_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → NarrowArchivedRow",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_335_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → Rec",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_335_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → Rec",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_335_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → Rec",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_336_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → CollectParent",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_336_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → CollectParent",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_336_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → CollectParent",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_337_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → StringArray",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_337_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → StringArray",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_337_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → StringArray",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_338_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → ParseAtMs",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_338_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → ParseAtMs",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_338_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → ParseAtMs",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_339_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → MintId",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_339_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → MintId",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_339_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → MintId",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_340_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → FIXED_CLOCK",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_340_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → FIXED_CLOCK",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_340_runtaskmodelevaluati",
+      "name": "RunTaskModelEvaluation → FIXED_CLOCK",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_341_commitchapter",
+      "name": "CommitChapter → ChapterFileStem",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_341_commitchapter",
+      "name": "CommitChapter → ChapterFileStem",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_341_commitchapter",
+      "name": "CommitChapter → ChapterFileStem",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_360_saveprosedraft",
+      "name": "SaveProseDraft → ChapterExistsError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_360_saveprosedraft",
+      "name": "SaveProseDraft → ChapterExistsError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_361_reopenchapter",
+      "name": "ReopenChapter → ChapterFileStem",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_361_reopenchapter",
+      "name": "ReopenChapter → ChapterFileStem",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_361_reopenchapter",
+      "name": "ReopenChapter → ChapterFileStem",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_362_reopenchapter",
+      "name": "ReopenChapter → PreWriteHashMismatchError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_362_reopenchapter",
+      "name": "ReopenChapter → PreWriteHashMismatchError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_365_runbenchmark",
+      "name": "RunBenchmark → JudgeCanonAccuracy",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_365_runbenchmark",
+      "name": "RunBenchmark → JudgeCanonAccuracy",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_365_runbenchmark",
+      "name": "RunBenchmark → JudgeCanonAccuracy",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_366_runbenchmark",
+      "name": "RunBenchmark → JudgeKnowledgeLeakRate",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_366_runbenchmark",
+      "name": "RunBenchmark → JudgeKnowledgeLeakRate",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_366_runbenchmark",
+      "name": "RunBenchmark → JudgeKnowledgeLeakRate",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_367_runbenchmark",
+      "name": "RunBenchmark → ReadKnowledgeRowsFromBatch",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_367_runbenchmark",
+      "name": "RunBenchmark → ReadKnowledgeRowsFromBatch",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_367_runbenchmark",
+      "name": "RunBenchmark → ReadKnowledgeRowsFromBatch",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_368_runbenchmark",
+      "name": "RunBenchmark → JudgePromiseRecall",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_368_runbenchmark",
+      "name": "RunBenchmark → JudgePromiseRecall",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_368_runbenchmark",
+      "name": "RunBenchmark → JudgePromiseRecall",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_369_runbenchmark",
+      "name": "RunBenchmark → EvaluateMetricGate",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_369_runbenchmark",
+      "name": "RunBenchmark → EvaluateMetricGate",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_369_runbenchmark",
+      "name": "RunBenchmark → EvaluateMetricGate",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_373_runscenario",
+      "name": "RunScenario → ProbeFacts",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_373_runscenario",
+      "name": "RunScenario → ProbeFacts",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_373_runscenario",
+      "name": "RunScenario → ProbeFacts",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_374_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → Sha256Hex",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_374_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → Sha256Hex",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_374_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → Sha256Hex",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_375_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → CanonicalJson",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_375_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → CanonicalJson",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_375_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → CanonicalJson",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_376_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → ReplayInputDriftError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_376_replayreceiptfrominp",
+      "name": "ReplayReceiptFromInputs → ReplayInputDriftError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_387_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowLevel",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_387_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowLevel",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_387_runpreferencelearnin",
+      "name": "RunPreferenceLearning → NarrowLevel",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_388_runpreferencelearnin",
+      "name": "RunPreferenceLearning → PreferenceAbsPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_388_runpreferencelearnin",
+      "name": "RunPreferenceLearning → PreferenceAbsPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_388_runpreferencelearnin",
+      "name": "RunPreferenceLearning → PreferenceAbsPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_389_runpreferencelearnin",
+      "name": "RunPreferenceLearning → IsFiniteNumber",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_389_runpreferencelearnin",
+      "name": "RunPreferenceLearning → IsFiniteNumber",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_389_runpreferencelearnin",
+      "name": "RunPreferenceLearning → IsFiniteNumber",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_390_runpreferencelearnin",
+      "name": "RunPreferenceLearning → PosteriorMean",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_390_runpreferencelearnin",
+      "name": "RunPreferenceLearning → PosteriorMean",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_390_runpreferencelearnin",
+      "name": "RunPreferenceLearning → PosteriorMean",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_391_runpreferencelearnin",
+      "name": "RunPreferenceLearning → DriftSigma",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_391_runpreferencelearnin",
+      "name": "RunPreferenceLearning → DriftSigma",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_391_runpreferencelearnin",
+      "name": "RunPreferenceLearning → DriftSigma",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_392_runpreferencelearnin",
+      "name": "RunPreferenceLearning → ColdDim",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_392_runpreferencelearnin",
+      "name": "RunPreferenceLearning → ColdDim",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_392_runpreferencelearnin",
+      "name": "RunPreferenceLearning → ColdDim",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_393_updateentitycard",
+      "name": "UpdateEntityCard → CardPreWriteMismatchError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_393_updateentitycard",
+      "name": "UpdateEntityCard → CardPreWriteMismatchError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_394_updateentitycard",
+      "name": "UpdateEntityCard → FlowParser",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_394_updateentitycard",
+      "name": "UpdateEntityCard → FlowParser",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_395_updateentitycard",
+      "name": "UpdateEntityCard → Dedent",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_395_updateentitycard",
+      "name": "UpdateEntityCard → Dedent",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_395_updateentitycard",
+      "name": "UpdateEntityCard → Dedent",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_396_updateentitycard",
+      "name": "UpdateEntityCard → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_396_updateentitycard",
+      "name": "UpdateEntityCard → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_396_updateentitycard",
+      "name": "UpdateEntityCard → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_397_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CompareDesirability",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_397_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CompareDesirability",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_397_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CompareDesirability",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_398_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CompileConfigError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_398_assemblebudgetedcont",
+      "name": "AssembleBudgetedContext → CompileConfigError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_399_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → StatSyncSafe",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_399_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → StatSyncSafe",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_399_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → StatSyncSafe",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_400_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → MissingManifestError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_400_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → MissingManifestError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_401_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → CorruptManifestError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_401_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → CorruptManifestError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_402_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → IsCanonRelPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_402_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → IsCanonRelPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_402_applygenrekittobook",
+      "name": "ApplyGenreKitToBook → IsCanonRelPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_403_readstyleprofiles",
+      "name": "ReadStyleProfiles → FlowParser",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_403_readstyleprofiles",
+      "name": "ReadStyleProfiles → FlowParser",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_404_readstyleprofiles",
+      "name": "ReadStyleProfiles → Dedent",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_404_readstyleprofiles",
+      "name": "ReadStyleProfiles → Dedent",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_404_readstyleprofiles",
+      "name": "ReadStyleProfiles → Dedent",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_405_readstyleprofiles",
+      "name": "ReadStyleProfiles → ParseBlockScalar",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_405_readstyleprofiles",
+      "name": "ReadStyleProfiles → ParseBlockScalar",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_405_readstyleprofiles",
+      "name": "ReadStyleProfiles → ParseBlockScalar",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_412_recoverpendingcommit",
+      "name": "RecoverPendingCommit → JournalPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_412_recoverpendingcommit",
+      "name": "RecoverPendingCommit → JournalPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_412_recoverpendingcommit",
+      "name": "RecoverPendingCommit → JournalPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_413_recoverpendingcommit",
+      "name": "RecoverPendingCommit → PendingCommitConflictError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_413_recoverpendingcommit",
+      "name": "RecoverPendingCommit → PendingCommitConflictError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_414_applystructuredupser",
+      "name": "ApplyStructuredUpsert → DeleteEntityCardRows",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_414_applystructuredupser",
+      "name": "ApplyStructuredUpsert → DeleteEntityCardRows",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_415_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ToAddressableLines",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_415_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ToAddressableLines",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_415_recordwholebodyautho",
+      "name": "RecordWholeBodyAuthorEdit → ToAddressableLines",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_416_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → SplitProseSentences",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_416_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → SplitProseSentences",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_416_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → SplitProseSentences",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_417_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → DialogueRatioOf",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_417_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → DialogueRatioOf",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_417_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → DialogueRatioOf",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_418_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → TokenizeTabooWords",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_418_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → TokenizeTabooWords",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_418_runstylelearnerforwi",
+      "name": "RunStyleLearnerForWindow → TokenizeTabooWords",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_419_completedrivensessio",
+      "name": "CompleteDrivenSession → StepGuardError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_426_canongraphview",
+      "name": "CanonGraphView → TypeLabel",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_426_canongraphview",
+      "name": "CanonGraphView → TypeLabel",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_432_count",
+      "name": "Count → IsChineseChar",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_432_count",
+      "name": "Count → IsChineseChar",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_433_rebuildpreference",
+      "name": "RebuildPreference → NarrowLevel",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_433_rebuildpreference",
+      "name": "RebuildPreference → NarrowLevel",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_433_rebuildpreference",
+      "name": "RebuildPreference → NarrowLevel",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_434_rebuildpreference",
+      "name": "RebuildPreference → PosteriorMean",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_434_rebuildpreference",
+      "name": "RebuildPreference → PosteriorMean",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_434_rebuildpreference",
+      "name": "RebuildPreference → PosteriorMean",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_435_rebuildpreference",
+      "name": "RebuildPreference → DriftSigma",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_435_rebuildpreference",
+      "name": "RebuildPreference → DriftSigma",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_435_rebuildpreference",
+      "name": "RebuildPreference → DriftSigma",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_436_rebuildpreference",
+      "name": "RebuildPreference → ColdDim",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_436_rebuildpreference",
+      "name": "RebuildPreference → ColdDim",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_436_rebuildpreference",
+      "name": "RebuildPreference → ColdDim",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_441_extractdelta",
+      "name": "ExtractDelta → BuildUserPrompt",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_441_extractdelta",
+      "name": "ExtractDelta → BuildUserPrompt",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_442_extractdelta",
+      "name": "ExtractDelta → ExtractJsonObject",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_442_extractdelta",
+      "name": "ExtractDelta → ExtractJsonObject",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_445_deleteentitycard",
+      "name": "DeleteEntityCard → CardPreWriteMismatchError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_445_deleteentitycard",
+      "name": "DeleteEntityCard → CardPreWriteMismatchError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_446_deleteentitycard",
+      "name": "DeleteEntityCard → AtomicWriteFileSync",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_446_deleteentitycard",
+      "name": "DeleteEntityCard → AtomicWriteFileSync",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_446_deleteentitycard",
+      "name": "DeleteEntityCard → AtomicWriteFileSync",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_458_createlocalembedding",
+      "name": "CreateLocalEmbeddingProvider → ModelAssetsError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_458_createlocalembedding",
+      "name": "CreateLocalEmbeddingProvider → ModelAssetsError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_459_createlocalembedding",
+      "name": "CreateLocalEmbeddingProvider → Sha256FileHex",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_459_createlocalembedding",
+      "name": "CreateLocalEmbeddingProvider → Sha256FileHex",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_459_createlocalembedding",
+      "name": "CreateLocalEmbeddingProvider → Sha256FileHex",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_460_queryembed",
+      "name": "QueryEmbed → Embed",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_461_absorbappwrite",
+      "name": "AbsorbAppWrite → IsCanonRelPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_461_absorbappwrite",
+      "name": "AbsorbAppWrite → IsCanonRelPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_462_absorbappwrite",
+      "name": "AbsorbAppWrite → AtomicWriteFileSync",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_462_absorbappwrite",
+      "name": "AbsorbAppWrite → AtomicWriteFileSync",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_463_querystorybrain",
+      "name": "QueryStoryBrain → ChapterFileStem",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_463_querystorybrain",
+      "name": "QueryStoryBrain → ChapterFileStem",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_469_retryextraction",
+      "name": "RetryExtraction → AtomicWriteFileSync",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_470_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → PreferenceAbsPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_470_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → PreferenceAbsPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_470_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → PreferenceAbsPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_471_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → ColdDim",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_471_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → ColdDim",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_471_loadprofileorcoldsta",
+      "name": "LoadProfileOrColdStart → ColdDim",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_472_queryactivefacts",
+      "name": "QueryActiveFacts → TrackingRowError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_472_queryactivefacts",
+      "name": "QueryActiveFacts → TrackingRowError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_473_queryactivefacts",
+      "name": "QueryActiveFacts → Describe",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_473_queryactivefacts",
+      "name": "QueryActiveFacts → Describe",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_473_queryactivefacts",
+      "name": "QueryActiveFacts → Describe",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_474_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → TrackingRowError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_474_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → TrackingRowError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_475_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → Describe",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_475_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → Describe",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_475_queryknowledgeperspe",
+      "name": "QueryKnowledgePerspective → Describe",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_476_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → ChapterPhaseError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_476_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → ChapterPhaseError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_477_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → DraftStateRelPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_477_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → DraftStateRelPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_477_makedraftproviderbin",
+      "name": "MakeDraftProviderBinding → DraftStateRelPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_479_requestresubmit",
+      "name": "RequestResubmit → ChapterProductionSession",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_481_runqualityreview",
+      "name": "RunQualityReview → RevEvaluation",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_481_runqualityreview",
+      "name": "RunQualityReview → RevEvaluation",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_481_runqualityreview",
+      "name": "RunQualityReview → RevEvaluation",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_482_runqualityreview",
+      "name": "RunQualityReview → Evaluate",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_482_runqualityreview",
+      "name": "RunQualityReview → Evaluate",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_482_runqualityreview",
+      "name": "RunQualityReview → Evaluate",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_483_runqualityreview",
+      "name": "RunQualityReview → UnknownFor",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_483_runqualityreview",
+      "name": "RunQualityReview → UnknownFor",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_483_runqualityreview",
+      "name": "RunQualityReview → UnknownFor",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_486_compile",
+      "name": "Compile → CompileConfigError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_486_compile",
+      "name": "Compile → CompileConfigError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_487_compile",
+      "name": "Compile → ToRecallCard",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_487_compile",
+      "name": "Compile → ToRecallCard",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_487_compile",
+      "name": "Compile → ToRecallCard",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_488_recoverforward",
+      "name": "RecoverForward → PendingCommitConflictError",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_488_recoverforward",
+      "name": "RecoverForward → PendingCommitConflictError",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_489_persistreceipt",
+      "name": "PersistReceipt → DeepSortKeys",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_489_persistreceipt",
+      "name": "PersistReceipt → DeepSortKeys",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_489_persistreceipt",
+      "name": "PersistReceipt → DeepSortKeys",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_494_aggregatesignals",
+      "name": "AggregateSignals → EmptySignals",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_494_aggregatesignals",
+      "name": "AggregateSignals → EmptySignals",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_494_aggregatesignals",
+      "name": "AggregateSignals → EmptySignals",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_500_spendrealcall",
+      "name": "SpendRealCall → LockDir",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_500_spendrealcall",
+      "name": "SpendRealCall → LockDir",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_500_spendrealcall",
+      "name": "SpendRealCall → LockDir",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_501_spendrealcall",
+      "name": "SpendRealCall → LedgerPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_501_spendrealcall",
+      "name": "SpendRealCall → LedgerPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_501_spendrealcall",
+      "name": "SpendRealCall → LedgerPath",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_513_server",
+      "name": "Server → Record",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_513_server",
+      "name": "Server → Record",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_513_server",
+      "name": "Server → Record",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_514_writewizardauthorint",
+      "name": "WriteWizardAuthorIntent → MarkdownValue",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_514_writewizardauthorint",
+      "name": "WriteWizardAuthorIntent → MarkdownValue",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_514_writewizardauthorint",
+      "name": "WriteWizardAuthorIntent → MarkdownValue",
+      "step_index": 3,
+      "step_count": 3
+    },
+    {
+      "id": "proc_515_absorbreviewcountere",
+      "name": "AbsorbReviewCounterexamples → CounterexamplesPath",
+      "step_index": 1,
+      "step_count": 3
+    },
+    {
+      "id": "proc_515_absorbreviewcountere",
+      "name": "AbsorbReviewCounterexamples → CounterexamplesPath",
+      "step_index": 2,
+      "step_count": 3
+    },
+    {
+      "id": "proc_515_absorbreviewcountere",
+      "name": "AbsorbReviewCounterexamples → CounterexamplesPath",
+      "step_index": 3,
+      "step_count": 3
+    }
+  ]
+}

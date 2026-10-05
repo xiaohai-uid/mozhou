@@ -1,0 +1,4 @@
+ .../routes/pipelineRoutes.advanceGuard.test.ts     | 155 +++++++++++++++++++++
+ apps/web/server/routes/pipelineRoutes.ts           |  22 +++
+ .../routes/proseRoutes.sessionComplete.test.ts     |  14 +-
+ 3 files changed, 190 insertions(+), 1 deletion(-)

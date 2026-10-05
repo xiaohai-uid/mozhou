@@ -1,0 +1,16 @@
+=== Probe 07: 提交各阶段失败及恢复过程再次中断 ===
+测试时间: 2026-10-02T17:28:36.832Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-07-8Aqcry
+阶段 [journal-durable] 中断测试: 注入成功=true, 恢复后 phase=draft, journal残留=false
+阶段 [stream-append] 中断测试: 注入成功=true, 恢复后 phase=draft, journal残留=false
+阶段 [event-append] 中断测试: 注入成功=true, 恢复后 phase=draft, journal残留=false
+阶段 [prose-flip] 中断测试: 注入成功=true, 恢复后 phase=draft, journal残留=false
+阶段 [projection] 中断测试: 注入成功=true, 恢复后 phase=committed, journal残留=false
+阶段 [manifest] 中断测试: 注入成功=true, 恢复后 phase=committed, journal残留=false
+
+--- 重点深入：recoverForward 恢复过程二次中断复现 ---
+模拟二次中断盘面: 正文已committed，但追踪文件大小被截回 0 (baseBytes)
+二次恢复完成: journal删除=true, 正文phase=committed
+追踪文件大小: 0 字节 (期望应补充 2 行，实际大小=0)
+【确证结论】数据丢失已复现：recoverForward 将 size === baseBytes 误判为 untouched，直接丢弃重放，journal 被删，增量永久丢失！

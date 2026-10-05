@@ -1,0 +1,51 @@
+=== GRAPH CHANNEL AVAILABILITY MATRIX (measured 2026-10-03T00:48+08:00) ===
+Runner: C:\zcode\novel-ai\.gitnexus\run.cjs  (present, 15584 bytes, mtime 2026/7/29 8:24:07)
+Resolved CLI: global C:\Users\a1691\AppData\Roaming\npm\gitnexus.ps1 -> 1.6.10-rc.123
+Runtime: node v24.18.0 win32/x64, LadybugDB 0.18.3, ONNX 1.27.0, native lbugjs.node loaded
+Graph store / FTS / VECTOR index: all available. Semantic mode: vector-index.
+
+--- CHANNEL A: GitNexus MCP  -- NOT AVAILABLE TO THIS SESSION ---
+Evidence: cordis_inspect_list (no gitnexus provider); Tool.listTools full enumeration (no gitnexus/query/context/impact/detect_changes tools);
+          list_mcp_resources -> only anysearch + n8n configured.
+NOTE: gitnexus MCP server IS running on host for other clients: node ...\gitnexus\dist\cli\index.js mcp (PID 43188, 35668).
+      Those are NOT bound to this DSH session.
+
+--- CHANNEL B: GitNexus CLI -- AVAILABLE (all measurements below are real runs) ---
+MEASURED OK:
+  status                              -> exit 0, reports Index 2026/10/2 21:22:02, commit 90b45a1, Status: stale
+  list                                -> exit 0, 22 indexed repos
+  doctor                              -> exit 0, capability matrix
+  check --cycles -r "C:\zcode\novel-ai" -> exit 0, "No circular imports found."  <-- graph gate clean
+  query -q "context receipt" -r ...    -> exit 0, returned processes/symbols/definitions
+  context -f <file> <sym> -r ...       -> exit 1 when symbol name wrong; works with real exported names
+  impact -f <file> <sym> -r ... --summary-only -> exit 0
+  detect-changes -s all -r ...         -> exit 0, "26 files, 38 symbols / 297 affected processes / risk: critical"
+  analyze --help                      -> exit 0 (help only, no indexing performed)
+  --help / no-args                     -> exit 1 / 0, full command list obtained
+NOT RUN (deliberate, see charter S1/S6):
+  analyze (mutates index AND rewrites AGENTS.md/CLAUDE.md), clean (deletes index), remove,
+  wiki (needs LLM + writes files), publish (external network), mcp/serve (long-running server),
+  setup/uninstall (mutates editor config), eval-server, group, augment, index, embeddings
+UNAVAILABLE IN THIS BUILD:
+  explain (taint/source-sink) -> NOT a subcommand of 1.6.10-rc.123
+  impact --mode pdg            -> exists, but requires 'analyze --pdg'; index provenance for --pdg = UNVERIFIED
+
+--- INDEX FACTS ---
+repo label 'mozhou' ; path C:\zcode\novel-ai ; branch feature/windows-local-release
+indexed 2026/10/2 21:22:02 ; indexed commit 90b45a1 ; current commit 90b45a1
+1029 files | 10007 symbols | 21780 edges | 673 clusters | 516 processes
+Stale despite commit equality -> staleness is caused by the dirty worktree, not by commit drift.
+Index is therefore a PICTURE OF WORKING-TREE-AS-OF 2026-10-02 21:22 (already contained the then-uncommitted edits).
+
+--- OPERATIONAL PITFALLS (measured) ---
+1) Repo selector: -r 'mozhou (C:\zcode\novel-ai)' FAILS ("Repository not found", backslashes mangled).
+   Use -r with the ABSOLUTE PATH: -r "C:\zcode\novel-ai"  (repo package.json script uses -r .)
+2) run.cjs uses execFileSync(..., {shell:true}) on win32 -> multi-word args are RE-SPLIT.
+   'query "context receipt"' via run.cjs -> "too many arguments for 'query'".
+   Use the global gitnexus binary for multi-word args, or -q/--query form.
+3) run.cjs spawns with shell:true + unescaped concatenation -> node DEP0190 deprecation warning on every call.
+   Low-severity argument-injection surface if args ever come from untrusted input.
+4) nalyze --help confirms safety flags: --skip-agents-md, --index-only, --no-stats, --skip-skills.
+   ALSO confirms DANGEROUS flag: --self-commit (auto-commits AGENTS.md/CLAUDE.md).
+   Default nalyze DOES rewrite the gitnexus section of AGENTS.md and CLAUDE.md -> both are dirty
+   (uncommitted user edits) -> plain nalyze is FORBIDDEN in this audit.

@@ -1,0 +1,3 @@
+name = "execute_sql"
+readonly = true
+name = "search_objects"

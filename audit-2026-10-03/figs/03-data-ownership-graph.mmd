@@ -1,0 +1,82 @@
+graph TD
+  %% MoZhou 数据所有权图 (Data Ownership & Persistence Graph · 2026-10-03)
+  %% 表达权威源、写入者、读取者、派生副本与灾难恢复/对账路径
+
+  subgraph AuthoritativeStates ["持久化权威源 (Single Source of Truth)"]
+    canonFiles["1. 正典 Markdown 与 YAML Frontmatter<br/>(<book>/chapters/ch-*.md, canon/, book.json)<br/>[权威: 本地文件系统 / 人工与管线并重]"]
+    eventsLedger["2. 事件账本 (Append-only Ledger)<br/>(<book>/.mozhou/runtime-events.jsonl)<br/>[权威: @mozhou/runtime PublishBus]"]
+    receiptFiles["3. 上下文编译凭证 (Context Receipts)<br/>(<book>/.mozhou/receipts/<receiptId>.json)<br/>[权威: @mozhou/context-compiler (不可变一证一文件)]"]
+    styleProfiles["4. 文风画像与偏好观察账本<br/>(<book>/.mozhou/preference/, style-profiles.yaml)<br/>[权威: @mozhou/flywheel StyleProfileStore]"]
+    manifestFile["5. 文件哈希清单 (Manifest)<br/>(<book>/manifest.json)<br/>[权威: @mozhou/data-plane manifest.ts]"]
+    billingDb["6. 商业化账本与凭据库<br/>(<dataRoot>/billing.sqlite)<br/>[权威: apps/web/server BillingStore]"]
+    installationKey["7. 实例主加密凭据<br/>(<dataRoot>/installation.key)<br/>[权威: desktop-server.mjs / 48字节随机hex]"]
+  end
+
+  subgraph Writers ["核心写入者 (Writers)"]
+    dpWriter["@mozhou/data-plane<br/>(atomicWriteFileSync, chapter.ts, saveProseDraft)"]
+    pipelineWriter["@mozhou/pipeline<br/>(commit-orchestration, draft-accept, proposal-step)"]
+    runtimeWriter["@mozhou/runtime<br/>(PublishBus.publishEvent)"]
+    compilerWriter["@mozhou/context-compiler<br/>(persistReceipt)"]
+    flywheelWriter["@mozhou/flywheel<br/>(writeStyleProfiles, appendObservations)"]
+    bffBillingWriter["apps/web/server/billing<br/>(BillingStore, pollingWorker)"]
+    externalUser["外部编辑器 / 作者<br/>(Obsidian / Typora / VSCode)"]
+  end
+
+  subgraph Readers ["核心读取者 (Readers)"]
+    compilerReader["@mozhou/context-compiler<br/>(recall.ts 召回正典与实体卡)"]
+    pipelineReader["@mozhou/pipeline<br/>(prepare.ts, ledger.ts)"]
+    flywheelReader["@mozhou/flywheel<br/>(learner.ts, project.ts 读取账本与正文)"]
+    bffApiReader["apps/web/server/routes<br/>(worksRoutes, proseRoutes, storyBrainRoutes)"]
+    webUiReader["apps/web/src 前端 UI<br/>(通过 HTTP 消费服务端聚合响应)"]
+  end
+
+  subgraph DerivedProjections ["派生副本与临时缓存 (Derived / Caches)"]
+    sqliteProjection["SQLite 投影数据库<br/>(<book>/.mozhou/runtime.sqlite)<br/>(含 outline_nodes, entity_cards, meta 等表)"]
+    staleCache["依赖钉版与过期标记暂存<br/>(<book>/.mozhou/dependency-manifests/)"]
+    proposalDrafts["未决提案与候选草稿区<br/>(<book>/.mozhou/proposals/, candidates/)"]
+    suggestionsLog["模型路由建议日志<br/>(<book>/.mozhou/suggestions/suggestions.jsonl)"]
+  end
+
+  subgraph RecoveryAndSync ["恢复与双向对账路径 (Recovery Paths)"]
+    rebuildProjection["rebuildProjectionFromCanon()<br/>(正典 Markdown 全量重放，100% 重建 SQLite)"]
+    reconciliationSync["ReconciliationService / FS Watcher<br/>(检测外部 Obsidian 修改，产出对账差异并吸收)"]
+    receiptReplay["replayReceiptFromInputs()<br/>(依据不可变输入重放凭证，复核 recomputationHash)"]
+    preferenceRebuild["rebuildPreference()<br/>(从头扫描事件账本，重建七维作者偏好画像)"]
+  end
+
+  %% 写入关系
+  dpWriter -- "原子写入正典与大纲<br/>[HEAD:90b45a1]" --> canonFiles
+  pipelineWriter -- "采纳落盘 & 提案落盘<br/>[HEAD:90b45a1]" --> canonFiles
+  externalUser -- "外部直接修改正典 Markdown<br/>[HEAD:90b45a1]" --> canonFiles
+  runtimeWriter -- "顺序追加领域事件<br/>[HEAD:90b45a1]" --> eventsLedger
+  compilerWriter -- "写不可变凭据文件<br/>[HEAD:90b45a1]" --> receiptFiles
+  flywheelWriter -- "写入文风状态与偏好观察<br/>[HEAD:90b45a1]" --> styleProfiles
+  dpWriter -- "更新各文件 SHA256<br/>[HEAD:90b45a1]" --> manifestFile
+  bffBillingWriter -- "订单记账与配额消耗<br/>[HEAD:90b45a1]" --> billingDb
+
+  %% 读取关系
+  canonFiles --> compilerReader
+  canonFiles --> pipelineReader
+  canonFiles --> dpWriter
+  eventsLedger --> pipelineReader
+  eventsLedger --> flywheelReader
+  receiptFiles --> pipelineReader
+  receiptFiles --> bffApiReader
+  styleProfiles --> compilerReader
+  billingDb --> bffApiReader
+
+  %% 派生与投影
+  canonFiles -. "投影生成<br/>[HEAD:90b45a1]" .-> sqliteProjection
+  eventsLedger -. "投影生成<br/>[HEAD:90b45a1]" .-> sqliteProjection
+  pipelineWriter -. "暂存提案<br/>[HEAD:90b45a1]" .-> proposalDrafts
+  flywheelWriter -. "生成建议<br/>[HEAD:90b45a1]" .-> suggestionsLog
+
+  %% 恢复与对账闭环
+  canonFiles ==> rebuildProjection
+  rebuildProjection ==> sqliteProjection
+  canonFiles ==> reconciliationSync
+  manifestFile ==> reconciliationSync
+  reconciliationSync ==> dpWriter
+  eventsLedger ==> preferenceRebuild
+  preferenceRebuild ==> styleProfiles
+  receiptFiles ==> receiptReplay

@@ -1,0 +1,80 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.saveProseDraft#1",
+    "name": "saveProseDraft",
+    "kind": "Method",
+    "filePath": "packages/data-plane/src/local-data-plane.ts",
+    "startLine": 221,
+    "endLine": 223
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "name": "makeChapterOne"
+      },
+      {
+        "uid": "Function:apps/web/server/routes/draftCandidates.test.ts:makeRoot",
+        "name": "makeRoot",
+        "filePath": "apps/web/server/routes/draftCandidates.test.ts"
+      },
+      {
+        "uid": "Function:apps/web/server/routes/pipelineRoutes.tierRoute.test.ts:makeBook",
+        "name": "makeBook",
+        "filePath": "apps/web/server/routes/pipelineRoutes.tierRoute.test.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.saveProseDraft#1",
+        "name": "saveProseDraft",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      },
+      {
+        "uid": "File:packages/pipeline/src/draft-accept.test.ts",
+        "name": "draft-accept.test.ts",
+        "filePath": "packages/pipeline/src/draft-accept.test.ts"
+      },
+      {
+        "uid": "File:packages/pipeline/src/draft-accept.test.ts",
+        "name": "draft-accept.test.ts",
+        "filePath": "packages/pipeline/src/draft-accept.test.ts"
+      },
+      {
+        "uid": "File:packages/pipeline/src/draft-accept.test.ts",
+        "name": "draft-accept.test.ts",
+        "filePath": "packages/pipeline/src/draft-accept.test.ts"
+      },
+      {
+        "uid": "File:packages/pipeline/src/draft-accept.test.ts",
+        "name": "draft-accept.test.ts",
+        "filePath": "packages/pipeline/src/draft-accept.test.ts"
+      },
+      {
+        "uid": "File:packages/pipeline/src/draft-accept.test.ts",
+        "name": "draft-accept.test.ts",
+        "filePath": "packages/pipeline/src/draft-accept.test.ts"
+      }
+    ],
+    "has_method": [
+      {
+        "uid": "Class:packages/data-plane/src/local-data-plane.ts:LocalDataPlane",
+        "name": "LocalDataPlane",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.saveProseDraft#1",
+        "name": "saveProseDraft",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      }
+    ],
+    "accesses": [
+      {
+        "uid": "Property:packages/data-plane/src/local-data-plane.ts:LocalDataPlane._ctx",
+        "name": "_ctx",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      }
+    ]

@@ -1,0 +1,34 @@
+== 环境 ==
+better-sqlite3 version : 12.11.1
+resolved entry         : C:\zcode\novel-ai\packages\data-plane\node_modules\better-sqlite3\lib\index.js
+node                   : v24.18.0
+platform               : win32 x64
+temp db (系统 TEMP)    : C:\Users\a1691\AppData\Local\Temp\mozhou-t5-pragma-yDyt2y\probe.db
+
+== openDatabase() 等价调用后的运行时 PRAGMA 实测 ==
+journal_mode         = "wal"
+foreign_keys         = 1
+busy_timeout         = 5000
+synchronous          = 2
+locking_mode         = "normal"
+user_version         = 0
+page_size            = 4096
+cache_size           = -16000
+temp_store           = 0
+auto_vacuum          = 0
+wal_autocheckpoint   = 1000
+mmap_size            = 0
+integrity_check      = "ok"
+
+NOTE openDatabase 源码 (packages/data-plane/src/database.ts:17-21) 只设了
+     journal_mode = WAL 与 foreign_keys = ON，未出现 timeout / busy_timeout。
+     上述 busy_timeout = 5000 完全来自 better-sqlite3 构造函数默认值，
+     源码出处：node_modules/.pnpm/better-sqlite3@12.11.1/.../lib/database.js:34
+       const timeout = 'timeout' in options ? options.timeout : 5000;
+
+对照 A：new Database(p, {timeout: 0})  -> busy_timeout = 0
+对照 B：new Database(p)  (无 options)  -> busy_timeout = 5000
+
+PRAGMA synchronous 语义：2 = SQLITE_FULL（不是原报告所说的 WAL 下默认 NORMAL=1）。
+  busy_timeout 之外，本产品确实没有显式覆盖 synchronous，因此沿用 SQLite 默认 FULL。
+临时目录已清理: C:\Users\a1691\AppData\Local\Temp\mozhou-t5-pragma-yDyt2y

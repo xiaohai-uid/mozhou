@@ -1,0 +1,46 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Method:apps/web/server/bookAccess.ts:BookOperationQueue.withBookLock#2",
+    "name": "withBookLock",
+    "kind": "Method",
+    "filePath": "apps/web/server/bookAccess.ts",
+    "startLine": 101,
+    "endLine": 116
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "has_method": [
+      {
+        "uid": "Class:apps/web/server/bookAccess.ts:BookOperationQueue",
+        "name": "BookOperationQueue",
+        "filePath": "apps/web/server/bookAccess.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "accesses": [
+      {
+        "uid": "Property:apps/web/server/bookAccess.ts:BookOperationQueue._locks",
+        "name": "_locks",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "Property:apps/web/server/bookAccess.ts:BookOperationQueue._locks",
+        "name": "_locks",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "Property:apps/web/server/bookAccess.ts:BookOperationQueue._locks",
+        "name": "_locks",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "Property:apps/web/server/bookAccess.ts:BookOperationQueue._locks",
+        "name": "_locks",
+        "filePath": "apps/web/server/bookAccess.ts"
+      }
+    ]
+  },
+  "processes": []
+}

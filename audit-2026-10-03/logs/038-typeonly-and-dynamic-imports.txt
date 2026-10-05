@@ -1,0 +1,717 @@
+===== 038: TYPE-ONLY import specifiers =====
+
+TYPESPEC: ../../../server/api  total=7
+    apps\web\src\mobile\drawers\MobileChaptersDrawer.tsx:9
+    apps\web\src\mobile\hubs\InspectorHub.tsx:6
+    apps\web\src\mobile\hubs\ResourcesHub.tsx:6
+    apps\web\src\mobile\hubs\SystemHub.tsx:7
+    apps\web\src\mobile\hubs\WorkbenchHub.tsx:12
+    apps\web\src\mobile\hubs\WorksHub.tsx:6
+    apps\web\src\workbench\editor\ProseEditorPanel.tsx:23
+
+TYPESPEC: ../../server/api  total=40
+    apps\web\src\capability-square\capabilityDetails.ts:7
+    apps\web\src\capability-square\CapabilitySquareView.test.tsx:12
+    apps\web\src\capability-square\CapabilitySquareView.tsx:10
+    apps\web\src\change-matrix\ChangeMatrixPanel.tsx:17
+    apps\web\src\cloud-sync\CloudSyncView.test.tsx:10
+    apps\web\src\cloud-sync\CloudSyncView.tsx:10
+    apps\web\src\context-receipt\ReceiptPanel.test.tsx:12
+    apps\web\src\context-receipt\ReceiptPanel.tsx:18
+    apps\web\src\context-receipt\WhyThisWritingButton.test.tsx:11
+    apps\web\src\context-receipt\WhyThisWritingButton.tsx:18
+    apps\web\src\export-suite\exportDownload.ts:3
+    apps\web\src\membership\MembershipView.test.tsx:9
+    apps\web\src\membership\MembershipView.tsx:7
+    apps\web\src\memo\MemoView.test.tsx:11
+    apps\web\src\memo\MemoView.tsx:9
+    apps\web\src\novel-breakdown\NovelBreakdownView.test.tsx:11
+    apps\web\src\novel-breakdown\NovelBreakdownView.tsx:10
+    apps\web\src\rank-scan\RankScanView.test.tsx:11
+    apps\web\src\rank-scan\RankScanView.tsx:10
+    apps\web\src\shelf\BookshelfView.test.tsx:13
+    apps\web\src\shelf\BookshelfView.tsx:14
+    apps\web\src\shell\DesktopToolModals.tsx:20
+    apps\web\src\shell\shellTelemetry.test.ts:9
+    apps\web\src\shell\shellTelemetry.ts:7
+    apps\web\src\shell\useShellTelemetry.ts:9
+    apps\web\src\story-brain\StoryBrainPanel.test.tsx:14
+    apps\web\src\story-brain\StoryBrainPanel.tsx:16
+    apps\web\src\storyboard\StoryboardView.tsx:18
+    apps\web\src\style-distill\StyleDistillView.test.tsx:11
+    apps\web\src\style-distill\StyleDistillView.tsx:11
+    apps\web\src\tasks\TasksView.test.tsx:12
+    apps\web\src\tasks\TasksView.tsx:13
+    apps\web\src\web-search\WebSearchView.test.tsx:11
+    apps\web\src\web-search\WebSearchView.tsx:9
+    apps\web\src\workbench\DialogueStream.accept.test.tsx:17
+    apps\web\src\workbench\DialogueStream.test.tsx:13
+    apps\web\src\workbench\DialogueStream.tsx:16
+    apps\web\src\workbench\WorkbenchView.tsx:13
+    apps\web\src\works\WorksView.test.tsx:12
+    apps\web\src\works\WorksView.tsx:13
+
+TYPESPEC: ../../shell/workbenchStorage  total=10
+    apps\web\src\mobile\drawers\ExportPublishDrawer.tsx:2
+    apps\web\src\mobile\drawers\MobileChaptersDrawer.tsx:8
+    apps\web\src\mobile\hubs\InspectorHub.tsx:4
+    apps\web\src\mobile\hubs\ResourcesHub.tsx:4
+    apps\web\src\mobile\hubs\SystemHub.tsx:5
+    apps\web\src\mobile\hubs\WorkbenchHub.tsx:10
+    apps\web\src\mobile\hubs\WorksHub.tsx:4
+    apps\web\src\workbench\editor\ProseEditorPanel.isolation.test.tsx:13
+    apps\web\src\workbench\editor\ProseEditorPanel.telemetry.test.tsx:18
+    apps\web\src\workbench\editor\ProseEditorPanel.tsx:22
+
+TYPESPEC: ../analysis/deltaExtractor.js  total=7
+    apps\web\server\routes\proseRoutes.commitRevision.test.ts:37
+    apps\web\server\routes\proseRoutes.dependencyManifest.test.ts:38
+    apps\web\server\routes\proseRoutes.flywheelRecord.test.ts:35
+    apps\web\server\routes\proseRoutes.gate.test.ts:35
+    apps\web\server\routes\proseRoutes.proposal.test.ts:40
+    apps\web\server\routes\proseRoutes.repeatCommit.test.ts:37
+    apps\web\server\routes\proseRoutes.sessionComplete.test.ts:49
+
+TYPESPEC: ../auth/session.js  total=1
+    apps\web\server\account\store.ts:9
+
+TYPESPEC: ../billing/contracts.js  total=1
+    apps\web\server\routes\billingRoutes.ts:14
+
+TYPESPEC: ../index.js  total=1
+    packages\flywheel\src\semantic\batch.test.ts:14
+
+TYPESPEC: ../llm/generationTarget.js  total=5
+    apps\web\server\analysis\deltaExtractor.test.ts:19
+    apps\web\server\analysis\deltaExtractor.ts:35
+    apps\web\server\routes\pipelineRoutes.ts:68
+    apps\web\server\storyboard\generate.test.ts:20
+    apps\web\server\storyboard\generate.ts:19
+
+TYPESPEC: ../llm/openaiStream.js  total=1
+    apps\web\server\storyboard\generate.test.ts:19
+
+TYPESPEC: ../router.js  total=18
+    apps\web\server\routes\accountRoutes.ts:9
+    apps\web\server\routes\backupRoutes.ts:10
+    apps\web\server\routes\billingRoutes.ts:11
+    apps\web\server\routes\crawlerRoutes.ts:4
+    apps\web\server\routes\exportRoutes.ts:4
+    apps\web\server\routes\healthRoutes.ts:19
+    apps\web\server\routes\managedModelRoutes.ts:10
+    apps\web\server\routes\memoRoutes.ts:8
+    apps\web\server\routes\namingRoutes.ts:10
+    apps\web\server\routes\pipelineRoutes.ts:11
+    apps\web\server\routes\proseRoutes.ts:138
+    apps\web\server\routes\providerRoutes.ts:11
+    apps\web\server\routes\reconciliationRoutes.ts:36
+    apps\web\server\routes\storyboardRoutes.ts:12
+    apps\web\server\routes\storyBrainRoutes.ts:4
+    apps\web\server\routes\systemRoutes.ts:4
+    apps\web\server\routes\truthfulPreviewRoutes.ts:11
+    apps\web\server\routes\worksRoutes.ts:4
+
+TYPESPEC: ../semantic/batch.js  total=1
+    packages\flywheel\src\semantic\batch.test.ts:15
+
+TYPESPEC: ../shell/workbenchStorage  total=15
+    apps\web\src\book-source\BookSourceView.tsx:19
+    apps\web\src\canon-graph\CanonGraphView.tsx:8
+    apps\web\src\genre-kits\GenreKitMarketplaceView.tsx:5
+    apps\web\src\mobile\MobileShell.tsx:8
+    apps\web\src\shelf\BookshelfView.tsx:16
+    apps\web\src\storyboard\dirtyGuard.test.tsx:23
+    apps\web\src\storyboard\StoryboardView.test.tsx:16
+    apps\web\src\storyboard\StoryboardView.tsx:17
+    apps\web\src\wizard\WizardOverlay.test.tsx:13
+    apps\web\src\wizard\WizardOverlay.tsx:18
+    apps\web\src\workbench\DialogueStream.accept.test.tsx:21
+    apps\web\src\workbench\DialogueStream.test.tsx:16
+    apps\web\src\workbench\DialogueStream.tsx:17
+    apps\web\src\workbench\WorkbenchView.test.tsx:9
+    apps\web\src\workbench\WorkbenchView.tsx:12
+
+TYPESPEC: ../storyboard/contract.js  total=1
+    apps\web\server\routes\storyboardRoutes.ts:26
+
+TYPESPEC: ../structuredOutput.js  total=1
+    packages\runtime\src\recipe\loader.ts:14
+
+TYPESPEC: ../types  total=5
+    apps\web\src\mobile\hubs\InspectorHub.tsx:5
+    apps\web\src\mobile\hubs\ResourcesHub.tsx:5
+    apps\web\src\mobile\hubs\SystemHub.tsx:6
+    apps\web\src\mobile\hubs\WorkbenchHub.tsx:11
+    apps\web\src\mobile\hubs\WorksHub.tsx:5
+
+TYPESPEC: ../types.js  total=1
+    packages\runtime\src\recipe\recipe.test.ts:13
+
+TYPESPEC: ../workbenchStorage  total=1
+    apps\web\src\shell\scene\SceneSettingsSheet.tsx:8
+
+TYPESPEC: ./analyze.js  total=2
+    packages\flywheel\src\semantic\analyze.test.ts:15
+    packages\flywheel\src\semantic\batch.ts:15
+
+TYPESPEC: ./assemble.js  total=2
+    packages\context-compiler\src\l1-lifecycle-bench.ts:48
+    packages\context-compiler\src\tokenizer.ts:28
+
+TYPESPEC: ./auth/session.js  total=3
+    apps\web\server\bookAccess.ts:28
+    apps\web\server\bookRequest.test.ts:40
+    apps\web\server\bookRequest.ts:35
+
+TYPESPEC: ./canon-read.js  total=1
+    packages\data-plane\src\projection.ts:19
+
+TYPESPEC: ./codeGraphData.json  total=1
+    apps\web\src\code-graph\CodeNodeExplorer.tsx:3
+
+TYPESPEC: ./contract.js  total=2
+    apps\web\server\storyboard\generate.ts:15
+    apps\web\server\storyboard\store.ts:29
+
+TYPESPEC: ./contracts.js  total=2
+    apps\web\server\billing\notifications.ts:8
+    apps\web\server\billing\pollingWorker.ts:11
+
+TYPESPEC: ./crawlers/qidian.js  total=1
+    apps\web\server\api.ts:55
+
+TYPESPEC: ./crawlers/rankings.js  total=1
+    apps\web\server\api.ts:54
+
+TYPESPEC: ./DesktopToolModals  total=1
+    apps\web\src\shell\TopBar.tsx:8
+
+TYPESPEC: ./embedding.js  total=4
+    packages\context-compiler\src\compile.ts:76
+    packages\context-compiler\src\embedding.test.ts:13
+    packages\context-compiler\src\recall.test.ts:24
+    packages\context-compiler\src\recall.ts:58
+
+TYPESPEC: ./engine.js  total=1
+    packages\runtime\src\structuredOutput.ts:8
+
+TYPESPEC: ./eventBus.js  total=1
+    packages\runtime\src\engine.ts:19
+
+TYPESPEC: ./extract-step.js  total=8
+    packages\pipeline\src\commit-orchestration.ts:47
+    packages\pipeline\src\extract-step.test.ts:14
+    packages\pipeline\src\gate-step.test.ts:13
+    packages\pipeline\src\gate-step.ts:52
+    packages\pipeline\src\proposal-port.ts:35
+    packages\pipeline\src\proposal-step.ts:30
+    packages\pipeline\src\scene-stage.test.ts:3
+    packages\pipeline\src\scene-stage.ts:12
+
+TYPESPEC: ./gate-step.js  total=1
+    packages\pipeline\src\commit-orchestration.ts:49
+
+TYPESPEC: ./genrePresets  total=1
+    apps\web\src\genre-kits\GenreKitMarketplaceView.tsx:3
+
+TYPESPEC: ./impact.js  total=1
+    packages\data-plane\src\impact-orchestrator.ts:21
+
+TYPESPEC: ./index.js  total=3
+    packages\flywheel\src\learner.test.ts:35
+    packages\pipeline\src\user-edit-step.test.ts:26
+    packages\pipeline\src\whole-body-edit.test.ts:24
+
+TYPESPEC: ./inference.js  total=3
+    packages\flywheel\src\inference.test.ts:8
+    packages\flywheel\src\learner.ts:18
+    packages\flywheel\src\storage.ts:16
+
+TYPESPEC: ./InspectorTower  total=1
+    apps\web\src\shell\InspectorTower.test.tsx:8
+
+TYPESPEC: ./kernel-schema.js  total=4
+    packages\kernel\src\causal-contract.test.ts:2
+    packages\kernel\src\causal-contract.ts:6
+    packages\kernel\src\entity-directory.ts:13
+    packages\kernel\src\protection.test.ts:18
+
+TYPESPEC: ./ledger.js  total=1
+    packages\pipeline\src\projection.ts:18
+
+TYPESPEC: ./llm/generationTarget.js  total=1
+    apps\web\server\semanticSettled.ts:37
+
+TYPESPEC: ./memory-anchor.js  total=1
+    packages\quality-engine\src\memory-anchor.test.ts:9
+
+TYPESPEC: ./metrics.js  total=1
+    packages\benchmark\src\quality-regression.test.ts:21
+
+TYPESPEC: ./PipelineStrip  total=1
+    apps\web\src\shell\shellTelemetry.ts:8
+
+TYPESPEC: ./project.js  total=4
+    packages\flywheel\src\evaluator\project.test.ts:24
+    packages\flywheel\src\evaluator\run.ts:22
+    packages\flywheel\src\evaluator\thresholds.test.ts:27
+    packages\flywheel\src\evaluator\thresholds.ts:31
+
+TYPESPEC: ./projection.js  total=1
+    packages\pipeline\src\session.ts:23
+
+TYPESPEC: ./proposal-step.js  total=2
+    packages\pipeline\src\commit-orchestration.ts:51
+    packages\pipeline\src\proposal-port.ts:37
+
+TYPESPEC: ./providerGuidance  total=1
+    apps\web\src\workbench\DialogueStream.tsx:20
+
+TYPESPEC: ./qidian.js  total=1
+    apps\web\server\crawlers\qimao.ts:5
+
+TYPESPEC: ./QualityPanel  total=1
+    apps\web\src\quality\QualityPanel.test.tsx:12
+
+TYPESPEC: ./reader-experience.js  total=1
+    packages\quality-engine\src\reader-experience.test.ts:7
+
+TYPESPEC: ./recall.js  total=2
+    packages\context-compiler\src\assemble.ts:43
+    packages\context-compiler\src\receipt-replay.ts:28
+
+TYPESPEC: ./recipe/types.js  total=1
+    packages\runtime\src\canonical-recipes.ts:5
+
+TYPESPEC: ./reconciliation.js  total=2
+    packages\data-plane\src\impact-orchestrator.test.ts:13
+    packages\data-plane\src\impact-orchestrator.ts:22
+
+TYPESPEC: ./record-step.js  total=2
+    packages\pipeline\src\commit-orchestration.ts:54
+    packages\pipeline\src\record-step.test.ts:19
+
+TYPESPEC: ./registry.js  total=1
+    packages\runtime\src\engine.ts:21
+
+TYPESPEC: ./run.js  total=2
+    packages\benchmark\src\version-matrix.test.ts:8
+    packages\benchmark\src\version-matrix.ts:12
+
+TYPESPEC: ./scenePreference  total=3
+    apps\web\src\shell\scene\SceneLayer.tsx:8
+    apps\web\src\shell\scene\SceneSettingsSheet.test.tsx:19
+    apps\web\src\shell\scene\SceneSettingsSheet.tsx:18
+
+TYPESPEC: ./semantic.js  total=2
+    packages\quality-engine\src\review.test.ts:5
+    packages\quality-engine\src\review.ts:21
+
+TYPESPEC: ./session.js  total=2
+    packages\pipeline\src\resubmit.ts:23
+    packages\pipeline\src\review-step.ts:59
+
+TYPESPEC: ./shell/InspectorTower  total=1
+    apps\web\src\App.tsx:17
+
+TYPESPEC: ./shell/scene/scenePreference  total=1
+    apps\web\src\App.tsx:15
+
+TYPESPEC: ./shell/views  total=1
+    apps\web\src\App.tsx:26
+
+TYPESPEC: ./shell/workbenchStorage  total=1
+    apps\web\src\App.tsx:25
+
+TYPESPEC: ./shellTelemetry  total=2
+    apps\web\src\shell\InspectorTower.tsx:7
+    apps\web\src\shell\useShellTelemetry.ts:10
+
+TYPESPEC: ./stale-cache.js  total=1
+    packages\data-plane\src\impact.ts:21
+
+TYPESPEC: ./steps.js  total=1
+    packages\pipeline\src\session.ts:25
+
+TYPESPEC: ./storage.js  total=3
+    packages\flywheel\src\evaluator\run.ts:24
+    packages\flywheel\src\evaluator\thresholds.test.ts:24
+    packages\flywheel\src\evaluator\thresholds.ts:21
+
+TYPESPEC: ./style-learner.js  total=3
+    packages\flywheel\src\style-learner.test.ts:21
+    packages\flywheel\src\style-store.test.ts:14
+    packages\flywheel\src\style-store.ts:41
+
+TYPESPEC: ./thresholds.js  total=1
+    packages\flywheel\src\evaluator\run.ts:38
+
+TYPESPEC: ./tierConfig.js  total=2
+    packages\runtime\src\tierRouting.test.ts:14
+    packages\runtime\src\tierRouting.ts:22
+
+TYPESPEC: ./tierRouting.js  total=2
+    apps\web\server\llm\generationTarget.ts:45
+    apps\web\server\llm\tierRouting.test.ts:36
+
+TYPESPEC: ./txt-clean.js  total=2
+    packages\data-plane\src\docx-export.ts:9
+    packages\data-plane\src\epub-export.ts:9
+
+TYPESPEC: ./txtCleanExporter  total=2
+    apps\web\src\export-suite\exportDownload.ts:1
+    apps\web\src\export-suite\PublicationExportModal.tsx:2
+
+TYPESPEC: ./types  total=2
+    apps\web\src\mobile\MobileShell.tsx:9
+    apps\web\src\storyboard\StoryboardView.test.tsx:17
+
+TYPESPEC: ./types.js  total=38
+    apps\web\server\llm\generationTarget.ts:39
+    apps\web\server\llm\openaiStream.ts:11
+    apps\web\server\llm\providerSettings.ts:17
+    apps\web\server\llm\semanticEvaluator.ts:19
+    apps\web\server\llm\tierRouting.test.ts:37
+    apps\web\server\llm\tierRouting.ts:33
+    packages\benchmark\src\metrics.ts:11
+    packages\benchmark\src\run.ts:24
+    packages\benchmark\src\version-matrix.test.ts:10
+    packages\benchmark\src\version-matrix.ts:11
+    packages\flywheel\src\evaluator\confirm.test.ts:15
+    packages\flywheel\src\evaluator\confirm.ts:28
+    packages\flywheel\src\evaluator\project.ts:27
+    packages\flywheel\src\evaluator\run.ts:39
+    packages\flywheel\src\evaluator\run.ts:40
+    packages\flywheel\src\evaluator\storage.ts:16
+    packages\flywheel\src\evaluator\thresholds.test.ts:26
+    packages\flywheel\src\evaluator\thresholds.ts:29
+    packages\flywheel\src\features.ts:18
+    packages\flywheel\src\inference.test.ts:10
+    packages\flywheel\src\inference.ts:26
+    packages\flywheel\src\learner.ts:26
+    packages\flywheel\src\semantic\analyze.ts:16
+    packages\flywheel\src\semantic\batch.ts:16
+    packages\flywheel\src\semantic\report-store.ts:10
+    packages\flywheel\src\storage.ts:19
+    packages\quality-engine\src\deterministic.test.ts:4
+    packages\quality-engine\src\failure-memory.test.ts:3
+    packages\quality-engine\src\failure-memory.ts:13
+    packages\quality-engine\src\policy.test.ts:3
+    packages\quality-engine\src\policy.ts:12
+    packages\quality-engine\src\staleness.test.ts:3
+    packages\quality-engine\src\staleness.ts:8
+    packages\runtime\src\eventBus.ts:15
+    packages\runtime\src\recipe\recipe.test.ts:23
+    packages\runtime\src\registry.ts:7
+    packages\runtime\src\tasks.test.ts:6
+    packages\runtime\src\tasks.ts:5
+
+TYPESPEC: ./useCanonGraphData  total=2
+    apps\web\src\canon-graph\CanonGraphView.tsx:3
+    apps\web\src\canon-graph\CanonNodeCard.tsx:2
+
+TYPESPEC: ./user-edit-step.js  total=1
+    packages\pipeline\src\multi-candidate.ts:20
+
+TYPESPEC: ./views  total=3
+    apps\web\src\shell\CapabilityChannels.tsx:8
+    apps\web\src\shell\PlaceholderView.tsx:6
+    apps\web\src\shell\workbenchStorage.ts:6
+
+TYPESPEC: ./wizard/WizardOverlay  total=1
+    apps\web\src\App.tsx:47
+
+TYPESPEC: ./WizardOverlay  total=1
+    apps\web\src\wizard\WizardOverlay.test.tsx:12
+
+TYPESPEC: ./workbenchStorage  total=3
+    apps\web\src\shell\DesktopToolModals.tsx:9
+    apps\web\src\shell\TopBar.tsx:7
+    apps\web\src\shell\workbenchStorage.test.ts:12
+
+TYPESPEC: @mozhou/benchmark  total=2
+    packages\flywheel\src\evaluator\storage.ts:15
+    packages\flywheel\src\evaluator\thresholds.ts:19
+
+TYPESPEC: @mozhou/context-compiler  total=13
+    apps\web\server\llm\semanticEvaluator.ts:16
+    apps\web\server\localEmbedding.test.ts:15
+    apps\web\server\localEmbedding.ts:25
+    packages\benchmark\src\continuity-assertions.test.ts:2
+    packages\benchmark\src\continuity-assertions.ts:5
+    packages\benchmark\src\long-novel.test.ts:3
+    packages\pipeline\src\draft-step.test.ts:14
+    packages\pipeline\src\draft-step.ts:36
+    packages\pipeline\src\golden-quality-journey.test.ts:15
+    packages\pipeline\src\nine-boundaries.test.ts:18
+    packages\pipeline\src\quality-context.test.ts:21
+    packages\pipeline\src\review-step.test.ts:13
+    packages\pipeline\src\t17-pipeline.test.ts:12
+
+TYPESPEC: @mozhou/data-plane  total=21
+    apps\web\server\api.ts:43
+    apps\web\server\routes\reconciliationRoutes.ts:34
+    apps\web\server\routes\storyBrainRoutes.ts:17
+    apps\web\src\change-matrix\ChangeMatrixPanel.test.tsx:12
+    apps\web\src\change-matrix\ChangeMatrixPanel.tsx:16
+    apps\web\src\story-brain\StoryBrainPanel.test.tsx:12
+    apps\web\src\story-brain\StoryBrainPanel.tsx:15
+    apps\web\src\test\fixtures.ts:5
+    packages\flywheel\src\style-learner.ts:35
+    packages\flywheel\src\style-sections.ts:28
+    packages\flywheel\src\style-store.test.ts:12
+    packages\flywheel\src\style-store.ts:39
+    packages\pipeline\src\prepare.ts:25
+    packages\pipeline\src\proposal-port.ts:31
+    packages\pipeline\src\proposal-port.ts:33
+    packages\pipeline\src\resubmit.ts:21
+    packages\pipeline\src\review-step.ts:51
+    packages\pipeline\src\revision-cascading.test.ts:3
+    packages\pipeline\src\revision-cascading.ts:5
+    packages\pipeline\src\user-edit-step.ts:47
+    packages\pipeline\src\watcher-checkpoint.ts:16
+
+TYPESPEC: @mozhou/flywheel  total=2
+    apps\web\server\llm\semanticEvaluator.ts:17
+    apps\web\server\semanticSettled.ts:35
+
+TYPESPEC: @mozhou/kernel  total=67
+    apps\web\server\api.ts:44
+    apps\web\server\compiledAnchor.test.ts:14
+    apps\web\server\compiledAnchor.ts:13
+    apps\web\server\draftContext.test.ts:42
+    apps\web\server\routes\productionRoutes.test.ts:28
+    apps\web\server\routes\proseRoutes.sessionComplete.test.ts:31
+    apps\web\server\routes\proseRoutes.sessionComplete.test.ts:32
+    apps\web\server\routes\reconciliationRoutes.ts:35
+    apps\web\server\routes\storyBrainRoutes.ts:18
+    apps\web\server\routes\systemRoutes.ts:5
+    apps\web\server\routes\worksRoutes.ts:25
+    apps\web\server\semanticSettled.ts:31
+    apps\web\server\tenancy.test.ts:39
+    apps\web\src\api.test.ts:28
+    apps\web\src\api.test.ts:29
+    apps\web\src\context-receipt\ReceiptPanel.test.tsx:11
+    apps\web\src\story-brain\StoryBrainPanel.test.tsx:13
+    packages\benchmark\src\continuity-assertions.test.ts:3
+    packages\benchmark\src\continuity-assertions.ts:6
+    packages\benchmark\src\long-novel.test.ts:4
+    packages\benchmark\src\metrics.ts:9
+    packages\benchmark\src\run.ts:7
+    packages\context-compiler\src\channels\rrf.ts:8
+    packages\context-compiler\src\compile.e2e.test.ts:17
+    packages\context-compiler\src\recall.test.ts:22
+    packages\context-compiler\src\receipt-file.test.ts:17
+    packages\context-compiler\src\receipt-file.ts:23
+    packages\context-compiler\src\receipt-replay.test.ts:14
+    packages\context-compiler\src\receipt-replay.ts:15
+    packages\data-plane\src\canon-read.ts:8
+    packages\data-plane\src\chapter.ts:24
+    packages\data-plane\src\entity-cards.test.ts:8
+    packages\data-plane\src\entity-cards.ts:15
+    packages\data-plane\src\golden-traversal.test.ts:17
+    packages\data-plane\src\impact-orchestrator.test.ts:14
+    packages\data-plane\src\impact-orchestrator.ts:23
+    packages\data-plane\src\impact.test.ts:17
+    packages\data-plane\src\impact.ts:17
+    packages\data-plane\src\stale-cache.test.ts:19
+    packages\data-plane\src\stale-cache.ts:19
+    packages\data-plane\src\stale.ts:29
+    packages\data-plane\src\style-profiles.ts:25
+    packages\flywheel\src\features.test.ts:8
+    packages\flywheel\src\semantic\batch.ts:13
+    packages\flywheel\src\style-learner.test.ts:16
+    packages\flywheel\src\style-learner.ts:34
+    packages\flywheel\src\style-runner.ts:21
+    packages\flywheel\src\style-store.test.ts:9
+    packages\flywheel\src\style-store.ts:25
+    packages\flywheel\src\style-store.ts:26
+    packages\pipeline\src\compile-step.test.ts:32
+    packages\pipeline\src\extract-step.ts:16
+    packages\pipeline\src\ledger.ts:19
+    packages\pipeline\src\nine-boundaries.test.ts:15
+    packages\pipeline\src\prepare.ts:17
+    packages\pipeline\src\prepare.ts:26
+    packages\pipeline\src\projection.ts:17
+    packages\pipeline\src\proposal-step.ts:26
+    packages\pipeline\src\quality-context.test.ts:20
+    packages\pipeline\src\record-step.test.ts:9
+    packages\pipeline\src\record-step.ts:20
+    packages\pipeline\src\scene-stage.test.ts:2
+    packages\pipeline\src\scene-stage.ts:11
+    packages\pipeline\src\session.ts:18
+    packages\pipeline\src\user-edit-step.ts:33
+    packages\pipeline\src\whole-body-edit.test.ts:17
+    packages\runtime\src\types.ts:14
+
+TYPESPEC: @mozhou/pipeline  total=12
+    apps\web\server\api.ts:45
+    apps\web\server\api.ts:52
+    apps\web\server\compiledAnchor.test.ts:13
+    apps\web\server\compiledAnchor.ts:12
+    apps\web\server\proposals.ts:11
+    packages\benchmark\src\metrics.ts:10
+    packages\benchmark\src\run.ts:8
+    packages\flywheel\src\evaluator\project.test.ts:22
+    packages\flywheel\src\evaluator\project.ts:24
+    packages\flywheel\src\evaluator\project.ts:25
+    packages\flywheel\src\features.test.ts:9
+    packages\flywheel\src\features.ts:16
+
+TYPESPEC: @mozhou/quality-engine  total=6
+    apps\web\server\api.ts:53
+    apps\web\src\api\client.ts:28
+    packages\benchmark\src\quality-regression.test.ts:14
+    packages\pipeline\src\prepare.ts:34
+    packages\pipeline\src\review-step.test.ts:22
+    packages\pipeline\src\user-edit-step.ts:36
+
+TYPESPEC: @mozhou/runtime  total=20
+    apps\web\server\llm\tierRouting.test.ts:23
+    apps\web\server\llm\tierRouting.ts:31
+    apps\web\server\routes\pipelineRoutes.ts:64
+    packages\benchmark\src\version-matrix.test.ts:6
+    packages\flywheel\src\evaluator\confirm.ts:27
+    packages\flywheel\src\semantic\batch.ts:12
+    packages\flywheel\src\style-runner.ts:20
+    packages\flywheel\src\style-store.ts:27
+    packages\pipeline\src\draft-step.test.ts:12
+    packages\pipeline\src\extract-step.ts:18
+    packages\pipeline\src\golden-quality-journey.test.ts:16
+    packages\pipeline\src\multi-candidate.ts:17
+    packages\pipeline\src\nine-boundaries.test.ts:17
+    packages\pipeline\src\proposal-step.ts:27
+    packages\pipeline\src\record-step.ts:21
+    packages\pipeline\src\review-step.test.ts:12
+    packages\pipeline\src\session.test.ts:11
+    packages\pipeline\src\session.ts:20
+    packages\pipeline\src\t17-pipeline.test.ts:11
+    packages\pipeline\src\user-edit-step.ts:34
+
+TYPESPEC: better-sqlite3  total=7
+    packages\data-plane\src\chapter.ts:25
+    packages\data-plane\src\entity-cards.test.ts:6
+    packages\data-plane\src\entity-cards.ts:16
+    packages\data-plane\src\local-data-plane.test.ts:14
+    packages\data-plane\src\projection.ts:17
+    packages\data-plane\src\reconciliation.test.ts:10
+    packages\data-plane\src\reconciliation.ts:34
+
+TYPESPEC: node:http  total=5
+    apps\web\server\api.ts:5
+    apps\web\server\auth\session.test.ts:9
+    apps\web\server\auth\session.ts:11
+    apps\web\server\router.ts:5
+    apps\web\server\security.ts:1
+
+TYPESPEC: node:net  total=41
+    apps\web\server\routes\accountRoutes.test.ts:15
+    apps\web\server\routes\backupRoutes.test.ts:6
+    apps\web\server\routes\billingRoutes.test.ts:6
+    apps\web\server\routes\bookCreate.test.ts:11
+    apps\web\server\routes\bookRequestDecoder.test.ts:14
+    apps\web\server\routes\draftCandidates.test.ts:13
+    apps\web\server\routes\exportRoutes.test.ts:6
+    apps\web\server\routes\fullJourney.test.ts:13
+    apps\web\server\routes\healthRoutes.test.ts:10
+    apps\web\server\routes\managedModelRoutes.test.ts:6
+    apps\web\server\routes\memoRoutes.test.ts:10
+    apps\web\server\routes\namingRoutes.realModel.test.ts:26
+    apps\web\server\routes\namingRoutes.test.ts:13
+    apps\web\server\routes\pipelineRoutes.advanceGuard.test.ts:15
+    apps\web\server\routes\pipelineRoutes.firstChapter.realModel.test.ts:24
+    apps\web\server\routes\pipelineRoutes.firstChapter.test.ts:19
+    apps\web\server\routes\pipelineRoutes.tierRoute.test.ts:29
+    apps\web\server\routes\planeSeamMigration.test.ts:21
+    apps\web\server\routes\productionRoutes.test.ts:13
+    apps\web\server\routes\proseRoutes.authorEditSignal.test.ts:21
+    apps\web\server\routes\proseRoutes.commitExternalChange.test.ts:15
+    apps\web\server\routes\proseRoutes.commitRevision.test.ts:18
+    apps\web\server\routes\proseRoutes.dependencyManifest.test.ts:13
+    apps\web\server\routes\proseRoutes.flywheelRecord.test.ts:15
+    apps\web\server\routes\proseRoutes.gate.test.ts:14
+    apps\web\server\routes\proseRoutes.proposal.test.ts:20
+    apps\web\server\routes\proseRoutes.repeatCommit.test.ts:18
+    apps\web\server\routes\proseRoutes.resubmit.test.ts:40
+    apps\web\server\routes\proseRoutes.resubmitAbandon.test.ts:21
+    apps\web\server\routes\proseRoutes.sessionComplete.test.ts:25
+    apps\web\server\routes\proseRoutes.test.ts:13
+    apps\web\server\routes\providerRoutes.test.ts:14
+    apps\web\server\routes\realModel.featureSweep.test.ts:31
+    apps\web\server\routes\reconciliationRoutes.semantic.test.ts:21
+    apps\web\server\routes\reconciliationRoutes.test.ts:11
+    apps\web\server\routes\researchRoutes.test.ts:6
+    apps\web\server\routes\storyboardRoutes.test.ts:13
+    apps\web\server\routes\storyBrainRoutes.contract.test.ts:12
+    apps\web\server\tenancy.test.ts:17
+    apps\web\src\api.test.ts:8
+    apps\web\src\release-hardening.test.ts:3
+
+TYPESPEC: react  total=4
+    apps\web\src\App.tsx:5
+    apps\web\src\shell\InspectorTower.tsx:6
+    apps\web\src\shell\scene\SceneLayer.tsx:7
+    apps\web\src\shell\scene\SceneSettingsSheet.tsx:7
+
+TYPESPEC: vite  total=1
+    apps\web\server\api.ts:6
+
+===== 038b: DYNAMIC import() specifiers =====
+
+DYNSPEC: ../analysis/deltaExtractor.js  total=12
+    apps\web\server\routes\proseRoutes.commitRevision.test.ts:39
+    apps\web\server\routes\proseRoutes.commitRevision.test.ts:42
+    apps\web\server\routes\proseRoutes.dependencyManifest.test.ts:40
+    apps\web\server\routes\proseRoutes.dependencyManifest.test.ts:43
+    apps\web\server\routes\proseRoutes.flywheelRecord.test.ts:37
+    apps\web\server\routes\proseRoutes.flywheelRecord.test.ts:40
+    apps\web\server\routes\proseRoutes.gate.test.ts:37
+    apps\web\server\routes\proseRoutes.gate.test.ts:40
+    apps\web\server\routes\proseRoutes.proposal.test.ts:42
+    apps\web\server\routes\proseRoutes.proposal.test.ts:45
+    apps\web\server\routes\proseRoutes.repeatCommit.test.ts:39
+    apps\web\server\routes\proseRoutes.repeatCommit.test.ts:42
+
+DYNSPEC: ../llm/openaiStream.js  total=8
+    apps\web\server\storyboard\generate.test.ts:176
+    apps\web\server\storyboard\generate.test.ts:197
+    apps\web\server\storyboard\generate.test.ts:204
+    apps\web\server\storyboard\generate.test.ts:225
+    apps\web\server\storyboard\generate.test.ts:243
+    apps\web\server\storyboard\generate.test.ts:254
+    apps\web\server\storyboard\generate.test.ts:263
+    apps\web\server\storyboard\generate.test.ts:275
+
+DYNSPEC: ./app/dist-server/productionServer.js  total=2
+    release-artifacts\windows-build-3lxNcY\desktop-server.mjs:21
+    scripts\release\windows\desktop-server.mjs:21
+
+DYNSPEC: ./atomic-write.js  total=1
+    packages\data-plane\src\atomic-write.test.ts:29
+
+DYNSPEC: ./code-graph/CodeGraphView  total=1
+    apps\web\src\App.tsx:55
+
+DYNSPEC: ./CodeNodeExplorer  total=1
+    apps\web\src\code-graph\CodeGraphView.tsx:5
+
+DYNSPEC: ./MyComponent  total=1
+    .next\dev\static\chunks\18pm_next_dist_compiled_141y_dp._.js:1488
+
+DYNSPEC: ./proposals.js  total=5
+    apps\web\server\api.ts:278
+    apps\web\server\api.ts:288
+    apps\web\server\api.ts:295
+    apps\web\server\api.ts:303
+    apps\web\server\api.ts:304
+
+DYNSPEC: ./storyboard/contract.js  total=2
+    apps\web\server\api.ts:311
+    apps\web\server\api.ts:340
+
+DYNSPEC: fastembed  total=1
+    packages\context-compiler\src\embedding.ts:163
+
+DYNSPEC: node:fs  total=2
+    packages\data-plane\src\atomic-write.test.ts:19
+    scripts\embedding-calib\calibrate.mjs:254

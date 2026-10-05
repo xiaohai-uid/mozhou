@@ -1,0 +1,12 @@
+=== Probe 05: 采纳与撤销时正文与版本一致性 ===
+测试时间: 2026-10-02T17:28:36.697Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-05-8YWYPL
+步骤1 初始草稿: revision=1
+步骤2 采纳候选: revision=2
+采纳后核验: SQLite revision=2, 磁盘 revision=2
+采纳后内容对齐: 一致
+步骤3 撤销采纳: revision=3
+撤销后核验: 磁盘 revision=3, SQLite revision=3
+撤销后正文: 版本2(撤销)：恢复作者原正文。
+判定: 撤销采纳采用版本单调递增向前回退（Revision Forwarding），非覆盖旧版本，保证了历史单调性

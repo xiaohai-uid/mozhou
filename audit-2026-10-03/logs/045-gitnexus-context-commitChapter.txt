@@ -1,0 +1,38 @@
+{
+  "status": "ambiguous",
+  "message": "Found 4 symbols matching 'commitChapter'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmit.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmit.test.ts",
+      "line": 96,
+      "score": 0.56
+    },
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts",
+      "line": 77,
+      "score": 0.56
+    },
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.commitChapter#1",
+      "name": "commitChapter",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 211,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "commitChapter",
+      "kind": "",
+      "filePath": "",
+      "line": 569,
+      "score": 0.5
+    }
+  ]
+}

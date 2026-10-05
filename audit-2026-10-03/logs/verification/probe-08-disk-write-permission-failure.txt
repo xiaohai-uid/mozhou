@@ -1,0 +1,9 @@
+=== Probe 08: 权限不足、磁盘写入失败 ===
+测试时间: 2026-10-02T17:28:37.278Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-08-DQRQ4f
+已占用目标正文文件只读句柄 fd=3
+写入遭遇预期拦截: EPERM -> EPERM: operation not permitted, rename 'C:\Users\a1691\AppData\Local\Temp\mozhou-probe-08-DQRQ4f\正文\第一卷\第0001章.md.mozhou-tmp' -> 'C:\Users\a1691\AppData\Local\Temp\mozhou-probe-08-DQRQ4f\正文\第一卷\第0001章.md'
+释放文件占用句柄
+原文件内容完整性: 完美保持原内容未被破坏
+临时文件残留状态: 发现残留泄漏 .mozhou-tmp

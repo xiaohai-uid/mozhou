@@ -1,0 +1,69 @@
+graph TD
+  %% MoZhou 运行图 (Runtime Process & Execution Graph · 2026-10-03)
+  %% 表达进程、线程、启动顺序、通信通道、锁与退出关系
+
+  subgraph HostRunners ["启动入口与桌面进程编排"]
+    direction TB
+    csLauncher["MoZhou.exe (C# WinForms 启动器)<br/>[HEAD:90b45a1]"]
+    nodeLauncher["scripts/launcher.mjs (CLI 开发启动器)<br/>[HEAD:90b45a1]"]
+    srcTauri["mozhou-desktop.exe (src-tauri 12行空壳)<br/>[HEAD:90b45a1]"]
+    innoSetup["Inno Setup 安装包 / 卸载器<br/>[HEAD:90b45a1]"]
+  end
+
+  subgraph WindowsOSPrimitives ["Windows 操作系统原语与锁"]
+    winMutex["Win32 命名互斥锁: Local\\MoZhou-{SHA256(data)}<br/>(单数据根实例互斥) [HEAD:90b45a1]"]
+    winStopEvent["Win32 EventWaitHandle: Local\\MoZhou-{SHA256}-stop<br/>(跨进程优雅停机信号) [HEAD:90b45a1]"]
+    winTray["Windows 系统托盘 NotifyIcon & 菜单<br/>(打开/数据目录/退出) [HEAD:90b45a1]"]
+    instanceFileLock[".mozhou_instance.lock (PID 文件排他锁)<br/>(dataRoot 争夺保护) [HEAD:90b45a1]"]
+  end
+
+  subgraph NodeServerProcess ["Node.js 服务端进程 (主工作进程)"]
+    direction TB
+    desktopServerMjs["desktop-server.mjs (引导脚本)<br/>(校验 installation.key / 注入 SECRET_KEY)<br/>[HEAD:90b45a1]"]
+    prodServer["apps/web/dist-server/productionServer.js<br/>(Node HTTP 服务端核心)<br/>[WORKTREE(未提交)]"]
+
+    subgraph InProcessConcurrencyAndLocks ["进程内队列与排他控制"]
+      bookQueue["BookOperationQueue.withBookLock(bookId)<br/>(每书并发串行化异步队列) [HEAD:90b45a1]"]
+      reconcileManager["ReconciliationRuntime Manager<br/>(外部 Obsidian 双向对账调度器) [HEAD:90b45a1]"]
+    end
+
+    subgraph InProcessNativeEngines ["进程内原生运行时与线程池"]
+      sqliteEngine["better-sqlite3 Native Addon<br/>(同步 C++ SQLite 引擎，操作 runtime.sqlite / billing.sqlite)<br/>[HEAD:90b45a1]"]
+      onnxEngine["ONNX Runtime Node Native Threads<br/>(fastembed BGE-small 向量模型 CPU 线程池)<br/>[HEAD:90b45a1]"]
+      fsWatchThreads["libuv FS Event Watcher 线程池<br/>(监听正典 Markdown 外部修改)<br/>[HEAD:90b45a1]"]
+    end
+  end
+
+  subgraph ClientProcess ["客户端进程 (渲染与交互面)"]
+    browser["系统默认浏览器 (Edge / Chrome 等)<br/>(UI 渲染与交互)"]
+    tauriWebView["WebView2 控件 (若通过 Tauri 打开)<br/>(纯 UI 呈现)"]
+    clientDeAi["Client-side De-AI Worker / 纯函数<br/>(@mozhou/quality-engine/de-ai)<br/>(逐键诊断，零 Node 依赖) [HEAD:90b45a1]"]
+  end
+
+  %% 启动与编排时序
+  innoSetup -- "安装/升级/卸载前调用<br/>MoZhou.exe --stop<br/>[HEAD:90b45a1]" --> csLauncher
+  csLauncher -- "1. 声明并获取排他所有权" --> winMutex
+  csLauncher -- "2. 创建事件句柄" --> winStopEvent
+  csLauncher -- "3. 挂载系统托盘" --> winTray
+  csLauncher -- "4. 派生确定性端口 (43000-43999)<br/>并 spawn runtime/node.exe<br/>[HEAD:90b45a1]" --> desktopServerMjs
+  nodeLauncher -- "检查构建产物缺失则 build<br/>spawn node productionServer.js<br/>[HEAD:90b45a1]" --> prodServer
+
+  desktopServerMjs -- "读取/生成 48字节 installation.key<br/>动态 import productionServer.js<br/>[HEAD:90b45a1]" --> prodServer
+  prodServer -- "获取目录独占锁<br/>(检查 PID 存活)<br/>[HEAD:90b45a1]" --> instanceFileLock
+
+  %% 运行时内部连线
+  prodServer --> bookQueue
+  prodServer --> reconcileManager
+  prodServer --> sqliteEngine
+  prodServer --> onnxEngine
+  reconcileManager --> fsWatchThreads
+
+  %% 通信通道
+  csLauncher -- "私有 stdin 管道发送 'shutdown\\n'<br/>[HEAD:90b45a1]" --> desktopServerMjs
+  desktopServerMjs -- "转发触发 process.emit('SIGTERM')<br/>[HEAD:90b45a1]" --> prodServer
+  prodServer -- "HTTP 监听 127.0.0.1:PORT<br/>(静态资源 + API 路由)<br/>[HEAD:90b45a1]" --> browser
+  prodServer -. "HTTP 监听 (若配置 devUrl)<br/>[HEAD:90b45a1]" .-> tauriWebView
+  browser --> clientDeAi
+
+  %% 停机与释放
+  prodServer -- "SIGTERM/exit 触发<br/>releaseResources()<br/>关闭连接/排空在途/释放文件锁<br/>[HEAD:90b45a1]" --> instanceFileLock

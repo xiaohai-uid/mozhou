@@ -1,0 +1,10 @@
+=== Probe 04: 生成停止、切章后的晚到结果 ===
+测试时间: 2026-10-02T17:28:36.628Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-04-KtjqV9
+作者在第 1 章发起模型生成，并在流传输途中切到第 2 章
+晚到候选写入隔离候选池: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-04-KtjqV9\.mozhou\draft_candidates.jsonl
+第 1 章盘上正文: 【第1章原正文】作者手写正文。
+第 2 章盘上正文: 【第2章原正文】作者手写正文。
+核查结果: 第 1 章正文未被篡改 (true)；第 2 章正文未被篡改 (true)
+判定: 候选缓冲层（C2）完全隔离了流式生成的不确定性，切章或停止不会污染正文文件

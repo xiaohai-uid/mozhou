@@ -1,0 +1,36 @@
+Usage: gitnexus [options] [command]
+
+GitNexus local CLI and MCP server
+
+Options:
+  -V, --version                            output the version number
+  -h, --help                               display help for command
+
+Commands:
+  setup [options]                          One-time setup: configure MCP for Cursor, Claude Code, Antigravity, OpenCode, CodeBuddy, Qoder, Codex
+  uninstall [options]                      Reverse `setup`: remove GitNexus MCP entries, skills, and hooks from all detected editors
+  analyze [options] [path]                 Index a repository (full analysis)
+  index [options] [path...]                Register an existing .gitnexus/ folder into the global registry (no re-analysis needed)
+  serve [options]                          Start local HTTP server for web UI connection
+  mcp [options]                            Start MCP server. Default: stdio. Use --http for a remote HTTP server (Streamable HTTP at POST /mcp + legacy SSE at GET /sse, POST /messages).
+  list                                     List all indexed repositories
+  status [options]                         Show index status for current repo
+  doctor                                   Show runtime platform capabilities and embedding configuration
+  embeddings                               Manage the on-demand local embedding runtime
+  clean [options]                          Delete GitNexus index for current repo
+  remove [options] <target>                Delete the GitNexus index for a registered repo (by alias, name, or absolute path). Unlike `clean`, does not require being inside the repo. Idempotent on unknown targets.
+  wiki [options] [path]                    Generate repository wiki from knowledge graph
+  augment <pattern>                        Augment a search pattern with knowledge graph context (used by hooks)
+  publish [options] [path]                 Notify the understand-quickly registry that this repo has a fresh GitNexus index. Opt-in: requires UNDERSTAND_QUICKLY_TOKEN (fine-grained PAT with `Repository dispatches: write` on looptech-ai/understand-quickly). No-op without the token. See https://github.com/looptech-ai/understand-quickly.
+  query [options] [search_query]           Search the knowledge graph for execution flows related to a concept
+  context [options] [name]                 360-degree view of a code symbol: callers, callees, processes
+  impact [options] [target]                Blast radius analysis: what breaks if you change a symbol
+  trace [options] <from> <to>              Find the shortest directed path between two symbols (call + class-member edges)
+  cypher [options] <query>                 Execute raw Cypher query against the knowledge graph
+  detect-changes|detect_changes [options]  Map git diff hunks to indexed symbols and affected execution flows
+  check [options]                          Run structural checks against the indexed graph
+  eval-server [options]                    Start lightweight HTTP server for fast tool calls during evaluation
+  group                                    Manage repository groups for cross-index impact analysis
+  help [command]                           display help for command
+(node:43160) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)

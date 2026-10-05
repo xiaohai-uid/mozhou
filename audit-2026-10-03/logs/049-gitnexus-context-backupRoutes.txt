@@ -1,0 +1,55 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/server/routes/backupRoutes.ts:backupRoutes",
+    "name": "backupRoutes",
+    "kind": "Function",
+    "filePath": "apps/web/server/routes/backupRoutes.ts",
+    "startLine": 18,
+    "endLine": 142
+  },
+  "epistemic": "exact",
+  "incoming": {},
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/settings/ProviderSettingsForm.tsx:useProviderSettings.test@87:2",
+        "name": "test",
+        "filePath": "apps/web/src/settings/ProviderSettingsForm.tsx"
+      },
+      {
+        "uid": "Function:apps/web/src/settings/ProviderSettingsForm.tsx:useProviderSettings.test@87:2",
+        "name": "test",
+        "filePath": "apps/web/src/settings/ProviderSettingsForm.tsx"
+      },
+      {
+        "uid": "Method:apps/web/server/bookAccess.ts:BookAccessManager.isHostedMode#0",
+        "name": "isHostedMode",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/bookAccess.ts:BookAccessManager.isHostedMode#0",
+        "name": "isHostedMode",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/bookAccess.ts:BookAccessManager.getDataRoot#0",
+        "name": "getDataRoot",
+        "filePath": "apps/web/server/bookAccess.ts"
+      },
+      {
+        "uid": "Method:apps/web/server/bookAccess.ts:BookAccessManager.registerLocalBook#2",
+        "name": "registerLocalBook",
+        "filePath": "apps/web/server/bookAccess.ts"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_177_backuproutes",
+      "name": "BackupRoutes → RequestBoundaryError",
+      "step_index": 1,
+      "step_count": 4
+    }
+  ]
+}

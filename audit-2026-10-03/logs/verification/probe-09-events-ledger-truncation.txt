@@ -1,0 +1,8 @@
+=== Probe 09: 事件账本尾部残缺 ===
+测试时间: 2026-10-02T17:28:37.335Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-09-LGLc0s
+已注入尾部残缺破损行: '{"type":"TaskStepTransitioned","seq":4,"at":"2026-10-0'
+读取结果: 抛出异常: readStoredLines is not a function
+事件解析有效项: seq 列表 = []
+判定: readStoredLines 具备容错性（Fail-Soft），单行 JSON 解析失败不会导致整账本崩溃，但截断事件永久丢失

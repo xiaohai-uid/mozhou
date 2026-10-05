@@ -1,0 +1,15 @@
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/server/routes/exportRoutes.ts:exportRoutes",
+    "name": "exportRoutes",
+    "kind": "Function",
+    "filePath": "apps/web/server/routes/exportRoutes.ts",
+    "startLine": 15,
+    "endLine": 102
+  },
+  "epistemic": "exact",
+  "incoming": {},
+  "outgoing": {},
+  "processes": []
+}

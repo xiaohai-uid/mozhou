@@ -1,0 +1,74 @@
+graph TD
+  %% MoZhou 源码依赖图 (Source Dependency Graph · 2026-10-03)
+  %% 语法：实线=生产代码运行时依赖；虚线=仅类型依赖 (type-only)；点划线=内部实现穿透 (deep import)；红双线=声明但未使用
+
+  subgraph BasePackages ["底层基础包 (零依赖 / 叶子包)"]
+    kernel["@mozhou/kernel<br/>(纯类型与核心不变量断言)"]
+    quality["@mozhou/quality-engine<br/>(规则机检与 De-AI 引擎)"]
+  end
+
+  subgraph CoreInfrastructure ["核心设施与编译器"]
+    dataPlane["@mozhou/data-plane<br/>(本地优先数据平面 & SQLite 投影)"]
+    contextCompiler["@mozhou/context-compiler<br/>(三通道召回 & 预算装配)"]
+    runtime["@mozhou/runtime<br/>(事件总线 & 模型路由)"]
+  end
+
+  subgraph OrchestrationAndLearning ["长篇编排与学习闭环"]
+    pipeline["@mozhou/pipeline<br/>(十步长篇事务状态机)"]
+    flywheel["@mozhou/flywheel<br/>(文风学习器 & 路由建议)"]
+    benchmark["@mozhou/benchmark<br/>(六指标断言 & 夹具评测)"]
+  end
+
+  subgraph ApplicationsAndBFF ["应用层与宿主总成"]
+    bffServer["apps/web/server (BFF 服务端)<br/>(productionServer / routes / tenancy)"]
+    webClient["apps/web/src (Web 前端)<br/>(React UI / Workbench / Editor)"]
+    srcTauri["src-tauri (Tauri 桌面外壳)<br/>(12行空壳 / Cargo 0.2.0)"]
+    desktopLauncher["MoZhou.cs / desktop-server.mjs<br/>(真实 Windows 进程编排 / 托盘 / 锁)"]
+  end
+
+  %% 生产运行时依赖 (实线)
+  dataPlane -- "import [@mozhou/kernel]<br/>[HEAD:90b45a1]" --> kernel
+  contextCompiler -- "import [@mozhou/kernel]<br/>[HEAD:90b45a1]" --> kernel
+  contextCompiler -- "import [@mozhou/data-plane]<br/>[HEAD:90b45a1]" --> dataPlane
+  runtime -- "import [@mozhou/kernel]<br/>[HEAD:90b45a1]" --> kernel
+  runtime -- "import RUNTIME_EVENTS_PATH [@mozhou/data-plane]<br/>[HEAD:90b45a1]" --> dataPlane
+
+  pipeline -- "import [@mozhou/kernel]<br/>[HEAD:90b45a1]" --> kernel
+  pipeline -- "import [@mozhou/data-plane]<br/>[HEAD:90b45a1]" --> dataPlane
+  pipeline -- "import compile [@mozhou/context-compiler]<br/>[HEAD:90b45a1]" --> contextCompiler
+  pipeline -- "import evaluateMechanicalGates [@mozhou/quality-engine]<br/>[HEAD:90b45a1]" --> quality
+  pipeline -- "import PublishBus [@mozhou/runtime]<br/>[HEAD:90b45a1]" --> runtime
+
+  flywheel -- "import [@mozhou/kernel]<br/>[HEAD:90b45a1]" --> kernel
+  flywheel -- "import [@mozhou/data-plane]<br/>[HEAD:90b45a1]" --> dataPlane
+  flywheel -- "import readPipelineLedger [@mozhou/pipeline]<br/>[HEAD:90b45a1]" --> pipeline
+  flywheel -- "import PublishBus [@mozhou/runtime]<br/>[HEAD:90b45a1]" --> runtime
+  flywheel -- "import METRIC_IDS, evaluateMetricGate [@mozhou/benchmark]<br/>[HEAD:90b45a1]" --> benchmark
+
+  bffServer -- "import [@mozhou/kernel]<br/>[HEAD:90b45a1]" --> kernel
+  bffServer -- "import createBook, LocalDataPlane [@mozhou/data-plane]<br/>[HEAD:90b45a1]" --> dataPlane
+  bffServer -- "import createLocalTokenizer, assemble [@mozhou/context-compiler]<br/>[WORKTREE(未提交)]" --> contextCompiler
+  bffServer -- "import evaluateStyleMetrics [@mozhou/quality-engine]<br/>[HEAD:90b45a1]" --> quality
+  bffServer -- "import runChapterCommit, ChapterProductionSession [@mozhou/pipeline]<br/>[WORKTREE(未提交)]" --> pipeline
+  bffServer -- "import RuntimeEngine, PublishBus [@mozhou/runtime]<br/>[HEAD:90b45a1]" --> runtime
+  bffServer -- "import runStyleLearnerForWindow [@mozhou/flywheel]<br/>[HEAD:90b45a1]" --> flywheel
+
+  %% 仅类型依赖 (虚线)
+  benchmark -. "import type { ContextReceipt } [type-only]<br/>[HEAD:90b45a1]" .-> kernel
+  benchmark -. "import type { ContinuityGateOutcome } [type-only]<br/>[HEAD:90b45a1]" .-> pipeline
+  benchmark -. "import type { ContextPacket } [type-only]<br/>[HEAD:90b45a1]" .-> contextCompiler
+  webClient -. "import type { ChangeMatrix } [type-only]<br/>[HEAD:90b45a1]" .-> dataPlane
+  webClient -. "import type { QualityPolicy } [type-only]<br/>[HEAD:90b45a1]" .-> quality
+  webClient -. "import type { *Response } from '../../server/api' [type-only]<br/>[HEAD:90b45a1]" .-> bffServer
+
+  %% 内部实现穿透 / 特殊子路径导出 (点划线)
+  webClient -. "subpath export import { runDeAiDiagnostics }<br/>from '@mozhou/quality-engine/de-ai' [HEAD:90b45a1]" .-> quality
+  webClient ==> "DEEP IMPORT PENETRATION: import { billingCatalog }<br/>from '../../server/billing/catalog' [HEAD:90b45a1]" ==> bffServer
+
+  %% 声明但生产代码未使用 (测试/冗余声明) (红色加粗标记)
+  benchmark x-.-x "DECLARED IN package.json BUT ZERO PROD IMPORTS<br/>(only used in tests) [HEAD:90b45a1]" quality
+  benchmark x-.-x "DECLARED IN package.json BUT ZERO PROD IMPORTS<br/>(only used in tests) [HEAD:90b45a1]" runtime
+
+  %% 外部/宿主边界
+  desktopLauncher -- "spawns Node runtime & loads dist-server<br/>[HEAD:90b45a1]" --> bffServer
+  srcTauri -. "tauri.conf.json devUrl=localhost:5173 / frontendDist<br/>(NO code connection) [HEAD:90b45a1]" .-> bffServer

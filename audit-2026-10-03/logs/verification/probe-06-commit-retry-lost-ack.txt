@@ -1,0 +1,10 @@
+=== Probe 06: 提交成功但响应丢失后的确认与重试 ===
+测试时间: 2026-10-02T17:28:36.769Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-06-xYeZut
+首次提交已落盘成功: commitId=cmit_01M3YTJA6M8ZZGB1VNJXRMJA41, revision已自增
+模拟客户端未收到 200 响应，携带 expectedRevision=1 发起重试提交...
+重试抛出异常: ChapterPhaseError -> chapter 1 phase violation: chapter is committed — reopen it before re-committing
+重试拦截判定: 正确被 ChapterPhaseError 拦截 (phase 已非 draft)
+客户端确认路径: 重新获取章节快照 -> phase=committed, commitId=cmit_01M3YTJA6M8ZZGB1VNJXRMJA41
+比对判定: commitId 匹配成功 (true)，客户端可通过快照确认提交已达成

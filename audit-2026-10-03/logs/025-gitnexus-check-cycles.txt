@@ -1,0 +1,3 @@
+{
+  "error": "Repository \"mozhou (C:\\zcode\\novel-ai)\" not found. Available: snake-graph, mozhou (C:\\Users\\a1691\\Documents\\antigravity\\happy-newton), Openwrite, mozhou-audit-20260914-fed29e3, lingbi-next (C:\\codex\\lingbi-next), lingbi-next (C:\\codex\\lingbi-next-fusion), lingbi-local, mcu-project-assistant (C:\\codex\\mcu-project-assistant), mcu-project-assistant (C:\\codex\\mcu-project-assistant\\.worktrees\\trust-baseline), storyrepo, toonflow-next, toonflow-source, CAD-AutoCAD-Platform (C:\\qoder\\autocad-mcp), CAD-AutoCAD-Platform (C:\\qoder\\autocad-mcp\\.worktrees\\cad-mcp-v2), ashquant, mcu, mozhou-author-os, mozhou (C:\\zcode\\novel-ai), mozhou (C:\\zcode\\novel-ai-closure), novels, BeefTV, FPM_INR"
+}

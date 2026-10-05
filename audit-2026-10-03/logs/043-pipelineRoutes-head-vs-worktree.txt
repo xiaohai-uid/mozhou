@@ -1,0 +1,55 @@
+=== pipelineRoutes.ts WORKTREE key line numbers ===
+395: if (path === '/api/session.open') {
+411: if (path === '/api/session.advance') {
+474: if (path === '/api/session.abandon') {
+499: if (path === '/api/capabilities') {
+518: if (path === '/api/draft.question') {
+546: if (path === '/api/draft.stream') {
+690: if (path === '/api/draft.candidate') {
+706: if (path === '/api/draft.cancel') {
+722: if (path === '/api/draft.accept') {
+772: if (path === '/api/chapter.review') {
+843: if (path === '/api/chapter.rework') {
+869: if (path === '/api/chapter.corrections') {
+914: if (path === '/api/chapter.quality') {
+952: if (path === '/api/proposal.list') {
+975: if (path === '/api/proposal.decide') {
+1041: if (path === '/api/proposal.discard') {
+
+=== pipelineRoutes.ts HEAD:90b45a1 key line numbers ===
+395: if (path === '/api/session.open') {
+411: if (path === '/api/session.advance') {
+452: if (path === '/api/session.abandon') {
+477: if (path === '/api/capabilities') {
+496: if (path === '/api/draft.question') {
+524: if (path === '/api/draft.stream') {
+668: if (path === '/api/draft.candidate') {
+684: if (path === '/api/draft.cancel') {
+700: if (path === '/api/draft.accept') {
+750: if (path === '/api/chapter.review') {
+821: if (path === '/api/chapter.rework') {
+847: if (path === '/api/chapter.corrections') {
+892: if (path === '/api/chapter.quality') {
+930: if (path === '/api/proposal.list') {
+953: if (path === '/api/proposal.decide') {
+1019: if (path === '/api/proposal.discard') {
+
+=== WorkbenchView.tsx (WORKTREE) ===
+WB 8: import { DialogueStream } from './DialogueStream'
+WB 9: import { ProseEditorPanel } from './editor/ProseEditorPanel'
+WB 183: className={'chap-card' + (ch.chapterIndex === chapterIndex ? ' current' : '')}
+WB 196: className="chap-card chap-add"
+WB 230: <ProseEditorPanel book={book} chapterIndex={chapterIndex} onSelectionChange={handleSelectionChange} />
+WB 334: <DialogueStream book={book} chapterIndex={chapterIndex} selection={editorSelection} />
+
+=== App.tsx (WORKTREE) ===
+APP 24: import { loadWorkbenchState, saveWorkbenchState } from './shell/workbenchStorage'
+APP 27: import { QualityPanel } from './quality/QualityPanel'
+APP 28: import { ReceiptPanel } from './context-receipt/ReceiptPanel'
+APP 48: import { WorkbenchView } from './workbench/WorkbenchView'
+APP 218: saveWorkbenchState({ book, view })
+APP 221: // U03：进入写作对话视图时滚动到真实对话面板（WorkbenchView 内锚点）
+APP 236: const selectBook = (nextBook: BookInfo): void => {
+APP 268: <QualityPanel root={book.root} chapterIndex={chapterIndex} />
+APP 280: <ReceiptPanel
+APP 330: <WorkbenchView

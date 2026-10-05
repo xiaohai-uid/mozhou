@@ -1,0 +1,33 @@
+临时书库根: C:\Users\a1691\AppData\Local\Temp\mozhou-t5-2pc-RD0E2g
+
+步骤1 注入崩溃: simulated crash at prose-flip
+journal 在盘            : true
+追踪流字节数(payload 已落): 930
+事件账本字节数          : -1
+正文 phase              : draft
+
+步骤2a 正文已翻转为 committed  (sha 匹配 journal.stagedProseSha256 = 前滚路径)
+步骤2b 追踪流被截回 baseBytes=0（= 前滚恢复 truncate 之后、append 之前断电的盘面）
+        此刻该文件的 classifyAppendDiskState 结果 = size === baseBytes ⇒ 'untouched'
+
+步骤3 LocalDataPlane.open(): 成功（未抛错）
+        打开即自动跑 recoverPendingCommit，无任何告警输出。
+
+== 恢复后盘面实况 ==
+journal 是否已删除   : true   (true = 恢复宣布完成)
+正文 phase           : committed   commitId=cmit_01M3YS7RSPZ1G60QR46446DAQF
+journal.commitId     : cmit_01M3YS7RSPZ1G60QR46446DAQF
+追踪流字节数        : 0  (baseBytes=0, payload=930)
+追踪流内容行数      : 0  (journal 记录应有 2 行)
+追踪流内容          : ""
+事件账本含 ChapterCommitted : false
+SQLite tracking_lines 行数  : 2
+verifyBaseline()     : {"modified":[],"missing":[],"untracked":[],"reconcileSurface":[],"draftFreeEdits":[]}
+
+*** 判定 ***
+  ✗ 数据丢失已复现：恢复返回「成功」、journal 被删、正文=committed、基线校验干净，
+    但追踪流的 2 行增量永久缺失（classify 判 untouched → recoverForward 不重放）。
+
+*** 对照：若没有这次「二次中断」，同一 commit 的正常前滚会补齐 ***
+
+临时书库已清理: C:\Users\a1691\AppData\Local\Temp\mozhou-t5-2pc-RD0E2g

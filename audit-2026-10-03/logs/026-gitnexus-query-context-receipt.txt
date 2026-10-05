@@ -1,0 +1,212 @@
+{
+  "processes": [
+    {
+      "id": "proc_70_app",
+      "summary": "App → SendJson",
+      "priority": 0.12,
+      "symbol_count": 3,
+      "process_type": "cross_community",
+      "step_count": 5
+    },
+    {
+      "id": "proc_310_onrefresh",
+      "summary": "OnRefresh → SendJson",
+      "priority": 0.094,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 4
+    },
+    {
+      "id": "proc_359_worksroutes",
+      "summary": "WorksRoutes → RequestBoundaryError",
+      "priority": 0.087,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 3
+    }
+  ],
+  "process_symbols": [
+    {
+      "id": "Function:apps/web/src/shell/useShellTelemetry.ts:useShellTelemetry",
+      "name": "useShellTelemetry",
+      "filePath": "apps/web/src/shell/useShellTelemetry.ts",
+      "startLine": 20,
+      "endLine": 67,
+      "module": "Shell",
+      "process_id": "proc_70_app",
+      "step_index": 2
+    },
+    {
+      "id": "Function:apps/web/src/shell/useShellTelemetry.ts:useShellTelemetry.refresh@23:2",
+      "name": "refresh",
+      "filePath": "apps/web/src/shell/useShellTelemetry.ts",
+      "startLine": 24,
+      "endLine": 49,
+      "module": "Shell",
+      "process_id": "proc_70_app",
+      "step_index": 3
+    },
+    {
+      "id": "Function:apps/web/src/App.tsx:App",
+      "name": "App",
+      "filePath": "apps/web/src/App.tsx",
+      "startLine": 80,
+      "endLine": 344,
+      "module": "Shell",
+      "process_id": "proc_70_app",
+      "step_index": 1
+    },
+    {
+      "id": "Function:apps/web/server/routes/worksRoutes.ts:worksRoutes",
+      "name": "worksRoutes",
+      "filePath": "apps/web/server/routes/worksRoutes.ts",
+      "startLine": 39,
+      "endLine": 326,
+      "module": "Routes",
+      "process_id": "proc_359_worksroutes",
+      "step_index": 1
+    }
+  ],
+  "definitions": [
+    {
+      "name": "bookIdOf",
+      "type": "File"
+    },
+    {
+      "id": "File:packages/context-compiler/src/receipt-replay.test.ts",
+      "name": "receipt-replay.test.ts",
+      "filePath": "packages/context-compiler/src/receipt-replay.test.ts"
+    },
+    {
+      "id": "File:packages/pipeline/src/quality-context.test.ts",
+      "name": "quality-context.test.ts",
+      "filePath": "packages/pipeline/src/quality-context.test.ts"
+    },
+    {
+      "id": "Const:packages/context-compiler/src/receipt-file.ts:RECEIPTS_SUBDIR",
+      "name": "RECEIPTS_SUBDIR",
+      "filePath": "packages/context-compiler/src/receipt-file.ts",
+      "startLine": 31,
+      "endLine": 31
+    },
+    {
+      "id": "Const:packages/context-compiler/src/receipt-file.ts:RECEIPTS_DIRNAME",
+      "name": "RECEIPTS_DIRNAME",
+      "filePath": "packages/context-compiler/src/receipt-file.ts",
+      "startLine": 34,
+      "endLine": 34
+    },
+    {
+      "id": "File:packages/context-compiler/src/receipt-file.ts",
+      "name": "receipt-file.ts",
+      "filePath": "packages/context-compiler/src/receipt-file.ts"
+    },
+    {
+      "id": "Function:apps/web/src/context-receipt/ReceiptPanel.tsx:ReceiptPanel",
+      "name": "ReceiptPanel",
+      "filePath": "apps/web/src/context-receipt/ReceiptPanel.tsx",
+      "startLine": 44,
+      "endLine": 341,
+      "module": "Shell"
+    },
+    {
+      "id": "Function:apps/web/src/context-receipt/ReceiptPanel.tsx:ReceiptPanel.loadList@65:2",
+      "name": "loadList",
+      "filePath": "apps/web/src/context-receipt/ReceiptPanel.tsx",
+      "startLine": 66,
+      "endLine": 77,
+      "module": "Shell"
+    },
+    {
+      "id": "Function:apps/web/src/context-receipt/ReceiptPanel.tsx:ReceiptPanel.budget@104:2",
+      "name": "budget",
+      "filePath": "apps/web/src/context-receipt/ReceiptPanel.tsx",
+      "startLine": 105,
+      "endLine": 122
+    },
+    {
+      "id": "Const:apps/web/src/shell/useShellTelemetry.ts:EMPTY",
+      "name": "EMPTY",
+      "filePath": "apps/web/src/shell/useShellTelemetry.ts",
+      "startLine": 18,
+      "endLine": 18
+    },
+    {
+      "id": "Function:packages/data-plane/src/reconciliation.ts:summarizeEntityCard",
+      "name": "summarizeEntityCard",
+      "filePath": "packages/data-plane/src/reconciliation.ts",
+      "startLine": 424,
+      "endLine": 458,
+      "module": "Cluster_31"
+    },
+    {
+      "id": "Function:apps/web/src/shell/shellTelemetry.ts:deriveStageStates",
+      "name": "deriveStageStates",
+      "filePath": "apps/web/src/shell/shellTelemetry.ts",
+      "startLine": 35,
+      "endLine": 62,
+      "module": "Shell"
+    },
+    {
+      "id": "Function:apps/web/src/shell/shellTelemetry.ts:deriveSummary",
+      "name": "deriveSummary",
+      "filePath": "apps/web/src/shell/shellTelemetry.ts",
+      "startLine": 89,
+      "endLine": 117,
+      "module": "Shell"
+    },
+    {
+      "id": "Const:packages/context-compiler/src/receipt-replay.test.ts:RECEIPT_ID",
+      "name": "RECEIPT_ID",
+      "filePath": "packages/context-compiler/src/receipt-replay.test.ts",
+      "startLine": 51,
+      "endLine": 51
+    },
+    {
+      "id": "File:docs/adr/K-0004-context-compiler-and-receipt.md",
+      "name": "K-0004-context-compiler-and-receipt.md",
+      "filePath": "docs/adr/K-0004-context-compiler-and-receipt.md"
+    },
+    {
+      "id": "File:docs/specs/context-receipt-physical-format-spec.md",
+      "name": "context-receipt-physical-format-spec.md",
+      "filePath": "docs/specs/context-receipt-physical-format-spec.md"
+    },
+    {
+      "id": "Function:apps/web/server/routes/worksRoutes.ts:receiptDigestMatch",
+      "name": "receiptDigestMatch",
+      "filePath": "apps/web/server/routes/worksRoutes.ts",
+      "startLine": 29,
+      "endLine": 32,
+      "module": "Routes"
+    },
+    {
+      "id": "File:docs/adr/0021-context-receipt-physical-storage-pointer-events.md",
+      "name": "0021-context-receipt-physical-storage-pointer-events.md",
+      "filePath": "docs/adr/0021-context-receipt-physical-storage-pointer-events.md"
+    },
+    {
+      "id": "Const:packages/pipeline/src/quality-context.test.ts:RECEIPT_ID",
+      "name": "RECEIPT_ID",
+      "filePath": "packages/pipeline/src/quality-context.test.ts",
+      "startLine": 33,
+      "endLine": 33
+    },
+    {
+      "id": "Const:apps/web/src/App.tsx:INSPECTOR_VIEW_TO_TAB",
+      "name": "INSPECTOR_VIEW_TO_TAB",
+      "filePath": "apps/web/src/App.tsx",
+      "startLine": 62,
+      "endLine": 67
+    }
+  ],
+  "timing": {
+    "vector": 4.1,
+    "bm25": 177.8,
+    "merge": 0.1,
+    "symbol_lookup": 14.9,
+    "ranking": 0,
+    "formatting": 0.1,
+    "wall": 193.6
+  }
+}

@@ -1,0 +1,18 @@
+better-sqlite3 version : 12.11.1
+node                    : v24.18.0  win32/x64
+temp db                 : C:\Users\a1691\AppData\Local\Temp\mozhou-t5-contend2-TeivhI\contend.db
+
+默认连接   busy_timeout = 5000
+timeout:0  busy_timeout = 0
+
+持锁子进程 pid=43468 已持有 BEGIN IMMEDIATE（存活 20s，两组测试期间不退出）。
+两条被测连接指向同一个 C:\Users\a1691\AppData\Local\Temp\mozhou-t5-contend2-TeivhI\contend.db
+
+== 行为级实测 ==
+A 默认 (未设 timeout) : 抛 SQLITE_BUSY 耗时 5514.7 ms  "database is locked"
+B 显式 timeout:0      : 抛 SQLITE_BUSY 耗时 1.1 ms  "database is locked"
+
+判读：A 等待约 5000ms 才抛 SQLITE_BUSY、B 立即(<50ms)抛 SQLITE_BUSY
+      ⇒ better-sqlite3 默认 timeout = 5000，不是 0。原报告该断言不成立。
+
+临时目录已清理: C:\Users\a1691\AppData\Local\Temp\mozhou-t5-contend2-TeivhI

@@ -1,0 +1,22 @@
+{
+  "status": "ambiguous",
+  "message": "Found 2 symbols matching 'reopenChapter'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.reopenChapter#1",
+      "name": "reopenChapter",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 216,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "reopenChapter",
+      "kind": "",
+      "filePath": "",
+      "line": 731,
+      "score": 0.5
+    }
+  ]
+}

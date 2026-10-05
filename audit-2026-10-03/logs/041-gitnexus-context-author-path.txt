@@ -1,0 +1,484 @@
+
+=== context: acceptDraft ===
+{
+  "status": "found",
+  "symbol": {
+    "name": "acceptDraft",
+    "startLine": 184,
+    "endLine": 334
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "name": "makeBook"
+      },
+      {
+        "name": "makeBook"
+      },
+      {
+        "name": "styleSectionOf"
+      },
+      {
+        "name": "makeBookWithSemanticOnlyFact"
+      },
+      {
+        "name": "makeBookWithSemanticOnlyFact"
+      },
+      {
+        "name": "localEmbeddingProvider"
+      },
+      {
+        "name": "captureStdout"
+      },
+      {
+        "name": "captureStderr"
+      },
+      {
+        "name": "resolveTarget"
+      },
+      {
+        "name": "resolveTarget"
+      },
+      {
+        "name": "resolveTarget"
+      },
+      {
+        "name": "resolveTarget"
+
+=== context: saveProseDraft ===
+{
+  "status": "ambiguous",
+  "message": "Found 2 symbols matching 'saveProseDraft'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.saveProseDraft#1",
+      "name": "saveProseDraft",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 221,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "saveProseDraft",
+      "kind": "",
+      "filePath": "",
+      "line": 805,
+      "score": 0.5
+    }
+  ]
+}
+
+=== context: commitChapter ===
+{
+  "status": "ambiguous",
+  "message": "Found 4 symbols matching 'commitChapter'. Use uid, file_path, or kind to disambiguate.",
+  "candidates": [
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmit.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmit.test.ts",
+      "line": 96,
+      "score": 0.56
+    },
+    {
+      "uid": "Function:apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts:commitChapter",
+      "name": "commitChapter",
+      "kind": "Function",
+      "filePath": "apps/web/server/routes/proseRoutes.resubmitAbandon.test.ts",
+      "line": 77,
+      "score": 0.56
+    },
+    {
+      "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.commitChapter#1",
+      "name": "commitChapter",
+      "kind": "Method",
+      "filePath": "packages/data-plane/src/local-data-plane.ts",
+      "line": 211,
+      "score": 0.54
+    },
+    {
+      "uid": "",
+      "name": "commitChapter",
+      "kind": "",
+      "filePath": "",
+      "line": 569,
+      "score": 0.5
+    }
+  ]
+}
+
+=== context: ProseEditorSession ===
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/src/workbench/editor/ProseEditorPanel.tsx:ProseEditorSession",
+    "name": "ProseEditorSession",
+    "kind": "Function",
+    "filePath": "apps/web/src/workbench/editor/ProseEditorPanel.tsx",
+    "startLine": 45,
+    "endLine": 333
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/workbench/editor/ProseEditorPanel.tsx:ProseEditorPanel",
+        "name": "ProseEditorPanel",
+        "filePath": "apps/web/src/workbench/editor/ProseEditorPanel.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:loadDraftCache",
+        "name": "loadDraftCache",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:saveDraftCache",
+        "name": "saveDraftCache",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:saveDraftBaseline",
+        "name": "saveDraftBaseline",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:draftCacheMatchesBaseline",
+        "name": "draftCacheMatchesBaseline",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:chapterDraftKey",
+        "name": "chapterDraftKey",
+
+=== context: DialogueStream ===
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/src/workbench/DialogueStream.tsx:DialogueStream",
+    "name": "DialogueStream",
+    "kind": "Function",
+    "filePath": "apps/web/src/workbench/DialogueStream.tsx",
+    "startLine": 52,
+    "endLine": 917
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/workbench/DialogueStream.honesty.test.tsx:renderStream",
+        "name": "renderStream",
+        "filePath": "apps/web/src/workbench/DialogueStream.honesty.test.tsx"
+      },
+      {
+        "uid": "Function:apps/web/src/workbench/WorkbenchView.tsx:WorkbenchView",
+        "name": "WorkbenchView",
+        "filePath": "apps/web/src/workbench/WorkbenchView.tsx"
+      },
+      {
+        "uid": "File:apps/web/src/workbench/DialogueStream.accept.test.tsx",
+        "name": "DialogueStream.accept.test.tsx",
+        "filePath": "apps/web/src/workbench/DialogueStream.accept.test.tsx"
+      },
+      {
+        "uid": "File:apps/web/src/workbench/DialogueStream.cancel.test.tsx",
+        "name": "DialogueStream.cancel.test.tsx",
+        "filePath": "apps/web/src/workbench/DialogueStream.cancel.test.tsx"
+      },
+      {
+        "uid": "File:apps/web/src/workbench/DialogueStream.hardening.test.tsx",
+        "name": "DialogueStream.hardening.test.tsx",
+        "filePath": "apps/web/src/workbench/DialogueStream.hardening.test.tsx"
+      },
+      {
+        "uid": "File:apps/web/src/workbench/DialogueStream.test.tsx",
+        "name": "DialogueStream.test.tsx",
+        "filePath": "apps/web/src/workbench/DialogueStream.test.tsx"
+      },
+      {
+        "uid": "File:apps/web/src/workbench/DialogueStream.undoIsolation.test.tsx",
+
+=== context: runChapterCommit ===
+{
+  "status": "found",
+  "symbol": {
+    "name": "runChapterCommit",
+    "startLine": 191,
+    "endLine": 499
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "name": "makeBook"
+      },
+      {
+        "name": "makeBook"
+      },
+      {
+        "name": "styleSectionOf"
+      },
+      {
+        "name": "makeBookWithSemanticOnlyFact"
+      },
+      {
+        "name": "makeBookWithSemanticOnlyFact"
+      },
+      {
+        "name": "localEmbeddingProvider"
+      },
+      {
+        "name": "captureStdout"
+      },
+      {
+        "name": "captureStderr"
+      },
+      {
+        "name": "resolveTarget"
+      },
+      {
+        "name": "resolveTarget"
+      },
+
+=== context: writeStyleProfiles ===
+{
+  "status": "found",
+  "symbol": {
+    "name": "writeStyleProfiles",
+    "startLine": 79,
+    "endLine": 120
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/deltaExtractor.test.ts",
+        "name": "deltaExtractor.test.ts",
+        "filePath": "apps/web/server/analysis/deltaExtractor.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/novelBreakdown.test.ts",
+        "name": "novelBreakdown.test.ts",
+        "filePath": "apps/web/server/analysis/novelBreakdown.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/styleAnalysis.test.ts",
+        "name": "styleAnalysis.test.ts",
+        "filePath": "apps/web/server/analysis/styleAnalysis.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/styleAnalysis.test.ts",
+        "name": "styleAnalysis.test.ts",
+        "filePath": "apps/web/server/analysis/styleAnalysis.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/analysis/styleAnalysis.test.ts",
+        "name": "styleAnalysis.test.ts",
+        "filePath": "apps/web/server/analysis/styleAnalysis.test.ts"
+      },
+      {
+        "uid": "File:apps/web/server/billing/catalog.test.ts",
+        "name": "catalog.test.ts",
+        "filePath": "apps/web/server/billing/catalog.test.ts"
+      },
+
+=== context: rebuildProjectionFromCanon ===
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:packages/data-plane/src/local-data-plane.ts:rebuildProjectionFromCanon",
+    "name": "rebuildProjectionFromCanon",
+    "kind": "Function",
+    "filePath": "packages/data-plane/src/local-data-plane.ts",
+    "startLine": 451,
+    "endLine": 465
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "File:packages/data-plane/src/entity-cards.test.ts",
+        "name": "entity-cards.test.ts",
+        "filePath": "packages/data-plane/src/entity-cards.test.ts"
+      },
+      {
+        "uid": "File:packages/data-plane/src/local-data-plane.test.ts",
+        "name": "local-data-plane.test.ts",
+        "filePath": "packages/data-plane/src/local-data-plane.test.ts"
+      },
+      {
+        "uid": "File:packages/data-plane/src/stale.test.ts",
+        "name": "stale.test.ts",
+        "filePath": "packages/data-plane/src/stale.test.ts"
+      },
+      {
+        "uid": "File:packages/data-plane/src/with-plane.test.ts",
+        "name": "with-plane.test.ts",
+        "filePath": "packages/data-plane/src/with-plane.test.ts"
+      },
+      {
+        "uid": "Method:packages/data-plane/src/local-data-plane.ts:LocalDataPlane.openOrRebuild#1",
+        "name": "openOrRebuild",
+        "filePath": "packages/data-plane/src/local-data-plane.ts"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "name": "readCanonState"
+      },
+
+=== context: handleAccept ===
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/src/workbench/DialogueStream.tsx:DialogueStream.handleAccept@436:2",
+    "name": "handleAccept",
+    "kind": "Function",
+    "filePath": "apps/web/src/workbench/DialogueStream.tsx",
+    "startLine": 437,
+    "endLine": 558
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/workbench/DialogueStream.tsx:DialogueStream",
+        "name": "DialogueStream",
+        "filePath": "apps/web/src/workbench/DialogueStream.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/server/router.ts:ApiRouter.dispatch.sendJson@49:4",
+        "name": "sendJson",
+        "filePath": "apps/web/server/router.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:saveDraftCache",
+        "name": "saveDraftCache",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:saveDraftBaseline",
+        "name": "saveDraftBaseline",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:chapterDraftKey",
+        "name": "chapterDraftKey",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:candidateDraftKey",
+        "name": "candidateDraftKey",
+
+=== context: doSave ===
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/src/workbench/editor/ProseEditorPanel.tsx:ProseEditorSession.doSave@131:2",
+    "name": "doSave",
+    "kind": "Function",
+    "filePath": "apps/web/src/workbench/editor/ProseEditorPanel.tsx",
+    "startLine": 132,
+    "endLine": 164
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/workbench/editor/ProseEditorPanel.tsx:ProseEditorSession.saveAsDraft@166:2",
+        "name": "saveAsDraft",
+        "filePath": "apps/web/src/workbench/editor/ProseEditorPanel.tsx"
+      },
+      {
+        "uid": "Function:apps/web/src/workbench/editor/ProseEditorPanel.tsx:ProseEditorSession.resolveConflictOverwrite@185:2",
+        "name": "resolveConflictOverwrite",
+        "filePath": "apps/web/src/workbench/editor/ProseEditorPanel.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/lib/post.ts:post",
+        "name": "post",
+        "filePath": "apps/web/src/lib/post.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/shell/workbenchStorage.ts:saveDraftBaseline",
+        "name": "saveDraftBaseline",
+        "filePath": "apps/web/src/shell/workbenchStorage.ts"
+      }
+    ]
+  },
+  "processes": []
+}
+
+=== context: handleCommit ===
+{
+  "status": "found",
+  "symbol": {
+    "uid": "Function:apps/web/src/quality/QualityPanel.tsx:QualityPanel.handleCommit@144:2",
+    "name": "handleCommit",
+    "kind": "Function",
+    "filePath": "apps/web/src/quality/QualityPanel.tsx",
+    "startLine": 145,
+    "endLine": 211
+  },
+  "epistemic": "exact",
+  "incoming": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/quality/QualityPanel.tsx:QualityPanel",
+        "name": "QualityPanel",
+        "filePath": "apps/web/src/quality/QualityPanel.tsx"
+      }
+    ]
+  },
+  "outgoing": {
+    "calls": [
+      {
+        "uid": "Function:apps/web/src/lib/post.ts:post",
+        "name": "post",
+        "filePath": "apps/web/src/lib/post.ts"
+      },
+      {
+        "uid": "Function:apps/web/src/quality/QualityPanel.tsx:QualityPanel.refresh@122:2",
+        "name": "refresh",
+        "filePath": "apps/web/src/quality/QualityPanel.tsx"
+      }
+    ]
+  },
+  "processes": [
+    {
+      "id": "proc_308_handlecommit",
+      "name": "HandleCommit → SendJson",
+      "step_index": 1,
+      "step_count": 4
+    },
+    {
+      "id": "proc_510_handlecommit",
+      "name": "HandleCommit → ReportToSummary",
+      "step_index": 1,
+

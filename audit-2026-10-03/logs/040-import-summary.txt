@@ -1,0 +1,200 @@
+
+### packages/runtime :: PROD (30 distinct)
+  ../structuredOutput.js [type-only] relative     1
+  ./adapter/anthropic-events.js      relative     1
+  ./adapter/errors.js                relative     1
+  ./adapter/openai-compat.js         relative     1
+  ./canonical-recipes.js             relative     1
+  ./engine.js [type-only]            relative     1
+  ./engine.js                        relative     2
+  ./eventBus.js [type-only]          relative     1
+  ./eventBus.js                      relative     3
+  ./loader.js                        relative     1
+  ./recipe/index.js                  relative     1
+  ./recipe/types.js [type-only]      relative     1
+  ./registry.js [type-only]          relative     1
+  ./registry.js                      relative     2
+  ./schema.js                        relative     2
+  ./structuredOutput.js              relative     1
+  ./tasks.js                         relative     1
+  ./tierConfig.js [type-only]        relative     1
+  ./tierConfig.js                    relative     1
+  ./tierRouting.js                   relative     1
+  ./types.js [type-only]             relative     5
+  ./types.js                         relative     9
+  @mozhou/data-plane                 internal     1
+  @mozhou/kernel [type-only]         internal     2
+  @mozhou/kernel                     internal     2
+  ajv [require]                      external     1
+  node:fs                            external     3
+  node:module                        external     1
+  node:path                          external     2
+  yaml                               external     2
+
+### packages/runtime :: TEST (24 distinct)
+  ../eventBus.js                     relative     1
+  ../types.js [type-only]            relative     1
+  ./adapter/anthropic-events.js      relative     1
+  ./adapter/errors.js                relative     1
+  ./adapter/openai-compat.js         relative     1
+  ./canonical-recipes.js             relative     1
+  ./engine.js                        relative     2
+  ./eventBus.js                      relative     3
+  ./loader.js                        relative     1
+  ./registry.js                      relative     1
+  ./structuredOutput.js              relative     1
+  ./tasks.js                         relative     1
+  ./tierConfig.js [type-only]        relative     1
+  ./tierConfig.js                    relative     1
+  ./tierRouting.js                   relative     1
+  ./types.js [type-only]             relative     2
+  ./types.js                         relative     4
+  ajv [require]                      external     1
+  node:fs                            external     5
+  node:module                        external     1
+  node:os                            external     5
+  node:path                          external     5
+  node:url                           external     1
+  vitest                             external     9
+
+### packages/quality-engine :: PROD (25 distinct)
+  ./de-ai-engine.js [type-only]      relative     2
+  ./de-ai-engine.js                  relative     2
+  ./deterministic.js [type-only]     relative     1
+  ./deterministic.js                 relative     2
+  ./failure-memory.js                relative     1
+  ./mechanical-gates.js [type-only]  relative     1
+  ./mechanical-gates.js              relative     1
+  ./memory-anchor.js [type-only]     relative     1
+  ./memory-anchor.js                 relative     1
+  ./policy.js                        relative     1
+  ./reader-experience.js [type-only] relative     1
+  ./reader-experience.js             relative     1
+  ./review.js [type-only]            relative     1
+  ./review.js                        relative     1
+  ./semantic.js [type-only]          relative     2
+  ./semantic.js                      relative     1
+  ./staleness.js [type-only]         relative     1
+  ./staleness.js                     relative     1
+  ./style-metrics.js [type-only]     relative     1
+  ./style-metrics.js                 relative     1
+  ./types.js [type-only]             relative     7
+  ./types.js                         relative     1
+  node:crypto                        external     2
+  node:fs                            external     1
+  node:path                          external     1
+
+### packages/quality-engine :: TEST (19 distinct)
+  ./de-ai-engine.js                  relative     1
+  ./deterministic.js                 relative     2
+  ./failure-memory.js                relative     1
+  ./mechanical-gates.js              relative     1
+  ./memory-anchor.js [type-only]     relative     1
+  ./memory-anchor.js                 relative     1
+  ./policy.js                        relative     3
+  ./reader-experience.js [type-only] relative     1
+  ./reader-experience.js             relative     1
+  ./review.js                        relative     1
+  ./semantic.js [type-only]          relative     1
+  ./staleness.js                     relative     1
+  ./style-metrics.js                 relative     1
+  ./types.js [type-only]             relative     5
+  node:fs                            external     2
+  node:os                            external     1
+  node:path                          external     2
+  node:url                           external     1
+  vitest                             external    11
+
+### packages/pipeline :: PROD (57 distinct)
+  ./commit-orchestration.js [type-only] relative     1
+  ./commit-orchestration.js          relative     1
+  ./compile-step.js [type-only]      relative     1
+  ./compile-step.js                  relative     2
+  ./draft-accept.js [type-only]      relative     1
+  ./draft-accept.js                  relative     1
+  ./draft-candidate.js [type-only]   relative     1
+  ./draft-candidate.js               relative     3
+  ./draft-step.js [type-only]        relative     1
+  ./draft-step.js                    relative     1
+  ./extract-step.js [type-only]      relative     6
+  ./extract-step.js                  relative     5
+  ./gate-step.js [type-only]         relative     2
+  ./gate-step.js                     relative     2
+  ./ledger.js [type-only]            relative     2
+  ./ledger.js                        relative     5
+  ./multi-candidate.js [type-only]   relative     1
+  ./multi-candidate.js               relative     1
+  ./prepare.js [type-only]           relative     1
+  ./prepare.js                       relative     1
+  ./projection.js [type-only]        relative     2
+  ./projection.js                    relative     2
+  ./proposal-port.js [type-only]     relative     1
+  ./proposal-port.js                 relative     2
+  ./proposal-step.js [type-only]     relative     3
+  ./proposal-step.js                 relative     3
+  ./record-step.js [type-only]       relative     2
+  ./record-step.js                   relative     2
+  ./resubmit.js [type-only]          relative     1
+  ./resubmit.js                      relative     1
+  ./review-step.js [type-only]       relative     1
+  ./review-step.js                   relative     1
+  ./revision-cascading.js [type-only] relative     1
+  ./revision-cascading.js            relative     1
+  ./scene-stage.js [type-only]       relative     1
+  ./scene-stage.js                   relative     1
+  ./session.js [type-only]           relative     3
+  ./session.js                       relative     3
+  ./steps.js [type-only]             relative     2
+  ./steps.js                         relative     3
+  ./user-edit-step.js [type-only]    relative     2
+  ./user-edit-step.js                relative     2
+  ./watcher-checkpoint.js [type-only] relative     1
+  ./watcher-checkpoint.js            relative     1
+  @mozhou/context-compiler [type-only] internal     2
+  @mozhou/context-compiler           internal     1
+  @mozhou/data-plane [type-only]     internal     8
+  @mozhou/data-plane                 internal    14
+  @mozhou/kernel [type-only]         internal    12
+  @mozhou/kernel                     internal     8
+  @mozhou/quality-engine [type-only] internal     3
+  @mozhou/quality-engine             internal     3
+  @mozhou/runtime [type-only]        internal     7
+  @mozhou/runtime                    internal     3
+  node:crypto                        external     2
+  node:fs                            external    12
+  node:path                          external    12
+
+### packages/pipeline :: TEST (30 distinct)
+  ./draft-accept.js                  relative     1
+  ./draft-candidate.js               relative     2
+  ./extract-step.js [type-only]      relative     3
+  ./extract-step.js                  relative     1
+  ./gate-step.js                     relative     1
+  ./index.js [type-only]             relative     2
+  ./index.js                         relative    18
+  ./ledger.js                        relative     2
+  ./proposal-port.js                 relative     1
+  ./proposal-step.js                 relative     4
+  ./record-step.js [type-only]       relative     1
+  ./record-step.js                   relative     1
+  ./revision-cascading.js            relative     1
+  ./scene-stage.js                   relative     1
+  ./session.js                       relative     2
+  @mozhou/context-compiler [type-only] internal     6
+  @mozhou/context-compiler           internal     1
+  @mozhou/data-plane [type-only]     internal     1
+  @mozhou/data-plane                 internal    26
+  @mozhou/kernel [type-only]         internal     6
+  @mozhou/kernel                     internal    12
+  @mozhou/quality-engine [type-only] internal     1
+  @mozhou/quality-engine             internal     4
+  @mozhou/runtime [type-only]        internal     6
+  @mozhou/runtime                    internal    21
+  node:crypto                        external     8
+  node:fs                            external    29
+  node:os                            external    26
+  node:path                          external    26
+  vitest                             external    28
+
+### packages/kernel :: PROD (8 distinct)
+  ./causal-contract.js               relative     1

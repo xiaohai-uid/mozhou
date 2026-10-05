@@ -1,0 +1,51 @@
+ M AGENTS.md
+ M CLAUDE.md
+A  apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+M  apps/web/server/routes/pipelineRoutes.ts
+ M apps/web/server/routes/productionRoutes.test.ts
+M  apps/web/server/routes/proseRoutes.sessionComplete.test.ts
+ M apps/web/server/test-support/realModelGate.test.ts
+ M apps/web/src/App.test.tsx
+ M apps/web/src/App.tsx
+ M apps/web/src/code-graph/CodeGraphView.test.tsx
+ M apps/web/src/code-graph/codeGraphData.json
+ M apps/web/src/code-graph/codeGraphSnapshot.ts
+ M apps/web/src/context-receipt/ReceiptPanel.test.tsx
+ M apps/web/src/context-receipt/ReceiptPanel.tsx
+ M apps/web/src/workbench/WorkbenchView.tsx
+ M apps/web/src/workbench/editor/ProseEditorPanel.isolation.test.tsx
+ M apps/web/src/workbench/editor/ProseEditorPanel.tsx
+ M eslint.config.js
+ M evidence/usability-fixes-20260921/result.json
+ M package.json
+ M packages/context-compiler/src/assemble.test.ts
+ M packages/context-compiler/src/assemble.ts
+ M packages/context-compiler/src/receipt-file.test.ts
+ M packages/kernel/src/kernel-schema.ts
+ M scripts/gen-adr-refs.mjs
+ M windows-install-check-report.json
+?? .agent-teams/archive/mozhou-audit-team/inbox/captain.jsonl
+?? .agent-teams/archive/mozhou-audit-team/team.json
+?? .agent-teams/archive/mozhou-full-pipeline-team/inbox/captain.jsonl
+?? .agent-teams/archive/mozhou-full-pipeline-team/team.json
+?? .agent-teams/archive/mozhou-refactor-team/inbox/captain.jsonl
+?? .agent-teams/archive/mozhou-refactor-team/team.json
+?? .agent-teams/mozhou-arch-audit-20261003/team.json
+?? .agent-teams/retired-members.json
+?? MOZHOU_MODULE_ARCHITECTURE_AUDIT.md
+?? apps/web/server/routes/exportRoutes.test.ts
+?? apps/web/src/context-receipt/WhyThisWritingButton.test.tsx
+?? apps/web/src/context-receipt/WhyThisWritingButton.tsx
+?? audit-2026-10-03/logs/010-git-status-porcelain-default.txt
+?? docs/audit/gitnexus-impact-analysis-phase1-2026-10-02.md
+?? docs/audit/mozhou-comprehensive-audit-report-2026-10-02.md
+?? docs/audit/mozhou-first-audit-report-2026-10-02.md
+?? docs/audit/mozhou-full-pipeline-acceptance-report-2026-10-02.md
+?? packages/data-plane/src/export-formats.test.ts
+?? packages/pipeline/src/guardrails-hardening.test.ts
+?? scripts/corpus/famous-novels-corpus.mjs
+?? scripts/corpus/lingjie-daozhong-loader.mjs
+?? scripts/measure-draft-context.mjs
+?? scripts/verify-batch-novel-pipeline-stress.mjs
+?? scripts/verify-famous-novel-refine.mjs
+?? scripts/verify-mock-journey.mjs

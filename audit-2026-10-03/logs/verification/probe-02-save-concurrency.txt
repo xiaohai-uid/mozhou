@@ -1,0 +1,10 @@
+=== Probe 02: 同章竞争保存 ===
+测试时间: 2026-10-02T17:28:36.562Z
+基线版本: WORKTREE(未提交)
+隔离目录: C:\Users\a1691\AppData\Local\Temp\mozhou-probe-02-kVKtcJ
+两客户端并发前读取版本: revision=1
+客户端 A 保存结果: 成功, revision=2
+客户端 B 保存结果: 捕获预期冲突异常 -> ProseRevisionConflictError: prose save conflict on chapter 1: expected r1, disk has r2
+是否为 ProseRevisionConflictError: true
+最终盘上正文: 客户端 A 的修改 (版本=2)
+判定: 严格防止丢失更新（Lost Update），CAS 校验拦截后到者

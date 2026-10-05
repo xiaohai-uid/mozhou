@@ -1,0 +1,35 @@
+warning: in the working copy of 'windows-install-check-report.json', CRLF will be replaced by LF the next time Git touches it
+Changes: 26 files, 38 symbols
+Affected processes: 297
+Risk level: critical
+
+Changed symbols:
+  Symbol 墨舟 (MoZhou) — AI 小说写作平台 → AGENTS.md
+  Symbol GitNexus — Code Intelligence → AGENTS.md
+  Symbol CLI → AGENTS.md
+  Symbol GitNexus — Code Intelligence → CLAUDE.md
+  Symbol CLI → CLAUDE.md
+  Symbol servers → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol tempDirs → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol SAVED_ENV → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol PROVIDER_ENV_KEYS → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol listen → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol server → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol postJson → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol makeDataRoot → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol openSessionAt → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+  Symbol Journey → apps/web/server/routes/pipelineRoutes.advanceGuard.test.ts
+... and 23 more
+
+Affected execution flows:
+  • CommitChapter → SendJson (7 steps) — changed: CLI, CLI, CLI, CLI
+  • MakeStreamEngine → SendJson (7 steps) — changed: CLI
+  • CreateChapterDraft → SendJson (7 steps) — changed: CLI, CLI, CLI, CLI
+  • OnSettled → Sha256Hex (7 steps) — changed: CLI, CLI, CLI, CLI
+  • ApplyStructuredUpsert → FlowParser (7 steps) — changed: CLI, CLI, CLI, CLI, CLI
+  • ApplyStructuredUpsert → Dedent (7 steps) — changed: CLI, CLI, CLI, CLI, CLI, CLI
+  • AcceptDraft → SendJson (7 steps) — changed: CLI, CLI, CLI, CLI
+  • DeleteEntityCard → FlowParser (7 steps) — changed: CLI, CLI, CLI, CLI, CLI, CLI
+  • DeleteEntityCard → Dedent (7 steps) — changed: CLI, CLI, CLI, CLI, CLI, CLI, CLI
+  • DeleteEntityCard → ParseBlockScalar (7 steps) — changed: CLI, CLI, CLI, CLI, CLI, CLI, CLI
+... and 287 more

@@ -1,0 +1,65 @@
+
+=== 关键文件：工作区 mtime + git 状态（决定证据标签）===
+apps/web/src/workbench/editor/ProseEditorPanel.tsx                 mtime=10-02 21:42:48  DIRTY: M
+apps/web/src/workbench/DialogueStream.tsx                          mtime=09-30 23:58:45  CLEAN=HEAD:90b45a1
+apps/web/src/workbench/WorkbenchView.tsx                           mtime=10-01 12:14:15  DIRTY: M
+apps/web/src/quality/QualityPanel.tsx                              mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+apps/web/src/App.tsx                                               mtime=10-02 21:42:32  DIRTY: M
+apps/web/src/shell/workbenchStorage.ts                             mtime=09-30 23:58:45  CLEAN=HEAD:90b45a1
+apps/web/src/context-receipt/ReceiptPanel.tsx                      mtime=10-01 12:14:51  DIRTY: M
+apps/web/src/context-receipt/WhyThisWritingButton.tsx              mtime=10-01 12:13:48  DIRTY:??
+apps/web/server/routes/pipelineRoutes.ts                           mtime=10-02 20:35:50  DIRTY:M 
+apps/web/server/routes/proseRoutes.ts                              mtime=09-28 22:56:02  CLEAN=HEAD:90b45a1
+apps/web/server/routes/worksRoutes.ts                              mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+apps/web/server/routes/exportRoutes.ts                             mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+apps/web/server/routes/backupRoutes.ts                             mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/context-compiler/src/assemble.ts                          mtime=10-01 12:10:05  DIRTY: M
+packages/kernel/src/kernel-schema.ts                               mtime=10-01 12:09:43  DIRTY: M
+packages/data-plane/src/chapter.ts                                 mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+packages/data-plane/src/local-data-plane.ts                        mtime=09-26 21:22:21  CLEAN=HEAD:90b45a1
+packages/data-plane/src/with-plane.ts                              mtime=09-28 22:02:25  CLEAN=HEAD:90b45a1
+packages/data-plane/src/projection.ts                              mtime=09-27 19:52:44  CLEAN=HEAD:90b45a1
+packages/data-plane/src/layout.ts                                  mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/pipeline/src/commit-orchestration.ts                      mtime=09-28 22:43:26  CLEAN=HEAD:90b45a1
+apps/web/src/shell/useShellTelemetry.ts                            mtime=09-30 23:17:30  CLEAN=HEAD:90b45a1
+apps/web/src/api/client.ts                                         mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+apps/web/src/lib/post.ts                                           mtime=09-27 14:48:01  CLEAN=HEAD:90b45a1
+apps/web/server/router.ts                                          mtime=09-26 02:16:45  CLEAN=HEAD:90b45a1
+apps/web/server/compiledAnchor.ts                                  mtime=09-28 00:11:41  CLEAN=HEAD:90b45a1
+apps/web/server/draftContext.ts                                    mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+apps/web/server/api.ts                                             mtime=09-30 00:14:43  CLEAN=HEAD:90b45a1
+packages/pipeline/src/record-step.ts                               mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/pipeline/src/draft-accept.ts                              mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+packages/pipeline/src/draft-candidate.ts                           mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/pipeline/src/draft-step.ts                                mtime=09-27 23:13:51  CLEAN=HEAD:90b45a1
+packages/pipeline/src/ledger.ts                                    mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/flywheel/src/style-store.ts                               mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/data-plane/src/style-profiles.ts                          mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/context-compiler/src/receipt-file.ts                      mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+packages/pipeline/src/compile-step.ts                              mtime=09-26 01:46:57  CLEAN=HEAD:90b45a1
+apps/web/src/export-suite/exportDownload.ts                        mtime=09-23 19:19:51  CLEAN=HEAD:90b45a1
+apps/web/server/productionServer.ts                                mtime=09-26 19:04:35  CLEAN=HEAD:90b45a1
+apps/web/server/routes/storyBrainRoutes.ts                         mtime=09-28 22:01:38  CLEAN=HEAD:90b45a1
+
+=== HEAD vs WORKTREE numstat（+新增 -删除）===
+22	0	apps/web/server/routes/pipelineRoutes.ts
+211	118	apps/web/src/App.tsx
+59	0	apps/web/src/context-receipt/ReceiptPanel.tsx
+11	0	apps/web/src/workbench/WorkbenchView.tsx
+16	0	apps/web/src/workbench/editor/ProseEditorPanel.tsx
+
+=== ProseEditorPanel.tsx: HEAD 版 doSave 行号 vs WORKTREE 行号 ===
+--- WORKTREE ---
+39: export function ProseEditorPanel(props: ProseEditorPanelProps): JSX.Element {
+45: function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEditorPanelProps): JSX.Element {
+148: const doSave = useCallback(async (expectedRevision: number | null, baseLabel: string, confirmExternalOverwrite = false): Promise<void> => {
+183: const saveAsDraft = useCallback(async (): Promise<void> => {
+202: const resolveConflictOverwrite = useCallback(async (): Promise<void> => {
+215: const reopenCommitted = useCallback(async (): Promise<void> => {
+--- HEAD:90b45a1 ---
+39: export function ProseEditorPanel(props: ProseEditorPanelProps): JSX.Element {
+45: function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEditorPanelProps): JSX.Element {
+132: const doSave = useCallback(async (expectedRevision: number | null, baseLabel: string, confirmExternalOverwrite = false): Promise<void> => {
+167: const saveAsDraft = useCallback(async (): Promise<void> => {
+186: const resolveConflictOverwrite = useCallback(async (): Promise<void> => {
+199: const reopenCommitted = useCallback(async (): Promise<void> => {

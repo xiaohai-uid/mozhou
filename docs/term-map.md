@@ -24,8 +24,8 @@
 
 - 词条总数: **88**
 - 声明: **27**
-- 局部同名: **5**
-- 引用: **10**
+- 局部同名: **6**
+- 引用: **9**
 - 仅测试: **1**
 - 未验证: **45**
 
@@ -61,7 +61,7 @@
 | 写前校验 | Write Verification | - | - | 未验证 |
 | 全量重建 | Full-Absorption Rebuild | - | - | 未验证 |
 | 运行时区 | Runtime Zone | - | - | 未验证 |
-| 快照 | Snapshot | `Snapshot` | `apps/web/src/workbench/editor/ProseEditorPanel.tsx:33` | 局部同名 |
+| 快照 | Snapshot | `Snapshot` | `apps/web/src/workbench/editor/ProseEditorPanel.tsx:35` | 局部同名 |
 | 外部修改提案 | External Modified Proposal | - | - | 未验证 |
 | 受保护作者内容 | Protected Author Content | - | - | 未验证 |
 | 过期标记 | Stale Marker | `StaleMarker` | `packages/kernel/src/kernel-schema.ts:85` | 声明 |
@@ -79,7 +79,7 @@
 | 重放输入 | Replay Inputs | `ReplayInputs` | `packages/kernel/src/kernel-schema.ts:464` | 声明 |
 | 图触发源 | Graph Trigger Source | - | - | 未验证 |
 | K 跳召回 | K-Hop Recall | - | - | 未验证 |
-| 连续性门 | Continuity Gate | `continuityGate` | `apps/web/server/routes/proseRoutes.ts:584` | 引用 |
+| 连续性门 | Continuity Gate | `continuityGate` | `apps/web/server/routes/proseRoutes.ts:783` | 引用 |
 | 上下文档位 | AI Context Tier | `AiContextTier` | `packages/kernel/src/kernel-schema.ts:573` | 声明 |
 | 小说运行时 | Novel Runtime | - | - | 未验证 |
 | 事件总线 | Event Bus | - | - | 未验证 |
@@ -118,7 +118,7 @@
 | 纵切 | Vertical Slice | - | - | 未验证 |
 | 切片 | Slice | `slice` | `packages/context-compiler/src/assemble.ts:295` | 局部同名 |
 | 挂账项 | Deferred Item | - | - | 未验证 |
-| 任务 | Task | `task` | `packages/context-compiler/src/assemble.ts:152` | 引用 |
+| 任务 | Task | `task` | `packages/pipeline/src/draft-continue.ts:98` | 局部同名 |
 | 任务简报 | Task Brief | - | - | 未验证 |
 | 决策记录 | ADR | `ADR` | `apps/web/src/story-brain/StoryBrainPanel.tsx:143` | 引用 |
 | 纪事 | Chronicle | - | - | 未验证 |

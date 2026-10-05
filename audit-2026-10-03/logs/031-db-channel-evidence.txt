@@ -1,0 +1,31 @@
+=== DB CHANNEL EVIDENCE (read-only) ===
+Date: 2026-10-03T00:48+08:00
+
+1) dbhub MCP tools exposed to THIS DSH session: NONE
+   - cordis_inspect_list -> only DSH Inspect providers (Service/Event/Config/Tool/Builtin/Slots/Theme). No dbhub, no gitnexus.
+   - host Tool.listTools -> full enumeration; grep for 'dbhub|execute_sql|search_objects' -> 0 tool hits.
+   - list_mcp_resources(server=anysearch) -> {"resources":[]}. Only anysearch + n8n MCP servers configured.
+
+2) dbhub IS running on the host, bound to OTHER clients:
+   PID 32104/10640/34544/11324/43100:
+   node C:\Users\a1691\AppData\Roaming\npm\node_modules\@bytebase\dbhub\dist\index.js
+     --config C:\Users\a1691\.dbhub\dbhub.toml --transport stdio
+
+3) dbhub config (names only, NO values/credentials recorded):
+   path: C:\Users\a1691\.dbhub\dbhub.toml  (25 lines, mtime 2026/9/30 11:42:37)
+   [[sources]] x4  ids: sqlite, postgres, mysql, mozhou_rt
+   [[tools]]  x2  names: execute_sql, search_objects
+   readonly = true  (declared in config)
+
+4) Sanctioned non-MCP client: C:\zcode\databases\seed_novel_data.py (DbHub class, 11773 bytes, mtime 2026/9/30 11:39:07)  [NOT EXECUTED by audit]
+
+5) mozhou_rt (per C:\zcode\databases\README.md L13, L16, L48):
+   engine SQLite 3
+   path  C:\zcode\mozhou-author-os\.experiment-data\books\<book>\.mozhou\runtime.sqlite
+   role  mozhou real manuscript DB ; MUST BE READ-ONLY
+   tables books / meta / outline_nodes / planning_artifacts
+   NOTE: no book content, no credentials, no row data were read by this audit.
+
+VERDICT for this DSH session: MCP db channel = BLOCKED (connector not bound to this session).
+Non-MCP sanctioned path EXISTS but was not used (not required for baseline deliverables).
+mozhou_rt: read-only constraint ACKNOWLEDGED. No write attempted. No driver installed. No direct connection made.

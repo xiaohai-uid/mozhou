@@ -1,0 +1,170 @@
+===== 040: apps/web/src -> ../server type imports (client reading server tree) =====
+apps\web\src\api\client.ts:27: } from '../../server/api'
+apps\web\src\book-source\BookSourceView.tsx:17: } from '../../server/api'
+apps\web\src\capability-square\capabilityDetails.ts:7: import type { CapabilityStatus } from '../../server/api'
+apps\web\src\capability-square\CapabilitySquareView.test.tsx:12: import type { CapabilitySquareResponse } from '../../server/api'
+apps\web\src\capability-square\CapabilitySquareView.tsx:10: import type { CapabilitySquareResponse, CapabilityStatus } from '../../server/api'
+apps\web\src\change-matrix\ChangeMatrixPanel.tsx:17: import type { ChangeMatrixResponse } from '../../server/api'
+apps\web\src\cloud-sync\CloudSyncView.test.tsx:10: import type { CloudSyncResponse } from '../../server/api'
+apps\web\src\cloud-sync\CloudSyncView.tsx:10: import type { CloudSyncResponse } from '../../server/api'
+apps\web\src\context-receipt\ReceiptPanel.test.tsx:12: import type { ReceiptListResponse, ReceiptDetailResponse } from '../../server/api'
+apps\web\src\context-receipt\ReceiptPanel.tsx:18: import type { ReceiptDetailResponse, ReceiptListResponse } from '../../server/api'
+apps\web\src\context-receipt\WhyThisWritingButton.test.tsx:11: import type { ReceiptListResponse } from '../../server/api'
+apps\web\src\context-receipt\WhyThisWritingButton.tsx:18: import type { ReceiptListResponse } from '../../server/api'
+apps\web\src\export-suite\exportDownload.ts:3: import type { WorksOverviewResponse } from '../../server/api'
+apps\web\src\membership\MembershipView.test.tsx:9: import type { MembershipResponse } from '../../server/api'
+apps\web\src\membership\MembershipView.tsx:7: import type { MembershipResponse } from '../../server/api'
+apps\web\src\memo\MemoView.test.tsx:11: import type { MemoListResponse } from '../../server/api'
+apps\web\src\memo\MemoView.tsx:9: import type { MemoListResponse, MemoMutationResponse, MemoNote } from '../../server/api'
+apps\web\src\mobile\drawers\MobileChaptersDrawer.tsx:9: import type { WorksChapterSummary } from '../../../server/api'
+apps\web\src\mobile\hubs\InspectorHub.tsx:6: import type { StoryBrainFactsResponse, ReceiptListResponse, ChangeMatrixResponse } from '../../../server/api'
+apps\web\src\mobile\hubs\ResourcesHub.tsx:6: import type { BookSourceSearchResponse, CrawledBook } from '../../../server/api'
+apps\web\src\mobile\hubs\SystemHub.tsx:7: import type { TasksResponse, MembershipResponse, LibraryResponse } from '../../../server/api'
+apps\web\src\mobile\hubs\WorkbenchHub.tsx:12: import type { DraftQuestionResponse, WorksChapterSummary } from '../../../server/api'
+apps\web\src\mobile\hubs\WorksHub.tsx:6: import type { WorksOverviewResponse } from '../../../server/api'
+apps\web\src\novel-breakdown\NovelBreakdownView.test.tsx:11: import type { NovelBreakdownResponse } from '../../server/api'
+apps\web\src\novel-breakdown\NovelBreakdownView.tsx:10: import type { NovelBreakdownResponse, NovelBreakdownResult } from '../../server/api'
+apps\web\src\public\PublicSite.tsx:12: import { billingCatalog } from '../../server/billing/catalog'
+apps\web\src\rank-scan\RankScanView.test.tsx:11: import type { RankScanResponse } from '../../server/api'
+apps\web\src\rank-scan\RankScanView.tsx:10: import type { RankScanResponse, RankBoard } from '../../server/api'
+apps\web\src\shelf\BookshelfView.test.tsx:13: import type { LibraryResponse, LibraryOpenResponse } from '../../server/api'
+apps\web\src\shelf\BookshelfView.tsx:14: import type { LibraryResponse, LibraryOpenResponse } from '../../server/api'
+apps\web\src\shell\DesktopToolModals.tsx:20: import type { NamingSuccessResponse, NamingSuggestion } from '../../server/api'
+apps\web\src\shell\shellTelemetry.test.ts:9: import type { WorksChapterSummary, ReceiptListItem } from '../../server/api'
+apps\web\src\shell\shellTelemetry.ts:7: import type { WorksChapterSummary, ReceiptListItem } from '../../server/api'
+apps\web\src\shell\useShellTelemetry.ts:9: import type { WorksOverviewResponse, ReceiptListItem } from '../../server/api'
+apps\web\src\story-brain\StoryBrainPanel.test.tsx:14: import type { StoryBrainFactsResponse } from '../../server/api'
+apps\web\src\story-brain\StoryBrainPanel.tsx:16: import type { StoryBrainFactsResponse } from '../../server/api'
+apps\web\src\storyboard\StoryboardView.tsx:18: import type { WorksOverviewResponse } from '../../server/api'
+apps\web\src\storyboard\types.ts:18: } from '../../server/storyboard/contract.js'
+apps\web\src\style-distill\StyleDistillView.test.tsx:11: import type { StyleDistillResponse } from '../../server/api'
+apps\web\src\style-distill\StyleDistillView.tsx:11: import type { StyleDistillResponse } from '../../server/api'
+apps\web\src\tasks\TasksView.test.tsx:12: import type { TasksResponse } from '../../server/api'
+apps\web\src\tasks\TasksView.tsx:13: import type { TasksResponse, TaskEventSummary } from '../../server/api'
+apps\web\src\web-search\WebSearchView.test.tsx:11: import type { WebSearchResponse } from '../../server/api'
+apps\web\src\web-search\WebSearchView.tsx:9: import type { WebSearchResponse } from '../../server/api'
+apps\web\src\workbench\editor\ProseEditorPanel.tsx:23: import type { ChapterProseResponse, ChapterProseSaveResponse } from '../../../server/api'
+apps\web\src\workbench\DialogueStream.accept.test.tsx:17: import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
+apps\web\src\workbench\DialogueStream.test.tsx:13: import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
+apps\web\src\workbench\DialogueStream.tsx:16: import type { CapabilitiesResponse, DraftQuestionResponse } from '../../server/api'
+apps\web\src\workbench\WorkbenchView.tsx:13: import type { WorksChapterSummary } from '../../server/api'
+apps\web\src\works\WorksView.test.tsx:12: import type { WorksOverviewResponse } from '../../server/api'
+apps\web\src\works\WorksView.tsx:13: import type { WorksOverviewResponse } from '../../server/api'
+apps\web\src\api.test.ts:13: import { apiMiddleware } from '../server/api'
+apps\web\src\release-hardening.test.ts:8: import { apiMiddleware } from '../server/api'
+apps\web\src\ssrf-hardening.test.ts:3: import { assertSafeRemoteTarget, resolveChatEndpoint } from '../server/llm/openaiStream'
+
+===== 040b: apps/web/server -> ../src imports (server reading client tree) =====
+
+===== 040c: quality-engine index vs de-ai entry =====
+--- packages/quality-engine/src/index.ts ---
+/**
+ * @mozhou/quality-engine — 公开接口（curated 导出，不用 export *：
+ * 接口即调用方必须学习的全部知识，新增导出必须显式过此文件）。
+ */
+export { CORRECTION_REASONS } from './types.js';
+export type {
+  CorrectionReason,
+  FailurePattern,
+  QualityEvidence,
+  QualityPolicy,
+  QualityReviewAnchor,
+  QualityReviewReport,
+  QualityRuleDefinition,
+  QualityRuleEvaluation,
+  QualityRuleKind,
+  QualityRuleVerdict,
+  QualitySeverity,
+  ReviewerBinding,
+} from './types.js';
+export {
+  defaultPlatformRules,
+  mergeQualityPolicies,
+  qualityRuleSetDigest,
+} from './policy.js';
+export type { ChapterQualityStatus, DraftIdentity } from './staleness.js';
+export { isQualityReviewCurrent, queryChapterQualityStatus } from './staleness.js';
+export {
+  DETERMINISTIC_RULE_VERSION,
+  PARA_001_ID,
+  REV_001_ID,
+  evaluateDeterministicRules,
+} from './deterministic.js';
+export type { DeterministicRuleOptions } from './deterministic.js';
+export { SEMANTIC_RULE_IDS } from './semantic.js';
+export type { SemanticQualityEvaluator, SemanticQualityEvaluatorInput, SemanticRuleId } from './semantic.js';
+export {
+  parseFailurePatterns,
+  serializeFailurePatterns,
+  updateFailurePatterns,
+} from './failure-memory.js';
+export {
+  parseReaderExperienceDeltas,
+  selectRecentDeltas,
+  serializeReaderExperienceDeltas,
+} from './reader-experience.js';
+export type {
+  ExpectationDelta,
+  PayoffProgress,
+  PressureDelta,
+  ReaderExperienceDelta,
+  TangibleGain,
+} from './reader-experience.js';
+export {
+  parseMemoryAnchors,
+  recordAnchorEcho,
+  retireAnchor,
+  selectRelevantAnchors,
+  serializeMemoryAnchors,
+} from './memory-anchor.js';
+export type { AnchorStatus, AnchorType, MemoryAnchor } from './memory-anchor.js';
+export { hashProse, runQualityReview } from './review.js';
+export type { QualityReviewInput } from './review.js';
+export {
+  BUILTIN_REDLINES,
+  detect4GramRepetition,
+  evaluateMechanicalGates,
+  findCommon5Gram,
+  isInsideQuotes,
+} from './mechanical-gates.js';
+export type {
+  MechanicalCheckResult,
+  MechanicalGateReport,
+} from './mechanical-gates.js';
+export { evaluateStyleMetrics } from './style-metrics.js';
+export type { SepiaNarrativeScore, StyleMetrics } from './style-metrics.js';
+export {
+  runDeAiDiagnostics,
+  TIER_1_PATTERNS,
+  TIER_2_CLUSTER_TERMS,
+} from './de-ai-engine.js';
+export type {
+  DeAiEngineReport,
+  DeAiFinding,
+  DeAiSeverity,
+} from './de-ai-engine.js';
+
+--- packages/quality-engine/src/de-ai.ts (first 40) ---
+/**
+ * @mozhou/quality-engine/de-ai —— 浏览器安全子路径导出。
+ *
+ * 为什么不从包根导入：包根（./index.js）重导出 policy.ts（node:crypto）与
+ * staleness.ts（node:fs），进不了浏览器包。本入口只承载「无 Node 依赖、
+ * 纯函数、可在渲染进程逐键调用」的 De-AI 机检能力。
+ *
+ * 不变量（由 de-ai.browser-safe.test.ts 守护）：本文件及其相对导入闭包内
+ * 不得出现任何 `node:*` / `fs` / `crypto` 依赖，也不得经 ./policy.js、
+ * ./staleness.js 回流到包根。
+ *
+ * 新增导出必须显式过此文件——接口即调用方必须学习的全部知识。
+ */
+export {
+  runDeAiDiagnostics,
+  TIER_1_PATTERNS,
+  TIER_2_CLUSTER_TERMS,
+} from './de-ai-engine.js';
+export type {
+  DeAiEngineReport,
+  DeAiFinding,
+  DeAiSeverity,
+} from './de-ai-engine.js';

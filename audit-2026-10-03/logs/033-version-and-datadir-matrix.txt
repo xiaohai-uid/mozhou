@@ -1,0 +1,92 @@
+=== VERSION / DATA-DIRECTORY MATRIX (evidence, 2026-10-03) ===
+
+[A] Repo identity
+  root            C:\zcode\novel-ai
+  branch          feature/windows-local-release  (ahead of origin/... by 7)
+  HEAD            90b45a1a1bf15a97b1cc690ad0b9872018aeebcb
+  HEAD subject    fix(terms): 修正术语映射的证据语义，58 条「已验证」降为 27 条声明
+  HEAD author/date 王大易 <169173651@qq.com>  Fri Oct 2 01:02:25 2026 +0800
+  root package.json  name=mozhou version=0.3.0 private=true type=module
+  tauri.conf.json   version=0.2.0 identifier=com.mozhou.novel-os      <-- DIVERGES from 0.3.0
+  src-tauri/Cargo.toml name=mozhou-desktop version=0.2.0 edition=2021 <-- DIVERGES from 0.3.0
+  workspace globs   packages/*, apps/*  (pnpm-workspace.yaml)
+
+[B] Toolchain
+  node v24.18.0 | npm 11.16.0 | pnpm 9.15.0 | git 2.55.0.windows.3 | PowerShell 7.6.4
+  gitnexus CLI 1.6.10-rc.123 | LadybugDB 0.18.3 | ONNX 1.27.0
+  OS Microsoft Windows 11 专业工作站版 10.0.26200 64-bit; RAM 33693593600 bytes; TZ China Standard Time
+
+[C] WHICH CODE DOES A RUN ACTUALLY EXECUTE?  -> WORKTREE, NOT HEAD  (verified, not inferred)
+  apps/web/node_modules/@mozhou/* are JUNCTIONS -> C:\zcode\novel-ai\packages\*  (live source dirs)
+  packages/context-compiler/package.json main = ./dist/index.js
+  packages/*/dist mtimes           : 2026/10/2 23:37:06 .. 23:41:35
+  apps/web/dist-server/* mtime    : 2026/10/2 23:44:09 .. 23:45:14
+  apps/web/dist/index.html mtime  : 2026/10/2 23:45:13
+  worktree edit mtimes (all EARLIER than the builds above):
+      apps/web/src/App.tsx                        2026/10/2 21:42:32
+      apps/web/server/routes/pipelineRoutes.ts    2026/10/2 20:35:50
+      packages/context-compiler/src/assemble.ts   2026/10/1 12:10:05
+      packages/kernel/src/kernel-schema.ts        2026/10/1 12:09:43
+  PROOF that built package dist contains worktree-only code:
+      'summarizeByChannel' (added in worktree, absent at HEAD) occurs 8x in
+      packages/context-compiler/dist/assemble.js   -> package dist built FROM WORKTREE
+  PROOF that the server bundle does NOT inline workspace packages (hence resolves the junction at runtime):
+      apps/web/dist-server/worksRoutes.js:3  import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-compiler'
+      apps/web/dist-server/semanticEvaluator.js:15 import { createLocalTokenizer } from '@mozhou/context-compiler'
+  => conclusion: pnpm start / any dist-server run executes WORKTREE code through the junctions.
+
+[D] DATA DIRECTORY resolution  (two DIFFERENT contracts)
+  apps/web/server/dataRoot.ts (-> dist-server/dataRoot.js):
+      MOZHOU_DATA_ROOT set (trimmed, non-empty) -> resolve(that)
+      else -> resolve(process.cwd(), '.mozhou_data')
+      dataRootSource() -> 'env' | 'default'
+  scripts/release/windows/desktop-server.mjs (packaged entry):
+      const root = resolve(process.env.MOZHOU_DATA_ROOT)   <-- NO fallback; throws if unset
+      also creates <root>/installation.key (48 random bytes hex, wx, EEXIST tolerated)
+      sets MOZHOU_SECRET_KEY from that key, NODE_ENV=production, MOZHOU_HOSTED=false, HOST=127.0.0.1
+      shutdown via private stdin pipe containing the line 'shutdown'
+  scripts/launcher.mjs: port = PORT || 5173, host = HOST || 127.0.0.1, cwd = repo root,
+      entry = apps/web/dist-server/productionServer.js, opens browser unless MOZHOU_NO_OPEN=1
+  scripts/release/windows/MoZhou.cs (launcher):
+      data = %LOCALAPPDATA%\MoZhou   (overridable via --data-dir)
+      spawns <install>/runtime/node.exe <install>/desktop-server.mjs
+      env MOZHOU_DATA_ROOT=<data>, PORT=<deterministic 43000..43999 derived from a digest>
+      writes <data>/desktop-session.json {url,pid,launcherPid}
+  installer.iss: AppName=墨舟  DefaultDirName={localappdata}\Programs\MoZhou
+                 PrivilegesRequired=lowest  OutputBaseFilename=MoZhou-{#AppVersion}-windows-x64-setup
+
+[E] DATA DIRS ACTUALLY PRESENT ON THIS MACHINE
+  C:\zcode\novel-ai\.mozhou_data           EXISTS  backups/, billing.sqlite(+wal/shm), .mozhou_instance.lock
+        mtimes: billing.sqlite-wal 2026/9/25 23:22:43 ; lock 2026/10/2 22:02:13
+  C:\zcode\novel-ai\apps\web\.mozhou_data   EXISTS  backups/, memo/, billing.sqlite(+wal/shm), lock
+        mtimes: memo 2026/9/30 1:13:17 ; billing.sqlite-shm 2026/10/2 23:51:04
+        -> the -shm was written ~6 min after the 23:45 build => a dev server ran from apps/web around then
+  NO src-tauri/.mozhou_data
+  %LOCALAPPDATA%\MoZhou                     ABSENT  (so the installed desktop app never completed a data-root init)
+  %APPDATA%\com.mozhou.author / MoZhou / mozhou  ABSENT
+  %LOCALAPPDATA%\Programs\MoZhou            EXISTS  (installed 2026/9/27 00:52, package.json version 0.3.0,
+                                               MoZhou.exe + runtime/node.exe + app/dist + app/dist-server + unins000.exe)
+  ==> installed desktop app (2026/9/27) is OLDER than release-artifacts/ setup (2026/10/2 21:15)
+
+[F] RUNNING PROCESSES (read-only listing; nothing was stopped)
+  NO mozhou server / tauri / MoZhou.exe process running at audit time.
+  port 5173 NOT listening. ports 43000-43999 NOT listening.
+  port 4173 IS listening, owned by PID 44268 = python.exe -m http.server 4173
+     -> this is a plain Python static file server, NOT a mozhou/vite preview. Do not mistake it for the product.
+  MoZhou data dirs hold live-looking sqlite WALs -> do not touch.
+
+[G] RELEASE ARTIFACT PROVENANCE (two manifests DISAGREE)
+  release-artifacts/release-manifest.json     : targetCommit = "local-draft"   (generatedAt 2026-10-02T13:14:14Z)
+  release-artifacts/windows-build-result.json  : sourceCommit = "90b45a1a1bf15a97b1cc690ad0b9872018aeebcb"
+                                                   (version 0.3.0, node v24.18.0, dependencyCopies 100)
+  Neither is git-verifiable. Build ran 2026/10/2 21:13-21:15 while the worktree was ALREADY dirty
+  (pipelineRoutes.ts mtime 20:35 < build; App.tsx 21:42 > build). So the shipped artifact is a MIXTURE.
+  Artifacts: MoZhou-0.3.0-windows-x64-setup.exe (125841951 B) + .sha256,
+             mozhou-v0.3.0-docker.tar.gz, mozhou-v0.3.0-local-runtime.tar.gz, mozhou-v0.3.0-web-dist.tar.gz
+  src-tauri/target/release and target/debug ABSENT -> no cargo build output present.
+
+[H] DESKTOP HOST IS A STUB
+  src-tauri/src/main.rs = 12 lines: tauri::Builder::default().setup(println).run(generate_context!())
+  no tauri command, no plugin, no sidecar, no node server spawn.
+  tauri.conf.json loads frontendDist ../apps/web/dist, devUrl http://localhost:5173,
+  beforeDevCommand 'pnpm --filter @mozhou/web dev', beforeBuildCommand 'pnpm --filter @mozhou/web build'.

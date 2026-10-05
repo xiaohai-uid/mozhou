@@ -1,0 +1,198 @@
+
+  Indexed Repositories (22)
+
+  lingbi-local
+    Path:    C:\codex\lingbi-review
+    Indexed: 2026/8/15 21:16:13
+    Commit:  3a419b6
+    Branch:  fix/p0-golden-path
+    Stats:   459 files, 9030 symbols, 20886 edges
+    Clusters:   397
+    Processes:  463
+
+  Openwrite
+    Path:    C:\codex\.tmp-openwrite-source
+    Indexed: 2026/7/29 08:55:33
+    Commit:  1e9453e
+    Branch:  main
+    Stats:   6 files, 85 symbols, 80 edges
+
+  CAD-AutoCAD-Platform  (C:\qoder\autocad-mcp)
+    Path:    C:\qoder\autocad-mcp
+    Indexed: 2026/8/15 21:12:15
+    Commit:  c6158ad
+    Branch:  main
+    Stats:   81 files, 787 symbols, 1829 edges
+    Clusters:   29
+    Processes:  64
+
+  mcu-project-assistant  (C:\codex\mcu-project-assistant)
+    Path:    C:\codex\mcu-project-assistant
+    Indexed: 2026/9/6 21:49:15
+    Commit:  0a77bce
+    Branch:  main
+    Stats:   300 files, 4313 symbols, 17494 edges
+    Clusters:   267
+    Processes:  339
+
+  CAD-AutoCAD-Platform  (C:\qoder\autocad-mcp\.worktrees\cad-mcp-v2)
+    Path:    C:\qoder\autocad-mcp\.worktrees\cad-mcp-v2
+    Indexed: 2026/8/15 21:12:45
+    Commit:  a5fcdad
+    Branch:  feature/cad-mcp-v2
+    Stats:   293 files, 2989 symbols, 5585 edges
+    Clusters:   125
+    Processes:  135
+
+  mcu-project-assistant  (C:\codex\mcu-project-assistant\.worktrees\trust-baseline)
+    Path:    C:\codex\mcu-project-assistant\.worktrees\trust-baseline
+    Indexed: 2026/8/15 21:16:23
+    Commit:  47924e3
+    Branch:  feat/trust-baseline
+    Stats:   184 files, 1432 symbols, 2478 edges
+    Clusters:   61
+    Processes:  69
+
+  toonflow-source
+    Path:    C:\codex\toonflow-source
+    Indexed: 2026/8/15 21:11:14
+    Commit:  270cbaf
+    Branch:  master
+    Stats:   4 files, 19 symbols, 18 edges
+    Clusters:   1
+
+  lingbi-next  (C:\codex\lingbi-next)
+    Path:    C:\codex\lingbi-next
+    Indexed: 2026/8/15 21:17:39
+    Commit:  c6aa0aa
+    Branch:  main
+    Stats:   251 files, 3856 symbols, 10050 edges
+    Clusters:   144
+    Processes:  328
+
+  storyrepo
+    Path:    C:\codex\storyrepo
+    Indexed: 2026/8/15 21:15:23
+    Commit:  db80fca
+    Branch:  index/storyrepo
+    Stats:   62 files, 873 symbols, 1918 edges
+    Clusters:   46
+    Processes:  60
+
+  lingbi-next  (C:\codex\lingbi-next-fusion)
+    Path:    C:\codex\lingbi-next-fusion
+    Indexed: 2026/8/15 21:16:36
+    Commit:  1616192
+    Branch:  fusion/book-v3
+    Stats:   259 files, 3917 symbols, 10151 edges
+    Clusters:   145
+    Processes:  333
+
+  mozhou  (C:\zcode\novel-ai)
+    Path:    C:\zcode\novel-ai
+    Indexed: 2026/10/2 21:22:02
+    Commit:  90b45a1
+    Branch:  feature/windows-local-release
+    Stats:   1029 files, 10007 symbols, 21780 edges
+    Clusters:   673
+    Processes:  516
+
+  ashquant
+    Path:    C:\zcode\ashquant
+    Indexed: 2026/9/5 01:13:18
+    Commit:  429644d
+    Branch:  main
+    Stats:   94 files, 1114 symbols, 2062 edges
+    Clusters:   35
+    Processes:  93
+
+  mozhou  (C:\Users\a1691\Documents\antigravity\happy-newton)
+    Path:    C:\Users\a1691\Documents\antigravity\happy-newton
+    Indexed: 2026/9/5 14:24:30
+    Commit:  b2a0930
+    Branch:  delivery-closure-20260905
+    Stats:   940 files, 8189 symbols, 18242 edges
+    Clusters:   510
+    Processes:  483
+
+  mozhou  (C:\zcode\novel-ai-closure)
+    Path:    C:\zcode\novel-ai-closure
+    Indexed: 2026/9/6 21:23:06
+    Commit:  1d842a2
+    Branch:  delivery-closure-20260905
+    Stats:   936 files, 8202 symbols, 24452 edges
+    Clusters:   513
+    Processes:  485
+
+  mcu
+    Path:    C:\zcode\mcu
+    Indexed: 2026/9/6 22:40:26
+    Commit:  15883d4
+    Branch:  main
+    Stats:   40 files, 330 symbols, 660 edges
+    Clusters:   14
+    Processes:  24
+
+  mozhou-author-os
+    Path:    C:\zcode\mozhou-author-os
+    Indexed: 2026/9/12 15:48:59
+    Commit:  12907e0
+    Branch:  main
+    Stats:   349 files, 3924 symbols, 10151 edges
+    Clusters:   337
+    Processes:  325
+
+  novels
+    Path:    C:\zcode\novels
+    Indexed: 2026/9/12 15:49:48
+    Commit:  6f9885f
+    Branch:  main
+    Stats:   192 files, 1516 symbols, 1525 edges
+    Clusters:   9
+
+  toonflow-next
+    Path:    C:\codex\toonflow-next
+    Indexed: 2026/9/14 22:16:11
+    Commit:  09e7ed3
+    Branch:  main
+    Stats:   44 files, 499 symbols, 1388 edges
+    Clusters:   40
+    Processes:  41
+
+  mozhou-audit-20260914-fed29e3
+    Path:    C:\codex\audits\mozhou-release-20260914-fed29e3
+    Indexed: 2026/9/14 21:38:30
+    Commit:  fed29e3
+    Branch:  master
+    Stats:   999 files, 8753 symbols, 19429 edges
+    Clusters:   551
+    Processes:  529
+
+  FPM_INR
+    Path:    C:\zcode\research\FPM_INR
+    Indexed: 2026/9/19 20:49:56
+    Commit:  9e1dbfe
+    Branch:  main
+    Stats:   159 files, 892 symbols, 1090 edges
+    Clusters:   26
+    Processes:  17
+
+  BeefTV
+    Path:    C:\zcode\research\BeefTV
+    Indexed: 2026/9/30 12:42:07
+    Commit:  852961a
+    Branch:  main
+    Stats:   2042 files, 28298 symbols, 96668 edges
+    Clusters:   1437
+    Processes:  1079
+
+  snake-graph
+    Path:    C:\Users\a1691\AppData\Local\Temp\snake-graph
+    Indexed: 2026/9/30 13:11:51
+    Commit:  unknown
+    Stats:   19 files, 643 symbols, 1540 edges
+    Clusters:   26
+    Processes:  57
+
+(node:49884) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)

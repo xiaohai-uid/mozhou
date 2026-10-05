@@ -1,0 +1,50 @@
+{
+  "processes": [
+    {
+      "id": "proc_25_crawlerroutes",
+      "summary": "CrawlerRoutes → DecodeHtml",
+      "priority": 0.113,
+      "symbol_count": 2,
+      "process_type": "intra_community",
+      "step_count": 6
+    },
+    {
+      "id": "proc_455_sceneprofile",
+      "summary": "SceneProfile → IsSceneProfile",
+      "priority": 0.11,
+      "symbol_count": 2,
+      "process_type": "intra_community",
+      "step_count": 3
+    },
+    {
+      "id": "proc_296_workbenchview",
+      "summary": "WorkbenchView → ChapterDraftKey",
+      "priority": 0.1,
+      "symbol_count": 2,
+      "process_type": "cross_community",
+      "step_count": 4
+    },
+    {
+      "id": "proc_378_mobileshell",
+      "summary": "MobileShell → ChapterDraftKey",
+      "priority": 0.094,
+      "symbol_count": 2,
+      "process_type": "cross_community",
+      "step_count": 3
+    },
+    {
+      "id": "proc_495_workbenchview",
+      "summary": "WorkbenchView → CandidateDraftKey",
+      "priority": 0.087,
+      "symbol_count": 1,
+      "process_type": "cross_community",
+      "step_count": 3
+    }
+  ],
+  "process_symbols": [
+    {
+      "id": "Function:apps/web/server/crawlers/qidian.ts:parseCards",
+      "name": "parseCards",
+      "filePath": "apps/web/server/crawlers/qidian.ts",
+      "startLine": 26,
+      "endLine": 62,

@@ -1,0 +1,24 @@
+ AGENTS.md                                          |   18 +-
+ CLAUDE.md                                          |   14 +-
+ apps/web/server/routes/productionRoutes.test.ts    |    8 +
+ apps/web/server/test-support/realModelGate.test.ts |    6 +-
+ apps/web/src/App.test.tsx                          |   45 +-
+ apps/web/src/App.tsx                               |  329 +-
+ apps/web/src/code-graph/CodeGraphView.test.tsx     |    6 +-
+ apps/web/src/code-graph/codeGraphData.json         |    2 +-
+ apps/web/src/code-graph/codeGraphSnapshot.ts       | 4345 ++++++++++----------
+ apps/web/src/context-receipt/ReceiptPanel.test.tsx |   73 +-
+ apps/web/src/context-receipt/ReceiptPanel.tsx      |   59 +
+ apps/web/src/workbench/WorkbenchView.tsx           |   11 +
+ .../editor/ProseEditorPanel.isolation.test.tsx     |   27 +
+ apps/web/src/workbench/editor/ProseEditorPanel.tsx |   16 +
+ eslint.config.js                                   |   12 +-
+ evidence/usability-fixes-20260921/result.json      |    4 +-
+ package.json                                       |    1 +
+ packages/context-compiler/src/assemble.test.ts     |   84 +
+ packages/context-compiler/src/assemble.ts          |   58 +
+ packages/context-compiler/src/receipt-file.test.ts |   16 +-
+ packages/kernel/src/kernel-schema.ts               |   27 +
+ scripts/gen-adr-refs.mjs                           |    1 -
+ windows-install-check-report.json                  |   32 +-
+ 23 files changed, 2870 insertions(+), 2324 deletions(-)
