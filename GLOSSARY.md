@@ -237,6 +237,14 @@ _Avoid_: Skill manager、tool list、plugin loader
 机器可校验的冻结方法论单元（类型化字段 + JSON Schema：触发器、静态加载条件、失败矩阵、跟踪门控、上下文预算、锁定的 MIT 来源），可实例化为一次或多次运行时技能运行。
 _Avoid_: Free-form prompt template、skill definition
 
+**任务流 (Task Stream)**:
+服务端任务进度的只读事件流：快照 + 带 schemaVersion/epoch/sequence 的增量事件，断线重连后以快照补发对齐；客户端不持有任务真实性，后端才是任务状态的家。
+_Avoid_: WebSocket 推送（实现细节）、日志流、轮询接口（不加限定）
+
+**候选生成标识 (Generation Id)**:
+一次草稿候选生成（draft.generate / draft.continue）的不可复用标识：续写严禁复用被续写候选的候选 id 或 generationId，每次操作必须分配全新 operationId 与全新 attemptId（契约见 ADR-0035 与 draft-continue）。
+_Avoid_: attemptId（每次尝试独立分配）、任务 (Task)（账本单位，见 Part 2 §2.3）、请求 id（不加限定）
+
 ## 1.4 评估与验证
 
 **评估引擎 (Evaluation Engine)**:
@@ -457,3 +465,4 @@ _Avoid_: 工作台、workbench
 2. **4 处"闸门"**（Part 2 §2.2 已列）。
 3. **三套工单 ID 方案并存**：本地 `NN-<slug>`、speckit `[ID] [P?]`、GitHub `#31`。规范只剩 GitHub `#31`。
 4. **两套"造什么"权威**：`AGENTS.md` §1（User journeys define product scope）与 `specs/*/spec.md`（User Scenarios）互不引用。规范权威是 `AGENTS.md` §1。
+5. **「门禁」「工单NN」在产品代码注释、测试标题与 `docs/gates.md` 中仍大量存在**（2026-10-05 全仓 grep：apps/web/server、packages 数十处；`docs/gates.md` 通篇、`AGENTS.md` 章节同用）。2026-10-05 修复轮已清掉当轮审查引用的文件（routeCodes / generationTarget / pipelineRoutes / namingRoutes / backupRoutes），其余为存量待迁移；`AGENTS.md` 与 `docs/gates.md` 的用词更名属仓库级口径决策，待裁决。

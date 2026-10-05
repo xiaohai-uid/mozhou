@@ -44,3 +44,32 @@
 - **排除与定性**：`.agent-teams/`、`review-result.json` 入 .gitignore 不入库；`apps/web/shared/*.js` 经核验为手维护最小子集（非构建产物），随源入库，重复问题留待 /code-review。
 - **验证状态**：已执行（基线全绿 + 每批 staged diff-stat 核对 + 收尾 detect_changes/gitnexus check）；**未 push、未合并回 develop**（需另行授权）。
 - **遗留/风险**：Mimosa 提交前扫描多次报 `scanner_enobufs`（扫描器缓冲不足），按兼容策略放行——**本轮未取得完整安全扫描结论，不宣称项目安全**，建议尽快重跑 mimosa 完整审计；推送前本地 CI 门禁与六分支合流仍需单独授权。
+
+### CHG-20261005-03 — 2026-10-05 — 用户授权，ZCode 执行
+
+- **需求来源**：用户要求「使用 archify 技能，把当前项目的架构生成中文交互图。附上源码依据，区分当前实现和未验证部分，保留 JSON、HTML 和检查结果」。
+- **观察基线**：图证钉在提交 `b13b6b2d`（origin `https://github.com/xiaohai-uid/mozhou.git`）；写图期间另一会话（即 `CHG-20261005-02` 的提交批次）持续前移 HEAD（`90b45a1`→`b13b6b2`，14 个提交），所有引用行号以显式 SHA 逐一 `grep -F` 复核，不受 HEAD 移动影响。
+- **目标行为**：产出 archify 架构交互图（中文、showcase 档），14 组件 + 1 进程 region + 13 关系，全部关键声明附 `file:line` 源引用；未验证项（Tauri 后端启动链、LLM 端到端、支付回调、对账 watcher 实跑）在图上以 tag/卡片显式区分。
+- **实际变更**：新增 `.archify/architecture-mozhou-20261005-134653/`（candidate.json、首轮 `mozhou.html`+收据、`candidate.review-1.json` 底稿、review-2 修复轮 `mozhou.html`+收据）；`PROJECT-MAP.md` 追加本条。
+- **验证状态**：finalize 四门禁（validate/deliver/check/browser-check）两轮均 pass、零诊断；首轮回执的 `pipeline→ledger` 4 弯绕行建议经坐标修复后消除；感知级视觉复查未执行（未捕获截图，仅自动门禁）。
+- **遗留**：`.archify/` 未入 .gitignore（是否入库/忽略待用户定）；地图登记与本图交付未提交（提交需另行授权）。
+
+### CHG-20261005-04 — 2026-10-05 — 用户授权（「开始修复吧」），ZCode 执行
+
+> 用户要求：每一次修复必须记录「修到哪里、为什么」。本条按修复项分列位置/原因/验证。
+
+- **需求来源**：/code-review 双轴报告（vs develop，62 提交）的修复授权；两轴各 7 项发现中本轮修 3 项核心。
+- **FIX-1 原子写全循环（Spec 轴最重发现：规划 §6.2 W1「写全循环」缺失）**
+  - 位置：`packages/data-plane/src/atomic-write.ts`——`atomicWriteFileSync` 原第 48 行单次 `writeSync(fd, content)` 改为 `writeFullSync` 循环补写（按返回字节数推进，零进展即抛错走清理路径）；`atomic-write.test.ts` 新增 2 测试（每次至多写 3 字节的短写模拟 → 内容仍逐字节完整；恒返回 0 → 显式失败、目标不出现、临时无残骸）。
+  - 为什么：单次 `writeSync` 允许短写，大内容部分写未防——作者文字完整性是产品第一原理。
+  - 验证：红（2 failed）→绿（6 passed）；impact=`atomicWriteFileSync` CRITICAL（81 直接调用方/38 流）已向用户明示；全量测试回归兜底。
+- **FIX-2 mock 生产闸（Standards 轴硬违规 1：UVSD §4-13 mock 仅限 dev/test/demo）**
+  - 位置：`pipelineRoutes.ts` `isMockDraftProviderMode`——原 `mock` 分支无生产闸（同函数 `mock-empty` 有闸，知情漏改），改为生产环境恒 false、两个开关统一门控；`namingRoutes.ts` 原第 123 行 mock 接缝加 `NODE_ENV !== 'production'` 前置；新增 `mockProviderGate.test.ts`（生产探针不报 mock 可用 / 非生产行为不变 / 生产起名 501 不伪造）。
+  - 为什么：生产里 mock 配置产出伪造可用性；§4-13 是环境白名单条文。
+  - 验证：红（2 failed/1 passed）→绿（3/3）；namingRoutes 既有 5 测试回归通过；impact=`isMockDraftProviderMode` HIGH（3 直接调用方）已明示。
+- **FIX-3 术语修正（Standards 轴硬违规 2/3 + 新领域词未入表）**
+  - 位置与为什么：`routeCodes.ts:59/62`、`generationTarget.ts`（10 处）、`backupRoutes.ts:8`、`pipelineRoutes.ts`（4 处「门禁」+3 处「工单06」）、`namingRoutes.ts:5`、`namingRoutes.test.ts` 头注——GLOSSARY Part 2 §2.2「门禁」出现即为错误、§2.1 本地文件不得称「工单」；「工单05/06」经核实为 `.scratch/mozhou-deepening-20260928/issues/05-commit-idempotency-contract-delta.md`、`06-provider-resolution.md`（GitHub #5/#6 标题无关），改写为文件指代「深化 05/06」；`GLOSSARY.md` §1.3 新增「任务流 (Task Stream)」「候选生成标识 (Generation Id)」词条。
+  - 验证：全部为注释/文档级修改；`tsc -b` 通过。
+- **挂账（不在本轮范围）**：全仓存量「门禁/工单NN」清扫（数十处，含测试文件）与 `AGENTS.md`/`docs/gates.md` 用词口径 → 已登记 GLOSSARY Part 3 存量违规第 5 条；memo/naming 规格外能力、W6 迁移半程、LOCK-01 跨会话证据、writerLock 数据团块、draft-continue 魔数 → 见 /code-review 报告待裁决。
+- **验证状态**：`tsc -b` 通过；全量测试 962 通过/14 跳过/0 失败（+5 新测试）；gitnexus 索引刷新至 11325 节点后 `check` **clean/0 环**；**未 push、未合并回 develop**。
+- **并发说明**：另一会话于本轮期间写入上方 CHG-20261005-03（archify 架构图交付记录），按并发写入规则原样保留、随本条同批入库；其 `.archify/` 交付物仍留工作区待用户裁决。
