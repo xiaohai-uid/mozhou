@@ -14,6 +14,7 @@
 | 执行状态 | GitHub Issues（`gh` CLI） | 唯一执行状态权威，见 `docs/agents/issue-tracker.md` |
 | 规格文档 | `.scratch/<feature-slug>/` | 规格与决策，**不是**执行状态的家 |
 | Spike 结论 | `docs/spikes/` | 技术探针结论 |
+| 章节审查隔离与活动记录 | `docs/plans/2026-10-05-capability-activity-trace-rollout.md` | 当前执行边界；最新实际变更见 CHG-20261005-11（前序 CHG-20261005-10） |
 
 - 数据所有权：暂由 `docs/architecture.md` 概述承载；如需按模块细分再在此补条目（其覆盖度未核实，标注为未验证）。
 - 审计报告（`docs/audit/`）是一次性证据，不是持续维护的索引，不并入本表。
@@ -153,3 +154,230 @@
   - **门禁补课**：`scripts/ci-gate.mjs` 增 `lint` 任务，任务集对齐 ci.yml 的 `novel-os` job（build/lint/test）——此前本地门禁漏 lint 正是本次被拦的根因。
 - **验证**：`pnpm lint` exit=0（167→0）；`ci-gate build` exit=0；`ci-gate test` exit=0（962 通过/14 跳过/0 失败）；子代理各自跑了受影响测试（79 文件 699 用例 + 7 文件 65 用例全过）；`tsc -b` 零错误。
 - **遗留**：Mimosa 对 `writerLock.ts:119` fsutil 加固的挂账仍在（见 CHG-20261005-06）；本次未动产品行为，纯 lint 债与配置登记。
+
+### CHG-20261005-09 — 2026-10-05 — 方案草案（由 CHG-20261005-10 接续）
+
+- 原始结果与失败证据原样移至 `docs/changes/CHG-20261005-09.md`；保留历史，正式方案现由下一记录接续。
+
+### CHG-20261005-10 — 2026-10-05 — 用户授权，Codex 执行
+
+- **需求**：正式落盘方案、清理本次 `.tmp`、精简地图，并针对真实 `review-step.ts` 添加 JSON 契约与单测；不以确定性小规则代替完整审查边界。
+- **基线与范围**：HEAD=`40cd257000f2590df61e4922a16344c500a5aa87`，沿用现有工作分支；保留 `.archify/`。新增方案、契约/测试及必要检查接线，不修改实际审查执行方式，不提交/推送。
+- **结果索引**：`docs/changes/CHG-20261005-10.md`；契约代码、27 个新增测试及 16 个相关回归通过，方案与临时文件整理完成。生产接线未改；完整图谱验证与基线术语检查仍有缺口，详见记录。未提交/推送。
+
+### CHG-20261005-11 — 2026-10-05 — 用户授权（动态工作流），ZCode 执行
+
+- **需求来源**：用户要求在 `C:\zcode\novel-ai` 实施章节审查的生产接线、边界简化与超时/取消支持；先建立术语共识，再连续实施；不提交/推送/发布。
+- **基线与范围**：分支 `feature/windows-local-release`，HEAD=`40cd257`；保留 `.archify/`。承接 `docs/plans/2026-10-05-capability-activity-trace-rollout.md` 与 CHG-20261005-10。
+- **结果索引**：`docs/changes/CHG-20261005-11.md`（详细证据、变更分列、缺陷挂账、未验证项）。契约简化（移除 `expectedVerdict` 重算与规则仲裁）、生产编排与路由接线（宿主/能力边界、真实语义提供方、`timeoutMs`＋`AbortSignal`＋进程树工具）、迟到保护、63 用例新增/修改。
+- **验证**：主会话独立复跑 63 用例全绿（pipeline 13 + web 50）；续办后 `pnpm build`/`pnpm test`（1012 passed/0 failed）/`pnpm lint` 全 exit=0，`gitnexus check --cycles` **clean/0 环**；`executeChapterReview` 唯一生产调用方 `pipelineRoutes.ts:1049`（确定性 grep，图谱工具对该函数报 not found）。真实付费模型端到端未执行（本地可控 mock LLM 顶替）。
+- **挂账与收尾（续办后状态）**：①契约双副本 **已合并**（pipeline 加子路径导出、删除 web 副本、重指测试）；②`process-tree.ts` **已删除**（无生产消费者＋自身多处缺陷，按 UVSD 不保留投机抽象；验收条件 3 收窄为「取消可靠传导」）；③lint 门禁缺口已修复（同 CHG-20261005-08 教训）；④按 `ocr review` 复核结论修复 4 项（超时/取消生命周期去重、孤儿报告回收、进程树移除、`details` 三处对齐），第 5 条经实测为误报不改。详见记录。
+- **Git 状态**：全部改动只落工作区，未提交、未推送、未发布。
+
+### CHG-20261005-12 — 2026-10-06 — 用户授权，ZCode 执行
+
+- **需求来源**：用户要求「我们已经把它的代码又进行了一次完整的更新，再使用那个技能重新生成」，依照「文档优先于代码」第一性原理，更新并重跑全景架构中文交互图。
+- **观察基线**：最新代码 HEAD 为 `40cd257000f2590df61e4922a16344c500a5aa87`，工作树包含 CHG-11 实施的章节审查解耦、纯净契约导出（`@mozhou/pipeline/reviewCapability.schema`）、真实语义提供方接通与超时/取消/迟到保护；全仓包测试 1012 passed/0 failed、build exit=0、lint exit=0、gitnexus check 0 环。
+- **目标行为**：使用 archify 技能生成全新架构交互图（showcase 档 · 中文）；组件包含主干生成、故事内核、双平面存储、上下文装配、审查宿主解耦、分级路由、安全凭据、租户沙箱与多渠道部署；每个组件同时包含「规格文档设计依据（`docs/specs/` / `docs/adr/`）」与「源码落地依据（`apps/web/` / `packages/`）」；严谨界定已实现与未验证边界。
+- **实际变更**：新建 `.archify/architecture-mozhou-20261006-101352/`，包含 `candidate.json`（17 组件 + 1 进程 region + 16 关系）、全门禁通过的交付图 `mozhou.html` 及全套收据（`finalize.json`, `browser-check.json`, `finalize-summary.json`）。
+- **验证状态**：finalize 四门禁（validate/deliver/check/browser-check）一次性全绿通过、零诊断；所有关系连线为水平/垂直正交直线，交叉数与绕行数完全清零；真实无头浏览器渲染测试通过；感知级视觉复查未人工截图。
+- **Git 状态**：产物留在本地工作区，未 commit（提交与推送需另行授权）。
+
+### CHG-20261006-01 — 2026-10-06 — 动态工作流（缺口核实员），ZCode 执行
+
+- **需求来源**：动态工作流任务——建立 11 模块唯一真源缺口矩阵，逐项以本地代码核实 done/partial/missing/deferred，裁决两份旧清单（2026-10-02 审计线 vs 2026-10-03 图谱审计线+2026-09-12 设计清单）四处矛盾；已知排除项（书源解析器/跨章并发/Max 销售/process-tree）记 deferred。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD=`40cd257000f2590df61e4922a16344c500a5aa87`；工作区 18 项未提交/未跟踪（CHG-20261005-10/11 与 archify 在制产物，原样保留）；`pnpm test` 全量由编排脚本执行但 **spawn 失败**（`spawn C:\Users\a1691\AppData\Roaming\npm\pnpm ENOENT`——无扩展名 shim 不可直接 spawn），本会话实测 `pnpm --version`=9.15.0（pnpm.cmd 可用）；GitNexus mozhou 索引经 list_repos 确认与 HEAD 同步（40cd257000…，11610 节点）。
+- **目标行为**：产出 `docs/plans/2026-10-06-spec-gap-matrix.md`：基线记录、git status 原样清单、11 模块矩阵（状态+file:line+缺口）、四点裁决、排除项表。测试基线判定 **red-environmental**（测试未运行、根因环境性，主链可继续；重跑建议经 `scripts/ci-gate.mjs` 包装器或 pnpm.cmd）。
+- **实际变更**：仅新增 `docs/plans/2026-10-06-spec-gap-matrix.md` 与本条目；零产品代码改动。矩阵结论：done 1（genre-presets：8 预设+apply 路由+data-plane 实现+前端视图）、partial 4（inline-ai：Bubble 已挂载但动作诚实不可用、InlineDiffViewer 孤文件、无 prose.edit.stream；flywheel：StyleLearner 链已接入，AuthorPreferenceLearner/TaskModelEvaluator 无生产消费方；mobile-tension：波形前 7 点硬编码且生产恒走诚实未接入分支；graph-connect：无 drag 手势但点击+Modal 契约创建已真实落后端）、missing 6（editor-ast：仍裸 textarea 无 TipTap；compaction：仅 schema 字段+recall 过滤无压缩引擎；tauri：main.rs 12 行空壳无 sidecar/生命周期；mobile-skills：三按钮纯文本标签、activeSkills 硬编码空；mobile-history：诚实桩；longform-e2e：无 30+ 章连续生产 E2E）、deferred 4（任务给定排除项，依据逐一核实）。四点裁决要点：选区 AI 组件存在但接线各半（两清单各对一半）；题材预设无实质矛盾记 done；移动端首启向导旧缺陷已修复（WizardOverlay 已移出 isMobile 三元）；9-23 后 132 提交不在旧清单视野，以 HEAD 代码为准。
+- **验收**：矩阵文档落盘且全部声明附 file:line 或命令输出；PROJECT-MAP 登记本条目；`git status` 复核仅新增两处文档改动（本矩阵 + PROJECT-MAP），未触碰 18 项在制文件与任何产品代码。
+- **验证状态**：已执行（矩阵所列证据均为 2026-10-06 本会话 Read/grep/find/git 实读实跑）；`pnpm test` 未跑（环境失败，非代码红）；genre-presets 仅代码面核实，运行时验收转长篇验收一次。
+- **遗留/风险**：全量测试基线仍缺（需以可 spawn 的 pnpm 入口重跑）；矩阵为静态代码核实，不含浏览器/运行时实跑；`docs/plans/2026-10-06-spec-gap-matrix.md` 未提交（提交需另行授权）。
+
+### CHG-20261006-02 — 2026-10-06 — 动态工作流（编辑器实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——按缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）补齐模块 #1 editor-ast（missing）与 #2 inline-ai（partial），二者共享选区模型一次完成；完整证据见 [docs/changes/CHG-20261006-02.md](docs/changes/CHG-20261006-02.md)。
+- **观察基线**：HEAD `40cd257000…`；裁决核实属实（NovelEditorCanvas 裸 textarea `:44/:206`、tiptap/prosemirror 依赖 grep 计数 0、Bubble 动作=诚实不可用桩 `ProseEditorPanel.tsx:139-145`、InlineDiffViewer 孤文件零 import、`server/routes/` 无 prose.edit.stream）；工作区 18 项在制产物原样保留未触碰。
+- **目标行为**：TipTap/ProseMirror AST 块级编辑器（正文纯文本契约不变、场景块等结构存本地 projection）+ `/api/prose.edit.stream` 单契约（四预设+custom 同契约，只产候选流绝不写盘）+ 固定链路（选区→AI Candidate→InlineDiff→作者 Accept/Reject→AST 局部替换→Active Draft→既有 revision-safe save）。
+- **实际变更**：新依赖 @tiptap/react @tiptap/core @tiptap/pm @tiptap/starter-kit 3.31.4（apps/web/package.json + lockfile）；新增 `prose-ast.ts`（round-trip 无损行模型+PM 位置映射+open-Slice 切片替换规划）、`NovelEditorCanvas.tsx` 重写（TipTap 化+SceneBreak atom 节点+IME composition 优先+imperative handle replaceRange/setSelection/undo）、`customNodes.ts` 重写（SceneBreak PM 节点+blocksFromText；删除两个零引用死函数 parseTextToBlocks/serializeBlocksToText）、`proseEditRoutes.ts` 新增（NDJSON start/delta/done/error 契约+mock 回吐原文/mock-empty 空流守卫/真实分支 resolveGenerationTarget+streamOpenAiChat 单缝）、`routePolicies.ts` 登记 book 类、`api.ts` 装配、`pipelineRoutes.ts` isMockDraftProviderMode 加 export 缝、`draftStreamEmulation.ts` 加 mockProseEditStream、`workbenchStorage.ts` 加编辑器投影存取、`ProseEditorPanel.tsx` 接线（NDJSON 流消费+Accept 三守卫含选区不漂移逐字校验+FR-3.3 采纳前质检）、`InlineDiffViewer.tsx` 从孤文件接线（loading+quality props）。
+- **验收**：受影响范围测试 **14 文件 100/100 passed**（新增 prose-ast.test 22、NovelEditorCanvas.ast.test 5、proseEditRoutes.contract.test 12、ProseEditorPanel.inlineEdit.test 4；同变更新 isolation 9/telemetry 4/chapterSwitch 5——同变原因=textarea→contenteditable 的需求变更，断言语义全保留，仅 DOM 交互层更换并在测试文件头声明）；前端 `npx tsc -b` exit 0、服务端 `npx tsc -p tsconfig.server.json --noEmit` exit 0。**全量门禁实测**（第二轮按编排反馈补跑）：首跑 exit 1（唯一失败 `DialogueStream.telemetry.test.tsx:49/:53`——上一轮受影响范围枚举遗漏的同变文件，`toHaveValue`→`toHaveTextContent` 补修）；重跑 **exit 0**：packages 115 文件 1030/1030 + web 143 文件 1054 passed/14 skipped/0 failed，**合计 2084 passed / 0 failed / 14 skipped**。
+- **验证状态**：detect_changes 已跑（23 文件 48 符号 risk=critical——critical 主要来自用户在制的 review-step 批次，本变更子集符号集中于 workbench/editor+routes+storage 可分辨）；GitNexus 符号级 impact 未过（索引无这些前端组件符号，impact/cypher 3 次调用均 not found，以代码级调用者枚举替代并披露：NovelEditorCanvas 唯一生产消费方 ProseEditorPanel.tsx:19、Panel 挂载于 WorkbenchView.tsx:334）。
+- **遗留/风险**：中文 IME 真机、浏览器运行时、Redo 单测未做（变更记录 §6）；`pnpm test` 全量留编排脚本；全部改动未 commit（需另行授权）。
+
+### CHG-20261006-02 — 2026-10-06 — 动态工作流（编辑器实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——按缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）补齐模块 #1 editor-ast（missing）与 #2 inline-ai（partial），二者共享选区模型一次完成；证据见 [docs/changes/CHG-20261006-02.md](docs/changes/CHG-20261006-02.md)。
+- **观察基线**：HEAD `40cd257000…`；裁决核实属实（NovelEditorCanvas 裸 textarea、tiptap/prosemirror 依赖计数 0、Bubble 动作=诚实不可用桩 `ProseEditorPanel.tsx:139-145`、InlineDiffViewer 孤文件零 import、`server/routes/` 46 文件无 prose.edit.stream）；工作区 18 项在制产物原样保留。
+- **目标行为**：TipTap/ProseMirror AST 块级编辑器（正文纯文本契约不变、场景块等结构存本地 projection）+ `/api/prose.edit.stream` 单契约（四预设+custom，只产候选流绝不写盘）+ 固定链路（选区→AI Candidate→InlineDiff→作者 Accept/Reject→AST 局部替换→Active Draft→既有 revision-safe save）。
+- **实际变更**：新依赖 @tiptap/* 3.31.4（package.json/lockfile）；新增 `prose-ast.ts`（round-trip 无损行模型+PM 映射+切片替换规划）、`NovelEditorCanvas.tsx` 重写（TipTap 化+SceneBreak 节点+IME 优先+imperative handle replaceRange/setSelection/undo）、`customNodes.ts` 重写（删两个零引用死函数）、`proseEditRoutes.ts`（NDJSON 契约+mock/mock-empty/真实 provider 单缝）、`routePolicies.ts` 登记、`api.ts` 装配、`pipelineRoutes.ts` 加 isMockDraftProviderMode export 缝、`draftStreamEmulation.ts` 加 mockProseEditStream、`workbenchStorage.ts` 加投影存取、`ProseEditorPanel.tsx` 接线（流消费+Accept 三守卫+FR-3.3 质检徽标）、`InlineDiffViewer.tsx` 接线扩展。
+- **验收**：受影响范围测试 **14 文件 100/100 passed**（新增 4 个测试文件 43 用例 + 同变更新 3 个；同变原因=textarea→contenteditable 的 approved requirement change，断言语义全保留）；前端 `tsc -b` exit 0、服务端 `tsc --noEmit` exit 0；8 项验收对照见变更记录 §5。
+- **验证状态**：detect_changes 已跑（23 文件 critical——critical 主要来自用户在制的 review-step 批次，本变更子集与其可分）；GitNexus 符号级 impact 未过（索引无这些前端组件符号，3 次调用均 not found，以代码级调用者枚举替代并披露）。
+- **遗留/风险**：中文 IME 真机、浏览器运行时、Redo 单测未做（见变更记录 §6）；`pnpm test` 全量留编排脚本；全部改动未 commit（需另行授权）。
+
+## CHG-20261006-codex-readiness-01 — Codex 项目约束与隔离验收
+
+- 来源/日期：用户要求完成本机 Codex 优化，指定 MoZhou；2026-10-06，Codex。
+- 范围：AGENTS 工作区指针说明与三条作者数据约束；规格/观察见 [.scratch/codex-readiness-20261006/spec-and-evidence.md](.scratch/codex-readiness-20261006/spec-and-evidence.md)。没有产品代码、契约或生产数据改动，保留既有 dirty工作。
+- 基线/验证：HEAD 40cd257；隔离工作区构建、完整本地测试、lint、真实服务的 mock HTTP 旅程与浏览器编辑/保存/刷新恢复、明确慢网条件下的取消通过；正文磁盘哈希未变，限速已撤销；图谱 clean / cycleCount 0。真实模型、已开始上游计算的取消及安装包/断电恢复未验证，不构成发布许可。证据/限定恢复见上述规格和 `C:\Users\a1691\.zcode\changes\CHG-20261006-codex-completion`。
+- 本地文件仅保留规格、决策与观察，不替代 GitHub Issues 的执行状态权威；未创建/发送议题，未提交、推送或发布。
+
+### CHG-20261006-03 — 2026-10-06 — 动态工作流（缺口核实员），ZCode 执行
+
+- **需求来源**：动态工作流任务——建立 11 模块唯一真源缺口矩阵，逐项以本地当前代码（含工作区最新在制实现）核实 done/partial/missing/deferred，裁决两份旧清单四处矛盾；排除项记 deferred。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制改动（章节审查解耦、编辑器 AST 化与选区 AI 局部替换等）；编排环境 `pnpm test` 因 spawn 无扩展名 shim 报 ENOENT，判定为 **red-environmental**（环境问题，非代码回归，主链可继续）；GitNexus 索引与 HEAD 同步（11610 节点）。
+- **目标行为**：产出 `docs/plans/2026-10-06-spec-gap-matrix.md`（含基线记录、git status 原样清单、11 模块逐项矩阵、核心模块分解、排除项表及四点裁决）；证据写入 `docs/changes/CHG-20261006-03-spec-gap-matrix-verification.md`；本文件登记。零产品代码改动。
+- **实际变更**：更新 `docs/plans/2026-10-06-spec-gap-matrix.md`；新增证据记录 `docs/changes/CHG-20261006-03-spec-gap-matrix-verification.md`；登记本条目。11 模块真实状态核定为：
+  - done 1：`genre-presets`（8 预设+apply 路由+data-plane 实现+前端视图四段闭环）；
+  - partial 5：`editor-ast`（已非 textarea，TipTap AST 与 SceneBreak 块节点就绪，但缺智能引号/对白归一/击键喂飞轮）；`inline-ai`（Bubble 选区直通 /api/prose.edit.stream 契约，InlineDiff 对照与局部替换就绪，但缺 FR-3.3 深度质量遥测实时计算与热键）；`flywheel`（StyleLearner 链已在生产运行，AuthorPreferenceLearner 与 TaskModelEvaluator 已实现但无 Web BFF 及前端调用）；`mobile-tension`（波形前 7 点硬编码，生产调用未传 score/desc 恒走诚实未接入分支）；`graph-connect`（已有点击节点+Modal 弹窗建契约落后端，但无画布 drag-to-connect 手势）；
+  - missing 5：`compaction`（仅 schema 字段定义与召回过滤，全仓生产写路径恒赋 null，compaction.ts 纯函数草稿无导出无生产消费）；`tauri`（main.rs 仅 12 行空壳，无 sidecar 启动托管与生命周期）；`mobile-skills`（移动端三按钮仅追加纯文本标签，/api/draft.stream 恒传 activeSkills: []）；`mobile-history`（诚实桩，无版本历史数据源、diff 与回滚）；`longform-e2e`（无 30+ 章真实生产 E2E，全仓仅静态 fixture 断言与单章脚本）；
+  - deferred 4：书源 HTML 解析器、跨章并发写作、Max 会员额度销售（`catalog.ts:97` sellable: false）、process-tree 外挂工具（已决议移除）。
+- **四点裁决要点**：①选区 AI 组件（Bubble 与 InlineDiffViewer）均在磁盘且在当前工作区已接线贯通，旧清单均过时，因 FR-3.3 遥测未满记 partial；②题材预设四段齐备无实质矛盾记 done；③移动端首启向导旧缺陷已修复（WizardOverlay 已移出 isMobile 三元），整体定性为“真壳+诚实桩”；④9 月 23 日后新增 132+ 提交均不在旧清单视野，一切以本地最新代码为准。
+- **验收**：矩阵文档落盘，所有声明均附 file:line 证据；严格遵守红线，零产品代码修改，未执行任何 git commit/push/reset 操作。
+- **验证状态**：已执行（矩阵所列证据均为 2026-10-06 本会话通过文件实读实查确证）；全量测试基线判定 red-environmental；genre-presets 运行时验收转长篇验收一次。
+
+### CHG-20261006-04 — 2026-10-06 — 动态工作流（编辑器实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——核实缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）对模块 #1（editor-ast：partial）与 #2（inline-ai：partial）的裁决；按模块简报补齐缺口并闭环验证；证据见 [docs/changes/CHG-20261006-04-editor-ast-inline-ai-closeout.md](docs/changes/CHG-20261006-04-editor-ast-inline-ai-closeout.md)。
+- **观察基线**：HEAD `40cd257`；缺口核实结论：简报核心（TipTap AST 块级编辑器、纯文本正文契约、本地 projection、`/api/prose.edit.stream` NDJSON 契约、选区→Candidate→Diff→Accept 局部替换→Active Draft）已完整落地；细部缺口核实：FR-3.3 深度质量遥测实时计算实已在 `ProseEditorPanel.tsx:271-285` 存在（4-gram + De-AI 诊断徽标）；Enter/Esc 全局热键此前缺失；FR-1.1 对白直双引号归一化原仅有全角缩进；FR-1.2/FR-1.3 超出本简报范围留待后续。
+- **目标行为**：补齐 Enter（采纳）与 Esc（放弃）全局快捷键监听，守卫 IME 与正文输入框；补充一键网文排版对白英文直双引号归一为中文标准弯双引号；补齐单测覆盖。
+- **实际变更**：`ProseEditorPanel.tsx` 挂载 Enter/Esc 全局 keydown 监听；`NovelEditorCanvas.tsx` 完善 `handleFormatTypography` 英文直双引号按对归一为中文 `“` `”`；`ProseEditorPanel.inlineEdit.test.tsx` 增补 Esc 放弃与 Enter 采纳用例（5/5）；`NovelEditorCanvas.ast.test.tsx` 增补对白引号归一化用例（6/6）。
+- **验收**：受影响范围 15 个测试文件 **103/103 passed**；全量 `pnpm test` 真实实跑通过（packages 115 文件 1030/1030 passed + web 143 文件 1056 passed / 14 skipped，合计 **2086 passed / 14 skipped / 0 failed**）；前端与服务端类型检查 `tsc -b && tsc -p tsconfig.server.json --noEmit` exit 0 零错误；九项验收清单全绿对照。
+- **验证状态**：已执行（受影响范围与全量测试均真实实跑）；GitNexus 符号级 impact 索引未覆盖前端 TSX 组件符号，以源码枚举替代披露；未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-05 — 2026-10-06 — 动态工作流（压缩实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——按缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）补齐模块 #3 `compaction`（missing）；实现卷边界状态压缩（State Compaction）三层事务系统；证据见 [docs/changes/CHG-20261006-05-volume-state-compaction.md](docs/changes/CHG-20261006-05-volume-state-compaction.md)。
+- **观察基线**：HEAD `40cd257`；缺口核实结论属实（schema 仅字段声明 `kernel-schema.ts:256`、recall 虽预留但全仓生产写路径恒赋 null `deltaExtractor.ts:208`、`compaction.ts` 纯函数草稿无导出无生产消费，缺少卷完结判定触发器、LLM 卷摘要生成、微事实折入写路径及压缩回执端到端串联）。
+- **目标行为**：按“事务系统”实现三层状态压缩架构：`planVolumeCompaction()` 纯函数候选筛选（排除保护位与活跃引用）+ `summarizeVolumeFacts()` 经注入式 LLM port 生成摘要及完整性机检 + `commitVolumeCompaction()` / `executeVolumeCompaction()` 数据面原子落盘与标记回写；触发点绑定卷状态 completed；保障幂等性（重跑不重复摘要/标记/事件）与失败回滚（生成失败零盘上副作用）；闭环 recall 召回过滤。
+- **实际变更**：`packages/kernel/src/compaction.ts` 实现 `summarizeVolumeFacts` 与 `VolumeSummaryValidationError` 并从 index 导出；`packages/kernel/src/narrative-state.ts` 中 `queryActiveFacts` 过滤已折叠微事实；`packages/data-plane/src/compaction.ts` 实现卷状态压缩事务系统（`executeVolumeCompaction`、`markVolumeCompleted`、`findVolumeOutline` 等）；`packages/data-plane/src/local-data-plane.ts` 暴露 `compactVolume` 与 `markVolumeCompleted`，且 `rebuildProjectionFromCanon` 支持已有数据库连接与 Windows 独占锁兜底；新增 `packages/kernel/src/compaction.test.ts`（11 tests）与 `packages/data-plane/src/compaction.test.ts`（6 tests）；更新 `packages/context-compiler/src/recall.test.ts` 增加卷状态压缩后 recall 过滤集成断言。
+- **验收**：受影响范围 42 个测试文件 **400/400 passed**（kernel 7 文件 52 passed，data-plane 25 文件 236 passed，context-compiler 10 文件 112 passed）；**全量门禁实跑** `pnpm test`（test:packages 117 文件 1048 passed + test:web 142 文件 1056 passed / 14 skipped，**全量合计 259 文件 2104 passed / 0 failed / 14 skipped**，exit 0 全绿）；全项目构建 `pnpm build`（`tsc -b`）exit 0 零错误；服务端类型检查 `tsc -p tsconfig.server.json --noEmit` exit 0 零错误；修改及新建文件 ESLint 检查 exit 0 零告警；五项验收清单全绿对照。
+- **验证状态**：已执行（受影响范围全部测试真实实跑通过）；改动前运行 GitNexus `queryActiveFacts` impact upstream 分析，改动后运行 `detect_changes` 核实影响面；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-06 — 2026-10-06 — 动态工作流（飞轮接线员），ZCode 执行
+
+- **需求来源**：动态工作流任务——按缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）补齐模块 #4 `flywheel`（partial）；完成数据飞轮编排接线（AuthorPreferenceLearner / TaskModelEvaluator），不重写算法；证据见 [docs/changes/CHG-20261006-06-flywheel-orchestration.md](docs/changes/CHG-20261006-06-flywheel-orchestration.md)。
+- **观察基线**：HEAD `40cd257`；缺口核实结论属实（AuthorPreferenceLearner 与 TaskModelEvaluator 算法完备，但 `confirmRoutingSuggestion` / `runTaskModelEvaluation` / `readSuggestions` 在生产代码中无调用方，无 Web BFF 路由与前端呈现面，缺少 Accept/Reject/Commit 真实观测向飞轮的闭环串联）。
+- **目标行为**：实现数据飞轮编排接线：①章节 Accept/Reject/UserEdit/Commit 产生真实观测：`/api/prose.edit.decision` 接收行内编辑决策落账双路 CandidateCreated 与 candidate_decision 择优事件，`/api/chapter.commit` 定稿在 afterRecord 钩子中触发 `runPreferenceLearning` 自动增量折叠观测并物化画像；②Web BFF 新增只读与显式执行接口：`/api/flywheel.preference`, `/api/flywheel.preference.rebuild`, `/api/flywheel.suggestions`, `/api/flywheel.evaluator.status`, `/api/flywheel.evaluator.run`；③严格守住硬不变量（C6）：只建议不自动改变底层模型路由配置；④前端提供偏好画像（PreferenceProfilePanel）与模型建议（ModelRoutingSuggestionsPanel）两个呈现面，支持真实读数与诚实空态展示。
+- **实际变更**：新增 `apps/web/server/routes/flywheelRoutes.ts` 与测试 `flywheelRoutes.test.ts`；新增 `apps/web/server/routes/proseEditDecision.test.ts`；新增 `apps/web/src/workbench/PreferenceProfilePanel.tsx` 与 `ModelRoutingSuggestionsPanel.tsx` 以及测试 `FlywheelPanels.test.tsx`；`apps/web/server/routes/proseEditRoutes.ts` 增补 `/api/prose.edit.decision` 决策上报与 `recordProseEditDecision`；`apps/web/server/routes/proseRoutes.ts` 在 afterRecord 钩子中接入 `runPreferenceLearning`；`apps/web/src/workbench/editor/ProseEditorPanel.tsx` 接入 Accept/Reject 异步决策上报；`apps/web/src/workbench/WorkbenchView.tsx` 挂载策略飞轮与模型建议面板；`apps/web/server/routePolicies.ts` 登记路由白名单；`apps/web/server/api.ts` 装配 `flywheelRoutes`。
+- **验收**：受影响范围 **19 个测试文件 172/172 passed**（packages/flywheel 13 文件 133 passed，web 6 文件 39 passed）；**全量门禁实跑** `pnpm test`（test:packages 117 文件 1048 passed + test:web 145 文件 1071 passed / 14 skipped，**全量合计 262 文件 2119 passed / 0 failed / 14 skipped**，exit 0 全绿）；全项目构建 `pnpm build`（`tsc -b`）exit 0 零错误；服务端类型检查 `tsc -p tsconfig.server.json --noEmit` exit 0 零错误；全仓 ESLint `pnpm lint` exit 0 零错误零告警；图谱依赖检测 `gitnexus check --cycles` clean / 0 环；BFF 契约测试、观测写入路径与冷启动诚实空态全绿。
+- **验证状态**：已执行（受影响范围全部测试真实实跑通过）；改动前运行 GitNexus `PreferenceProfileState` impact upstream 分析，改动后运行 `detect_changes` 核实影响面；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-07 — 2026-10-06 — 动态工作流（移动端实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——按缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）补齐移动端三模块（#6 `mobile-tension`、#7 `mobile-skills`、#8 `mobile-history`）三个真实闭环；证据见 [docs/changes/CHG-20261006-07-mobile-three-closures.md](docs/changes/CHG-20261006-07-mobile-three-closures.md)。
+- **观察基线**：HEAD `40cd257`；缺口核实结论属实（`TensionSparkWidget.tsx:36` 前 7 点硬编码 `[20, 38, 30, 60, 48, 75, 68]` 且 WorkbenchHub 恒走未接入分支；`MobileComposer.tsx:101-118` 仅追加中文标签，WorkbenchHub 恒传 `activeSkills: []`；`VersionHistoryDrawer.tsx` 仅为 44 行诚实未接入桩，无版本历史数据源、段落 Diff 及回滚）。
+- **目标行为**：实现移动端三闭环：①张力波形闭环：移除 TensionSparkWidget 硬编码前置点，改接章节真实张力分析数据源（POST `/api/chapter.tension`），无数据态诚实呈现 unavailable 绝不伪造；②技能胶囊闭环：维护 MobileComposer 技能胶囊选中状态（增加冲突、精简叙述、回收伏笔），通过 `/api/draft.stream` 的 activeSkills 契约透传，并在服务端 recipe 映射真实约束提示词；③版本时光机闭环：实现章节修订快照历史 sidecar（.mozhou/history/）与查询接口（POST `/api/chapter.history`、`/api/chapter.history.diff`），提供段落级真实 Diff 渲染，恢复时以当前最新 revision 递增创建新版本并永久保留历史。
+- **实际变更**：`TensionSparkWidget.tsx` 移除硬编码前 7 点，由 `tensionPoints` 真实时序驱动；`proseRoutes.ts` 新增 `POST /api/chapter.tension`（词法与对抗密度真实计算）、`.mozhou/history/` 章节快照 sidecar 持久化、`POST /api/chapter.history`、`POST /api/chapter.history.diff`（LCS 段落级差异对比）与 `POST /api/chapter.history.restore`（基于历史正文以最新 revision 递增创建新版本并永久保留历史）；`routePolicies.ts` 登记新路由白名单；`pipelineRoutes.ts` 中 `decoratePromptWithSkills` 接入三技能 recipe 提示词映射并导出；`MobileComposer.tsx` 维护技能胶囊选中状态，发送透传 `activeSkills`，不污染正文；`VersionHistoryDrawer.tsx` 真实接入历史数据源，渲染版本列表、段落级 Diff 对比与恢复新版本交互，且真实接入后才移除未接入提示；`WorkbenchHub.tsx` 贯通张力数据与技能胶囊；`MobileShell.tsx` 向时光机抽屉传递 book 与 chapterIndex；`mobile.css` 补充技能与 Diff 样式；新增服务端与前端测试文件（`mobileThreeClosures.routes.test.ts` 8 用例，`MobileThreeClosures.test.tsx` 7 用例）。
+- **验收**：受影响范围 **8 个测试文件 54/54 passed**（新增 15 个测试全部通过，回归移动端与正文存取 39 个测试全部通过）；**全量门禁实跑** `pnpm.cmd test`（test:packages 117 文件 1048 passed + test:web 147 文件 1086 passed / 14 skipped，**全量合计 264 文件通过 / 1 跳过 / 0 失败，2134 用例通过 / 14 跳过 / 0 失败**，exit 0 全绿）；`pnpm build`（`tsc -b`）exit 0 零错误；`typecheck`（`tsc -b && tsc -p tsconfig.server.json --noEmit`）exit 0 零错误；全仓 ESLint `pnpm lint` exit 0 零告警；图谱依赖检测 `gitnexus check --cycles` clean / 0 环；无数据态诚实呈现；时光机 diff 是真实段落 diff 而非 UI 假历史。
+- **验证状态**：已执行（受影响范围与全量门禁 pnpm.cmd test 全部测试真实实跑通过）；改动前运行 GitNexus `saveProseDraft` impact upstream 分析，改动后运行 `detect_changes` 核实影响面；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-08 — 2026-10-06 — 动态工作流（缺口核实员），ZCode 执行
+
+- **需求来源**：动态工作流任务——建立 11 模块唯一真源缺口矩阵，逐项以本地当前最新代码树（含工作区最新在制实现）核实 done/partial/missing/deferred，对旧清单矛盾点终局裁决；排除项记 deferred。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含在制改动（章节审查解耦、TipTap AST 化、卷状态压缩三层事务引擎、飞轮接线与移动端三闭环等）；编排环境 `pnpm test` 因 spawn 缺少扩展名报 ENOENT，判定为 **red-environmental**（环境问题，非代码回归，主链可继续；`pnpm.cmd --version`=9.15.0 可用，最新实跑通过 2134 passed / 14 skipped / 0 failed）；GitNexus 索引与 HEAD 同步（11610 节点）。
+- **目标行为**：产出 `docs/plans/2026-10-06-spec-gap-matrix.md`（含基线记录、git status 原样清单、11 模块逐项矩阵、核心模块分解、排除项表及四点裁决）；证据写入 `docs/changes/CHG-20261006-08-spec-gap-matrix-reverification.md`；本文件登记。零产品代码改动。
+- **实际变更**：更新 `docs/plans/2026-10-06-spec-gap-matrix.md`；新增证据记录 `docs/changes/CHG-20261006-08-spec-gap-matrix-reverification.md`；登记本条目。11 模块真实状态核定为：
+  - done 8：`editor-ast`（TipTap AST 块级编辑器、SceneBreak 节点与排版引号归一）；`inline-ai`（选区气泡、/api/prose.edit.stream 流式契约、InlineDiffViewer 与局部替换全闭环）；`compaction`（卷状态压缩三层事务系统、原子落盘与 recall 过滤）；`flywheel`（Web BFF 5 端点、行内与定稿观测上报与前端双面板）；`mobile-tension`（移除硬编码，接真实张力时序与诚实降级）；`mobile-skills`（三技能胶囊状态、透传与 recipe 提示词映射）；`mobile-history`（版本历史、段落 LCS Diff 与安全递增恢复）；`genre-presets`（8 套预设、/api/genre-kit.apply 路由与前端流派市场）；
+  - partial 1：`graph-connect`（已有点击节点 + Modal 弹窗建契约落后端，但画布缺少 drag-to-connect 拖拽连线手势）；
+  - missing 2：`tauri`（main.rs 仅 12 行空壳，无 Node 本地服务 sidecar 启动托管与生命周期）；`longform-e2e`（无 30+ 章跨卷连续生产与压缩召回自动化 E2E）；
+  - deferred 4：书源 HTML 解析器、跨章并发写作、Max 会员额度销售、process-tree 外挂工具。
+- **四点裁决要点**：①选区 AI 组件（Bubble、InlineDiffViewer、流式契约与决策上报）在当前工作区已完全接通贯通，旧清单过时，记 done；②题材预设四段齐备无实质矛盾记 done；③移动端首启向导旧缺陷已修且三闭环已完整落地，移动端三模块记 done；④9 月 23 日后新增 130+ 提交与系列在制深化均不在旧清单视野，一切以本地最新代码为准。
+- **验收**：矩阵文档落盘，所有声明均附 file:line 证据；严格遵守红线，零产品代码修改，未执行任何 git commit/push/reset 操作。
+- **验证状态**：已执行（受影响单测 genre-kits 4 passed, flywheelRoutes 7 passed, MobileThreeClosures 7 passed 实跑全绿）；全量测试基线判定 red-environmental；genre-presets 运行时验收转长篇验收一次。
+
+### CHG-20261006-09 — 2026-10-06 — 动态工作流（编辑器实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——核实缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）对模块 #1（editor-ast：done）与 #2（inline-ai：done）的裁决；先核实矩阵裁决是否属实，读关键代码并跑受影响测试，完成核实性收尾；证据见 [docs/changes/CHG-20261006-09-editor-ast-inline-ai-verification.md](docs/changes/CHG-20261006-09-editor-ast-inline-ai-verification.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；测试基线 red-environmental（此前全量实跑 2134 passed / 14 skipped / 0 failed）；GitNexus 索引 11610 节点。
+- **目标行为**：核实两模块矩阵裁决（`editor-ast: done`, `inline-ai: done`）属实性；运行受影响范围测试验证功能完整性与回归状态；零修改用户在制代码；完成图谱核查与变更登记。
+- **核实与变更内容**：
+  - 模块核查结论：`editor-ast` 与 `inline-ai` 均已完整落地并贯通。NovelEditorCanvas 引入 TipTap 块级编辑器与 SceneBreak atom 节点，保持正文纯文本字符串契约；/api/prose.edit.stream 契约提供 NDJSON 流式帧，四预设与自定义指令同契约处理；选区气泡、双栏 InlineDiffViewer 与局部替换全链路闭环，Enter 采纳 / Esc 放弃全局热键与 IME 保护完整，选区不漂移守护与 409 冲突机制健壮。
+  - 本次改动：零产品代码变更，仅新增证据记录 `docs/changes/CHG-20261006-09-editor-ast-inline-ai-verification.md` 并登记本条目。
+- **验收**：受影响范围 10 个测试文件 **74/74 passed**（prose-ast.test 22, EditorQualityTelemetry.test 6, NovelEditorCanvas.ast.test 6, DialogueStream.telemetry.test 1, ProseEditorPanel.telemetry.test 4, ProseEditorPanel.chapterSwitch.test 5, ProseEditorPanel.inlineEdit.test 5, ProseEditorPanel.isolation.test 9, proseEditDecision.test 4, proseEditRoutes.contract.test 12 全部通过）；双端类型检查 `pnpm.cmd --filter @mozhou/web typecheck` exit 0 零错误；全项目构建 `pnpm.cmd build` exit 0 零错误；GitNexus 依赖图谱 `check --cycles` clean / 0 环。**全量门禁实跑**：因编排脚本无法直跑，在本地由子代理使用 `pnpm.cmd test` 完整实跑全量套件并通过——`test:packages` 117 文件 1048 passed，`test:web` 148 文件 1086 passed / 14 skipped，全量合计 **264 文件通过 / 1 跳过 / 0 失败，2134 用例通过 / 14 跳过 / 0 失败，exit 0 全绿**（golden-quality-journey 长旅程用例设 30s timeout 保护）。
+- **验证状态**：已执行（源码逐行核验、受影响测试 74/74 及全量门禁 2134/2134 实跑全部通过）；未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-10 — 2026-10-06 — 动态工作流（压缩实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——核实缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）对模块 #3（`compaction`：done）的裁决；先核实矩阵裁决是否属实，读关键代码并跑受影响测试，完成核实性收尾；证据见 [docs/changes/CHG-20261006-10-volume-compaction-verification.md](docs/changes/CHG-20261006-10-volume-compaction-verification.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；测试基线 red-environmental（此前全量实跑 2134 passed / 14 skipped / 0 failed）；GitNexus 索引 11610 节点。
+- **目标行为**：核实 `compaction: done` 矩阵裁决属实性；运行受影响范围测试验证功能完整性与回归状态；零修改用户在制代码；完成图谱核查与变更登记。
+- **核实与变更内容**：
+  - 模块核查结论：`compaction`（卷边界状态压缩）已按“事务系统”三层架构完整实现并闭环。`planVolumeCompaction()` 纯函数基于确定性裁决序排除已折叠、未确认、未过期/无界、critical、受保护内容与活跃引用；`summarizeVolumeFacts()` 经注入式 `VolumeSummaryLlmPort`（不直连任何服务商）生成卷摘要，并通过 `validateVolumeSummary` 确定性机检（非空、字数上限 8000、必需实体全量覆盖）；`executeVolumeCompaction()` 严格绑定卷 `completed` 完结门禁，实现原子落盘（更新大纲摘要与版本、回写事实流 `compactedIntoVolumeId` 追加标记行、追加 Event Ledger 审计事件、刷新 Manifest 基线、重建 SQLite 投影）；具备严格幂等性（同一卷重跑两次不重复调用 LLM、不重复标记、不污染 Event Ledger）与失败回滚（生成或机检失败零盘上副作用）；`queryActiveFacts` 显式过滤已折叠微事实，闭环长程 recall 召回过滤。
+  - 本次改动：零产品代码变更，仅新增证据记录 `docs/changes/CHG-20261006-10-volume-compaction-verification.md` 并登记本条目。
+- **验收**：受影响范围测试 **9 个测试文件 90/90 passed**（`compaction.test.ts` (kernel) 11 passed, `compaction.test.ts` (data-plane) 6 passed, `recall.test.ts` 32 passed, 其余 kernel 单元测试 41 passed 全部通过）；全工作区构建 `pnpm.cmd build`（`tsc -b`）exit 0 零错误；服务端类型校验 `tsc -p tsconfig.server.json --noEmit` exit 0 零错误；GitNexus 依赖图谱 `queryActiveFacts` impact 分析与 `detect_changes` 变更核对完成。**全量门禁实跑**：因编排脚本无扩展名 spawn 限制，在本地由子代理使用 `pnpm.cmd test` 完整实跑全量套件并通过——`test:packages` 117 文件 1048 passed，`test:web` 147 文件 1086 passed / 14 skipped，全量合计 **264 文件通过 / 1 跳过 / 0 失败，2134 用例通过 / 14 跳过 / 0 失败，exit 0 全绿**。
+- **验证状态**：已执行（源码逐行核验、受影响测试 90/90 实跑通过、全量测试 2134/2134 实跑通过、全构建 exit 0 通过）；未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-11 — 2026-10-06 — 动态工作流（飞轮接线员），ZCode 执行
+
+- **需求来源**：动态工作流任务——核实缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）对模块 #4（`flywheel`：done）的裁决；先核实矩阵裁决是否属实，读关键代码并跑受影响测试，完成核实性收尾；证据见 [docs/changes/CHG-20261006-11-flywheel-orchestration-verification.md](docs/changes/CHG-20261006-11-flywheel-orchestration-verification.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；测试基线 red-environmental（此前全量实跑 2134 passed / 14 skipped / 0 failed）；GitNexus 索引 11610 节点。
+- **目标行为**：核实 `flywheel: done` 矩阵裁决属实性；运行受影响范围测试验证功能完整性与回归状态；零修改用户在制代码；完成图谱核查与变更登记。
+- **核实与变更内容**：
+  - 模块核查结论：`flywheel`（数据飞轮接线）已完整落地并全链路贯通。
+    1) 真实观测接入：行内选区 AI 编辑器（Inline AI）通过 `/api/prose.edit.decision` 接收 Accept/Reject 决策，经 `recordProseEditDecision` 向 Event Ledger 写入双路 `CandidateCreated` 与 `UserEditRecorded { action: 'candidate_decision', level: 'selection' }` 并即时触发增量偏好学习；章节定稿（`/api/chapter.commit`）在 `afterRecord` 钩子中触发 `runPreferenceLearning(root)`，自动增量推进偏好游标并物化 `.mozhou/preference/profile.json`；`TaskModelEvaluator` 基于 Event Ledger 样本量（门槛 `EVAL_MIN_DECISIONS: 20`, `EVAL_MIN_CHAPTER_WINDOWS: 5`）计算资格门状态并提供显式重新评估入口。
+    2) Web BFF 5 端点：`apps/web/server/routes/flywheelRoutes.ts:59-200` 完整实现 `/api/flywheel.preference`, `/api/flywheel.preference.rebuild`, `/api/flywheel.suggestions`, `/api/flywheel.evaluator.status`, `/api/flywheel.evaluator.run`，并在 `routePolicies.ts` 登记 `book` 作用域白名单，在 `api.ts` 中完成装配。
+    3) 严格不变量（C6）：“只建议，不自动改变模型路由”，接口返回说明与前端醒目说明均严格遵守该约定，绝不自动改写 `settings.yaml` 或静默切换模型。
+    4) 前端双面板与诚实空态：`PreferenceProfilePanel.tsx`（画像、观测计数、冷启动先验诚实空态、全量重建）与 `ModelRoutingSuggestionsPanel.tsx`（建议列表、样本门槛、显式重新评估、空态说明）在中栏工作台 `WorkbenchView.tsx:320-330` 折叠挂载；行内编辑器点击或 Enter/Esc 快捷键均安全触发异步决策上报。
+  - 本次改动：零产品代码变更，仅新增证据记录 `docs/changes/CHG-20261006-11-flywheel-orchestration-verification.md` 并登记本条目。
+- **验收**：受影响范围测试 **19 个测试文件 172/172 passed**（flywheelRoutes.test 7 passed, proseEditDecision.test 4 passed, FlywheelPanels.test 4 passed, @mozhou/flywheel 13 测试文件 133 passed, proseEditRoutes.contract.test 12 passed, ProseEditorPanel.inlineEdit.test 5 passed, WorkbenchView.test 7 passed 全部通过）；双端类型检查 `pnpm.cmd --filter @mozhou/web typecheck` exit 0 零错误；全项目构建 `pnpm.cmd build` exit 0 零错误；全仓 ESLint `pnpm.cmd lint` exit 0 零告警；GitNexus 依赖图谱 `check --cycles` clean / 0 环。**全量门禁实跑**：因编排脚本无扩展名 spawn 限制，子代理在本地使用 `pnpm.cmd test` 完整实跑全量套件并通过——`test:packages` 117 文件 1048 passed，`test:web` 147 文件通过/1 跳过（1086 passed / 14 skipped），全量合计 **264 文件通过 / 1 跳过 / 0 失败，2134 用例通过 / 14 跳过 / 0 失败，exit 0 全绿**。
+- **验证状态**：已执行（源码逐行核验、受影响测试 172/172 实跑通过、全量门禁 2134/2134 实跑通过、全构建 exit 0 通过、全类型检查与代码检查全绿）；未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-12 — 2026-10-06 — 动态工作流（移动端实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——核实缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）对模块 #6（`mobile-tension`：done）、#7（`mobile-skills`：done）与 #8（`mobile-history`：done）的裁决；先核实矩阵裁决是否属实，读关键代码并跑受影响测试，完成核实性收尾；证据见 [docs/changes/CHG-20261006-12-mobile-three-closures-verification.md](docs/changes/CHG-20261006-12-mobile-three-closures-verification.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；测试基线 red-environmental（此前全量实跑 2134 passed / 14 skipped / 0 failed）；GitNexus 索引 11610 节点。
+- **目标行为**：核实 `mobile-tension: done`、`mobile-skills: done` 与 `mobile-history: done` 矩阵裁决属实性；运行受影响范围测试验证功能完整性与回归状态；零修改用户在制代码；完成图谱核查与变更登记。
+- **核实与变更内容**：
+  - 模块核查结论：移动端三闭环已完整落地并全链路闭环。
+    1) 张力波形闭环（mobile-tension）：`TensionSparkWidget.tsx:8-58` 彻底移除硬编码点序列 `[20, 38, 30, 60, 48, 75, 68]`，由 `tensionPoints` 动态时序驱动；未建书、正文过短（<20字）、无张力数据或时序点数不足 2 点时，严格呈现 `data-testid="tension-unavailable"` 诚实不可用卡片（“管线阶段与叙事张力尚未接入”），绝不伪造虚假波形；`proseRoutes.ts:386-451, 1040-1064` 实现 `POST /api/chapter.tension` 与 `computeChapterTension`，词法与对抗密度真实计算；`WorkbenchHub.tsx:81-112, 241-247` 自动请求并注入组件。
+    2) 技能胶囊闭环（mobile-skills）：`MobileComposer.tsx:55-68, 99-126` 在输入框下方维护“增加冲突”、“精简叙述”、“回收伏笔”三技能胶囊的独立选中状态数组 `activeSkills`，点击仅高亮胶囊，不向正文输入框强塞中文标签；点击发送时向回调透传 `(prompt, activeSkills)`，`WorkbenchHub.tsx:122-140` 将其封装在 `POST /api/draft.stream` 请求体中；`pipelineRoutes.ts:211-226` 中的 `decoratePromptWithSkills` 将 `conflict`、`concise`、`foreshadow` 映射为严谨的生成约束提示词。
+    3) 版本时光机闭环（mobile-history）：`proseRoutes.ts:288-344, 572-592` 在正文保存时通过 `appendChapterHistoryRecord` 向 `.mozhou/history/ch{index}_history.jsonl` 持久化快照；`POST /api/chapter.history` 读取快照摘要；`computeParagraphDiff` 与 `POST /api/chapter.history.diff` 基于 LCS 算法返回段落级 `added`、`removed`、`unchanged` 对比；`POST /api/chapter.history.restore` 恢复 r8 时调用 `saveProseDraft` 在当前版本基础上自增生成新版本 r13（body=r8），并将 r13 追加落盘，r8~r12 历史版本永久保留；`VersionHistoryDrawer.tsx:41-160` 真实接入数据源，渲染版本列表、红绿段落级 Diff 对比高亮与恢复交互，恢复成功后提供新版本反馈。
+  - 本次改动：零产品代码变更，仅新增证据记录 `docs/changes/CHG-20261006-12-mobile-three-closures-verification.md` 并登记本条目。
+- **验收**：受影响范围测试 **10 个测试文件 65/65 passed | 2 skipped**（`mobileThreeClosures.routes.test.ts` 8 passed, `MobileThreeClosures.test.tsx` 7 passed, `src/mobile` 前端全套 4 文件 20 passed, `proseRoutes.test.ts` 16 passed, `pipelineRoutes` 4 文件 22 passed / 2 skipped 全部通过）；双端类型检查 `pnpm.cmd --filter @mozhou/web typecheck` exit 0 零错误；全项目构建 `pnpm.cmd build` exit 0 零错误；全仓 ESLint `pnpm.cmd lint` exit 0 零告警；GitNexus 依赖图谱 `check --cycles` clean / 0 环。**全量门禁实跑**：因编排脚本无扩展名 spawn 限制，子代理在本地以 `pnpm.cmd test` 完整实跑全量测试——`test:packages` 117 文件 1048 passed，`test:web` 147 文件通过/1 跳过（1086 passed / 14 skipped），全量合计 **264 文件通过 / 1 跳过 / 0 失败，2134 用例通过 / 14 跳过 / 0 失败，exit 0 全绿**。
+- **验证状态**：已执行（源码逐行核验、受影响测试 65/65 实跑通过、全量门禁 2134/2134 实跑通过、全构建 exit 0 通过、全类型检查与代码检查全绿）；未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-13 — 2026-10-06 — 动态工作流（图谱实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务——按缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）对模块 #9（`graph-connect`：partial）核实矩阵裁决并补齐缺口；设定图谱 drag-to-connect 拖拽连线手势交互与全链路验证，保留现有表单作为无障碍 fallback；证据见 [docs/changes/CHG-20261006-13-canon-graph-drag-to-connect.md](docs/changes/CHG-20261006-13-canon-graph-drag-to-connect.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；缺口核实结论属实（`CanonGraphView.tsx:56-95, 221-276` 原先仅支持点击实体节点卡片，顶部按钮只能与第一个非己实体打开弹窗，画布内缺失节点连线手柄、拖拽手势、临时虚线、悬停高亮、自连拒绝保护、重复连线检测、撤销操作支持以及键盘/触屏辅助路径）。
+- **目标行为**：实现图谱拖拽连线（Drag-to-Connect）交互体系：①SVG 节点增加专属 connection handle，准星光标，hover 放大反馈；②PointerDown 发起连线，移动时在画布渲染金色动态虚线（`temp-connection-line`）；③悬停合法目标节点显示高亮环；④Drop 释放时不直接建关系，自动打开 `CreateContractModal`，传递准确源与目标实体，由作者设定因果契约类型与内容后确认落盘；⑤Self-link 拒绝保护（拖回自身红线警告，释放明确拒绝并不开弹窗）；⑥Duplicate-link 重复连接提示；⑦Undo 撤销操作栈（支持撤销按钮与 Ctrl+Z/Cmd+Z）；⑧全链路 Pointer Events 触屏与 PointerCancel 安全退出；⑨键盘操作路径（handle/节点按 Enter 或 c 进入键盘连线模式）与无障碍目标下拉选择表单 Fallback（`aria-live="polite"` 读屏支持）。
+- **实际变更**：`apps/web/src/canon-graph/useCanonGraphData.ts` 导出 `removeLink` 供撤销栈消费；`apps/web/src/canon-graph/CanonGraphView.tsx` 完整重构并实现 connection handle、拖拽连线、高亮、自连拒绝、重复连接处理、撤销栈、触屏 Pointer 监听、键盘连线模式及无障碍 fallback；新增 `apps/web/src/canon-graph/CanonGraphView.dragConnect.test.tsx`（8 项测试全链路覆盖）；新增证据文档 `docs/changes/CHG-20261006-13-canon-graph-drag-to-connect.md`；登记本条目。
+- **验收**：受影响范围测试 **4 个测试文件 34/34 passed**（新建 `CanonGraphView.dragConnect.test.tsx` 8 passed, `storyBrainRoutes.contract.test.ts` 5 passed, `planeSeamMigration.test.ts` 14 passed, `WorkbenchView.test.tsx` 7 passed 全部通过）；双端类型检查 `pnpm.cmd --filter @mozhou/web typecheck` exit 0 零错误；全项目构建 `pnpm.cmd build`（`tsc -b`）exit 0 零错误；全仓 ESLint `pnpm.cmd lint` exit 0 零告警；GitNexus 依赖图谱 `check --cycles` clean / 0 环。**全量门禁实跑**：由子代理在本地以 `pnpm.cmd test` 完整实跑全量测试——`test:packages` 117 文件 1048 passed，`test:web` 148 文件通过/1 跳过（1094 passed / 14 skipped），全量合计 **265 文件通过 / 1 跳过 / 0 失败，2142 用例通过 / 14 跳过 / 0 失败，exit 0 全绿**。
+- **验证状态**：已执行（源码重构实现、受影响测试 34/34 实跑通过、全量门禁 2142/2142 实跑通过、全构建 exit 0 通过、全类型检查与代码检查全绿、GitNexus 依赖无环）；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-14 — 2026-10-06 — 动态工作流（桌面实现员），ZCode 执行
+
+- **需求来源**：动态工作流任务 —— 补齐唯一真源缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）模块 #5 `tauri`（missing）；实现双击桌面程序 → 自动选空闲端口 → 启动本地 Node 服务 → health check → 打开 WebView → 退出时终止服务 → 异常时显示本地诊断（绝不白屏）全生命周期闭环；证据见 [docs/changes/CHG-20261006-14-tauri-desktop-lifecycle.md](docs/changes/CHG-20261006-14-tauri-desktop-lifecycle.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；裁决核实属实（`src-tauri/src/main.rs:4-12` 仅 12 行空壳，无 Node 本地服务 sidecar 启动或生命周期托管，缺少 `build.rs` 与图标资源导致无法编译）；本机具备完整 Rust 1.96.0 + Cargo 1.96.0 + MSVC 工具链。
+- **目标行为**：实现 Tauri 2.0 桌面端完整服务生命周期闭环：①自动选择可用端口（优先 5173，备用 127.0.0.1:0 动态内核分配）；②本地 Node 服务启动（白名单路径与静态字面量防注入，Windows 无黑框）；③Windows Job Object 内核级守护（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）与优雅关闭握手（stdin 发送 `"shutdown\n"` + kill 兜底），杜绝孤儿进程；④原生 TCP 直连 `http://127.0.0.1:{port}/api/health` 存活探测与子进程早退感知；⑤本地诊断兜底页面（深色水墨美学、分配端口、数据根目录、实时控制台日志流、排查指引与复制/重试按钮，绝不白屏）；⑥Spec 冲突处置：实测原生桌面二进制体积 8.44 MB（完全优于 <15MB 规格指标），完整自带运行时包压缩后约 45MB，空闲 RAM 约 65~85MB，如实写回证据文档。
+- **实际变更**：新增 `src-tauri/src/server_manager.rs`（端口选择、服务启动、Job Object、健康检查、诊断 HTML 与生命周期管理）；新增 `src-tauri/build.rs` 与应用图标资源（`icons/` 32x32, 128x128 PNG 与 ICO）；更新 `src-tauri/src/main.rs` 串联 Tauri setup hook 导航与 exit 事件终止；更新 `src-tauri/Cargo.toml` 引入 `windows-sys` 平台依赖；新增前端与服务端契约测试 `apps/web/server/routes/desktopLifecycle.contract.test.ts`；更新 `eslint.config.js` 与 `.gitignore` 忽略 Rust target 产物；新增证据文档 `docs/changes/CHG-20261006-14-tauri-desktop-lifecycle.md`；登记本条目。
+- **验收**：Rust 单元测试 `cargo test` **7/7 passed**；真实原生 Release 二进制构建 `cargo build --release` 成功产出 `src-tauri/target/release/mozhou-desktop.exe`（**实测 8.44 MB**）；受影响 TypeScript 契约测试 `desktopLifecycle.contract.test.ts` **4/4 passed**；健康探针测试 `healthRoutes.test.ts` **4/4 passed**；双端类型检查 `pnpm.cmd --filter @mozhou/web typecheck` exit 0 零错误；全项目构建 `pnpm.cmd build`（`tsc -b`）exit 0 零错误；全仓 ESLint `pnpm.cmd lint` exit 0 零告警零错误；GitNexus 依赖图谱 `check --cycles` clean / 0 环。**全量门禁实跑**：由桌面实现员子代理在本地完整实跑 `pnpm.cmd test`（`test:packages` 117 文件 1048 passed + `test:web` 149 文件通过 / 1 跳过，1098 passed / 14 skipped），全量合计 **266 个测试文件通过 / 1 跳过 / 0 失败，2146 个用例通过 / 14 跳过 / 0 失败，exit 0 全绿**。
+- **验证状态**：已执行（Rust 单元测试 7/7 实跑通过、真实 Release 构建 8.44MB 实跑完成、TS 契约测试 4/4 实跑通过、全量门禁 2146/2146 实跑通过、全构建与双端类型检查与全仓代码检查全绿、GitNexus 依赖无环）；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-15 — 2026-10-06 — 动态工作流（长篇验收员），ZCode 执行
+
+- **需求来源**：动态工作流任务 —— 补齐唯一真源缺口矩阵（`docs/plans/2026-10-06-spec-gap-matrix.md`）模块 #11 `longform-e2e`（missing）与核验模块 #10 `genre-presets`（done）；建立真实 30+ 章跨卷连续生产（建书、生成、审查、定稿提交、卷压缩、后续卷长程召回、重启一致性、题材预设核验）端到端自动化验收流水线；杜绝以 fixture 冒充 E2E；证据见 [docs/changes/CHG-20261006-15-longform-e2e-acceptance.md](docs/changes/CHG-20261006-15-longform-e2e-acceptance.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；缺口核查结论属实（现有 50 章 benchmark 为 fixture+packet 断言，全仓无 30+ 章跨卷自动化验收流水线，记 `missing`；`genre-presets` 8 套预设与应用路由完整闭环且单测通过，记 `done`）；本机已配置自托管网关 `wb2api.exe`，挂载免费测试模型 `global:deepseek-v4.1-flash`（credits: x0.00，TTFT 实测 1468ms，具备零费用真实生成与语义提取条件）。
+- **目标行为**：实现 30+ 章跨卷长篇连续生产端到端自动化验收流水线（`scripts/verify-longform-e2e.mjs`）：①物理隔离与断点续跑：临时书稿与运行数据置于系统临时目录，零污染用户真实数据，每 5 章落盘检查点支持断点续跑；②31 章完整叙事与戏剧要素编织：两卷大纲（卷一 1-15 章、卷二 16-31 章），有意制造秘密产生（第3章）、承诺建立（第5章）、秘密对抗（第8章）、事实失效（第9章）、角色死亡（第12章）、正文回溯修改（第14章）、卷一收官与状态压缩（第15章）、跨卷新开与长程召回剪枝（第16章）、承诺兑现（第18章）、秘密反转（第22章）、卷二决战（第30章）与终章定鼎（第31章）；③单章全链路：真实模型生成 → 采纳 → 待决提案确认 → 定稿提交 → 事实/认知/承诺更新；④卷边界状态压缩事务（Compaction）：卷一完结触发 `markVolumeCompleted` 与 `executeVolumeCompaction`，大纲更新卷摘要、终态微事实回写 `compactedIntoVolumeId` 标记、Event Ledger 记 `VOLUME_COMPACTED`，第二卷长程召回排查过滤已折叠微事实；⑤应用重启一致性：服务重启后 31 章全量正文、版本、事实、飞轮与压缩状态完全一致；⑥题材预设核验：`/api/genre-kit.apply` 注入预设且二度调用严格幂等；⑦输出机械可核对的 `journey-ledger.md`（31 行台账）及结构化证据文件。
+- **实际变更**：新增 `scripts/verify-longform-e2e.mjs` 自动化验收流水线脚本；优化 `apps/web/server/llm/openaiStream.ts` 在私有网络模型模式下携带 `thinking: { type: 'disabled' }, enable_thinking: false` 提升生成速度；修复 `scripts/verify-real-model-journey.mjs` 本地建章后释放命名管道写锁避免服务冲突；新增证据记录 `docs/changes/CHG-20261006-15-longform-e2e-acceptance.md`；落盘验收产物于 `evidence/longform-journey/2026-10-06T13-48-19-681Z/`；登记本条目。
+- **验收**：流水线脚本全量实跑 **31/31 章全绿 PASS**；真实模型首包延迟 1468ms，零付费额度消耗；卷状态压缩事务成功执行（卷摘要落地、折叠标记回写、审计事件落盘）；服务重启一致性校验 **PASS (完全一致)**；题材预设应用核验 **PASS (首度5写入，二度0写入严格幂等)**；受影响范围单元测试（`genre-kits.test.ts`, `compaction.test.ts` (kernel/data-plane)）**3 测试文件 21/21 passed**；真实单章模型旅程 `verify-real-model-journey.mjs` 实跑 **RESULT: VERIFIED**；服务端类型检查 `tsc -p tsconfig.server.json --noEmit` exit 0 零错误；GitNexus 依赖图谱 `check --cycles` clean / 0 环；31 行机械可核对长篇台账 `journey-ledger.md` 与结构化证据已完整留档。
+- **验证状态**：已执行（31 章长篇端到端验收全量实跑通过、受影响测试 21/21 实跑通过、真实模型旅程通过、重启一致性与预设核验通过、全量门禁实跑 pnpm.cmd test 266 文件通过/1 跳过/0 失败，2146 用例通过/14 跳过/0 失败，exit 0 全绿、图谱无环）；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+### CHG-20261006-16 — 2026-10-06 — 动态工作流（终门禁复核员），ZCode 执行
+
+- **需求来源**：动态工作流任务 —— 独立终门禁复核；核实工作区实际改动面、GitNexus 依赖图谱与循环依赖检查；抽查各阶段证据文件真实存在且关键断言可复核；输出最终交付报告；证据见 [docs/changes/CHG-20261006-16-final-release-gate-verification.md](docs/changes/CHG-20261006-16-final-release-gate-verification.md) 与 [docs/plans/2026-10-06-final-release-gate-report.md](docs/plans/2026-10-06-final-release-gate-report.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `40cd257`；工作区含用户在制工作；GitNexus 依赖图谱索引正常。
+- **目标行为**：①执行 GitNexus `detect_changes` 确认工作区变更边界（55 变更符号、48 变更文件、560 受影响节点，属前序在制批次积累），执行 `check` 确认依赖图谱 clean 且 cycleCount=0；②逐一抽查并实读各阶段证据文件（CHG-20261006-09 至 15 及 31 章 E2E 证据目录），确认断言真实可信；③独立抽测最新改动契约测试（`CanonGraphView.dragConnect.test.tsx` + `desktopLifecycle.contract.test.ts`，12/12 passed）；④形成全要素最终交付报告并准确列出未验证维度与已知风险。
+- **实际变更**：新增证据文档 `docs/changes/CHG-20261006-16-final-release-gate-verification.md`；新增交付报告 `docs/plans/2026-10-06-final-release-gate-report.md`；登记本条目。
+- **验收**：GitNexus `check --cycles` clean / 0 环；受影响抽测测试 **2 测试文件 12/12 passed**；各阶段证据文件全部实读核验确认；交付报告与证据记录完整闭环。
+- **验证状态**：已执行（GitNexus 图谱门禁实跑通过、证据链逐项实读核查通过、受影响抽样测试 12/12 实跑通过、最终交付报告已写入）；严格遵守红线，未执行任何 git commit/push/reset 操作。
+
+
+
+
+
+
+
+
+
+
+
