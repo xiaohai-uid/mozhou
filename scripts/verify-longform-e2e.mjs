@@ -39,7 +39,6 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -52,21 +51,17 @@ const repoRoot = resolve(__dirname, '..')
 
 // 动态载入内部包
 const {
-  LocalDataPlane,
   createBook,
   readBookRecord,
   markVolumeCompleted,
   executeVolumeCompaction,
-  findVolumeOutline,
   readProseChapter,
   proseChapterPath,
-  saveProseDraft,
 } = await import(new URL('../packages/data-plane/dist/index.js', import.meta.url).href)
 
 const {
   newVolumeNodeId,
   newFactId,
-  validateVolumeSummary,
 } = await import(new URL('../packages/kernel/dist/index.js', import.meta.url).href)
 
 // CLI 参数
@@ -450,7 +445,9 @@ async function streamDraft(path, body) {
   if (buffered.trim()) {
     try {
       frames.push(JSON.parse(buffered.trim()))
-    } catch {}
+    } catch {
+      // 末帧不完整时丢弃，不影响已解析帧
+    }
   }
   return frames
 }
@@ -465,7 +462,9 @@ async function waitForServer(timeoutMs = 30000) {
         body: '{}',
       })
       if (res.ok) return
-    } catch {}
+    } catch {
+      // 服务尚未就绪，按重试节奏继续探测
+    }
     await new Promise((r) => setTimeout(r, 400))
   }
   throw new Error('Server did not become ready in time')
@@ -694,7 +693,6 @@ async function main() {
       })
 
       const startFrame = draftFrames.find((f) => f.event === 'start')
-      const doneFrame = draftFrames.find((f) => f.event === 'done')
       const errorFrame = draftFrames.find((f) => f.event === 'error')
       if (errorFrame) {
         throw new Error(`第 ${i} 章生成遇到流内错误: ${JSON.stringify(errorFrame)}`)
@@ -1043,7 +1041,9 @@ async function main() {
   } finally {
     try {
       serverProcess.kill('SIGTERM')
-    } catch {}
+    } catch {
+      // 进程可能已自行退出，忽略
+    }
     flushLog()
   }
 }
