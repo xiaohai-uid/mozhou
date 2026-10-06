@@ -8,6 +8,7 @@ import { ApiRouter } from './router.js'
 import { healthRoutes } from './routes/healthRoutes.js'
 import { storyBrainRoutes } from './routes/storyBrainRoutes.js'
 import { pipelineRoutes } from './routes/pipelineRoutes.js'
+import { proseEditRoutes } from './routes/proseEditRoutes.js'
 import { worksRoutes } from './routes/worksRoutes.js'
 import { proseRoutes } from './routes/proseRoutes.js'
 import { truthfulPreviewRoutes } from './routes/truthfulPreviewRoutes.js'
@@ -24,6 +25,7 @@ import { exportRoutes } from './routes/exportRoutes.js'
 import { memoRoutes } from './routes/memoRoutes.js'
 import { taskStreamRoutes } from './routes/taskStreamRoutes.js'
 import { namingRoutes } from './routes/namingRoutes.js'
+import { flywheelRoutes } from './routes/flywheelRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -608,6 +610,8 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(healthRoutes)
     .use(storyBrainRoutes)
     .use(pipelineRoutes)
+    // CHG-20261006-02：行内选区 AI 编辑流（book 作用域，只产候选不写盘）
+    .use(proseEditRoutes)
     .use(worksRoutes)
     .use(proseRoutes)
     .use(truthfulPreviewRoutes)
@@ -624,6 +628,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(memoRoutes)
     .use(taskStreamRoutes)
     .use(namingRoutes)
+    .use(flywheelRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

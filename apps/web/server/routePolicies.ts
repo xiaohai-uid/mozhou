@@ -112,6 +112,15 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/session.advance': 'book',
   '/api/session.abandon': 'book',
   '/api/draft.stream': 'book',
+  // CHG-20261006-02：行内选区 AI 编辑流（与 draft.stream 同级 book 作用域、同样鉴权；只产候选流不写盘）
+  '/api/prose.edit.stream': 'book',
+  '/api/prose.edit.decision': 'book',
+  // CHG-20261006-06：策略飞轮与模型评估端点（book 作用域、同样鉴权）
+  '/api/flywheel.preference': 'book',
+  '/api/flywheel.preference.rebuild': 'book',
+  '/api/flywheel.suggestions': 'book',
+  '/api/flywheel.evaluator.status': 'book',
+  '/api/flywheel.evaluator.run': 'book',
   '/api/draft.candidate': 'book',
   '/api/draft.cancel': 'book',
   '/api/draft.accept': 'book',
@@ -120,6 +129,11 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/chapter.rework': 'book',
   '/api/chapter.corrections': 'book',
   '/api/chapter.quality': 'book',
+  // CHG-20261006-07 移动端三闭环端点（张力时序与时光机历史/恢复/对比）
+  '/api/chapter.tension': 'book',
+  '/api/chapter.history': 'book',
+  '/api/chapter.history.diff': 'book',
+  '/api/chapter.history.restore': 'book',
   // 步 8 提案队列确认面（S6）：ProposalPort 逐条 confirm/reject/editAccept
   '/api/proposal.list': 'book',
   '/api/proposal.decide': 'book',
