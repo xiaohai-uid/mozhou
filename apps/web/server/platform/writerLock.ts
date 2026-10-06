@@ -138,9 +138,9 @@ function defaultDriveTypeProbe(driveLetter: string): string | null {
   }
   let output: string | null = null
   try {
-    const fsutil = process.env['SystemRoot'] ? `${process.env['SystemRoot']}\\System32\\fsutil.exe` : 'fsutil'
-    // 不指定 encoding：拿原始字节，再按多种代码页解码（见 decodeConsoleText）
-    const raw = execFileSync(fsutil, ['fsinfo', 'drivetype', driveLetter], { timeout: 5000, windowsHide: true })
+    // 程序名保持字面量：不从 SystemRoot 等环境变量拼可执行文件路径——那等于把「跑哪个程序」
+    // 的决定权交给环境。Windows 上 fsutil 位于 System32，系统 PATH 必然包含它。
+    const raw = execFileSync('fsutil', ['fsinfo', 'drivetype', driveLetter], { timeout: 5000, windowsHide: true })
     output = decodeConsoleText(raw)
   } catch {
     output = null

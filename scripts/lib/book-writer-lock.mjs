@@ -81,9 +81,8 @@ export function probeDriveType(driveLetter) {
   if (cached !== undefined) return cached
   let output = null
   try {
-    const fsutil = process.env.SystemRoot ? process.env.SystemRoot + '\\System32\\fsutil.exe' : 'fsutil'
-    // 不指定 encoding：拿原始字节，再按多种代码页解码（fsutil 输出是控制台 OEM 代码页）
-    const raw = execFileSync(fsutil, ['fsinfo', 'drivetype', driveLetter], { timeout: 5000, windowsHide: true })
+    // 程序名保持字面量（与 TS 侧同口径）：不拼环境变量里的可执行文件路径。
+    const raw = execFileSync('fsutil', ['fsinfo', 'drivetype', driveLetter], { timeout: 5000, windowsHide: true })
     output = decodeConsoleText(raw)
   } catch {
     output = null

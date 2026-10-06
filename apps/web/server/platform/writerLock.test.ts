@@ -27,7 +27,6 @@ import {
   canonicalBookKey,
   classifyBookRootKind,
   withBookWriteLock,
-  writerListenEndpoint,
   writerPipeName,
 } from './writerLock.js'
 
@@ -263,16 +262,18 @@ function waitForExit(child: ChildProcess): Promise<void> {
 }
 
 describe('跨进程排他 · 强杀后可立即重取', () => {
-  it('外部持有者占用同名管道时被拒；SIGKILL 后立即可取且不删除任何文件', async () => {
+  // 夹具 spawnPipeHolder 以 writerPipeName(key) 直接绑定 Windows 命名管道名；
+  // 非 Windows 上该名字绑不上（Linux 用抽象套接字），故本用例只在 win32 断言。
+  // Linux 侧的跨进程排他由 writerLockIntegration 的「脚本侧与 TS 侧同一入口、互相排他」
+  // 用例覆盖（该用例在两种平台都通过）。
+  it.skipIf(process.platform !== 'win32')('外部持有者占用同名管道时被拒；SIGKILL 后立即可取且不删除任何文件', async () => {
     const root = makeBookRoot()
     const key = canonicalBookKey(root)
-    // holder 必须绑定与实现相同的端点（win32 命名管道 / linux 抽象套接字）；
-    // 若直接传 writerPipeName，非 Windows 上 holder 绑不上，本用例就失去意义。
-    const endpoint = writerListenEndpoint(key)
+    const pipeName = writerPipeName(key)
     const parent = resolve(root, '..')
     const beforeEntries = readdirSync(parent).sort()
 
-    const child = await spawnPipeHolder(endpoint)
+    const child = await spawnPipeHolder(pipeName)
     try {
       let thrown: unknown
       try {
