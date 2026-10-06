@@ -12,13 +12,13 @@ import { DesktopToolModals, type DesktopModalType } from '../shell/DesktopToolMo
 import type { BookInfo } from '../shell/workbenchStorage'
 import type { WorksChapterSummary } from '../../shared/api'
 import { WhyThisWritingButton } from '../context-receipt/WhyThisWritingButton'
-
+import { PreferenceProfilePanel } from './PreferenceProfilePanel'
+import { ModelRoutingSuggestionsPanel } from './ModelRoutingSuggestionsPanel'
 interface BookCreated {
   ok: true
   root: string
   bookId: string
 }
-
 interface LedgerRow {
   kind: string
   event?: { type?: string; taskRef?: string }
@@ -313,6 +313,19 @@ export function WorkbenchView({
                 )}
               </section>
             </div>
+              </details>
+            )}
+
+            {book !== null && (
+              <details className="card-shell studio-flywheel" style={{ marginTop: 24, cursor: 'pointer' }} data-testid="studio-flywheel-details">
+                <summary style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-faint)', outline: 'none', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>策略飞轮与模型评估 (Author Preference & Model Routing)</span>
+                  <span style={{ fontSize: 10 }}>展开 ▾</span>
+                </summary>
+                <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <PreferenceProfilePanel book={book} />
+                  <ModelRoutingSuggestionsPanel book={book} />
+                </div>
               </details>
             )}
             </div>
