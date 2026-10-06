@@ -206,5 +206,9 @@ export function useCanonGraphData(bookRoot?: string | null) {
     setLinks((prev) => [...prev, newLink]);
   };
 
-  return { nodes, links, isLive, isDemo, isEmpty, addLink, reload };
+  const removeLink = (predicate: (link: GraphLink) => boolean) => {
+    setLinks((prev) => prev.filter((l) => !predicate(l)));
+  };
+
+  return { nodes, links, isLive, isDemo, isEmpty, addLink, removeLink, reload };
 }
