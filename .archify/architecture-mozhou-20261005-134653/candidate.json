@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "墨舟 MoZhou 架构总览",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-mozhou-20261005-134653/mozhou.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/xiaohai-uid/mozhou.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b13b6b2db328a3c6658e8b3556fbbed3a1b63061"
+    },
+    "views": [
+      { "id": "journey", "label": "主旅程", "focus": ["author", "ui", "gateway", "pipeline", "llmgw", "llm"], "note": "从开窗到十步管线与模型生成的请求路径" },
+      { "id": "data", "label": "数据与对账", "focus": ["pipeline", "ledger", "recon", "bookaccess"], "note": "落盘、账本重放与外部修改检出" },
+      { "id": "biz", "label": "商业化", "focus": ["gateway", "billing", "pay", "llmgw"], "note": "权益门禁、定价目录与支付回调" },
+      { "id": "deploy", "label": "部署形态", "focus": ["ops", "gateway", "ui"], "note": "launcher / Docker / systemd；Tauri 桌面壳后端链未验证" }
+    ]
+  },
+  "components": [
+    { "id": "author", "type": "external", "label": "作者", "sublabel": "浏览器 / 桌面窗口", "pos": [40, 320], "size": [120, 60] },
+    {
+      "id": "ui", "type": "frontend", "label": "工作台前端", "sublabel": "React 18 · Ink Orbit 壳",
+      "pos": [230, 320], "size": [150, 64],
+      "sources": [
+        { "path": "apps/web/src/App.tsx", "line": 2, "label": "工作台壳" },
+        { "path": "apps/web/src/App.tsx", "line": 165, "label": "视图路由" },
+        { "path": "apps/web/src/api/client.ts", "line": 35, "label": "ApiClient" }
+      ]
+    },
+    {
+      "id": "gateway", "type": "backend", "label": "BFF 网关 ApiRouter", "sublabel": "19 组领域路由·策略白名单",
+      "pos": [490, 320], "size": [170, 64],
+      "sources": [
+        { "path": "apps/web/server/router.ts", "line": 57, "end_line": 66, "label": "策略白名单" },
+        { "path": "apps/web/server/router.ts", "line": 99, "end_line": 145, "label": "会话与书租户" },
+        { "path": "apps/web/server/api.ts", "line": 605, "end_line": 628, "label": "路由装配" }
+      ]
+    },
+    {
+      "id": "pipeline", "type": "backend", "label": "章节生产管线", "sublabel": "十步会话·全局单飞",
+      "pos": [750, 320], "size": [180, 64],
+      "sources": [
+        { "path": "apps/web/server/routes/pipelineRoutes.ts", "line": 400, "end_line": 436, "label": "session.open/advance" },
+        { "path": "packages/pipeline/src/steps.ts", "line": 10, "end_line": 25, "label": "十步词表" }
+      ]
+    },
+    {
+      "id": "llmgw", "type": "backend", "label": "生成端点解析", "sublabel": "registry→BYOK·宁败不猜",
+      "pos": [1020, 320], "size": [170, 64],
+      "sources": [
+        { "path": "apps/web/server/llm/generationTarget.ts", "line": 9, "end_line": 27, "label": "三层解析序" },
+        { "path": "apps/web/server/llm/tierRouting.ts", "line": 4, "end_line": 24, "label": "端点身份=providerId" },
+        { "path": "packages/runtime/src/engine.ts", "line": 1, "end_line": 8, "label": "RuntimeEngine" }
+      ]
+    },
+    {
+      "id": "llm", "type": "cloud", "label": "OpenAI 兼容模型", "sublabel": "DeepSeek 默认·SSRF 门禁", "tag": "未实跑验证",
+      "pos": [1280, 320], "size": [150, 60],
+      "sources": [
+        { "path": "apps/web/server/llm/openaiStream.ts", "line": 88, "end_line": 131, "label": "SSRF 阻断" },
+        { "path": "apps/web/server/llm/openaiStream.ts", "line": 200, "end_line": 206, "label": "流式调用" }
+      ]
+    },
+    {
+      "id": "compiler", "type": "backend", "label": "上下文装配", "sublabel": "两阶段预算·收据可重放",
+      "pos": [750, 140], "size": [180, 64],
+      "sources": [
+        { "path": "packages/context-compiler/src/assemble.ts", "line": 1, "end_line": 25, "label": "预算装配" }
+      ]
+    },
+    {
+      "id": "byok", "type": "security", "label": "BYOK 凭据仓储", "sublabel": "MOZHOU_SECRET_KEY 加密",
+      "pos": [1020, 140], "size": [170, 64],
+      "sources": [
+        { "path": "apps/web/server/llm/providerSettings.ts", "line": 76, "end_line": 93, "label": "主密钥解析" },
+        { "path": "apps/web/server/llm/providerSettings.ts", "line": 111, "end_line": 128, "label": "缺钥拒启·加密" },
+        { "path": "apps/web/server/llm/providerSettings.ts", "line": 148, "label": "密钥脱敏" }
+      ]
+    },
+    {
+      "id": "bookaccess", "type": "security", "label": "书访问控制", "sublabel": "进程锁·沙箱·每书队列",
+      "pos": [460, 510], "size": [170, 64],
+      "sources": [
+        { "path": "apps/web/server/bookAccess.ts", "line": 1, "end_line": 9, "label": "T09 规格" },
+        { "path": "apps/web/server/bookAccess.ts", "line": 110, "end_line": 118, "label": "进程锁" },
+        { "path": "apps/web/server/bookAccess.ts", "line": 221, "label": "每书队列" }
+      ]
+    },
+    {
+      "id": "billing", "type": "backend", "label": "计费与权益", "sublabel": "目录唯一真源·能力门禁",
+      "pos": [640, 510], "size": [170, 64],
+      "sources": [
+        { "path": "apps/web/server/billing/catalog.ts", "line": 2, "end_line": 9, "label": "定价冻结" },
+        { "path": "apps/web/server/billing/entitlements.ts", "line": 18, "end_line": 30, "label": "权益映射" }
+      ]
+    },
+    {
+      "id": "recon", "type": "backend", "label": "对账宿主", "sublabel": "外部改动 watcher·五态",
+      "pos": [1020, 510], "size": [170, 64],
+      "sources": [
+        { "path": "apps/web/server/routes/reconciliationRoutes.ts", "line": 1, "end_line": 25, "label": "T5 接线" },
+        { "path": "apps/web/server/routes/reconciliationRoutes.ts", "line": 77, "end_line": 96, "label": "常驻宿主" }
+      ]
+    },
+    {
+      "id": "ledger", "type": "database", "label": "双平面数据根", "sublabel": "书稿·账本·收据·导出",
+      "pos": [750, 680], "size": [180, 64],
+      "sources": [
+        { "path": "apps/web/server/dataRoot.ts", "line": 17, "end_line": 27, "label": "MOZHOU_DATA_ROOT" },
+        { "path": "packages/data-plane/src/index.ts", "line": 14, "end_line": 26, "label": "落盘与导出模块" },
+        { "path": "docker-compose.yml", "line": 19, "end_line": 31, "label": "容器 /data 卷" }
+      ]
+    },
+    {
+      "id": "pay", "type": "external", "label": "支付平台", "sublabel": "支付宝 / 微信异步回调", "tag": "未实测",
+      "pos": [440, 680], "size": [170, 60],
+      "sources": [
+        { "path": "apps/web/server/routes/billingRoutes.ts", "line": 7, "end_line": 8, "label": "验签边界" },
+        { "path": "apps/web/server/routes/billingRoutes.ts", "line": 105, "end_line": 124, "label": "回调端点" }
+      ]
+    },
+    {
+      "id": "ops", "type": "cloud", "label": "进程宿主与部署", "sublabel": "5173·密钥必检·单实例锁",
+      "pos": [40, 140], "size": [170, 64],
+      "sources": [
+        { "path": "scripts/launcher.mjs", "line": 14, "end_line": 18, "label": "launcher 入口" },
+        { "path": "apps/web/server/productionServer.ts", "line": 25, "end_line": 41, "label": "端口·密钥·锁" },
+        { "path": "deploy/mozhou.service", "line": 10, "end_line": 18, "label": "systemd 托管" }
+      ]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "墨舟 Node.js 生产进程", "wraps": ["gateway", "pipeline", "llmgw", "compiler", "byok", "bookaccess", "billing", "recon"] }
+  ],
+  "connections": [
+    { "id": "author-to-ui", "from": "author", "to": "ui", "label": "使用", "variant": "emphasis" },
+    { "id": "ui-to-gateway", "from": "ui", "to": "gateway", "label": "POST /api/*" },
+    { "id": "gateway-to-pipeline", "from": "gateway", "to": "pipeline", "label": "路由分发" },
+    { "id": "pipeline-to-llmgw", "from": "pipeline", "to": "llmgw", "label": "生成调用" },
+    { "id": "llmgw-to-llm", "from": "llmgw", "to": "llm", "label": "SSE 流式" },
+    { "id": "llmgw-to-byok", "from": "llmgw", "to": "byok", "label": "解密取密钥", "fromSide": "top", "toSide": "bottom" },
+    { "id": "pipeline-to-compiler", "from": "pipeline", "to": "compiler", "label": "装配调用", "fromSide": "top", "toSide": "bottom" },
+    { "id": "gateway-to-bookaccess", "from": "gateway", "to": "bookaccess", "label": "租户校验·锁", "fromSide": "bottom", "toSide": "top" },
+    { "id": "gateway-to-billing", "from": "gateway", "to": "billing", "label": "能力权益门禁", "fromSide": "bottom", "toSide": "top" },
+    { "id": "pipeline-to-ledger", "from": "pipeline", "to": "ledger", "label": "十步账本·候选 CAS 落盘", "fromSide": "bottom", "toSide": "top" },
+    { "id": "recon-to-ledger", "from": "recon", "to": "ledger", "label": "改动检出", "fromSide": "bottom", "toSide": "top" },
+    { "id": "pay-to-billing", "from": "pay", "to": "billing", "label": "支付回调", "fromSide": "top", "toSide": "bottom" },
+    { "id": "ops-to-gateway", "from": "ops", "to": "gateway", "label": "构建·启动", "variant": "dashed", "fromSide": "right", "toSide": "top" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "主旅程 · 十步管线",
+      "items": [
+        "session.open 开窗 → session.advance 逐步推进；全局单飞，同书同时最多一个活动会话",
+        "十步：prepare→compile→draft→review→user_edit→final_extract→continuity_gate→canon_proposal→commit→flywheel_record",
+        "草稿先写候选区，Accept 以 CAS+意图日志受控落盘；生成经 RuntimeEngine，超时触发 fallback 链"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "数据与对账",
+      "items": [
+        "数据根 MOZHOU_DATA_ROOT（默认 .mozhou_data；容器钉 /data 卷，缺 MOZHOU_SECRET_KEY 拒绝启动）",
+        "Ledger 十步事件可重放：当前步随时由投影恢复；外部修改（如 Obsidian 并行编辑）由启动必检+首次访问 watcher 检出",
+        "对账五态提案逐条取舍；落定后向下游章传播 stale 标记"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "商业化",
+      "items": [
+        "定价唯一真源 catalog：Pro ¥19.9/月 · Max ¥39/月（CNY，客户端不可改价）",
+        "基础能力（建书/阅读/手写/导出/备份）永不锁死；高级能力服务端实时核验权益",
+        "托管模型额度 sellable=false——单次成本未实测前禁止销售"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "未验证 · 诚实边界",
+      "items": [
+        "Tauri 桌面壳仅装载 web 产物（frontendDist=../apps/web/dist），main.rs 未含拉起 Node 后端的 sidecar——桌面后端启动链未验证",
+        "LLM 流式生成、支付回调、对账 watcher 均为静态代码证据，本任务未实跑验证",
+        "图证钉在提交 b13b6b2（自 90b45a1 起并行落库 14 个提交）；更晚的提交未入图"
+      ]
+    }
+  ]
+}

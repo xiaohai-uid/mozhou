@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261005-173151\\candidate.json",
+    "sha256": "8b5b232615058fcabdb908e9c6474022daab14dd5cad6adf4b354fc076b2413f",
+    "bytes": 15348
+  },
+  "artifact": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261005-173151\\mozhou.html",
+    "sha256": "8443d014643143870a3e1f7fe66f11a12476ad10661e19fb0f0a08f5dcdc8c81",
+    "bytes": 791313
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261005-173151\\mozhou.finalize.json",
+    "summaryReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261005-173151\\mozhou.finalize-summary.json",
+    "browserCheckReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261005-173151\\mozhou.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-05T05:50:40.473Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2121,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 2,
+      "routesOverSuggestedBends": 3,
+      "routesOverSuggestedStretch": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "gateway-to-billing",
+            "from": "api_gateway",
+            "to": "billing_entitlements",
+            "label": "能力权限裁决",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "right": {
+            "id": "pipeline-to-kernel",
+            "from": "pipeline_engine",
+            "to": "story_kernel",
+            "label": "十步事实提取与校验",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "point": [
+            724.2000000000003,
+            522
+          ]
+        },
+        {
+          "left": {
+            "id": "pipeline-to-kernel",
+            "from": "pipeline_engine",
+            "to": "story_kernel",
+            "label": "十步事实提取与校验",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "right": {
+            "id": "pay-to-billing",
+            "from": "pay_channel",
+            "to": "billing_entitlements",
+            "label": "异步通知验签",
+            "collectionIndex": 13,
+            "artifactIndex": 14
+          },
+          "point": [
+            737,
+            646
+          ]
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "id": "gateway-to-billing",
+            "from": "api_gateway",
+            "to": "billing_entitlements",
+            "label": "能力权限裁决",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "bends": 3,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "id": "pipeline-to-kernel",
+            "from": "pipeline_engine",
+            "to": "story_kernel",
+            "label": "十步事实提取与校验",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "bends": 4,
+          "stretch": 1.749,
+          "directCorridorBlockers": [
+            {
+              "id": "billing_entitlements",
+              "label": "计费与权益门禁",
+              "box": [
+                740,
+                490,
+                190,
+                64
+              ]
+            }
+          ]
+        },
+        {
+          "relationship": {
+            "id": "pay-to-billing",
+            "from": "pay_channel",
+            "to": "billing_entitlements",
+            "label": "异步通知验签",
+            "collectionIndex": 13,
+            "artifactIndex": 14
+          },
+          "bends": 3,
+          "stretch": 1
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "api_gateway → billing_entitlements crosses pipeline_engine → story_kernel: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "pipeline_engine → story_kernel crosses pay_channel → billing_entitlements: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "api_gateway → billing_entitlements needs 3 bends: move node api_gateway or billing_entitlements so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "pay_channel → billing_entitlements needs 3 bends: move node pay_channel or billing_entitlements so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}
