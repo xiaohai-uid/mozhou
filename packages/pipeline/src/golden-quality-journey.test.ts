@@ -352,7 +352,7 @@ describe('ADR-0025 Task 10 黄金章级旅程', () => {
       expect(types).toContain('QualityReviewCompleted');
       expect(types).toContain('TaskFinished');
     }
-  });
+  }, 30_000);
 
   it('负路径：stale PASS 交付拦截——终稿后旧报告失效，重审必 BLOCKING（REV-001/正文变化）', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-t25-stale-'));

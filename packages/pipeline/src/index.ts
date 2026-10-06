@@ -146,14 +146,24 @@ export type {
  * 版本绑定 QualityReviewReport（报告落 .mozhou/quality-reviews/，非 Canon）。
  * 事件落账与回炉决策由编排者经 ChapterProductionSession 显式驱动。
  */
-export { NoCompiledReceiptAnchorError, executeChapterReview, loadDraftForReview, runReviewStep } from './review-step.js';
+export {
+  ChapterReviewCancelledError,
+  ChapterReviewTimeoutError,
+  NoCompiledReceiptAnchorError,
+  defaultReviewCapabilityExecutor,
+  executeChapterReview,
+  loadDraftForReview,
+  runReviewStep,
+} from './review-step.js';
 export type {
   ExecuteChapterReviewOutcome,
   ExecuteChapterReviewRequest,
   MechanicalReviewInput,
+  ReviewCapabilityExecutor,
   ReviewStepOutcome,
   RunReviewStepRequest,
 } from './review-step.js';
+export * from './reviewCapability.schema.js';
 
 /** Compile 步衔接：复用 compile() 缝；stale 警告继续+Receipt 留痕；receiptId 续跑；
  *  依赖钉版产出（D06）：编译入包实体钉版暂存于 .mozhou/dependency-manifests/，提交侧回读。 */

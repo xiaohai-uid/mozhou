@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./reviewCapability.schema": {
+      "types": "./dist/reviewCapability.schema.d.ts",
+      "default": "./dist/reviewCapability.schema.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

@@ -27,6 +27,8 @@ import {
   AcceptConflictError,
   CandidateError,
   ChapterProductionSession,
+  ChapterReviewCancelledError,
+  ChapterReviewTimeoutError,
   ProposalPort,
   ProposalPortError,
   acceptDraft,
@@ -50,7 +52,11 @@ import {
   hashProse,
   queryChapterQualityStatus,
   type CorrectionReason,
+  type QualityEvidence,
   type QualityPolicy,
+  type QualityRuleEvaluation,
+  type SemanticQualityEvaluator,
+  type SemanticQualityEvaluatorInput,
 } from '@mozhou/quality-engine'
 import { resolveCompiledAnchor } from '../compiledAnchor.js'
 import {
@@ -66,7 +72,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PublishBus, RuntimeEngine, createDraftRecipe, toProviderOverride } from '@mozhou/runtime'
 import type { CapabilityRecipe } from '@mozhou/runtime'
-import { streamOpenAiChat } from '../llm/openaiStream.js'
+import { streamOpenAiChat, type ResolvedEndpoint } from '../llm/openaiStream.js'
 import { DRAFT_TASK_TYPE, tierRouteTraceLine } from '../llm/tierRouting.js'
 import { resolveGenerationTarget } from '../llm/generationTarget.js'
 import type { GenerationUnavailableReason } from '../llm/generationTarget.js'
@@ -836,6 +842,127 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     return true
   }
 
+function extractReviewJsonObject(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start === -1) return null
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) return text.slice(start, index + 1)
+    }
+  }
+  return null
+}
+
+function createReviewSemanticEvaluator(
+  endpoint: ResolvedEndpoint,
+  signal?: AbortSignal,
+): SemanticQualityEvaluator {
+  return {
+    async evaluate(input: SemanticQualityEvaluatorInput): Promise<readonly QualityRuleEvaluation[]> {
+      if (input.rules.length === 0) return []
+
+      const systemPrompt = [
+        '你是资深中文小说审读专家。请严格依照文学质量审查规则，对章节草稿正文进行专业客观的审查。',
+        '对每条规则，给出 verdict (pass | fail | na)。',
+        '如果判定为 fail，必须给出具体说明 note，并在正文中找出对应证据摘录 excerpt 与位置 location (start 和 end 字符偏移量)。',
+        '如果判定为 pass，给出判断依据 note。',
+        '必须只输出纯 JSON 对象，格式如下：',
+        '{"evaluations": [{"ruleId": "...", "verdict": "pass" | "fail" | "na", "note": "...", "excerpt": "...", "location": {"start": 0, "end": 10}}]}',
+      ].join('\n')
+
+      const userPayload = {
+        rules: input.rules.map((r) => ({
+          id: r.id,
+          version: r.version,
+          severity: r.severity,
+          description: r.description,
+          evidenceRequired: r.evidenceRequired,
+        })),
+        failurePatterns: input.projectFailurePatterns,
+        prose: input.prose,
+      }
+      const userPrompt = JSON.stringify(userPayload)
+
+      let reply = ''
+      for await (const chunk of streamOpenAiChat(endpoint, userPrompt, systemPrompt, signal)) {
+        reply += chunk.delta
+      }
+
+      const jsonStr = extractReviewJsonObject(reply)
+      if (!jsonStr) {
+        throw new Error('语义审查提供方未返回有效 JSON 对象')
+      }
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(jsonStr)
+      } catch (err) {
+        throw new Error('语义审查提供方返回的 JSON 无法解析: ' + (err instanceof Error ? err.message : String(err)))
+      }
+      const record = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null
+      const rawEvals = record?.['evaluations']
+      if (!Array.isArray(rawEvals)) {
+        throw new Error('语义审查提供方返回格式非法：缺少 evaluations 数组')
+      }
+
+      const ruleMap = new Map(input.rules.map((r) => [r.id, r]))
+      const evaluations: QualityRuleEvaluation[] = []
+      for (const item of rawEvals) {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) continue
+        const itemObj = item as Record<string, unknown>
+        const ruleId = typeof itemObj['ruleId'] === 'string' ? itemObj['ruleId'] : ''
+        if (!ruleId || !ruleMap.has(ruleId)) continue
+        const rule = ruleMap.get(ruleId)!
+        const rawVerdict = itemObj['verdict']
+        const verdict: QualityRuleEvaluation['verdict'] =
+          rawVerdict === 'pass' || rawVerdict === 'fail' || rawVerdict === 'na' ? rawVerdict : 'unknown'
+        const note = typeof itemObj['note'] === 'string' && itemObj['note'].trim().length > 0
+          ? itemObj['note'].trim()
+          : (verdict === 'pass' ? '经语义模型审读未发现违例' : '未提供违例说明')
+        const excerpt = typeof itemObj['excerpt'] === 'string' ? itemObj['excerpt'] : undefined
+        const rawLoc = itemObj['location'] as { start?: unknown; end?: unknown } | undefined
+        const location =
+          rawLoc && typeof rawLoc.start === 'number' && typeof rawLoc.end === 'number'
+            ? { start: rawLoc.start, end: rawLoc.end }
+            : undefined
+
+        const evidence: QualityEvidence[] = []
+        if (verdict === 'fail' || excerpt !== undefined) {
+          evidence.push({
+            ruleId: rule.id,
+            note,
+            ...(excerpt !== undefined ? { excerpt } : {}),
+            ...(location !== undefined ? { location } : {}),
+          })
+        }
+
+        evaluations.push({
+          ruleId: rule.id,
+          ruleVersion: rule.version,
+          verdict,
+          severity: rule.severity,
+          evidence,
+        })
+      }
+      return evaluations
+    },
+  }
+}
+
   /* ---- 文学质量审查与回炉 ---- */
   if (path === '/api/chapter.review') {
     const decoded = decodeBookRequest(body, resolvedRoot, { principal })
@@ -878,34 +1005,103 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         ? rawPolicy
         : undefined
 
-    const outcome = await executeChapterReview({
-      bookRoot: root,
-      chapterIndex,
-      session,
-      receiptId,
-      reviewer: { providerId: 'web', model: 'web-direct', recipeVersion: '0.0.0' },
-      ...(policy !== undefined ? { policy } : {}),
-      autoHarvestQuotes: true,
-      autoAbsorbCounterexamples: true,
-    })
-    const projection = session.project()
-    const failed = outcome.report.evaluations.filter((e) => e.verdict === 'fail')
+    // 超时与取消支持
+    const rawTimeoutMs = body['timeoutMs']
+    const timeoutMs =
+      typeof rawTimeoutMs === 'number' && Number.isSafeInteger(rawTimeoutMs) && rawTimeoutMs >= 1000 && rawTimeoutMs <= 300000
+        ? rawTimeoutMs
+        : 60000
 
-    json(200, {
-      ok: true,
-      verdict: outcome.report.verdict,
-      reportId: outcome.report.reportId,
-      reportPath: outcome.reportRelPath,
-      draftRevision: outcome.input.revision,
-      draftContentHash: outcome.report.anchor.draftContentHash,
-      reworkCount: projection.qualityReworkCount,
-      current: true,
-      blockingFailures: failed.filter((e) => e.severity === 'blocking'),
-      advisories: failed.filter((e) => e.severity === 'advisory'),
-      semanticReviewer: 'unavailable',
-      mechanicalGate: outcome.mechanicalGate,
+    const abortController = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      abortController.abort(new ChapterReviewTimeoutError(timeoutMs))
+    }, timeoutMs)
+
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        abortController.abort(new ChapterReviewCancelledError('客户端连接已断开'))
+      }
     })
-    return true
+
+    // 接通真实语义审查提供方（通过 resolveGenerationTarget）
+    const target = await resolveGenerationTarget({
+      taskType: 'SEMANTIC_ANALYSIS',
+      principal: principal ?? undefined,
+      env: process.env,
+    })
+
+    const semanticReviewerStatus: 'unavailable' | 'attached' = target.available ? 'attached' : 'unavailable'
+    const reviewer = target.available
+      ? { providerId: target.providerId, model: target.model, recipeVersion: '1.0.0' }
+      : { providerId: 'web', model: 'web-direct', recipeVersion: '0.0.0' }
+    const semanticEvaluator = target.available
+      ? createReviewSemanticEvaluator(target.endpoint, abortController.signal)
+      : undefined
+
+    const rawMechanicalOptions = body['mechanicalOptions'] as { minWords?: number; maxWords?: number; customRedlines?: string[] } | undefined
+    const mechanicalOptions = rawMechanicalOptions && typeof rawMechanicalOptions === 'object' ? rawMechanicalOptions : undefined
+    const rawActionBeats = Array.isArray(body['actionBeatParagraphs']) ? (body['actionBeatParagraphs'] as number[]) : undefined
+    const actionBeatParagraphs = rawActionBeats ? new Set(rawActionBeats.filter((n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0)) : undefined
+
+    try {
+      const outcome = await executeChapterReview({
+        bookRoot: root,
+        chapterIndex,
+        session,
+        receiptId,
+        reviewer,
+        ...(policy !== undefined ? { policy } : {}),
+        autoHarvestQuotes: true,
+        autoAbsorbCounterexamples: true,
+        ...(semanticEvaluator !== undefined ? { semanticEvaluator } : {}),
+        ...(actionBeatParagraphs !== undefined ? { actionBeatParagraphs } : {}),
+        ...(mechanicalOptions !== undefined ? { mechanicalOptions } : {}),
+        // 截止时间只由宿主这一处拥有：本路由已建 AbortController + setTimeout，
+        // 只传 signal；不再同时传 timeoutMs，避免同一截止时间出现两个定时器
+        // （并防止内层把超时误归类成取消）。
+        signal: abortController.signal,
+      })
+      clearTimeout(timer)
+      const projection = session.project()
+      const failed = outcome.report.evaluations.filter((e) => e.verdict === 'fail')
+
+      json(200, {
+        ok: true,
+        verdict: outcome.report.verdict,
+        reportId: outcome.report.reportId,
+        reportPath: outcome.reportRelPath,
+        draftRevision: outcome.input.revision,
+        draftContentHash: outcome.report.anchor.draftContentHash,
+        reworkCount: projection.qualityReworkCount,
+        current: true,
+        blockingFailures: failed.filter((e) => e.severity === 'blocking'),
+        advisories: failed.filter((e) => e.severity === 'advisory'),
+        semanticReviewer: semanticReviewerStatus,
+        mechanicalGate: outcome.mechanicalGate,
+      })
+      return true
+    } catch (error) {
+      clearTimeout(timer)
+      if (abortController.signal.aborted || error instanceof ChapterReviewTimeoutError || error instanceof ChapterReviewCancelledError) {
+        if (!res.writableEnded) {
+          const isTimeout = timedOut || error instanceof ChapterReviewTimeoutError
+          json(isTimeout ? 408 : 499, {
+            ok: false,
+            code: isTimeout ? 'CHAPTER_REVIEW_TIMEOUT' : 'CHAPTER_REVIEW_CANCELLED',
+            error: (error as Error).message || (isTimeout ? '章节审查执行超时' : '章节审查已取消'),
+          })
+        }
+        return true
+      }
+      if (error instanceof NoCompiledReceiptAnchorError) {
+        json(409, { ok: false, code: error.code, error: error.message })
+        return true
+      }
+      json(500, { ok: false, error: (error as Error).message })
+      return true
+    }
   }
 
   if (path === '/api/chapter.rework') {

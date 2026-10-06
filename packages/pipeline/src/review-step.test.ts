@@ -22,14 +22,20 @@ import { defaultPlatformRules, hashProse, isQualityReviewCurrent } from '@mozhou
 import type { QualityPolicy } from '@mozhou/quality-engine';
 import {
   ChapterProductionSession,
+  ChapterReviewCancelledError,
+  ChapterReviewTimeoutError,
   NoCompiledReceiptAnchorError,
   acceptDraft,
+  defaultReviewCapabilityExecutor,
   executeChapterReview,
   loadDraftForReview,
   makeDraftProviderBinding,
   recordUserEdit,
   runDraftStep,
   runReviewStep,
+  type ReviewCapabilityCompletedResponse,
+  type ReviewCapabilityExecutor,
+  type ReviewCapabilityRequest,
   type WriteBase,
 } from './index.js';
 
@@ -372,5 +378,155 @@ describe('ADR-0025 runReviewStep：版本绑定审查报告', () => {
     // 且不得有任何报告文件被写出来
     expect(existsSync(join(root, '.mozhou', 'quality-reviews', 'chapter_7'))).toBe(false)
   })
+
+  it('超时支持与迟到保护：timeoutMs 触发时抛出超时错误且报告绝不落盘、会话绝不推进', async () => {
+    const root = hermeticBook();
+    const bus = new PublishBus();
+    const session = ChapterProductionSession.start({
+      bus,
+      root,
+      chapterIndex: 3,
+      newTaskRef: () => 'tsk_timeout_test',
+    });
+    session.advance('compile');
+    session.advance('draft');
+
+    const ctx = draftEngine(root, ['正文内容第一句。\n\n']);
+    await runDraftStep({
+      engine: ctx.engine,
+      bookRoot: root,
+      chapterIndex: 3,
+      packet: PACKET,
+      recipe: RECIPE,
+    });
+    acceptDraftOf(root, ctx);
+
+    // 模拟迟到执行器：在 150ms 后返回成功结果，但超时设定为 50ms
+    const slowExecutor: ReviewCapabilityExecutor = async (req: ReviewCapabilityRequest): Promise<ReviewCapabilityCompletedResponse> => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return {
+        schemaVersion: 1,
+        requestId: req.requestId,
+        status: 'completed',
+        report: {
+          schemaVersion: 1,
+          reportId: 'rep_late',
+          reviewer: req.reviewer,
+          anchor: {
+            chapterIndex: req.draft.chapterIndex,
+            draftRevision: req.draft.revision,
+            draftContentHash: req.draft.contentHash,
+            receiptId: req.receiptId,
+            ruleSetDigest: req.ruleSetDigest,
+          },
+          evaluations: [],
+          verdict: 'pass',
+        },
+        mechanicalGate: {
+          passed: true,
+          checks: [],
+          fails: [],
+          oks: [],
+        },
+      };
+    };
+
+    await expect(
+      executeChapterReview({
+        bookRoot: root,
+        chapterIndex: 3,
+        session,
+        receiptId: 'rcpt_timeout_anchor',
+        policy: deterministicOnlyPolicy(),
+        reviewer: REVIEWER,
+        timeoutMs: 50,
+        capabilityExecutor: slowExecutor,
+      }),
+    ).rejects.toBeInstanceOf(ChapterReviewTimeoutError);
+
+    // 迟到保护验证：任何迟到的执行结果决不再落盘、推进会话账本
+    expect(existsSync(join(root, '.mozhou', 'quality-reviews', 'chapter_3'))).toBe(false);
+    expect(session.currentStep).toBe('draft');
+  });
+
+  it('取消支持与迟到保护：AbortSignal 中止时抛出取消错误且报告绝不落盘', async () => {
+    const root = hermeticBook();
+    const bus = new PublishBus();
+    const session = ChapterProductionSession.start({
+      bus,
+      root,
+      chapterIndex: 3,
+      newTaskRef: () => 'tsk_cancel_test',
+    });
+    session.advance('compile');
+    session.advance('draft');
+
+    const ctx = draftEngine(root, ['正文内容。\n\n']);
+    await runDraftStep({
+      engine: ctx.engine,
+      bookRoot: root,
+      chapterIndex: 3,
+      packet: PACKET,
+      recipe: RECIPE,
+    });
+    acceptDraftOf(root, ctx);
+
+    const abortController = new AbortController();
+    abortController.abort('用户主动取消审查');
+
+    await expect(
+      executeChapterReview({
+        bookRoot: root,
+        chapterIndex: 3,
+        session,
+        receiptId: 'rcpt_cancel_anchor',
+        policy: deterministicOnlyPolicy(),
+        reviewer: REVIEWER,
+        signal: abortController.signal,
+      }),
+    ).rejects.toBeInstanceOf(ChapterReviewCancelledError);
+
+    expect(existsSync(join(root, '.mozhou', 'quality-reviews', 'chapter_3'))).toBe(false);
+    expect(session.currentStep).toBe('draft');
+  });
+
+  it('纯净通信契约：传输数据为纯净可序列化 JSON，不含 session 与 bookRoot', async () => {
+    const root = hermeticBook();
+    const ctx = draftEngine(root, ['陈缺推门而入。\n\n']);
+    await runDraftStep({
+      engine: ctx.engine,
+      bookRoot: root,
+      chapterIndex: 3,
+      packet: PACKET,
+      recipe: RECIPE,
+    });
+    acceptDraftOf(root, ctx);
+
+    let capturedRequest: ReviewCapabilityRequest | null = null;
+    const inspectExecutor: ReviewCapabilityExecutor = async (req, opts) => {
+      capturedRequest = req;
+      return defaultReviewCapabilityExecutor(req, opts);
+    };
+
+    await executeChapterReview({
+      bookRoot: root,
+      chapterIndex: 3,
+      receiptId: 'rcpt_pure_contract',
+      policy: deterministicOnlyPolicy(),
+      reviewer: REVIEWER,
+      capabilityExecutor: inspectExecutor,
+    });
+
+    expect(capturedRequest).toBeDefined();
+    // 纯净通信契约核检：严禁包含 session、bookRoot、回调等字段
+    const rawReq = capturedRequest as unknown as Record<string, unknown>;
+    expect(rawReq['session']).toBeUndefined();
+    expect(rawReq['bookRoot']).toBeUndefined();
+    expect(rawReq['root']).toBeUndefined();
+    expect(rawReq['semanticEvaluator']).toBeUndefined();
+    // 纯 JSON 序列化无损验证
+    const jsonStr = JSON.stringify(capturedRequest);
+    expect(JSON.parse(jsonStr)).toEqual(capturedRequest);
+  });
 });
 

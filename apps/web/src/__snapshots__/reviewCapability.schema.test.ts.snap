@@ -1,0 +1,151 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`chapter review JSON boundary > accepts the real asynchronous semantic and mechanical outputs 1`] = `
+{
+  "mechanicalGate": {
+    "checks": [
+      {
+        "detail": "正文字数 16 字（符合 [0, 6000] 窗口）",
+        "id": "mech_01_words",
+        "name": "字数窗口",
+        "ok": true,
+      },
+      {
+        "detail": "无未清理占位符",
+        "id": "mech_02_placeholder",
+        "name": "占位符拦截",
+        "ok": true,
+      },
+      {
+        "detail": "无 AI 红线命中",
+        "id": "mech_03_redlines",
+        "name": "AI红线检测",
+        "ok": true,
+      },
+      {
+        "detail": "相邻段落无复读",
+        "id": "mech_04_adjacent_repeat",
+        "name": "相邻段落复读",
+        "ok": true,
+      },
+      {
+        "detail": "4-gram 词频分布均匀",
+        "id": "mech_05_4gram",
+        "name": "单章词频方差",
+        "ok": true,
+      },
+    ],
+    "fails": [],
+    "oks": [
+      "字数窗口",
+      "占位符拦截",
+      "AI红线检测",
+      "相邻段落复读",
+      "单章词频方差",
+    ],
+    "passed": true,
+  },
+  "report": {
+    "anchor": {
+      "chapterIndex": 3,
+      "draftContentHash": "7b7399a581573b29fc684c5ff8af0a31edb1558e56353cc799baff721030329e",
+      "draftRevision": 1,
+      "receiptId": "receipt-fixture-1",
+      "ruleSetDigest": "dc2165dbc94dc2addafc6403bf8ec77025a0b9713489315e1a1508ec5df4bf28",
+    },
+    "evaluations": [
+      {
+        "evidence": [],
+        "ruleId": "REV-001",
+        "ruleVersion": "1.0.0",
+        "severity": "blocking",
+        "verdict": "pass",
+      },
+      {
+        "evidence": [],
+        "ruleId": "NARR-001",
+        "ruleVersion": "1.0.0",
+        "severity": "advisory",
+        "verdict": "pass",
+      },
+    ],
+    "reportId": "<generated-report-id>",
+    "reviewer": {
+      "model": "async-review",
+      "providerId": "fixture",
+      "recipeVersion": "1.0.0",
+    },
+    "schemaVersion": 1,
+    "verdict": "pass",
+  },
+  "requestId": "review-fixture-1",
+  "schemaVersion": 1,
+  "status": "completed",
+}
+`;
+
+exports[`chapter review JSON boundary > preserves all request data during JSON round trip and does not mutate it 1`] = `
+{
+  "ok": true,
+  "value": {
+    "actionBeatParagraphs": [
+      0,
+    ],
+    "draft": {
+      "body": "门外传来敲门声。他收起旧信，吹灭了灯。",
+      "chapterIndex": 3,
+      "contentHash": "7b7399a581573b29fc684c5ff8af0a31edb1558e56353cc799baff721030329e",
+      "revision": 1,
+    },
+    "failurePatterns": [
+      {
+        "active": true,
+        "code": "outline_expansion",
+        "firstSeenChapter": 1,
+        "lastSeenChapter": 2,
+        "occurrences": 1,
+      },
+    ],
+    "mechanicalOptions": {
+      "maxWords": 6000,
+      "minWords": 0,
+    },
+    "policy": {
+      "maxAutomaticReworks": 2,
+      "projectId": "review-contract-fixture",
+      "rules": [
+        {
+          "description": "审查锚点必须与待审正文精确 revision/hash 一致（结构性不变量）",
+          "enabled": true,
+          "evidenceRequired": true,
+          "id": "REV-001",
+          "kind": "deterministic",
+          "scope": "platform",
+          "severity": "blocking",
+          "version": "1.0.0",
+        },
+        {
+          "description": "大纲扩写：把大纲逐拍扩成报告式段落，无场景因果",
+          "enabled": true,
+          "evidenceRequired": true,
+          "id": "NARR-001",
+          "kind": "semantic",
+          "scope": "platform",
+          "severity": "advisory",
+          "version": "1.0.0",
+        },
+      ],
+      "schemaVersion": 1,
+    },
+    "receiptId": "receipt-fixture-1",
+    "requestId": "review-fixture-1",
+    "reviewer": {
+      "model": "async-review",
+      "providerId": "fixture",
+      "recipeVersion": "1.0.0",
+    },
+    "ruleSetDigest": "dc2165dbc94dc2addafc6403bf8ec77025a0b9713489315e1a1508ec5df4bf28",
+    "schemaVersion": 1,
+  },
+}
+`;
