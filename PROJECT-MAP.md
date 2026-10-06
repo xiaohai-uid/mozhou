@@ -371,6 +371,16 @@
 - **验收**：GitNexus `check --cycles` clean / 0 环；受影响抽测测试 **2 测试文件 12/12 passed**；各阶段证据文件全部实读核验确认；交付报告与证据记录完整闭环。
 - **验证状态**：已执行（GitNexus 图谱门禁实跑通过、证据链逐项实读核查通过、受影响抽样测试 12/12 实跑通过、最终交付报告已写入）；严格遵守红线，未执行任何 git commit/push/reset 操作。
 
+### CHG-20261006-17 — 2026-10-06 — 用户授权（「推送」→ 选路径 A），ZCode 执行
+
+- **需求来源**：用户要求推送本批次 14 个提交；`git-push-gate` 在 `ci.yml` / `novel-os` 上 BLOCKED（`pnpm audit --audit-level high` 失败），用户选定「先做依赖修复变更再走门禁推送」。证据见 [docs/changes/CHG-20261006-17-dependency-security-upgrade.md](docs/changes/CHG-20261006-17-dependency-security-upgrade.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `f79423d`（本地领先远端尖 `979f1cfa` 50 个提交，可快进）；act 容器实跑结果：前 4 步（checkout / Node 22.23.2 / pnpm 9.15.0 / `--frozen-lockfile` 安装 2m17s）全绿，第 5 步 `pnpm audit` 失败 —— 9 漏洞（6 moderate / 1 high / 2 critical：`tinypool@1.1.1` ×2 经 vitest、`source-map-js@1.2.1` 经 vite→postcss）。
+- **定性取证**：`source-map-js@1.2.1` 与 `tinypool@1.1.1` 在基线 `40cd257`、远端尖 `979f1cfa`、HEAD 三处锁文件**逐字一致**，且本批次 diff 对 vitest/tinypool/source-map-js/postcss 零命中 → 属**既有依赖债**，非本批次引入。
+- **目标行为**：①消除 high/critical 依赖漏洞使 `pnpm audit --audit-level high` 通过；②清理本批次引入的 lint 失败；③刷新过期生成物并消除既有裸 ADR 预算超限；④重跑推送门禁并推送。
+- **实际变更**：`vitest` `^3.2.7`→`^4.0.4`（5 个 package.json；选 4.x 因 `vite ^6||^7` 与本仓 vite 6.4.3 兼容，且 4.x 起不再依赖 tinypool）；新增 pnpm override `source-map-js: 1.2.2`；`scripts/verify-longform-e2e.mjs` 清理 5 处未使用导入 + 1 处未使用变量 + 3 处空 catch；重新生成 `docs/architecture.md` 与 `docs/term-map.md`；`docs/specs/dual-plane-sync-spec.md` 的 `ADR-0006`×2→`K-0006`、`docs/specs/change-impact-engine-spec.md` 的 `ADR-0003`×3→`K-0003`（裸 ADR 计数 56→51，预算 54）。
+- **验收**：`pnpm run test:packages` 117 文件 1048 用例通过；`pnpm --filter @mozhou/web test` 149 文件 / 1098 用例通过（14 跳过）；`pnpm build` exit 0；web `typecheck` exit 0；`pnpm lint` exit 0（修复前 9 errors）；`check:glossary/architecture/gates/term-map/readmes` 5/5 PASS；锁文件中 tinypool 归 0、source-map-js 为 1.2.2、vite 仍 6.4.3。
+- **验证状态**：已执行（上述命令均为本地实跑）。**环境性未覆盖**：`pnpm audit` 无法本地执行（本机 registry 为 npmmirror，无 audit 端点），审计结论以 act 容器结果为准；`vite build` 在本机 `%TEMP%` 下报 esbuild `Access is denied`（本机磁盘/权限问题，改 TEMP 至仓库内即成功；`esbuild@0.25.12` 基线与 HEAD 相同），CI 的 Linux 容器不受影响。
+
 
 
 
