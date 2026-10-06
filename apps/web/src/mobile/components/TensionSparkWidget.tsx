@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react'
 
 export interface TensionSparkWidgetProps {
-  tensionScore?: number
-  tensionDesc?: string
-  currentStage?: number
-  onSelectStage?: (stageIndex: number) => void
+  tensionScore?: number | undefined
+  tensionDesc?: string | undefined
+  currentStage?: number | undefined
+  onSelectStage?: ((stageIndex: number) => void) | undefined
+  /** 真实章节时序张力点序列（0-100）。若无真实数据或不足两点，判为不可用 */
+  tensionPoints?: readonly number[] | undefined
 }
 
 /** 阶段词表 = 管线八步（与桌面 PipelineStrip 同源，禁止再用旧聊天七相位/发布词表）。 */
@@ -15,12 +17,18 @@ export function TensionSparkWidget({
   tensionDesc,
   currentStage,
   onSelectStage,
+  tensionPoints,
 }: TensionSparkWidgetProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const available = tensionScore !== undefined && tensionDesc !== undefined && currentStage !== undefined
+  const available =
+    tensionScore !== undefined &&
+    tensionDesc !== undefined &&
+    currentStage !== undefined &&
+    tensionPoints !== undefined &&
+    tensionPoints.length >= 2
 
   useEffect(() => {
-    if (!available) return
+    if (!available || !tensionPoints) return
     const canvas = canvasRef.current
     if (!canvas) return
     let ctx: CanvasRenderingContext2D | null = null
@@ -33,7 +41,7 @@ export function TensionSparkWidget({
 
     const w = (canvas.width = canvas.offsetWidth || 100)
     const h = (canvas.height = canvas.offsetHeight || 42)
-    const pts = [20, 38, 30, 60, 48, 75, 68, tensionScore]
+    const pts = [...tensionPoints]
     const step = w / (pts.length - 1)
     ctx.clearRect(0, 0, w, h)
     ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-mobile').trim() || '#72c9c4'
@@ -46,11 +54,11 @@ export function TensionSparkWidget({
       else ctx.lineTo(x, y)
     })
     ctx.stroke()
-  }, [available, tensionScore])
+  }, [available, tensionPoints])
 
   if (!available) {
     return (
-      <div className="mobile-card">
+      <div className="mobile-card" data-testid="tension-unavailable">
         <b>管线阶段与叙事张力尚未接入</b>
         <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--fg-muted-mobile)', lineHeight: 1.6 }}>
           Technical Preview 不展示模拟阶段、张力分数或情绪波峰。

@@ -374,6 +374,12 @@ button.mobile-tag {
   transition: all 0.2s var(--spring-fast-mobile);
 }
 .tool-mini-chip:active { background: var(--surface-core-mobile); color: var(--accent-strong-mobile); }
+.tool-mini-chip.active {
+  background: var(--accent-soft-mobile, rgba(114, 201, 196, 0.2));
+  border-color: var(--accent-strong-mobile, #72c9c4);
+  color: var(--accent-strong-mobile, #72c9c4);
+  font-weight: 600;
+}
 .send-action-circle {
   flex: none;
   width: var(--touch-target-min);
@@ -556,3 +562,42 @@ button.mobile-tag {
   color: #a06a1f;
 }
 .mfp-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* 版本时光机与段落 Diff (CHG-20261006-07) */
+.diff-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.diff-item.added {
+  background: rgba(46, 125, 84, 0.15);
+  border-left: 3px solid #2e7d54;
+  color: var(--fg-pure-mobile);
+}
+.diff-item.removed {
+  background: rgba(244, 63, 94, 0.15);
+  border-left: 3px solid #f43f5e;
+  color: var(--rose-mobile);
+  text-decoration: line-through;
+}
+.diff-item.unchanged {
+  color: var(--fg-muted-mobile);
+}
+.history-rev-chip {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline-crisp-mobile);
+  background: var(--surface-raised-mobile);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--fg-primary-mobile);
+}
+.history-rev-chip.selected {
+  border-color: var(--accent-strong-mobile);
+  background: var(--accent-soft-mobile);
+  color: var(--accent-strong-mobile);
+}

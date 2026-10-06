@@ -3,7 +3,7 @@ import { SendIcon } from './MobileIcons'
 import { loadDraftCache, saveDraftCache } from '../../shell/workbenchStorage'
 
 export interface MobileComposerProps {
-  onSendPrompt?: (prompt: string) => void
+  onSendPrompt?: (prompt: string, activeSkills?: string[]) => void
   onOpenInspiration?: () => void
   /** 外部回填（情节选择/灵感采用）：变更时追加进输入框。 */
   inject?: { id: number; text: string } | undefined
@@ -15,6 +15,7 @@ export function MobileComposer({
   inject,
 }: MobileComposerProps): JSX.Element {
   const [text, setText] = useState(() => loadDraftCache('composer_draft'))
+  const [activeSkills, setActiveSkills] = useState<string[]>([])
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [lastInjectId, setLastInjectId] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -51,18 +52,18 @@ export function MobileComposer({
     saveDraftCache(value, 'composer_draft')
   }
 
-  const handleAddTag = (tag: string) => {
-    const next = (text ? `${text} ` : '') + tag
-    setText(next)
-    saveDraftCache(next, 'composer_draft')
-    textareaRef.current?.focus()
+  const toggleSkill = (skillId: string) => {
+    setActiveSkills((prev) =>
+      prev.includes(skillId) ? prev.filter((id) => id !== skillId) : [...prev, skillId],
+    )
   }
 
   const handleSend = () => {
     const trimmed = text.trim()
     if (!trimmed) return
-    onSendPrompt?.(trimmed)
+    onSendPrompt?.(trimmed, activeSkills)
     setText('')
+    setActiveSkills([])
     saveDraftCache('', 'composer_draft')
   }
 
@@ -97,22 +98,28 @@ export function MobileComposer({
           </button>
           <button
             type="button"
-            className="tool-mini-chip"
-            onClick={() => handleAddTag('【增加冲突】')}
+            className={`tool-mini-chip ${activeSkills.includes('conflict') ? 'active' : ''}`}
+            onClick={() => toggleSkill('conflict')}
+            data-testid="skill-conflict"
+            aria-pressed={activeSkills.includes('conflict')}
           >
             增加冲突
           </button>
           <button
             type="button"
-            className="tool-mini-chip"
-            onClick={() => handleAddTag('【精简叙述】')}
+            className={`tool-mini-chip ${activeSkills.includes('concise') ? 'active' : ''}`}
+            onClick={() => toggleSkill('concise')}
+            data-testid="skill-concise"
+            aria-pressed={activeSkills.includes('concise')}
           >
             精简叙述
           </button>
           <button
             type="button"
-            className="tool-mini-chip"
-            onClick={() => handleAddTag('【回收伏笔】')}
+            className={`tool-mini-chip ${activeSkills.includes('foreshadow') ? 'active' : ''}`}
+            onClick={() => toggleSkill('foreshadow')}
+            data-testid="skill-foreshadow"
+            aria-pressed={activeSkills.includes('foreshadow')}
           >
             回收伏笔
           </button>

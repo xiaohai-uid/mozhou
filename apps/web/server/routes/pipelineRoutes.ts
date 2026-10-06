@@ -208,9 +208,22 @@ function decoratePromptWithSkills(prompt: string, skills: readonly string[]): st
   if (skills.includes('dialogue-polish')) {
     constraints.push('【对白打磨】压缩交代性对白，增加潜台词与语调性格差异。')
   }
+  // CHG-20261006-07 移动端三技能胶囊配方映射
+  if (skills.includes('conflict') || skills.includes('add-conflict') || skills.includes('增加冲突') || skills.includes('【增加冲突】')) {
+    constraints.push('【增加冲突】升级主角遭遇的外部阻力与人际对抗，制造即时危机与利益争夺。')
+  }
+  if (skills.includes('concise') || skills.includes('trim-narrative') || skills.includes('精简叙述') || skills.includes('【精简叙述】')) {
+    constraints.push('【精简叙述】删减冗余心理交代与背景铺垫，采用紧凑主谓短句加快叙事行进。')
+  }
+  if (skills.includes('foreshadow') || skills.includes('resolve-foreshadow') || skills.includes('回收伏笔') || skills.includes('【回收伏笔】')) {
+    constraints.push('【回收伏笔】呼应前文埋下的线索暗示与悬念道具，完成因果闭环。')
+  }
+
   if (constraints.length === 0) return prompt
   return `${constraints.join('\n')}\n\n${prompt}`
 }
+
+export { decoratePromptWithSkills }
 
 /** 正文 raw 文件 sha256（与 accept 落盘校验同源；base.sha256 的唯一合法默认）。 */
 function hashProseRaw(root: string, chapterIndex: number): string {

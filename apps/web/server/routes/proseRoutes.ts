@@ -133,7 +133,7 @@
  * 两种收口都是派生面：失败不回退已落定的提交，响应如实上报（sessionWindow /
  * resubmitWindowCleanup，绝不静默）。被拒的提交零副作用（不触发收口）。
  */
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RouteHandler } from '../router.js'
 import {
@@ -185,6 +185,7 @@ import {
   readBookRecord,
   readOperationRecord,
   readProseChapter,
+  sha256Hex,
   withBook,
 } from '@mozhou/data-plane'
 import {
@@ -200,7 +201,7 @@ import type {
   UsageFact,
 } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
-import { runStyleLearnerForWindow } from '@mozhou/flywheel'
+import { runPreferenceLearning, runStyleLearnerForWindow } from '@mozhou/flywheel'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
 import { resolveGenerationTarget } from '../llm/generationTarget.js'
 import {
@@ -282,6 +283,171 @@ function parseUsageFacts(raw: unknown): UsageFact[] | null {
     facts.push(fact)
   }
   return facts
+}
+
+/** CHG-20261006-07 章节修订版本快照 Sidecar 记录结构 */
+export interface ChapterRevisionRecord {
+  readonly chapterIndex: number
+  readonly revision: number
+  readonly body: string
+  readonly sha256: string
+  readonly wordCount: number
+  readonly savedAt: string
+  readonly title?: string | undefined
+}
+
+function chapterHistoryFilePath(root: string, chapterIndex: number): string {
+  return join(root, '.mozhou', 'history', `ch${chapterIndex}_history.jsonl`)
+}
+
+function appendChapterHistoryRecord(root: string, record: ChapterRevisionRecord): void {
+  try {
+    const dir = join(root, '.mozhou', 'history')
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true })
+    }
+    const file = chapterHistoryFilePath(root, record.chapterIndex)
+    if (existsSync(file)) {
+      const lines = readFileSync(file, 'utf8').split('\n').filter((l) => l.trim().length > 0)
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line) as { revision?: number }
+          if (parsed.revision === record.revision) return
+        } catch {
+          // ignore torn lines
+        }
+      }
+    }
+    appendFileSync(file, JSON.stringify(record) + '\n', 'utf8')
+  } catch {
+    // sidecar 写入降级不阻断主写路径
+  }
+}
+
+function readChapterHistoryRecords(root: string, chapterIndex: number): ChapterRevisionRecord[] {
+  const file = chapterHistoryFilePath(root, chapterIndex)
+  if (!existsSync(file)) return []
+  const records: ChapterRevisionRecord[] = []
+  const lines = readFileSync(file, 'utf8').split('\n').filter((l) => l.trim().length > 0)
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line) as ChapterRevisionRecord
+      if (typeof parsed.revision === 'number' && typeof parsed.body === 'string') {
+        records.push(parsed)
+      }
+    } catch {
+      // 容错跳过撕裂行
+    }
+  }
+  return records.sort((a, b) => b.revision - a.revision)
+}
+
+/** 段落级 LCS Diff 计算 */
+export function computeParagraphDiff(
+  fromText: string,
+  toText: string,
+): readonly { kind: 'added' | 'removed' | 'unchanged'; text: string; index: number }[] {
+  const a = fromText.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 0)
+  const b = toText.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 0)
+
+  const n = a.length
+  const m = b.length
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0))
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      if (a[i] === b[j]) {
+        dp[i + 1]![j + 1] = dp[i]![j]! + 1
+      } else {
+        dp[i + 1]![j + 1] = Math.max(dp[i]![j + 1]!, dp[i + 1]![j]!)
+      }
+    }
+  }
+
+  const result: { kind: 'added' | 'removed' | 'unchanged'; text: string; index: number }[] = []
+  let i = n
+  let j = m
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      result.unshift({ kind: 'unchanged', text: a[i - 1]!, index: result.length })
+      i--
+      j--
+    } else if (j > 0 && (i === 0 || dp[i]![j - 1]! >= dp[i - 1]![j]!)) {
+      result.unshift({ kind: 'added', text: b[j - 1]!, index: result.length })
+      j--
+    } else if (i > 0 && (j === 0 || dp[i]![j - 1]! < dp[i - 1]![j]!)) {
+      result.unshift({ kind: 'removed', text: a[i - 1]!, index: result.length })
+      i--
+    }
+  }
+  return result.map((item, idx) => ({ ...item, index: idx }))
+}
+
+/** 章节正文真实张力与波峰分析计算（零硬编码，文本驱动） */
+export function computeChapterTension(
+  body: string,
+  chapterIndex: number,
+  phase: string,
+): {
+  available: boolean
+  tensionScore?: number
+  tensionDesc?: string
+  tensionPoints?: number[]
+  currentStage?: number
+} {
+  const trimmed = body.trim()
+  if (trimmed.length < 20) {
+    return { available: false }
+  }
+
+  const paras = trimmed.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 0)
+  const sliceCount = Math.min(8, Math.max(4, paras.length))
+  const sliceSize = Math.ceil(paras.length / sliceCount)
+
+  const points: number[] = []
+  for (let s = 0; s < sliceCount; s++) {
+    const chunkParas = paras.slice(s * sliceSize, (s + 1) * sliceSize)
+    const text = chunkParas.join('\n')
+    if (text.length === 0) continue
+
+    const actionMatches = text.match(/[杀击退战斩拔刺轰撞震裂怒喝冷笑危急危机刀剑敌血死狂扑崩破锁追逃]/g) || []
+    const punctMatches = text.match(/[！!——…]/g) || []
+    const dialogueMatches = text.match(/[“"”]/g) || []
+
+    const base = 25
+    const actionScore = Math.min(40, actionMatches.length * 6)
+    const punctScore = Math.min(20, punctMatches.length * 4)
+    const dialogueScore = dialogueMatches.length > 0 ? 8 : 0
+
+    const score = Math.max(15, Math.min(95, base + actionScore + punctScore + dialogueScore))
+    points.push(score)
+  }
+
+  if (points.length < 2) {
+    return { available: false }
+  }
+
+  const maxScore = Math.max(...points)
+  const maxIdx = points.indexOf(maxScore)
+  const tensionScore = maxScore
+
+  let tensionDesc = '情绪平缓蓄力，叙事稳步向前'
+  if (maxIdx <= 1) {
+    tensionDesc = '开篇即起波澜：危机骤临，矛盾迅速激化'
+  } else if (maxIdx >= points.length - 2) {
+    tensionDesc = '终段悬念留钩：暗流汹涌，危机悬而未决'
+  } else {
+    tensionDesc = `第 ${maxIdx + 1} 节抵达波峰：对抗加剧，局势反转爆发`
+  }
+
+  const currentStage = phase === 'committed' ? 7 : 2
+  return {
+    available: true,
+    tensionScore,
+    tensionDesc,
+    tensionPoints: points,
+    currentStage,
+  }
 }
 
 export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
@@ -403,6 +569,27 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
             authorEditSignal = { published: false, blocks: 0, errorDetail: (cause as Error).message }
           }
         }
+        // CHG-20261006-07: 章节修订快照历史 Sidecar 持久化（支持版本时光机）
+        if (beforeBody && expectedRevision !== null) {
+          appendChapterHistoryRecord(root, {
+            chapterIndex,
+            revision: expectedRevision,
+            body: beforeBody,
+            sha256: sha256Hex(beforeBody),
+            wordCount: beforeBody.length,
+            savedAt: new Date().toISOString(),
+            title,
+          })
+        }
+        appendChapterHistoryRecord(root, {
+          chapterIndex,
+          revision: result.revision,
+          body: rawBody,
+          sha256: sha256Hex(rawBody),
+          wordCount: rawBody.length,
+          savedAt: new Date().toISOString(),
+          title,
+        })
         json(200, {
           ok: true,
           chapterIndex: result.chapterIndex,
@@ -726,6 +913,11 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
             if (lease !== null) await lease.release()
           },
           afterRecord: ({ taskRef }) => {
+            try {
+              runPreferenceLearning(root)
+            } catch {
+              // 偏好学习是自愈派生面，失败不阻断后续
+            }
             runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
           },
         })
@@ -824,6 +1016,217 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       // 深化 05 Contract Delta：作者所读 revision 已过期（他端保存/双窗口）——与
       // /api/chapter.prose.save 同码同形（409 PROSE_REVISION_CONFLICT + 双 revision），
       // 本章正文/正典/账本零写入、提取缝零调用（编排层在提取之前比对）。
+      if (cause instanceof ProseRevisionConflictError) {
+        json(409, {
+          ok: false,
+          code: PROSE_REVISION_CONFLICT,
+          expectedRevision: cause.expectedRevision,
+          currentRevision: cause.currentRevision,
+          error: (cause as Error).message,
+        })
+        return true
+      }
+      if (isEnoent(cause)) {
+        json(404, { ok: false, code: CHAPTER_MISSING, error: `chapter ${chapterIndex} not found on disk` })
+        return true
+      }
+      json(500, { ok: false, error: (cause as Error).message })
+    }
+    return true
+  }
+
+  /* ---- CHG-20261006-07 移动端三闭环端点：张力时序与时光机历史/对比/恢复 ---- */
+
+  if (path === '/api/chapter.tension') {
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
+    try {
+      const chapter = readProseChapter(root, proseChapterPath(chapterIndex))
+      const tension = computeChapterTension(chapter.body, chapterIndex, chapter.phase)
+      json(200, {
+        ok: true,
+        chapterIndex,
+        ...tension,
+      })
+    } catch (cause) {
+      if (isEnoent(cause)) {
+        json(200, { ok: true, available: false, chapterIndex })
+        return true
+      }
+      json(500, { ok: false, error: (cause as Error).message })
+    }
+    return true
+  }
+
+  if (path === '/api/chapter.history') {
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
+    try {
+      let currentRevision = 0
+      let currentBody = ''
+      try {
+        const chapter = readProseChapter(root, proseChapterPath(chapterIndex))
+        currentRevision = chapter.revision
+        currentBody = chapter.body
+      } catch {
+        // 章节若不存在，仍可查询是否有历史记录
+      }
+
+      let records = readChapterHistoryRecords(root, chapterIndex)
+      // 若盘上有正文但 sidecar 尚无任何记录，将当前正文作为第一条快照记入
+      if (records.length === 0 && currentBody) {
+        const initialRecord: ChapterRevisionRecord = {
+          chapterIndex,
+          revision: currentRevision,
+          body: currentBody,
+          sha256: sha256Hex(currentBody),
+          wordCount: currentBody.length,
+          savedAt: new Date().toISOString(),
+        }
+        appendChapterHistoryRecord(root, initialRecord)
+        records = [initialRecord]
+      }
+
+      const summaries = records.map((r) => ({
+        revision: r.revision,
+        wordCount: r.wordCount,
+        sha256: r.sha256,
+        savedAt: r.savedAt,
+        title: r.title,
+      }))
+
+      json(200, {
+        ok: true,
+        chapterIndex,
+        currentRevision,
+        revisions: summaries,
+      })
+    } catch (cause) {
+      json(500, { ok: false, error: (cause as Error).message })
+    }
+    return true
+  }
+
+  if (path === '/api/chapter.history.diff') {
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
+    const fromRevision = typeof body['fromRevision'] === 'number' ? body['fromRevision'] : null
+    const toRevision = typeof body['toRevision'] === 'number' ? body['toRevision'] : null
+    if (fromRevision === null || toRevision === null) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'fromRevision and toRevision integers required' })
+      return true
+    }
+
+    try {
+      const records = readChapterHistoryRecords(root, chapterIndex)
+      let fromText: string | null = records.find((r) => r.revision === fromRevision)?.body ?? null
+      let toText: string | null = records.find((r) => r.revision === toRevision)?.body ?? null
+
+      // 若 sidecar 没找到但刚好是当前盘上正文
+      if (fromText === null || toText === null) {
+        try {
+          const current = readProseChapter(root, proseChapterPath(chapterIndex))
+          if (fromText === null && current.revision === fromRevision) fromText = current.body
+          if (toText === null && current.revision === toRevision) toText = current.body
+        } catch {
+          // ignore
+        }
+      }
+
+      if (fromText === null) {
+        json(404, { ok: false, error: `revision ${fromRevision} not found in history` })
+        return true
+      }
+      if (toText === null) {
+        json(404, { ok: false, error: `revision ${toRevision} not found in history` })
+        return true
+      }
+
+      const diffs = computeParagraphDiff(fromText, toText)
+      json(200, {
+        ok: true,
+        chapterIndex,
+        fromRevision,
+        toRevision,
+        diffs,
+      })
+    } catch (cause) {
+      json(500, { ok: false, error: (cause as Error).message })
+    }
+    return true
+  }
+
+  if (path === '/api/chapter.history.restore') {
+    const decoded = decodeBookRequest(body, resolvedRoot, { principal })
+    if (!decoded.ok) {
+      json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+      return true
+    }
+    const { root, chapterIndex } = decoded.value
+    const targetRevision = typeof body['targetRevision'] === 'number' ? body['targetRevision'] : null
+    if (targetRevision === null) {
+      json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'targetRevision integer required' })
+      return true
+    }
+
+    try {
+      const records = readChapterHistoryRecords(root, chapterIndex)
+      const targetRecord = records.find((r) => r.revision === targetRevision)
+      if (!targetRecord) {
+        json(404, { ok: false, error: `target revision ${targetRevision} not found in history` })
+        return true
+      }
+
+      await withBookWriteLock(root, () => withBook(root, (plane) => {
+        const existing = readProseChapter(root, proseChapterPath(chapterIndex))
+        if (existing.phase === 'committed') {
+          json(409, { ok: false, code: CHAPTER_ALREADY_COMMITTED, error: 'chapter is committed — explicit reopen required before restore' })
+          return
+        }
+
+        const result = plane.saveProseDraft({
+          chapterIndex,
+          body: targetRecord.body,
+          expectedRevision: existing.revision,
+          title: targetRecord.title,
+        })
+
+        // 新版本记录入 sidecar，r8..r12 历史完整保留
+        appendChapterHistoryRecord(root, {
+          chapterIndex,
+          revision: result.revision,
+          body: targetRecord.body,
+          sha256: sha256Hex(targetRecord.body),
+          wordCount: targetRecord.body.length,
+          savedAt: new Date().toISOString(),
+          title: targetRecord.title,
+        })
+
+        json(200, {
+          ok: true,
+          chapterIndex,
+          restoredFromRevision: targetRevision,
+          newRevision: result.revision,
+          revision: result.revision,
+        })
+      }), { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS })
+    } catch (cause) {
+      if (cause instanceof ChapterPhaseError) {
+        json(409, { ok: false, code: CHAPTER_ALREADY_COMMITTED, error: (cause as Error).message })
+        return true
+      }
       if (cause instanceof ProseRevisionConflictError) {
         json(409, {
           ok: false,

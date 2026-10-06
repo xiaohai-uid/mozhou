@@ -139,7 +139,13 @@ export function MobileShell({
           <AuthLicenseDrawer onLoginSuccess={() => undefined} onOpenLicense={() => handleOpenDrawer('license')} />
         )}
         {activeDrawer === 'license' && <PreviewUnavailable label="许可证购买与激活" />}
-        {activeDrawer === 'history' && <VersionHistoryDrawer onClose={handleCloseDrawer} />}
+        {activeDrawer === 'history' && (
+          <VersionHistoryDrawer
+            book={book}
+            chapterIndex={chapterIndex ?? 1}
+            onClose={handleCloseDrawer}
+          />
+        )}
         {activeDrawer === 'inspiration' && (
           <InspirationDrawer
             onClose={handleCloseDrawer}

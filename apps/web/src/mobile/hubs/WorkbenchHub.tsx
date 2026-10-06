@@ -33,6 +33,14 @@ export function WorkbenchHub({
   const [notice, setNotice] = useState<{ kind: 'ok' | 'warn' | 'err'; text: string } | null>(null)
   /** works 真实章节元数据（阅读面 + 章切换）。 */
   const [chapterMeta, setChapterMeta] = useState<WorksChapterSummary | null>(null)
+  /** CHG-20261006-07 真实章节张力与情绪波峰分析数据 */
+  const [tensionData, setTensionData] = useState<{
+    available: boolean
+    tensionScore?: number
+    tensionDesc?: string
+    tensionPoints?: readonly number[]
+    currentStage?: number
+  } | null>(null)
   /** 情节选择回填（本地）；与 Shell 灵感管道合并后进 Composer。 */
   const [plotInject, setPlotInject] = useState<{ id: number; text: string } | null>(null)
   const composerInject = shellInject ?? plotInject ?? undefined
@@ -69,6 +77,40 @@ export function WorkbenchHub({
     }
   }, [book, chapterIndex])
 
+  // 当前章真实张力与波峰时序（/api/chapter.tension）
+  useEffect(() => {
+    if (book === null) {
+      setTensionData(null)
+      return
+    }
+    let mounted = true
+    void post<{
+      ok: boolean
+      available: boolean
+      tensionScore?: number
+      tensionDesc?: string
+      tensionPoints?: readonly number[]
+      currentStage?: number
+    }>('/api/chapter.tension', { root: book.root, chapterIndex })
+      .then((data) => {
+        if (!mounted) return
+        if (data && data.ok) {
+          setTensionData(data)
+          if (data.currentStage !== undefined) {
+            setCurrentStage(data.currentStage)
+          }
+        } else {
+          setTensionData({ available: false })
+        }
+      })
+      .catch(() => {
+        if (mounted) setTensionData({ available: false })
+      })
+    return () => {
+      mounted = false
+    }
+  }, [book, chapterIndex, chapterMeta])
+
   // 本地 Active Draft 草稿缓存（桌面写作层与移动端同一 workbenchStorage 面；
   // T00：键绑定书身份，未绑书不读任何缓存）。
   const draftCacheText = loadDraftCache(book !== null ? chapterDraftKey(book, chapterIndex) : null)
@@ -77,7 +119,7 @@ export function WorkbenchHub({
     .map((p) => p.replace(/^　+/, '').trim())
     .filter((p) => p.length > 0)
 
-  const handleSendPrompt = async (prompt: string): Promise<void> => {
+  const handleSendPrompt = async (prompt: string, activeSkills: string[] = []): Promise<void> => {
     if (drafting) return
     if (book === null) {
       setNotice({ kind: 'err', text: '请先建书，再开始正文生成。' })
@@ -93,7 +135,7 @@ export function WorkbenchHub({
           root: book.root,
           chapterIndex,
           prompt,
-          activeSkills: [],
+          activeSkills,
         }),
       })
 
@@ -196,7 +238,13 @@ export function WorkbenchHub({
         </button>
       </div>
 
-      <TensionSparkWidget currentStage={currentStage} onSelectStage={setCurrentStage} />
+      <TensionSparkWidget
+        currentStage={tensionData?.currentStage ?? currentStage}
+        onSelectStage={setCurrentStage}
+        tensionScore={tensionData?.available ? tensionData.tensionScore : undefined}
+        tensionDesc={tensionData?.available ? tensionData.tensionDesc : undefined}
+        tensionPoints={tensionData?.available ? tensionData.tensionPoints : undefined}
+      />
 
       <PlotBranchWidget
         question={questionData?.question}
@@ -220,7 +268,7 @@ export function WorkbenchHub({
       )}
 
       <MobileComposer
-        onSendPrompt={(p) => { void handleSendPrompt(p) }}
+        onSendPrompt={(p, skills) => { void handleSendPrompt(p, skills) }}
         onOpenInspiration={() => onOpenDrawer('inspiration')}
         inject={composerInject}
       />
