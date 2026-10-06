@@ -21,6 +21,11 @@
 apps/web/.mozhou_data/
 dist/
 dist-server/
+target/
+src-tauri/target/
+# Tauri 生成的 ACL 能力清单与运行期自描述文件，每次构建/启动重新生成
+src-tauri/gen/
+desktop-runtime.json
 archive-legacy/
 release-artifacts/
 figma-upload/
