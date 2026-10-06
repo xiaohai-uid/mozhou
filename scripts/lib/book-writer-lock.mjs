@@ -42,7 +42,27 @@ export function canonicalBookKey(root) {
 }
 
 export function writerPipeName(bookKey) {
-  return WRITER_PIPE_PREFIX + createHash('sha256').update(bookKey).digest('hex').slice(0, 32)
+  return WRITER_PIPE_PREFIX + writerLockNameSuffix(bookKey)
+}
+
+/** 锁名中平台无关的部分：`<sha256(bookKey).slice(0,32)>`。 */
+function writerLockNameSuffix(bookKey) {
+  return createHash('sha256').update(bookKey).digest('hex').slice(0, 32)
+}
+
+/**
+ * 实际监听端点（与 TS 侧 writerLock.ts 的 writerListenEndpoint 同源同义）：
+ * win32 → 命名管道；linux → 抽象命名空间套接字（真排他、内核管生命周期、不落文件）；
+ * 其他平台没有等价原语 → fail-closed 抛错，绝不降级成假锁。
+ */
+export function writerListenEndpoint(bookKey) {
+  if (process.platform === 'win32') return writerPipeName(bookKey)
+  if (process.platform === 'linux') return '\0mozhou-writer-' + writerLockNameSuffix(bookKey)
+  throw new BookWriterLockError(
+    'WRITER_LOCK_UNSUPPORTED_PLATFORM',
+    bookKey,
+    'book writer lock has no cross-process exclusive primitive on platform=' + process.platform + '; refusing to degrade to a non-exclusive lock',
+  )
 }
 
 export class BookWriterLockError extends Error {
@@ -148,6 +168,7 @@ export async function holdBookWriteLock(root, options = {}) {
     throw new BookWriterLockError('BOOK_ROOT_UNRESOLVABLE', String(root), 'book root cannot be canonicalized: ' + root + ' (' + error.message + ')')
   }
   const pipeName = writerPipeName(bookKey)
+  const endpoint = writerListenEndpoint(bookKey)
   const server = net.createServer()
   await new Promise((resolveListen, rejectListen) => {
     server.once('error', (error) => {
@@ -155,9 +176,9 @@ export async function holdBookWriteLock(root, options = {}) {
         rejectListen(new BookWriterLockError('BOOK_WRITE_BUSY', bookKey, 'another writer already holds this book (bookKey=' + bookKey + ' pipe=' + pipeName + ') — stop the server or the other script first'))
         return
       }
-      rejectListen(new BookWriterLockError('WRITER_LOCK_FAILED', bookKey, 'failed to bind writer pipe: bookKey=' + bookKey + ' pipe=' + pipeName + ' code=' + error.code))
+      rejectListen(new BookWriterLockError('WRITER_LOCK_FAILED', bookKey, 'failed to bind writer endpoint: bookKey=' + bookKey + ' pipe=' + pipeName + ' endpoint=' + endpoint + ' code=' + error.code))
     })
-    server.listen(pipeName, () => resolveListen())
+    server.listen(endpoint, () => resolveListen())
   })
   let released = false
   return async () => {

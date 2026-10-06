@@ -32,6 +32,8 @@ export type BookWriteLockErrorCode =
   | 'WRITER_LOCK_TIMEOUT'
   | 'WRITER_LOCK_ABORTED'
   | 'WRITER_LOCK_FAILED'
+  /** 当前平台没有等价于命名管道的真排他跨进程原语——fail-closed，不降级成假锁。 */
+  | 'WRITER_LOCK_UNSUPPORTED_PLATFORM'
 
 export class BookWriteLockError extends Error {
   override readonly name = 'BookWriteLockError'
@@ -72,7 +74,29 @@ function normalizeBookKey(nativePath: string): string {
 }
 
 export function writerPipeName(bookKey: string): string {
-  return `${WRITER_PIPE_PREFIX}${createHash('sha256').update(bookKey).digest('hex').slice(0, 32)}`
+  return `${WRITER_PIPE_PREFIX}${writerLockNameSuffix(bookKey)}`
+}
+
+/** 锁名中平台无关的部分：`<sha256(bookKey).slice(0,32)>`。 */
+function writerLockNameSuffix(bookKey: string): string {
+  return createHash('sha256').update(bookKey).digest('hex').slice(0, 32)
+}
+
+/**
+ * 实际监听端点（锁身份在两种平台上同源，只换承载原语）：
+ * - `win32` → `\\.\pipe\mozhou-writer-<hash>`：会话本地命名管道，第二个绑定者得 EADDRINUSE；
+ * - `linux` → `\0mozhou-writer-<hash>`：抽象命名空间套接字，同为「真排他 + 内核管生命周期」，
+ *   且不落文件系统因此同样无需删除任何东西（与命名管道语义一一对应）；
+ * - 其他平台没有等价原语 → fail-closed 抛错，**绝不**降级成进程内锁或假锁。
+ */
+export function writerListenEndpoint(bookKey: string): string {
+  if (process.platform === 'win32') return writerPipeName(bookKey)
+  if (process.platform === 'linux') return `\0mozhou-writer-${writerLockNameSuffix(bookKey)}`
+  throw new BookWriteLockError(
+    'WRITER_LOCK_UNSUPPORTED_PLATFORM',
+    bookKey,
+    `book writer lock has no cross-process exclusive primitive on platform=${process.platform}; refusing to degrade to a non-exclusive lock`,
+  )
 }
 
 /* ---------------------------------------------------------------------------
@@ -333,6 +357,7 @@ export async function acquireBookWriteLock(
     allowUnverifiedRoot: options.allowUnverifiedRoot,
   })
   const pipeName = writerPipeName(bookKey)
+  const endpoint = writerListenEndpoint(bookKey)
   const timeoutMs = options.timeoutMs ?? 0
   const pollIntervalMs = options.pollIntervalMs ?? 50
   const deadline = Date.now() + Math.max(0, timeoutMs)
@@ -345,7 +370,7 @@ export async function acquireBookWriteLock(
         `book writer lock wait aborted: bookKey=${bookKey} pipe=${pipeName}`,
       )
     }
-    const outcome = await listenOnce(pipeName)
+    const outcome = await listenOnce(endpoint)
     if (outcome.ok) {
       return new BookWriteLock(bookKey, pipeName, outcome.server)
     }
@@ -353,7 +378,7 @@ export async function acquireBookWriteLock(
       throw new BookWriteLockError(
         'WRITER_LOCK_FAILED',
         bookKey,
-        `failed to bind writer pipe: bookKey=${bookKey} pipe=${pipeName} code=${outcome.code}`,
+        `failed to bind writer endpoint: bookKey=${bookKey} pipe=${pipeName} endpoint=${endpoint} code=${outcome.code}`,
       )
     }
     if (timeoutMs <= 0) {

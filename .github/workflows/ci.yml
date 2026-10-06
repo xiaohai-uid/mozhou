@@ -43,10 +43,13 @@ jobs:
         run: pnpm run test:packages
       - name: Typecheck apps/web (tsc -b)
         run: pnpm --filter @mozhou/web typecheck
-      - name: Test apps/web (vitest)
-        run: pnpm --filter @mozhou/web test
+      # Web 层构建必须先于 Web 层测试：dist-server/ 只由这一步产出（根 tsc -b 只引用
+      # packages/*，apps/web 的 tsconfig 是 noEmit），而跨进程写锁等用例会 spawn 子进程
+      # 直接 import dist-server/platform/writerLock.js。顺序颠倒时这些用例在全新检出上必挂。
       - name: Build apps/web (vite)
         run: pnpm --filter @mozhou/web build
+      - name: Test apps/web (vitest)
+        run: pnpm --filter @mozhou/web test
       # 文档门禁：术语单一权威 + 架构地图新鲜度。
       # 二者都是「只许变好」的检查，失败即阻断合并。
       - name: Doc gates (glossary / architecture / gates / term-map / readmes)
