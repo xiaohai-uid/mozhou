@@ -11,13 +11,22 @@
  * - 正文变化：指标必须跟着变，不能停在首帧快照。
  */
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProseEditorPanel } from './ProseEditorPanel'
 import { chapterDraftKey, saveDraftCache } from '../../shell/workbenchStorage'
 import type { BookInfo } from '../../shell/workbenchStorage'
 
 const BOOK: BookInfo = { root: 'C:/tmp/book-a', bookId: 'bk_aaaa', title: '雾港失真' }
+
+/**
+ * AST 化同变更新（CHG-20261006-02，approved requirement change）：
+ * 编辑器从 textarea 换成 TipTap/ProseMirror——jsdom 无浏览器默认输入行为，
+ * 键入走「改 DOM + PM DOMObserver 捕获」路径（与真实输入落字后 PM 读 DOM 同源）。
+ */
+async function typeProse(editorEl: HTMLElement, fullText: string): Promise<void> {
+  editorEl.innerHTML = `<p>${fullText}</p>`
+  await new Promise((resolve) => setTimeout(resolve, 60)) // PM DOMObserver flush
+}
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn((input: string) => {
@@ -52,12 +61,11 @@ describe('ProseEditorPanel × EditorQualityTelemetry（生产接线）', () => {
   })
 
   it('键入正文后指标随真实文本更新（不停在首帧）', async () => {
-    const user = userEvent.setup()
     saveDraftCache('夜幕降临，钟声在海港回荡。', chapterDraftKey(BOOK, 1))
     render(<ProseEditorPanel book={BOOK} chapterIndex={1} />)
     expect(screen.getByTestId('editor-quality-telemetry').textContent ?? '').toContain('11')
 
-    await user.type(screen.getByRole<HTMLTextAreaElement>('textbox'), '海边')
+    await typeProse(screen.getByRole('textbox'), '夜幕降临，钟声在海港回荡。海边')
 
     await waitFor(() => {
       expect(screen.getByTestId('editor-quality-telemetry').textContent ?? '').toContain('13')
@@ -65,9 +73,8 @@ describe('ProseEditorPanel × EditorQualityTelemetry（生产接线）', () => {
   })
 
   it('AI 腔调正文：遥测条在同一生产路径上转为「待净化」（失败路径不静默）', async () => {
-    const user = userEvent.setup()
     render(<ProseEditorPanel book={BOOK} chapterIndex={1} />)
-    await user.type(screen.getByRole<HTMLTextAreaElement>('textbox'), '恐惧瞬间吞噬了他的理智。')
+    await typeProse(screen.getByRole('textbox'), '恐惧瞬间吞噬了他的理智。')
 
     await waitFor(() => {
       const text = screen.getByTestId('editor-quality-telemetry').textContent ?? ''

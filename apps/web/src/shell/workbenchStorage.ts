@@ -5,6 +5,7 @@
 import { isViewId } from './views'
 import type { ViewId } from './views'
 import { syncSha256Hex } from '../workbench/lib/sha256'
+import type { EditorBlock } from '../workbench/editor/customNodes'
 
 export interface BookInfo {
   readonly root: string
@@ -115,6 +116,43 @@ export function chapterDraftKey(
 }
 
 const CANDIDATE_CACHE_KEY = 'mozhou.candidate.cache'
+
+/**
+ * 编辑器结构投影（CHG-20261006-02 AST 化）：场景块等编辑器结构存本地投影，
+ * 不进 Chapter body（正文契约仍是纯文本字符串）。键纪律与草稿缓存一致：
+ * 绑定书身份（bookId 优先 root 兜底），无身份不读不写。
+ */
+const EDITOR_PROJECTION_KEY = 'mozhou.editor.projection'
+
+export interface EditorProjection {
+  readonly savedAt: string
+  readonly blocks: readonly EditorBlock[]
+}
+
+export function loadEditorProjection(chapterKey: DraftCacheKey): EditorProjection | null {
+  if (chapterKey === null) return null
+  try {
+    const raw = window.localStorage.getItem(`${EDITOR_PROJECTION_KEY}.${chapterKey}`)
+    if (raw === null) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    const { savedAt, blocks } = parsed as { savedAt?: unknown; blocks?: unknown }
+    if (typeof savedAt !== 'string' || !Array.isArray(blocks)) return null
+    return { savedAt, blocks: blocks as readonly EditorBlock[] }
+  } catch {
+    return null
+  }
+}
+
+export function saveEditorProjection(blocks: readonly EditorBlock[], chapterKey: DraftCacheKey): void {
+  if (chapterKey === null) return
+  try {
+    const projection: EditorProjection = { savedAt: new Date().toISOString(), blocks }
+    window.localStorage.setItem(`${EDITOR_PROJECTION_KEY}.${chapterKey}`, JSON.stringify(projection))
+  } catch {
+    // 投影是增强，不是硬依赖；不可用时静默保留纯文本正文。
+  }
+}
 
 export interface CandidateCache {
   readonly candidateId: string

@@ -9,6 +9,26 @@ const b = { root: 'C:/chapter-b', bookId: 'chapter-b', title: '乙书' }
 beforeEach(() => { localStorage.clear() })
 afterEach(() => { vi.unstubAllGlobals() })
 
+/**
+ * AST 化同变更新（CHG-20261006-02，approved requirement change）：
+ * 编辑器 textarea → TipTap contenteditable。`toHaveValue` 改 `toHaveTextContent`
+ * （正文纯文本契约不变）；`fireEvent.change` 改「改 DOM + PM DOMObserver 捕获」
+ * （jsdom 无浏览器默认输入行为；与真实输入落字后 PM 读 DOM 同源）。
+ * 断言语义（快照归属/回填隔离/迟到保存不污染）全部保留。
+ */
+async function typeProse(editorEl: HTMLElement, fullText: string): Promise<void> {
+  editorEl.innerHTML = `<p>${fullText}</p>`
+  await new Promise((resolve) => setTimeout(resolve, 60)) // PM DOMObserver flush
+}
+
+function editorEl(): HTMLElement {
+  return screen.getByLabelText('章节正文编辑区')
+}
+
+async function expectProse(text: string): Promise<void> {
+  await waitFor(() => expect(editorEl().textContent ?? '').toBe(text))
+}
+
 describe('编辑区切章的快照归属', () => {
   it.each([false, true])('重开时已保存缓存跟随磁盘，未保存编辑保留（有未保存编辑=%s）', async (dirty) => {
     let diskBody = '服务端初稿。'
@@ -23,17 +43,17 @@ describe('编辑区切章的快照归属', () => {
       return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision, body: diskBody }))
     }))
     const view = render(<ProseEditorPanel book={a} chapterIndex={1} />)
-    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveValue('服务端初稿。'))
-    fireEvent.change(screen.getByLabelText('章节正文编辑区'), { target: { value: '已保存的草稿。' } })
+    await expectProse('服务端初稿。')
+    await typeProse(editorEl(), '已保存的草稿。')
     fireEvent.click(screen.getByTestId('prose-accept-draft'))
     await waitFor(() => expect(screen.getByTestId('prose-save-result')).toHaveTextContent('r2'))
-    if (dirty) fireEvent.change(screen.getByLabelText('章节正文编辑区'), { target: { value: '作者尚未保存的新修改。' } })
+    if (dirty) await typeProse(editorEl(), '作者尚未保存的新修改。')
     view.unmount()
     diskBody = '服务端已撤销后的原稿。'
     revision++
     render(<ProseEditorPanel book={a} chapterIndex={1} />)
     await waitFor(() => expect(screen.getByTestId('prose-accept-draft')).toBeEnabled())
-    expect(screen.getByLabelText('章节正文编辑区')).toHaveValue(dirty ? '作者尚未保存的新修改。' : diskBody)
+    await expectProse(dirty ? '作者尚未保存的新修改。' : diskBody)
   })
 
   it.each([false, true])('旧快照不回填新书章空缓存（切书=%s）', async (switchBook) => {
@@ -46,12 +66,12 @@ describe('编辑区切章的快照归属', () => {
       return new Promise<Response>(resolve => { release = resolve })
     }))
     const view = render(<ProseEditorPanel book={a} chapterIndex={1} />)
-    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveValue('甲书第一章原文。'))
+    await expectProse('甲书第一章原文。')
     view.rerender(<ProseEditorPanel book={nextBook} chapterIndex={nextChapter} />)
     expect(loadDraftCache(chapterDraftKey(nextBook, nextChapter))).toBe('')
-    expect(screen.getByLabelText('章节正文编辑区')).toHaveValue('')
+    expect(editorEl().textContent ?? '').toBe('')
     await act(async () => { release(okJson({ ok: true, exists: true, revision: 7, phase: 'draft', body: '新现场的正确正文。' })); await Promise.resolve() })
-    expect(screen.getByLabelText('章节正文编辑区')).toHaveValue('新现场的正确正文。')
+    await expectProse('新现场的正确正文。')
     expect(loadDraftCache(chapterDraftKey(nextBook, nextChapter))).toBe('新现场的正确正文。')
     expect(loadDraftCache(chapterDraftKey(a, 1))).toBe('甲书第一章原文。')
   })
@@ -64,11 +84,11 @@ describe('编辑区切章的快照归属', () => {
       return Promise.resolve(okJson({ ok: true, exists: true, phase: 'draft', revision: 1, body: payload.chapterIndex === 1 ? '第一章。' : '第二章。' }))
     }))
     const view = render(<ProseEditorPanel book={a} chapterIndex={1} />)
-    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveValue('第一章。'))
+    await expectProse('第一章。')
     fireEvent.click(screen.getByTestId('prose-accept-draft'))
     view.rerender(<ProseEditorPanel book={a} chapterIndex={2} />)
     await act(async () => { rejectSave(new Error('第一章旧保存失败')); await Promise.resolve() })
     expect(screen.queryByText(/第一章旧保存失败/)).not.toBeInTheDocument()
-    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveValue('第二章。'))
+    await expectProse('第二章。')
   })
 })

@@ -20,6 +20,10 @@
     "@mozhou/pipeline": "workspace:*",
     "@mozhou/quality-engine": "workspace:*",
     "@mozhou/runtime": "workspace:*",
+    "@tiptap/core": "^3.31.4",
+    "@tiptap/pm": "^3.31.4",
+    "@tiptap/react": "^3.31.4",
+    "@tiptap/starter-kit": "^3.31.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

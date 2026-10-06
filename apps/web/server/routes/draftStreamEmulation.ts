@@ -34,3 +34,22 @@ export function mockDraftStream(prompt: string, onDelta?: (text: string) => void
     }
   })()
 }
+
+/**
+ * 行内编辑流的 mock 源（CHG-20261006-02 /api/prose.edit.stream）。
+ * 纪律与 mockDraftStream 一致：非重叠切片、空块丢弃；内容回吐**选区原文**——
+ * mock 语义是演示流节奏与帧协议，不伪造改写（Accept 后正文不变，诚实）。
+ */
+export function mockProseEditStream(selectedText: string, onDelta?: (text: string) => void): AsyncIterable<string> {
+  const base = selectedText.trim().length > 0 ? selectedText.trim() : '　　他望着窗外的雨，没有说话。'
+  const chunks = [base.slice(0, 8), base.slice(8, 18), base.slice(18)]
+  return (async function* () {
+    for (const chunk of chunks) {
+      await Promise.resolve()
+      if (chunk.length > 0) {
+        onDelta?.(chunk)
+        yield chunk
+      }
+    }
+  })()
+}

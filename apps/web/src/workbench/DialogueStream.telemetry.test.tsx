@@ -46,11 +46,13 @@ describe('AI 采纳后的全局状态', () => {
     const meta = () => view.container.querySelector('.chapterbar .meta')
     await waitFor(() => expect(meta()).toHaveTextContent('5 字 · r1'))
     fireEvent.click(screen.getByTestId('adopt-into-slate'))
-    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveValue(generated))
+    // AST 化同变更新（CHG-20261006-02）：编辑器 textarea → TipTap contenteditable，
+    // toHaveValue（textarea .value）→ toHaveTextContent（正文纯文本契约不变）。
+    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveTextContent(generated))
     await waitFor(() => expect(meta()).toHaveTextContent('9 字 · r2'))
     expect(within(screen.getByTestId('chapter-rail')).getByRole('button', { name: /第一章/ })).toHaveTextContent('9 字')
     fireEvent.click(screen.getByTestId('undo-accept'))
-    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveValue(original))
+    await waitFor(() => expect(screen.getByLabelText('章节正文编辑区')).toHaveTextContent(original))
     await waitFor(() => expect(meta()).toHaveTextContent('5 字 · r3'))
     expect(within(screen.getByTestId('chapter-rail')).getByRole('button', { name: /第一章/ })).toHaveTextContent('5 字')
   })

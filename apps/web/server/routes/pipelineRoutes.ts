@@ -106,6 +106,9 @@ function isMockDraftProviderMode(env: NodeJS.ProcessEnv): boolean {
   return configured === 'mock' || configured === 'mock-empty'
 }
 
+/** mock 判据的**导出缝**（CHG-20261006-02）：行内编辑流（proseEditRoutes）与 draft.stream 共用同一判据，禁止各写一份。 */
+export { isMockDraftProviderMode }
+
 /**
  * 能力探针的**完整**结论：可用性 + 病因分类。
  *
@@ -205,7 +208,6 @@ function decoratePromptWithSkills(prompt: string, skills: readonly string[]): st
   if (skills.includes('dialogue-polish')) {
     constraints.push('【对白打磨】压缩交代性对白，增加潜台词与语调性格差异。')
   }
-
   if (constraints.length === 0) return prompt
   return `${constraints.join('\n')}\n\n${prompt}`
 }
