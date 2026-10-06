@@ -22,12 +22,12 @@
 
 ## 统计
 
-- 词条总数: **88**
+- 词条总数: **90**
 - 声明: **27**
 - 局部同名: **6**
-- 引用: **9**
+- 引用: **10**
 - 仅测试: **1**
-- 未验证: **45**
+- 未验证: **46**
 
 ## 已确认的命名漂移
 
@@ -91,6 +91,8 @@
 | 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
 | 能力注册表 | Capability Registry | `CapabilityRegistry` | `packages/runtime/src/registry.ts:23` | 声明 |
 | 能力配方 | Capability Recipe | `CapabilityRecipe` | `packages/runtime/src/recipe/types.ts:142` | 声明 |
+| 任务流 | Task Stream | - | - | 未验证 |
+| 候选生成标识 | Generation Id | `generationId` | `packages/pipeline/src/draft-candidate.ts:111` | 引用 |
 | 评估引擎 | Evaluation Engine | - | - | 未验证 |
 | 长篇基准 | Long Novel Benchmark | - | - | 未验证 |
 | 文学审查报告 | QualityReviewReport | `QualityReviewReport` | `packages/quality-engine/src/types.ts:68` | 声明 |
@@ -118,7 +120,7 @@
 | 纵切 | Vertical Slice | - | - | 未验证 |
 | 切片 | Slice | `slice` | `packages/context-compiler/src/assemble.ts:295` | 局部同名 |
 | 挂账项 | Deferred Item | - | - | 未验证 |
-| 任务 | Task | `task` | `packages/pipeline/src/draft-continue.ts:98` | 局部同名 |
+| 任务 | Task | `task` | `packages/pipeline/src/draft-continue.ts:115` | 局部同名 |
 | 任务简报 | Task Brief | - | - | 未验证 |
 | 决策记录 | ADR | `ADR` | `apps/web/src/story-brain/StoryBrainPanel.tsx:143` | 引用 |
 | 纪事 | Chronicle | - | - | 未验证 |

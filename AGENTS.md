@@ -1,6 +1,6 @@
 # 墨舟 (MoZhou) — AI 小说写作平台
 
-> **本会话第一个动作：先读 `C:\zcode\AGENTS.md`（符号链接自 `~/.zcode/AGENTS.md`），再调任何工具、再作答——包括看起来只是「查一下资料」的问题。** 本文件只是在它之上追加项目级约定，任何时候都不替代它。判断权不在你：这条闸门没有"任务太小所以跳过"这一档。
+> 共享规则的唯一源是 `C:\Users\a1691\.zcode\AGENTS.md`；`C:\zcode\AGENTS.md` 是工作区指针文件。执行前加载当前相关规则；已经完整加载且版本有效的内容可复用，避免重复注入。此文件只追加 MoZhou 项目约束，不替代共享规则。
 >
 > Repo-level agent instructions; the global contract above always wins, and this file never replaces it.
 
@@ -71,6 +71,15 @@
 27. Produce a structured Morning Report detailing commits, verification results, contract deltas, pending migrations, blocked tickets, external side effects, and retained diffs.
 
 ### 7. 项目基建
+
+作者数据相关改动优先核对以下三条项目约束。它们对应现有契约，不授权新增功能或改变冻结契约。完整验收例、源位置和本轮观察见 [Codex 项目验收规格与证据](.scratch/codex-readiness-20261006/spec-and-evidence.md)。
+
+| 约束 | 禁止的行为 | 可执行的安全路径 |
+|---|---|---|
+| 作者决定正文写入 | 把生成候选自动当作 Active Draft 或 Chapter Commit；冲突时静默覆盖 | 候选保持独立；作者显式采纳；保存携带预期版本，冲突保留本地编辑并提示核对；定稿走质量门 |
+| 旧任务不能污染新现场 | 停止、切书、切章后，旧请求的成功、失败或终帧改变当前正文/状态 | 使旧请求失效，取消其可取消资源；按任务身份和视图代次拒绝迟到结果；保留未采纳半稿，并检查新现场未变 |
+| 恢复必须验证作者数据 | 仅凭备份文件存在、构建成功或恢复函数返回就宣称恢复完成 | 保留可恢复原件；先在隔离目录恢复，再回读正文、书章身份和版本；未覆盖的安装包、断电或并发恢复标为未验证 |
+
 - 术语：**[`GLOSSARY.md`](./GLOSSARY.md)**（原 `CONTEXT.md`，2026-10-01 迁正）
 - 架构地图：`docs/architecture.md`；决策地图：`docs/adr/INDEX.md`；决策记录：`docs/adr/`
 - 变更记录地图：[`PROJECT-MAP.md`](./PROJECT-MAP.md)（全局指令《项目地图与变更溯源》要求的 canonical 入口）——变更 ID、基线、验收、证据索引；专项细节归上列各图，本图不重复维护
@@ -113,7 +122,7 @@ Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mozhou** (11413 symbols, 30494 relationships, 571 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mozhou** (11610 symbols, 36061 relationships, 560 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
