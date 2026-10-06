@@ -942,3 +942,58 @@ describe('embedding 直达卡片与合并收口', () => {
   })
 })
 
+/* ----------------------------------------------------------------------------
+ * 卷状态压缩与召回集成断言
+ * -------------------------------------------------------------------------- */
+
+describe('卷边界状态压缩与召回集成断言 (State Compaction Recall Filtering)', () => {
+  it('卷压缩后，已折叠微事实不再作为活跃事实召回；跨卷有效事实保持召回', async () => {
+    const vol1Id = volumeAt(1)
+
+    // 已被第一卷压缩折叠的微事实
+    const compactedFact = mkFact(LIN, {
+      id: factAt(1200),
+      predicate: 'early_realm',
+      value: '炼气期',
+      validFrom: 1,
+      validUntil: 5,
+      compactedIntoVolumeId: vol1Id,
+    })
+
+    // 跨卷持续有效的活跃事实
+    const liveFact = mkFact(LIN, {
+      id: factAt(1201),
+      predicate: 'spirit_root',
+      value: '天灵根',
+      validFrom: 1,
+      validUntil: null,
+      compactedIntoVolumeId: null,
+    })
+
+    const snapshot = snap({
+      temporalFact: [compactedFact, liveFact],
+    })
+
+    // 在卷后第 11 章进行召回
+    const laterScope = {
+      chapterIndex: 11,
+      pov: 'protagonist' as const,
+      povEntity: LIN,
+    }
+
+    const result = await recallCandidates({
+      draftText: '林枫运转灵力，展现天灵根之威。',
+      cards: [linCard],
+      snapshot,
+      scope: laterScope,
+      config: DEFAULT_KHOP_RECALL_CONFIG,
+    })
+
+    // 核心断言：被压缩的微事实不再被召回
+    expect(result.candidates.some((c) => c.id === compactedFact.id)).toBe(false)
+    // 活跃事实正常被召回
+    expect(result.candidates.some((c) => c.id === liveFact.id)).toBe(true)
+  })
+})
+
+

@@ -14,6 +14,8 @@ import {
   type KnowledgeState,
   type QueryActiveFactsRequest,
   type TemporalFact,
+  type VolumeNodeId,
+  type VolumeSummaryLlmPort,
 } from '@mozhou/kernel'
 import Database from 'better-sqlite3'
 import {
@@ -59,6 +61,12 @@ import {
   type BaselineReport,
   type ReconciliationOptions,
 } from './reconciliation.js'
+import {
+  executeVolumeCompaction,
+  markVolumeCompleted as markVolumeCompletedInCanon,
+  type VolumeCompactionResult,
+} from './compaction.js'
+export type { VolumeCompactionResult } from './compaction.js'
 export type { BaselineReport } from './reconciliation.js'
 import {
   propagateStaleMarkers as propagateStaleMarkersIntoCanon,
@@ -410,6 +418,32 @@ export class LocalDataPlane {
   }
   private _reconciliation: ReconciliationService | null = null
 
+  /**
+   * 卷边界状态压缩事务（US#8 · ADR-0011 · ADR-0019 #3）
+   */
+  async compactVolume(options: {
+    volumeNodeId: VolumeNodeId
+    volumeEndChapter?: number | undefined
+    llm: VolumeSummaryLlmPort
+    maxChars?: number | undefined
+  }): Promise<VolumeCompactionResult> {
+    return executeVolumeCompaction({
+      root: this.root,
+      volumeNodeId: options.volumeNodeId,
+      volumeEndChapter: options.volumeEndChapter,
+      llm: options.llm,
+      maxChars: options.maxChars,
+      db: this._db,
+    })
+  }
+
+  /**
+   * 标记卷大纲节点为完结状态（completed）
+   */
+  markVolumeCompleted(volumeNodeId: VolumeNodeId): void {
+    markVolumeCompletedInCanon(this.root, volumeNodeId, this._db)
+  }
+
   close(): void {
     this._reconciliation?.stopWatcher()
     this._db.close()
@@ -448,16 +482,53 @@ export interface WorksOverview {
  * 纯确定性扫描 MD/JSONL → 从零重造投影 → 重立 hash 基线。
  * 零 LLM、零触碰 canon 文件；结构违例宁败不脏（readCanonState 抛错）。
  */
-export function rebuildProjectionFromCanon(root: string): void {
+export function rebuildProjectionFromCanon(root: string, activeDb?: Database.Database): void {
   const state = readCanonState(root)
 
-  removeProjectionFiles(root)
-  const db = openDatabase({ path: join(root, RUNTIME_DB_PATH) })
-  try {
-    initProjection(db)
-    populateProjection(db, state)
-  } finally {
-    db.close()
+  if (activeDb !== undefined) {
+    activeDb.transaction(() => {
+      activeDb.prepare('DELETE FROM entity_excluded_phrases').run()
+      activeDb.prepare('DELETE FROM entity_alias_rules').run()
+      activeDb.prepare('DELETE FROM entity_cards').run()
+      activeDb.prepare('DELETE FROM tracking_lines').run()
+      activeDb.prepare('DELETE FROM planning_artifacts').run()
+      activeDb.prepare('DELETE FROM outline_nodes').run()
+      activeDb.prepare('DELETE FROM books').run()
+      activeDb.prepare('DELETE FROM meta').run()
+    })()
+    populateProjection(activeDb, state)
+  } else {
+    try {
+      removeProjectionFiles(root)
+      const db = openDatabase({ path: join(root, RUNTIME_DB_PATH) })
+      try {
+        initProjection(db)
+        populateProjection(db, state)
+      } finally {
+        db.close()
+      }
+    } catch (error) {
+      if ((error as { code?: string }).code === 'EPERM' || (error as { code?: string }).code === 'EBUSY') {
+        const db = openDatabase({ path: join(root, RUNTIME_DB_PATH) })
+        try {
+          db.transaction(() => {
+            db.prepare('DELETE FROM entity_excluded_phrases').run()
+            db.prepare('DELETE FROM entity_alias_rules').run()
+            db.prepare('DELETE FROM entity_cards').run()
+            db.prepare('DELETE FROM tracking_lines').run()
+            db.prepare('DELETE FROM planning_artifacts').run()
+            db.prepare('DELETE FROM outline_nodes').run()
+            db.prepare('DELETE FROM books').run()
+            db.prepare('DELETE FROM meta').run()
+          })()
+          populateProjection(db, state)
+        } finally {
+          db.close()
+        }
+      } else {
+        throw error
+      }
+    }
   }
 
   // 重立基线（S4：基线只记应用自己的写入；canon 未变则与旧基线逐字节相同）

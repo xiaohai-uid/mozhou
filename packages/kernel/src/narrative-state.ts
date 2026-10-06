@@ -537,6 +537,7 @@ export function queryActiveFacts(
   const result: TemporalFact[] = []
   for (const fact of state.facts.values()) {
     if (fact.status === 'rejected') continue
+    if (fact.compactedIntoVolumeId !== null) continue
     if (fact.validFrom > request.chapter) continue
     if (fact.validUntil !== null && fact.validUntil < request.chapter) continue
     if (subjects !== null && !subjects.has(fact.subject)) continue
