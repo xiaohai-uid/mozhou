@@ -24,6 +24,6 @@
     "@mozhou/runtime": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^3.2.7"
+    "vitest": "^4.0.4"
   }
 }
