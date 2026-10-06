@@ -9,7 +9,7 @@ tags:
 # 变更影响引擎折叠规格（Phase 5）
 
 > Wayfinder 地图 [#59](https://github.com/xiaohai-uid/mozhou/issues/59) · 研究：docs/research/t60-a / t61-b / t62-c / t63-d · 裁决：docs/research/t65-grill-traversal-trigger（#64）/ t66-grill-semantic-reuse（#65）
-> 折叠纪律：只折叠不发明；冲突以 grilling 终裁为准；ADR-0003 双图层为主干
+> 折叠纪律：只折叠不发明；冲突以 grilling 终裁为准；K-0003 双图层为主干
 
 ## 0. 一句话
 
@@ -17,7 +17,7 @@ tags:
 
 ## 1. 全局裁定（t65/t66 继承）
 
-- 边界母版：ADR-0024:26（Gate 纯机械+LLM 旁路）+ ADR-0003（Step1 确定性/Step2 语义/Step3 作者动作）
+- 边界母版：ADR-0024:26（Gate 纯机械+LLM 旁路）+ K-0003（Step1 确定性/Step2 语义/Step3 作者动作）
 - 词表纪律：domain-events.ts:4-6 唯一真源、死词条禁回填（:9-10）、新词条带发射方义务禁先加词后实现
 - 确定性面**零新事件**（D19：不增 ReconciliationSettled）；TraversalStarted/Finished（E1/E2）仅作遍历生命周期观测（词表 15→17）
 - 语义层 V1 无默认写口，三通道：报告文件→指针事件（SemanticAnalyzed，不成对，词表 15→16）→派生投影
@@ -55,7 +55,7 @@ tags:
 | D14 入账 | 报告文件先→SemanticAnalyzed 指针事件后→SQLite 投影 semantic_analysis |
 | D15 Port | V1 零集成点；critical→style 桥接 V2 缓；只记 suggestion |
 | D16 保留 | V1 全保留 |
-| D17/R2 | 语义输入面 = 受影响章 diffs + 修改实体定义（ADR-0003:21）+ receipt 锚点伴随态；diffs 以引用摘要进 payload（不内嵌全文） |
+| D17/R2 | 语义输入面 = 受影响章 diffs + 修改实体定义（K-0003:21）+ receipt 锚点伴随态；diffs 以引用摘要进 payload（不内嵌全文） |
 
 ## 5. 复用面定案（t66 D23-D28）
 

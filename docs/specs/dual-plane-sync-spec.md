@@ -23,7 +23,7 @@ tags:
 | Q3 | 投影更新时机 | **write-through 同步**：文件写成功 → 同一逻辑操作内刷投影，失败即报错 | 本地单机毫秒级写入；投影落后窗口让编译器读脏状态 |
 | Q4 | 外部修改检测面 | **启动必检 + 运行期 watcher**（mtime 预筛 + hash 复核） | 与 Obsidian 并行使用是核心场景；承诺语义="最终必被检出" |
 | Q5 | hash 基线存放 | **`.mozhou/manifest.json`** + rebuild=全量吸收 | SQLite 可弃 ⇒ 基线必须在文件侧 |
-| Q6 | 目录树 v2 | ADR-0006 草案细化版（见下节） | 新实体逐个安家，不推翻原结构 |
+| Q6 | 目录树 v2 | K-0006 草案细化版（见下节） | 新实体逐个安家，不推翻原结构 |
 | Q7 | 多书工作区 | **一书一目录**：打开目录 = 打开一本书 | 文件管理器就是书架；多一层注册表无真实需求 |
 
 ### 分层表（Q1 的唯一答案集）
@@ -141,7 +141,7 @@ detected → extracting → awaiting_author → applied | partially_applied | di
 
 ## 相对既有 ADR 的显式细化清单
 
-1. **ADR-0006**：新增 `book.json`、`.mozhou/manifest.json`、`.mozhou/receipts/`；Arc 层文件明确；Scene 安家于章大纲文件；摘要文件获得保护规则。
+1. **K-0006**：新增 `book.json`、`.mozhou/manifest.json`、`.mozhou/receipts/`；Arc 层文件明确；Scene 安家于章大纲文件；摘要文件获得保护规则。
 2. **ADR-0010**：检测面从"启动时"扩为"启动必检 + 运行期 watcher"；提案细化为五态状态机 + 逐条取舍粒度；澄清拒绝 ≠ 回滚文件；新增 jsonl 行级三分法与写前校验前置防线。
 3. **US#19**："launch 检测" ⊂ 启动必检，语义被 Q4 吸收并扩展。
 4. **工单 #13**：`设定/` 子目录四目改五目对齐 EntityRef 五前缀（原「世界/」并入概念，新增物品）；Codex 自由 md 的可选 `ref:` 升格为必填身份字段，frontmatter 即目录卡正式 Schema。
