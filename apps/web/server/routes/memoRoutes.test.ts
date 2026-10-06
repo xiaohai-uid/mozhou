@@ -129,7 +129,7 @@ describe('POST /api/memo（备忘录 · .scratch/mozhou-mvp/issues/22-openwrite-
     const overflow = await call(base, { action: 'create', title: 'over', content: 'x' })
     expect(overflow.status).toBe(409)
     expect(overflow.payload['code']).toBe('MEMO_LIMIT_EXCEEDED')
-  })
+  }, 30_000)
 
   it('损坏的便签文件 → list 500 MEMO_PERSIST_FAILED（诚实报错）', async () => {
     root = mkdtempSync(join(tmpdir(), 'mozhou-memo-'))

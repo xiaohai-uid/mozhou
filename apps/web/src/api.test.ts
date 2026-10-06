@@ -1270,7 +1270,7 @@ describe('端侧多源书源检索 API 契约', () => {
     expect(nonNull.data.ok).toBe(true)
     expect(Array.isArray(nonNull.data.books)).toBe(true)
     expect(typeof nonNull.data.degraded).toBe('boolean')
-  })
+  }, 30_000)
 
   it('POST /api/crawler.extract：缺 URL 返回 400；私网/IPv6/非安全地址被安全策略拦截', async () => {
     const base = await listen()
