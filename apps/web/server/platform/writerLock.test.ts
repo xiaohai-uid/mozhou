@@ -27,6 +27,7 @@ import {
   canonicalBookKey,
   classifyBookRootKind,
   withBookWriteLock,
+  writerListenEndpoint,
   writerPipeName,
 } from './writerLock.js'
 
@@ -56,7 +57,10 @@ afterAll(() => {
  * ------------------------------------------------------------------------- */
 
 describe('canonicalBookKey · 书籍身份归一', () => {
-  it('junction / 大小写 / 尾分隔符 / 点段等 7 种变体归一到同一个 key', () => {
+  // Windows 专属语义：junction 符号链接类型、盘符大小写不敏感、反斜杠尾分隔符。
+  // Linux 上三者都不成立（大小写敏感、'\' 是合法文件名字符、symlinkSync 不接受 'junction'），
+  // 故本用例只在 win32 断言；跨平台可断言的部分见下一个用例。
+  it.skipIf(process.platform !== 'win32')('junction / 大小写 / 尾分隔符 / 点段等 7 种变体归一到同一个 key', () => {
     const root = makeBookRoot()
     const link = join(makeTempDir('mozhou-writer-link-'), 'booklink')
     symlinkSync(root, link, 'junction')
@@ -81,7 +85,9 @@ describe('canonicalBookKey · 书籍身份归一', () => {
     expect([...distinct][0]).toBe(canonicalBookKey(root))
   })
 
-  it('不同目录得到不同 key；尾分隔符不产生第二个身份', () => {
+  // 同上的 Windows 专属部分：反斜杠尾分隔符与「key 必须全小写」都只在大小写不敏感、
+  // '\' 作分隔符的 Windows 上成立。跨平台部分见下一个用例。
+  it.skipIf(process.platform !== 'win32')('不同目录得到不同 key；尾分隔符不产生第二个身份', () => {
     const a = makeBookRoot()
     const b = makeBookRoot()
     expect(canonicalBookKey(a)).not.toBe(canonicalBookKey(b))
@@ -90,6 +96,15 @@ describe('canonicalBookKey · 书籍身份归一', () => {
     expect(key).toBe(key.toLowerCase())
     expect(key).not.toContain('\\')
     expect(key.endsWith('/book')).toBe(true)
+  })
+
+  it('身份归一的跨平台部分：不同目录不同 key；尾分隔符与点段不产生第二个身份', () => {
+    const a = makeBookRoot()
+    const b = makeBookRoot()
+    expect(canonicalBookKey(a)).not.toBe(canonicalBookKey(b))
+    expect(canonicalBookKey(a + '/')).toBe(canonicalBookKey(a))
+    expect(canonicalBookKey(join(a, 'x', '..'))).toBe(canonicalBookKey(a))
+    expect(canonicalBookKey(a)).not.toContain('\\')
   })
 
   it('不存在的书根抛可定位的 BOOK_ROOT_UNRESOLVABLE', () => {
@@ -251,11 +266,13 @@ describe('跨进程排他 · 强杀后可立即重取', () => {
   it('外部持有者占用同名管道时被拒；SIGKILL 后立即可取且不删除任何文件', async () => {
     const root = makeBookRoot()
     const key = canonicalBookKey(root)
-    const pipeName = writerPipeName(key)
+    // holder 必须绑定与实现相同的端点（win32 命名管道 / linux 抽象套接字）；
+    // 若直接传 writerPipeName，非 Windows 上 holder 绑不上，本用例就失去意义。
+    const endpoint = writerListenEndpoint(key)
     const parent = resolve(root, '..')
     const beforeEntries = readdirSync(parent).sort()
 
-    const child = await spawnPipeHolder(pipeName)
+    const child = await spawnPipeHolder(endpoint)
     try {
       let thrown: unknown
       try {
@@ -286,8 +303,11 @@ describe('跨进程排他 · 强杀后可立即重取', () => {
  * 4. 网络共享书根拒绝
  * ------------------------------------------------------------------------- */
 
+// 本组多数用例断言的是 Windows 盘符与 fsutil 探测语义：classifyBookRootKind 在非 win32 上
+// 直接判为 local（无盘符概念），这些分支在 Linux 上不可达，故逐条标 skipIf 只在 win32 断言；
+// 非 Windows 行为由「本机临时目录实测为 local」与紧随其后的 Linux 断言覆盖。
 describe('网络共享书根拒绝', () => {
-  it('UNC 书根（\\\\server\\share 与 //server/share）被拒绝为可写书根', async () => {
+  it.skipIf(process.platform !== 'win32')('UNC 书根（\\\\server\\share 与 //server/share）被拒绝为可写书根', async () => {
     for (const unc of ['\\\\fileserver\\novels\\book1', '//fileserver/novels/book1']) {
       expect(classifyBookRootKind(unc)).toBe('unc')
       let thrown: unknown
@@ -304,7 +324,7 @@ describe('网络共享书根拒绝', () => {
     }
   })
 
-  it('映射网络盘（注入探测：英文/中文远端标记）被拒绝；本机固定盘通过', async () => {
+  it.skipIf(process.platform !== 'win32')('映射网络盘（注入探测：英文/中文远端标记）被拒绝；本机固定盘通过', async () => {
     const remoteEn = (): string => 'Z: - Remote/Network Drive'
     const remoteZh = (): string => 'Z: - 远程/网络驱动器'
     expect(classifyBookRootKind('Z:\\novels\\book', remoteEn)).toBe('network-drive')
@@ -329,7 +349,15 @@ describe('网络共享书根拒绝', () => {
     await held.release()
   })
 
-  it('探测不可判定（null）→ unverified，默认拒绝且不绑定管道（fail-closed）', async () => {
+  it.skipIf(process.platform === 'win32')('非 Windows：无盘符概念，普通路径判为 local 且可正常取锁', async () => {
+    const root = makeBookRoot()
+    expect(classifyBookRootKind(root)).toBe('local')
+    const held = await acquireBookWriteLock(root)
+    expect(held.held).toBe(true)
+    await held.release()
+  })
+
+  it.skipIf(process.platform !== 'win32')('探测不可判定（null）→ unverified，默认拒绝且不绑定管道（fail-closed）', async () => {
     const root = makeBookRoot()
     expect(classifyBookRootKind(root, () => null)).toBe('unverified')
 
@@ -350,14 +378,14 @@ describe('网络共享书根拒绝', () => {
     await held.release()
   })
 
-  it('未知语言输出（无本地/远端标记）→ unverified，默认拒绝', () => {
+  it.skipIf(process.platform !== 'win32')('未知语言输出（无本地/远端标记）→ unverified，默认拒绝', () => {
     const root = makeBookRoot()
     const unknownLocale = (): string => 'Z: - Volume in drive Z is NOVELS'
     expect(classifyBookRootKind(root, unknownLocale)).toBe('unverified')
     expect(() => assertLocalWritableBookRoot(root, { driveTypeProbe: unknownLocale })).toThrow(/could not be verified/)
   })
 
-  it('显式 opt-in 覆盖：参数与 MOZHOU_ALLOW_UNVERIFIED_BOOK_ROOT=1 均放行（默认仍 fail-closed）', async () => {
+  it.skipIf(process.platform !== 'win32')('显式 opt-in 覆盖：参数与 MOZHOU_ALLOW_UNVERIFIED_BOOK_ROOT=1 均放行（默认仍 fail-closed）', async () => {
     const root = makeBookRoot()
     const nullProbe = (): string | null => null
 

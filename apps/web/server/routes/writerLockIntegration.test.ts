@@ -191,7 +191,10 @@ describe('scripts/*.mjs 与 TS 原语同一入口', () => {
     await after.release()
   })
 
-  it('脚本侧与 TS 侧拒绝口径对称：UNC 硬拒绝、探测不可判定 fail-closed、opt-in 放行', async () => {
+  // 本用例断言的是 Windows 盘符 / UNC 语义（与 writerLock.test.ts 同组用例同理）：
+  // classifyBookRootKind 在非 win32 上直接判为 local，这些分支在 Linux 上不可达。
+  // 脚本侧与 TS 侧「同一端点、互相排他」的对称性由上面那条用例在两种平台上继续覆盖。
+  it.skipIf(process.platform !== 'win32')('脚本侧与 TS 侧拒绝口径对称：UNC 硬拒绝、探测不可判定 fail-closed、opt-in 放行', async () => {
     const helper = (await import(
       pathToFileURL(resolve(process.cwd(), '../../scripts/lib/book-writer-lock.mjs')).href
     )) as {
