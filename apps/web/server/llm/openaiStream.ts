@@ -234,6 +234,7 @@ export async function* streamOpenAiChat(
         ],
         stream: true,
         temperature: 0.85,
+        ...(endpoint.allowPrivateNetwork ? { thinking: { type: 'disabled' }, enable_thinking: false } : {}),
       }),
       signal: controller.signal,
       redirect: 'manual',

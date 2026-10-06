@@ -201,9 +201,8 @@ try {
   // 1. 建书 + 建章
   bookRoot = mkdtempSync(join(tmpdir(), 'mozhou-realmodel-'));
   const created = createBook({ dir: bookRoot, title: '真实模型验收书' });
-// W2-3：本脚本是书稿写入者——经同一命名管道入口占锁；已有写入者（服务在跑）则明确拒绝。
-// 进程退出时 OS 自动回收管道名，无需显式释放。
-await holdBookWriteLock(created.root)
+  // W2-3：本地初始化时占锁，写完建章后显式释放，避免服务进程在 commit 时遇到 BOOK_WRITE_BUSY
+  const releaseInitLock = await holdBookWriteLock(created.root);
   log(`book created: id=${created.book.id} root=${bookRoot}`);
 
   const plane = LocalDataPlane.openOrRebuild(bookRoot);
@@ -212,6 +211,7 @@ await holdBookWriteLock(created.root)
   } finally {
     plane.close();
   }
+  await releaseInitLock();
   log('chapter 1 draft created');
 
   // 2. 启动真实服务器（不设 mock provider）
