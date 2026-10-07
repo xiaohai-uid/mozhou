@@ -30,7 +30,7 @@ import {
 } from './layout.js'
 import { readManifest, refreshManifestEntries, writeManifest } from './manifest.js'
 import { readNarrativeSnapshot } from './narrative-state.js'
-import { rebuildProjectionFromCanon } from './local-data-plane.js'
+import { rebuildProjectionFromCanon } from './projection-rebuild.js'
 import { emitFrontmatter, parseFrontmatter, type FrontmatterFieldValue } from './yaml-frontmatter.js'
 
 /* ----------------------------------------------------------------------------
