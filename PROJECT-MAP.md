@@ -394,6 +394,7 @@
 - **验收**：定向测试 backupRoutes 3/3、billingCatalog 4/4、data-plane 60 用例全过（均 exit 0，无既有测试改删）；定向 typecheck（web server / data-plane / context-compiler）均 exit 0；修复后图谱 `check --cycles` clean / cycleCount=0；Web 构建修复后连续两次 exit 0；导航验收真实服务（127.0.0.1:5190）实跑 7 探针 **6 过 1 失败**——唯一失败 `/api/web-search` POST→501 为审计前已知未实现项（按任务要求未修），报告 `navigation-acceptance-report.json` 如实保留 `allPass: false`。
 - **验证状态**：已执行（各修复代理定向命令带退出码 + 独立审计复核 + 导航验收实跑 + 安装器构建实跑；收口核验：HEAD / diff-stat / SHA-256 / 关键代码行逐项与报告吻合）；全量门禁（pnpm test / pnpm build / Web 构建 / 图谱 check）由编排器统一执行。**安装器未签名（NotSigned，本机无代码签名证书，按要求未伪造）——签名仍为挂账。**
 - **遗留/风险**：浏览器级下载点击与 hosted 会话鉴权未验证；esbuild/Defender 修复为环境敏感型（换杀软可能复现，届时杀软侧加仓库目录排除）；`%TEMP%` 清理误删 4 个会话前当日残留（无功能影响，如实披露）；`AGENTS.md:125`/`CLAUDE.md:4` 各一行改动为 gitnexus 托管块自动统计行（索引重建副作用，非手工改规则）。
+- **收口补记（2026-10-07，收口会话亲跑）**：修复已落账 5 提交（0c3b4f3…8cf72b0，未推送）；安装器自 HEAD 8cf72b0 重建（exit 0，SHA-256 9aa2c286…f28f4，windows-build-result.json 戳 sourceCommit=8cf72b0…eaf3 与 HEAD 一致，Get-AuthenticodeSignature 复核仍 NotSigned）；图谱 check --cycles 收口复跑 clean/cycleCount=0。
 
 
 

@@ -117,3 +117,10 @@
   - 图谱解环：还原 `packages/data-plane/src/{compaction,local-data-plane}.ts`，删除 `projection-rebuild.ts`，随后重跑 `node .gitnexus/run.cjs analyze` 刷新索引（注意：还原即恢复 1 循环，`check --cycles` 将回到 exit 1）；
   - 安装器：删除 `release-artifacts/MoZhou-0.3.0-windows-x64-setup.exe`（产物目录，gitignore 内）。
 - 提交后如需回滚：`git revert <本批次提交 SHA>`。
+
+## 7. 收口补记（2026-10-07，收口会话亲跑）
+
+- 本变更前六节记录时全部改动尚在工作区；随后按「修复并落账」授权，修复按单一目的落账为 5 个提交：`0c3b4f3`（备份下载 GET 通道 + DELTA-007）、`e8a49e9`（定价目录 GET 放行）、`a0f4473`（data-plane 解环下沉）、`285778e`（vite 构建临时目录）、`8cf72b0`（本变更文档与地图登记）。基线 06a5069 不变，均在 feature/windows-local-release，未推送。
+- 安装器最终产物自 HEAD `8cf72b0` 重建（`pnpm package:windows` exit 0）：SHA-256 `9aa2c2862eea63cdf4c22fc4a406f8b72ebef1b4fc919e0514f85687695f28f4`（收口复算一致，128626434 字节）；`release-artifacts/windows-build-result.json` 戳 `sourceCommit=8cf72b0bafe17fb05cd4af03ad2ceaa6c8c9eaf3` 与 HEAD 逐字一致；`Get-AuthenticodeSignature`（pwsh 7）复核仍 `NotSigned`（build.mjs 无签名步骤、本机无证书）。§3.5 记录的 `5e1133208c…`（HEAD 06a5069、工作区=修复内容的过渡产物）由本条取代为最终记录。
+- 图谱门禁收口复跑：`node .gitnexus/run.cjs check --cycles --json -r .` → exit 0，`{"status":"clean","cycleCount":0}`。
+- 导航验收报告复读：6/7 过（唯一失败 /api/web-search 501，清单外已知项），报告 `navigation-acceptance-report.json` 保留在仓库根（未跟踪）。
