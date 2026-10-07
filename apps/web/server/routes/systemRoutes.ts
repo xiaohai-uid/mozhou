@@ -180,7 +180,12 @@ function databaseBytes(root: string | null): number {
 // async：/api/capability-square 的 providerAvailable 走 hasDraftProvider()，该判据要读覆盖层
 // YAML 才能回答（注册表配好、BYOK 没配时也必须报 true），故 handler 一并异步化。
 export const systemRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
-  if (req.method !== 'POST' && !(req.method === 'GET' && path === '/api/membership')) return false
+  // GET 只放行公开读面：会员中心与定价目录（T02 冻结 · 唯一真源，只读不改状态）。
+  if (
+    req.method !== 'POST' &&
+    !(req.method === 'GET' && (path === '/api/membership' || path === '/api/billing/catalog'))
+  )
+    return false
 
   const resolvedRoot = bookRoot ?? null
 
