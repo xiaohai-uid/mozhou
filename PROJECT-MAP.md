@@ -381,6 +381,20 @@
 - **验收**：`pnpm run test:packages` 117 文件 1048 用例通过；`pnpm --filter @mozhou/web test` 149 文件 / 1098 用例通过（14 跳过）；`pnpm build` exit 0；web `typecheck` exit 0；`pnpm lint` exit 0（修复前 9 errors）；`check:glossary/architecture/gates/term-map/readmes` 5/5 PASS；锁文件中 tinypool 归 0、source-map-js 为 1.2.2、vite 仍 6.4.3。
 - **验证状态**：已执行（上述命令均为本地实跑）。**环境性未覆盖**：`pnpm audit` 无法本地执行（本机 registry 为 npmmirror，无 audit 端点），审计结论以 act 容器结果为准；`vite build` 在本机 `%TEMP%` 下报 esbuild `Access is denied`（本机磁盘/权限问题，改 TEMP 至仓库内即成功；`esbuild@0.25.12` 基线与 HEAD 相同），CI 的 Linux 容器不受影响。
 
+### CHG-20261007-18 — 2026-10-07 — 用户授权（发布审计 NO-GO 修复），动态工作流（4 修复代理 + 收口人），ZCode 执行
+
+- **需求来源**：用户 2026-10-07 发布审计结论 **NO-GO**，五项：①备份下载 GET 契约断裂；②定价目录 GET 404；③Web 构建失败；④图谱 1 循环；⑤安装器基于旧提交 `90b45a1` 且未签名。授权修复前四项 + 补 GET/query 测试 + 从当前 HEAD 重建安装器。证据见 [docs/changes/CHG-20261007-18-release-no-go-remediation.md](docs/changes/CHG-20261007-18-release-no-go-remediation.md)。
+- **观察基线**：分支 `feature/windows-local-release`，HEAD `06a5069`；修复前 `check --cycles` exit 1 / cycleCount=1（`compaction.ts ↔ local-data-plane.ts`）；工作区含并行会话未提交改动，全程零 git 写操作。
+- **实际变更**（行为面最小化，四项修复）：
+  - ①备份下载：`apps/web/server/routes/backupRoutes.ts:53-66` GET 改从 URL query 读 `backupId`（POST 维持 body），校验/400/404/响应头两通道一致，UI 未改；`backupRoutes.test.ts` 新增 GET/query 三场景用例（+55/0）；契约按其自身 Delta 流程登记 `api-contract.md` §28 + 新建 `deltas/DELTA-007.md`。
+  - ②定价目录：`apps/web/server/routes/systemRoutes.ts:183-189` 方法闸放行 `GET /api/billing/catalog`（membership 与其余方法限制逐字未动，价格数据零改动）；新增 `systemRoutes.billingCatalog.test.ts` 4 用例。
+  - ③Web 构建：根因为 esbuild >1MiB 输入临时文件机制撞 Windows Defender 实时扫描窗口（对照实验 8/8 复现→重定向后 8/8 通过）；`apps/web/vite.config.ts:1-20` win32 下重定向 TMP/TEMP 至 `node_modules/.tmp/esbuild`，创建失败原样抛错，非 Windows 不变，不装新依赖。
+  - ④图谱解环：新建 `packages/data-plane/src/projection-rebuild.ts` 逐字下沉 `rebuildProjectionFromCanon`（行为与公共 API 零变化），`local-data-plane.ts:72-73` 改 re-export，`compaction.ts:33` 改引新模块。
+  - ⑤安装器：从 HEAD `06a5069` 重建 `release-artifacts/MoZhou-0.3.0-windows-x64-setup.exe`（SHA-256 `5e1133208c…cd9dd`，收口复算一致）。
+- **验收**：定向测试 backupRoutes 3/3、billingCatalog 4/4、data-plane 60 用例全过（均 exit 0，无既有测试改删）；定向 typecheck（web server / data-plane / context-compiler）均 exit 0；修复后图谱 `check --cycles` clean / cycleCount=0；Web 构建修复后连续两次 exit 0；导航验收真实服务（127.0.0.1:5190）实跑 7 探针 **6 过 1 失败**——唯一失败 `/api/web-search` POST→501 为审计前已知未实现项（按任务要求未修），报告 `navigation-acceptance-report.json` 如实保留 `allPass: false`。
+- **验证状态**：已执行（各修复代理定向命令带退出码 + 独立审计复核 + 导航验收实跑 + 安装器构建实跑；收口核验：HEAD / diff-stat / SHA-256 / 关键代码行逐项与报告吻合）；全量门禁（pnpm test / pnpm build / Web 构建 / 图谱 check）由编排器统一执行。**安装器未签名（NotSigned，本机无代码签名证书，按要求未伪造）——签名仍为挂账。**
+- **遗留/风险**：浏览器级下载点击与 hosted 会话鉴权未验证；esbuild/Defender 修复为环境敏感型（换杀软可能复现，届时杀软侧加仓库目录排除）；`%TEMP%` 清理误删 4 个会话前当日残留（无功能影响，如实披露）；`AGENTS.md:125`/`CLAUDE.md:4` 各一行改动为 gitnexus 托管块自动统计行（索引重建副作用，非手工改规则）。
+
 
 
 
