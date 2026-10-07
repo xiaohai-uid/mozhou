@@ -491,9 +491,31 @@ interface StyleGuide {
 // 测试接缝 MOZHOU_NAMING_PROVIDER=mock（仅测试环境；对齐 MOZHOU_DRAFT_PROVIDER 先例）。
 ```
 
+## 28. 备份下载双通道：GET query + POST body（DELTA-007，2026-10-07）
+
+> 现行应用（无版本前缀 `/api/*`，策略 account，routePolicies FAIL-CLOSED 注册表）端点契约——由发布审计
+> 「备份下载契约断裂」阻断项修复授权变更。UI 下载链接（`apps/web/src/cloud-sync/CloudSyncView.tsx:190`）
+> 是 GET query 形状，修复前服务端只从 body 读 backupId，GET 恒 400 INVALID_BACKUP_ID，用户真实路径断裂。
+> 以用户路径优先：服务端兼容双通道，UI 不改，POST body 通道维持不变（兼容既有调用与测试）。
+
+```typescript
+// GET  /api/backups/download?backupId=<id> —— UI 下载链接通道（CloudSyncView 下载按钮 href 形状）
+// POST /api/backups/download { backupId: <id> } —— 既有 body 通道（不变）
+// backupId 校验两通道一致：trim 后须匹配 /^[a-zA-Z0-9_-]{1,64}$/（防穿越白名单）
+//   - 缺失 / 非法 → 400 { ok:false, code:'INVALID_BACKUP_ID' }（动盘之前）
+//   - backups 目录无该归档 → 404 { ok:false, code:'BACKUP_NOT_FOUND' }
+// 成功 → 200 ZIP，两通道响应完全一致：
+//   Content-Type: application/zip；Content-Disposition: attachment; filename="<backupId>.zip"；
+//   Content-Length = 归档字节数
+// 完整 Delta：deltas/DELTA-007.md
+// 契约测试：apps/web/server/routes/backupRoutes.test.ts「下载 GET query 通道」用例（DELTA-007）
+//   —— 合法 id 200 ZIP（断言 Content-Type 与 Content-Disposition）、非法 id 400、不存在 id 404
+```
+
 ## 历史
 
 - DELTA-001：PATCH 正文乐观并发（expectedRevision + 409 ContentChanged）
 - DELTA-002（2026-08-22）：任务重试与 WebDAV 推送限流；同日完成全量契约回填（openapi 23→53 paths，覆盖全部已实现路由）
 - DELTA-005（2026-09-28）：/api/chapter.commit 提交幂等（expectedRevision + 409 PROSE_REVISION_CONFLICT，见第 26 节）
 - DELTA-006（2026-09-30）：/api/memo 与 /api/naming 新增（OpenWrite 对标切片，见第 27 节）
+- DELTA-007（2026-10-07）：/api/backups/download 双通道（GET query + POST body，UI 真实路径修复），见第 28 节

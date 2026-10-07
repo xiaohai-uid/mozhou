@@ -3,7 +3,8 @@
  * 
  * 依照 reference/02-features.md T10 规格：
  * - POST /api/backups {bookId} → {backupId, bytes, sha256}；
- * - POST /api/backups/download {backupId} → 重新鉴权并下载 ZIP 归档；
+ * - GET /api/backups/download?backupId=...（UI 下载链接，CloudSyncView）| POST /api/backups/download {backupId}
+ *   → 重新鉴权并下载 ZIP 归档（DELTA-007：GET query + POST body 双通道）；
  * - POST /api/backups/restore {backupId} → 在当前用户沙箱下安全恢复为新作品，禁止任意目标路径注入；
  * - 严格执行 C5 资源限制与防穿越门。
  */
@@ -50,8 +51,18 @@ export const backupRoutes: RouteHandler = async (req, res, { path, body, json, p
   }
 
   /* ---- 2. 下载备份文件 ---- */
+  // DELTA-007（2026-10-07）：UI 下载链接是 GET /api/backups/download?backupId=...（CloudSyncView.tsx），
+  // 修复前 GET 的 backupId 只从 body 读、恒为空 → 误报 400 INVALID_BACKUP_ID。
+  // 双通道：GET 从 URL query 取 backupId，POST 维持 JSON body 通道；正则与长度校验两通道一致。
   if (path === '/api/backups/download' && (req.method === 'POST' || req.method === 'GET')) {
-    const backupId = typeof body['backupId'] === 'string' ? body['backupId'].trim() : null
+    let backupId: string | null = null
+    if (req.method === 'GET') {
+      const query = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
+      const raw = query.get('backupId')
+      backupId = typeof raw === 'string' ? raw.trim() : null
+    } else {
+      backupId = typeof body['backupId'] === 'string' ? body['backupId'].trim() : null
+    }
     if (!backupId || !/^[a-zA-Z0-9_-]{1,64}$/.test(backupId)) {
       json(400, { ok: false, code: 'INVALID_BACKUP_ID', error: 'valid backupId required' })
       return true

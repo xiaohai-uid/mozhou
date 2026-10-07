@@ -145,4 +145,59 @@ describe('作品归档备份与恢复路由 (T10)', () => {
     expect(data.ok).toBe(false)
     expect(data.code).toBe('INVALID_INPUT')
   })
+
+  // DELTA-007（2026-10-07）：UI 下载链接走 GET /api/backups/download?backupId=...（CloudSyncView.tsx），
+  // 修复前 GET 只从 body 读 backupId，恒 400。本用例覆盖 GET query 通道的真实用户路径。
+  it('下载 GET query 通道：合法 id 200 ZIP / 非法 id 400 / 不存在 id 404 (DELTA-007)', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-backup-get-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const base = await listen()
+    const srcDir = join(dataRoot, 'original-book')
+    const created = createBook({ dir: srcDir, title: 'GET 通道测试作品' })
+    const plane = LocalDataPlane.open(srcDir)
+    plane.createChapterDraft({ chapterIndex: 1, title: '第1章' })
+    const text = renderProseChapter({
+      mozhouId: created.book.id,
+      revision: 1,
+      chapterIndex: 1,
+      phase: 'draft',
+      body: '渡口灯火，照彻归人。',
+    })
+    writeFileSync(join(srcDir, proseChapterPath(1)), text, 'utf8')
+    plane.close()
+
+    // 先经真实 POST /api/backups 生成归档，GET 下载的是真实落盘文件
+    const resBackup = await fetch(`${base}/api/backups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: srcDir }),
+    })
+    expect(resBackup.status).toBe(200)
+    const dataBackup = (await resBackup.json()) as { ok: boolean; backupId: string; bytes: number }
+    expect(dataBackup.ok).toBe(true)
+
+    // 1. UI 真实路径形状：GET ?backupId=... → 200 ZIP
+    const resGet = await fetch(`${base}/api/backups/download?backupId=${dataBackup.backupId}`)
+    expect(resGet.status).toBe(200)
+    expect(resGet.headers.get('Content-Type')).toBe('application/zip')
+    expect(resGet.headers.get('Content-Disposition')).toBe(`attachment; filename="${dataBackup.backupId}.zip"`)
+    const zipBytes = await resGet.arrayBuffer()
+    expect(zipBytes.byteLength).toBe(dataBackup.bytes)
+
+    // 2. 非法 id（路径穿越形状，query 解码后不过白名单正则）→ 400 INVALID_BACKUP_ID
+    const resInvalid = await fetch(`${base}/api/backups/download?backupId=..%2F..%2Fsecret`)
+    expect(resInvalid.status).toBe(400)
+    const dataInvalid = (await resInvalid.json()) as { ok: boolean; code: string }
+    expect(dataInvalid.ok).toBe(false)
+    expect(dataInvalid.code).toBe('INVALID_BACKUP_ID')
+
+    // 3. 合法格式但不存在的 id → 404 BACKUP_NOT_FOUND
+    const resMissing = await fetch(`${base}/api/backups/download?backupId=bup_missing0000000000000000`)
+    expect(resMissing.status).toBe(404)
+    const dataMissing = (await resMissing.json()) as { ok: boolean; code: string }
+    expect(dataMissing.ok).toBe(false)
+    expect(dataMissing.code).toBe('BACKUP_NOT_FOUND')
+  })
 })
