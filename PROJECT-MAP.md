@@ -396,6 +396,15 @@
 - **遗留/风险**：浏览器级下载点击与 hosted 会话鉴权未验证；esbuild/Defender 修复为环境敏感型（换杀软可能复现，届时杀软侧加仓库目录排除）；`%TEMP%` 清理误删 4 个会话前当日残留（无功能影响，如实披露）；`AGENTS.md:125`/`CLAUDE.md:4` 各一行改动为 gitnexus 托管块自动统计行（索引重建副作用，非手工改规则）。
 - **收口补记（2026-10-07，收口会话亲跑）**：修复已落账 5 提交（0c3b4f3…8cf72b0，未推送）；安装器自 HEAD 8cf72b0 重建（exit 0，SHA-256 9aa2c286…f28f4，windows-build-result.json 戳 sourceCommit=8cf72b0…eaf3 与 HEAD 一致，Get-AuthenticodeSignature 复核仍 NotSigned）；图谱 check --cycles 收口复跑 clean/cycleCount=0。
 
+### CHG-20261008-21 — 2026-10-08 — 用户授权（「按你推荐的来吧」，retro 候选 3→1→4→2），ZCode 执行
+
+- **需求来源**：/retro 会话产出的候选清单，用户授权按推荐顺序执行。证据见 [docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md](docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md)。
+- **观察基线**：HEAD e321323；windows/build.mjs:94 无条件取 HEAD 作戳；CI 无图谱步骤、.gitnexus 不入库；追踪器开放议题 0 条（仓库 PUBLIC）；提交钩子扫描恒 scanner_enobufs。同类缺陷早在 audit-2026-10-03/01-baseline-and-graph-gate.md:350 已登记为散文，未机械化。
+- **实际变更**：①产物戳诚实化——新增 scripts/release/lib/source-stamp.mjs（脏工作区戳 <sha>-dirty + sourceCommitSha/dirty/dirtyFiles），windows/build.mjs 改用并加 --print-stamp；②AGENTS.md §8 增项目级推送前门禁：必须跑 node scripts/ci-gate.mjs graph-check（任务已存在，未改该文件）；③Mimosa 决策：保持 open（advisory），后果是不得宣称项目安全；④挂账项待提 issue 清单（仓库 PUBLIC，未提交）。
+- **验收**：戳函数两分支实跑（clean→abc1234；dirty→abc1234-dirty）；真实仓库 --print-stamp → e3213238…-dirty / 125 项；node scripts/ci-gate.mjs graph-check → clean/cycleCount=0（exit 0）；MCP check clean/0。
+- **验证状态**：已执行（实跑见上）。未做：完整安装器重跑（会覆盖已登记的干净产物 9aa2c286…，故不跑）；scripts/ 不在图谱索引内（impact 报 Target not found），改用消费方 grep 替代并如实披露。
+- **遗留/风险**：CI 化依赖环检查、真实模型作业、CODING_STANDARDS.md、AGENTS.md 沉积清理、陈旧 release-verify.mjs 清理、若干测试缺口 → 见变更文档 §6 待提清单（10 条，未提交）。
+
 
 
 

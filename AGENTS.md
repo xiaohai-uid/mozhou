@@ -100,6 +100,7 @@
   - AI 代理工作分支可用 `feature/<agent>-<module>` 前缀，但合入语义必须遵守六分支模型（功能只进 `develop`，不直接进 `main`）。
 - 提交信息：按全局指令（文件头 `C:\zcode\AGENTS.md`）「Git 分支与提交 → 提交信息与历史保护」章执行（八类 Conventional Commits 前缀、单提交同一类别不超过 3 个问题）；破坏性 Git 操作的禁令以全局同章与本文件 §6 第 23 条为准。本节只保留项目级差异，不重复全局条文。
 - 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
+- **推送前本地门禁的项目级额外项**：除全局的 act 本地 CI 外，本项目推送前必须跑一次依赖环检查 `node scripts/ci-gate.mjs graph-check`，期望输出 `clean` / `cycleCount: 0`。ci.yml 与 release.yml 都没有图谱步骤、`.gitnexus/` 索引也不入库，所以这条只在本地把得住（2026-10-07 发布审计的 1 个循环就是这样活到 HEAD 的）。记录见 `docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md`。
 
 ## 9. Wayfinder 追踪操作（内核线并入）
 
