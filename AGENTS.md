@@ -72,13 +72,7 @@
 
 ### 7. 项目基建
 
-作者数据相关改动优先核对以下三条项目约束。它们对应现有契约，不授权新增功能或改变冻结契约。完整验收例、源位置和本轮观察见 [Codex 项目验收规格与证据](.scratch/codex-readiness-20261006/spec-and-evidence.md)。
-
-| 约束 | 禁止的行为 | 可执行的安全路径 |
-|---|---|---|
-| 作者决定正文写入 | 把生成候选自动当作 Active Draft 或 Chapter Commit；冲突时静默覆盖 | 候选保持独立；作者显式采纳；保存携带预期版本，冲突保留本地编辑并提示核对；定稿走质量门 |
-| 旧任务不能污染新现场 | 停止、切书、切章后，旧请求的成功、失败或终帧改变当前正文/状态 | 使旧请求失效，取消其可取消资源；按任务身份和视图代次拒绝迟到结果；保留未采纳半稿，并检查新现场未变 |
-| 恢复必须验证作者数据 | 仅凭备份文件存在、构建成功或恢复函数返回就宣称恢复完成 | 保留可恢复原件；先在隔离目录恢复，再回读正文、书章身份和版本；未覆盖的安装包、断电或并发恢复标为未验证 |
+**作者数据相关改动**（正文写入、任务切换、恢复）优先核对三条项目约束：作者决定正文写入／旧任务不能污染新现场／恢复必须验证作者数据。它们的判断类条款与硬护栏在 [`CODING_STANDARDS.md`](./CODING_STANDARDS.md)——评审代理在 `/code-review` 的 Standards 轴读全文，机械类约束一律做成确定性检查、不加进该文件。三条对应现有领域契约，不授权新增功能，也不改变已冻结的领域契约；完整验收例、源位置与本轮观察见 [Codex 项目验收规格与证据](.scratch/codex-readiness-20261006/spec-and-evidence.md)。
 
 - 术语：**[`GLOSSARY.md`](./GLOSSARY.md)**（原 `CONTEXT.md`，2026-10-01 迁正）
 - 架构地图：`docs/architecture.md`；决策地图：`docs/adr/INDEX.md`；决策记录：`docs/adr/`
@@ -100,7 +94,7 @@
   - AI 代理工作分支可用 `feature/<agent>-<module>` 前缀，但合入语义必须遵守六分支模型（功能只进 `develop`，不直接进 `main`）。
 - 提交信息：按全局指令（文件头 `C:\zcode\AGENTS.md`）「Git 分支与提交 → 提交信息与历史保护」章执行（八类 Conventional Commits 前缀、单提交同一类别不超过 3 个问题）；破坏性 Git 操作的禁令以全局同章与本文件 §6 第 23 条为准。本节只保留项目级差异，不重复全局条文。
 - 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
-- **推送前本地门禁的项目级额外项**：除全局的 act 本地 CI 外，本项目推送前必须跑一次依赖环检查 `node scripts/ci-gate.mjs graph-check`，期望输出 `clean` / `cycleCount: 0`。ci.yml 与 release.yml 都没有图谱步骤、`.gitnexus/` 索引也不入库，所以这条只在本地把得住（2026-10-07 发布审计的 1 个循环就是这样活到 HEAD 的）。记录见 `docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md`。
+- **推送前的自动化门（项目级额外项）**：除全局的 act 本地 CI 外，本项目推送前还必须跑一次依赖环检查 `node scripts/ci-gate.mjs graph-check`，期望输出 `clean` / `cycleCount: 0`。ci.yml 与 release.yml 都没有图谱步骤、`.gitnexus/` 索引也不入库，所以这条只在本地把得住（2026-10-07 发布审计的 1 个循环就是这样活到 HEAD 的）。记录见 `docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md`。
 
 ## 9. Wayfinder 追踪操作（内核线并入）
 

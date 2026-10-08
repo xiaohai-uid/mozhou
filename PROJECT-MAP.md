@@ -405,6 +405,15 @@
 - **验证状态**：已执行（实跑见上）。未做：完整安装器重跑（会覆盖已登记的干净产物 9aa2c286…，故不跑）；scripts/ 不在图谱索引内（impact 报 Target not found），改用消费方 grep 替代并如实披露。
 - **遗留/风险**：CI 化依赖环检查、真实模型作业、CODING_STANDARDS.md、AGENTS.md 沉积清理、陈旧 release-verify.mjs 清理、若干测试缺口 → 见变更文档 §6 待提清单（10 条，未提交）。
 
+### CHG-20261008-22 — 2026-10-08 — 用户授权（「按你推荐的来」，议题 #96），ZCode 执行
+
+- **需求来源**：GitHub 议题 #96（用户授权实施）。证据见 [docs/changes/CHG-20261008-22-coding-standards-extraction.md](docs/changes/CHG-20261008-22-coding-standards-extraction.md)。
+- **观察基线**：HEAD 0b71ee6；仓库根无 CODING_STANDARDS.md；三条作者数据约束住在 AGENTS.md §7 表格、被每个实现代理每轮加载；.agents/skills/code-review/SKILL.md:36 规定该文件存在时必须纳入扫描清单。
+- **实际变更**：①新建 CODING_STANDARDS.md（只收判断类；机械类以 docs/gates.md 为唯一清单、不复制）；②AGENTS.md §7 原表格改为指针（保留触发条件与范围边界，净减 5 行）；③附带修正 AGENTS.md §8 上一轮那行的禁用词「门禁」→「推送前的自动化门」。
+- **验收**：check:glossary exit 0（改前 exit 1 报 AGENTS.md:97 禁用词）；check:gates/term-map/readmes 均 exit 0；check:architecture exit 1 归因并行会话（生成器 countLOC 统计包内源码行数，其约 60 个源码文件未提交；本变更未触碰任何 .ts/.js）。
+- **验证状态**：已执行（上述命令实跑）；docs-only 按规程未跑测试套件。双轴评审（Standards 4 项判断类 + Spec 无实质缺失）已按发现修正三处、记缺口一处。
+- **遗留/风险**：CODING_STANDARDS.md 不在 check:glossary 的 ACTIVE_FILE 白名单（该脚本正被并行会话改，未介入）；「评审代理实际读它」仅有一致性证据、加载未验证。
+
 
 
 
