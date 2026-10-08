@@ -93,7 +93,7 @@ if (!existsSync(nodeLicense)) throw new Error(`Missing Node distribution license
 cpSync(nodeLicense, join(bundle, 'runtime/LICENSE.txt'))
 writeFileSync(join(bundle, 'package.json'), JSON.stringify({ name: 'mozhou-windows', version, type: 'module' }, null, 2))
 writeFileSync(join(bundle, 'DEPENDENCIES.json'), JSON.stringify({ node: process.version, packages: inventory }, null, 2))
-writeFileSync(join(bundle, '使用说明.txt'), `墨舟 ${version} Windows 本地版\r\n\r\n双击 MoZhou.exe，工作台在默认浏览器打开。\r\n托盘图标可重新打开工作台、查看数据目录、退出服务。\r\n关闭浏览器不会关闭本地服务；退出请使用托盘菜单。\r\n书稿与密钥存放在 %LOCALAPPDATA%\\MoZhou。升级和卸载不删除此目录。\r\n备份时请退出墨舟，再复制整个数据目录（包括 installation.key）。\r\nAI 功能需在设置中配置您自己的模型服务；未配置时仍可手工写作。\r\n本安装包不包含云同步、支付或签名证书。\r\n`)
+writeFileSync(join(bundle, '使用说明.txt'), `墨舟 ${version} Windows 本地版\r\n\r\n双击 MoZhou.exe，工作台在默认浏览器打开。\r\n托盘图标可重新打开工作台、查看数据目录、退出服务。\r\n关闭浏览器不会关闭本地服务；退出请使用托盘菜单。\r\n书稿与密钥存放在 %LOCALAPPDATA%\\MoZhou。升级和卸载不删除此目录。\r\n备份时请退出墨舟，再复制整个数据目录（包括 installation.key）。\r\nAI 功能需在设置中配置您自己的模型服务；未配置时仍可手工写作。\r\n多 Windows 登录会话同时运行不在支持范围内；网络共享目录不能作为书稿目录。\r\n本安装包不包含云同步、支付或签名证书。\r\n`)
 
 // Exercise native SQLite with the exact executable and deployed graph.
 execFileSync(join(bundle, 'runtime/node.exe'), ['--input-type=module', '-e', `import {createRequire} from 'node:module'; const r=createRequire(process.cwd()+'/app/node_modules/@mozhou/data-plane/package.json'); const Database=r('better-sqlite3'); const db=new Database(':memory:'); db.exec('CREATE TABLE smoke (id INTEGER)'); db.close(); console.log('Packaged SQLite ABI OK');`], { cwd: bundle, stdio: 'inherit' })

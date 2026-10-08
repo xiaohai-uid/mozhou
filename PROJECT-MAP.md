@@ -441,6 +441,15 @@
 - **验证状态**：已执行（上列实跑）。**未验证**：VERIFIED 路径（本机三个 Key 均未设置，未伪造）；GitHub Actions 的 secrets 注入/artifact 上传/hosted 结果本地无法运行。
 - **遗留/风险**：证据 sourceCommit 写短 SHA，与推送门收据的 40 位完整 SHA 约定不同形（用途不同，留给评审裁决）。
 
+### CHG-20261008-26 — 2026-10-08 — 用户授权（议题 #100，主会话执行），ZCode 执行
+
+- **需求来源**：GitHub 议题 #100（写锁跨登录会话互斥未验证）。证据见 [docs/changes/CHG-20261008-26-writer-lock-session-scope.md](docs/changes/CHG-20261008-26-writer-lock-session-scope.md)。
+- **观察基线**：HEAD dfda2ad；writerLock.ts:13-16 把「Windows 平台语义」与「本仓实测」混在一句里（读起来像实测过）；LOCK-01 只覆盖同一登录会话内的两个进程；计划 docs/plans/2026-10-03-…:188 要求把多会话/网络共享范围写入发布说明，而 release body 与安装器说明里都没有。
+- **实际变更**：①新增 docs/spikes/2026-10-08-writer-lock-cross-session-verification.md（拆解陈述三栏 + 人工验证步骤 + 两种判定与后果 + 现状=未验证）；②writerLock.ts 注释精确化（证据边界 + 指向验证程序 + 若实测成立则按缺陷处理）；③release.yml 的 release body 补「支持范围」段；④build.mjs 的安装器使用说明补同一句。
+- **验收**：YAML 解析 OK（job build-and-verify / 19 步 / body 含支持范围）；typecheck exit 0；check:gates 与 check:glossary exit 0；图谱 check clean/cycleCount=0。
+- **验证状态**：已执行（上列实跑）。**未验证**：跨登录会话互斥（人工步骤未执行，且持有者 --hold 入口尚未实现，属该程序前置工作）→ 记 unverified，不得当作「已验证不支持」；图谱 impact 对 writerLock.ts 返回 Target not found（不在索引内），能力缺口已披露。
+- **遗留/风险**：GitHub release body 的实际渲染未验证（本地仅解析 YAML）。
+
 
 
 

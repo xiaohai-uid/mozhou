@@ -173,6 +173,8 @@ jobs:
             - `SHA256SUMS.txt`：完整性校验清单
 
             默认服务只绑定本机回环地址。云备份、付费许可证激活、未接线的数据源不会伪装成已实现。
+
+            **支持范围（写入发布说明，依据 `docs/plans/2026-10-03-gitnexus-plan-mozhou-architecture-release.md:188`）**：写入权原语基于**会话本地**命名管道，因此**多 Windows 登录会话同时运行不在支持范围内**（跨会话互斥未实测，验证程序见 `docs/spikes/2026-10-08-writer-lock-cross-session-verification.md`）；**网络共享目录不能作为书稿目录**（未验证，先拒绝为可写书根）。
           files: |
             release-artifacts/*.tar.gz
             release-artifacts/mozhou-sbom.spdx.json
