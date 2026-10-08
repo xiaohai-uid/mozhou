@@ -450,6 +450,16 @@
 - **验证状态**：已执行（上列实跑）。**未验证**：跨登录会话互斥（人工步骤未执行，且持有者 --hold 入口尚未实现，属该程序前置工作）→ 记 unverified，不得当作「已验证不支持」；图谱 impact 对 writerLock.ts 返回 Target not found（不在索引内），能力缺口已披露。
 - **遗留/风险**：GitHub release body 的实际渲染未验证（本地仅解析 YAML）。
 
+### CHG-20261008-27 — 2026-10-08 — 用户授权（议题 #93，子代理执行、主会话核验），ZCode 执行
+
+- **需求来源**：GitHub 议题 #93（依赖环检查纳入 CI）。证据见 [docs/changes/CHG-20261008-27-ci-import-cycle-gate.md](docs/changes/CHG-20261008-27-ci-import-cycle-gate.md)。
+- **观察基线**：HEAD 8e8eacb；.github/workflows 无 graph 步骤（grep 零命中）；.gitnexus 索引不入库（git ls-files = 0）→ CI 无法跑 graph:check；2026-10-07 审计的 1 个循环在 CI 全绿时存在于 HEAD。
+- **实际变更**：①新增 scripts/check-import-cycles.mjs（用自带 typescript 的 preProcessFile 解析导入；相对导入含 NodeNext ./x.js→./x.ts；@mozhou/* 映射到包 src 入口；DFS 找环；exit 0/1/2）；②新增 .github/workflows/graph-gate.yml（push master/main + PR 触发）。未改 ci.yml（并行会话占用）。
+- **选型依据（子代理实测）**：madge 在仓库根解析不了工作区包——2030 条边里跨包 0 条，会漏跨包环；dependency-cruiser 本机下载失败无法验证；typescript 已在本仓、不联网、不读索引。
+- **验收（主会话亲验）**：绿 585 模块/1666 边/0 环 exit 0；红（主会话自造相对环）exit 1 并打印环路径；YAML 解析 OK（job import-cycles）；check:gates 与 check:glossary exit 0；旁证 gitnexus check clean/cycleCount=0。
+- **验证状态**：已执行（上列实跑）。**未验证**：GitHub 托管 CI 未真跑（本地无法执行 Actions）；madge/dependency-cruiser 路线未验证；新门未登记进 docs/gates.md（文件被并行会话占用）。
+- **遗留/风险**：脚本只覆盖相对导入与工作区包名导入，路径别名/动态 specifier/第三方包内部环不在范围。
+
 
 
 

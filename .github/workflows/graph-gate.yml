@@ -1,0 +1,44 @@
+# 依赖环自动化门：在 CI 里拦住导入环回归，不再只靠本地手工跑。
+#
+# 背景：2026-10-07 发布审计发现 1 个依赖环（packages/data-plane/src/compaction.ts
+# 与 local-data-plane.ts 互相 import）在 CI 全绿的同时存在于 HEAD。原因是
+# .gitnexus/ 索引不入库（git ls-files .gitnexus = 0），CI 无法跑 pnpm graph:check；
+# ci.yml 与 release.yml 也都没有图谱步骤。
+#
+# 本 workflow 用不依赖索引的静态导入环检测（scripts/check-import-cycles.mjs）
+# 补上这个缺口：只读源码，不需要 .gitnexus、不需要联网下载额外工具。
+# 覆盖 packages/* 与 apps/web 的源码，含跨包 @mozhou/* 依赖。
+name: graph-gate
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+
+jobs:
+  import-cycles:
+    name: static import cycle check
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@9.15.0
+      # 检测脚本用 devDependency 里的 typescript 解析导入（不新增依赖），
+      # 所以必须先装依赖再跑。
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # 退出码：0 无环；1 发现依赖环（阻断合并）；2 用法错误。
+      - name: Static import cycle gate
+        run: node scripts/check-import-cycles.mjs
