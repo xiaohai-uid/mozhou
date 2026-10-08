@@ -3,10 +3,24 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { readSourceStamp } from '../lib/source-stamp.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const source = join(root, 'scripts/release/windows')
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
+
+// 产物戳要能回答「这份安装器对应哪个提交」。脏工作区里 rev-parse HEAD 会谎报：
+// 内容来自未提交改动，戳却指向干净提交（发布审计两次栽在这：90b45a1、06a5069）。
+// 规则见 lib/source-stamp.mjs（纯函数，两个分支可直接核验）；--print-stamp 只打印不构建。
+const stamp = readSourceStamp(root)
+if (process.argv.includes('--print-stamp')) {
+  console.log(JSON.stringify(stamp, null, 2))
+  process.exit(0)
+}
+if (stamp.dirty) {
+  console.warn(`WARNING: 工作区有 ${stamp.dirtyFiles} 个未提交改动——产物戳记作 ${stamp.sourceCommit}，不能作为干净提交 ${stamp.sourceCommitSha} 的证明`)
+}
+
 if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('Build on Windows x64 with native Windows dependencies')
 const artifacts = join(root, 'release-artifacts')
 mkdirSync(artifacts, { recursive: true })
@@ -91,5 +105,5 @@ execFileSync(iscc, [`/DBundle=${bundle}`, `/DAppVersion=${version}`, `/DOutput=$
 const installer = join(artifacts, `MoZhou-${version}-windows-x64-setup.exe`)
 const hash = createHash('sha256').update(readFileSync(installer)).digest('hex')
 writeFileSync(`${installer}.sha256`, `${hash}  ${installer.split(sep).pop()}\n`)
-writeFileSync(join(artifacts, 'windows-build-result.json'), JSON.stringify({ version, bundle, installer, sha256: hash, bytes: statSync(installer).size, node: process.version, sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), dependencyCopies: inventory.length }, null, 2))
+writeFileSync(join(artifacts, 'windows-build-result.json'), JSON.stringify({ version, bundle, installer, sha256: hash, bytes: statSync(installer).size, node: process.version, ...stamp, dependencyCopies: inventory.length }, null, 2))
 console.log(JSON.stringify({ installer, sha256: hash, bundle }))
