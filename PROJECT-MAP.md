@@ -460,6 +460,15 @@
 - **验证状态**：已执行（上列实跑）。**未验证**：GitHub 托管 CI 未真跑（本地无法执行 Actions）；madge/dependency-cruiser 路线未验证；新门未登记进 docs/gates.md（文件被并行会话占用）。
 - **遗留/风险**：脚本只覆盖相对导入与工作区包名导入，路径别名/动态 specifier/第三方包内部环不在范围。
 
+### CHG-20261008-28 — 2026-10-08 — 用户授权（议题 #101，主会话执行），ZCode 执行
+
+- **需求来源**：GitHub 议题 #101（删除陈旧 release-verify.mjs）。证据见 [docs/changes/CHG-20261008-28-delete-stale-release-verify.md](docs/changes/CHG-20261008-28-delete-stale-release-verify.md)。
+- **观察基线**：HEAD e242832；该脚本检查 2 要求分支 codex/mozhou-full-release-20260915、检查 3-5 指向 C:/codex/handoffs/mozhou-recovery-20260917/；grep 确认无任何代码调用方（release.yml 与 package:windows 都不经过它）。
+- **实际变更**：①删除 scripts/release/release-verify.mjs；②在变更文档里给出「原脚本想核验的 5 件事 → 现在的落点」对照表（产物戳/release.yml 测试步骤/graph-gate.yml/文档门与真实模型门/docs/gates.md 证据约定）；③逐字保留并行会话在该文件里的未提交注释改动（门禁→门），避免静默丢弃。
+- **验收**：grep 复查除 docs/changes 记录外无 release-verify 引用（生成物符号快照除外）；删除后无其它文件受影响。
+- **验证状态**：已执行（grep + 删除）。**未做**：未重写为新的核验脚本（当前发布路径已覆盖，另写平行脚本无增量价值）；未验证 release.yml 在 GitHub 上的真实执行。
+- **遗留/风险**：本次删除丢弃了并行会话的一处未提交注释改动（已逐字记录）；判定依据是该工作线已停摆约 25 小时（123 个在制文件最后修改于 2026-10-07 23:26）。
+
 
 
 
