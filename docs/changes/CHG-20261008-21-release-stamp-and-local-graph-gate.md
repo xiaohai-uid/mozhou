@@ -64,7 +64,22 @@ retro 候选（按严重度）中的第 3、1、4、2 项：
 - `scripts/release/release-verify.mjs` 是 9 月恢复期陈旧脚本（检查 2 要求分支 `codex/mozhou-full-release-20260915`；检查 3-5 指向 `C:/codex/handoffs/mozhou-recovery-20260917/`），且当前被并行会话占用 → **未删未改**，仅登记（见 §6）。
 - 低优先未开工（retro 第 8、9 项）：`.cmd` 垫片知识已在 `scripts/ci-gate.mjs:1-6` 注释里，AGENTS.md 未加该指针；大产物目录（`release-artifacts/`）不进递归检索的约定未写入标准。
 
-## 6. 待提议题清单（第 2 项产出；因仓库 PUBLIC，待用户点头后提交）
+## 6. 已提议题（2026-10-08，用户「提吧」授权后创建）
+
+创建时另发现一处约定缺口：`AGENTS.md` §9 规定的五个 canonical 标签里，**`needs-triage` 与 `ready-for-human` 在追踪器里原本不存在**（只有 `ready-for-agent`/`needs-info`/`wontfix`）——已按 §9 补齐这两个标签。
+
+| 议题 | 标题 | 标签 |
+|---|---|---|
+| [#93](https://github.com/xiaohai-uid/mozhou/issues/93) | 门禁：依赖环检查纳入 CI（不止本地门禁） | `ready-for-agent` |
+| [#94](https://github.com/xiaohai-uid/mozhou/issues/94) | 门禁：真实模型路径纳入发布前作业 | `ready-for-agent` |
+| [#95](https://github.com/xiaohai-uid/mozhou/issues/95) | 门禁：Mimosa 提交扫描恒 INCONCLUSIVE 的处置 | `needs-triage` |
+| [#96](https://github.com/xiaohai-uid/mozhou/issues/96) | 标准：建立 CODING_STANDARDS.md 并迁移判断类条款 | `ready-for-agent` |
+| [#97](https://github.com/xiaohai-uid/mozhou/issues/97) | 文档：AGENTS.md 沉积清理（§0 叙事与 CLAUDE.md 重复） | `needs-triage` |
+| [#98](https://github.com/xiaohai-uid/mozhou/issues/98) | 测试：保存路径 journal 崩溃注入恢复用例缺失 | `ready-for-agent` |
+| [#99](https://github.com/xiaohai-uid/mozhou/issues/99) | 测试：naming 502 路径真实模型未实测 | `ready-for-agent` |
+| [#100](https://github.com/xiaohai-uid/mozhou/issues/100) | 测试：写锁跨 Windows 登录会话互斥未验证 | `needs-triage` |
+| [#101](https://github.com/xiaohai-uid/mozhou/issues/101) | 清理：删除 9 月陈旧 release-verify.mjs | `ready-for-agent` |
+| [#102](https://github.com/xiaohai-uid/mozhou/issues/102) | 缺陷：基线既有 TS2352（taskStream.routes.test.ts:170） | `ready-for-agent` |
 
 | 标题 | 标签 | 正文要点 |
 |---|---|---|
