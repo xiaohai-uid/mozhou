@@ -69,6 +69,28 @@ jobs:
       - name: Build web and production server
         run: pnpm --filter @mozhou/web build
 
+      # 发布路径真实模型自动化门：有凭据则跑真实模型端到端旅程，缺凭据则 BLOCKED 并阻断发布。
+      # 刻意不放进默认 PR 门（ci.yml）——真实模型调用会产生费用，只在发布路径触发。
+      # 依赖上一步产出的 apps/web/dist-server 与 pnpm build 产出的 packages/data-plane/dist。
+      - name: Real-model release gate
+        run: node scripts/release/real-model-gate.mjs
+        env:
+          MOZHOU_API_KEY: ${{ secrets.MOZHOU_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MOZHOU_API_BASE: ${{ secrets.MOZHOU_API_BASE }}
+          MOZHOU_MODEL: ${{ secrets.MOZHOU_MODEL }}
+
+      # 无论本门通过、失败还是 BLOCKED，都留存结构化证据（字段约定见 docs/gates.md）。
+      - name: Upload real-model release evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mozhou-real-model-release-evidence
+          path: evidence/real-model-journey/**
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Build truthful release assets
         run: node scripts/build-release.mjs
 

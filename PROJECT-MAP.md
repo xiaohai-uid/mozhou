@@ -432,6 +432,15 @@
 - **验证状态**：已执行（四门实跑 + 行数核对）。**收口修正**：子代理交付的「1 行纯指针」经查 gitnexus 注入器源码（ai-context.js 的 upsertGitNexusSection：文件无标记时 append）会在下次 analyze 被追加回自动块——已改用工具支持的 gitnexus:keep 精简块（保留用户布局、只刷新统计行），去重方可持久。
 - **遗留/风险**：check:architecture 仍 STALE（并行会话源码改动，非本变更）；AGENTS.md 的自动块未加 keep 标记，仍会被 analyze 整体替换（机器管理，符合预期）。
 
+### CHG-20261008-25 — 2026-10-08 — 用户授权（议题 #94，子代理执行、主会话核验），ZCode 执行
+
+- **需求来源**：GitHub 议题 #94（真实模型路径纳入发布前作业）。证据见 [docs/changes/CHG-20261008-25-real-model-release-gate.md](docs/changes/CHG-20261008-25-real-model-release-gate.md)。
+- **观察基线**：HEAD 34b426e；pnpm test 默认零真实模型调用；release.yml 19 步无真实模型作业；既有旅程脚本默认「无密钥 → BLOCKED 证据 + exit 0」（对发布门是假绿）。
+- **实际变更**：①新增 scripts/release/real-model-gate.mjs（缺凭据 → BLOCKED/exit 2；有凭据 → --strict 调起既有旅程脚本并透传 0/1/2；落 docs/gates.md:49 的 9 字段证据）；②release.yml +22 行（gate 步骤 + always() 证据上传，action 固定 SHA）。
+- **验收**：BLOCKED 路径实跑 exit=2 且输出含 BLOCKED（主会话复跑）；证据 JSON 9 字段齐备（主会话实读）；凭据字面量 grep 零命中；YAML js-yaml 解析通过；check:gates/glossary exit 0。
+- **验证状态**：已执行（上列实跑）。**未验证**：VERIFIED 路径（本机三个 Key 均未设置，未伪造）；GitHub Actions 的 secrets 注入/artifact 上传/hosted 结果本地无法运行。
+- **遗留/风险**：证据 sourceCommit 写短 SHA，与推送门收据的 40 位完整 SHA 约定不同形（用途不同，留给评审裁决）。
+
 
 
 
