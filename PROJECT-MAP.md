@@ -423,6 +423,15 @@
 - **验证状态**：已执行（四条门实跑；决策依据的两条路径证据为实跑/实读）。未切 strict（安全姿态变更，触发条件已写入 ADR）；未修扫描器缓冲（属上游）。
 - **遗留/风险**：提交时无安全门（advisory 的后果）；.mimosa/hook-state/ 约 953 MB 保留期处置仍未决（INDEX 挂账第 3 项，与本变更无关）。
 
+### CHG-20261008-24 — 2026-10-08 — 用户授权（议题 #97，子代理执行、主会话核验），ZCode 执行
+
+- **需求来源**：GitHub 议题 #97（AGENTS.md 沉积清理）。证据见 [docs/changes/CHG-20261008-24-agents-md-deposit-cleanup.md](docs/changes/CHG-20261008-24-agents-md-deposit-cleanup.md)。
+- **观察基线**：HEAD 9cadfdf；AGENTS.md 160 行（§0 六线裁决叙事 21 行常驻、三处「已更正」+一处「已废止」）；CLAUDE.md 44 行全为 gitnexus 自动块；verify-glossary.mjs:106 的 ACTIVE_FILE 含 CLAUDE.md。
+- **实际变更**：①AGENTS.md §0 叙事（21 行）压成一段指针指向 ADR-0031，§7/§9 三处注记各压一句；②CLAUDE.md 44 行自动块 → 精简块（gitnexus:keep 标记 + 一行指针 + 统计行）；③新增 CHG-20261008-24。
+- **验收**：AGENTS.md 160→142、CLAUDE.md 44→5（主会话收口修正后）；check:glossary/gates/term-map/readmes 均 exit 0（实跑）。
+- **验证状态**：已执行（四门实跑 + 行数核对）。**收口修正**：子代理交付的「1 行纯指针」经查 gitnexus 注入器源码（ai-context.js 的 upsertGitNexusSection：文件无标记时 append）会在下次 analyze 被追加回自动块——已改用工具支持的 gitnexus:keep 精简块（保留用户布局、只刷新统计行），去重方可持久。
+- **遗留/风险**：check:architecture 仍 STALE（并行会话源码改动，非本变更）；AGENTS.md 的自动块未加 keep 标记，仍会被 analyze 整体替换（机器管理，符合预期）。
+
 
 
 

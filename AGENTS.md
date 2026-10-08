@@ -4,27 +4,9 @@
 >
 > Repo-level agent instructions; the global contract above always wins, and this file never replaces it.
 
-## 0. 流程权威与优先级（2026-10-01 裁决）
+## 0. 流程权威与优先级
 
-> 本文件此前由两条产品线的指令**拼接**而成：`## Agent skills`（应用线）出现在第 66–78 行，`# 内核线增补：Wayfinder 追踪操作` 又在第 82–97 行重复了一遍同样三个小节。两者在 Issue tracker / Triage labels / Domain docs 三处**互相矛盾**，且**没有任何优先级规则**。本节是那次拼接的裁决结果。
-
-**本仓现在只有一套流程权威：mattpocock/skills。** 六条历史工作流线的裁决：
-
-| 线 | 裁决 | 家 |
-|---|---|---|
-| **mattpocock/skills** | **保留，唯一流程权威** | `docs/agents/` + 本文件 |
-| 应用线 UVSD | 并入 matt 线，受本节优先级规则裁决 | 本文件 §1–§8 |
-| 内核线 Wayfinder | 并入 matt 线，受本节优先级规则裁决 | 本文件 §9 |
-| spec-kit / speckit | **降级为产物目录**，其模板不再产生新约束 | `.specify/`、`specs/` |
-| superpowers | **降级为历史层**，brief/report 不再是新工作的单位 | `docs/superpowers/`、`.superpowers/` |
-| DSH `.dwf.ts` | **降级为任务级脚本**，不是流程 | `.zcode/workflow-drafts/` |
-
-**优先级规则**：
-
-- §1–§8（UVSD 工程纪律）与 §9（Wayfinder 追踪操作）**互补而非竞争**：前者管"能不能做"，后者管"记在哪"。
-- 二者冲突时，**§1–§8 的范围纪律优先**。宁可停下并报告依赖，不得自行扩大范围。
-- **术语**：任何产物中的领域词一律以 [`GLOSSARY.md`](./GLOSSARY.md) 为准。本文件不定义术语，只定义流程。
-- **决策**：以 `docs/adr/` 为准，入口 `docs/adr/INDEX.md`。
+本仓只有一套流程权威：**mattpocock/skills**。UVSD 并入 §1–§8（管"能不能做"），Wayfinder 并入 §9（管"记在哪"）；二者冲突时 **§1–§8 的范围纪律优先**，宁可停下报告依赖，不得自行扩大范围。spec-kit/speckit、superpowers、DSH `.dwf.ts` 分别降级为产物目录（`.specify/`、`specs/`）、历史层（`docs/superpowers/`）、任务级脚本（`.zcode/workflow-drafts/`），保留文件但不再产生新约束。六条线的完整裁决与理由见 [ADR-0031](docs/adr/0031-single-workflow-authority.md)；术语以 [`GLOSSARY.md`](./GLOSSARY.md) 为准，本文件只定义流程；决策入口 `docs/adr/INDEX.md`。
 
 ## Engineering Rules - UVSD Protocol v2.2.1 Final
 
@@ -83,7 +65,7 @@
 - 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
 - 挂账项（Deferred Item，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，议题 #14/#15）
 
-> **已废止**：本节原写作「Ticket tracker：`.scratch/mozhou-mvp/issues/NN-<slug>.md`」，并把「遗留切片」当作 Deferred Item 的名称。两者均已按 `GLOSSARY.md` Part 2 §2.3 与 §2.1 更正。原「决策记录：OB `10_Projects/墨舟.md`」指向已退役的 Obsidian 库，一并更正为 `docs/adr/`。
+> **已更正**：本节的执行跟踪家、挂账项命名与决策记录家已分别更正为 GitHub Issues、挂账项 Deferred Item、`docs/adr/`（原为本地 issues 目录、「遗留切片」、OB `10_Projects/墨舟.md`）；依据 `GLOSSARY.md` Part 2 与 ADR-0032/0034。
 
 ### 8. Git 分支与提交约定（2026-09-23 起生效）
 - 本仓库采用六分支模型，完整手册见 WinClaw `knowledge/GIT-BRANCHING-AND-COMMIT-STANDARD.md`：
@@ -106,13 +88,13 @@
 
 五个规范标签（canonical，非 "default"）：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。存放于 GitHub 议题标签。映射见 `docs/agents/triage-labels.md`。
 
-> **已更正**：本节与旧的 `## Agent skills` 块曾分别写作 "Default five canonical roles" 与 "Canonical 5-role triage label vocabulary" —— 同一套五个标签，两种措辞。现统一为 **canonical**。
+> **已更正**：五个标签的两套措辞已统一为 **canonical**（映射见 `docs/agents/triage-labels.md`）。
 
 ### Domain docs
 
 Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY-MAP.md`）；决策记录在 `docs/adr/`（惰性创建）。消费规则见 `docs/agents/domain.md`。
 
-> **已更正**：本节曾出现三次措辞不同的同义描述，且 `docs/agents/domain.md` 还要求读一个本仓不存在的 `CONTEXT-MAP.md` 并援引一个两系都不存在的 `ADR-0007 (event-sourced orders)` 作为示例。示例已改为占位形式。
+> **已更正**：本节的重复同义描述已合并，`docs/agents/domain.md` 对 `CONTEXT-MAP.md` 与 `ADR-0007` 的错误引用已修正。
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
