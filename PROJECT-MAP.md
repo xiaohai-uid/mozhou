@@ -414,6 +414,15 @@
 - **验证状态**：已执行（上述命令实跑）；docs-only 按规程未跑测试套件。双轴评审（Standards 4 项判断类 + Spec 无实质缺失）已按发现修正三处、记缺口一处。
 - **遗留/风险**：CODING_STANDARDS.md 不在 check:glossary 的 ACTIVE_FILE 白名单（该脚本正被并行会话改，未介入）；「评审代理实际读它」仅有一致性证据、加载未验证。
 
+### CHG-20261008-23 — 2026-10-08 — 用户授权（「按你推荐的来」，议题 #95），ZCode 执行
+
+- **需求来源**：GitHub 议题 #95（Mimosa 提交扫描恒 INCONCLUSIVE 的处置）。证据见 [docs/changes/CHG-20261008-23-mimosa-advisory-decision.md](docs/changes/CHG-20261008-23-mimosa-advisory-decision.md)。
+- **观察基线**：HEAD 5dbec47；提交钩子路径扫描恒 scanner_enobufs（本会话 3 次）；MCP 扫描路径 completeness=complete（919/919 文件，coverage.json 实读）；插件旋钮 MIMOSA_HOOK_FAILURE_MODE / MIMOSA_GIT_GATE_FAILURE_MODE / MIMOSA_HOOK_STRICT。
+- **实际变更**：新增 ADR-0036（合并系列 0008–0036）记录决策——保持 open=advisory、明示「不得宣称项目安全」、给出切 strict 的两个触发条件与复核方式；docs/adr/INDEX.md 的范围与清单同步。
+- **验收**：check:glossary / check:gates / check:term-map / check:readmes 均 exit 0（实跑）。
+- **验证状态**：已执行（四条门实跑；决策依据的两条路径证据为实跑/实读）。未切 strict（安全姿态变更，触发条件已写入 ADR）；未修扫描器缓冲（属上游）。
+- **遗留/风险**：提交时无安全门（advisory 的后果）；.mimosa/hook-state/ 约 953 MB 保留期处置仍未决（INDEX 挂账第 3 项，与本变更无关）。
+
 
 
 
