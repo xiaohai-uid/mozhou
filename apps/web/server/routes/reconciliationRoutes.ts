@@ -468,7 +468,13 @@ export const reconciliationRoutes: RouteHandler = async (req, res, { path, body,
     try {
       resolved = resolveService(root)
       if (!proposalExists(resolved.service, proposalId, json)) return true
-      const proposal = resolved.service.dismiss(proposalId)
+      // R3：dismiss 与 decide 同样经 finalize → syncBaselineForPath 对 manifest.json
+      // 做读-改-写（写前哈希基线）。必须与 decide 同持书稿写锁，否则与其它平面或保存
+      // 路径交错时，别的写者刚落的条目会被本拍的陈旧底覆盖，随后被误报 EXTERNAL_MODIFIED。
+      const service = resolved.service
+      const proposal = await withBookWriteLock(root, () => service.dismiss(proposalId), {
+        timeoutMs: 30_000,
+      })
       json(200, { ok: true, proposal })
     } catch (error) {
       sendError(json, error)
