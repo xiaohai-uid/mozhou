@@ -1,7 +1,9 @@
 /**
  * apps/web · 账号体系与设备授权路由 (Account & Device Flow Routes · T08)。
  * - 注册、登录、退出、刷新、重置；
- * - 会话安全：HttpOnly / SameSite=Lax / Secure cookies，写请求防 CSRF；
+ * - 会话安全：HttpOnly / SameSite=Lax / Secure cookies；跨站写请求由 SameSite 与
+ *   `assertTrustedRequest` 的 loopback + Origin 一致性缓解（令牌式 CSRF 未接线，见
+ *   docs/adr/0030-local-api-trust-model.md）；
  * - Windows PKCE 设备授权（系统浏览器回调接收器）；
  * - 最多 3 个绑定设备限额，解绑即撤销票据；
  * - 用户间严格隔离，错误不泄露账号存在性。
@@ -70,7 +72,7 @@ export const accountRoutes: RouteHandler = async (req, res, { path, body, json }
 
     const { user } = await defaultSessionManager.provider.signIn(email, password)
     const principal = { userId: user.id, email: user.email }
-    const { session, cookie } = defaultSessionManager.createSession(principal)
+    const { cookie } = defaultSessionManager.createSession(principal)
 
     res.setHeader('Set-Cookie', cookie)
     json(200, {
@@ -79,7 +81,6 @@ export const accountRoutes: RouteHandler = async (req, res, { path, body, json }
         id: user.id,
         email: user.email,
       },
-      csrfToken: session.csrfToken,
     })
     return true
   }

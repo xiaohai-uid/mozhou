@@ -15,7 +15,7 @@ tags:
 
 ## Context
 
-十步管线（Prepare→Compile→Draft→Review→User Edit→Final Extract→Continuity Gate→Canon Proposal→Commit→Flywheel Record）的编排语义此前散落在各 ADR 与规格中：相位机与原子提交在 T3、对账协议在 #6、候选生命周期在 ADR-0002/0014，但「步与步如何衔接、崩溃后从哪续、回环怎么终止」无唯一答案。参考项目最大共性短板即事后补救而非事务化提交（卷二 §C）；ANWA 三大雷区（#60 断线丢章 / #90 完成态多源 / #116 停止策略失控）全部命中编排层。
+十步管线（Prepare→Compile→Draft→Review→User Edit→Final Extract→Continuity Gate→Canon Proposal→Commit→Flywheel Record）的编排语义此前散落在各 ADR 与规格中：相位机与原子提交在 T3、对账协议在 #6、候选生命周期在 ADR-A-0002/0014，但「步与步如何衔接、崩溃后从哪续、回环怎么终止」无唯一答案。参考项目最大共性短板即事后补救而非事务化提交（卷二 §C）；ANWA 三大雷区（#60 断线丢章 / #90 完成态多源 / #116 停止策略失控）全部命中编排层。
 
 ## Decision
 

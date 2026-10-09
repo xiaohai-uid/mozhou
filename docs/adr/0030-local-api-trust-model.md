@@ -17,7 +17,7 @@
 
 核验方式：PowerShell 逐行扫描 `apps` + `packages` 下 486 个 `.ts`/`.tsx` 源文件（排除 `node_modules`/`dist`/生成快照），非图谱推断；199 个测试文件中提及这 5 个守卫的有 **0** 个。
 
-沿革：`0e14fb9 fix(security): enforce local API trust boundary` 引入 bootstrap 守卫；`78e5d79 feat(T08)` 另建了一套并行的会话与 CSRF 体系（`apps/web/server/auth/session.ts:602` 真正在验证 CSRF）。结果：**两份 CSRF 实现，只有一份被调用**。
+沿革：`0e14fb9 fix(security): enforce local API trust boundary` 引入 bootstrap 守卫；`78e5d79 feat(T08)` 另建了一套并行的会话与 CSRF 体系（`apps/web/server/auth/session.ts` 的 `assertCsrf`）。结果：**两份 CSRF 实现，两份都未被生产路径调用**——`security.ts` 那份已按本 ADR 删除，`session.ts` 的 `assertCsrf` 仅剩单元测试（生产零调用方，客户端从不回传 `x-csrf-token`）。当前生效的跨站缓解是会话 Cookie 的 `SameSite=Lax` 与 `assertTrustedRequest` 的 loopback + Origin 一致性。
 
 ## 关键事实：HTTP 投递的 bootstrap token 是安全剧场
 
@@ -37,7 +37,7 @@ bootstrap token 的作用是拒绝「非本应用发起的本机请求」。要�
 
 3. **删除 5 个从未接线的守卫及其独占的 `node:crypto` import。** 保留 `assertTrustedRequest` / `readRequestPayload` / `parseCookies` / `RateLimiter` / `assertSafeBookRoot` / `assertSafeParentDirectory`（这些有真实调用方）。删除的是生产 0 引用、测试 0 引用的代码，不违反 AGENTS.md 规则 21（未删除任何测试）。
 
-4. **CSRF 的唯一实现在 `auth/session.ts:602`。** `security.ts` 中那份重复实现已删，不保留两套。
+4. **不采用令牌式 CSRF 防线。** `security.ts` 中那份重复实现已删；`auth/session.ts` 的 `assertCsrf` 保留但**未接线**（生产零调用方，仅有单元测试），因为客户端从不回传 `x-csrf-token`。跨站写请求的实际缓解是会话 Cookie 的 `SameSite=Lax` 与 `assertTrustedRequest` 的 loopback + Origin 一致性；登录响应也不再下发 `csrfToken`，避免发出无人回传的装饰性令牌。
 
 ## 要做真防护的前置条件（另立工单，不在本 ADR）
 
@@ -51,6 +51,6 @@ bootstrap token 的作用是拒绝「非本应用发起的本机请求」。要�
 
 ## 后果
 
-- 安全面零悬空：每个安全守卫要么已接线且有测试，要么已删除，没有第三种状态。
+- 安全面清点：已接线的守卫（`assertTrustedRequest` 等）有测试；未接线的重复实现已删除；`assertCsrf` 是唯一保留的未接线守卫（有单元测试、生产零调用方），本 ADR 显式记录这一状态，见决定 4，不再声称「没有第三种状态」。
 - 边界守卫 `assertTrustedRequest` 有端到端覆盖：`apps/web/src/release-hardening.test.ts:87,94` 与 `apps/web/server/routes/accountRoutes.test.ts:161`（经 HTTP 路径，非直接 import）。
 - 本 ADR 是 `security.ts` 的威胁模型真源。代码若要越过 loopback+Origin 边界，须先改本 ADR。

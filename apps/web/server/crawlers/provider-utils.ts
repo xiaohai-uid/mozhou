@@ -6,6 +6,47 @@
 const DEFAULT_TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 3
 
+/** IPv4 私有/保留网段判定（点分十进制；非四段或越界一律视为不安全）。 */
+function isPrivateOrReservedIpv4(address: string): boolean {
+  const parts = address.split('.').map((part) => Number.parseInt(part, 10))
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true
+  }
+  const [a = 0, b = 0] = parts
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) || // CGNAT
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && (b === 0 || b === 168)) ||
+    a >= 224
+  )
+}
+
+/**
+ * 还原 IPv6 字面量中嵌入的 IPv4 地址（返回点分十进制；无嵌入则返回 null）。
+ *
+ * URL 解析器会把点分映射形式（`::ffff:127.0.0.1`）规范化为十六进制
+ * （`::ffff:7f00:1`），因此点分与十六进制两种形式都必须覆盖；同时覆盖
+ * `::ffff:0:0/96` 转换段与 `64:ff9b::/96` NAT64 段。缺少还原时，环回、
+ * 私网与云元数据地址会以 IPv4 映射形式绕过下方校验。
+ */
+function extractEmbeddedIpv4(host: string): string | null {
+  const dotted = host.match(/^(?:::ffff:(?:0:)?|64:ff9b::)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+  if (dotted?.[1] !== undefined) {
+    return dotted[1]
+  }
+  const hex = host.match(/^(?:::ffff:(?:0:)?|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (hex?.[1] !== undefined && hex[2] !== undefined) {
+    const high = Number.parseInt(hex[1], 16)
+    const low = Number.parseInt(hex[2], 16)
+    return `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`
+  }
+  return null
+}
+
 export function isSafePublicUrl(urlString: string): boolean {
   try {
     const parsed = new URL(urlString)
@@ -14,6 +55,13 @@ export function isSafePublicUrl(urlString: string): boolean {
     }
     const rawHost = parsed.hostname.toLowerCase()
     const host = rawHost.replace(/^\[|\]$/g, '') // 去除 IPv6 括号包裹
+
+    // IPv4 映射/转换形式的 IPv6 先还原为 IPv4 再判定，否则环回、私网与
+    // 云元数据地址（如 ::ffff:127.0.0.1、::ffff:a9fe:a9fe）会绕过下方校验。
+    const embeddedV4 = extractEmbeddedIpv4(host)
+    if (embeddedV4 !== null && isPrivateOrReservedIpv4(embeddedV4)) {
+      return false
+    }
 
     // 过滤 localhost、环回、未指定与私有/保留地址
     if (

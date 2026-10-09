@@ -437,6 +437,7 @@ export interface SessionRecord {
   readonly sessionId: string
   readonly userId: string
   readonly email: string | null
+  /** 供 `assertCsrf` 校验的令牌；当前未接线、不下发客户端（见 assertCsrf 注释）。 */
   readonly csrfToken: string
   readonly createdAt: number
   expiresAt: number
@@ -596,6 +597,14 @@ export class SessionManager {
     throw new RequestBoundaryError(401, 'INVALID_SESSION', 'session is invalid, revoked, or expired')
   }
 
+  /**
+   * 会话级 CSRF 令牌校验（当前未接线）。
+   *
+   * 生产路径没有任何调用方：客户端从不回传 `x-csrf-token`。跨站写请求的实际缓解是
+   * 会话 Cookie 的 `SameSite=Lax` 与路由层 `assertTrustedRequest` 的 loopback + Origin
+   * 一致性（见 docs/adr/0030-local-api-trust-model.md）。本方法连同 `SessionRecord.csrfToken`
+   * 保留给「客户端回传令牌」的后续接线，现仅有单元测试覆盖，不是生效中的防线。
+   */
   assertCsrf(req: IncomingMessage, session: SessionRecord): void {
     const csrfHeader = req.headers['x-csrf-token']
     const token = typeof csrfHeader === 'string' ? csrfHeader.trim() : null
