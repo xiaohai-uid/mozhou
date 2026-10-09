@@ -53,11 +53,17 @@ export default tseslint.config(
             'apps/web/server/test-support/*.ts',
             // 2026-10-05：写锁平台层测试目录同样不被任何 project 发现，按目录补登记。
             'apps/web/server/platform/*.test.ts',
+            // 2026-10-09：爬虫目录的 SSRF 过滤测试（B1 修复新增）同样不被任何 project
+            // 发现，按同一先例补登记。
+            'apps/web/server/crawlers/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，
           // 上调至 120 恢复 pnpm lint 门禁。
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 120,
+          // 2026-10-09 由 120 上调至 140：服务端新增测试文件后匹配数达 121，触顶报
+          // 「Too many files (>120) matched the default project」；按同一先例上调。
+          // 长期正解是让 server/ 有可被 projectService 发现的 tsconfig，而不是持续抬高阈值。
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 140,
         },
         tsconfigRootDir: import.meta.dirname,
       },

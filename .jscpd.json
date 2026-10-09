@@ -4,7 +4,7 @@
   "reporters": ["console"],
   "absolute": true,
   "patternOptions": { "maxLines": 40, "minLines": 8, "minTokens": 60 },
-  "formats": ["typescript", "javascript"],
+  "format": ["typescript", "javascript"],
   "ignore": [
     "**/node_modules/**",
     "**/dist/**",
