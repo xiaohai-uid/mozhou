@@ -564,6 +564,16 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：一处**未复现的偶发**（子代理报 `quota.test.ts:110` 全段首跑失败一次，主会话连跑 3 遍全段 + 5 遍 billing 段均未复现；该套件全用真实 `Date.now()`，跨 UTC 日/月边界理论上可致失败，但失败时刻为 UTC 10:0x 与此不符）；`verifyTicket` 生产无调用方（本次是消除隐患）；被拒绝的预留仍停留 `reserved` 不自动释放；Tauri 入口未编译运行；沿用生产改密需接口变更、配额未接生成路径、receipt/report TOCTOU、`listUserBooks` 死代码、未连真实 Supabase、#99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
 - **遗留/风险**：本批 6 个源文件与测试动手前均为干净（无夹带）；生成物无需刷新，故未触碰 `docs/architecture.md` 与 `docs/term-map.md`。
 
+### CHG-20261010-11 — 2026-10-10 — 第九轮复核「声称 vs 现实」审计发现收口，ZCode 执行
+
+- **需求来源**：第九轮独立对抗复核（verdict `release`，连续第六次；本轮要求**证伪**上一批两处并**首次系统做「声称 vs 现实」审计**）报出的 1 处文档不实声称 + 1 处文案错误。证据见 [docs/changes/CHG-20261010-11-round9-claims-audit.md](docs/changes/CHG-20261010-11-round9-claims-audit.md)。
+- **实际变更**：506a46d 更正 `apps/web/MOBILE_UI_BRIEF.md` —— 原文声称「生产级、可商用……（848/848 项测试全绿）」，实测 `pnpm test` 为 **2368 通过 / 15 跳过**，且「可商用」与根 `README.md` 的「技术预览版 (Technical Preview / v0.3.0)、社区免费」直接矛盾；改为与 README 一致的表述并把测试数改为带日期的实测值。同提交修正 `scripts/release/windows/desktop-server.mjs` 报错文案里的启动者——`scripts/launcher.mjs` 并不启动该文件（它直接起 `apps/web` 的 `productionServer.js`），真正启动方是 `MoZhou.cs:114`（配 `:127` 设 MOZHOU_DATA_ROOT）与 `server_manager.rs`（配 `:213`）。
+- **审计的其余结论（干净，如实记录）**：代码注释里的强断言逐条核对**未发现与实现不符**（atomic-write 的唯一名+fsync+rename、styleAnalysis 的原子落盘、quota 的「余额 1 时 20 并发仅 1 成功」实测成立）；`docs/gates.md` 与 `check:gates` 的缺口逻辑确实只存在于并行会话未提交改动里，但 **HEAD 自洽**（干净副本五门全 0）；`release.yml` 已有真校验步骤，此前缺口已闭合。
+- **记录未改的一处残余耦合**：「单用户在预算内无法打掉全局断路器」依赖「默认月预算 1500 ≤ 全局日预算 10000」；两者生产均无 setter 调用。若将来开放运行期配置，应在那里加一致性校验（本次未改，属配置治理）。
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1066 例 + 台架 3 例 + web 156 文件 1299 例，合计 2368 通过 / 15 跳过）；lint exit 0；`node --check desktop-server.mjs` OK；glossary/gates/readmes 全 exit 0；干净 HEAD（506a46d）副本上 architecture/term-map FRESH + 其余三门 0；生成物无需刷新。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：文档测试数无自动校验（未建门去查文档里的数字）；「声称 vs 现实」审计**未覆盖全仓所有文档**，不可读作「所有文档声称都已核实」；月预算 ≤ 日预算的耦合未改；沿用生产改密需接口变更、配额未接生成路径、receipt/report TOCTOU、`listUserBooks` 死代码、被拒预留仍停留 reserved、`verifyTicket` 生产无调用方、未连真实 Supabase、Tauri 未编译运行、一处未复现偶发（`quota.test.ts:110`）、#99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
+- **遗留/风险**：`apps/web/MOBILE_UI_BRIEF.md` 被并行会话改过同一行的一个词（数据平面→数据面），本次整句重写该行、暂存差异仅此 1 行；生成物无需刷新故未触碰。
+
 
 
 
