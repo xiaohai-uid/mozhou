@@ -5,12 +5,12 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createMoZhouApiRouter } from '../api.js'
-import { createBook, LocalDataPlane, renderProseChapter, proseChapterPath } from '@mozhou/data-plane'
+import { createBook, LocalDataPlane, packZip, renderProseChapter, proseChapterPath } from '@mozhou/data-plane'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { defaultSessionManager, InMemoryAuthProvider } from '../auth/session.js'
 
@@ -204,5 +204,90 @@ describe('作品归档备份与恢复路由 (T10)', () => {
     const dataMissing = (await resMissing.json()) as { ok: boolean; code: string }
     expect(dataMissing.ok).toBe(false)
     expect(dataMissing.code).toBe('BACKUP_NOT_FOUND')
+  })
+
+  // 历史遗留：POST 分支原子写 + 回读校验只防「新写坏」；盘上可能已有半份/截断 zip。
+  it('损坏/截断的既有备份：下载与恢复都不再当有效备份（409 而非 200）', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-backup-corrupt-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const base = await listen()
+    const backupsDir = join(dataRoot, 'backups')
+    mkdirSync(backupsDir, { recursive: true })
+    // 用真实 packZip 生成合法归档后截掉尾部 EOCD，模拟半份落盘
+    const valid = packZip([{ path: 'manifest.json', data: '{}' }])
+    const truncated = valid.subarray(0, valid.length - 8)
+    const backupId = 'bup_truncated000000000000'
+    writeFileSync(join(backupsDir, `${backupId}.zip`), truncated)
+
+    // 下载：不再 200 原样发出，返回明确错误码
+    const resDownload = await fetch(`${base}/api/backups/download?backupId=${backupId}`)
+    expect(resDownload.status).toBe(409)
+    const dl = (await resDownload.json()) as { ok: boolean; code: string }
+    expect(dl.ok).toBe(false)
+    expect(dl.code).toBe('BACKUP_CORRUPT')
+
+    // 恢复：同样拒绝进入恢复流程
+    const resRestore = await fetch(`${base}/api/backups/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backupId }),
+    })
+    expect(resRestore.status).toBe(409)
+    const rs = (await resRestore.json()) as { ok: boolean; code: string }
+    expect(rs.code).toBe('BACKUP_CORRUPT')
+  })
+
+  // 跨主体能力型 IDOR：96bit 随机 backupId 不是授权凭据。
+  it('hosted 模式：备份按主体隔离，主体 B 无法下载/恢复主体 A 的备份', async () => {
+    defaultBookAccessManager.setHostedMode(true)
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-backup-tenant-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user: userA } = await provider.signUp('a@backup.com', 'passA123')
+    const { user: userB } = await provider.signUp('b@backup.com', 'passB123')
+    const { cookie: cookieA } = defaultSessionManager.createSession({ userId: userA.id, email: userA.email })
+    const { cookie: cookieB } = defaultSessionManager.createSession({ userId: userB.id, email: userB.email })
+
+    // 主体 A 的真实书 + 真实备份
+    const srcDir = join(dataRoot, 'users', userA.id, 'books', 'bk_a')
+    createBook({ dir: srcDir, title: 'A 的作品' })
+    const resBackupA = await fetch(`${base}/api/backups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookieA },
+      body: JSON.stringify({ bookId: 'bk_a' }),
+    })
+    expect(resBackupA.status).toBe(200)
+    const backupA = (await resBackupA.json()) as { ok: boolean; backupId: string }
+    expect(backupA.ok).toBe(true)
+
+    // A 落在自己的私有备份目录
+    expect(readdirSync(join(dataRoot, 'users', userA.id, 'backups'))).toContain(`${backupA.backupId}.zip`)
+
+    // 主体 A 本人可下载
+    const resDownloadA = await fetch(`${base}/api/backups/download?backupId=${backupA.backupId}`, {
+      headers: { Cookie: cookieA },
+    })
+    expect(resDownloadA.status).toBe(200)
+
+    // 主体 B 拿到同一个 backupId：下载/恢复均 404（B 的目录里没有它）
+    const resDownloadB = await fetch(`${base}/api/backups/download?backupId=${backupA.backupId}`, {
+      headers: { Cookie: cookieB },
+    })
+    expect(resDownloadB.status).toBe(404)
+    const dlB = (await resDownloadB.json()) as { ok: boolean; code: string }
+    expect(dlB.code).toBe('BACKUP_NOT_FOUND')
+
+    const resRestoreB = await fetch(`${base}/api/backups/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookieB },
+      body: JSON.stringify({ backupId: backupA.backupId }),
+    })
+    expect(resRestoreB.status).toBe(404)
   })
 })

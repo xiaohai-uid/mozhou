@@ -119,17 +119,59 @@ export interface UnpackedFile {
   readonly data: Buffer
 }
 
+/** 定位 EOCD（末中央目录记录）签名；未找到返回 -1。 */
+function findEocdOffset(buf: Buffer): number {
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i -= 1) {
+    if (buf.readUInt32LE(i) === 0x06054b50) return i
+  }
+  return -1
+}
+
+/**
+ * 轻量完整性检查：只读头部，不 inflate 任何条目。
+ *
+ * 用途：在把「盘上既有文件」当有效备份发出或恢复之前，识别被截断或结构损坏的
+ * 归档（EOCD 缺失、中央目录或条目数据越界、局部头签名不符）。它检测的是
+ * 「字节不完整」，不是「内容被篡改」——内容级校验仍需解压并比对哈希。
+ */
+export function assertZipStructureIntact(buf: Buffer): void {
+  const eocdOffset = findEocdOffset(buf)
+  if (eocdOffset === -1) {
+    throw new Error('INVALID_ZIP: end of central directory signature not found')
+  }
+  const totalEntries = buf.readUInt16LE(eocdOffset + 10)
+  const cdSize = buf.readUInt32LE(eocdOffset + 12)
+  const cdOffset = buf.readUInt32LE(eocdOffset + 16)
+  if (cdOffset + cdSize > buf.length) {
+    throw new Error('INVALID_ZIP: central directory extends beyond archive bounds')
+  }
+  let pos = cdOffset
+  for (let i = 0; i < totalEntries; i += 1) {
+    if (pos + 46 > buf.length || buf.readUInt32LE(pos) !== 0x02014b50) {
+      throw new Error('INVALID_ZIP: corrupted central directory header')
+    }
+    const compSize = buf.readUInt32LE(pos + 20)
+    const nameLen = buf.readUInt16LE(pos + 28)
+    const extraLen = buf.readUInt16LE(pos + 30)
+    const commentLen = buf.readUInt16LE(pos + 32)
+    const localOffset = buf.readUInt32LE(pos + 42)
+    if (localOffset + 30 > buf.length || buf.readUInt32LE(localOffset) !== 0x04034b50) {
+      throw new Error('INVALID_ZIP: corrupted local header')
+    }
+    const lhNameLen = buf.readUInt16LE(localOffset + 26)
+    const lhExtraLen = buf.readUInt16LE(localOffset + 28)
+    if (localOffset + 30 + lhNameLen + lhExtraLen + compSize > buf.length) {
+      throw new Error('INVALID_ZIP: entry data extends beyond archive bounds (truncated archive)')
+    }
+    pos += 46 + nameLen + extraLen + commentLen
+  }
+}
+
 /**
  * 解包 ZIP Buffer，严格执行 C5 资源约束与路径穿越安全拦截。
  */
 export function unpackZip(buf: Buffer, limits: ZipLimits = C5_ZIP_LIMITS): UnpackedFile[] {
-  let eocdOffset = -1
-  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i -= 1) {
-    if (buf.readUInt32LE(i) === 0x06054b50) {
-      eocdOffset = i
-      break
-    }
-  }
+  const eocdOffset = findEocdOffset(buf)
   if (eocdOffset === -1) {
     throw new Error('INVALID_ZIP: end of central directory signature not found')
   }
@@ -142,6 +184,7 @@ export function unpackZip(buf: Buffer, limits: ZipLimits = C5_ZIP_LIMITS): Unpac
   const cdOffset = buf.readUInt32LE(eocdOffset + 16)
   let pos = cdOffset
   let totalBytes = 0
+  let actualTotalBytes = 0
   const result: UnpackedFile[] = []
 
   for (let i = 0; i < totalEntries; i += 1) {
@@ -183,9 +226,25 @@ export function unpackZip(buf: Buffer, limits: ZipLimits = C5_ZIP_LIMITS): Unpac
     if (compMethod === 0) {
       data = rawData
     } else if (compMethod === 8) {
-      data = inflateRawSync(rawData)
+      // 真实输出上限：声明字段 (uncompSize) 可被伪造，绝不能作为内存分配依据。
+      // maxOutputLength 由 zlib 在解压过程中强制，超限抛 ERR_BUFFER_TOO_LARGE，
+      // 与声明值是否诚实无关；上限取自既有 C5_ZIP_LIMITS.maxSingleFileBytes。
+      try {
+        data = inflateRawSync(rawData, { maxOutputLength: limits.maxSingleFileBytes })
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') {
+          throw new Error(`C5_LIMIT_EXCEEDED: entry "${fileName}" exceeds single file limit of ${limits.maxSingleFileBytes} bytes`)
+        }
+        throw err
+      }
     } else {
       throw new Error(`UNSUPPORTED_ZIP: compression method ${compMethod} not supported`)
+    }
+
+    // 声明总量同样可被伪造：按实际解压字节再核一次总上限。
+    actualTotalBytes += data.length
+    if (actualTotalBytes > limits.maxTotalBytes) {
+      throw new Error(`C5_LIMIT_EXCEEDED: uncompressed archive size exceeds total limit of ${limits.maxTotalBytes}`)
     }
 
     if (crc32(data) !== crc) {

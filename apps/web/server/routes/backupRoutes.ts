@@ -12,7 +12,7 @@ import type { RouteHandler } from '../router.js'
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createHash, randomBytes } from 'node:crypto'
-import { atomicWriteFileSync, createBookBackup, restoreBookBackup } from '@mozhou/data-plane'
+import { atomicWriteFileSync, assertZipStructureIntact, createBookBackup, restoreBookBackup } from '@mozhou/data-plane'
 import { defaultBookAccessManager, withBookWriteLock } from '../bookAccess.js'
 import { RequestBoundaryError } from '../security.js'
 
@@ -22,7 +22,15 @@ function sha256Hex(data: Buffer): string {
 
 export const backupRoutes: RouteHandler = async (req, res, { path, body, json, principal, bookRoot }) => {
   const dataRoot = defaultBookAccessManager.getDataRoot()
-  const backupsDir = resolve(dataRoot, 'backups')
+  // 备份归档按归属隔离：hosted 模式下落到当前主体的私有目录，下载/恢复只在该主体
+  // 目录内按 backupId 查找——96bit 随机 ID 是能力凭据，不能跨主体复用。
+  // local 单机模式维持全局 dataRoot/backups（单用户数据根，行为与既有备份可见性不变）。
+  // 兼容说明：本次改动前 hosted 模式写在全局 dataRoot/backups 的存量归档，不再对本
+  // 主体可见（fail-closed，避免跨主体读取）；local 模式不受影响。
+  const backupOwnerId = principal?.userId ?? 'local_user'
+  const backupsDir = defaultBookAccessManager.isHostedMode()
+    ? resolve(dataRoot, 'users', backupOwnerId, 'backups')
+    : resolve(dataRoot, 'backups')
   mkdirSync(backupsDir, { recursive: true })
 
   /* ---- 1. 生成作品备份归档 ---- */
@@ -88,6 +96,15 @@ export const backupRoutes: RouteHandler = async (req, res, { path, body, json, p
     }
 
     const data = readFileSync(backupFilePath)
+    // 完整性门：POST 分支已保证新写归档原子且哈希自洽，但历史上可能已存在半份/截断
+    // 的 zip。下载前做轻量结构检查（不解压），损坏文件返回明确错误码而不是 200 原样发出。
+    try {
+      assertZipStructureIntact(data)
+    } catch {
+      json(409, { ok: false, code: 'BACKUP_CORRUPT', error: 'backup archive is truncated or structurally corrupt' })
+      return true
+    }
+
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/zip')
     res.setHeader('Content-Disposition', `attachment; filename="${backupId}.zip"`)
@@ -117,7 +134,15 @@ export const backupRoutes: RouteHandler = async (req, res, { path, body, json, p
         json(404, { ok: false, code: 'BACKUP_NOT_FOUND', error: `backup archive not found: ${backupId}` })
         return true
       }
-      archiveBuffer = readFileSync(backupFilePath)
+      const onDisk = readFileSync(backupFilePath)
+      // 与下载分支同一条完整性门：截断/结构损坏的既有归档不得进入恢复流程。
+      try {
+        assertZipStructureIntact(onDisk)
+      } catch {
+        json(409, { ok: false, code: 'BACKUP_CORRUPT', error: `backup archive is truncated or structurally corrupt: ${backupId}` })
+        return true
+      }
+      archiveBuffer = onDisk
     } else if (typeof body['archiveBase64'] === 'string') {
       try {
         archiveBuffer = Buffer.from(body['archiveBase64'], 'base64')
