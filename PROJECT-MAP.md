@@ -532,6 +532,16 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：`maxTotalBytes = 1 GiB` 为既有设计值（1 MiB 请求仍可把峰值推到约 1 GiB，单条已封顶 100 MiB）；结构门不查内容篡改（下载路径无落盘哈希可比）；hosted 存量全局备份不可见（fail-closed）；receipt/report 的 existsSync 预检仍 TOCTOU；发布链校验未在 GitHub Actions 上实跑（依赖 runner 对真实 origin 的 fetch）；未做真实并发 OOM 压测；沿用 #99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
 - **遗留/风险**：`zip-util.ts` 混有对方 1 行术语改动，暂存时还原该行措辞后入索引（`git diff --cached` 中他人术语行数 0）；`docs/gates.md` 与 `scripts/verify-gates-contract.mjs` 里的「build-release 无来源戳」登记**只存在于对方未提交改动中**（HEAD 版无该检查），本批只提交 `release.yml` 与 `build-release.mjs` 两个干净文件，那两处文字改动留给对方。
 
+### CHG-20261010-08 — 2026-10-10 — 第六轮复核发现收口（计费成本可达 / 票据能力一致 / zip stored 口径 / 目录副作用），ZCode 执行
+
+- **需求来源**：第六轮独立对抗复核（verdict `release`，连续第三次；本轮要求复核员**专攻证伪**，四项修复均未被证伪）报出的 2 中 2 低。证据见 [docs/changes/CHG-20261010-08-round6-findings-closure.md](docs/changes/CHG-20261010-08-round6-findings-closure.md)。
+- **实际变更**：f757cad 计费——settle 路由读取并校验 `costFen`（有限非负，非法显式 400 `INVALID_COST_FEN`）后透传（此前**根本不接受该字段**，致日成本断路器与月预算永不触发）；reserve/settle 保留额度层状态码 429/402；票据能力改由 `capabilitiesForPlan(planId)` 从冻结目录推导，**删除** `issueTicket` 的 capabilities 入参，路由改用 `entitled ? planId : 'free'`，`verifyTicket` **新增**能力一致性校验（标注为新增防御纵深）。24c3609 zip 的 `compMethod 0` 分支补按真实 `data.length` 核单文件上限；备份路由删掉顶部无条件 `mkdirSync` 移入 POST 分支。81b9637 刷新两个生成物。
+- **关键依据（主会话亲读确认）**：冻结目录 `catalog.ts` 的 `managed.sellable: false`、`includedCallsPerMonth: null`、`worstCasePerCallFen: null`，`pricePerMTokenFen` 注明「null = 未实测」——**没有真实单价可算**，故 `costFen` 一律由调用方提供，绝不凭 tokens 自算。
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1066 例 + 台架 3 例 + web 156 文件 1289 例）；build/lint exit 0；web 计费+路由 421 例、data-plane 247 例通过；静态环 `PASS 595 模块 / 1701 边 / 0 依赖环`；`graph:check` cycleCount 0；重复度 15.82% < 17%；干净 HEAD（81b9637）副本上 architecture/term-map FRESH + glossary/gates/readmes 全 0。
+- **同类扫描（子代理）**：「拿声明值/调用方声称值当依据做校验或分配」类别**未发现新缺陷**；已核对 `namingRoutes` 的 count 范围校验、`security.ts readRequestPayload` 按真实字节限体不信 `Content-Length`、`chapter.ts`/`wechat.ts` 的 base64 往返校验、`ssrfGuard` 的 fill 限 1..7；相邻但非同类的 `proseRoutes` 段落 LCS 由真实正文驱动，未报为缺陷。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：真实生成路径仍未接配额（断路器只在调用方上报 costFen 时可达，是否接线属产品决定且 `managed.sellable: false`）；旧票据会因新增一致性校验失效需重签（fail-closed，TTL 72h，未实机验证桌面端缓存行为）；zip stored 用例用 32 KiB 合成上限；receipt/report 的 existsSync 预检仍 TOCTOU；`listUserBooks` 仍是无调用方的死代码；沿用 #99 真模型路径、未推送（未跑 act）、安装器未签名、发布链校验未在 Actions 实跑、Mimosa advisory、4 个 moderate 依赖漏洞。
+- **遗留/风险**：`zip-util.ts` 混有对方 1 行术语改动，暂存时还原该行措辞后入索引（`git diff --cached` 中他人术语行数 0）；`docs/term-map.md` 的工作区副本是对方按其自己的 GLOSSARY 重生成的产物，本次不覆盖，从 HEAD 版本出发只修正 `managedModelRoutes.ts` 的 `ticket` 符号行号后入索引。
+
 
 
 
