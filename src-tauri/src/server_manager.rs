@@ -139,7 +139,13 @@ pub fn locate_server_entry() -> Result<PathBuf, String> {
 pub fn prepare_data_root() -> Result<(PathBuf, String), String> {
     let base_dir = std::env::current_dir()
         .map_err(|e| format!("获取当前工作目录失败: {}", e))?;
-    let data_root = base_dir.join(".mozhou-data");
+    // 目录名必须与 apps/web/server/dataRoot.ts 的 DEFAULT_DATA_ROOT_DIRNAME 一致
+    // （".mozhou_data"，下划线）。此前这里是 ".mozhou-data"（连字符）：桌面端与 CLI
+    // 启动器会落到两个数据根、各自铸造一把 installation.key，同一份
+    // provider-settings.enc 跨入口读不出凭据。
+    // 已知限制：本入口不读 MOZHOU_DATA_ROOT（自定义数据根请用 scripts/launcher.mjs
+    // 或安装器的 MoZhou.exe，二者都会把该变量传给服务进程）。
+    let data_root = base_dir.join(".mozhou_data");
 
     fs::create_dir_all(&data_root)
         .map_err(|e| format!("创建数据目录 '{}' 失败: {}", data_root.display(), e))?;
