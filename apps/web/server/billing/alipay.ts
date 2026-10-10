@@ -60,20 +60,16 @@ export class AlipayVerifier {
 
     const signMessage = this.buildSignMessage(params)
 
-    if (this._alipayPublicKey) {
-      const verifier = createVerify('RSA-SHA256')
-      verifier.update(signMessage, 'utf8')
-      const valid = verifier.verify(this._alipayPublicKey, sign, 'base64')
-      if (!valid) {
-        throw new RequestBoundaryError(401, 'INVALID_SIGNATURE', 'Alipay signature verification failed')
-      }
-    } else {
-      if (process.env.NODE_ENV === 'production') {
-        throw new RequestBoundaryError(503, 'ALIPAY_KEY_MISSING', 'Alipay public key is not configured')
-      }
-      if (sign.startsWith('bad_sign') || sign.startsWith('fake_')) {
-        throw new RequestBoundaryError(401, 'INVALID_SIGNATURE', 'simulated bad Alipay signature')
-      }
+    if (!this._alipayPublicKey) {
+      // R2 修复：未配置公钥一律拒绝（fail-closed），与 NODE_ENV 无关；测试放行分支已删除。
+      // 测试经构造函数注入临时密钥后做真实 RSA2 验签（见 alipay.test.ts）。
+      throw new RequestBoundaryError(503, 'ALIPAY_KEY_MISSING', 'Alipay public key is not configured')
+    }
+    const verifier = createVerify('RSA-SHA256')
+    verifier.update(signMessage, 'utf8')
+    const valid = verifier.verify(this._alipayPublicKey, sign, 'base64')
+    if (!valid) {
+      throw new RequestBoundaryError(401, 'INVALID_SIGNATURE', 'Alipay signature verification failed')
     }
 
     // 校验 AppID

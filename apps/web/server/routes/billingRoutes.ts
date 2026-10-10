@@ -103,6 +103,11 @@ export const billingRoutes: RouteHandler = (req, res, { path, body, rawText, raw
 
   /* ---- 3. 微信支付异步通知回调 ---- */
   if (path === '/api/payments/wechat/notify' && req.method === 'POST') {
+    // R2 修复：验签器未配置时在进入 try/catch 前明确拒绝（fail-closed），不靠异常兜底。
+    if (!defaultWechatPayVerifier.isConfigured()) {
+      json(503, { ok: false, code: 'WECHAT_NOT_CONFIGURED', error: 'WeChat pay verifier is not configured' })
+      return true
+    }
     try {
       // T14: 保留真实原始报文 bytes/string，避免重新序列化破坏加密签名验签
       const rawPayload = rawText ?? (rawBuffer ? rawBuffer.toString('utf8') : JSON.stringify(body))
@@ -122,6 +127,11 @@ export const billingRoutes: RouteHandler = (req, res, { path, body, rawText, raw
 
   /* ---- 4. 支付宝异步通知回调 ---- */
   if (path === '/api/payments/alipay/notify' && req.method === 'POST') {
+    // R2 修复：验签器未配置时在进入 try/catch 前明确拒绝（fail-closed），不靠异常兜底。
+    if (!defaultAlipayVerifier.isConfigured()) {
+      json(503, { ok: false, code: 'ALIPAY_NOT_CONFIGURED', error: 'Alipay verifier is not configured' })
+      return true
+    }
     try {
       const params = body as Record<string, string>
       defaultAlipayVerifier.verifyAndParseNotification(params)

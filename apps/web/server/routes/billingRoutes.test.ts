@@ -7,11 +7,27 @@ import type { AddressInfo } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMoZhouApiRouter } from '../api.js'
 import { defaultBillingStore } from '../billing/store.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { defaultSessionManager, InMemoryAuthProvider } from '../auth/session.js'
+
+// R2：支付验签改为 fail-closed 后，「未配置」负路径断言必须确定性——清空支付凭据环境变量，
+// 使 defaultWechatPayVerifier/defaultAlipayVerifier 单例在模块加载时即为未配置。
+// vi.hoisted 在 import 之前执行，早于单例构造。
+vi.hoisted(() => {
+  for (const key of [
+    'WECHAT_MCH_ID',
+    'WECHAT_APP_ID',
+    'WECHAT_APIV3_KEY',
+    'WECHAT_PLATFORM_CERT',
+    'ALIPAY_APP_ID',
+    'ALIPAY_PUBLIC_KEY',
+  ]) {
+    delete process.env[key]
+  }
+})
 
 let servers: ReturnType<typeof createServer>[] = []
 let tempDirs: string[] = []
@@ -180,7 +196,7 @@ describe('订单与支付回调路由 (T14)', () => {
     expect(bodyB.order.orderId).toBe(orderB.orderId)
   })
 
-  it('微信支付回调：伪造签名拒绝 (401)，有效签名入账成功 (200 SUCCESS)', async () => {
+  it('微信支付回调：验签器未配置时任意签名一律拒绝 (503，fail-closed)', async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-wx-notify-'))
     tempDirs.push(dataRoot)
     defaultBookAccessManager.setDataRoot(dataRoot)
@@ -203,55 +219,38 @@ describe('订单与支付回调路由 (T14)', () => {
       summary: '支付成功',
       resource: {
         algorithm: 'AEAD_AES_256_GCM',
-        ciphertext: JSON.stringify({
-          mchid: process.env['WECHAT_MCH_ID'] || '',
-          appid: process.env['WECHAT_APP_ID'] || '',
-          out_trade_no: order.orderId,
-          transaction_id: 'tx_wx_12345678',
-          trade_type: 'NATIVE',
-          trade_state: 'SUCCESS',
-          amount: { total: 1900, currency: 'CNY' },
-        }),
+        ciphertext: JSON.stringify({ out_trade_no: order.orderId }),
         nonce: '123456789012',
       },
     }
 
     const nowSec = String(Math.floor(Date.now() / 1000))
 
-    // 1. 伪造签名 → 401
-    const resBad = await fetch(`${base}/api/payments/wechat/notify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'wechatpay-timestamp': nowSec,
-        'wechatpay-nonce': 'random_nonce',
-        'wechatpay-signature': 'bad_signature_test',
-      },
-      body: JSON.stringify(payloadObj),
-    })
-    expect(resBad.status).toBe(401)
+    // 行为契约变化（R2）：未配置平台证书/APIv3 密钥时，不再有「非生产放行」分支。
+    // 无论签名是历史伪签名还是此前会被放行的「合法形状」签名，都返回 503。
+    for (const signature of ['bad_signature_test', 'valid_sign_test_ok', 'anything']) {
+      const res = await fetch(`${base}/api/payments/wechat/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'wechatpay-timestamp': nowSec,
+          'wechatpay-nonce': 'random_nonce',
+          'wechatpay-signature': signature,
+        },
+        body: JSON.stringify(payloadObj),
+      })
+      expect(res.status).toBe(503)
+      const body = (await res.json()) as { ok: boolean; code: string }
+      expect(body.ok).toBe(false)
+      expect(body.code).toBe('WECHAT_NOT_CONFIGURED')
+    }
 
-    // 2. 有效回调 → 200 SUCCESS
-    const resGood = await fetch(`${base}/api/payments/wechat/notify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'wechatpay-timestamp': nowSec,
-        'wechatpay-nonce': 'random_nonce',
-        'wechatpay-signature': 'valid_sign_test_ok',
-      },
-      body: JSON.stringify(payloadObj),
-    })
-    expect(resGood.status).toBe(200)
-    const resData = (await resGood.json()) as { code: string }
-    expect(resData.code).toBe('SUCCESS')
-
-    // 3. 验证订单状态已为 paid
+    // 未配置即拒绝，订单绝不被入账。
     const updated = defaultBillingStore.getOrder(order.orderId)
-    expect(updated?.state).toBe('paid')
+    expect(updated?.state).not.toBe('paid')
   })
 
-  it('支付宝异步通知：伪造签名拒绝 (401)，有效签名入账成功 (200 success)', async () => {
+  it('支付宝异步通知：验签器未配置时任意签名一律拒绝 (503，fail-closed)', async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-ali-notify-'))
     tempDirs.push(dataRoot)
     defaultBookAccessManager.setDataRoot(dataRoot)
@@ -267,7 +266,6 @@ describe('订单与支付回调路由 (T14)', () => {
     })
 
     const params = {
-      app_id: process.env['ALIPAY_APP_ID'] || '',
       out_trade_no: order.orderId,
       trade_no: '20260918_ali_trade_888',
       total_amount: '39.00',
@@ -276,27 +274,18 @@ describe('订单与支付回调路由 (T14)', () => {
       sign_type: 'RSA2',
     }
 
-    // 1. 伪造签名 → 401
-    const resBad = await fetch(`${base}/api/payments/alipay/notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...params, sign: 'bad_signature_ali' }),
-    })
-    expect(resBad.status).toBe(401)
+    // 行为契约变化（R2）：未配置公钥时任意签名都返回 503，不再有「非生产放行」分支。
+    for (const sign of ['bad_signature_ali', 'valid_signature_ali_ok', 'anything']) {
+      const res = await fetch(`${base}/api/payments/alipay/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...params, sign }),
+      })
+      expect(res.status).toBe(503)
+    }
 
-    // 2. 有效签名 → 200
-    const resGood = await fetch(`${base}/api/payments/alipay/notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...params, sign: 'valid_signature_ali_ok' }),
-    })
-    expect(resGood.status).toBe(200)
-    const text = await resGood.text()
-    expect(text).toBe('success')
-
-    // 验证状态已为 paid
     const updated = defaultBillingStore.getOrder(order.orderId)
-    expect(updated?.state).toBe('paid')
+    expect(updated?.state).not.toBe('paid')
   })
 
   it('退款处理：POST /api/billing/orders/refund 变更状态为 refunded', async () => {

@@ -62,7 +62,9 @@ export class WechatPayVerifier {
   }
 
   isConfigured(): boolean {
-    return Boolean(this._mchId && this._appId && this._apiV3Key)
+    // R2 修复：回调验签需要平台证书（验签）+ APIv3 密钥（解密）+ 商户/应用标识，缺一即未配置。
+    // 路由层据此在进入 try/catch 前明确拒绝（503），不依赖异常兜底。
+    return Boolean(this._mchId && this._appId && this._apiV3Key && this._platformCert)
   }
 
   /**
@@ -89,22 +91,17 @@ export class WechatPayVerifier {
 
     // 2. 验签：待签名串为 `${timestamp}\n${nonce}\n${rawBody}\n`
     const signatureMessage = `${timestamp}\n${nonce}\n${rawBody}\n`
-    if (this._platformCert) {
-      const verifier = createVerify('RSA-SHA256')
-      verifier.update(signatureMessage)
-      const valid = verifier.verify(this._platformCert, signature, 'base64')
-      if (!valid) {
-        throw new RequestBoundaryError(401, 'INVALID_SIGNATURE', 'WeChat pay signature verification failed')
-      }
-    } else {
-      // 未配置公钥证书且非测试模式时拒绝
-      if (process.env.NODE_ENV === 'production') {
-        throw new RequestBoundaryError(503, 'WECHAT_CERT_MISSING', 'WeChat platform certificate is not configured')
-      }
+    if (!this._platformCert) {
       // 测试模式下使用固定 HMAC 验签对比守卫
-      if (signature.startsWith('bad_sign') || signature.startsWith('fake_')) {
-        throw new RequestBoundaryError(401, 'INVALID_SIGNATURE', 'simulated bad WeChat signature')
-      }
+      // R2 修复：以上测试放行分支已删除——未配置平台证书一律拒绝（fail-closed），与 NODE_ENV 无关。
+      // 测试不再需要旁路：经构造函数注入临时密钥后做真实 RSA 验签（见 wechat.test.ts）。
+      throw new RequestBoundaryError(503, 'WECHAT_CERT_MISSING', 'WeChat platform certificate is not configured')
+    }
+    const verifier = createVerify('RSA-SHA256')
+    verifier.update(signatureMessage)
+    const valid = verifier.verify(this._platformCert, signature, 'base64')
+    if (!valid) {
+      throw new RequestBoundaryError(401, 'INVALID_SIGNATURE', 'WeChat pay signature verification failed')
     }
 
     // 3. 解密 payload (AES-256-GCM)
@@ -141,19 +138,12 @@ export class WechatPayVerifier {
       throw new RequestBoundaryError(400, 'UNSUPPORTED_ALGORITHM', `unsupported algorithm: ${resource.algorithm}`)
     }
 
-    // 测试模式允许透传明文 JSON 结构
-    if (resource.ciphertext.startsWith('{')) {
-      try {
-        return JSON.parse(resource.ciphertext) as WechatDecryptedTransaction
-      } catch {
-        // continue to normal decrypt
-      }
-    }
-
     if (!this._apiV3Key) {
       throw new RequestBoundaryError(503, 'APIV3_KEY_MISSING', 'WeChat APIv3 key not configured')
     }
 
+    // R2 修复：删除「ciphertext 以 { 开头即 JSON 明文透传」分支——它此前无任何环境/开关判断。
+    // 现在 ciphertext 一律按 base64 AEAD_AES_256_GCM 解密，生产与测试都不存在明文放行路径。
     try {
       const keyBuffer = Buffer.from(this._apiV3Key, 'utf8')
       const nonceBuffer = Buffer.from(resource.nonce, 'utf8')
