@@ -84,14 +84,19 @@ const problems = []
 const checked = []
 
 const lines = readFileSync(GATES, 'utf8').split('\n')
-// 只取「门清单」那张表：表头含「在 CI」的下一行起，到表结束
-const headerIdx = lines.findIndex((l) => l.startsWith('| 门 |') && l.includes('在 CI'))
+// 只取「门清单」那张表：第一张首列 + 5 列、且表头含「在 CI」的表。
+// **不按首列的文字匹配**——该列表头的措辞在术语统一前后不同（旧写法已被 GLOSSARY 列为
+// 禁用词），绑字面就会在两种写法之间二选一失败（实测：已提交状态用旧写法时本脚本 exit 2，
+// 而它已被接进 ci.yml，会让 Doc gates 步骤直接失败）。
+const headerIdx = lines.findIndex(
+  (l) => l.startsWith('|') && l.includes('在 CI') && l.split('|').length - 2 === 5,
+)
 if (headerIdx < 0) {
-  console.error('FAIL docs/gates.md 找不到含「在 CI」列的门表格')
+  console.error('FAIL docs/gates.md 找不到含「在 CI」列的 5 列门表格')
   process.exit(2)
 }
-const header = lines[headerIdx]
-const ciCol = header.split('|').length - 2 // 去掉首尾空段后的列数
+const headerFirstCell = lines[headerIdx].split('|')[1].trim()
+const ciCol = lines[headerIdx].split('|').length - 2 // 去掉首尾空段后的列数
 if (ciCol !== 5) {
   console.error(`FAIL 门表格列数变了（期望 5，实际 ${ciCol}）——本检查需同步更新`)
   process.exit(2)
@@ -106,7 +111,7 @@ for (let i = headerIdx + 2; i < lines.length; i += 1) {
   const cells = line.split('|').slice(1, -1).map((c) => c.trim())
   if (cells.length !== 5) continue
   const [gate, command, , , ciCell] = cells
-  if (gate === '门') continue // 重复表头
+  if (gate === headerFirstCell) continue // 重复表头
   const token = primaryCommand(command)
   if (!token) continue // 非脚本型命令（如 pnpm 标准链），跳过
 
