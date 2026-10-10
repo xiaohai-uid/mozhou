@@ -230,12 +230,40 @@ export class QuotaManager {
       if (existing.status === 'settled') return existing
 
       if (costFen > 0) {
+        const monthKey = `${userId}:${new Date(now).toISOString().slice(0, 7)}`
+        const curMonth = this._userMonthlyCosts.get(monthKey) ?? 0
+        // 用户月度预算校验：与 reserve 第 3 步同源（同一 Map，同一默认值）。
+        // reserve 只检查「已计入」的月消费，而月消费仅由 settle 累加；若 settle 不设此关，
+        // 同一用户可先大量 reserve（此时月消费为 0，全部通过），再逐单 settle 把全局日成本推过
+        // 全局日预算，触发断路器而阻断所有其他用户。此处拒绝本次结算，使单个用户无法凭自身消费
+        // 打掉全局断路器。取舍：账本记录的是「被接受」的成本，不是「被尝试」的成本——被拒绝的
+        // 成本绝不写入 _dailyCosts / _userMonthlyCosts，否则全局日成本照样被推高，缺陷未修。
+        const budget = this._userMonthlyBudgetMap.get(userId) ?? 1500
+        if (curMonth + costFen > budget) {
+          // 恢复日期必须与 monthKey 的口径一致（都按 UTC 月）。不能用
+          // `setMonth(+1)` + `setDate(1)`：月末日期会先溢出到下下个月
+          // （2026-01-31 → setMonth(1) 得到 3 月 3 日 → setDate(1) 得到 2026-03-01），
+          // 而月预算实际在 2026-02-01 就重置，消息会多报一个月。
+          const nowDate = new Date(now)
+          const recoveryDate = new Date(
+            Date.UTC(
+              nowDate.getUTCMonth() === 11 ? nowDate.getUTCFullYear() + 1 : nowDate.getUTCFullYear(),
+              (nowDate.getUTCMonth() + 1) % 12,
+              1,
+            ),
+          )
+            .toISOString()
+            .slice(0, 10)
+          throw new RequestBoundaryError(
+            402,
+            'USER_BUDGET_EXCEEDED',
+            `USER_BUDGET_EXCEEDED: monthly model budget (${budget} fen) would be exceeded by settling ${costFen} fen (already spent: ${curMonth} fen); recovery date: ${recoveryDate}`,
+          )
+        }
+
         const dateKey = new Date(now).toISOString().slice(0, 10)
         const curDaily = this._dailyCosts.get(dateKey) ?? 0
         this._dailyCosts.set(dateKey, curDaily + costFen)
-
-        const monthKey = `${userId}:${new Date(now).toISOString().slice(0, 7)}`
-        const curMonth = this._userMonthlyCosts.get(monthKey) ?? 0
         this._userMonthlyCosts.set(monthKey, curMonth + costFen)
       }
 

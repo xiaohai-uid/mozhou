@@ -92,6 +92,57 @@ describe('QuotaManager 额度事务、断路器与并发测试 (T15)', () => {
     )
   })
 
+  it('单用户无法凭自身结算把全局日成本推过全局日预算：超出其月预算的 settle 被拒且不累加', async () => {
+    const quota = new QuotaManager()
+    const userId = 'usr_self_drain'
+    // 不设置月预算：沿用默认 1500 分（与 reserve 同源）；全局日预算默认 10000 分。
+    const monthlyBudget = 1500
+
+    // 先大量预留（此阶段月消费为 0，全部通过），再逐单以正常量级结算。
+    const N = 20
+    for (let i = 0; i < N; i += 1) {
+      await quota.reserve(userId, `op_drain_${i}`, 1)
+    }
+
+    // 第 1 单合法（0 + 1500 === 预算上界，仍允许），其余全部被月预算拒绝。
+    await expect(quota.settle(userId, 'op_drain_0', 0, 1500)).resolves.toBeDefined()
+    for (let i = 1; i < N; i += 1) {
+      await expect(quota.settle(userId, `op_drain_${i}`, 0, 1500)).rejects.toMatchObject({
+        status: 402,
+        code: 'USER_BUDGET_EXCEEDED',
+      })
+    }
+
+    // 账本只记录被接受的成本：被拒的 19 单绝不进入日成本。
+    expect(quota.getDailyCost()).toBe(1500)
+    expect(quota.getDailyCost()).toBeLessThanOrEqual(monthlyBudget)
+    // 全局断路器未被该用户打掉，其他用户的下一次预留仍可成功。
+    expect(quota.isCircuitBreakerTripped()).toBe(false)
+    await expect(quota.reserve('usr_other', 'op_other', 1)).resolves.toBeDefined()
+  })
+
+  it('多个用户各自在预算内的合法消费仍能把全局日断路器推到 tripped', async () => {
+    const quota = new QuotaManager()
+    quota.setDailyBudgetFen(150) // 全局日预算 150 分
+    quota.setUserMonthlyBudget('usr_legit_a', 1000)
+    quota.setUserMonthlyBudget('usr_legit_b', 1000)
+
+    // 每个用户各自消费 100 分，均在自身月预算内；两笔合计 200 分越过全局日预算。
+    await quota.reserve('usr_legit_a', 'op_legit_a', 1)
+    await quota.settle('usr_legit_a', 'op_legit_a', 1000, 100)
+    expect(quota.isCircuitBreakerTripped()).toBe(false)
+
+    await quota.reserve('usr_legit_b', 'op_legit_b', 1)
+    await quota.settle('usr_legit_b', 'op_legit_b', 1000, 100)
+
+    expect(quota.getDailyCost()).toBe(200)
+    expect(quota.isCircuitBreakerTripped()).toBe(true)
+    await expect(quota.reserve('usr_legit_c', 'op_legit_c', 1)).rejects.toMatchObject({
+      status: 429,
+      code: 'CIRCUIT_BREAKER_TRIPPED',
+    })
+  })
+
   it('成功结算扣减用量，取消释放保留额度', async () => {
     const quota = new QuotaManager()
     const userId = 'usr_settle_release'
