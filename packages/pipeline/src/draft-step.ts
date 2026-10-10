@@ -33,7 +33,7 @@
  * benchmark version-matrix.ts 兼容层已删）；
  * 失败原因折叠改按本次 taskRef 精确匹配（Q-E，替代「最近一条」邻接启发式）。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ContextPacket } from '@mozhou/context-compiler';
 import type {
@@ -47,6 +47,7 @@ import type {
 import { RecoverableError, normalizeProviderError, toGenerationStartedPayload } from '@mozhou/runtime';
 import {
   ChapterPhaseError,
+  atomicWriteFileSync,
   proseChapterPath,
   readProseChapter,
 } from '@mozhou/data-plane';
@@ -138,7 +139,10 @@ function writeDraftState(root: string, state: DraftStateWrite): void {
     ...(state.candidateId === undefined ? {} : { candidateId: state.candidateId }),
   };
   mkdirSync(join(root, DRAFT_STATE_DIR), { recursive: true });
-  writeFileSync(join(root, draftStateRelPath(state.chapterIndex)), JSON.stringify(payload, null, 2) + '\n');
+  // 原子落盘（与同包 draft-candidate.writeCandidate 一致）：裸 writeFileSync 被中断会留下
+  // 截断的 JSON，readDraftState 对撕裂内容宁抛不猜——一次崩溃即把该章的运行态读废。
+  // tmp → fsync → rename 后，rename 是唯一可见点，盘上永远是完整 JSON。
+  atomicWriteFileSync(join(root, draftStateRelPath(state.chapterIndex)), JSON.stringify(payload, null, 2) + '\n');
 }
 
 /** 读 Draft 运行态文件；缺失返回 null（从未开流的章）。撕裂/坏形宁抛不猜。 */

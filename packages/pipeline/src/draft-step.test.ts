@@ -4,9 +4,9 @@
  * M17 三级降级可见性各一例（一级静默 / 二级 attempt 事件 / 三级 failed_recoverable 上报）。
  * 零时钟零外部服务：假 provider 流夹具禁真网；taskRef 注入固定值；hermetic 临时书。
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PublishBus, RuntimeEngine, readLedger } from '@mozhou/runtime';
 import type { CapabilityRecipe, CapabilityRecipeDocument } from '@mozhou/runtime';
@@ -22,6 +22,7 @@ import {
 } from '@mozhou/data-plane';
 import {
   ProviderTransportError,
+  draftStateRelPath,
   makeDraftProviderBinding,
   readDraftCandidate,
   readDraftState,
@@ -400,7 +401,7 @@ describe('M17 三级降级可见性接线', () => {
     expect(types).toEqual(['GenerationStarted', 'GenerationFinished']);
   });
 
-  it('committed 章拒绝流式写入（phase 守卫宁败不脏）', async () => {
+  it('committed 章拒绝流式写入（相位门宁败不脏）', async () => {
     const { root } = hermeticBook();
     const engine = makeEngine(root);
     registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['不应落盘。']));
@@ -594,7 +595,7 @@ describe('produced：本次是否真的产出正文（末帧选型的判据）',
     expect(outcome.produced).toBe(true);
   });
 
-  // 回归守卫：produced 必须跨 attempt 累加，不能只看最后一次。
+  // 回归检查：produced 必须跨 attempt 累加，不能只看最后一次。
   // 第一次 attempt 写了半稿后断流，引擎定向重生的第二次 attempt 静默空输出——
   // 那半稿是真内容、真落盘、可采纳。若 produced=false，作者拿到 error 帧，
   // 半稿被判定为「什么都没生成」而困死（error 分支只给「再来一轮」）。
@@ -655,6 +656,35 @@ describe('produced：本次是否真的产出正文（末帧选型的判据）',
 
     expect(outcome.outcome).toBe('failed_recoverable');
     expect(outcome.produced).toBe(false);
+  });
+});
+
+/**
+ * 运行态文件原子落盘（B4/B5 同类）。裸 writeFileSync 被中断会留下截断 JSON，
+ * 而 readDraftState 对撕裂内容宁抛不猜——一次崩溃即把该章的运行态读废。改为
+ * atomicWriteFileSync（tmp → fsync → rename）后，rename 是唯一可见点，盘上永远是完整 JSON。
+ */
+describe('Draft 运行态文件原子落盘', () => {
+  it('一次 draft 步后运行态文件是完整合法 JSON，且目录内无原子写临时残留', async () => {
+    const { root } = hermeticBook();
+    const engine = makeEngine(root);
+    registerDraftBinding(engine, root, 'deepseek', 'deepseek', fakeStream(['原子落盘成稿。']));
+    await runDraftStep({ engine, bookRoot: root, chapterIndex: 7, packet: PACKET, recipe: RECIPE });
+
+    const statePath = join(root, draftStateRelPath(7));
+    const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as { status: string };
+    expect(parsed.status).toBe('complete');
+    // 同目录无 `.mozhou-tmp` 残留（atomicWriteFileSync 用 <target>.mozhou-tmp-<token>）
+    const leftovers = readdirSync(dirname(statePath)).filter((name) => name.includes('.mozhou-tmp'));
+    expect(leftovers).toEqual([]);
+  });
+
+  it('撕裂的运行态文件：readDraftState 宁抛不猜（本文件无「上一份可用状态」可回退）', () => {
+    const { root } = hermeticBook();
+    const statePath = join(root, draftStateRelPath(7));
+    mkdirSync(dirname(statePath), { recursive: true });
+    writeFileSync(statePath, '{"stateVersion":1,"chapterIndex":7,"status":"stre');
+    expect(() => readDraftState(root, 7)).toThrow();
   });
 });
 
