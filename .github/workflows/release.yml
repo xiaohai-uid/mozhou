@@ -41,6 +41,60 @@ jobs:
           node-version: 22.23.2
           package-manager-cache: false
 
+      # 发布前校验两个手工输入。没有这一步，就能从任意提交、用任意版本号发一个正式 Release，
+      # 而 workflow_dispatch 的输入说明（:7、:11）却声称来源提交已审计、版本号必须匹配 package.json。
+      # 校验放在构建之前，失败即停，不浪费后续安装与构建。
+      - name: 校验发布来源与版本
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ github.event.inputs.sourceCommit }}
+          RELEASE_VERSION: ${{ github.event.inputs.releaseVersion }}
+        run: |
+          set -euo pipefail
+          echo "sourceCommit   = ${SOURCE_COMMIT}"
+          echo "releaseVersion = ${RELEASE_VERSION}"
+
+          # 祖先判定需要 main/release 的分支引用。checkout 用 ref: sourceCommit 只拉取该提交，
+          # 其完整历史由 checkout 的 fetch-depth: 0 保证；这里再显式取两个分支的引用。
+          # release 分支惰性创建，可能不存在：逐个 fetch，缺哪个就少一个比较基准。
+          git fetch --no-tags origin +main:refs/remotes/origin/main || true
+          git fetch --no-tags origin +release:refs/remotes/origin/release || true
+
+          # 提交对象必须真实存在（checkout 成功即已存在，这里给出显式的实际值以便排查）。
+          if ! git cat-file -e "${SOURCE_COMMIT}^{commit}" 2>/dev/null; then
+            echo "::error::sourceCommit 不是有效提交：${SOURCE_COMMIT}"
+            exit 1
+          fi
+
+          on_audited_branch=0
+          for branch in origin/main origin/release; do
+            if git rev-parse --verify --quiet "${branch}" >/dev/null; then
+              if git merge-base --is-ancestor "${SOURCE_COMMIT}" "${branch}"; then
+                echo "OK: ${SOURCE_COMMIT} 是 ${branch} 的祖先"
+                on_audited_branch=1
+              else
+                echo "不满足: ${SOURCE_COMMIT} 不是 ${branch} 的祖先"
+              fi
+            else
+              echo "跳过: ${branch} 不存在（release 分支惰性创建）"
+            fi
+          done
+          if [ "${on_audited_branch}" -ne 1 ]; then
+            echo "::error::sourceCommit ${SOURCE_COMMIT} 既不是 origin/main 也不是 origin/release 的祖先，拒绝发布"
+            exit 1
+          fi
+
+          # 版本匹配规则：去掉一个可选的前导 v 后，与 package.json 的 version 逐字相等。
+          # 依据输入说明的例子 v0.3.0 与 package.json 现值 0.3.0：两者必须能对上，
+          # 所以接受「带 v」与「不带 v」两种写法，但版本号本身必须完全一致。
+          pkg_version="$(node -p "require('./package.json').version")"
+          normalized="${RELEASE_VERSION#v}"
+          if [ "${normalized}" != "${pkg_version}" ]; then
+            echo "::error::releaseVersion ${RELEASE_VERSION} 与 package.json version ${pkg_version} 不一致（规范化后 ${normalized} != ${pkg_version}）"
+            exit 1
+          fi
+          echo "OK: releaseVersion ${RELEASE_VERSION} 与 package.json version ${pkg_version} 一致"
+
       - name: Install pinned pnpm
         run: npm install --global pnpm@9.15.0
 

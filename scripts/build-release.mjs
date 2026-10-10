@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readSourceStamp } from './release/lib/source-stamp.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const rootDir = join(__dirname, '..')
@@ -27,6 +28,15 @@ const version = parsePkg(readFileSync(join(rootDir, 'package.json'), 'utf8')).ve
 const artifactsDir = join(rootDir, 'release-artifacts')
 const bundleName = `mozhou-v${version}`
 const runtimeDir = join(artifactsDir, bundleName)
+
+// 产物戳：回答「这份发行包对应哪个提交」。复用 windows 构建同一个戳实现
+// （scripts/release/lib/source-stamp.mjs），字段保持一致：sourceCommit /
+// sourceCommitSha / dirty / dirtyFiles。脏工作区里 rev-parse HEAD 会谎报，
+// 戳必须带 -dirty 后缀，见该模块头部注释。
+const stamp = readSourceStamp(rootDir)
+if (stamp.dirty) {
+  console.warn(`WARNING: 工作区有 ${stamp.dirtyFiles} 个未提交改动——产物戳记作 ${stamp.sourceCommit}，不能作为干净提交 ${stamp.sourceCommitSha} 的证明`)
+}
 
 process.env.ONNXRUNTIME_NODE_INSTALL_CUDA = 'skip'
 
@@ -85,6 +95,9 @@ requirePath(join(rootDir, 'apps/web/dist-server/productionServer.js'), 'producti
 // 保留已有 release-artifacts 产物目录，只清理并准备当前版本的唯一 bundle 运行目录
 rmSync(runtimeDir, { recursive: true, force: true })
 mkdirSync(runtimeDir, { recursive: true })
+
+// 戳写进 bundle 目录，随 local-runtime / docker 两个 tar 归档一起分发，使产物自证来自哪个提交。
+writeFileSync(join(runtimeDir, 'BUILD-STAMP.json'), JSON.stringify({ version, ...stamp }, null, 2), 'utf8')
 
 for (const file of [
   'package.json',
@@ -177,3 +190,5 @@ console.log('[release] verified assets:')
 console.log(`  ${runtimeArchive}`)
 console.log(`  ${webArchive}`)
 console.log(`  ${dockerArchive}`)
+console.log(`[release] source stamp (${join(runtimeDir, 'BUILD-STAMP.json')}):`)
+console.log(JSON.stringify({ version, ...stamp }))
