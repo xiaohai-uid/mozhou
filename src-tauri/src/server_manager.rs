@@ -4,7 +4,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 #[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
@@ -166,17 +166,12 @@ pub fn prepare_data_root() -> Result<(PathBuf, String), String> {
     Ok((data_root, secret_key))
 }
 
-/// 生成 48 字节 (96 个字符) 十六进制密钥
+/// 生成 48 字节 (96 个字符) 十六进制密钥（CSPRNG）
 fn generate_hex_key_96() -> String {
     let mut bytes = [0u8; 48];
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let mut seed = now.as_nanos();
-    for (i, byte) in bytes.iter_mut().enumerate() {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407 + (i as u128));
-        *byte = ((seed >> 24) ^ (seed >> 56) ^ (i as u128)) as u8;
-    }
+    // 不用墙钟种子/LCG 自造随机：那让密钥空间小到可被离线枚举（对照
+    // scripts/release/windows/desktop-server.mjs 用 randomBytes(48)）。
+    getrandom::fill(&mut bytes).expect("系统随机源不可用：拒绝以弱随机生成安装密钥");
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 

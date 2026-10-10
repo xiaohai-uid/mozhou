@@ -1793,6 +1793,7 @@ dependencies = [
 name = "mozhou-desktop"
 version = "0.2.0"
 dependencies = [
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "tauri",
