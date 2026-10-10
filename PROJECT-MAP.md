@@ -574,6 +574,16 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：文档测试数无自动校验（未建门去查文档里的数字）；「声称 vs 现实」审计**未覆盖全仓所有文档**，不可读作「所有文档声称都已核实」；月预算 ≤ 日预算的耦合未改；沿用生产改密需接口变更、配额未接生成路径、receipt/report TOCTOU、`listUserBooks` 死代码、被拒预留仍停留 reserved、`verifyTicket` 生产无调用方、未连真实 Supabase、Tauri 未编译运行、一处未复现偶发（`quota.test.ts:110`）、#99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
 - **遗留/风险**：`apps/web/MOBILE_UI_BRIEF.md` 被并行会话改过同一行的一个词（数据平面→数据面），本次整句重写该行、暂存差异仅此 1 行；生成物无需刷新故未触碰。
 
+### CHG-20261010-12 — 2026-10-10 — 第十轮复核「声称 vs 现实」审计收口（7 处文档陈旧声称），ZCode 执行
+
+- **需求来源**：第十轮独立对抗复核（verdict `release`，连续第七次；本轮把「声称 vs 现实」审计**做完**）报出的 7 处文档陈旧声称——**无代码缺陷**。证据见 [docs/changes/CHG-20261010-12-round10-claims-audit-closure.md](docs/changes/CHG-20261010-12-round10-claims-audit-closure.md)。
+- **实际变更**：aa9ce99 修正 7 处（另加主会话暂存时发现的第 8 处），涉及 9 个文件：①`apps/web/README.md` 与 `docs/adr/CODE-DUPLICATION-INVENTORY.md` 称微信/支付宝验签「只由 NODE_ENV 把关」——**已随 R2 关闭**（`wechat.ts:94-99`/`alipay.ts:63-67` 无条件 fail-closed，两文件已无 NODE_ENV 引用）；②`docs/gates.md` 把 duplication 标「❌ 未接入」——`graph-gate.yml:54-73` 已是 CI 作业；③`packages/flywheel/README.md` 称评估器「无路由」——三条路由可达；④`MOBILE_UI_BRIEF.md` 的 17 项航道/InkBackground WebGL（该文件不存在）/网格出处三处；⑤三个包 README 的具名导出数 7/26/12 → 8/29/13（口径已写明）；⑥测试基线 103 文件/910 例、856/623 → 实测值+日期；⑦`docs/gates.md` 实测基线节称重复度门「未实跑验证」——实际已多次实跑并做过红/绿对照。
+- **优先修第 ① 条的理由**：它的方向是**低估自身安全性**——会让复核者以为存在一个早已修掉的验签绕过漏洞。高估能力危险，低估安全同样误导。
+- **一处口径纠正（复核员错、子代理纠正）**：复核员称 `MOBILE_UI_BRIEF.md:42` 的「17 项」应为 9；子代理核实技能广场消费的是 `/api/capability-square`（`CapabilitySquareView.tsx:61`），其 `CAPABILITY_SQUARE_GROUPS` **恰为 17 项**，9 项属于另一个端点 `/api/capabilities`——故保留 17、只改端点名。**复核结论本身也要复核。**
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1066 例 + 台架 3 例 + web 1299 例 / 15 跳过）；build/lint exit 0；静态环 `PASS 595 模块 / 1703 边 / 0 依赖环`；`graph:check` cycleCount 0；readmes/gates/glossary 全 0；干净 HEAD（aa9ce99）副本上 architecture/term-map FRESH + 其余三门 0；数字重新实测（`grep -c "^export \* from"` → 8/29/13；`pnpm test` → 2368 通过 / 15 跳过）。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：审计**仍有残余未核实项**（flywheel/pipeline/quality-engine 具名导出数 159/194/67 未逐一点算、Tauri「<15MB/<40MB」体积未实测、apps/web README 行数约数偏小）——不可读作「所有文档声称都已核实」；`MOBILE_UI_BRIEF.md` 的「原生 WebGL 着色器」属技术栈愿景未改；文档测试数无自动校验；沿用生产改密需接口变更、配额未接生成路径、receipt/report TOCTOU、`listUserBooks` 死代码、被拒预留仍停留 reserved、`verifyTicket` 生产无调用方、未连真实 Supabase、Tauri 未编译运行、一处未复现偶发、#99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
+- **遗留/风险**：`packages/data-plane/README.md`（1 行 守卫→门）与 `docs/gates.md`（大面积术语统一）被并行会话改过，均从 HEAD 版本出发只替换本轮涉及的行，`git diff --cached` 中他人术语改动行数 0；生成物无需刷新（本批只改 .md）。
+
 
 
 
