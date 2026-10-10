@@ -150,30 +150,88 @@ function masterKey(): Buffer {
   return cachedMasterKey
 }
 
-function encrypt(text: string): string {
+function encryptWith(key: Buffer, text: string): string {
   const iv = randomBytes(12)
-  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, masterKey(), iv)
+  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, key, iv)
   let encrypted = cipher.update(text, 'utf8', 'hex')
   encrypted += cipher.final('hex')
   const tag = cipher.getAuthTag()
   return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted}`
 }
 
-function decrypt(cipherText: string): string {
+function encrypt(text: string): string {
+  return encryptWith(masterKey(), text)
+}
+
+/**
+ * 用指定主密钥解密。结构、认证标签或填充任一失败都返回 null；调用方据此决定是
+ * 「备份 + 报错」还是「试旧密钥迁移」。不再把失败折成空串——那正是静默的根。
+ */
+function decryptWith(key: Buffer, cipherText: string): string | null {
   const parts = cipherText.split(':')
-  if (parts.length !== 3) return ''
+  if (parts.length !== 3) return null
   const [ivHex = '', tagHex = '', dataHex = ''] = parts
   try {
     const iv = Buffer.from(ivHex, 'hex')
     const tag = Buffer.from(tagHex, 'hex')
-    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, masterKey(), iv)
+    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, key, iv)
     decipher.setAuthTag(tag)
     let decrypted = decipher.update(dataHex, 'hex', 'utf8')
     decrypted += decipher.final('utf8')
     return decrypted
   } catch {
-    return ''
+    return null
   }
+}
+
+function decrypt(cipherText: string): string | null {
+  return decryptWith(masterKey(), cipherText)
+}
+
+/** 解析已解密的配置 JSON；非对象或缺 apiKey 一律视同「不可读」，交由上层处置。 */
+function parseUserConfig(plaintext: string): UserProviderConfig | null {
+  try {
+    const parsed = JSON.parse(plaintext) as Partial<UserProviderConfig> | null
+    if (parsed === null || typeof parsed !== 'object') return null
+    if (typeof parsed.apiKey !== 'string' || parsed.apiKey === '') return null
+    return parsed as UserProviderConfig
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 把无法解密的凭据文件复制为 `<path>.bak` 并返回备份路径；**绝不删除**原文件。
+ * 数据保护优先：文件里可能仍是用户唯一的 Key 副本（只是解不开），删了就真没了。
+ */
+function backupUnreadableCredentials(path: string): string {
+  const backupPath = `${path}.bak`
+  writeFileSync(backupPath, readFileSync(path))
+  return backupPath
+}
+
+/**
+ * 迁移期一次性路径：把旧主密钥加密的凭据重加密为当前主密钥。
+ *
+ * 旧版本用源码常量作为主密钥加密 provider-settings.enc；该常量已在 B7 从源码移除，
+ * 绝不写回源码——写回等于把「任何读到 .enc 的人都能用公开常量解开」的漏洞重新引入。
+ * 因此这里只接受操作员通过环境变量 MOZHOU_LEGACY_SECRET_KEY 显式提供的旧密钥：
+ * 解得开就用当前主密钥重加密并原子落盘（内容以更强密钥保留，不是删除用户文件）；
+ * 解不开返回 null，交给上层走「备份 + 明确报错」。
+ *
+ * 移除条件：升级窗口结束后（不再有旧版本写出的 .enc），连同 MOZHOU_LEGACY_SECRET_KEY
+ * 的读取一起删除本函数。风险：设置该变量期间它出现在进程环境里，同机同权限的进程可读；
+ * 迁移完成后应立即从环境中移除。
+ */
+function migrateLegacyCredentials(path: string, cipherText: string): UserProviderConfig | null {
+  const legacy = process.env['MOZHOU_LEGACY_SECRET_KEY']?.trim()
+  if (legacy === undefined || legacy === '') return null
+  const plaintext = decryptWith(scryptSync(legacy, MASTER_KEY_SALT, 32), cipherText)
+  if (plaintext === null) return null
+  const config = parseUserConfig(plaintext)
+  if (config === null) return null
+  atomicWriteFileSync(path, encryptWith(masterKey(), plaintext))
+  return config
 }
 
 export function maskApiKey(key: string): string {
@@ -181,6 +239,30 @@ export function maskApiKey(key: string): string {
   const trimmed = key.trim()
   if (trimmed.length <= 8) return '****'
   return `${trimmed.slice(0, 3)}****${trimmed.slice(-4)}`
+}
+
+/**
+ * 「已保存的凭据无法用当前主密钥解密」的显式错误。
+ *
+ * 触发场景：升级前用旧源码常量加密的 provider-settings.enc，升级后主密钥改为
+ * installation.key（B7），旧文件解不开。修复前 getSettings 把解密失败折成 null，
+ * 用户看到的是「从没配过」——同一个 Key 明明还在文件里。
+ *
+ * 数据保护：抛出前原文件已复制为 `<path>.bak`，绝不删除。code 供调用方/日志识别，
+ * message 直接告诉用户下一步（重新输入 API Key）。
+ */
+export class ProviderCredentialsUnreadableError extends RequestBoundaryError {
+  readonly backupPath: string
+  constructor(backupPath: string) {
+    super(
+      409,
+      'PROVIDER_CREDENTIALS_UNREADABLE',
+      '已保存的模型凭据无法用当前主密钥解密（升级后主密钥变更，或 installation.key 被替换）。' +
+        `原文件未删除，已备份到 ${backupPath}。请到「模型设置」重新输入 API Key 恢复使用。`,
+    )
+    this.name = 'ProviderCredentialsUnreadableError'
+    this.backupPath = backupPath
+  }
 }
 
 export class ProviderSettingsManager {
@@ -195,17 +277,30 @@ export class ProviderSettingsManager {
     return resolve(dataRoot, 'local-provider-settings.enc')
   }
 
+  /**
+   * 读取并解密本机/本用户的凭据。文件不存在返回 null（确实没配过）。
+   *
+   * 文件存在但解不开（升级后主密钥变更、installation.key 被替换、文件损坏）时
+   * **不再静默返回 null**：先尝试迁移期旧密钥重加密；不行就把原文件备份为 .bak
+   * 并抛 ProviderCredentialsUnreadableError，让调用方/界面给出「重新输入 API Key」。
+   */
   getSettings(userId?: string): UserProviderConfig | null {
     const path = this.getSettingsPath(userId)
     if (!existsSync(path)) return null
-    try {
-      const encrypted = readFileSync(path, 'utf8').trim()
-      const raw = decrypt(encrypted)
-      if (!raw) return null
-      return JSON.parse(raw) as UserProviderConfig
-    } catch {
-      return null
+
+    const cipherText = readFileSync(path, 'utf8').trim()
+    const plaintext = decrypt(cipherText)
+    if (plaintext !== null) {
+      const config = parseUserConfig(plaintext)
+      if (config !== null) return config
     }
+
+    // 1) 迁移期：操作员显式给出旧主密钥时，尝试一次性重加密。
+    const migrated = migrateLegacyCredentials(path, cipherText)
+    if (migrated !== null) return migrated
+
+    // 2) 解不开：先备份原文件（绝不删除），再抛出可操作错误。
+    throw new ProviderCredentialsUnreadableError(backupUnreadableCredentials(path))
   }
 
   saveSettings(
@@ -237,7 +332,15 @@ export class ProviderSettingsManager {
       throw new RequestBoundaryError(400, 'INVALID_URL', 'invalid baseUrl format')
     }
 
-    const existing = this.getSettings(userId)
+    let existing: UserProviderConfig | null
+    try {
+      existing = this.getSettings(userId)
+    } catch (err) {
+      // 旧文件解不开：原文件已备份为 .bak。继续以「无既有配置」保存新 Key——这正是
+      // 用户从不可读状态恢复的路径，不能因为旧文件坏掉就拒绝写入。
+      if (!(err instanceof ProviderCredentialsUnreadableError)) throw err
+      existing = null
+    }
     const configVersion = (existing?.configVersion ?? 0) + 1
     const config: UserProviderConfig = {
       providerId: input.providerId?.trim() || existing?.providerId || 'custom',
