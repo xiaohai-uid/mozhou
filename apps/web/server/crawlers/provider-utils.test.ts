@@ -97,3 +97,47 @@ describe('fetchText · 不安全目标在发起请求前被拦截', () => {
     expect(result.error ?? '').toContain('SECURITY_REJECT')
   })
 })
+
+/**
+ * 残余缺陷 B2：IPv6 判定此前用字面前缀 `fc00:`/`fd00:`/`fe80:`，只能命中
+ * 恰好以这四个字符开头的写法。`fc12::1`、`fd12:3456::1`、`fe90::1` 同属
+ * ULA（fc00::/7）与链路本地（fe80::/10）却被放行。改用数值位段判定后，
+ * 同网段内任意取值都必须拒绝，公网 IPv6 仍放行。
+ */
+describe('isSafePublicUrl · IPv6 按数值位段判定（同网段任意取值不得漏放）', () => {
+  const blockedIpv6 = [
+    'http://[fc12::1]/', // ULA fc00::/7，字面前缀 `fc00:` 漏放
+    'http://[fd12:3456::1]/', // ULA 上界侧，`fd00:` 漏放
+    'http://[fcff::]/', // ULA 段内
+    'http://[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/', // ULA 段上界
+    'http://[fe80::1]/', // 链路本地 fe80::/10
+    'http://[fe90::1]/', // 链路本地段内，`fe80:` 漏放
+    'http://[febf::1]/', // 链路本地段上界
+    'http://[::1]/', // 环回
+    'http://[::]/', // 未指定
+    'http://[::ffff:127.0.0.1]/', // IPv4 映射（B1 不得回退）
+    'http://[::7f00:1]/', // 已废弃 IPv4 兼容 ::127.0.0.1
+    'http://[2001:db8::1]/', // 文档段
+    'http://[ff02::1]/', // 组播
+  ]
+
+  for (const url of blockedIpv6) {
+    it(`拒绝 ${url}`, () => {
+      expect(isSafePublicUrl(url)).toBe(false)
+    })
+  }
+
+  const publicIpv6 = [
+    'http://[2606:4700::1111]/', // Cloudflare
+    'http://[2404:6800:4003::1]/', // 公网
+    'http://[2001:4860:4860::8888]/', // Google DNS
+    'http://[2a00:1450:4001:800::200e]/', // 公网
+    'http://[::ffff:808:808]/', // ::ffff:8.8.8.8，公网映射
+  ]
+
+  for (const url of publicIpv6) {
+    it(`放行 ${url}`, () => {
+      expect(isSafePublicUrl(url)).toBe(true)
+    })
+  }
+})
