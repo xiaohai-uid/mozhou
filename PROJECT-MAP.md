@@ -488,6 +488,14 @@
 - **验证状态**：已执行（上列实跑）。**未修**：R5 依赖漏洞结论（本机 registry 无 audit 端点）；SSRF 残余（ULA 字面匹配 + 无 DNS 解析）。**未验证**：安装器签名、未推送（未跑 act 本地 CI 门）、Mimosa 完整扫描、真实微信/支付宝联调、真实浏览器路径。
 - **遗留/风险**：B4/B5 无专门崩溃注入用例（复用已测的 atomicWriteFileSync 原语）；check:term-map 与 check:architecture 因并行会话未提交改动为 STALE（生成器分别只读 GLOSSARY.md 与统计包内源码行数），非本变更因果范围。
 
+### CHG-20261010-03 — 2026-10-10 — 第二轮独立复核发现与残余收口，ZCode 执行
+
+- **需求来源**：第二轮独立对抗复核（verdict block，基线 1947cf7）报出的新阻断与残余。证据见 [docs/changes/CHG-20261010-03-round2-findings-and-residuals.md](docs/changes/CHG-20261010-03-round2-findings-and-residuals.md)。
+- **实际变更**：f3133a3 Tauri 数据根目录名对齐 .mozhou_data（原 .mozhou-data 连字符 → 桌面端与 CLI 各铸一把 installation.key）；f2f1a68 SSRF 残余（裸 IPv4 交给数值判定，原正则清单漏 0/8、224/4、240/4；并拒绝 NAT64 本地前缀 64:ff9b:1::/48）；263a9ee 重复度成为真门（.jscpd.json threshold 17 + graph-gate.yml 新增 duplication job）；05a70b1 主密钥不可解时备份 .bak 并明确报错（原 catch return ''/null 被读成「从未配置」），支持经环境变量 MOZHOU_LEGACY_SECRET_KEY 的一次性迁移（不把旧常量写回源码）。
+- **验收（实跑）**：主会话实测 SSRF 函数——修前 0.1.2.3/224.0.0.1/239.1.2.3/[64:ff9b:1::7f00:1] 全放行，修后全拒绝且公网仍放行（crawlers 用例 60→72）；重复度门红/绿对照（阈值 0.01 → exit 1 并报 found too many duplicates）；llm 62 项通过；合并后全量门 test/build/lint/duplication/两处环检测/glossary·gates·readmes/cargo check 全绿。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：DNS rebinding（只看字面 host，防护应在请求层，已注释声明）；Tauri 写 installation.key 未显式限权；阈值只防恶化；迁移需操作员显式设环境变量；HTTP 级端到端未跑；R5 依赖漏洞结论（本机 registry 无 audit 端点）；安装器签名；未推送（未跑 act）；Mimosa 完整扫描；真实微信/支付宝联调；naming 502 真实模型。
+- **遗留/风险**：check:term-map 与 check:architecture 因并行会话未提交改动为 STALE（生成器只读 GLOSSARY.md / 统计包内源码行数），非本变更因果范围。
+
 
 
 
