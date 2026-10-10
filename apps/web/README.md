@@ -23,7 +23,8 @@
 - `src/api.test.ts` 是黑盒集成套件（起真实 `node:http` 打真实 `apiMiddleware`），不是契约复述；
   它的体量跟的是纵向旅程，不是复制来的形状。
 - **安全注意**：`scripts/launcher.mjs`（即 `pnpm start`）**不设 `NODE_ENV`**，
-  而 `server/billing/wechat.ts` 与 `alipay.ts` 的验签降级只由 `NODE_ENV === "production"` 把关。
-  `server/productionServer.ts:37` 启动即 `assertMasterKeyConfigured()`，
-  所以缺主密钥时会拒绝启动——但**验签降级路径不受此保护**。
+  但 `server/billing/wechat.ts` 与 `alipay.ts` 的验签已**无条件 fail-closed**：
+  未配置证书/公钥一律抛 503，与 `NODE_ENV` 无关（`wechat.ts:94-99`、`alipay.ts:63-67`），
+  两文件已无 `NODE_ENV` 引用。`server/productionServer.ts:37` 启动即 `assertMasterKeyConfigured()`，
+  所以缺主密钥时会拒绝启动。
   详见 [`docs/gates.md`](../docs/gates.md) 与 `CODE-DUPLICATION-INVENTORY.md` 的相关条目。

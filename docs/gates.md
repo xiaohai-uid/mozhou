@@ -38,7 +38,7 @@
 | R05 端到端旅程 | `node scripts/verify-r05-journey.mjs` | 0 `scripts/verify-r05-journey.mjs:1249` | 无 | ❌ |
 | 草稿上下文测量 | `node scripts/measure-draft-context.mjs` | 2 `:229`、`:238`、`:242` · 1 `:246` | 无 | ❌ |
 | 覆盖率 | `pnpm run coverage:check`（仅报告状态） | 0 配置就绪 · 1 配置缺失 | 无 | ❌ 未接入 |
-| 克隆检测 | `pnpm run duplication` | 见 jscpd | 无 | ❌ 未接入 |
+| 克隆检测 | `pnpm run duplication` | 见 jscpd（`.github/workflows/graph-gate.yml:54-73` 的 duplication job；0 未超阈值 / 非 0 超阈值） | 无 | ✅ `graph-gate.yml` |
 
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 
@@ -105,10 +105,10 @@
 
 | 项 | 实测值 | 出处 |
 |---|---|---|
-| 包层测试 | **103 个文件 / 910 个测试全部通过**，耗时 14.66s | `pnpm run test:packages` 实跑 |
+| 包层测试 | **以 `pnpm run test:packages` 实测为准**（2026-10-10 实测：并行段 119 文件 / 1066 例 + 独占台架段 1 文件 / 3 例，全部通过；原记 103 文件 / 910 例已过期） | `pnpm run test:packages` 实跑 |
 | 覆盖率 | **未启用**。`vitest.config.ts` 已配好 coverage 段，但 `@vitest/coverage-v8` 未安装，
 | 直接 `--coverage` 会报 MISSING DEPENDENCY | `pnpm run coverage:check` |
-| 克隆检测 | `.jscpd.json` 已就位，但 `pnpm run duplication` 需 `npx` 现场下载 jscpd，**未实跑验证** | `.jscpd.json` |
+| 克隆检测 | **已实跑验证**（2026-10-10）：总重复 15.8% < 阈值 17%（`.jscpd.json`），exit 0；把阈值临时调到 0.01 时 exit 1 并报 `found too many duplicates`，证明该门会拦。命令走 `npx --yes jscpd@3.5.10`（需现场下载 jscpd） | `.jscpd.json` |
 | | 覆盖率阈值 | **刻意未设** —— DSH 的「逐文件 100%」按其 §七 判断不适用于本仓；阈值须由人看过真实数字后再定 |
 
 > 启用覆盖率需要 `pnpm add -D @vitest/coverage-v8`。本仓库**刻意未擅自添加该依赖**：

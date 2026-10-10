@@ -15,7 +15,7 @@
 
 ## Extension points
 
-本包**不提供运行时可替换的能力**，它是纯类型与纯函数的领域定义层。经 `src/index.ts` 的 7 条 `export * from` 再导出对外。
+本包**不提供运行时可替换的能力**，它是纯类型与纯函数的领域定义层。经 `src/index.ts` 的 8 条 `export * from` 再导出对外（口径：`export * from` 语句条数；本包 `index.ts` 无具名 `export {}`）。
 
 没有 `export * from` 会新增对外面的部分——新增导出即新增扩展点，需在 ADR 记录。
 

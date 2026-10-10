@@ -11,19 +11,19 @@
 - **前端技术栈**：React 18 + TypeScript + Vite + Tailwind CSS v4 + 原生 WebGL 着色器
 - **核心前端目录**：`apps/web/`
 - **核心文件映射**：
-  - `apps/web/src/App.tsx`：应用壳主入口，当前为桌面三栏网格（`grid-template-columns: 228px 1fr 356px`），手机端需改为响应式单列流 + 底部导航 / 顶部抽屉。
+  - `apps/web/src/App.tsx`：应用壳主入口；桌面三栏网格定义在 `apps/web/src/styles/ink-orbit.css:69`（`grid-template-columns: 228px minmax(610px, 1fr) 356px`），手机端需改为响应式单列流 + 底部导航 / 顶部抽屉。
   - `apps/web/src/workbench/WorkbenchView.tsx`：中栏创作工作台主容器。
   - `apps/web/src/workbench/DialogueStream.tsx`：中栏写作对话流、墨舟先问、双胶囊轨与流式正文渲染。
   - `apps/web/src/shell/TopBar.tsx`：顶栏品牌与项目切换。
   - `apps/web/src/shell/PipelineStrip.tsx`：八步写作管线指示条（准备→草稿→审查→落定等）。
-  - `apps/web/src/shell/CapabilityChannels.tsx`：左侧 17 项功能航道。
+  - `apps/web/src/shell/CapabilityChannels.tsx`：左侧 23 项功能航道（注册表 `apps/web/src/shell/views.ts`，`VIEW_COUNT`）。
   - `apps/web/src/shell/InspectorTower.tsx`：右侧检视塔（质量门 / Story Brain / 装配看板 / 变更矩阵）。
-  - `apps/web/src/shell/InkBackground.tsx`：背景全屏 WebGL 墨流着色器（Fragment Shader）。
+  - `apps/web/src/shell/scene/SceneLayer.tsx`：背景场景层（L0 场景图 / L1 氛围 / L2 暗幕，CSS 实现，非 WebGL 着色器）。
   - `apps/web/src/styles/globals.css` & `ink-orbit.css`：品牌配色 Token、近黑材质与排印样式。
 
 ---
 
-## 2. 墨舟 17 项功能航道与 API 数据契约
+## 2. 墨舟 23 项功能航道与 API 数据契约
 
 全部采用同进程 Connect 中间件直出，请求方式均为 `POST`，内容类型为 `application/json`：
 
@@ -39,7 +39,7 @@
 | | 装配看板 (Receipt) | `POST /api/receipts` | 入参 `{ root }`，返回装配凭证列表与上下文预算消耗 |
 | | 变更影响矩阵 | `POST /api/change-matrix` | 入参 `{ root }`，返回遍历波及矩阵与重跑接口 |
 | **工作流** | 任务中心与流水账本 | `POST /api/tasks` / `POST /api/ledger` | 返回系统任务队列与 Traversal 事件流水 |
-| **资源组** | 技能广场 (17航道) | `POST /api/capabilities` | 返回系统注册的 17 项能力状态（原生可用 / 需要模型等） |
+| **资源组** | 技能广场 (17航道) | `POST /api/capability-square` | 返回系统注册的 17 项能力状态（原生可用 / 需要模型等） |
 | | 本地书架扫描与导入 | `POST /api/library` / `POST /api/library.import` | 扫描本地书库或导入第三方书源 |
 | | 书源全网检索 | `POST /api/book-source.search` | 入参 `{ keyword }`，返回聚合书源检索结果 |
 | | 智能双轨正文提取 | `POST /api/crawler.extract` | 入参 `{ url }`，返回 crawl4ai 清洗后正文并自动建书入库 |

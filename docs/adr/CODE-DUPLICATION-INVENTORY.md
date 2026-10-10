@@ -119,12 +119,12 @@ UI 侧也没有复述契约：`apps/web/src/api/client.ts:27` **从 `../../serve
 ### B. `NODE_ENV` 缺失导致验签降级 —— **已核实，边界要说清**
 
 - ✅ **已核实**：`scripts/launcher.mjs` **从不设置** `NODE_ENV`；安装器路径 `desktop-server.mjs:18` **会**设 `production`。
-- ✅ **已核实**：`wechat.ts:99-108` / `alipay.ts:70-77` 在「未配置公钥」分支里，只有 `NODE_ENV === 'production'` 才抛 503 缺证书；否则只对以 `bad_sign` / `fake_` 开头的签名抛 401。
-- ⚠️ **措辞纠正**：那**不是**「接受伪造签名」的旁路 —— 它 `throw 401`。真正的暴露是：**未配置公钥 + 非 production 时，不以那两个前缀开头的签名会静默穿过验签，无任何错误**。
+- ⚠️ **已过期（R2 修复后，2026-10-10 复核）**：本节原称 `wechat.ts` / `alipay.ts` 在「未配置公钥」分支里，只有 `NODE_ENV === 'production'` 才抛 503 缺证书。**该行为已不存在**：两个 verifier 现为**无条件 fail-closed**——未配置证书/公钥一律抛 503，与 `NODE_ENV` 无关（`wechat.ts:94-99`、`alipay.ts:63-67`，注释明写「与 NODE_ENV 无关」；两文件已无 `NODE_ENV` 引用）。
+- ⚠️ **原「措辞纠正」已失效**：原称「未配置公钥 + 非 production 时，不以那两个前缀开头的签名会静默穿过验签，无任何错误」——该放行分支已随 R2 修复删除，此暴露不再成立。
 - ⚠️ **未核实**：伪造通知是否真能推进订单/权益变更 —— 需运行时验证，本清单未跑应用。
 - ✅ **已核实（缓解事实）**：`productionServer.ts:37` 启动即 `assertMasterKeyConfigured()`。所以 `pnpm start` 没有 `MOZHOU_SECRET_KEY` 就**拒绝启动**，`providerSettings.ts:99` 的 `DEV_FALLBACK_SECRET` 派生在该路径上够不到服务。
 
-**结论**：这是**文档缺陷**而非可直接利用的漏洞 —— `docs/deployment.md:15` 把 `pnpm start` 列为本地运行入口，但它既不设 `NODE_ENV` 也不满足 `MOZHOU_SECRET_KEY` 的生产前提。**要你答**：`pnpm start` 到底是不是面向终端用户的真实运行路径？如果是，它需要 `desktop-server.mjs:8-17` 那套 installation.key 引导；如果不是，`docs/deployment.md` 应改写，别让它读起来像生产入口。
+**结论（2026-10-10 更新）**：验签降级暴露已随 R2 修复关闭，本条不再是安全缺陷。仍存的是**文档口径问题** —— `docs/deployment.md:15` 把 `pnpm start` 列为本地运行入口，但 `scripts/launcher.mjs` 不满足 `MOZHOU_SECRET_KEY` 的生产前提（`productionServer.ts:37` 缺主密钥即拒绝启动）。**要你答**：`pnpm start` 到底是不是面向终端用户的真实运行路径？如果是，它需要 `desktop-server.mjs:8-17` 那套 installation.key 引导；如果不是，`docs/deployment.md` 应改写，别让它读起来像生产入口。
 
 ## 我上一轮说错、在此更正的四项
 

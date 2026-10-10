@@ -11,7 +11,7 @@
 
 ## Depends on
 
-`@mozhou/kernel`。经 `src/index.ts` 的 26 条 `export * from` 再导出（具名导出 0 个）。
+`@mozhou/kernel`。经 `src/index.ts` 的 29 条 `export * from` 再导出（口径：`export * from` 语句条数；具名导出 0 个）。
 
 ## Extension points
 
@@ -22,4 +22,4 @@
 
 - **禁止增量迁移框架**（`src/database.ts:4-7` 明文）。投影靠 `PRAGMA user_version` 守卫，
   版本不匹配即抛 `ProjectionVersionMismatchError`，正确做法是全量重建。
-- 26 条 `export * from` 意味着包的实际公开面在子模块里，`index.ts` 自身看不到清单。
+- 29 条 `export * from` 意味着包的实际公开面在子模块里，`index.ts` 自身看不到清单。

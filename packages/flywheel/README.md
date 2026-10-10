@@ -21,7 +21,10 @@
 ## Known limitations
 
 - **159 个具名导出**，公开面同样偏大。
-- 评估器子树在 2026-09-30 已接入包的一等公开面，但**运行期仍不可达**：
-  `confirmRoutingSuggestion` / `runTaskModelEvaluation` / `readSuggestions` 在生产代码中无调用方，
-  也无路由、脚本或定时任务触发；`run.ts` 与 `storage.ts` 至今无测试。
-  ADR-0008 的「一等子系统」定位**尚未兑现**——这是仓库自述，不是本文件的推断。
+- 评估器子树在 2026-09-30 已接入包的一等公开面，且**运行期可达**：
+  `readSuggestions`（`apps/web/server/routes/flywheelRoutes.ts:122`）与 `runTaskModelEvaluation`（`:190`）
+  经 `/api/flywheel.suggestions`、`/api/flywheel.evaluator.status`、`/api/flywheel.evaluator.run`
+  三条路由暴露（安全策略 `apps/web/server/routePolicies.ts:121-123`，接线 `apps/web/server/api.ts:631`）。
+  仅 `confirmRoutingSuggestion` 在生产代码中无调用方（只在 `packages/flywheel/src/index.ts:238` 再导出）。
+  `run.ts` 无测试；`storage.ts` 已有 `storage.test.ts`。
+  ADR-0008 的「一等子系统」定位由此落地一部分——这是仓库自述，不是本文件的推断。
