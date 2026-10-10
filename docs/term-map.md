@@ -108,7 +108,7 @@
 | 路由建议确认 | RoutingSuggestion | `RoutingSuggestion` | `packages/flywheel/src/evaluator/types.ts:53` | 声明 |
 | 路由变更 | RouteChange | `RouteChange` | `packages/flywheel/src/evaluator/confirm.ts:50` | 声明 |
 | 议题 | Issue | `issue` | `packages/pipeline/src/gate-step.ts:216` | 局部同名 |
-| 工单 | Ticket | `ticket` | `apps/web/server/routes/managedModelRoutes.ts:36` | 局部同名 |
+| 工单 | Ticket | `ticket` | `apps/web/server/routes/managedModelRoutes.ts:39` | 局部同名 |
 | 本地规格文档 | Local Spec Doc | - | - | 未验证 |
 | 地图 | Map | `Map` | `packages/benchmark/src/metrics.ts:215` | 引用 |
 | 状态标签 | Triage Label | - | - | 未验证 |
