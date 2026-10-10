@@ -3,7 +3,8 @@
 > 本文描述**本仓库实际交付的栈**：Node 22 + 本地优先文件 canon + SQLite 投影，
 > 入口为 `apps/web/dist-server/productionServer.js`，默认只监听 `127.0.0.1`。
 >
-> 历史文档 `docs/production-deployment.md` 描述的是 Next.js `next start` + Postgres/drizzle
+> 历史文档 [`archive/2026-08/production-deployment.md`](./archive/2026-08/production-deployment.md)
+> 描述的是 Next.js `next start` + Postgres/drizzle
 > + one-api + Cloud Run 的另一套应用，**该应用不在本仓库中**（无 `app/`、无 `drizzle/`），
 > 照其操作会失败。需要归档背景时再读它。
 

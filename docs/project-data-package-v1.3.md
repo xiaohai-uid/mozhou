@@ -184,7 +184,7 @@ OpenWrite = Flutter 桌面端 AI 小说写作助手（**无秘密瘦客户端**�
 9. 技能=文本注入（非工具调用）；无 Agent 体系
 10. 无会员/计费/限流（配额靠 one-api 网关；生产无 IP 限流）
 11. 测试基建：Next16 dev server 项目级锁 + 字体网络依赖（gstatic 偶发超时需重试）
-12. 生产部署细节与踩坑：见 docs/production-deployment.md（可复用）
+12. 生产部署细节与踩坑：见 [`archive/2026-08/production-deployment.md`](./archive/2026-08/production-deployment.md)（已归档，且该栈不属于本仓库交付物）
 
 ## 9. 用户工作流与期望（产品语义，方案必须尊重）
 

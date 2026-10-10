@@ -11,6 +11,7 @@
 - **AI 模型通道**：支持 **USER_BYOK（用户自带 Key）** 的 OpenAI-compatible 真实流式调用；未配置可用 Provider 时相关生成能力会显式显示不可用，只有明确开启 Demo 数据的环境才使用演示数据；
 - **商业化状态**：当前为**社区免费技术预览版**。云同步/云备份、付费许可证激活与正式支付通道尚未作为本 Release 的可用能力发布。
 - **部署**：只支持单机回环部署，容器与 systemd 部署必须显式设置 `MOZHOU_DATA_ROOT` 与 `MOZHOU_SECRET_KEY`。完整清单与已知限制见 [`docs/deployment.md`](docs/deployment.md)。
+- **怎么用**：面向作者的完整说明（安装、首跑、数据位置、故障排查、已知边界）见 [`docs/user-guide.md`](docs/user-guide.md)；给贡献者的命令与回滚清单见 [`docs/development.md`](docs/development.md)。
 
 ### v0.3.0 修复摘要
 
@@ -19,6 +20,7 @@
 - **掉电耐久**：章节、canon、基线等写入此前只有 `writeFileSync + rename` 而无 fsync，rename 可能先于数据刷盘，掉电后目标文件变零长度。现统一收敛到 `atomicWriteFileSync`（tmp → fsync → rename）。
 - **可运维性**：新增真实 `/api/health`（此前只在路由策略表登记、无处理器，实际返回 404）、单行 JSON 请求日志与 `X-Request-Id`、SIGTERM/SIGINT 优雅停机（排空在途请求，10 秒超时）。
 - **文档校正**：`docs/deployment.md` 此前描述的是一套不存在的 Next.js + Postgres + one-api 栈（本仓库无 `app/`、无 `drizzle/`），已重写为当前栈；`docs/production-deployment.md` 标记作废。
+  > 追记（2026-10-10）：该作废文档已随历史报告归档至 [`docs/archive/2026-08/`](docs/archive/2026-08/)，本条为历史陈述故不改写；现行部署栈见 [`docs/deployment.md`](docs/deployment.md)。
 
 ### v0.2.1 修复摘要（历史）
 

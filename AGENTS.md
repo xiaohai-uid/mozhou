@@ -58,6 +58,8 @@
 
 - 术语：**[`GLOSSARY.md`](./GLOSSARY.md)**（原 `CONTEXT.md`，2026-10-01 迁正）
 - 架构地图：`docs/architecture.md`；决策地图：`docs/adr/INDEX.md`；决策记录：`docs/adr/`
+- 用户指南：`docs/user-guide.md`（面向作者）；开发指南：`docs/development.md`（命令、回滚清单、平台注意）；界面契约：`apps/web/DESIGN.md`
+- 历史档案：`docs/archive/`（已完成或被取代的审计/评审/发布报告，一次性证据，不作执行依据）
 - 变更记录地图：[`PROJECT-MAP.md`](./PROJECT-MAP.md)（全局指令《项目地图与变更溯源》要求的 canonical 入口）——变更 ID、基线、验收、证据索引；专项细节归上列各图，本图不重复维护
 - 契约全集：`.scratch/mozhou-mvp/contracts/api-contract.md`（已实现端点以后端发射端 + 契约测试为准，UI 消费是协议子集）
 - 执行跟踪：GitHub Issues（见 §9）；本地规格文档：`.scratch/<feature-slug>/`（**不是**执行状态的家）
@@ -100,7 +102,7 @@ Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mozhou** (12839 symbols, 27151 relationships, 606 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mozhou** (12840 symbols, 27152 relationships, 606 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
