@@ -553,6 +553,17 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：生产改密不可用且需接口变更；成本上界是「月上限约束单次成本」的保守近似；真实生成路径仍未接配额；receipt/report 的 existsSync 预检仍 TOCTOU；`listUserBooks` 仍是无调用方死代码；未连真实 Supabase；未跑 Tauri 运行时；沿用 #99 真模型路径、未推送（未跑 act）、安装器未签名、发布链校验未在 Actions 实跑、Mimosa advisory、4 个 moderate 依赖漏洞。
 - **遗留/风险**：本批 6 个源文件与测试动手前均为干净（无夹带）；`docs/term-map.md` 工作区副本属对方，本次不覆盖，只修正那一处行号后入索引。
 
+### CHG-20261010-10 — 2026-10-10 — 第八轮复核发现收口（成本断路器真缺陷 / 票据验签 / 桌面入口），ZCode 执行
+
+- **需求来源**：第八轮独立对抗复核（verdict `release`，连续第五次；本轮要求**证伪**上一批并明确回答「还有没有属于缺陷而非产品决定的问题」）报出的 **1 处真缺陷** + 1 处潜在安全 + 2 处低。证据见 [docs/changes/CHG-20261010-10-round8-findings-closure.md](docs/changes/CHG-20261010-10-round8-findings-closure.md)。
+- **实际变更**：e3c2d10 在 `quota.ts` 的 `settle` 累加**之前**校验该用户月预算（与 reserve 同源、同默认值 1500），超出即 402 `USER_BUDGET_EXCEEDED` **且不写入成本账**——复核员实测：先 reserve 20 单（成本 0）再逐单 settle 1500，**第 7 单**即把全局日成本推过 10000、断路器 tripped、其他用户 reserve 全 429；这是上一批上界（只在路由层）修复不完整所致。e6abd17 `license.ts` 的 `verifyTicket` 改为只用服务端公钥验签（原用票据自带的 publicKey，自造密钥即可签出 `valid: true` 的 max 套餐票据），并把两个既有防御用例改为白盒取真私钥（它们原先靠自签绕过签名——正是该漏洞；**断言未改**）；`desktop-server.mjs` 缺数据根改 fail-closed 明确报错（不回退 cwd）；`server_manager.rs` 只补注释（不读 MOZHOU_DATA_ROOT 是安全扫描约束、该入口不在发行产物内）。
+- **主会话的独立复核与修补**：负例探针——把月预算判据置为永不成立后**正是那条新用例变红**、其余仍绿，证明它咬住修复点；并**自行修掉子代理漏掉的「恢复日期跨月溢出」**（原 `setMonth(+1)`+`setDate(1)` 在 2026-01-31 报成 2026-03-01，实际 2026-02-01 重置）。
+- **判定不修（如实记录）**：第八轮称「重置码在 provider 确认失败前被烧掉」经复核**就所述后果不成立**（外部 provider 路径必然先抛 `INVALID_RESET_CODE`，到不了确认那一步）；真问题是外部 provider 确认分支为死代码，修它需决定外部码如何入账，属范围扩张（UVSD §2.8），故未动 `accountRoutes.ts`/`session.ts`。
+- **首次覆盖的五个包结论干净**：`flywheel`、`context-compiler`、`quality-engine`、`runtime` 与 `reconciliation`/`proposal-*` 流程逐处核对后未发现缺陷（catch 均有注释、写盘原子、预算失败响亮报错），并列出检索式。
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1066 例 + 台架 3 例 + web 156 文件 1299 例）；billing+routes+auth 445 例（连跑 3 遍）；build/lint/typecheck/cargo check exit 0；静态环 `PASS 595 模块 / 1703 边 / 0 依赖环`；`graph:check` cycleCount 0；重复度 15.8% < 17%；干净 HEAD（e6abd17）副本上五个文档门全 0；两个生成物**无需刷新**（与 HEAD 差异均为 0）。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：一处**未复现的偶发**（子代理报 `quota.test.ts:110` 全段首跑失败一次，主会话连跑 3 遍全段 + 5 遍 billing 段均未复现；该套件全用真实 `Date.now()`，跨 UTC 日/月边界理论上可致失败，但失败时刻为 UTC 10:0x 与此不符）；`verifyTicket` 生产无调用方（本次是消除隐患）；被拒绝的预留仍停留 `reserved` 不自动释放；Tauri 入口未编译运行；沿用生产改密需接口变更、配额未接生成路径、receipt/report TOCTOU、`listUserBooks` 死代码、未连真实 Supabase、#99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
+- **遗留/风险**：本批 6 个源文件与测试动手前均为干净（无夹带）；生成物无需刷新，故未触碰 `docs/architecture.md` 与 `docs/term-map.md`。
+
 
 
 
