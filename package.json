@@ -18,7 +18,7 @@
     "package": "node scripts/build-release.mjs",
     "lint": "eslint .",
     "test": "pnpm run test:packages && pnpm run test:web",
-    "test:packages": "vitest run",
+    "test:packages": "vitest run && vitest run --config vitest.bench.config.ts",
     "test:web": "pnpm --filter @mozhou/web test",
     "verify:real-model": "node scripts/verify-real-model-journey.mjs",
     "verify:journey": "node scripts/verify-mock-journey.mjs",
