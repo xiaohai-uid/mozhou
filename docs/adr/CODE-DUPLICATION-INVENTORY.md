@@ -116,7 +116,7 @@ UI 侧也没有复述契约：`apps/web/src/api/client.ts:27` **从 `../../serve
 ### A. `scripts/build-windows-runtime.mjs` 产出的产物**起不来**
 零调用者，且它生成的 `run.mjs` 设 `NODE_ENV=production` 却不设 `MOZHOU_SECRET_KEY`，`productionServer.ts:37` 会拒绝启动。
 
-### B. `NODE_ENV` 缺失导致验签降级 —— **已核实，边界要说清**
+### B. `NODE_ENV` 缺失曾导致验签降级 —— **已关闭（R2 修复后不存在），边界仍要说清**
 
 - ✅ **已核实**：`scripts/launcher.mjs` **从不设置** `NODE_ENV`；安装器路径 `desktop-server.mjs:18` **会**设 `production`。
 - ⚠️ **已过期（R2 修复后，2026-10-10 复核）**：本节原称 `wechat.ts` / `alipay.ts` 在「未配置公钥」分支里，只有 `NODE_ENV === 'production'` 才抛 503 缺证书。**该行为已不存在**：两个 verifier 现为**无条件 fail-closed**——未配置证书/公钥一律抛 503，与 `NODE_ENV` 无关（`wechat.ts:94-99`、`alipay.ts:63-67`，注释明写「与 NODE_ENV 无关」；两文件已无 `NODE_ENV` 引用）。

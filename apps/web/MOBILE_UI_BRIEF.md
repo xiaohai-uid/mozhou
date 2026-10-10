@@ -8,7 +8,8 @@
 
 ## 1. 核心技术栈与文件结构
 
-- **前端技术栈**：React 18 + TypeScript + Vite + Tailwind CSS v4 + 原生 WebGL 着色器
+- **前端技术栈**：React 18 + TypeScript + Vite + Tailwind CSS v4
+- **目标（尚未实现，勿当作现状）**：原生 WebGL 着色器背景 —— 当前 `src` 内**没有 WebGL**，只有两处 `getContext('2d')`；本文件下文要求的「赛博液态黑曜石」质感属待建目标。
 - **核心前端目录**：`apps/web/`
 - **核心文件映射**：
   - `apps/web/src/App.tsx`：应用壳主入口；桌面三栏网格定义在 `apps/web/src/styles/ink-orbit.css:69`（`grid-template-columns: 228px minmax(610px, 1fr) 356px`），手机端需改为响应式单列流 + 底部导航 / 顶部抽屉。

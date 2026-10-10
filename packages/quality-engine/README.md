@@ -19,7 +19,7 @@
 - `defaultPlatformRules` / 规则集：平台默认规则 + 项目覆盖（`QualityPolicy.maxAutomaticReworks` 恒为 2）。
 - `ReviewerBinding`：审查者绑定，决定 LLM 旁路用哪个模型。
 
-本包共 67 个具名导出，其中约一半是规则与报告的类型/结构。
+本包共 78 个具名导出（2026-10-10 实测：`src/index.ts` 里 `export {…}` / `export type {…}` 标识符去重计数），其中约一半是规则与报告的类型/结构。
 
 ## Known limitations
 

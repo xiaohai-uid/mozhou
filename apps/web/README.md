@@ -19,7 +19,7 @@
 
 ## Known limitations
 
-- **全仓体量最大**（src 约 3.6 万行 / server 约 2.8 万行），承担了 UI + BFF 双重职责。
+- **全仓体量最大**（2026-10-10 实测：`src` 39,040 行 / `server` 40,860 行，均**含**测试文件；去掉 `*.test.*` 后为 `src` 27,550 / `server` 18,197），承担了 UI + BFF 双重职责。
 - `src/api.test.ts` 是黑盒集成套件（起真实 `node:http` 打真实 `apiMiddleware`），不是契约复述；
   它的体量跟的是纵向旅程，不是复制来的形状。
 - **安全注意**：`scripts/launcher.mjs`（即 `pnpm start`）**不设 `NODE_ENV`**，

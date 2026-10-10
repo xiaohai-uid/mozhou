@@ -136,7 +136,7 @@ mozhou/
 │   └── benchmark/         # L1 确定性连续性断言、Promptfoo 测试编译器
 ├── apps/
 │   └── web/               # 现代化 Web/桌面 UI (Vite + React + TipTap AST + Tailwind)
-├── src-tauri/             # Tauri 2.0 原生跨平台桌面外壳 (<15MB 体积，<40MB 内存)
+├── src-tauri/             # Tauri 2.0 原生跨平台桌面外壳（exe 实测 8.4MB；空闲内存 65~85MB —— 原始「<15MB / <40MB」指标经分析互斥且不可达，见 CHG-20261006-14）
 ├── scripts/               # 启动自检、多平台发布打包与工程脚本
 └── release-artifacts/     # 全平台发布构建产物
 ```
