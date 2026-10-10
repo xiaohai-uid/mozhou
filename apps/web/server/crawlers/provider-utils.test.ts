@@ -141,3 +141,42 @@ describe('isSafePublicUrl · IPv6 按数值位段判定（同网段任意取值�
     })
   }
 })
+
+/**
+ * 残余缺陷 B3（2026-10-10 第二轮对抗复核）：裸 IPv4 走的是**正则前缀清单**，只覆盖
+ * 127./10./192.168./172.16-31./169.254./100.64-127.，于是 `0.0.0.0/8`（除精确的
+ * 0.0.0.0）、组播 `224.0.0.0/4`、保留 `240.0.0.0/4` 被放行；NAT64 本地用途前缀
+ * `64:ff9b:1::/48`（RFC 8215）也不在判定内。现改为裸 IPv4 交给数值判定，
+ * 并把 `64:ff9b:1::/48` 整段拒绝。
+ */
+describe('isSafePublicUrl · 保留段/组播/翻译器前缀（裸 IPv4 交给数值判定）', () => {
+  const blockedResidual = [
+    'http://0.1.2.3/', // 0.0.0.0/8（此前只拦精确的 0.0.0.0）
+    'http://0.255.255.255/',
+    'http://224.0.0.1/', // 组播 224.0.0.0/4
+    'http://239.1.2.3/', // 组播段内
+    'http://240.0.0.1/', // 保留 240.0.0.0/4
+    'http://255.255.255.255/', // 广播
+    'http://[64:ff9b:1::7f00:1]/', // NAT64 本地用途 64:ff9b:1::/48
+    'http://[64:ff9b:1::1]/',
+  ]
+
+  for (const url of blockedResidual) {
+    it(`拒绝 ${url}`, () => {
+      expect(isSafePublicUrl(url)).toBe(false)
+    })
+  }
+
+  const allowedControl = [
+    'http://8.8.8.8/', // 公网 IPv4 仍放行
+    'http://1.1.1.1/',
+    'http://[64:ff9b::808:808]/', // 公网 IPv4 的 NAT64（well-known 前缀）仍放行
+    'http://[2606:4700::1111]/', // 公网 IPv6
+  ]
+
+  for (const url of allowedControl) {
+    it(`放行 ${url}`, () => {
+      expect(isSafePublicUrl(url)).toBe(true)
+    })
+  }
+})

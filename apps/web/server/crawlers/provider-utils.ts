@@ -176,6 +176,18 @@ function isPrivateOrReservedIpv6(address: string): boolean {
   if (bytes.slice(0, 10).every((byte) => byte === 0) && bytes[10] === 0xff && bytes[11] === 0xff) {
     return isPrivateOrReservedIpv4(bytesToDottedIpv4(bytes, 12))
   }
+  // NAT64 本地用途前缀 64:ff9b:1::/48（RFC 8215）：整段视为不安全（翻译器前缀，
+  // 爬虫没有理由穿过它；其 /48 内的嵌入 IPv4 形式点分与十六进制并存，整段拒绝更稳）。
+  if (
+    bytes[0] === 0x00 &&
+    bytes[1] === 0x64 &&
+    bytes[2] === 0xff &&
+    bytes[3] === 0x9b &&
+    bytes[4] === 0x00 &&
+    bytes[5] === 0x01
+  ) {
+    return true
+  }
   // NAT64 64:ff9b::/96
   if (
     bytes[0] === 0x00 &&
@@ -226,20 +238,20 @@ export function isSafePublicUrl(urlString: string): boolean {
       return false
     }
 
-    // 过滤 localhost、私有域名后缀与裸 IPv4 私有/保留网段
+    // 裸 IPv4：交给数值判定。此前的正则前缀清单只覆盖 127./10./192.168./172.16-31./
+    // 169.254./100.64-127.，漏掉 0.0.0.0/8、组播 224.0.0.0/4、保留 240.0.0.0/4 等
+    // （实测 http://0.1.2.3/ 与 http://224.0.0.1/ 曾被放行）。URL 解析器已把 1–3 段、
+    // 八进制与十六进制形式规范化为点分四段，故这里只认点分四段。
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      return !isPrivateOrReservedIpv4(host)
+    }
+
+    // 过滤 localhost 与私有域名后缀
     if (
       host === 'localhost' ||
-      host === '127.0.0.1' ||
-      host === '0.0.0.0' ||
       host.endsWith('.local') ||
       host.endsWith('.internal') ||
-      host.endsWith('.lan') ||
-      /^127\./.test(host) ||
-      /^10\./.test(host) ||
-      /^192\.168\./.test(host) ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
-      /^169\.254\./.test(host) ||
-      /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(host)
+      host.endsWith('.lan')
     ) {
       return false
     }
