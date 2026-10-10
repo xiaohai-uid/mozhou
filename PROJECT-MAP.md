@@ -479,6 +479,15 @@
 - **验证状态**：已执行（上列实跑）。**未做**：未加 onStage 接缝（见手段替换）；未跑全量 vitest/typecheck（本轮仅新增测试，全量门由主会话收口时统一跑）。
 - **遗留/风险**：用例覆盖保存路径两窗口；提交路径 REC-01~04 由既有 recovery-reentry.test.ts 覆盖，两者互不替代。
 
+### CHG-20261010-02 — 2026-10-10 — 用户授权（对抗评审剩余阻断修复），ZCode 执行
+
+- **需求来源**：CHG-20261010-01 之后按独立放行复核员清单继续修剩余阻断（R2/B4/B5/B6/B7）。证据见 [docs/changes/CHG-20261010-02-adversarial-fixes-round2.md](docs/changes/CHG-20261010-02-adversarial-fixes-round2.md)。
+- **观察基线**：HEAD d0a7bc3；R2 支付回调验签仅在 NODE_ENV==='production' 时生效，且 decryptResource 对 `{` 开头 ciphertext 无任何环境判断地明文透传；B7 源码含 DEV_FALLBACK_SECRET 与 local-dev-token 字面量；B6 Tauri 用 LCG+墙钟种子生成 MOZHOU_SECRET_KEY；B4/B5 两处裸 writeFileSync。
+- **实际变更**：da092f8 R2（两处旁路整体删除：未配证书一律 503、密文一律真解密，测试改用运行时临时 RSA/AES 密钥做真实验签）；b4825aa B7（删字面量，本地主密钥改为数据根 installation.key，CSPRNG 铸造 0600）；b5e4505 B6（getrandom::fill 替换 LCG，新增直接依赖 getrandom 0.3——已在 Cargo.lock 中，不引入新下载）；54faea3 B4/B5（writeIntent 与 createDraftCandidate 改用 atomicWriteFileSync）。
+- **验收（实跑）**：pnpm test exit 0（154 文件/1162 用例/15 skipped）；pnpm build exit 0；pnpm lint exit 0（并修掉新测试文件两处多余类型断言）；静态环检测 PASS 590 模块/1680 边/0 环；gitnexus check cycleCount 0；check:glossary/gates/readmes exit 0；cargo check 4.15s 通过；定向 billing 60 用例、pipeline 254 用例通过。
+- **验证状态**：已执行（上列实跑）。**未修**：R5 依赖漏洞结论（本机 registry 无 audit 端点）；SSRF 残余（ULA 字面匹配 + 无 DNS 解析）。**未验证**：安装器签名、未推送（未跑 act 本地 CI 门）、Mimosa 完整扫描、真实微信/支付宝联调、真实浏览器路径。
+- **遗留/风险**：B4/B5 无专门崩溃注入用例（复用已测的 atomicWriteFileSync 原语）；check:term-map 与 check:architecture 因并行会话未提交改动为 STALE（生成器分别只读 GLOSSARY.md 与统计包内源码行数），非本变更因果范围。
+
 
 
 

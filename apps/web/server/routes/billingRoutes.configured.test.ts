@@ -8,7 +8,7 @@
  * - 构造真实 RSA 签名与真实 AES-256-GCM 密文。
  * 环境变量必须在动态 import 之前设置，使验签器单例读到配置（vi.hoisted 之外的显式顺序）。
  */
-import { createCipheriv, createSign, generateKeyPairSync, randomBytes, type KeyObject } from 'node:crypto'
+import { createCipheriv, createSign, generateKeyPairSync, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -43,7 +43,7 @@ function encryptResource(payload: unknown, nonce: string): string {
 }
 
 function signWechat(ts: string, nonce: string, rawBody: string): string {
-  return createSign('RSA-SHA256').update(`${ts}\n${nonce}\n${rawBody}\n`).sign(privateKey as KeyObject, 'base64')
+  return createSign('RSA-SHA256').update(`${ts}\n${nonce}\n${rawBody}\n`).sign(privateKey, 'base64')
 }
 
 function buildAlipaySignMessage(params: Record<string, string>): string {
@@ -55,7 +55,7 @@ function buildAlipaySignMessage(params: Record<string, string>): string {
 }
 
 function signAlipay(params: Record<string, string>): string {
-  return createSign('RSA-SHA256').update(buildAlipaySignMessage(params), 'utf8').sign(privateKey as KeyObject, 'base64')
+  return createSign('RSA-SHA256').update(buildAlipaySignMessage(params), 'utf8').sign(privateKey, 'base64')
 }
 
 let servers: ReturnType<typeof createServer>[] = []
