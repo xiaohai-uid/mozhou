@@ -2,7 +2,7 @@
 /**
  * 作品归档备份与恢复重建测试 (T10 · C5 门验证)。
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -67,6 +67,42 @@ describe('Book Backup & Restore (T10 / C5)', () => {
     expect(chapter.body).toContain('山雨欲来风满楼')
     expect(chapter.chapterIndex).toBe(1)
     restoredPlane.close()
+  })
+
+  it('恢复逐文件原子落盘：内容完整且目标目录不留 `.mozhou-tmp` 残留', () => {
+    const srcDir = mkdtempSync(join(tmpdir(), 'mozhou-backup-atomic-src-'))
+    const dstDir = mkdtempSync(join(tmpdir(), 'mozhou-backup-atomic-dst-'))
+    tempDirs.push(srcDir, dstDir)
+
+    const created = createBook({ dir: srcDir, title: '原子恢复测试' })
+    const plane = LocalDataPlane.open(srcDir)
+    plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
+    const chapterContent = renderProseChapter({
+      mozhouId: created.book.id,
+      revision: 1,
+      chapterIndex: 1,
+      phase: 'draft',
+      body: '落霞与孤鹜齐飞，秋水共长天一色。',
+    })
+    writeFileSync(join(srcDir, proseChapterPath(1)), chapterContent, 'utf8')
+    plane.close()
+
+    const backup = createBookBackup(srcDir)
+    restoreBookBackup(backup.buffer, dstDir)
+
+    // 落盘正文与源文件逐字节相同（写全、无截断）
+    expect(readFileSync(join(dstDir, proseChapterPath(1)), 'utf8')).toBe(chapterContent)
+
+    // 递归扫描：恢复目录内不得出现任何原子写临时文件残留
+    const leftovers: string[] = []
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name.includes('.mozhou-tmp')) leftovers.push(join(dir, entry.name))
+        if (entry.isDirectory()) walk(join(dir, entry.name))
+      }
+    }
+    walk(dstDir)
+    expect(leftovers).toEqual([])
   })
 
   it('C5 门：拦截路径穿越 (Path Traversal) 归档包', () => {

@@ -18,8 +18,9 @@
  * SQLite 投影索引（spec §2）本票不落——文件即真源，扫描目录可 100% 重建（INV-R4），
  * 索引随查询面票据再补。GenerationStarted.receiptId 链路闭合归生成侧票据。
  */
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 import type { ContextReceipt, ContextReceiptId } from '@mozhou/kernel'
 
 /* ----------------------------------------------------------------------------
@@ -179,10 +180,8 @@ export function persistReceipt(
   }
   mkdirSync(receiptsDir, { recursive: true })
 
-  // ① 先写凭证文件（原子可见点 = rename）
-  const staged = `${receiptPath}.mozhou-tmp`
-  writeFileSync(staged, serializeReceiptFile(receipt), 'utf8')
-  renameSync(staged, receiptPath)
+  // ① 先写凭证文件（原子可见点 = rename；唯一临时名 + fsync 由共享原语承担）
+  atomicWriteFileSync(receiptPath, serializeReceiptFile(receipt))
 
   // ② 后追加指针事件（seq = 追加前行数，与 ChapterCommitted 同账本约定）
   const eventsPath = join(bookRoot, RUNTIME_DIR, EVENTS_FILENAME)

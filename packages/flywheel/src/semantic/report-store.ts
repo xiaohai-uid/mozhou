@@ -5,8 +5,9 @@
  * 稳定键序美化序列化（沿 receipt-file 先例）；读面全目录扫描可重建。
  * V1 全保留（D16）；目录属 .mozhou 运行时区非 canon（对齐 receipts 归属）。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { atomicWriteFileSync } from '@mozhou/data-plane';
 import type { SemanticAnalysisReport } from './types.js';
 
 /** 语义报告目录（.mozhou 运行时区；E7）。 */
@@ -30,9 +31,8 @@ export function writeSemanticReport(options: WriteReportOptions): string {
     // 报告 id 取自调用方 ULID；重复写同 id 视为崩溃重放或 id 撞车——宁败不脏
     throw new Error('semantic report already exists: ' + relPath);
   }
-  const tmp = absolute + '.tmp';
-  writeFileSync(tmp, JSON.stringify(options.report) + '\n');
-  renameSync(tmp, absolute);
+  // 原子落盘（唯一临时名 + fsync + rename）；上面 existsSync 预检保留「重复写同 id 即抛」语义。
+  atomicWriteFileSync(absolute, JSON.stringify(options.report) + '\n');
   return relPath;
 }
 

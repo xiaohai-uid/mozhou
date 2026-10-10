@@ -13,10 +13,10 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  writeFileSync,
 } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
+import { atomicWriteFileSync } from './atomic-write.js'
 import { packZip, unpackZip, type ZipEntry, C5_ZIP_LIMITS } from './zip-util.js'
 import { withBook } from './with-plane.js'
 
@@ -218,14 +218,16 @@ export function restoreBookBackup(archiveBuffer: Buffer, targetRoot: string): Re
     }
   }
 
-  // 4. 原子落盘写入新目录
+  // 4. 逐文件原子落盘（唯一临时名 + fsync + rename）：每个文件要么完整要么不存在。
+  //    注意目录整体**不是**原子的——进程在循环中崩溃仍会留下「缺文件」的部分目录，
+  //    异常路径的 rmSync 只在抛错时清理、不覆盖崩溃。单文件原子只消除「半份文件」。
   try {
     for (const [relPath, data] of fileMap.entries()) {
       if (relPath === 'manifest.json') continue
       const outPath = join(target, ...relPath.split('/'))
       const parent = join(outPath, '..')
       mkdirSync(parent, { recursive: true })
-      writeFileSync(outPath, data)
+      atomicWriteFileSync(outPath, data)
     }
 
     // 5. 借用句柄触发 openOrRebuild 重建 SQLite 投影；借完即还，不留常驻句柄

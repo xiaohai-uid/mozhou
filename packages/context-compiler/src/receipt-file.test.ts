@@ -10,7 +10,7 @@
  *   - loadReceipt 往返无损；listReceiptIds 字典序 = 时间序（INV-R4 扫描面）。
  * 全部 hermetic：临时目录 + 确定性夹具，零网络零时钟依赖（atIso 注入）。
  */
-import { mkdtempSync, existsSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
+import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, afterEach } from 'vitest'
@@ -170,6 +170,17 @@ describe('INV-R2 不可变凭证与存取', () => {
 
     expect(loadReceipt(root, receipt.id)).toEqual(receipt)
     expect(() => loadReceipt(root, 'rcpt_01JMISSING000000000MOZHOU')).toThrow(ReceiptNotFoundError)
+  })
+
+  it('原子落盘：receipts 目录不留任何 `.mozhou-tmp` 临时文件，落盘内容完整', () => {
+    const root = newBookRoot()
+    const receipt = assembleBudgetedContext(baseInput()).receipt
+    persistReceipt(root, receipt, { atIso: AT })
+
+    const receiptsDir = join(root, RECEIPTS_DIRNAME)
+    expect(readdirSync(receiptsDir).filter((name) => name.includes('.mozhou-tmp'))).toEqual([])
+    // 盘上文件 = 序列化纯函数产出（逐字节），证明写全、未被截断
+    expect(readFileSync(join(receiptsDir, `${receipt.id}.json`), 'utf8')).toBe(serializeReceiptFile(receipt))
   })
 
   it('listReceiptIds 字典序 = 时间序（ULID 单调）；空目录返回 []', () => {

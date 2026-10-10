@@ -7,8 +7,10 @@
  * - 数量与长度上限在写入前强制，超限显式报错（不静默截断、不静默丢数据）。
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 
 import { resolveDefaultDataRoot } from '../dataRoot.js'
 
@@ -100,10 +102,10 @@ export class MemoStore {
     const file = this.fileFor(userId)
     try {
       mkdirSync(join(file, '..'), { recursive: true })
-      const tmp = `${file}.tmp`
       const payload: MemoFileShape = { notes: [...notes] }
-      writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8')
-      renameSync(tmp, file)
+      // 原子落盘（唯一临时名 + fsync + rename）：并发写者不再互相截断同一 `.tmp`，
+      // 崩溃也不会留下半份 JSON。
+      atomicWriteFileSync(file, JSON.stringify(payload, null, 2))
     } catch (error) {
       throw new MemoPersistError(`write failed: ${(error as Error).message}`)
     }

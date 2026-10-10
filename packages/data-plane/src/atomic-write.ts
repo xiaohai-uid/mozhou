@@ -38,8 +38,11 @@ function newTmpPath(absolutePath: string): string {
 /**
  * 写入 = 独占创建同目录唯一临时文件 → 写全循环 → fsync → close → rename。
  * 失败路径只清理**本次调用拥有**的临时文件（自己的唯一名），绝不触碰他人文件。
+ *
+ * content 接受 string（按 UTF-8 编码）或 Buffer（逐字节原样落盘，供备份 zip、
+ * 恢复出的二进制文件等使用）；两者共用同一条唯一名 + fsync + rename 路径。
  */
-export function atomicWriteFileSync(absolutePath: string, content: string): void {
+export function atomicWriteFileSync(absolutePath: string, content: string | Buffer): void {
   const tmp = newTmpPath(absolutePath)
   let fd: number | undefined
   try {
@@ -74,8 +77,8 @@ export function atomicWriteFileSync(absolutePath: string, content: string): void
  * 单次调用零进展（返回 ≤0）即失败——继续重试只会空转，宁可显式报错走清理路径，
  * 也不留下被截断的半份临时内容。
  */
-function writeFullSync(fd: number, content: string): void {
-  const bytes = Buffer.from(content, 'utf8')
+function writeFullSync(fd: number, content: string | Buffer): void {
+  const bytes = typeof content === 'string' ? Buffer.from(content, 'utf8') : content
   let written = 0
   while (written < bytes.length) {
     const n = writeSync(fd, bytes, written, bytes.length - written)

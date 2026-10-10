@@ -69,6 +69,18 @@ describe('atomicWriteFileSync · 原子与耐久', () => {
     expect(readdirSync(root).filter((name) => name.includes(ATOMIC_TMP_SUFFIX))).toEqual([])
   })
 
+  it('Buffer 内容逐字节原样落盘（备份 zip / 二进制恢复共用同一路径）', () => {
+    const root = freshRoot()
+    const target = join(root, 'archive.bin')
+    // 覆盖 0x00–0xFF 全字节域：任何 UTF-8 往返都会破坏 >0x7F 的字节，故必须逐字节相等
+    const content = Buffer.from(Array.from({ length: 256 }, (_, i) => i))
+
+    atomicWriteFileSync(target, content)
+
+    expect(readFileSync(target).equals(content)).toBe(true)
+    expect(readdirSync(root).filter((name) => name.includes(ATOMIC_TMP_SUFFIX))).toEqual([])
+  })
+
   it('覆盖更长的旧内容时整份替换，不留旧尾巴', () => {
     const root = freshRoot()
     const target = join(root, 'c.md')

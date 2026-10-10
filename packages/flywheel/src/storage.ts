@@ -11,8 +11,9 @@
  * **R1 标量红线**：本模块只接受/只落盘标量形状（types.ts PreferenceObservation、
  * inference.ts PreferenceProfileState）；任何 P0 正文片段在源头就进不来。
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { atomicWriteFileSync } from '@mozhou/data-plane';
 import type { DimState, DriftEvent, PreferenceProfileState } from './inference.js';
 import { coldStartProfile } from './inference.js';
 import { OBSERVATION_KINDS, PREFERENCE_DIMS } from './types.js';
@@ -41,12 +42,17 @@ export function appendObservations(bookRoot: string, rows: readonly PreferenceOb
   appendFileSync(preferenceAbsPath(bookRoot, OBSERVATIONS_RELPATH), Buffer.from(payload, 'utf8'));
 }
 
-/** 整表重写（rebuild/自愈路径专用；读侧撕裂容忍使中断安全）。 */
+/**
+ * 整表重写（rebuild/自愈路径专用）。原子落盘：要么旧表完整、要么新表完整，
+ * 不会留下被截断的半份表。读侧的行级撕裂容忍只兜得住 append 的尾部撕裂，
+ * 兜不住整表截断——那会静默丢掉尾部观测（observations 是派生面，可从 pipeline
+ * 账本经 rebuildPreference / 冷启动自愈重折，但 resume 路径不会自动补回丢失的尾行）。
+ */
 export function rewriteObservations(bookRoot: string, rows: readonly PreferenceObservation[]): void {
   if (rows.length === 0) return;
   mkdirSync(preferenceAbsPath(bookRoot, PREFERENCE_DIR), { recursive: true });
   const payload = rows.map((row) => JSON.stringify(row) + '\n').join('');
-  writeFileSync(preferenceAbsPath(bookRoot, OBSERVATIONS_RELPATH), Buffer.from(payload, 'utf8'));
+  atomicWriteFileSync(preferenceAbsPath(bookRoot, OBSERVATIONS_RELPATH), payload);
 }
 
 function narrowObservation(row: Record<string, unknown>): PreferenceObservation | undefined {
@@ -147,7 +153,8 @@ export function hasMaterializedProfile(bookRoot: string): boolean {
 /** 写画像快照。调用方负责「首批观测后物化」门槛（obsCount>0 才许调）。 */
 export function saveProfileSnapshot(bookRoot: string, profile: PreferenceProfileState): void {
   mkdirSync(preferenceAbsPath(bookRoot, PREFERENCE_DIR), { recursive: true });
-  writeFileSync(preferenceAbsPath(bookRoot, PROFILE_RELPATH), Buffer.from(JSON.stringify(profile, null, 2), 'utf8'));
+  // 与 rewriteObservations 同口径：整份重写走原子落盘，崩溃不留半份 JSON。
+  atomicWriteFileSync(preferenceAbsPath(bookRoot, PROFILE_RELPATH), JSON.stringify(profile, null, 2));
 }
 
 function isFiniteNumber(value: unknown): value is number {

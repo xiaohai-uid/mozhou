@@ -9,12 +9,16 @@
  * - 严格执行 C5 资源限制与防穿越门。
  */
 import type { RouteHandler } from '../router.js'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { randomBytes } from 'node:crypto'
-import { createBookBackup, restoreBookBackup } from '@mozhou/data-plane'
+import { createHash, randomBytes } from 'node:crypto'
+import { atomicWriteFileSync, createBookBackup, restoreBookBackup } from '@mozhou/data-plane'
 import { defaultBookAccessManager, withBookWriteLock } from '../bookAccess.js'
 import { RequestBoundaryError } from '../security.js'
+
+function sha256Hex(data: Buffer): string {
+  return createHash('sha256').update(data).digest('hex')
+}
 
 export const backupRoutes: RouteHandler = async (req, res, { path, body, json, principal, bookRoot }) => {
   const dataRoot = defaultBookAccessManager.getDataRoot()
@@ -34,7 +38,16 @@ export const backupRoutes: RouteHandler = async (req, res, { path, body, json, p
       const result = await withBookWriteLock(root, () => createBookBackup(root), { timeoutMs: 60_000 })
       const backupId = 'bup_' + randomBytes(12).toString('hex')
       const backupFilePath = resolve(backupsDir, `${backupId}.zip`)
-      writeFileSync(backupFilePath, result.buffer)
+      // 原子落盘（唯一名 + fsync + rename）：崩溃/中断只可能「没有备份」，不会留下半份 zip。
+      atomicWriteFileSync(backupFilePath, result.buffer)
+
+      // 对外宣称的 sha256 必须描述盘上真实字节，而不是内存里的 result.buffer。
+      // 回读校验；不一致说明落盘异常，删除这份备份并报错，绝不发布一个哈希对不上的归档。
+      const onDisk = readFileSync(backupFilePath)
+      if (sha256Hex(onDisk) !== result.sha256) {
+        unlinkSync(backupFilePath)
+        throw new Error('backup archive failed on-disk sha256 verification')
+      }
 
       json(200, {
         ok: true,

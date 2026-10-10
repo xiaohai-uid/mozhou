@@ -4,7 +4,8 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -100,6 +101,10 @@ describe('作品归档备份与恢复路由 (T10)', () => {
     expect(resDownload.headers.get('Content-Type')).toBe('application/zip')
     const zipBytes = await resDownload.arrayBuffer()
     expect(zipBytes.byteLength).toBe(dataBackup.bytes)
+    // 对外宣称的 sha256 必须描述盘上/下载的真实字节，而不是内存缓冲
+    expect(createHash('sha256').update(Buffer.from(zipBytes)).digest('hex')).toBe(dataBackup.sha256)
+    // 原子落盘：备份目录不留任何 `.mozhou-tmp` 临时文件
+    expect(readdirSync(join(dataRoot, 'backups')).filter((n) => n.includes('.mozhou-tmp'))).toEqual([])
 
     // 3. 从备份恢复为新作品
     const resRestore = await fetch(`${base}/api/backups/restore`, {
