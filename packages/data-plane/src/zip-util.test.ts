@@ -64,6 +64,28 @@ describe('zip-util · C5 资源门', () => {
     ).toThrow(/C5_LIMIT_EXCEEDED/)
   })
 
+  it('stored 条目：谎报 uncompSize 仍按真实 data.length 核单文件上限', () => {
+    // store:true 强制方法 0（stored），声明值被改成 0 以绕过声明检查；
+    // stored 为 1:1，真实字节即 data.length，必须由真实值兜住单文件上限。
+    const payload = Buffer.alloc(64 * 1024, 0x63)
+    const honest = packZip([{ path: 'stored.bin', data: payload, store: true }])
+    const lied = patchCentralUncompSize(honest, 'stored.bin', 0)
+
+    expect(() =>
+      unpackZip(lied, { maxFiles: 10, maxTotalBytes: 1024 * 1024 * 1024, maxSingleFileBytes: 32 * 1024 }),
+    ).toThrow(/C5_LIMIT_EXCEEDED/)
+  })
+
+  it('stored 条目：真实大小恰等于单文件上限时放行（边界）', () => {
+    const size = 4096
+    const payload = Buffer.alloc(size, 0x64)
+    const zipped = packZip([{ path: 'stored.bin', data: payload, store: true }])
+
+    const files = unpackZip(zipped, { maxFiles: 10, maxTotalBytes: 1024 * 1024, maxSingleFileBytes: size })
+    expect(files).toHaveLength(1)
+    expect(files[0]?.data.length).toBe(size)
+  })
+
   it('诚实归档仍在既有上限内正常解包', () => {
     const zipped = packZip([
       { path: 'manifest.json', data: '{"schemaVersion":1}' },

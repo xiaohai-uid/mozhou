@@ -31,7 +31,6 @@ export const backupRoutes: RouteHandler = async (req, res, { path, body, json, p
   const backupsDir = defaultBookAccessManager.isHostedMode()
     ? resolve(dataRoot, 'users', backupOwnerId, 'backups')
     : resolve(dataRoot, 'backups')
-  mkdirSync(backupsDir, { recursive: true })
 
   /* ---- 1. 生成作品备份归档 ---- */
   if (path === '/api/backups' && req.method === 'POST') {
@@ -42,6 +41,9 @@ export const backupRoutes: RouteHandler = async (req, res, { path, body, json, p
     }
 
     try {
+      // 备份目录只在真正要落盘时创建：下载/恢复是纯读分支，未命中任何分支的请求更不应
+      // 因经过本 handler 而在数据根下产生目录副作用（只读请求不得建目录）。
+      mkdirSync(backupsDir, { recursive: true })
       // W2-3：备份是「一致性快照」，必须与书稿写入互斥——同一书稿锁内取快照。
       const result = await withBookWriteLock(root, () => createBookBackup(root), { timeoutMs: 60_000 })
       const backupId = 'bup_' + randomBytes(12).toString('hex')

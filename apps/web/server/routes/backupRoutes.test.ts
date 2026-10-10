@@ -5,7 +5,7 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -204,6 +204,26 @@ describe('作品归档备份与恢复路由 (T10)', () => {
     const dataMissing = (await resMissing.json()) as { ok: boolean; code: string }
     expect(dataMissing.ok).toBe(false)
     expect(dataMissing.code).toBe('BACKUP_NOT_FOUND')
+  })
+
+  // 只读请求不得因经过本 handler 而产生目录副作用：查询不存在的 backupId 走纯读分支。
+  it('只读请求不建备份目录：查询不存在的 backupId 返回 404 且不创建 backups 目录', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-backup-nosideeffect-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+
+    const base = await listen()
+    const backupsDir = join(dataRoot, 'backups')
+    // 前置断言：请求前该目录确实不存在（否则本用例不能证明副作用来自请求）。
+    expect(existsSync(backupsDir)).toBe(false)
+
+    const res = await fetch(`${base}/api/backups/download?backupId=bup_missing0000000000000000`)
+    expect(res.status).toBe(404)
+    const data = (await res.json()) as { ok: boolean; code: string }
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('BACKUP_NOT_FOUND')
+
+    expect(existsSync(backupsDir)).toBe(false)
   })
 
   // 历史遗留：POST 分支原子写 + 回读校验只防「新写坏」；盘上可能已有半份/截断 zip。

@@ -224,7 +224,12 @@ export function unpackZip(buf: Buffer, limits: ZipLimits = C5_ZIP_LIMITS): Unpac
 
     let data: Buffer
     if (compMethod === 0) {
+      // stored 为 1:1 无放大，但声明值 (uncompSize) 同样可被伪造：按真实字节再核一次
+      // 单文件上限，与 compressed 分支的 maxOutputLength 口径一致（上限取自既有配置）。
       data = rawData
+      if (data.length > limits.maxSingleFileBytes) {
+        throw new Error(`C5_LIMIT_EXCEEDED: entry "${fileName}" exceeds single file limit of ${limits.maxSingleFileBytes} bytes`)
+      }
     } else if (compMethod === 8) {
       // 真实输出上限：声明字段 (uncompSize) 可被伪造，绝不能作为内存分配依据。
       // maxOutputLength 由 zlib 在解压过程中强制，超限抛 ERR_BUFFER_TOO_LARGE，
