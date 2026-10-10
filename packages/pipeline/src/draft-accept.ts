@@ -14,13 +14,14 @@
  *   insert 在生成开始时选区位置插入（地址按 base 现场，编辑即冲突）。
  */
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   ChapterPhaseError,
   OPERATION_RECORD_VERSION,
   PreWriteHashMismatchError,
   ProseRevisionConflictError,
+  atomicWriteFileSync,
   findReplayableOperation,
   linkTaskOperation,
   proseChapterPath,
@@ -100,7 +101,9 @@ function readIntent(root: string, candidateId: string): AcceptIntent | null {
 
 function writeIntent(root: string, intent: AcceptIntent): void {
   mkdirSync(join(root, INTENT_DIR), { recursive: true })
-  writeFileSync(intentPath(root, intent.candidateId), JSON.stringify(intent, null, 2) + '\n')
+  // 原子写：该文件是崩溃恢复的唯一凭证，裸 writeFileSync 撕裂后 JSON.parse 会失败，
+  // 候选此后每次采纳都误报 BASE_STALE（需手工删文件才能恢复）。与同目录更新路径一致。
+  atomicWriteFileSync(intentPath(root, intent.candidateId), JSON.stringify(intent, null, 2) + '\n')
 }
 
 /** 正文 raw 文件 sha256（写后指纹；候选接受结果回给 UI 的 after.sha256 同源）。 */

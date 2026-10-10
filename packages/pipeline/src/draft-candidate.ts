@@ -9,7 +9,7 @@
  * - owner/权限裁决在 HTTP 层（bookAccess），本模块不含权限。
  */
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { atomicWriteFileSync } from '@mozhou/data-plane'
 
@@ -267,7 +267,9 @@ export function createDraftCandidate(root: string, request: DraftCandidateReques
     throw new CandidateError('CANDIDATE_EXISTS', `CANDIDATE_EXISTS: candidate ${request.id} already exists`)
   }
   mkdirSync(join(root, CANDIDATE_DIR), { recursive: true })
-  writeFileSync(path, JSON.stringify(payload, null, 2) + '\n')
+  // 原子写：创建路径此前漏改（同文件的更新路径 :399 已是原子写）。撕裂记录会让
+  // readDraftCandidate 的 JSON.parse 抛错，进而 listDraftCandidates 整表失败（整章 500）。
+  atomicWriteFileSync(path, JSON.stringify(payload, null, 2) + '\n')
   return payload
 }
 
