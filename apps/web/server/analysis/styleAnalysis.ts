@@ -7,8 +7,9 @@
  * - 提供版本化持久化到书根 (.mozhou/style-profile.json)；
  * - 下一次生成时，装配凭据 ContextReceipt 必须记录 appliedStyleVersion。
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 import { evaluateStyleMetrics, type StyleMetrics } from '@mozhou/quality-engine'
 import { RequestBoundaryError, assertSafeBookRoot } from '../security.js'
 
@@ -113,7 +114,9 @@ export function saveBookStyleProfile(
     summary: profile.summary ?? '用户确认的文风画像',
   }
 
-  writeFileSync(profilePath, JSON.stringify(saved, null, 2) + '\n', 'utf8')
+  // 原子落盘：整份重写要么旧画像完整、要么新画像完整。读侧 loadBookStyleProfile 对
+  // 解析失败返回 null（静默），非原子写会让一次崩溃静默退化成「画像不存在」。
+  atomicWriteFileSync(profilePath, JSON.stringify(saved, null, 2) + '\n')
   return saved
 }
 
