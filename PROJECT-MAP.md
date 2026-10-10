@@ -505,6 +505,15 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：DNS rebinding（只看字面 host，防护归请求层，已注释声明）；isPrivateOrReservedAddress 对非 IP 文本 fail closed（调用方须先 isIP 门控）；重复度门只比总量（逐格式稀释，登记技术债）；readDraftState 撕裂仍抛（只消除来源）；真权限拒绝 EACCES/EBUSY 未构造（只覆盖 EISDIR）；R5 依赖漏洞结论（无 audit 端点）；安装器签名；未推送（未跑 act）；Mimosa 完整扫描；真实微信/支付宝联调；naming 502 真实模型。
 - **遗留/风险**：check:term-map 与 check:architecture 因并行会话未提交改动为 STALE，非本变更因果范围。
 
+### CHG-20261010-05 — 2026-10-10 — 第四轮复核发现收口 + 依赖漏洞结论取得（R5 结案），ZCode 执行
+
+- **需求来源**：第四轮独立对抗复核（**首次判 `release`**，无数据丢失级或安全绕过级阻断）报出的 1 项中等 + 3 项低问题；以及主会话随后自做的全仓同类缺陷清扫（第五批）。证据见 [docs/changes/CHG-20261010-05-round4-closure-and-dependency-audit.md](docs/changes/CHG-20261010-05-round4-closure-and-dependency-audit.md)。
+- **实际变更**：7ca8dd7 `isPrivateOrReservedIpv4` 掩码收紧到文档段逐段对齐（原把 192.0/16、198.51/16、203.0/16 整段拒，误拦真实公网地址 192.0.1.1/198.51.1.1/203.0.1.1）；8d82eed compile-step 钉版暂存、user-edit-step 失败记忆、proposal-step/proposal-port 固定 `.tmp` 全改共享原子写，撕裂回读改抛可操作错误（不自愈：编译时快照不可得，静默丢弃会让影响分析静默失明）。
+- **R5 结案**：`pnpm audit --registry=https://registry.npmjs.org` → 0 high / 0 critical、4 moderate（fast-uri 经 ajv；brace-expansion ×2 经 eslint/typescript-eslint；sprintf-js 经 fastembed→onnxruntime-node）。**独立印证 CHG-17 依赖升级确已消掉 act 当初报的 1 high + 2 critical**。不等于「无漏洞」，也不等于已修那 4 个 moderate。
+- **验收（实跑）**：主会话直调 `isPrivateOrReservedIpv4` 实测 15 拒 / 10 放行全对（含 198.20.0.1 不被多拦）；web 段 crawlers+llm+ssrfGuard 197 例、pipeline 260 例（+4）通过；pipeline tsc exit 0；原子写临时名核验为 `.mozhou-tmp-<token>`，故「无残留」断言非恒真空转。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：第五批 5 类（backupRoutes 备份 zip 裸写且对外 sha256 取自内存 buffer、book-backup restore 注释与事实不符、flywheel storage 整表重写、memoStore/receipt-file/report-store 固定 `.tmp`）收口待落账；并发写者互截仅单进程内由原语保证（无多进程/掉电实测）；4 个 moderate 依赖漏洞未修；沿用安装器签名、未推送（未跑 act）、Mimosa 完整扫描（advisory）、真实微信/支付宝联调、naming 502 真实模型。
+- **遗留/风险**：check:term-map 与 check:architecture 因并行会话未提交改动为 STALE，非本变更因果范围；`user-edit-step.ts(.test.ts)` 含停摆工作线未提交的术语改动，提交用「HEAD 版本 + 只套本轮 3+2 处改动」精确暂存，已核验暂存差异中他人术语行数为 0。
+
 
 
 
