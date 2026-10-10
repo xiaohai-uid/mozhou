@@ -317,7 +317,7 @@ async function makeStreamEngine(
 
   // mock 开关族：'mock' 回吐 prompt 切块（既有演示/测试开关）。
   // 'mock-empty' 只在**非生产**环境成立：它模拟真实上游「HTTP 200 但零 delta」的静默空输出形态
-  // （commit 0693776 记录），供空流守卫的 HTTP 级回归测试使用。生产构建下该值不生效，
+  // （commit 0693776 记录），供空流门的 HTTP 级回归测试使用。生产构建下该值不生效，
   // 免得出现「能力探针报可用、但每次生成都失败」的假可用（AGENTS.md §4.13-4.14）。
   const emptyMock = process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock-empty' && process.env['NODE_ENV'] !== 'production'
   const explicitMock = isMockDraftProviderMode(process.env)
@@ -461,7 +461,7 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         // advance 只移步光标、不执行步内工作；而 web 侧草稿步的唯一工作入口
         // /api/draft.stream 有自己的 provider 前置闸。若在这里放行一个
         // 「无任何 provider」的会话进入 draft 步，作者会在 review→user_edit 撞上
-        // QualityReviewNotPassError（verdict '<none>'）——一个 fail-closed 守卫的
+        // QualityReviewNotPassError（verdict '<none>'）——一个 fail-closed 门的
         // 内部术语错误，且会话除了 abandon 无路可走。
         // 语义与 draft.stream 前置闸（本文件 :558 注释）对齐：仅
         // no_provider_configured 笼统收口并拒绝推进；配了但解析不出

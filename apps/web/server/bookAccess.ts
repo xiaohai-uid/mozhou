@@ -96,7 +96,7 @@ function isProcessAlive(pid: number): boolean {
 }
 
 /**
- * dataRoot 进程级启动守卫。
+ * dataRoot 进程级启动门。
  *
  * W2-2 修正两处既有缺陷：
  * 1. 旧实现用 `openSync(lockPath, 'w')`——截断式且**非独占**，已改为 `'wx'`（已存在即失败）；
@@ -104,7 +104,7 @@ function isProcessAlive(pid: number): boolean {
  *    不在解锁后删除并重建同名文件」相反，已去掉删除；文件被就地接管（`'r+'` + 截断改写）。
  *
  * 说明：真正的**每书**排他由 platform/writerLock.ts 的命名管道锁承担（W2-2 新增）；
- * 本类只是「同一 dataRoot 不并发起两个服务实例」的启动守卫，其判定含 PID 存活启发式，
+ * 本类只是「同一 dataRoot 不并发起两个服务实例」的启动门，其判定含 PID 存活启发式，
  * 因此保留其既有同步签名与 DATA_ROOT_LOCKED 错误语义。
  */
 export class DataRootProcessLock {

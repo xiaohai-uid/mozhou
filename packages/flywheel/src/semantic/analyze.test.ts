@@ -1,7 +1,7 @@
 /**
  * T28 语义层骨架测试（#69；t66 D08/D11/D13/D15）。
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -58,6 +58,9 @@ describe('语义层骨架 · T28', () => {
     expect(report.anchor.receiptId).toBe('rcpt_abc')
     expect(report.verdict).toBe('ok')
     expect(report.affectedRefs).toEqual([{ chapterIndex: 2, changeSummaryDigest: 'dig_2' }])
+    // 原子落盘：同目录不得残留任何 `.mozhou-tmp` 临时文件
+    const dir = join(root, '.mozhou/semantic-analysis')
+    expect(readdirSync(dir).filter((name) => name.includes('.mozhou-tmp'))).toEqual([])
   })
 
   it('预算门：contextTokens 超 INPUT_TOKEN_CAP → refusal(budget_exceeded)、零文件', async () => {

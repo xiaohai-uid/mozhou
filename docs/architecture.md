@@ -13,7 +13,7 @@
 | `@mozhou/pipeline` | `packages/pipeline` | 57 | 18022 | 32 | 9472 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/data-plane` | `packages/data-plane` | 60 | 15541 | 27 | 6951 | `@mozhou/kernel` |
 | `@mozhou/context-compiler` | `packages/context-compiler` | 20 | 8082 | 10 | 3567 | `@mozhou/data-plane`, `@mozhou/kernel` |
-| `@mozhou/flywheel` | `packages/flywheel` | 36 | 7166 | 14 | 2944 | `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
+| `@mozhou/flywheel` | `packages/flywheel` | 36 | 7169 | 14 | 2947 | `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/runtime` | `packages/runtime` | 29 | 4444 | 11 | 1848 | `@mozhou/data-plane`, `@mozhou/kernel` |
 | `@mozhou/kernel` | `packages/kernel` | 16 | 3248 | 7 | 942 | — |
 | `@mozhou/quality-engine` | `packages/quality-engine` | 27 | 3071 | 12 | 1142 | — |

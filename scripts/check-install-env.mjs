@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * 安装环境守卫（实现票 #18 / T8b-1；T9 风险 R1）：
+ * 安装环境门（实现票 #18 / T8b-1；T9 风险 R1）：
  * onnxruntime-node 的 postinstall 默认强拉 GPU 版二进制（约 250MB），无 CUDA
  * 工具链的机器在解压时失败并整体回滚安装。唯一受支持取值是
  * ONNXRUNTIME_NODE_INSTALL_CUDA=skip——墨舟为纯本地 CPU 推理（P0），不需要
- * CUDA 二进制。本守卫挂在根 preinstall，先于依赖 postinstall 执行，把晦涩的
+ * CUDA 二进制。本门挂在根 preinstall，先于依赖 postinstall 执行，把晦涩的
  * nvcc 解压报错变成一行可执行的修复指令。运行期兜底见
  * packages/context-compiler/src/embedding.ts 的 ensureCudaSkipEnv()。
  */

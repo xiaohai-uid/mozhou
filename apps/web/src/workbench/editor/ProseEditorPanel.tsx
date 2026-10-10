@@ -137,7 +137,7 @@ function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEdit
     setText(snapshot.body)
   }, [draftKey, snapshot])
 
-  // 防误关丢稿守卫：正文处于未保存（dirty）状态时拦截页面卸载
+  // 丢稿门：正文处于未保存（dirty）状态时拦截页面卸载
   useEffect(() => {
     if (typeof window === 'undefined' || draftKey === null) return
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -416,7 +416,7 @@ function ProseEditorSession({ book, chapterIndex, onSelectionChange }: ProseEdit
     }
   }, [book, chapterIndex, doSave])
 
-  /** 显式重开定稿（复用数据平面 reopenChapter：写前哈希 + ChapterReopened 事件 + 基线刷新）。 */
+  /** 显式重开定稿（复用数据面 reopenChapter：写前哈希 + ChapterReopened 事件 + 基线刷新）。 */
   const reopenCommitted = useCallback(async (): Promise<void> => {
     if (book === null) return
     setSaveState({ kind: 'busy', text: '重开中…' })

@@ -38,7 +38,7 @@ import {
   runFinalExtract,
   runFlywheelRecord,
 } from './index.js';
-// assertSessionStartable 是 session 模块的公共守卫，未在 index 重导出（与 resubmit.ts 同源用法）
+// assertSessionStartable 是 session 模块的公共门，未在 index 重导出（与 resubmit.ts 同源用法）
 import { assertSessionStartable } from './session.js';
 import { markProposalConsumed } from './proposal-step.js';
 
@@ -223,7 +223,7 @@ describe('S9 重提交入口', () => {
     expect(() =>
       requestResubmit({ bus, root: dir, chapterIndex: 2, newTaskRef: () => 'tsk_rs_z' }),
     ).toThrow(GlobalSingleFlightError);
-    // 守卫在翻相位之前：正文相位原封未动
+    // 该门在翻相位之前：正文相位原封未动
     expect(readProseChapter(dir, proseChapterPath(2)).phase).toBe('committed');
   });
 
@@ -409,7 +409,7 @@ describe('S9 收口 · 作废后该章可再次重提交（不残留锁）', () 
  *      assertSessionStartable 不再抛错、别章 session.start 成功（单飞真正释放）；
  *   2. 跨请求配对：abandon 用新 PublishBus 实例也能成功（adoptOpenHeads 认领悬挂 head，
  *      否则 PAIRING_TAIL_WITHOUT_HEAD）；
- *   3. 从非末步调用合法（prepare / draft 中途），对比 finish() 的步进守卫；
+ *   3. 从非末步调用合法（prepare / draft 中途），对比 finish() 的步进门；
  *   4. 留痕可观测：TaskFinished 带 outcome='abandoned' + reason，配对 head 闭合；
  *   5. 失败路径：空 reason 拒；二次作废拒；finish 之后拒；markCommitted（本会话真完成）
  *      之后拒——作废是「放弃未完成」，不是「抹掉完成」；
@@ -504,12 +504,12 @@ describe('S9 收口 · abandon 关闭活动窗口并释放全局单飞', () => {
     expect(taskEventTypes(root)).toEqual(['TaskStarted', 'TaskFinished']);
   });
 
-  it('从非末步调用合法（prepare / draft 中途），对比 finish() 的步进守卫', () => {
+  it('从非末步调用合法（prepare / draft 中途），对比 finish() 的步进门', () => {
     // 刚开卷即作废（prepare）
     const rootA = ledgerOnlyRoot();
     const atPrepare = ChapterProductionSession.start(abandonDeps(rootA, 2, 'tsk_ab_prepare'));
     expect(atPrepare.currentStep).toBe('prepare');
-    // finish() 在此步被步进守卫拒（作废的对照组）
+    // finish() 在此步被步进门拒（作废的对照组）
     expect(() => atPrepare.finish()).toThrow(/requires current step 'flywheel_record'/);
     expect(() => atPrepare.abandon('author_abandoned')).not.toThrow();
     expect(findOpenSessionWindow(readPipelineLedger(rootA))).toBeNull();

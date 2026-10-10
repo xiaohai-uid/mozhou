@@ -5,7 +5,7 @@
  * 职责拆分（本项交付的边界）：
  *   - /api/chapter.reopen  = 作者编辑用的**可重复**底层重开（写前哈希 + ChapterReopened
  *     事件 + 基线刷新），**不开会话窗口**——它不得被重提交的会话语义污染；
- *   - /api/chapter.resubmit = S9 重提交：committed 前置守卫 → 新会话窗口（新 taskRef、
+ *   - /api/chapter.resubmit = S9 重提交：committed 前置门 → 新会话窗口（新 taskRef、
  *     光标 prepare、V1 十步全量重走）→ 重提交期间的真相锚（事件行锚，不读已翻 draft
  *     的正文文件）。
  *
@@ -18,13 +18,13 @@
  *   4. resubmit 盘上无此章 → 404 CHAPTER_MISSING，零副作用；
  *   5. resubmit 外部改盘 → 409 PROSE_EXTERNAL_CHANGE，相位不翻转、零会话开卷（拒绝零副作用）；
  *   6. resubmit 单飞冲突（别章已占全局活动窗口）→ 409 RESUBMIT_SESSION_CONFLICT，
- *      被重提交章保持 committed（守卫先于翻相位）；
+ *      被重提交章保持 committed（该门先于翻相位）；
  *   7. resubmit 账实不符（相位 committed 但事件流无匹配 ChapterCommitted 锚）→ 500，
  *      相位未翻、窗口未开、绝不返回假真相锚；
  *   8. 拒绝路径不留孤儿窗口（不变量）：被拒的 resubmit 之后别章 /api/session.open 仍 200，
  *      同章修好外部改动后重试仍 200——「拒绝零副作用」是可重试性的前提；
  *   9. 成功重提交不挡作者 reopen 旅程（不变量）：重提交窗口占的是会话单飞，reopen 走
- *      数据平面相位机、与会话账本解耦，故别章 reopen 仍 200；
+ *      数据面相位机、与会话账本解耦，故别章 reopen 仍 200；
  *  10. 平面句柄即用即关（不变量）：成功与失败路径都 close() 掉本次开的 LocalDataPlane。
  *
  * 已知依赖（**故意不写成不变量**）：成功重提交开出的会话窗口按 S9 由本会话第 9 步
@@ -92,7 +92,7 @@ async function makeBook(): Promise<{ base: string; root: string }> {
   return { base, root: dir }
 }
 
-/** 直接经数据平面提交一章（与既有 proseRoutes 用例同款夹具：写 ChapterCommitted 事件行）。 */
+/** 直接经数据面提交一章（与既有 proseRoutes 用例同款夹具：写 ChapterCommitted 事件行）。 */
 function commitChapter(root: string, chapterIndex = 1, prose = FINAL): { commitId: string; contentSha256: string } {
   const plane = LocalDataPlane.openOrRebuild(root)
   try {
@@ -158,7 +158,7 @@ describe('POST /api/chapter.reopen · 作者编辑用重开保持可重复（本
   })
 })
 
-describe('POST /api/chapter.resubmit · 步 9 S9 重提交（守卫 / 新会话窗口 / 真相锚）', () => {
+describe('POST /api/chapter.resubmit · 步 9 S9 重提交（前置门 / 新会话窗口 / 真相锚）', () => {
   it('committed 章：翻回 draft + 开新会话窗口 + 返回事件行真相锚（锚不来自已翻 draft 的正文文件）', async () => {
     const { base, root } = await makeBook()
     const commit = commitChapter(root)
@@ -198,7 +198,7 @@ describe('POST /api/chapter.resubmit · 步 9 S9 重提交（守卫 / 新会话�
     expect(readFileSync(join(root, RUNTIME_EVENTS_PATH), 'utf8')).toContain(commit.commitId)
   })
 
-  it('草稿章：409 CHAPTER_NOT_COMMITTED 且零盘面副作用（守卫先于开卷/翻相位）', async () => {
+  it('草稿章：409 CHAPTER_NOT_COMMITTED 且零盘面副作用（该门先于开卷/翻相位）', async () => {
     const { base, root } = await makeBook()
     const saved = await post(base, '/api/chapter.prose.save', { root, chapterIndex: 1, body: '草稿正文。', expectedRevision: null })
     expect(saved.status).toBe(200)
@@ -275,7 +275,7 @@ describe('POST /api/chapter.resubmit · 步 9 S9 重提交（守卫 / 新会话�
     const resubmitted = await post(base, '/api/chapter.resubmit', { root, chapterIndex: 1 })
     expect(resubmitted.status).toBe(200)
 
-    // 重提交窗口占的是会话单飞；reopen 走数据平面相位机、不查会话账本 ⇒ 作者编辑旅程不受影响
+    // 重提交窗口占的是会话单飞；reopen 走数据面相位机、不查会话账本 ⇒ 作者编辑旅程不受影响
     const other = await post(base, '/api/chapter.reopen', { root, chapterIndex: 2 })
     expect(other.status).toBe(200)
     expect(readProseChapter(root, proseChapterPath(2)).phase).toBe('draft')

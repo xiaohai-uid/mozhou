@@ -16,7 +16,7 @@ export class RequestBoundaryError extends Error {
 }
 
 /**
- * 统一文件系统路径守卫（Path Guard）：
+ * 统一文件系统路径检查（Path Guard）：
  * 1. 验证既有书根的合法性（存在、是目录、包含正典标记 book.json）；
  * 2. 避免客户端传入恶意相对路径或任意目录穿越。
  */

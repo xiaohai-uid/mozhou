@@ -6,7 +6,7 @@
  * /api/draft.stream 有 provider 前置闸。无任何 provider 时 advance 能把会话
  * 从 prepare 一路推到 review（盘上无正文、无编译凭证），最后在
  * review→user_edit 撞 QualityReviewNotPassError（verdict '<none>'）——
- * fail-closed 守卫的内部术语错误，会话除 abandon 外无路可走。
+ * fail-closed 门的内部术语错误，会话除 abandon 外无路可走。
  *
  * 修复语义：与 draft.stream 前置闸同缝——仅 no_provider_configured 在
  * 进入 draft 步前以 PROVIDER_UNAVAILABLE 拒绝；配置类病因照常放行。
@@ -114,11 +114,11 @@ async function openSessionAt(dataRoot: string): Promise<Journey> {
   return { base, root }
 }
 
-describe('/api/session.advance 无 provider 守卫', () => {
+describe('/api/session.advance 无 provider 门', () => {
   it('无任何 provider：prepare→compile 可推进；compile→draft 被 PROVIDER_UNAVAILABLE 拒绝且会话停在 compile', async () => {
     const { base, root } = await openSessionAt(makeDataRoot())
 
-    // compile 步不依赖 provider：照常推进（守卫不得误伤其他步）
+    // compile 步不依赖 provider：照常推进（该门不得误伤其他步）
     const toCompile = await postJson(base, '/api/session.advance', { root, chapterIndex: 1 })
     expect(toCompile.status).toBe(200)
     expect(toCompile.data).toMatchObject({ ok: true, previousStep: 'prepare', currentStep: 'compile' })
@@ -140,7 +140,7 @@ describe('/api/session.advance 无 provider 守卫', () => {
     expect(retry.data).toMatchObject({ ok: false, code: 'PROVIDER_UNAVAILABLE' })
   })
 
-  it('MOZHOU_DRAFT_PROVIDER=mock：compile→draft 照常放行（守卫不误伤显式 mock）', async () => {
+  it('MOZHOU_DRAFT_PROVIDER=mock：compile→draft 照常放行（该门不误伤显式 mock）', async () => {
     process.env.MOZHOU_DRAFT_PROVIDER = 'mock'
     const { base, root } = await openSessionAt(makeDataRoot())
 

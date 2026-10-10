@@ -151,7 +151,7 @@ describe('装载封装的纯本地失败模式', () => {
   })
 })
 
-describe('ONNXRUNTIME_NODE_INSTALL_CUDA 环境守卫', () => {
+describe('ONNXRUNTIME_NODE_INSTALL_CUDA 环境门', () => {
   it('defaults to skip when unset and preserves explicit values', () => {
     const previous = process.env.ONNXRUNTIME_NODE_INSTALL_CUDA
     try {

@@ -96,7 +96,7 @@ export class EmptyRecallError extends Error {
  * -------------------------------------------------------------------------- */
 
 /** 编译输入的目录卡最小面（data-plane EntityCardScan 结构性满足；fileRel 仅用于
- *  Research 区隔离守卫，缺省视为非研究区）。 */
+ *  Research 区门，缺省视为非研究区）。 */
 export interface CompileCard {
   readonly ref: EntityRef
   readonly name: string
@@ -106,7 +106,7 @@ export interface CompileCard {
   readonly excludedPhrases?: readonly string[]
   /** 进 prompt 的压缩面；null/缺省 = 空 AI 面（brief 缺省回退归数据面读取层）。 */
   readonly brief?: string | null
-  /** 书根相对 POSIX 路径（EntityCardScan 自带；Research 区守卫消费）。 */
+  /** 书根相对 POSIX 路径（EntityCardScan 自带；Research 区门消费）。 */
   readonly fileRel?: string
 }
 
@@ -222,7 +222,7 @@ const mintReceiptId = (): ContextReceiptId => `rcpt_${newUlid()}` as ContextRece
 
 /**
  * 编译一章的完整上下文并落盘服务端 Receipt：
- *   Research 守卫 → 四档激活 → 三通道召回 → 空召回门 → 预算装配 → persistReceipt。
+ *   Research 区门 → 四档激活 → 三通道召回 → 空召回门 → 预算装配 → persistReceipt。
  * 任一失败路径显式抛错（见模块头），绝不产出半成品凭证。
  */
 export async function compile(input: CompileInput): Promise<CompileResult> {

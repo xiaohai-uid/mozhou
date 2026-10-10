@@ -10,10 +10,10 @@
  * 覆盖的失败路径与不变量：
  *   - 无覆盖层文件 ⇒ 与接线前逐字节一致（providerId 仍 'deepseek'，model/端点仍是 BYOK 值）；
  *   - **providerId 决定实际出站端点**：BYOK 指向诱饵上游、注册表指向真上游时，请求必须落在
- *     注册表那家，账本 providerId 与之一致（这是本票要消灭的「账本说 X、请求发 Y」的反例守卫）；
+ *     注册表那家，账本 providerId 与之一致（这是本票要消灭的「账本说 X、请求发 Y」的反例检查）；
  *   - **注册表独立可用**：BYOK 环境变量全部清空、只配 providers 注册表时 /api/draft.stream
  *     也要成功出流，账本 providerId 是注册表那家（hasDraftProvider 判据认注册表）；
- *   - 反向守卫：覆盖层缺失且 BYOK 全缺 ⇒ 仍 200 JSON PROVIDER_UNAVAILABLE（判据放宽不等于放行）；
+ *   - 反向检查：覆盖层缺失且 BYOK 全缺 ⇒ 仍 200 JSON PROVIDER_UNAVAILABLE（判据放宽不等于放行）；
  *   - UI 声明一致：/api/capabilities 与 /api/capability-square 的 providerAvailable 与
  *     「能不能真的生成」同源（注册表可解析 ⇒ true；密钥缺失/覆盖层缺失 ⇒ false）；
  *   - 叶子声明 model ⇒ 上游收到该 model，且留痕日志出现；
@@ -23,7 +23,7 @@
  *   - 多叶子未指定 tier ⇒ 流以 error 帧收口、消息含键路径、候选与补救操作位，上游零请求；
  *   - 叶子声明 api_key_ref ⇒ 显式拒绝（密钥只来自注册表 apiKeyEnv），上游零请求；
  *   - 显式 tier 缺失 ⇒ 同上，消息含 CHAPTER_DRAFTING.<tier>；
- *   - 非法配置（明文 apiKey）⇒ 显式 TierConfigError 且消息含键路径、不回显密钥（防静默回落守卫）。
+ *   - 非法配置（明文 apiKey）⇒ 显式 TierConfigError 且消息含键路径、不回显密钥（防静默回落门）。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -434,7 +434,7 @@ describe('分级模型路由 · 注册表独立可用（不配 BYOK 也能生成
     expect(ledgerProviderIds(root)).toEqual(['glm'])
   })
 
-  it('反向守卫：覆盖层缺失且 BYOK 全缺 ⇒ 仍 200 JSON PROVIDER_UNAVAILABLE（非流式），账本零事件', async () => {
+  it('反向检查：覆盖层缺失且 BYOK 全缺 ⇒ 仍 200 JSON PROVIDER_UNAVAILABLE（非流式），账本零事件', async () => {
     armRegistryOnly()
     process.env[TIER_CONFIG_ENV] = join(tmp('mozhou-tier-route-none-'), 'absent.yaml')
     const base = await startApi()
@@ -497,7 +497,7 @@ describe('分级模型路由 · 注册表独立可用（不配 BYOK 也能生成
     delete process.env[TIER_KEY_ENV]
     expect((await postJson(base, '/api/capabilities')).providerAvailable).toBe(false)
 
-    // 覆盖层缺失 + BYOK 缺失 ⇒ false（与流式闸同源的反向守卫）
+    // 覆盖层缺失 + BYOK 缺失 ⇒ false（与流式闸同源的反向检查）
     process.env[TIER_KEY_ENV] = TIER_KEY_VALUE
     process.env[TIER_CONFIG_ENV] = join(tmp('mozhou-tier-route-none-'), 'absent.yaml')
     expect((await postJson(base, '/api/capabilities')).providerAvailable).toBe(false)
@@ -627,7 +627,7 @@ describe('分级模型路由 · 歧义与非法配置 fail-fast', () => {
     const upstream = await startUpstream()
     armRealProvider(upstream)
     // 生产入口读配置后，非法配置必须显式失败而不是静默回落到旧行为。选「明文密钥」这条
-    // 做守卫：它同时证明密钥扫描在生成路径上生效、且报错不回显密钥本体。
+    // 做检查：它同时证明密钥扫描在生成路径上生效、且报错不回显密钥本体。
     const secret = 'sk-tier-route-leak'
     process.env[TIER_CONFIG_ENV] = writeConfig(
       'leak.yaml',

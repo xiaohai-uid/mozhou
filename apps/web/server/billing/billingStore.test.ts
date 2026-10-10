@@ -61,7 +61,7 @@ describe('BillingStore 订单与事务履约 (T14)', () => {
     store.close()
   })
 
-  it('单事务入账与履约：并发重复通知幂等处理，grants_once_per_order 守卫唯一权益', () => {
+  it('单事务入账与履约：并发重复通知幂等处理，grants_once_per_order 唯一性门', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-billing-fulfill-'))
     tempDirs.push(dir)
     const store = new BillingStore()

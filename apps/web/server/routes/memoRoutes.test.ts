@@ -9,7 +9,7 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -69,6 +69,11 @@ describe('POST /api/memo（备忘录 · .scratch/mozhou-mvp/issues/22-openwrite-
     const note = created.payload['note'] as { id: string; title: string; content: string }
     expect(note.title).toBe('第三章钩子')
     expect(typeof note.id).toBe('string')
+
+    // 原子落盘：盘上是完整 JSON（含新便签），且 memo 目录不留 `.mozhou-tmp` 残留
+    const onDisk = JSON.parse(readFileSync(memoFileFor('local_user'), 'utf8')) as { notes: { id: string }[] }
+    expect(onDisk.notes.map((n) => n.id)).toContain(note.id)
+    expect(readdirSync(join(root, 'memo')).filter((n) => n.includes('.mozhou-tmp'))).toEqual([])
 
     const listed = await call(base, { action: 'list' })
     expect(listed.status).toBe(200)

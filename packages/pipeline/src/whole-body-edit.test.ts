@@ -77,7 +77,7 @@ function authorEditEvents(root: string): DomainEvent[] {
 
 /**
  * 调用方侧块形：发布侧克隆块盖的 removedText 是**步内产出**（t52:B2），
- * validateBlock 镜像守卫拒调用方携带——复算不变量前必须剥掉盖章（同 recordUserEdit
+ * validateBlock 镜像门拒调用方携带——复算不变量前必须剥掉盖章（同 recordUserEdit
  * 的请求侧/发布侧两形纪律）。
  */
 function callerSide(blocks: readonly EditOperationBlock[]): EditOperationBlock[] {
@@ -158,7 +158,7 @@ describe('recordWholeBodyAuthorEdit · 块推导不变量', () => {
     expect(outcome.blocks[0]).toMatchObject({ op: 'replace', paragraphStart: 1000, paragraphEnd: 1000 });
   });
 
-  it('delete 块不带 replacementText、insert 块不带 removedText（块形状与步内守卫同源）', () => {
+  it('delete 块不带 replacementText、insert 块不带 removedText（块形状与步内门同源）', () => {
     const root = hermeticBook();
     const deletion = recordWholeBodyAuthorEdit(request(root, 'A\nB\nC\n', 'A\nC\n'));
     expect(deletion.blocks[0]).toMatchObject({ op: 'delete', paragraphStart: 2, paragraphEnd: 2, removedText: 'B' });
@@ -242,7 +242,7 @@ describe('recordWholeBodyAuthorEdit · 窗口累计（窗口键只认提交 revi
     const first = recordWholeBodyAuthorEdit(request(root, '', '他走了1步。他走了2步。\n', 1));
     expect(first.published).toBe(true);
 
-    // 原样重存：revision 照常 +1（数据平面无条件步进），本次增量为空
+    // 原样重存：revision 照常 +1（数据面无条件步进），本次增量为空
     const second = recordWholeBodyAuthorEdit(request(root, '他走了1步。他走了2步。\n', '他走了1步。他走了2步。\n', 2));
     expect(second.published).toBe(true);
     expect(second.blocks).toEqual(first.blocks); // 累计链 = 上一链（本次无增量）
@@ -283,7 +283,7 @@ describe('recordWholeBodyAuthorEdit · 窗口累计（窗口键只认提交 revi
     expect(second.blocks).toHaveLength(1); // 上一窗口已闭合：只有本次增量
   });
 
-  it('链密度守卫：中间 revision 缺账（外部改盘/落账失败）时不累积陈旧块', () => {
+  it('链密度门：中间 revision 缺账（外部改盘/落账失败）时不累积陈旧块', () => {
     const root = hermeticBook();
     recordWholeBodyAuthorEdit(request(root, '', '第一行。\n', 1));
     // 本次保存 revision=3 ⇒ 前一 revision 应为 2，账上却只有 rev1 ⇒ 链不密 ⇒ 宁缺不假
@@ -292,7 +292,7 @@ describe('recordWholeBodyAuthorEdit · 窗口累计（窗口键只认提交 revi
     expect(second.blocks).toHaveLength(1);
   });
 
-  it('账本坏块守卫：不可复用块不进入新事件（宁缺不假）', () => {
+  it('账本坏块门：不可复用块不进入新事件（宁缺不假）', () => {
     const root = hermeticBook();
     appendTaskRow(root, {
       type: 'UserEditRecorded', taskRef: 'web_commit_ch1_rev1', chapterIndex: 1,
@@ -303,6 +303,6 @@ describe('recordWholeBodyAuthorEdit · 窗口累计（窗口键只认提交 revi
     });
     const second = recordWholeBodyAuthorEdit(request(root, '第一行。\n', '第一行。\n第二行。\n', 2));
     expect(second.published).toBe(true);
-    expect(second.blocks).toHaveLength(1); // 坏块被守卫挡下，退化为本次增量
+    expect(second.blocks).toHaveLength(1); // 坏块被该门挡下，退化为本次增量
   });
 });

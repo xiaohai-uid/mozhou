@@ -152,7 +152,7 @@ export function MemoView(): JSX.Element {
 
         {notes.length === 0 ? (
           <p className="muted" data-testid="memo-empty">
-            还没有便签。灵感来了就记一笔——它不属于任何一本书，随时可查。
+            还没有便签。灵感来了就记一笔——它不属于任何一部作品，随时可查。
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="memo-list">

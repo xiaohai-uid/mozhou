@@ -18,7 +18,7 @@
  * 凭据处置：key 只在本测试进程内注入 process.env（providerSettings.resolveEnvEndpoint
  * 只读环境变量），afterAll 逐项恢复原值；全程不写盘、不打印、不落任何产物。
  *
- * SSRF 门：下方第一个用例是**确定性守卫**，不依赖任何凭据、不发网络请求，
+ * SSRF 门：下方第一个用例是**确定性门**，不依赖任何凭据、不发网络请求，
  * 因此**不受门控开关影响，任何时候都跑**——它反向断言未授权时环回端点被拒，
  * 证明本切片没有借道放宽门。
  */
@@ -38,7 +38,7 @@ import {
 } from '../test-support/realModelGate.js'
 
 /**
- * 仅供 SSRF 守卫用例使用的环回 URL 字面量。assertSafeEndpointUrl 是**纯 URL 判定**
+ * 仅供 SSRF 门用例使用的环回 URL 字面量。assertSafeEndpointUrl 是**纯 URL 判定**
  * （协议白名单 + 字面 IP/本机名），不会发任何请求；端口取一个明显的占位值，
  * 以免被误读成"本机某服务的真实地址"。真实上游一律来自 MOZHOU_API_BASE。
  */
@@ -122,7 +122,7 @@ function assertRealNames(names: unknown, maxCount: number): Array<{ name: string
 }
 
 describe('P1 真实模型 · /api/naming AI 起名', () => {
-  // 确定性守卫：不依赖凭据、不发网络请求，任何时候都执行。
+  // 确定性门：不依赖凭据、不发网络请求，任何时候都执行。
   it('SSRF 门未被本切片放宽：未授权时环回端点被拒', () => {
     expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, false)).toThrowError(/SSRF 门/)
     expect(() => assertSafeEndpointUrl(LOOPBACK_BASE, true)).not.toThrow()

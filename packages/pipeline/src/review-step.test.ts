@@ -1,6 +1,6 @@
 /**
  * T17 验收测试（#41）：Review 步——draft 产物可被机械核检入口消费。
- * 门本体归 T18，本票只测消费入口的确定性读取与相位守卫。零时钟零外部服务。
+ * 门本体归 T18，本票只测消费入口的确定性读取与相位门。零时钟零外部服务。
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';

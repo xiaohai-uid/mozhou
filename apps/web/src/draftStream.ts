@@ -69,7 +69,7 @@ export interface DraftStreamResult {
   readonly outcome: string | null
   readonly chars: number | null
   readonly error: string | null
-  /** start 帧自述：这次上下文是走编译收据还是降级结构包。 */
+  /** start 帧自述：这次上下文是走上下文凭证还是降级结构包。 */
   readonly contextMode: string | null
 }
 
@@ -232,7 +232,7 @@ export function describeContextMode(mode: string | null | undefined): string | n
   if (mode === 'structural_fallback') {
     return '上下文降级：未走编译（无文风画像 / 质量切片 / 激活设定）——生成质量可能低于平时'
   }
-  if (mode === 'compiled_receipt') return '上下文已编译（含收据）'
+  if (mode === 'compiled_receipt') return '上下文已编译（含上下文凭证）'
   return `上下文模式：${mode}`
 }
 

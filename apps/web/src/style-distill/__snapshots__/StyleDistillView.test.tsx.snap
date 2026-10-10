@@ -302,7 +302,7 @@ exports[`StyleDistillView（风格蒸馏） > 样本输入与指标渲染；契�
                 style="font-size: 11px; padding: 4px 12px;"
                 type="button"
               >
-                应用为本书此场景文风
+                应用为当前作品此场景文风
               </button>
             </div>
           </div>

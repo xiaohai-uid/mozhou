@@ -7,7 +7,7 @@
  *
  * AST 化同变更新（CHG-20261006-02，approved requirement change）：
  * 编辑器从 textarea 换成 TipTap/ProseMirror（正文纯文本契约不变）。断言语义
- * 全部保留（切书隔离/冲突保护/选区偏移/缓存落盘/丢稿守卫）；仅 DOM 交互层更换：
+ * 全部保留（切书隔离/冲突保护/选区偏移/缓存落盘/丢稿门）；仅 DOM 交互层更换：
  * jsdom 无浏览器默认输入行为，键入走「改 DOM + PM DOMObserver 捕获」（与真实
  * 输入落字后 PM 读 DOM 同源）；选区走 DOM Selection API（PM selectionchange 同步）。
  */
@@ -230,7 +230,7 @@ describe('ProseEditorPanel（R1/R2 冲突保护与定稿边界）', () => {
     })
   })
 
-  it('防误关丢稿守卫：正文有未保存修改（dirty）时挂载 beforeunload 提示拦截，保存后取消拦截', async () => {
+  it('丢稿门：正文有未保存修改（dirty）时挂载 beforeunload 提示拦截，保存后取消拦截', async () => {
     stubApi({})
     render(<ProseEditorPanel book={BOOK_A} chapterIndex={1} />)
     await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy())

@@ -1,0 +1,66 @@
+{
+  "record_type": "gate_baseline",
+  "id": "GATE-BASE-20261009",
+  "captured_at": "2026-10-10T00:00:00+08:00",
+  "captured_by": "captain (pre-change, before any binding work)",
+  "head": "8fb9798ae4eb36ee07226bcb60f02be4e9a9cc0e",
+  "branch": "feature/windows-local-release",
+  "purpose": "固定改动前的门禁状态。t2 修改 verify-gates-contract.mjs 后，此状态不可复原；没有本记录就无法区分『绑定改坏了门』与『门本来就坏』。",
+  "authority_note": "本记录只反映 2026-10-10 采集时刻的实测退出码，不预设后续改动的影响。",
+  "gates": [
+    {
+      "gate": "check:gates",
+      "command": "pnpm run check:gates",
+      "exit_code": 0,
+      "last_line": "PASS",
+      "state": "PASS"
+    },
+    {
+      "gate": "check:glossary",
+      "command": "pnpm run check:glossary",
+      "exit_code": 0,
+      "last_line": "PASS",
+      "state": "PASS"
+    },
+    {
+      "gate": "check:term-map",
+      "command": "pnpm run check:term-map",
+      "exit_code": 1,
+      "state": "STALE_BEFORE",
+      "observed_output": [
+        "SELF-TEST PASS: 2 positive + 4 negative cases OK",
+        "STALE: docs/term-map.md differs from generator output. Run: pnpm gen:term-map"
+      ],
+      "diagnosis": "自检段通过，但 docs/term-map.md 与生成器输出不一致，属生成物新鲜度问题，非术语规则错误。",
+      "pre_existing": true
+    },
+    {
+      "gate": "check:readmes",
+      "command": "pnpm run check:readmes",
+      "exit_code": 0,
+      "last_line": "PASS: 9/9 个包 README 四段齐备",
+      "state": "PASS"
+    },
+    {
+      "gate": "check:architecture",
+      "command": "pnpm run check:architecture",
+      "exit_code": 1,
+      "state": "STALE_BEFORE",
+      "observed_output": [
+        "STALE: docs/architecture.md 与生成器输出不一致。运行: node scripts/gen-architecture.mjs"
+      ],
+      "diagnosis": "与 PROJECT-MAP.md CHG-20261007-19 §6 登记的未处置阻断项完全吻合：既有记录称 docs/architecture.md 记 packages/data-plane 57 文件/15059 行，生成器现算 58 文件/15073 行，净 +1 文件/+14 行，成因为 CHG-20261007-18 新建 projection-rebuild.ts 却未刷新架构地图。",
+      "pre_existing": true
+    }
+  ],
+  "summary": {
+    "pass": ["check:gates", "check:glossary", "check:readmes"],
+    "stale_before_change": ["check:term-map", "check:architecture"],
+    "total": 5
+  },
+  "acceptance_rule_for_downstream": [
+    "改动后 check:gates / check:glossary / check:readmes 必须仍为 exit 0；变为非 0 即为本轮改坏。",
+    "改动后 check:term-map / check:architecture 的退出码变化必须单独归因：变 STALE 仍属既有阻断，不得声称为本轮引入；转为 PASS 需说明本轮如何修复，不能默认归功。",
+    "本记录不构成对这两个陈旧门的修复授权；修复它们是独立变更。"
+  ]
+}

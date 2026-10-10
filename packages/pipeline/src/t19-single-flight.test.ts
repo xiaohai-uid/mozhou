@@ -1,7 +1,7 @@
 /**
  * 跨章并发全局单飞测试（T19 · #43；S11）：V1 同时最多一个活动 session——
- * 别章开卷即拒（守卫在 TaskStarted 落账前，拒绝零副作用）；收卷后单飞释放；
- * 同章既有守卫（SessionAlreadyActiveError）不回归。零时钟零外部服务。
+ * 别章开卷即拒（该门在 TaskStarted 落账前，拒绝零副作用）；收卷后单飞释放；
+ * 同章既有门（SessionAlreadyActiveError）不回归。零时钟零外部服务。
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,13 +56,13 @@ describe('S11 跨章并发 V1 全局单飞', () => {
       expect(single.activeTaskRef).toBe('tsk_sf_ch2');
       expect(single.message).toContain('globally single-flight');
     }
-    // 守卫在事件落账之前：拒绝后账本零增长
+    // 该门在事件落账之前：拒绝后账本零增长
     expect(readPipelineLedger(root)).toHaveLength(before);
     // 全局扫描与投影一致：仍只有 ch2 一个开放窗口
     expect(findOpenSessionWindow(readPipelineLedger(root))).toEqual({ chapterIndex: 2, taskRef: 'tsk_sf_ch2' });
   });
 
-  it('同章活动会话仍是 SessionAlreadyActiveError（既有守卫不回归）；resume 照常续接', () => {
+  it('同章活动会话仍是 SessionAlreadyActiveError（既有门不回归）；resume 照常续接', () => {
     const { root, bus } = makeBook('mozhou-t19-sf2-');
     LocalDataPlane.open(root).createChapterDraft({ chapterIndex: 2, title: '第二章' });
     ChapterProductionSession.start(deps(root, bus, 2, 'sf_same'));

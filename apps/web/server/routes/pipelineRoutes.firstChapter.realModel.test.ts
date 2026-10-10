@@ -16,7 +16,7 @@
  * 凭据处置：key 只在本测试进程内注入 process.env，afterAll 逐项恢复原值；
  * 全程不写盘、不打印、不落任何产物。
  *
- * SSRF 门：下方第一个用例是**确定性守卫**（纯 URL 判定，不发请求），
+ * SSRF 门：下方第一个用例是**确定性门**（纯 URL 判定，不发请求），
  * 不依赖凭据，任何时候都执行——反向断言未授权时环回端点仍被拒，
  * 以证明本次修复没有借道放宽门。
  */
@@ -37,7 +37,7 @@ import {
   resolveRealModelGate,
 } from '../test-support/realModelGate.js'
 
-/** 仅供 SSRF 守卫用例的环回 URL 字面量；不发起任何请求，端口是明显的占位值。 */
+/** 仅供 SSRF 门用例的环回 URL 字面量；不发起任何请求，端口是明显的占位值。 */
 const LOOPBACK_BASE = 'http://127.0.0.1:45999/v1'
 
 const gate = resolveRealModelGate()
@@ -99,7 +99,7 @@ async function post(path: string, body: Record<string, unknown>) {
 }
 
 describe('P1 真实模型 · 建书后第一次点生成', () => {
-  // 确定性守卫：不依赖凭据、不发请求，任何时候都执行。
+  // 确定性门：不依赖凭据、不发请求，任何时候都执行。
   it('SSRF 门未被本次修复放宽：未授权时环回端点被拒（且与章脚手架无关）', () => {
     // 直接打门本体，而不是靠生成请求顺带触发——生成请求还要穿 provider 解析，
     // 一旦别处先拒，断言就测不到门本身了。
@@ -177,7 +177,7 @@ describe('P1 真实模型 · 建书后第一次点生成', () => {
       const after = readProseChapter(root, proseChapterPath(1))
       expect(after.body.length).toBeGreaterThan(before.body.length + 20)
     } else {
-      // 上游超时终态：采纳被既有守卫拒绝（409），但 P1 的主张（能生成、能落脚手架、
+      // 上游超时终态：采纳被既有门拒绝（409），但 P1 的主张（能生成、能落脚手架、
       // 候选有真正文）已全部达成。显式记录，不把上游延迟伪装成 P1 通过。
       expect(accepted.status).toBe(409)
     }

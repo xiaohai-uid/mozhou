@@ -18,16 +18,21 @@ supersedes: CONTEXT.md
 ## 0. 使用规则
 
 1. **本表未收录的词，不得携带墨舟特定含义。** 需要新词时先入本表，再使用。
-2. 每个词条同时给出**规范中文名**与**英文名**。二者指同一物，**不得互换使用**（例如不得中文写"收据"、英文写 `Context`）。
+2. 每个词条同时给出**规范中文名**与**英文名**。二者指同一物，**不得互换使用**（例如不得中文写"收据"、英文写 `Context Receipt`）。
 3. `_Avoid_` 行是**硬约束**：在墨舟产物中出现即为用词错误，不是风格偏好。
 4. **Part 2 收录的是通用工程词**——它们本身不是墨舟专有概念，但它们在本仓曾有多个互相冲突的定义，因此在此登记唯一含义。Part 2 未收录的通用词，**不得携带墨舟特定含义**。
 5. **纪事不进本表。** 带日期的决策叙述属于 `docs/adr/`；架构组合关系属于 `docs/architecture.md`。
+6. **冻结的历史档案不改写。** `docs/adr/`、`docs/changes/`、`audit-2026-10-03/`、`docs/handoff/`、`docs/audit/`、`handoff-results/`、`.scratch/`、`PROJECT-MAP.md` 是已定稿的决策与变更证据；其中的过时用词只登记（见 Part 3 注记），不追改。生成物（`docs/term-map.md`、`docs/architecture.md`、`apps/web/src/code-graph/codeGraphData.*`）同样不改写，随各自生成器刷新。
 
 ---
 
 # Part 1 — 产品领域术语
 
 ## 1.1 内核与领域状态
+
+**作品 (Work)**:
+作者的一部创作，是书稿树、正典文件与运行时的顶层容器。**UI 与文档一律写"作品"**；"书"只留在既有复合词（书库、建书、切书、书稿）与"书名"字段名内；"小说"只用于题材与他人作品（小说拆解、对标小说）。
+_Avoid_: 单用"书""本书""该书""这本书"指当前作品；用"小说"指作者自己的作品
 
 **作者意图 (Author Intent)**:
 一部小说不可妥协的宪法性蓝图，封装核心爽点、读者承诺、主角欲望、绝对禁忌与预设高潮。
@@ -45,6 +50,10 @@ _Avoid_: Beat list、chapter fragment、outline leaf
 `设定/<类型>/` 下的逐实体 Markdown 卡，其 YAML frontmatter 承载机器字段（`ref`、`name`、`aiContext` 四档策略、别名表、排除词、`brief`、`tags`），正文面向人类，绝不整卡拼入提示词。
 _Avoid_: Free setting note、lore entry、config object
 
+**对标 Codex (Reference Codex)**:
+外部对标产品（Novelcrafter）的设定库功能；本仓只把它作为设计参考来源引用，不实现同名能力。
+_Avoid_: 裸写"Codex"指本功能——本仓裸写的"Codex"另指执行与复核用的 OpenAI Codex 智能体
+
 **实体引用 (Entity Ref)**:
 书内实体的稳定可读 slug，限定在五个冻结命名空间（`char:`、`item:`、`location:`、`faction:`、`concept:`）内，每书唯一，一旦被跟踪行或卡片引用即冻结。
 _Avoid_: Opaque ID、mutable name、numeric key
@@ -56,6 +65,10 @@ _Avoid_: Memory item、context note、setting entry
 **候选事实 (Candidate Fact)**:
 从 AI 生成草稿正文中提取、尚未验证的事实断言，等待用户验证或章节提交。
 _Avoid_: Canon、true fact、memory。**中文一律写"候选事实"，不得只写"候选"**
+
+**候选 (Candidate)**:
+**必须带限定词。** 本仓有三个候选：**候选草稿**（未经采纳的生成产物）、**候选事实**（见上条）、**候选条目**（上下文装配的召回候选）。裸用"候选"即为错误。
+_Avoid_: 全部（裸用）
 
 **正典事实 (Canon Fact)**:
 正典中永久、已验证的真相，仅在章节提交并经作者确认后成立。
@@ -87,6 +100,10 @@ _Avoid_: Fact deletion、garbage collection、memory purge
 
 ## 1.2 事务与连续性
 
+**数据面 (Data Plane)**:
+承载正典文件与其可丢弃投影的持久化层。正典文件是唯一真值，投影可随时重建；书内全部持久化写入经它收口。
+_Avoid_: 数据平面、storage layer、database、后端存储
+
 **章节提交 (Chapter Commit)**:
 已定稿叙事输出的原子事务单元，含最终正文、抽取增量（事实、关系、知情、承诺、时间线、物品）、章节摘要与依赖清单。
 _Avoid_: Saved file、chapter markdown、draft accept
@@ -112,7 +129,7 @@ _Avoid_: Last-writer-wins、force save、merge-on-save
 _Avoid_: Ledger replay、backup restore、resync wizard
 
 **运行时区 (Runtime Zone)**:
-书内非正典区域（`.mozhou/`），存放可丢弃投影、审计账本、收据与快照；不参与对账，永不作为真值。
+书内非正典区域（`.mozhou/`），存放可丢弃投影、审计账本、凭证与快照；不参与对账，永不作为真值。
 _Avoid_: Hidden state、system folder、cache directory
 
 **快照 (Snapshot)**:
@@ -147,9 +164,9 @@ _Avoid_: Prompt builder、context injector、system prompt generator
 传给模型的提示词载荷，由带严格优先级与裁剪策略的预算化分节组成。
 _Avoid_: Full context、prompt text、context window
 
-**上下文收据 (Context Receipt)**:
+**上下文凭证 (Context Receipt)**:
 用户可检视的透明拆解，逐项交代编译出的上下文数据包中每个 token、每个纳入实体与每条排除规则，说明为何纳入或排除。
-_Avoid_: Context viewer、prompt log、debug trace。**中文一律写"上下文收据"，不得只写"收据"**
+_Avoid_: 收据、上下文收据、Context viewer、prompt log、debug trace。**规范短式：上下文凭证；带限定词的短式同样合法（装配凭证 / 编译凭证 / 不可变凭证）**
 
 **预留分配 (Reserved Allocation)**:
 两阶段预算算法，先严格按可取序为候选条目预留最终形态 token 成本，再放置预留前缀；因此"被纳入"等价于"占据该顺序的一个前缀"。
@@ -168,15 +185,15 @@ _Avoid_: Protected entry、undeletable entry、eviction-immune entry
 _Avoid_: Prose budget cap、quota refund、story text limit
 
 **可复算性 (Recomputability)**:
-上下文收据的审计属性：它归档最小重放输入面，使任意时刻重跑预算装配都能复现同一重算哈希；被篡改或已退役的输入会显式失败并把漂移定位到具体条目，绝不静默分叉。
+上下文凭证的审计属性：它归档最小重放输入面，使任意时刻重跑预算装配都能复现同一重算哈希；被篡改或已退役的输入会显式失败并把漂移定位到具体条目，绝不静默分叉。
 _Avoid_: Digest-only anchoring、determinism claim without verification、best-effort replay
 
 **激活证据 (Activation Evidence)**:
-候选条目经由哪条召回通道进入的类型化记录——命中关键词、图跳来源与深度、向量分、人工置顶——按收据条目可选携带；结构性注入没有激活证据。
+候选条目经由哪条召回通道进入的类型化记录——命中关键词、图跳来源与深度、向量分、人工置顶——按凭证条目可选携带；结构性注入没有激活证据。
 _Avoid_: Compressed evidence string、activation key dump、search log、relevance explanation prose
 
 **重放输入 (Replay Inputs)**:
-上下文收据内归档的最小输入快照——配置/分词器/模型版本，加上带分数与内容摘要的可取序候选列表、结构分节摘要、正文切片摘要——足以确定性重跑预算装配阶段；实体正文本身从不复制。召回过滤的透传位于重放契约之外。
+上下文凭证内归档的最小输入快照——配置/分词器/模型版本，加上带分数与内容摘要的可取序候选列表、结构分节摘要、正文切片摘要——足以确定性重跑预算装配阶段；实体正文本身从不复制。召回过滤的透传位于重放契约之外。
 _Avoid_: Raw prompt archive、full input snapshot、digest-only anchor
 
 **图触发源 (Graph Trigger Source)**:
@@ -227,7 +244,11 @@ _Avoid_: Ad-hoc dialog state、silent auto-promotion
 
 **能力 (Capability)**:
 抽象的任务级契约（如 `PROSE_DEAI`、`MARKET_SCAN`、`STATE_EXTRACTOR`、`LONGFORM_PLANNING`），与底层实现提供者解耦。
-_Avoid_: Skill、tool、agent
+_Avoid_: tool、agent、技能（当所指是该契约本身时）
+
+**技能 (Skill)**:
+作者可见、可启用的方法论单元，由**能力配方**实例化后的运行时形态（如「技能广场」里的项）。与**能力 (Capability)** 分工不同，不是同义词。
+_Avoid_: 用"技能"指任务级抽象契约（那是能力）
 
 **能力注册表 (Capability Registry)**:
 把抽象能力解析到具体提供者（原生例程、外部技能或远程服务）的中心注册表，不让调用方耦合实现名。
@@ -319,15 +340,15 @@ GitHub 上的执行跟踪单元，编号写作 `#31`，一律用 `gh` CLI 操作
 _Avoid_: 工单、ticket、本地文件
 
 **工单 (Ticket)**:
-**即"议题 (Issue)"。** 本仓**不使用**"工单"指代任何本地文件。
-_Avoid_: 本地 markdown 文件、NN-slug 文件
+**已废弃中文俗称，即"议题 (Issue)"。** 出现即为用词错误，一律改写为"议题"。存量集中在冻结的历史档案（Part 3 注记 3）。
+_Avoid_: 全部
 
 **本地规格文档 (Local Spec Doc)**:
 `.scratch/<feature-slug>/` 下的本地 markdown，承载**规格、决策与历史归档**，**不是执行状态**。
 _Avoid_: 工单、ticket、issue、"当前要做的活"
 
 **地图 (Map)**:
-单个标注 `wayfinder:map` 的议题，其子议题为工单。
+单个标注 `wayfinder:map` 的议题，其所有子议题都挂在它下面。
 _Avoid_: 任务列表、backlog、总览页
 
 **状态标签 (Triage Label)**:
@@ -341,7 +362,7 @@ _Avoid_: 在本地 markdown 的 frontmatter 里声明状态（存量违规见 Pa
 
 | 限定词 | 含义 | 定义所在 |
 |---|---|---|
-| 需求保真门 (Requirement Fidelity Gate) | 工单完成前验证是否实现了被批准的需求 | ADR-0018 |
+| 需求保真门 (Requirement Fidelity Gate) | 议题完成前验证是否实现了被批准的需求 | ADR-0018 |
 | 连续性门 (Continuity Gate) | 章节提交前的逻辑/知情/时间线/承诺核查 | Part 1 §1.2 |
 | 文学质量门 (Quality Gate) | pre-Canon 文学质量边界 | ADR-0025 |
 | 自动化门 (Automated Gate) | 由 CI 或脚本执行的 Gate | `AGENTS.md` §5 |
@@ -352,7 +373,7 @@ _Avoid_: 门禁、闸门、gate（裸用）、`.specify` 的 review gate（属�
 _Avoid_: 全部
 
 **闸门**:
-**本仓不使用此词。** 现存 4 处为历史遗留（`packages/context-compiler/src/compile.ts:30` 的"硬隔离闸"、`docs/novel-four-project-acceptance-matrix-2026-08-16.md:36` 的"人工闸门"）。规范替代：确定性阻断用**门 (Gate)**，人工介入点用**检查点 (Checkpoint)**。
+**本仓不使用此词。** 存量的 11 处全部在冻结的历史档案与生成物内（清单见 Part 3 注记 2），本仓不再新用。规范替代：确定性阻断用**门 (Gate)**，人工介入点用**检查点 (Checkpoint)**。
 _Avoid_: 全部
 
 **检查 (Check)**:
@@ -370,8 +391,8 @@ UVSD 协议下的**交付单元**：一个端到端、可上线、可观察的�
 _Avoid_: 切片（单用）、task、job
 
 **切片 (Slice)**:
-**必须写全"纵切 (Vertical Slice)"。** 单用"切片"在本仓曾有三个冲突含义：纵切、遗留未做项、superpowers 计划章节。
-_Avoid_: 单用
+文本、状态或统计上的局部片段（正文切片、质量切片、时间切片），**必须带限定词**。UVSD 的**交付单元**一律写全"纵切 (Vertical Slice)"。单用"切片"在本仓曾有三个冲突含义：纵切、遗留未做项、superpowers 计划章节。
+_Avoid_: 单用（指 UVSD 交付单元或某个具体切片时）
 
 **挂账项 (Deferred Item)**:
 已识别、已裁决**不在当前范围内**的条目。`AGENTS.md` 曾称之为"遗留切片"，该说法已废止。
@@ -383,7 +404,7 @@ _Avoid_: job、任务项、要做的事
 
 **任务简报 (Task Brief)**:
 superpowers 工作流的单位，属**已降级的历史层**，新工作不再使用。
-_Avoid_: ticket、issue、工单
+_Avoid_: ticket、工单
 
 ## 2.4 决策、契约与文档分层
 
@@ -425,6 +446,14 @@ _Avoid_: agent harness 语境。该语境一律译作**智能体 Harness (Agent 
 可嵌入的 AI 代理运行时（如 DeepSeek Harness / DSH）。
 _Avoid_: 工作台、workbench
 
+**版本 (Version)**:
+对外版本标识：发布版本号（以 `package.json` 为准）与画像版本（`StyleProfile vN`）。章一级的版次一律写 **revision**，不写"版本"。
+_Avoid_: 用"版本"指章 revision；用"版本号"笼统指三者
+
+**会话 (Session)**:
+**必须带限定词。** 裸用"会话"只指**章节生产会话**（Part 1 §1.3）；登录态写**登录会话**，LLM 对话写**写作对话**。
+_Avoid_: 全部（裸用指登录态或写作对话）
+
 ## 2.5 流程线（2026-10-01 裁决）
 
 本仓同时存在六条历史工作流线。裁决后**只有一条有流程权威**：
@@ -446,23 +475,27 @@ _Avoid_: 工作台、workbench
 
 | 禁用词 | 规范词 | 依据 |
 |---|---|---|
-| 收据 | 上下文收据 Context Receipt | Part 1 §1.2 |
-| 候选（单用） | 候选事实 Candidate Fact | Part 1 §1.1 |
+| 收据 / 上下文收据 | 上下文凭证 Context Receipt | Part 1 §1.2 |
+| 候选（裸用） | 候选草稿 / 候选事实 / 候选条目 | Part 1 §1.1 |
+| 书 / 本书 / 该书（指当前作品时） | 作品 Work | Part 1 §1.1 |
+| 小说（指作者自己的作品时） | 作品 Work | Part 1 §1.1 |
+| 会话（裸用） | 章节生产会话 / 登录会话 / 写作对话 | Part 2 §2.4 |
 | 熔核 | 内核 Kernel（中文一律写"内核"） | Part 1 §1.1 |
-| 数据面（英文语境无对应） | 数据面 Data Plane（英文统一写 Data Plane） | — |
+| 数据平面 | 数据面 Data Plane（英文一律写 Data Plane） | Part 1 §1.2 |
 | 门禁 / 闸门 / 裸 gate | 门 Gate + 限定词 | Part 2 §2.2 |
-| 切片（单用） | 纵切 Vertical Slice | Part 2 §2.3 |
+| 切片（指 UVSD 交付单元时） | 纵切 Vertical Slice | Part 2 §2.3 |
 | 遗留切片 | 挂账项 Deferred Item | Part 2 §2.3 |
-| 任务（指"要做的事"） | 工单 Ticket / 挂账项 Deferred Item | Part 2 §2.3 |
-| 任务简报 | 工单 Ticket | Part 2 §2.3 |
+| 任务（指"要做的事"） | 议题 Issue / 挂账项 Deferred Item | Part 2 §2.3 |
+| 任务简报 | 议题 Issue | Part 2 §2.3 |
+| 工单 | 议题 Issue | Part 2 §2.1 |
 | workbench（agent 语境） | 智能体 Harness | Part 2 §2.4 |
 | 契约（裸用） | BFF 契约 / 领域契约 | Part 2 §2.4 |
 | "Default" vs "Canonical" 二选一 | **canonical（规范）** | `AGENTS.md` 历史冲突 |
 
-## 已知存量违规（待迁移，不阻塞使用）
+## 已知存量违规（冻结层不追改，不阻塞使用）
 
 1. **9 个 `.scratch/mozhou-deepening-20260928/issues/*.md` 带 `status` frontmatter**（8 个 `ready-for-agent` + 1 个 `wontfix`），其余 65 个本地规格文档**没有**该字段，74 个中仅 32 个进 git。按 Part 2 §2.1，状态只应存在于 GitHub 议题，故这 9 个字段无权威。该批次已冻结（见 ADR-0034）。
-2. **4 处"闸门"**（Part 2 §2.2 已列）。
-3. **三套工单 ID 方案并存**：本地 `NN-<slug>`、speckit `[ID] [P?]`、GitHub `#31`。规范只剩 GitHub `#31`。
+2. **11 处"闸门"**。除本表、`docs/term-map.md` 与 `scripts/verify-glossary.mjs`（三处都是登记/检测该词本身）外，其余全部在冻结的历史档案内：`docs/adr/CODE-DUPLICATION-INVENTORY.md` ×3、`audit-2026-10-03/01-baseline-and-graph-gate.md` ×3、`docs/research/t51-grill-learner-protocols.md`、`docs/novel-four-project-acceptance-matrix-2026-08-16.md`、`docs/w3-operations-implementation-report-2026-10-05.md`（引述禁令本身）、`audit-2026-10-03/logs/014-AGENTS-md-diff.txt`、`PROJECT-MAP.md`。`packages/context-compiler/src/compile.ts` 的"硬隔离闸"已于 2026-10-05 改为"硬隔离门"。
+3. **三套执行跟踪 ID 方案并存**：本地 `NN-<slug>`、speckit `[ID] [P?]`、GitHub `#31`。规范只剩 GitHub `#31`（议题）。
 4. **两套"造什么"权威**：`AGENTS.md` §1（User journeys define product scope）与 `specs/*/spec.md`（User Scenarios）互不引用。规范权威是 `AGENTS.md` §1。
-5. **「门禁」「工单NN」在产品代码注释、测试标题与 `docs/gates.md` 中仍大量存在**（2026-10-05 全仓 grep：apps/web/server、packages 数十处；`docs/gates.md` 通篇、`AGENTS.md` 章节同用）。2026-10-05 修复轮已清掉当轮审查引用的文件（routeCodes / generationTarget / pipelineRoutes / namingRoutes / backupRoutes），其余为存量待迁移；`AGENTS.md` 与 `docs/gates.md` 的用词更名属仓库级口径决策，待裁决。
+5. **冻结层的「门禁」「工单」「数据平面」存量。** 2026-10-07 完成活跃层清扫：代码注释与测试标题、`README.md`、包 README、`scripts/`、`.github/workflows/`、`docs/gates.md`、`eslint.config.js`；同时把 Part 3 禁用词接进 `pnpm run check:glossary`（只扫活跃层，范围见 `scripts/verify-glossary.mjs` §7）。剩余存量全部在冻结的历史档案（`docs/adr/`、`docs/changes/`、`docs/specs/`、`docs/handoff/`、`docs/audit/`、`docs/research/`、`docs/spikes/`、`audit-2026-10-03/`、`handoff-results/`、`.scratch/`、`PROJECT-MAP.md`、根级历史审计报告）与生成物（`apps/web/src/code-graph/codeGraphData.*`、`docs/term-map.md`）中，按 §0 规则 6 不追改。

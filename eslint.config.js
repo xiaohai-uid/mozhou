@@ -43,7 +43,7 @@ export default tseslint.config(
             'apps/web/server/analysis/*.test.ts',
             'apps/web/server/skills/*.test.ts',
             'apps/web/server/llm/*.test.ts',
-            // 工单 08 新增：句柄 seam 的真实语义测试（packages/data-plane 那份走
+            // 深化 08 新增：句柄 seam 的真实语义测试（packages/data-plane 那份走
             // 自己的 tsconfig，不经 defaultProject；这里的是路由级迁移回归）。
             'apps/web/server/routes/planeSeamMigration.test.ts',
             // 2026-09-30 整改 T02 新增：真实模型测试的统一门控目录。
@@ -59,7 +59,7 @@ export default tseslint.config(
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，
-          // 上调至 120 恢复 pnpm lint 门禁。
+          // 上调至 120 恢复 pnpm lint 门。
           // 2026-10-09 由 120 上调至 140：服务端新增测试文件后匹配数达 121，触顶报
           // 「Too many files (>120) matched the default project」；按同一先例上调。
           // 长期正解是让 server/ 有可被 projectService 发现的 tsconfig，而不是持续抬高阈值。
@@ -91,7 +91,7 @@ export default tseslint.config(
     },
   },
   {
-    // 工单 08：LocalDataPlane 句柄生命周期门禁。
+    // 深化 08：LocalDataPlane 句柄生命周期门。
     //
     // 为什么是 eslint 而不是那条 245 行的正则源码扫描守卫（apps/web/server/planeHandles.test.ts，
     // 已随本票删除）：忘记 close 的 SQLite 句柄**不报错、不崩、测试照样全绿**，
@@ -101,7 +101,7 @@ export default tseslint.config(
     //
     // seam 在 packages/data-plane/src/with-plane.ts：借出的句柄没有名字，调用点想忘也忘不掉。
     // 真正需要长活句柄的持有者（常驻对账宿主、提交编排、生命周期台架）走 retainBook/releaseBook
-    // 成对转移——那是另一种源码形态，门禁不误报，review 也看得见配对。
+    // 成对转移——那是另一种源码形态，门不误报，review 也看得见配对。
     files: [
       'apps/web/server/**/*.ts',
       'apps/web/src/**/*.ts',
@@ -153,6 +153,7 @@ export default tseslint.config(
       ],
     },
   },
+  {
     // 用户数据写盘的机械守卫：**整份重写**必须走共享原子写原语 atomicWriteFileSync
     // （唯一临时名 + wx 独占创建 + fsync + rename），裸 writeFileSync 会留下半份文件。
     //
@@ -188,5 +189,4 @@ export default tseslint.config(
       'no-restricted-syntax': 'off',
     },
   },
-)
 )

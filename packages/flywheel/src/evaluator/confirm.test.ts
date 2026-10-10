@@ -206,7 +206,7 @@ describe('confirmRoutingSuggestion · 校验栏复用（真跑既有 loadTierCon
   });
 });
 
-describe('confirmRoutingSuggestion · 空串守卫（可达性回归）', () => {
+describe('confirmRoutingSuggestion · 空串门（可达性回归）', () => {
   it('proposedRoute.model 为空串 ⇒ malformed_proposed_route（不得产出被校验器拒收的配置）', () => {
     const outcome = confirmRoutingSuggestion({
       suggestion: suggestion({ proposedRoute: { providerId: 'prov_c', model: '' } }),
@@ -228,7 +228,7 @@ describe('confirmRoutingSuggestion · 空串守卫（可达性回归）', () => 
    * storage.narrowSuggestion 只判 typeof === 'string'、不判非空，
    * 因此一条 proposedRoute.model 为 "" 的记录能真的从磁盘上的
    * suggestions.jsonl 读回来，进而走到 confirmRoutingSuggestion。
-   * 若守卫被移除，本用例会在「第一次确认返回 applied」处失败。
+   * 若该门被移除，本用例会在「第一次确认返回 applied」处失败。
    */
   it('空 model 能从磁盘 suggestions.jsonl 读回（证明该输入真实可达），且确认时被挡下', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mozhou-confirm-disk-'));

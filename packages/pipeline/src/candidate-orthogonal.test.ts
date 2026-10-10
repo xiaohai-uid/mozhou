@@ -1,5 +1,5 @@
 /**
- * W4-2b：候选三字段正交化 + 有损迁移 + 取消判定点 + 迟到 chunk 守卫。
+ * W4-2b：候选三字段正交化 + 有损迁移 + 取消判定点 + 迟到 chunk 门。
  * 隔离夹具（tmpdir），不读写真实书稿。
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -134,7 +134,7 @@ describe('W4-2b 有损迁移（旧单一 status → 三字段）', () => {
   })
 })
 
-describe('W4-2b 取消判定点与迟到 chunk 守卫', () => {
+describe('W4-2b 取消判定点与迟到 chunk 门', () => {
   it('cancel_requested 是中间态；判定点用**上游结局**：完成先于取消生效 ⇒ succeeded', () => {
     const a = createDraftCandidate(root, { ...REQ, id: '66666666-6666-4666-8666-666666666661' })
     expect(requestCandidateCancel(root, a.id).taskState).toBe('cancel_requested')

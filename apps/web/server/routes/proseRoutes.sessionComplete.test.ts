@@ -235,7 +235,7 @@ async function makeBookWithWalkedWindow(title: string): Promise<{ base: string; 
   expect(review.status).toBe(200)
   expect(review.data.verdict).toBe('pass')
 
-  // 步 4→5：review→user_edit（门守卫对 quality verdict='pass' 放行）
+  // 步 4→5：review→user_edit（门对 quality verdict='pass' 放行）
   const toUserEdit = await post(base, '/api/session.advance', { root, chapterIndex: 1 })
   expect(toUserEdit.data).toMatchObject({ ok: true, previousStep: 'review', currentStep: 'user_edit' })
 

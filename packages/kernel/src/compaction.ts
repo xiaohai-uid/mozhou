@@ -316,7 +316,7 @@ export interface BuildCompactedFactRowInput {
  * 压缩标记行：同 id 追加行，末行胜出折叠后 `compactedIntoVolumeId` 非 null。
  * 内容字段（subject/predicate/value/valid 区间/重要度/风险/来源/状态/provenance）
  * 全部原样保留——压缩只挂标记，绝不改写事实内容（I6/I1）。
- * 双前置守卫（重复折叠与保护位）在动第一字节前抛错（宁败不脏）。
+ * 双前置门（重复折叠与保护位）在动第一字节前抛错（宁败不脏）。
  */
 export function buildCompactedFactRow(input: BuildCompactedFactRowInput): TemporalFact {
   const { fact, volumeNodeId, updatedAtIso } = input

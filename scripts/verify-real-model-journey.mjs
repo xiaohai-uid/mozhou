@@ -279,7 +279,7 @@ try {
   // （409 CANON_PROPOSAL_PENDING，"本章正典零写入"）。本脚本在旅程中扮演作者：
   // 对未决项显式 confirm 后重试提交。跳过这一步的旧版脚本只在「提取全部低风险、
   // 路由自动确认」时才能通过，不能代表真实用户路径。
-  // 工单05 Contract Delta：提交携带作者所读 revision（draft.accept 响应回带的值）。
+  // 深化 05 Contract Delta：提交携带作者所读 revision（draft.accept 响应回带的值）。
   let commit = await postJson('/api/chapter.commit', {
     root: bookRoot,
     chapterIndex: 1,

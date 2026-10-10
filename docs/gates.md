@@ -1,8 +1,8 @@
-# 门禁契约 (Gates)
+# 门清单与退出码 (Gates)
 
-> 本文件是墨舟**全部门禁的唯一清单**：每个门禁跑什么、退出码是什么、有没有 BLOCKED 状态、是否接进 CI。
+> 本文件是墨舟**全部门的唯一清单**：每个门跑什么、退出码是什么、有没有 BLOCKED 状态、是否接进 CI。
 >
-> **2026-10-02 新增。此前全仓没有任何文档写过门禁的退出码契约**——`AGENTS.md`、`docs/agents/*.md`、`GLOSSARY.md` 中 `退出码` 命中数为 0。每个门禁的语义只能靠读源码推断。本文件补上这个缺口。
+> **2026-10-02 新增。此前全仓没有任何文档写过门的退出码契约**——`AGENTS.md`、`docs/agents/*.md`、`GLOSSARY.md` 中 `退出码` 命中数为 0。每个门的语义只能靠读源码推断。本文件补上这个缺口。
 >
 > 退出码数字的出处见每行 `file:line`。
 
@@ -10,24 +10,24 @@
 
 > ### BLOCKED 不是 PASSED。
 >
-> 门禁的第三种状态是「**没跑成**」，不是「跑过且通过」。任何自动化消费门禁时，**只看退出码会把两者混为一谈**。
+> 门的第三种状态是「**没跑成**」，不是「跑过且通过」。任何自动化消费门时，**只看退出码会把两者混为一谈**。
 
 正确消费方式，按优先级：
 
-1. 门禁写了 `result.json` 之类的结构化产物 → **读 `status` 字段**，别读退出码。
-2. 门禁支持 `--strict` 之类的严格开关 → 在 CI 中**启用它**。
-3. 两者都没有 → 该门禁的 BLOCKED 状态目前**无法被自动化区分**，这是已知缺口，不要假装它能被区分。
+1. 门写了 `result.json` 之类的结构化产物 → **读 `status` 字段**，别读退出码。
+2. 门支持 `--strict` 之类的严格开关 → 在 CI 中**启用它**。
+3. 两者都没有 → 该门的 BLOCKED 状态目前**无法被自动化区分**，这是已知缺口，不要假装它能被区分。
 
-## 门禁清单
+## 门清单
 
-| 门禁 | 命令 | 退出码（出处） | BLOCKED | 在 CI |
+| 门 | 命令 | 退出码（出处） | BLOCKED | 在 CI |
 |---|---|---|---|---|
 | **术语单一权威** | `pnpm run check:glossary` | 0 通过 `scripts/verify-glossary.mjs:89` · 1 失败 `:92` | 无此状态 | ✅ `ci.yml` |
 | **包 README 契约** | `pnpm run check:readmes` | 0 四段齐备 · 1 缺 README 或缺段 `scripts/verify-package-readmes.mjs` | 无此状态 | ✅ `ci.yml` |
 
 | **中英术语映射新鲜度** | `pnpm run check:term-map` | 0 一致 · 1 与生成器输出不符 `scripts/gen-term-map.mjs --check` | 无此状态 | ✅ `ci.yml` |
 
-| **门禁契约防腐化** | `pnpm run check:gates` | 0 一致 · 1 清单与仓库现实脱节 `scripts/verify-gates-contract.mjs` | 无此状态 | ✅ `ci.yml` |
+| **门清单防腐化** | `pnpm run check:gates` | 0 一致 · 1 清单与仓库现实脱节 `scripts/verify-gates-contract.mjs` | 无此状态 | ✅ `ci.yml` |
 
 | **架构地图新鲜度** | `pnpm run check:architecture` | 0 一致（无显式 exit，自然落透） · 1 陈旧 `scripts/gen-architecture.mjs:140` | 无此状态 | ✅ `ci.yml` |
 | **真实模型旅程** | `pnpm run verify:real-model` | 0 VERIFIED · 1 FAILED · **0 BLOCKED** · **2 BLOCKED `--strict`** | `status: 'BLOCKED'` `scripts/verify-real-model-journey.mjs:76` | ❌ 未接入 |
@@ -56,21 +56,11 @@
 > 跑 `--check` 会把他人未提交的改动算成陈旧（只能降级为告警），而告警挡不住「自己的提交把生成物
 > 改陈旧」（同类漂移在 2026-10-10 会话里出现 4 次），索引语义没有这个问题，故做成阻断。
 > 前两者都接进了 `ci.yml` 的 Doc gates 步骤、`scripts/ci-gate.mjs doc-gates` 与仓库的 pre-commit
-
-| **门清单在 CI 列一致性** | `node scripts/check-gates-ci-column.mjs` | 0 一致 · 1 脱节 · 2 用法错误 | 无此状态 | ✅ `ci.yml` |
-| **文档裸数字** | `node scripts/check-doc-numbers.mjs` | 0（默认只报不拦）· `--strict` 有发现即 1 | 无此状态 | ✅ `ci.yml`（只报不拦） |
-
-> 末两行 2026-10-10 补：`check-gates-ci-column.mjs` 校验本表「在 CI」列与 `.github/workflows/`
-> 的实际内容一致（双向：点名 workflow 的必须在其中找到该命令；标 ❌ 的不许出现在任何 workflow）。
-> 之所以需要它——此前 `check:gates` 只拿**硬编码的三个门名**去比对 ci.yml，于是「克隆检测」
-> 那一行写着「❌ 未接入」而它早已是 `graph-gate.yml` 的作业，门一声不响。
-> `check-doc-numbers.mjs` 扫活文档里的裸规模数字（旁边既无日期也无命令指针），只报不拦——
-> 两轮「声称 vs 现实」审计清的 15 处陈旧声称几乎全是这类数字，先让漂移可见再决定阈值。
-> 两者都接进了 `ci.yml` 的 Doc gates 步骤、`scripts/ci-gate.mjs doc-gates` 与仓库的 pre-commit 钩子。
+> 钩子；生成物新鲜度只在钩子里（CI 的检出是干净的，用 `gen-*.mjs --check` 即可）。
 
 ## `verify:real-model` 的完整契约
 
-这是全仓唯一有 BLOCKED 语义的门禁，所以单列。
+这是全仓唯一有 BLOCKED 语义的门，所以单列。
 
 **结构化产物**（权威通道）：`evidence/real-model-journey/<RUN_ID>/result.json`，字段 `kind, status, sourceCommit, command, exitCode, scope, provider, result, limitations`。
 
@@ -86,7 +76,7 @@
 
 `--strict` 的加入（2026-10-02）**不改变默认行为**：`result.json` / `run.log` / stdout 在不带该参数时与改动前**逐字节相同**（SHA-256 已实测比对，见该次提交的验证记录）。`--strict` 只做一件事——让 BLOCKED 的退出码变成 2，使 CI 与 agent 能把它读成「没跑」。
 
-**当前实际用哪个**：该门禁**未接入 CI**，也不被任何仓内自动化消费（`grep real-model .github/workflows/*.yml` → 0 命中）。所以今天两种退出码都不会破坏任何东西——这也是能安全加 `--strict` 而不改默认的原因。
+**当前实际用哪个**：该门**未接入 CI**，也不被任何仓内自动化消费（`grep real-model .github/workflows/*.yml` → 0 命中）。所以今天两种退出码都不会破坏任何东西——这也是能安全加 `--strict` 而不改默认的原因。
 
 ## 术语映射语义更正（2026-10-02）
 
@@ -122,9 +112,9 @@
 
 ## 相关
 
-- 术语规则见 [`GLOSSARY.md`](../GLOSSARY.md)；本文件只讲门禁，不定义术语。
+- 术语规则见 [`GLOSSARY.md`](../GLOSSARY.md)；本文件只讲门，不定义术语。
 - 决策记录见 [`docs/adr/INDEX.md`](./adr/INDEX.md)。
-- CI 里文档门禁的实际位置：`.github/workflows/ci.yml` 的 `Doc gates` 步骤。
+- CI 里文档门的实际位置：`.github/workflows/ci.yml` 的 `Doc gates` 步骤。
 ---
 
 ## 实测基线（2026-10-02）
@@ -139,3 +129,59 @@
 
 > 启用覆盖率需要 `pnpm add -D @vitest/coverage-v8`。本仓库**刻意未擅自添加该依赖**：
 > 它会改动 `pnpm-lock.yaml` 并引入供应链变更，需显式授权。
+
+## 门清单已知缺口（可见，不阻塞）
+
+> 本节标题与本文件上方既有的「已知缺口（不假装已解决）」是两个不同的小节：
+> 后者记录**退出码语义现状**，是本轮之前就有的内容；本节只记录**门清单自身没覆盖到的路径**。
+> `check:gates` 的 GAP 输出逐字指向本节标题，改名时必须同步改
+> `scripts/verify-gates-contract.mjs` 里的指引文案，否则引用会指向不存在的小节。
+>
+> 本节由 `check:gates`（`scripts/verify-gates-contract.mjs` 检查 6/7）在每次运行时同步打印，
+> 目的是让「清单声称覆盖了全部门」这句话不再靠自觉。下列条目中，**第 1 条已于 2026-10-10 关闭**，
+> 第 2、3 条是**真实存在的缺口**；门把它们打印为 `GAP` 而不是悄悄放过，门默认不因此变红，
+> 因为它们是存量问题，一次全量阻断只会让门常红而无人处理。**谁该修、修前要什么授权，写在每条下面。**
+
+1. **[已关闭 2026-10-10] `scripts/build-release.mjs` 产出的交付物没有来源戳。**
+   该脚本是 `package.json` 的 `build:release` / `package`，也是 `.github/workflows/release.yml:149`
+   「Build truthful release assets」的实际执行者；它产出三个 tar 归档
+   （`build-release.mjs:163-181`）。
+   **修复**：`build-release.mjs` 现复用既有的 `scripts/release/lib/source-stamp.mjs`
+   （`readSourceStamp`），把戳写入 bundle 目录的 `BUILD-STAMP.json`
+   （`build-release.mjs:100`），字段与 `scripts/release/windows/build.mjs` 完全一致
+   （`sourceCommit` / `sourceCommitSha` / `dirty` / `dirtyFiles`）；该文件随
+   local-runtime 与 docker 两个 tar 归档一起分发。脏工作区会得到 `-dirty` 后缀与脏文件数。
+   `check:gates` 检查 6 因此从 `GAP` 变为「全部交付物入口都有来源戳引用」。
+   **未变的部分**：`build-release.mjs` 的 `web-dist` 归档直接打包 `apps/web/dist`，
+   不含此戳文件；本条的关闭只覆盖带 bundle 目录的两个归档，不改变 web-dist 归档的内容。
+
+2. **`scripts/check-import-cycles.mjs` 在本清单之外。**
+   它由 `.github/workflows/graph-gate.yml:43-44` 在 CI 中执行（退出码 0 无环 / 1 有环 / 2 用法错，
+   定义见 `scripts/check-import-cycles.mjs:151`、`:158`、`:102`），但**既不在本清单，也不在
+   `package.json` 的任何 script**，因此本地无法用 `pnpm run` 复现这条 CI 门。
+   **本轮刻意未把它并入本清单表**：并表会改动既有章节的表格结构，且需要先确认
+   `graph-gate.yml` 是否有独立退出码语义约定（0/1/2 与本文件「退出码未统一」的已知缺口相关）。
+   谁该修：门清单的维护者，与退出码统一那一次独立变更一并处理。
+
+3. **`scripts/release/real-model-gate.mjs` 的 0/1/2 契约在本清单之外。**
+   它由 `.github/workflows/release.yml:76` 执行，是发布路径上唯一的真实模型门；
+   退出码契约写在脚本头部 `real-model-gate.mjs:21`（`0 VERIFIED · 1 FAILED · 2 BLOCKED`），
+   实现见 `:118`（`const exitCode = 2`）、`:121`（`status: 'BLOCKED'`）、`:208`。
+   本文件「`verify:real-model` 的完整契约」一节只覆盖 `scripts/verify-real-model-journey.mjs`，
+   **没有覆盖这个发布路径包装层**，而两者的 BLOCKED 语义恰好相反（前者默认 0，后者必须非 0）。
+   **本轮刻意未补写该契约小节**：该门只在 `release.yml` 消费、不在 `ci.yml`，
+   写它的退出码表需要先确认凭据缺失时的托管行为，属独立变更。
+   谁该修：门清单维护者，与发布路径的真实模型门一起登记。
+
+### 开关 `--strict-gaps`
+
+`check:gates` 默认把上面这类缺口打印为 `GAP` 而不阻断。加 `--strict-gaps` 会把缺口升级为阻断项（exit 1）。
+
+- **默认关闭**，且**只能收紧、不能放宽**：它只把 `GAP` 提升为 `problems`，
+  没有任何「开了开关就少报几项」的分支。
+- **本仓库没有任何 CI 或 pnpm script 使用它**（`Select-String -Path .github/workflows/*.yml,package.json -Pattern 'strict-gaps'` → 0 命中，2026-10-10 实跑）。
+  现状下 CI 行为与本节引入前完全一致。
+- 开关存在的理由只有一个：让「缺口检测逻辑真的能触发」可以被实跑证明。
+  **本轮的五门验收一律用默认模式**，strict 模式只用于正例演示，不作为验收依据。
+- 想开启它的人需要先知道：开启即意味着仍开放的缺口（第 2、3 条）会立刻让 CI 变红，
+  必须先补齐缺口（或把它们降级为已解决）再开。

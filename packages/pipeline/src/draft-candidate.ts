@@ -409,7 +409,7 @@ export function appendCandidateDelta(
   guard?: { readonly generationEpoch?: number | undefined; readonly sequence?: number | undefined },
 ): DraftCandidate {
   const c = readOrThrow(root, id)
-  // W4-2b 迟到 chunk 守卫：**写盘之前**双校验。旧代次（客户端已切书/切章/停止/新生成）
+  // W4-2b 迟到 chunk 门：**写盘之前**双校验。旧代次（客户端已切书/切章/停止/新生成）
   // 或已见过的序号一律**丢弃**——返回原记录、不落盘、不报错（丢弃是预期行为，不是失败）。
   if (guard !== undefined) {
     // 代次：**旧代次丢弃**（客户端已切书/切章/停止/新生成）；更新的代次表示视图已前进，

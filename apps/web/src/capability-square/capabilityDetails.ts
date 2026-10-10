@@ -18,7 +18,7 @@ export interface CapabilityDetail {
 }
 
 export const CAPABILITY_DETAILS: Record<string, CapabilityDetail> = {
-  workbench: { requirement: ['本地数据平面（LocalDataPlane）已就绪', '无需 provider'], contract: '无独立动作——视图直达；建书走 POST /api/book 真实磁盘写入', landing: 'nav 01 → WorkbenchView' },
+  workbench: { requirement: ['本地数据面（LocalDataPlane）已就绪', '无需 provider'], contract: '无独立动作——视图直达；建书走 POST /api/book 真实磁盘写入', landing: 'nav 01 → WorkbenchView' },
   dialogue: {
     requirement: ['配置 draft provider（Gate 3 模型接入）', 'NDJSON /api/draft.stream 通道可用'],
     unavailable: ['草稿生成 provider 未配置——中栏写作对话当前不可用（Gate 3）。发送时服务端返回 {ok:false, code:\'PROVIDER_UNAVAILABLE\'}——结构化 blocker，而非灰掉输入框。'],

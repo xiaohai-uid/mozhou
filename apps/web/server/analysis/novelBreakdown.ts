@@ -5,7 +5,7 @@
  * - 拒绝虚假固定模板（彻底消除固定“样本文本主角”）；
  * - 原文引用锚定：每个提取项必须绑定原文真实存在的 span (start, end) 与 quote；
  * - 验证断言：source.slice(x.span.start, x.span.end) === x.quote 必须完全成立；
- * - 安全守卫：文本中的潜在提示词注入（如“删除文件/忽略规则”）绝不执行，无文件写旁路；
+ * - 安全检查：文本中的潜在提示词注入（如“删除文件/忽略规则”）绝不执行，无文件写旁路；
  * - 提取故事核心、角色弧光、节奏曲线与情感节拍。
  */
 import { createHash } from 'node:crypto'
@@ -79,7 +79,7 @@ export function analyzeNovelBreakdown(sourceText: string): NovelBreakdownAnalysi
   const trimmed = sourceText
   const sourceHash = sha256(trimmed)
 
-  // 1. 安全守卫：检测潜在指令注入（安全断言，不执行任何指令）
+  // 1. 安全检查：检测潜在指令注入（安全断言，不执行任何指令）
   const containsMaliciousDirectives = /(delete|remove|rmdir|unlink|drop table|ignore all previous)/i.test(sourceText)
   if (containsMaliciousDirectives) {
     // 纯文本分析，指令被作为普通文本处理，绝不触发外部操作

@@ -156,9 +156,9 @@ for (const book of CORPUS) {
     console.log(`   - 实体卡落盘: ${existsSync(join(bookDir, '设定', '人物', `${book.entity.ref.replace('char:', '')}.md`))}`);
     console.log(`   - 文风.md 飞轮版本: r${verifiedProfiles.dialogue.revision} (动作节奏: ${verifiedProfiles.dialogue.actionPacing.toFixed(2)})`);
 
-    // 4. 机械门禁审判 (Mechanical Gates)
+    // 4. 机械门审判 (Mechanical Gates)
     const gateResult = evaluateMechanicalGates(book.sampleText);
-    console.log(`[4. 机械门禁判定]`);
+    console.log(`[4. 机械门判定]`);
     console.log(`   - 占位符拦截 (mech_02): ${gateResult.checks.find(c => c.id === 'mech_02_placeholder').ok ? '通过' : '拦截'}`);
     console.log(`   - AI红线正则 (mech_03): ${gateResult.checks.find(c => c.id === 'mech_03_redlines').ok ? '纯净无AI套路' : '命中红线'}`);
     console.log(`   - 5-gram复读 (mech_04): ${gateResult.checks.find(c => c.id === 'mech_04_adjacent_repeat').ok ? '通过' : '拦截'}`);

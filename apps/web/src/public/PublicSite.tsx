@@ -69,7 +69,7 @@ export const PublicSite: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
               <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg space-y-2">
                 <h3 className="font-bold text-amber-400">本地优先与数据掌控</h3>
-                <p className="text-sm text-neutral-400">所有小说正典、草稿与因果流水均存储在本地 SQLite 与 Markdown 中，永不锁死。</p>
+                <p className="text-sm text-neutral-400">所有作品正典、草稿与因果流水均存储在本地 SQLite 与 Markdown 中，永不锁死。</p>
               </div>
               <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg space-y-2">
                 <h3 className="font-bold text-amber-400">双模型调用轨道</h3>
@@ -167,7 +167,7 @@ export const PublicSite: React.FC = () => {
             <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg space-y-4">
               <h3 className="text-base font-bold text-amber-400">一、用户数据自主权</h3>
               <p>
-                用户在墨舟创作的一切小说文本、大纲、分镜和设定，版权完全归创作者所有。本地模式下所有数据均保存在创作者设备本地磁盘中，服务端绝不上传或窃取创作内容。
+                用户在墨舟创作的一切作品文本、大纲、分镜和设定，版权完全归创作者所有。本地模式下所有数据均保存在创作者设备本地磁盘中，服务端绝不上传或窃取创作内容。
               </p>
               <h3 className="text-base font-bold text-amber-400">二、大模型调用说明</h3>
               <p>

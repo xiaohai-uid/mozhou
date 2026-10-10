@@ -6,7 +6,7 @@
  * 校验条件却是**五种不同的写法**（有的只判 `typeof`，有的判 `< 1`，有的判
  * `Number.isInteger && >= 1`）。冻结规则其实只有一句——「chapterIndex 是 ≥ 1 的整数」，
  * 但每次加一个新端点，开发者都得重新猜一次该抄哪份，于是 `chapterIndex: 0` 与
- * `chapterIndex: 1.5` 在某些端点能穿过校验、落到数据平面上再炸。
+ * `chapterIndex: 1.5` 在某些端点能穿过校验、落到数据面上再炸。
  * 不变式留在每个调用方脑子里 = 不变式事实上不存在。
  *
  * 本模块把不变式提到**一处**：
@@ -43,7 +43,7 @@ export interface ContractError {
 
 /** 解码成功：已授权书根 + 规范化章号 + 请求主体。 */
 export interface DecodedBookRequest<TChapter extends number | null = number> {
-  /** 已过路径守卫与书权限的绝对书根。 */
+  /** 已过路径检查与书权限的绝对书根。 */
   readonly root: string
   /** ≥ 1 的整数；`chapter: 'optional'` 且请求未带该字段时为 null。 */
   readonly chapterIndex: TChapter
@@ -114,7 +114,7 @@ export function decodeBookRequest(
     return fail(401, UNAUTHORIZED_PRINCIPAL, PRINCIPAL_REQUIRED_MESSAGE)
   }
 
-  // 2. 书根：缺失是形状错误，已在场则交既有守卫判定授权/存在性。
+  // 2. 书根：缺失是形状错误，已在场则交既有门判定授权/存在性。
   //    边界错误原样透出 status/code/message——本模块不重新解释「什么算一本书」。
   if (typeof bookRoot !== 'string' || bookRoot.trim().length === 0) {
     return fail(400, INVALID_BOOK_REQUEST, ROOT_REQUIRED_MESSAGE)

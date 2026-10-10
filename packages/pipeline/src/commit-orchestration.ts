@@ -7,11 +7,11 @@
  * 步序规则在此只出现一次。
  *
  * 职责边界（编排规则全部在此，路由不做第二步实现）：
- *   - 步 6 前置守卫：合法相位检查（draft）先于提取缝（深化 02 缺陷 A——重复提交必须
+ *   - 步 6 前置门：合法相位检查（draft）先于提取缝（深化 02 缺陷 A——重复提交必须
  *     在 0 消耗处拒绝，不得先跑提取再撞 409）；expectedRevision 比对（深化 05 Contract
- *     Delta）同列前置守卫——作者所读 revision 与盘不符即在 0 消耗处 409；
+ *     Delta）同列前置门——作者所读 revision 与盘不符即在 0 消耗处 409；
  *   - 结果契约 / commitChapter 透传 expectedRevision（TOCTOU 兜底，提取 await 期间的
- *     并发保存由数据平面写路守卫拦截）；
+ *     并发保存由数据面写路门拦截）；
  *   - D06 依赖钉版回读（无暂存 = 不带清单提交；形状非法由回读显式抛错）；
  *   - 窗口键 `web_commit_ch<N>_rev<R>`（webCommitWindowTaskRef）：步 8 提案绑定 /
  *     步 10 窗口锚 / 保存路径编辑信号共用同一格式——**键形状冻结**（风格学习器按
@@ -207,8 +207,8 @@ export interface RunChapterCommitRequest {
 
 /**
  * F-04（W3）：成功提交的同号重试必须回放**原结果**（200 + 原 commitId + replayed:true），
- * 而不是撞相位守卫变 409 CHAPTER_ALREADY_COMMITTED——丢失确认的调用方将永远无法安全收敛。
- * 判定放在相位守卫与正文读取之前：回放不需要读正文，章此后被删/已提交都不影响回放。
+ * 而不是撞相位门变 409 CHAPTER_ALREADY_COMMITTED——丢失确认的调用方将永远无法安全收敛。
+ * 判定放在相位门与正文读取之前：回放不需要读正文，章此后被删/已提交都不影响回放。
  * 同 ID 不同摘要/他人作用域仍按 findReplayableOperation 的既有冲突语义抛出。
  */
 function replayOutcomeFromRecord(root: string, chapterIndex: number, record: OperationRecord): ChapterCommitOutcome {
@@ -266,7 +266,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
     await request.releaseWriteLease?.();
   };
   try {
-    // F-04：操作回放判定先行（不需要读正文），其后才是相位/revision 守卫。
+    // F-04：操作回放判定先行（不需要读正文），其后才是相位/revision 门。
     if (request.operation !== undefined) {
       const replayHit = findReplayableOperation(root, request.operation);
       if (replayHit !== null) {
@@ -282,7 +282,7 @@ export async function runChapterCommit(request: RunChapterCommitRequest): Promis
       throw new ChapterPhaseError(chapterIndex, 'chapter is committed — reopen it before re-committing');
     }
     // 深化 05 Contract Delta：作者所读 revision 与盘不符 ⇒ 在提取缝（真实 LLM 调用）之前
-    // 拒绝——过期提交必须 0 消耗 409，正文/正典/账本零写入。相位守卫在前（照搬
+    // 拒绝——过期提交必须 0 消耗 409，正文/正典/账本零写入。相位门在前（照搬
     // saveProseDraft 的检查顺序，chapter.ts:802-806）：已提交章仍回相位 409（深化 02
     // 缺陷 A 语义不变）。expectedRevision 同时随 commitChapter 透传（TOCTOU 兜底）。
     if (proseFile.revision !== request.expectedRevision) {

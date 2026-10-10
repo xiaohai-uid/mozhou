@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * 深化 01 验收补充（.scratch/mozhou-deepening-20260928/issues/01-commit-external-change-500.md）：
- * 无 provider 快速提交路径下的外部改盘守卫。
+ * 无 provider 快速提交路径下的外部改盘门。
  *
  * 已有验收：proseRoutes.proposal.test.ts:369（带 appends 的续接提交路径，proseRoutes.ts:708）
  * ——本文件补齐另一条真实代码路径：delta 为空 ⇒ 无提案 ⇒ 快速提交（proseRoutes.ts:621 直接
@@ -58,7 +58,7 @@ async function post(base: string, path: string, body: Record<string, unknown>): 
   return { status: res.status, data }
 }
 
-describe('POST /api/chapter.commit · 外部改盘守卫（深化 01 验收 · 无 provider 快速路径）', () => {
+describe('POST /api/chapter.commit · 外部改盘门（深化 01 验收 · 无 provider 快速路径）', () => {
   it('外部改盘后提交：409 PROSE_EXTERNAL_CHANGE，正文保留外部字节、正典/事件零写入', async () => {
     // 清空 provider 环境变量：与开发机环境无关（确定性），提取走 'none'，零模型调用
     const saved = {
@@ -89,7 +89,7 @@ describe('POST /api/chapter.commit · 外部改盘守卫（深化 01 验收 · �
       expect(readFileSync(prosePath, 'utf8')).toContain('EXTERNAL AUTHOR CONTENT')
 
       // 深化 05 Contract Delta：提交携带作者所读 revision（此处即盘上 revision——外部改盘
-      // 未走 API，frontmatter revision 不变）；失配守卫不触发，仍落外部改盘 409。
+      // 未走 API，frontmatter revision 不变）；失配门不触发，仍落外部改盘 409。
       const { status, data } = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: Number(beforeRevision) })
 
       expect(status, JSON.stringify(data)).toBe(409)

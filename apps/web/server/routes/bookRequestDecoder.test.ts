@@ -95,7 +95,7 @@ function seedCandidateArtifact(root: string, candidateId: string): void {
 /**
  * 全部走同一个解码缝的 16 个书级端点（深化 07 点数：pipelineRoutes 9 / proseRoutes 5 /
  * storyboardRoutes 2）。`extra` 是各端点自己那部分的必填字段——只为让「非法章号」
- * 这一条成为**唯一**的失败原因，否则测的是别的守卫。
+ * 这一条成为**唯一**的失败原因，否则测的是别的门。
  */
 const CHAPTER_ENDPOINTS: ReadonlyArray<readonly [string, Readonly<Record<string, unknown>>]> = [
   // proseRoutes 5

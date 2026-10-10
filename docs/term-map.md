@@ -22,12 +22,12 @@
 
 ## 统计
 
-- 词条总数: **90**
+- 词条总数: **97**
 - 声明: **27**
-- 局部同名: **5**
-- 引用: **11**
-- 仅测试: **1**
-- 未验证: **46**
+- 局部同名: **6**
+- 引用: **13**
+- 仅测试: **3**
+- 未验证: **48**
 
 ## 已确认的命名漂移
 
@@ -40,13 +40,16 @@
 
 | 规范中文名 | 英文名 | 代码标识符 | 出处 | 状态 |
 |---|---|---|---|---|
+| 作品 | Work | - | - | 未验证 |
 | 作者意图 | Author Intent | `AuthorIntent` | `packages/kernel/src/kernel-schema.ts:141` | 声明 |
 | 大纲图 | Outline Graph | - | - | 未验证 |
 | 场景 | Scene | `Scene` | `packages/kernel/src/kernel-schema.ts:191` | 声明 |
 | 实体卡 | Entity Directory Card | - | - | 未验证 |
+| 对标 Codex | Reference Codex | - | - | 未验证 |
 | 实体引用 | Entity Ref | `EntityRef` | `packages/kernel/src/kernel-schema.ts:62` | 声明 |
 | 时序事实 | Temporal Fact | `TemporalFact` | `packages/kernel/src/kernel-schema.ts:239` | 声明 |
 | 候选事实 | Candidate Fact | - | - | 未验证 |
+| 候选 | Candidate | `Candidate` | `apps/web/src/workbench/editor/ProseEditorPanel.tsx:558` | 引用 |
 | 正典事实 | Canon Fact | - | - | 未验证 |
 | 知情状态 | Knowledge State | `KnowledgeState` | `packages/kernel/src/kernel-schema.ts:279` | 声明 |
 | 叙事承诺 | Narrative Promise | `NarrativePromise` | `packages/kernel/src/kernel-schema.ts:315` | 声明 |
@@ -54,6 +57,7 @@
 | 时间线事件 | Timeline Event | `TimelineEvent` | `packages/kernel/src/kernel-schema.ts:341` | 声明 |
 | 场景风格画像 | Scenario Style Profile | - | - | 未验证 |
 | 状态压缩 | State Compaction | - | - | 未验证 |
+| 数据面 | Data Plane | `data-plane` | `apps/web/src/cloud-sync/CloudSyncView.tsx:170` | 引用 |
 | 章节提交 | Chapter Commit | `ChapterCommit` | `packages/kernel/src/kernel-schema.ts:546` | 声明 |
 | 在写草稿 | Active Draft | - | - | 未验证 |
 | 双平面同步 | Sync Layering | - | - | 未验证 |
@@ -69,7 +73,7 @@
 | 变更影响引擎 | Change Impact Engine | - | - | 未验证 |
 | 上下文编译器 | Context Compiler | - | - | 未验证 |
 | 上下文数据包 | Context Packet | `ContextPacket` | `packages/context-compiler/src/assemble.ts:185` | 声明 |
-| 上下文收据 | Context Receipt | `ContextReceipt` | `packages/kernel/src/kernel-schema.ts:479` | 声明 |
+| 上下文凭证 | Context Receipt | `ContextReceipt` | `packages/kernel/src/kernel-schema.ts:479` | 声明 |
 | 预留分配 | Reserved Allocation | - | - | 未验证 |
 | 可取序 | Desirability Order | - | - | 未验证 |
 | 原子条目 | Atomic Entry | - | - | 未验证 |
@@ -89,6 +93,7 @@
 | 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:235` | 声明 |
 | 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:183` | 声明 |
 | 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
+| 技能 | Skill | `skill` | `apps/web/src/workbench/DialogueStream.hardening.test.tsx:49` | 仅测试 |
 | 能力注册表 | Capability Registry | `CapabilityRegistry` | `packages/runtime/src/registry.ts:23` | 声明 |
 | 能力配方 | Capability Recipe | `CapabilityRecipe` | `packages/runtime/src/recipe/types.ts:142` | 声明 |
 | 任务流 | Task Stream | - | - | 未验证 |
@@ -130,3 +135,5 @@
 | 消费者 | Definition | `definition` | `packages/quality-engine/src/deterministic.ts:101` | 引用 |
 | 工作台 | Workbench | `workbench` | `apps/web/src/capability-square/capabilityDetails.ts:21` | 引用 |
 | 智能体 Harness | Agent Harness | - | - | 未验证 |
+| 版本 | Version | `version` | `packages/pipeline/src/draft-candidate.ts:322` | 局部同名 |
+| 会话 | Session | `Session` | `apps/web/src/workbench/DialogueStream.telemetry.test.tsx:12` | 仅测试 |

@@ -1,5 +1,5 @@
 /**
- * @mozhou/pipeline · 安全守卫与规则契约护栏固化测试（Hardened Guardrails）
+ * @mozhou/pipeline · 安全检查与规则契约护栏固化测试（Hardened Guardrails）
  * 覆盖：
  * 1. 5 项纯算术机械门极端对抗性测试（字数窗口边界、占位符全变体、AI红线正则、相邻段落复读回环、4-gram 方差）
  * 2. Fail-Closed 审查报告哈希防篡改（REV-001 任意单字节篡改、hash 不一致时的 blocking_fail、unknown fail closed）
@@ -356,7 +356,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
       expect(semEval?.verdict).toBe('unknown');
     });
 
-    it('2.4 时效性守卫：草稿改动后旧 PASS 立即失效（isQualityReviewCurrent 为 false）', async () => {
+    it('2.4 时效门：草稿改动后旧 PASS 立即失效（isQualityReviewCurrent 为 false）', async () => {
       const report = await runQualityReview({
         prose,
         policy: emptyPolicy(),
@@ -467,7 +467,7 @@ describe('Guardrail Hardening: 规则契约与安全护栏固化测试', () => {
         );
       }).not.toThrow();
 
-      // 追踪流防自动化取代守卫（assertNoProtectedSupersession）
+      // 追踪流防自动化取代门（assertNoProtectedSupersession）
       const protectedFact = makeFact({
         id: 'fact_prot_01',
         subject: 'char:protagonist',

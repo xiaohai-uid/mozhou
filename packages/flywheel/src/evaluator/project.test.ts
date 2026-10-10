@@ -212,7 +212,7 @@ describe('projectInputs · C2 桥接 join', () => {
     expect(cell.s5).toMatchObject({ costMicros: 150, outputTokens: 300, microsPerOutputToken: 0.5 });
   });
 
-  it('桥接缺位守卫：无 parentTaskRef ⇒ bridgePresent=false 且路由不可归因', () => {
+  it('桥接缺位门：无 parentTaskRef ⇒ bridgePresent=false 且路由不可归因', () => {
     const root = hermeticBook();
     const bus = new PublishBus();
     bus.publish({ root }, {

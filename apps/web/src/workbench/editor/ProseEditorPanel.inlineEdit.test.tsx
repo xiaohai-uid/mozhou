@@ -1,7 +1,7 @@
 /**
  * 行内 AI 编辑链路面板测试（CHG-20261006-02 同变新增）。
  *
- * 守卫语义（specs/002 FR-3 / 任务验收）：
+ * 选区门语义（specs/002 FR-3 / 任务验收）：
  * - 选区 → 契约请求（action/selectedText/selectionRange 逐字一致）→ 流式候选 → 双栏 diff；
  * - AI 失败（NDJSON error 帧）：诚实报错，正文一字不改；
  * - Accept：AST 局部替换落写作层（可撤销），绝不自动落盘；
@@ -221,7 +221,7 @@ describe('行内 AI 编辑（/api/prose.edit.stream 接线）', () => {
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('选区不再匹配')
     })
-    // 守卫生效：候选没有落到错误位置
+    // 选区门生效：候选没有落到错误位置
     expect(editorEl.textContent).toContain('作者已重写整段')
     expect(editorEl.textContent).not.toContain('反转候选文本')
   })

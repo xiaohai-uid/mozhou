@@ -427,7 +427,7 @@ export function assembleBudgetedContext(input: AssembleInput): AssemblyResult {
   const storyQuotaFloor = Math.ceil(quotaRatio * budgetTotal)
   const competitivePool = budgetTotal - structuralTokens - storyQuotaFloor
 
-  // fail loudly（NAI「lorebook cancel out story text」反面教训的根治点，INV-3 前置守卫）
+  // fail loudly（NAI「lorebook cancel out story text」反面教训的根治点，INV-3 前置门）
   if (structuralTokens > cfg.structuralCapTokens) {
     throw new CompileConfigError(
       `structural layer uses ${structuralTokens} tokens, exceeding structuralCapTokens=${cfg.structuralCapTokens}`,

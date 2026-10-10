@@ -3,7 +3,7 @@
  * 独立审查（REVIEW-20261004-01）负样本回归锁。
  * 四个用例锁定 2026-10-04 审查发现的应有行为，修复对应：
  *   W3 save 回放零事件副作用 → F-09（proseRoutes 回放不落作者编辑信号）
- *   W3 成功 commit 同号重试回放原结果 → F-04（commit-orchestration 相位守卫前回放）
+ *   W3 成功 commit 同号重试回放原结果 → F-04（commit-orchestration 相位门前回放）
  *   W2 已确认 proposal 续接必须等跨进程书锁 → F-03（写租约注入编排层写回段）
  *   F02 活着的无关 PID 不误判历史 dataRoot 锁 → F-10（锁记录 v2，旧格式可接管）
  * 提取缝被 mock：本文件零模型调用、零真实书稿访问。

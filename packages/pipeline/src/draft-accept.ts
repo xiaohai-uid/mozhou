@@ -8,7 +8,7 @@
  *   崩溃窗口（正文已写但候选未标记）按 intent.after 恢复，绝不再次追加/涨版本。
  * - 幂等：同 (bookId, idempotencyKey) 重放返回 alreadyApplied；目标已 applied
  *   的候选再 accept 返回同结果；不同 body 复用同一 key → 409。
- * - 正文写入统一走 data-plane saveProseDraft（revision CAS + 写前 hash 守卫 +
+ * - 正文写入统一走 data-plane saveProseDraft（revision CAS + 写前哈希门 +
  *   定稿保护），本模块不新建旁路。
  * - 模式组合：replace/replace-selection 全文替换；continue 原文+候选增量；
  *   insert 在生成开始时选区位置插入（地址按 base 现场，编辑即冲突）。
@@ -191,7 +191,7 @@ export function findIntentByKey(root: string, bookId: string, idempotencyKey: st
 /**
  * 受控采纳。不变量：
  * - 未写正文前持久化 intent（含 predicated after）——崩溃恢复按 after 比对，不二次写入；
- * - 全程单 LocalDataPlane 句柄，saveProseDraft 内部完成 revision 比对 + 写前 hash 守卫，
+ * - 全程单 LocalDataPlane 句柄，saveProseDraft 内部完成 revision 比对 + 写前哈希门，
  *   外部改盘（revision 未变但 hash 变）→ PreWriteHashMismatchError，候选保留；
  * - 只有上抛前已完成正文落盘才写 done；done 重放返回 alreadyApplied=true。
  */
@@ -370,7 +370,7 @@ export function acceptDraft(request: AcceptDraftRequest): AcceptDraftResult {
     }
     writeIntent(bookRoot, intent)
 
-    // 正文落盘：revision CAS + 写前 hash 守卫；confirmExternalOverwrite 不传——
+    // 正文落盘：revision CAS + 写前哈希门；confirmExternalOverwrite 不传——
     // 受控采纳不做静默外部覆盖，冲突即 409，交由 UI 展示差异。
     plane.saveProseDraft({
       chapterIndex: candidate.chapterIndex,

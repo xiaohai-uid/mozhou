@@ -30,7 +30,7 @@
 ### 2.3 文档门禁前置修复
 
 - `docs/architecture.md`、`docs/term-map.md` 过期（本批次后续提交新增代码所致），经 `pnpm gen:architecture` / `pnpm gen:term-map` 重新生成。
-- `check:glossary` 的裸 ADR 引用预算（54，只许减不许增）在**基线即为 56**（远端尖 `979f1cfa` 更高达 87），属既有债。本次消歧 5 处：`docs/specs/dual-plane-sync-spec.md` 的 `ADR-0006`×2 → `K-0006`、`docs/specs/change-impact-engine-spec.md` 的 `ADR-0003`×3 → `K-0003`。归属依据为 ADR 标题（K-0006 "Local Data Plane…"、K-0003 "Dependency Manifest and Deterministic-First Change Impact Engine"）与所在文档主题逐字对应。计数降至 **51**。
+- `check:glossary` 的裸 ADR 引用预算（54，只许减不许增）在**基线即为 56**（远端尖 `979f1cfa` 更高达 87），属既有债。本次消歧 5 处：`docs/specs/dual-plane-sync-spec.md` 的 0006 号裸引用×2 → `K-0006`、`docs/specs/change-impact-engine-spec.md` 的 0003 号裸引用×3 → `K-0003`。归属依据为 ADR 标题（K-0006 "Local Data Plane…"、K-0003 "Dependency Manifest and Deterministic-First Change Impact Engine"）与所在文档主题逐字对应。计数降至 **51**。
 
 ## 3. 验证（本地实跑）
 

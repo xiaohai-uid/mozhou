@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // gen-architecture.mjs — 生成 docs/architecture.md（有序地图）。
 //   node scripts/gen-architecture.mjs           写入
-//   node scripts/gen-architecture.mjs --check   新鲜度门禁，不一致 exit 1
+//   node scripts/gen-architecture.mjs --check   新鲜度门，不一致 exit 1
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 

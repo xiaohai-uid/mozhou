@@ -5,7 +5,7 @@
  * - 两窗口/两并发生成：并行流互不覆盖；双 accept 竞态仅一次生效；
  * - 同 idempotencyKey 换 body → 409；accept 重放 → alreadyApplied；
  * - 生成中作者保存成功且 accept 随之冲突（base stale → 409 保留候选）；
- * - 外部编辑发生于两 delta 之间 → accept 409（写前 hash 守卫），外部内容保留；
+ * - 外部编辑发生于两 delta 之间 → accept 409（写前哈希门），外部内容保留；
  * - 取消后 chunk 不写候选；accept 写后断进程 → 重启同 accept 重放幂等。
  * 使用 mock provider（MOZHOU_DRAFT_PROVIDER=mock）；draft.stream 为 NDJSON 流。
  */
@@ -205,7 +205,7 @@ describe('C2 生成中保存与外部编辑', () => {
     expect((c.data as { candidate: { status: string } }).candidate.status).toBe('ready') // 候选保留
   })
 
-  it('外部编辑发生于两 delta 之间 → accept 409（写前 hash 守卫）且外部内容在盘上', async () => {
+  it('外部编辑发生于两 delta 之间 → accept 409（写前哈希门）且外部内容在盘上', async () => {
     const base = await listen()
     const root = makeRoot()
     const plane = LocalDataPlane.open(root)
@@ -525,7 +525,7 @@ describe('C2 / R01: 采纳前状态校验与终态保护 (HTTP 级)', () => {
   })
 })
 
-describe('空流守卫（商业化阻断 1 · HTTP 级）', () => {
+describe('空流门（商业化阻断 1 · HTTP 级）', () => {
   it('上游 200 但零 delta ⇒ 末帧是 error（不是 done），且带 EMPTY_STREAM 原因', async () => {
     const prev = process.env.MOZHOU_DRAFT_PROVIDER
     process.env.MOZHOU_DRAFT_PROVIDER = 'mock-empty'

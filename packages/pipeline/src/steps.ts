@@ -29,7 +29,7 @@ export function stepIndex(step: string): number {
   return index;
 }
 
-/** 词表守卫：任意字符串是否为合法步 id。 */
+/** 词表检查：任意字符串是否为合法步 id。 */
 export function isPipelineStep(value: string): value is PipelineStep {
   return stepIndex(value) >= 0;
 }

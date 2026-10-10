@@ -43,7 +43,7 @@
 | 今日码字 | TopBar.tsx:42-44 | 静态 `div.quiet-btn` 文本「今日码字统计未接入」 | 无 | **未接入，诚实展示** | unavailable | 03：保留诚实 unavailable；移动端同（§8.1） | MOUNTED_PARTIAL_OR_BLOCKED |
 | 时光机/导出/敏感词 | TopBar.tsx:47-58 | 4 个 emoji 按钮 → DesktopToolModals | 点击 | history/export/compliance→Unavailable 卡（DesktopToolModals.tsx:60,79,80） | unavailable 诚实 | 08-aux-latent.html；emoji 换 SVG（规格 §9） | MOUNTED_PARTIAL_OR_BLOCKED |
 | 灵感工坊 | TopBar.tsx:50-52 → DesktopToolModals.tsx:62-77 | 本地骰子卡 4 张 | 掷骰 | 纯本地 `shared/inspirationPresets`，无 API | LOCAL PRESET 真可用 | 08：卡牌化抽取，标 `LOCAL PRESET`（规格 §23） | MOUNTED_TRUTHFUL |
-| 本地就绪 | TopBar.tsx:59-62 | 禁用按钮+绿点 | 无 | 静态（数据平面本地存储） | local-ready ≠ cloud-synced | 03/06：绿点+文字保留 | MOUNTED_TRUTHFUL |
+| 本地就绪 | TopBar.tsx:59-62 | 禁用按钮+绿点 | 无 | 静态（数据面本地存储） | local-ready ≠ cloud-synced | 03/06：绿点+文字保留 | MOUNTED_TRUTHFUL |
 | 17 项导航 | CapabilityChannels.tsx:20-44 | NAV_GROUPS×5 组（views.ts:19-58） | 点击→setView | 无 | active 态 aria-current | 03：金脊选中态（规格 §10）；17 项全数进原型 | MOUNTED_TRUTHFUL |
 | 8 步 Pipeline | PipelineStrip.tsx:7-16,30-31,38 | prepare→commit 8 stage | 点击（纯视觉） | 无 | done/active/default 三态；**无 blocked/failed 态** | 03：新增 blocked/failed/unavailable 三态视觉 | MOUNTED_PARTIAL_OR_BLOCKED |
 | 检视塔 4 tab | InspectorTower.tsx:8-13,72-96 | quality/story-brain/context-receipt/change-matrix | tab 切换 | 面板见 §4 | aria tablist 完整 | 03/05：summary rail 新增（数字无源时 `— / 未载入`） | MOUNTED_TRUTHFUL |

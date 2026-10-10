@@ -5,7 +5,7 @@
  * V2）。重提交期间读取真相 = phase=committed 的最新 commitId——latestCommittedTruth
  * 以 ChapterCommitted 事件行为锚返回最新 commit 的 commitId/contentSha256，
  * 不读已翻回 draft 的正文文件；重提交完成后真相前移到新 commit。
- * 纪律：所有会被拒的判据（相位守卫 / 单飞双守卫 / 真相锚 / 写前哈希）都在任何
+ * 纪律：所有会被拒的判据（相位门 / 单飞双门 / 真相锚 / 写前哈希）都在任何
  * 盘面写入之前出局（拒绝零副作用，不留半开状态机）；单飞判据由 assertSessionStartable
  * 与 start() 同源提供；open() 先跑 recoverPendingCommit 再动相位；平面句柄即用即关；
  * 零时钟零外部服务，手工 id 由调用方注入。
@@ -88,7 +88,7 @@ export interface ResubmitOutcome {
 /**
  * S9 重提交入口：committed 章 → 相位移回 draft + 开新会话窗口。次序（纪律：所有
  * **会被拒**的判据都在任何盘面写入之前出局，故拒绝路径零副作用——不留半开状态机）：
- *   1. 前置守卫——正文必须 phase=committed（否则 ResubmitNotCommittedError）；
+ *   1. 前置门——正文必须 phase=committed（否则 ResubmitNotCommittedError）；
  *   2. 纯读预检 assertSessionStartable：同章 SessionAlreadyActive / 别章
  *      GlobalSingleFlight（与 start() 同一判据，前移到 TaskStarted 落账之前）；
  *   3. 真相锚预检 latestCommittedTruth：有相位无匹配事件行 = 账实不符，此时
@@ -98,7 +98,7 @@ export interface ResubmitOutcome {
  *      痕迹——追踪流行与本事件行——永不改写，I5）。写前哈希失配在 reopenChapter
  *      内、任何写入之前抛出（chapter.ts:725），故同样零副作用。句柄即用即关
  *      （每请求一个 better-sqlite3 连接，不关会占住 runtime.sqlite/-wal/-shm）。
- *   5. 开新会话窗口 ChapterProductionSession.start（预检已保证不会被守卫拒绝）。
+ *   5. 开新会话窗口 ChapterProductionSession.start（预检已保证不会被该门拒绝）。
  * 次序取舍：窗口开在翻相位**之后**。进程若在第 4/5 步之间中断，留下的是
  * 「draft 章 + 无窗口」——作者改文再定稿后可重新重提交，web 侧可达；反之
  * window-first 留下的孤儿窗口在 web 侧没有任何路由能闭合（无会话内 commit/finish）。

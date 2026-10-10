@@ -22,8 +22,8 @@ export const WIZARD_STEPS = [
   {
     key: 'create',
     label: '建书',
-    eyebrow: '先给这本书一个可以启航的名字',
-    lead: '不用现在就把一切想清楚。书名和题材只用于建立作品容器，之后仍可修改。',
+    eyebrow: '先给这部作品一个可以启航的名字',
+    lead: '不用现在就把一切想清楚。作品名和题材只用于建立作品容器，之后仍可修改。',
     field: '作品名',
     placeholder: '未命名之书',
   },

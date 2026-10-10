@@ -16,7 +16,7 @@ export function emptyDraftStream(): AsyncIterable<string> {
 /**
  * mock 流：把作者指令按固定窗口切块逐步吐出，模拟真实 provider 的分帧节奏。
  *
- * 分块纪律：每块是 `base` 上一个**不重叠**的切片，空块由下面的 length 守卫丢弃。
+ * 分块纪律：每块是 `base` 上一个**不重叠**的切片，空块由下面的 length 检查丢弃。
  * 曾经的写法是 `base.slice(8, 18) === '' ? base : base.slice(8, 18)`——短提示词
  * （不足 8 字）时中间块回退成整段 base，于是首块与中间块都是全文，mock 生成的
  * 正文被原样吐了两遍。这类错误在 mock 下没人看正文，所以一直没被发现。

@@ -73,7 +73,7 @@ async function makeBook(): Promise<{ base: string; root: string }> {
   return { base, root: dir }
 }
 
-/** 直接经数据平面提交一章（与既有 resubmit 用例同款夹具：写平铺 ChapterCommitted 行）。 */
+/** 直接经数据面提交一章（与既有 resubmit 用例同款夹具：写平铺 ChapterCommitted 行）。 */
 function commitChapter(root: string, chapterIndex = 1, prose = FINAL): { commitId: string; contentSha256: string } {
   const plane = LocalDataPlane.openOrRebuild(root)
   try {

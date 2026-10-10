@@ -245,7 +245,7 @@ export function WorkbenchView({
                     onChange={(event) => setTitle(event.target.value)}
                     disabled={createBusy}
                     aria-label="作品名"
-                    placeholder="输入小说书名 (如：假神真显灵、万道祖师...)"
+                    placeholder="输入作品名 (如：假神真显灵、万道祖师...)"
                     style={{ flex: 1, minWidth: 200, padding: '8px 12px', fontSize: 13 }}
                   />
                   <button className="btn-primary" onClick={() => void handleCreateBook()} disabled={createBusy} style={{ padding: '8px 18px', fontSize: 13, whiteSpace: 'nowrap' }}>

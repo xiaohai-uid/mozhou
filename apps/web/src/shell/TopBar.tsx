@@ -80,7 +80,7 @@ export function TopBar({
         <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('compliance')} title="合规审查尚未接入">
           <ToolIcon path={ICONS.compliance} /> <span className="top-btn-label">敏感词</span>
         </button>
-        <button className="quiet-btn" disabled title="数据平面为本地存储；云同步未接入">
+        <button className="quiet-btn" disabled title="数据面为本地存储；云同步未接入">
           <i className="status-dot" />
           <span className="top-btn-label">本地已就绪</span>
         </button>

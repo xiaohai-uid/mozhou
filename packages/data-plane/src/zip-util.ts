@@ -209,7 +209,7 @@ export function unpackZip(buf: Buffer, limits: ZipLimits = C5_ZIP_LIMITS): Unpac
     }
 
     const fileName = buf.toString('utf8', pos + 46, pos + 46 + nameLen)
-    // 严格安全守卫：阻断路径穿越 (Path Traversal) 与绝对路径
+    // 严格安全检查：阻断路径穿越 (Path Traversal) 与绝对路径
     if (fileName.includes('..') || fileName.startsWith('/') || fileName.startsWith('\\') || /^[A-Za-z]:/.test(fileName)) {
       throw new Error(`SECURITY_ERROR: zip path traversal detected in entry "${fileName}"`)
     }

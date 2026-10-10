@@ -33,7 +33,7 @@ export interface ChapterProductionSessionDeps {
   readonly newTaskRef?: () => string;
 }
 
-/** 同章已有活动会话时开新卷即拒（先 resume 或走完收卷；单飞语义的前置守卫）。 */
+/** 同章已有活动会话时开新卷即拒（先 resume 或走完收卷；单飞语义的前置门）。 */
 export class SessionAlreadyActiveError extends Error {
   override readonly name = 'SessionAlreadyActiveError';
   constructor(readonly chapterIndex: number, readonly activeTaskRef: string) {
@@ -214,7 +214,7 @@ function toDomainEvent(event: DomainEvent): DomainEvent {
 }
 
 /**
- * 开卷守卫的**纯读预检**（零盘面副作用）：同章已有活动会话 / 别章占用全局单飞。
+ * 开卷门的**纯读预检**（零盘面副作用）：同章已有活动会话 / 别章占用全局单飞。
  * start() 与 requestResubmit 共用同一判据——重提交的拒绝路径必须落在 TaskStarted
  * 落账之前，否则「被拒的调用」会在账上留下一个无人驱动的孤儿窗口（web 侧没有
  * 会话内 commit/finish 路由可闭合它，见 S9 接线注释）。start() 仍自行复检，本函数
@@ -260,7 +260,7 @@ export class ChapterProductionSession {
   }
 
   /** 开卷：TaskStarted(step=prepare)。同章活动会话存在即拒（重提交=新 session 的前置是旧卷已闭合）；
-   *  别章活动会话存在同样即拒——V1 全局单飞，同时最多一个活动 session（S11）。守卫在
+   *  别章活动会话存在同样即拒——V1 全局单飞，同时最多一个活动 session（S11）。该门在
    *  TaskStarted 落账之前，拒绝零副作用（判据由 assertSessionStartable 提供，与
    *  requestResubmit 的纯读预检同源）。 */
   static start(deps: ChapterProductionSessionDeps): ChapterProductionSession {
@@ -359,7 +359,7 @@ export class ChapterProductionSession {
    * hard_conflict 悬置时，作者「承认错误」改文 ⇒ 光标移回 user_edit，随后沿
    * 线性序重走 Final Extract 全量重提取（一致性优先于增量成本）。纪律：
    *   - 这是唯一的逆向步转换——且必须由作者显式调用本方法驱动（无自动迭代、
-   *     无次数上限：有显式驱动即无失控）；advance() 的线性后继守卫不变；
+   *     无次数上限：有显式驱动即无失控）；advance() 的线性后继门不变；
    *   - 判据读当下投影（lastGateVerdict='hard_conflict'），不是内存光标——
    *     崩溃恢复后同样可判；verdict=pass 或未走到门即拒（ReworkNotDrivenError）；
    *   - 回炉事件照常落账：TaskStepTransitioned{from:'continuity_gate',to:'user_edit'}
@@ -501,9 +501,9 @@ export class ChapterProductionSession {
    * 锁死全书后续开卷。
    *
    * 纪律：
-   *   - **无步进守卫**（与 finish() 相反）：作废必须能从十步中的任意一步调用
+   *   - **无步进门**（与 finish() 相反）：作废必须能从十步中的任意一步调用
    *     （prepare…flywheel_record 全程可作废）——「任意步都能放弃」正是它作为
-   *     死锁出口的意义；步进守卫只留给正常前进路径；
+   *     死锁出口的意义；步进门只留给正常前进路径；
    *   - 判据是 findOpenSessionWindow（活动窗口＝最后一个未闭合的 TaskStarted），
    *     不是内存光标，也不看 projectSession.committed：web 提交路径写的是**平铺**
    *     ChapterCommitted 行，它会落进 projectSession 的窗口区间被计为 committed，

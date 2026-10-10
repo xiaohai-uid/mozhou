@@ -80,7 +80,7 @@ describe('1. 合法请求：root 规范化 + 章号直出', () => {
     }
   })
 
-  it('相对路径 root 也被规范化（守卫的既有语义不被本模块改写）', () => {
+  it('相对路径 root 也被规范化（路径门的既有语义不被本模块改写）', () => {
     const result = decodeBookRequest({ chapterIndex: 1 }, root + '/./', { principal: PRINCIPAL })
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.value.root).toBe(resolve(root))

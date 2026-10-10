@@ -503,7 +503,7 @@ for (const novel of allNovels) {
       extract: () => chapterDelta,
     });
 
-    // Step 7: Continuity Gate 连续性门禁核验
+    // Step 7: Continuity Gate 连续性门核验
     const gated = runContinuityGate({ bookRoot: bookDir, chapterIndex: chIndex, delta: extracted.batch || {} });
     session.advance('continuity_gate', { verdict: gated.verdict, hardConflicts: gated.hardConflicts });
 

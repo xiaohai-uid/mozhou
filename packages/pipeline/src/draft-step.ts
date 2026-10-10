@@ -289,7 +289,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         }
         if (delta.length === 0) continue;
         streamSequence += 1;
-        // 迟到 chunk 守卫：**写盘之前**双校验（旧代次 / 已见序号一律丢弃，不落盘不报错）
+        // 迟到 chunk 门：**写盘之前**双校验（旧代次 / 已见序号一律丢弃，不落盘不报错）
         candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta, {
           ...(opts.generationEpoch === undefined ? {} : { generationEpoch: opts.generationEpoch }),
           sequence: streamSequence,

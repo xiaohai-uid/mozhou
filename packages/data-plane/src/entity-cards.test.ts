@@ -300,7 +300,7 @@ describe('Research 区硬隔离（#14 US17 / D6）', () => {
   })
 })
 
-describe('投影 v2：版本守卫与重建幂等（含目录卡）', () => {
+describe('投影 v2：版本门与重建幂等（含目录卡）', () => {
   it('user_version=2；删库后两次重建指纹与基线逐字节复原', async () => {
     const ctx = makeCtx()
     createEntityCard(ctx, 'char:lin-wan', LIN_WAN)

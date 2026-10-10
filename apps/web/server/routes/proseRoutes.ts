@@ -5,7 +5,7 @@
  * POST /api/chapter.prose.save   {root, chapterIndex, body, expectedRevision, title?}
  *   → Accept → Active Draft。expectedRevision:null=仅新建（章已存在 409）；
  *     数字=必须等于盘上 revision（不等 409 PROSE_REVISION_CONFLICT）。
- *     外部改盘由数据平面写前哈希拒绝（409 PROSE_EXTERNAL_CHANGE）；
+ *     外部改盘由数据面写前哈希拒绝（409 PROSE_EXTERNAL_CHANGE）；
  *     committed 章普通保存 409（CHAPTER_COMMITTED）——重开必须走显式
  *     /api/chapter.reopen（复用 reopenChapter：写前哈希 + ChapterReopened 事件 +
  *     基线刷新），本路由绝不静默降级或自动重开。冲突路径零磁盘变更。
@@ -29,11 +29,11 @@
  * （可重复的底层重开：写前哈希 + ChapterReopened 事件 + 基线刷新，不开会话窗口），
  * S9 走独立入口 POST /api/chapter.resubmit → requestResubmit
  * （packages/pipeline/src/resubmit.ts）：
- *   1. committed 前置守卫：非 committed（草稿/从未提交）在**任何盘面副作用之前**
+ *   1. committed 前置门：非 committed（草稿/从未提交）在**任何盘面副作用之前**
  *      以 ResubmitNotCommittedError 拒绝；盘上无此章仍按契约 404 CHAPTER_MISSING。
  *   2. 开新会话窗口：ChapterProductionSession.start 新 taskRef、光标 prepare，
  *      V1 十步全量重走（S9）。同章已有活动窗口 / 别章占用全局单飞 → 409
- *      RESUBMIT_SESSION_CONFLICT（守卫先于翻相位，拒绝零盘面副作用）。
+ *      RESUBMIT_SESSION_CONFLICT（该门先于翻相位，拒绝零盘面副作用）。
  *   3. 重提交期间的真相锚：响应 truthAnchor = 最近一次 ChapterCommitted 事件行的
  *      {commitId, contentSha256, proseRelPath}（latestCommittedTruth 以事件行为锚，
  *      **不读已翻回 draft 的正文文件**）；重提交完成后真相由新 commit 前移。
@@ -48,7 +48,7 @@
  *   - 作废收口：未被行走的窗口（光标停在 prepare..review）在作者重新定稿后就地
  *     作废（POST /api/session.abandon 或提交出口的 resubmitWindowCleanup）。
  * 两条路径都在 findOpenSessionWindow 视角下真正关闭窗口并释放 V1 全局单飞；
- * reopen 走数据平面相位机、不查会话账本，故作者编辑旅程始终不受影响。
+ * reopen 走数据面相位机、不查会话账本，故作者编辑旅程始终不受影响。
  *
  * 步 5 User Edit 接线（chapter-pipeline-spec §1 表第 5 行 / S4）：
  * /api/chapter.prose.save 在权威写路径（saveProseDraft：预期版本 + 写前哈希 + 定稿
@@ -60,7 +60,7 @@
  *     故每次保存落的是**本窗口累计编辑链**（自上次提交/重开起的全部编辑，可依序应用到
  *     窗口基线）：作者改完再原样重存一次（revision 照常 +1）时窗口信号不会被挤出窗口键，
  *     多次小增量保存也不会各自低于学习器 Nmin=10 而判零。此前每窗口读到零条编辑。
- *     链密度守卫：本窗口最近一条编辑必须恰是本次保存的前一 revision，否则（外部改盘 /
+ *     链密度门：本窗口最近一条编辑必须恰是本次保存的前一 revision，否则（外部改盘 /
  *     落账失败 / 跨窗口残留）退化为本次增量，绝不累积陈旧块。
  *   - 新建章基线 = ''（建章占位标题不是作者内容，不算作者删除）；
  *   - 本窗口无任何编辑可落（首次保存即无改动）不落事件（零噪声）；
@@ -499,7 +499,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
       : typeof rawExpected === 'number' && Number.isInteger(rawExpected) && rawExpected >= 0
         ? rawExpected
         : undefined
-    // 作者显式确认覆盖外部修改（仅在 expectedRevision 匹配 + 写前哈希失配时被数据平面采纳）
+    // 作者显式确认覆盖外部修改（仅在 expectedRevision 匹配 + 写前哈希失配时被数据面采纳）
     const confirmExternalOverwrite = body['confirmExternalOverwrite'] === true ? true : undefined
     if (rawBody === null || rawBody.trim() === '' || expectedRevision === undefined) {
       json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'root, chapterIndex, non-empty body and expectedRevision (integer >= 0 or null) required' })
@@ -544,7 +544,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
                 ),
               }),
         })
-        // 步 5 User Edit 接线：保存已由受守卫的权威写路径落定，编辑信号是派生面——
+        // 步 5 User Edit 接线：保存已由受门约束的权威写路径落定，编辑信号是派生面——
         // 落账失败不阻断保存（S12 同款降级），但必须在响应里可见（绝不静默）。
         // taskRef 与提交侧窗口锚同源（webCommitWindowTaskRef），否则 StyleLearner 读不到。
         // W3/F-09：**历史操作回放零事件副作用**——回放没有发生新的作者编辑，绝不为一
@@ -709,7 +709,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
     }
     const { root, chapterIndex } = decoded.value
     try {
-      // 盘上无此章保持 CHAPTER_MISSING 404 语义——守卫的 ResubmitNotCommittedError
+      // 盘上无此章保持 CHAPTER_MISSING 404 语义——该门的 ResubmitNotCommittedError
       // 分不出「无章」与「有章非 committed」，故先判存在性再进管线（只做错误码分层）。
       if (!existsSync(join(root, proseChapterPath(chapterIndex)))) {
         json(404, { ok: false, code: CHAPTER_MISSING, error: `chapter ${chapterIndex} not found on disk` })
@@ -732,7 +732,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
         return true
       }
       if (cause instanceof SessionAlreadyActiveError || cause instanceof GlobalSingleFlightError) {
-        // 单飞双守卫在翻相位之前拒绝：正文相位与盘面零变更（S11）
+        // 单飞双门在翻相位之前拒绝：正文相位与盘面零变更（S11）
         json(409, { ok: false, code: RESUBMIT_SESSION_CONFLICT, error: (cause as Error).message })
         return true
       }
@@ -875,7 +875,7 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
               )
             })()
       // 步 6-10 编排已收进管线边界（深化 04 · packages/pipeline/src/commit-orchestration.ts）：
-      // 相位守卫、依赖钉版回读、窗口键、提案续接/stale/待决规则、两道门、commitChapter
+      // 相位门、依赖钉版回读、窗口键、提案续接/stale/待决规则、两道门、commitChapter
       // 收口、飞轮记账、会话驱动与作废收口全部是 module 侧单一实现——路由只保留输入解码、
       // 身份/书权限与响应契约映射。提取缝（真实模型调用）与 StyleLearner 窗口闭合钩子在
       // 此注入（依赖方向：pipeline 不 import web 提取器与 flywheel）；web_commit_* 窗口键

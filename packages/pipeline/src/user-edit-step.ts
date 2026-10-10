@@ -17,12 +17,12 @@
  *   - T21 编辑 delta（#54 · t52:B2）：payload 增 deltaStats 五字段（口径钉死恒有）；
  *     delete/replace 块由步内盖 removedText——应用前从行数组截取、全文无截断上限
  *     （与无上限的 replacementText 保持 diff 对称性），仅及发布侧克隆块；
- *     validateBlock 镜像守卫拒调用方传入该键（宁败不猜，杜绝伪造删除侧文本）。
+ *     validateBlock 镜像门拒调用方传入该键（宁败不猜，杜绝伪造删除侧文本）。
  *
  * 第二入口（web 保存路径接线）：recordWholeBodyAuthorEdit 把「整文保存」折算成同形
  * 结构化块并落同一种 UserEditRecorded——作者写作层提交的是一整篇正文而非操作块，
  * 故由行级 diff 推导块（发布侧盖章/deltaStats 复用本模块单一事实源）；正文的权威
- * 落盘仍走数据平面 saveProseDraft（R1/R2 契约不动），本入口只产派生信号。
+ * 落盘仍走数据面 saveProseDraft（R1/R2 契约不动），本入口只产派生信号。
  * payload.blocks 为**本窗口累计编辑链**（窗口键只认恰在提交 revision 上落的那一条，
  * 详见 recordWholeBodyAuthorEdit 注释）：原样重存不丢窗口信号，多次小增量可凑够
  * 学习器 Nmin 样本。
@@ -87,7 +87,7 @@ export interface EditOperationBlock {
   /**
    * 删除侧原文（T21 · t52:B2）：**步内产出、仅及发布侧克隆块**——recordUserEdit
    * 在应用前从行数组截取后盖章，全文无截断上限（与无上限的 replacementText 保持
-   * diff 对称性）；validateBlock 镜像守卫拒调用方传入。
+   * diff 对称性）；validateBlock 镜像门拒调用方传入。
    */
   readonly removedText?: string;
 }
@@ -105,8 +105,8 @@ export interface EditDeltaStats {
 
 function validateBlock(block: EditOperationBlock, index: number): void {
   const label = `block #${index} (${block.op})`;
-  // T21 镜像守卫：删除侧文本由本步发布侧产出，调用方一律不得携带（镜像 delete
-  // 不得携带 replacementText 的既有守卫；宁败不猜，杜绝伪造删除侧文本）
+  // T21 镜像门：删除侧文本由本步发布侧产出，调用方一律不得携带（镜像 delete
+  // 不得携带 replacementText 的既有门；宁败不猜，杜绝伪造删除侧文本）
   if (block.removedText !== undefined) {
     throw new EditBlockShapeError(`${label}: removedText 由本步发布侧产出，调用方不得携带`);
   }
@@ -360,7 +360,7 @@ export function recordUserEdit(request: RecordUserEditRequest): UserEditOutcome 
 const LINE_DIFF_MAX_CELLS = 4_000_000;
 
 /**
- * 正文区归一：与数据平面 saveProseDraft 同款尾换行纪律（非空正文恒以 '\n' 收尾；
+ * 正文区归一：与数据面 saveProseDraft 同款尾换行纪律（非空正文恒以 '\n' 收尾；
  * 空正文恒 ''）——diff 两侧同口径才能逐字节比对。
  */
 function normalizeBody(body: string): string {
@@ -553,11 +553,11 @@ function isReusableBlock(value: unknown): boolean {
  *
  * 为什么需要它：web 路径的窗口键是 `web_commit_ch<N>_rev<R>`（R = **提交时**的盘上
  * revision，步 8 提案绑定冻结），而学习器按 taskRef 精确匹配 ⇒ 只有恰在 R 上落的那一条
- * 事件被消费。保存每次无条件 revision+1（数据平面 chapter.ts:815-818），故「作者改完
+ * 事件被消费。保存每次无条件 revision+1（数据面 chapter.ts:815-818），故「作者改完
  * 再原样重存一次」会把前一条信号挤出窗口键，本窗口信号整体归零；多次小增量保存也会
  * 因每次只带自己的增量而在 Nmin=10 门下判零。故每次保存都带上本窗口已累积的编辑链。
  *
- * 链密度守卫：本条必须恰是前一 revision，否则中间存在未落账的改动（外部改盘 / 落账
+ * 链密度门：本条必须恰是前一 revision，否则中间存在未落账的改动（外部改盘 / 落账
  * 失败 / 跨窗口残留）——累积会混入陈旧块，宁缺不假（退化为本次增量）。
  */
 function lastWindowAuthorEditBlocks(
@@ -612,7 +612,7 @@ function lastWindowAuthorEditBlocks(
  *     学习器 Nmin=10 门下判零）。
  *
  * 纪律：
- *   - 正文的**权威落盘**仍走数据平面 saveProseDraft（预期版本 + 写前哈希 + 定稿保护，
+ *   - 正文的**权威落盘**仍走数据面 saveProseDraft（预期版本 + 写前哈希 + 定稿保护，
  *     R1/R2 契约不动）；本函数只产派生信号，不写正文文件、不做冲突判定；
  *   - 本次增量块必须逐字节复现 afterBody（自证不变量），否则抛错——绝不落一条描述不了
  *     盘上正文的信号；累计链的每一段都曾各自过同一不变量（本函数是唯一发射端）；
@@ -640,7 +640,7 @@ export function recordWholeBodyAuthorEdit(request: RecordWholeBodyAuthorEditRequ
     return removed === undefined ? { ...block } : { ...block, removedText: removed };
   });
 
-  // 保存前盘上 revision = 本次保存 revision - 1（数据平面无条件 +1）
+  // 保存前盘上 revision = 本次保存 revision - 1（数据面无条件 +1）
   const windowPrior = lastWindowAuthorEditBlocks(request.bookRoot, request.chapterIndex, request.revision - 1);
   const publishedBlocks: readonly EditOperationBlock[] = [...(windowPrior ?? []), ...incremental];
   if (publishedBlocks.length === 0) {

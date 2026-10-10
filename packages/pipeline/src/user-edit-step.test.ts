@@ -236,7 +236,7 @@ describe('T21 编辑 delta 增补（#54 · t52:B2）', () => {
     });
   });
 
-  it('镜像守卫：调用方携带 removedText 即拒（宁败不猜），且零盘面副作用', () => {
+  it('镜像门：调用方携带 removedText 即拒（宁败不猜），且零盘面副作用', () => {
     const root = hermeticBook();
     const deps = makeDeps(root);
     expect(() =>
@@ -249,7 +249,7 @@ describe('T21 编辑 delta 增补（#54 · t52:B2）', () => {
         { op: 'replace', paragraphStart: 1, paragraphEnd: 1, replacementText: 'x', removedText: '伪造' } as never,
       ]),
     ).toThrowError(EditBlockShapeError);
-    // 守卫先行：拒绝路径不产生任何 UserEditRecorded 行
+    // 镜像门先行：拒绝路径不产生任何 UserEditRecorded 行
     const editRows = readLedger({ root }).map((row) => row.event)
       .filter((event) => event.type === 'UserEditRecorded');
     expect(editRows).toHaveLength(0);

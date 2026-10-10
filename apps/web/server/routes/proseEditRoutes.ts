@@ -214,7 +214,7 @@ export const proseEditRoutes: RouteHandler = async (req, res, { path, body, json
   try {
     const mock = isMockDraftProviderMode(process.env)
     // mock-empty = 「上游 HTTP 200 但零 delta」的静默空输出回归缝（与 draft.stream 同语义，
-    // 仅非生产成立）：走空流，让空流守卫产出 error 帧——不给「完成的空候选」。
+    // 仅非生产成立）：走空流，让空流门产出 error 帧——不给「完成的空候选」。
     const emptyMock =
       process.env['MOZHOU_DRAFT_PROVIDER'] === 'mock-empty' && process.env['NODE_ENV'] !== 'production'
     ndjson({ ok: true, event: 'start', candidateId, action: payload.action, provider: mock ? 'mock' : 'real-openai-compatible' })
@@ -247,7 +247,7 @@ export const proseEditRoutes: RouteHandler = async (req, res, { path, body, json
       }
     }
 
-    // 空流守卫（与 draft.stream 判帧纪律一致：没给出正文就是失败，不给「完成的空候选」）。
+    // 空流门（与 draft.stream 判帧纪律一致：没给出正文就是失败，不给「完成的空候选」）。
     if (produced === 0) {
       ndjson({ ok: false, event: 'error', candidateId, error: 'provider returned an empty stream' })
     } else {

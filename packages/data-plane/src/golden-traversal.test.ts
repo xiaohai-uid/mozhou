@@ -79,7 +79,7 @@ function fingerprintOf(sortedChapters: readonly number[]): string {
   return createHash('sha256').update(sortedChapters.join(',')).digest('hex')
 }
 
-describe('T30 黄金对拍台架 · 资格门 + CASE 守卫', () => {
+describe('T30 黄金对拍台架 · 资格门 + CASE 门', () => {
   it('资格门：CASE schema 校验通过（图合法：节点存在、期望 ⊆ 可达、无自环）', () => {
     const fixture = loadFixture()
     // 图合法：所有章号 1-10 存在、依赖实体 kind/id 只是引用（findReaders 不要求实体存在性）

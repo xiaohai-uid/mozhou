@@ -1,7 +1,7 @@
 /**
  * W2-3 · scripts/*.mjs 的统一书稿写入口。
  *
- * 与 apps/web/server/platform/writerLock.ts **同一命名规则与同一书根守卫**：
+ * 与 apps/web/server/platform/writerLock.ts **同一命名规则与同一书根门**：
  * 同一本书（同一规范化身份）在任何进程里都落到同一个命名管道名，因此 CLI/验收脚本
  * 与服务进程互斥；书根类型判定口径也逐条对齐（UNC 纯语法硬拒绝；盘符路径探测不可判定
  * 默认 fail-closed）。
@@ -155,7 +155,7 @@ export function assertLocalWritableBookRoot(root, probe = probeDriveType, option
 }
 
 /**
- * 以同一命名管道入口占锁。先过书根守卫（UNC/映射盘/不可判定一律拒绝），再绑定管道；
+ * 以同一命名管道入口占锁。先过书根门（UNC/映射盘/不可判定一律拒绝），再绑定管道；
  * 已有写入者（服务或另一脚本）则明确拒绝。
  */
 export async function holdBookWriteLock(root, options = {}) {

@@ -138,7 +138,7 @@ export interface ArchivedMatrixRow {
   readonly matrixRowRef: string;
   /** T20 matrixRowFor 原样形状（六指标读数含门限判定随读数携带）。 */
   readonly row: VersionMatrixRow;
-  /** 该次基准运行的 CASE-NNNN 清单（回归守卫的覆盖面证据）。 */
+  /** 该次基准运行的 CASE-NNNN 清单（回归检查的覆盖面证据）。 */
   readonly caseIds: readonly string[];
 }
 

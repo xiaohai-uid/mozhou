@@ -555,7 +555,7 @@ describe('五态对账：作者门与落投影（Q8-Q12 + S4）', () => {
     }
   })
 
-  it('守卫：未知提案 / 非 awaiting_author 状态决策 / 未知条目一律响亮拒绝', () => {
+  it('提案决策门：未知提案 / 非 awaiting_author 状态决策 / 未知条目一律响亮拒绝', () => {
     const plane = newBook()
     try {
       const rec = plane.reconciliation()

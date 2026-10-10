@@ -20,6 +20,6 @@
 
 ## Known limitations
 
-- **禁止增量迁移框架**（`src/database.ts:4-7` 明文）。投影靠 `PRAGMA user_version` 守卫，
+- **禁止增量迁移框架**（`src/database.ts:4-7` 明文）。投影靠 `PRAGMA user_version` 门，
   版本不匹配即抛 `ProjectionVersionMismatchError`，正确做法是全量重建。
 - 29 条 `export * from` 意味着包的实际公开面在子模块里，`index.ts` 自身看不到清单。

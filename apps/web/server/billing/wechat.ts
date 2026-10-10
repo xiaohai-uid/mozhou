@@ -92,7 +92,7 @@ export class WechatPayVerifier {
     // 2. 验签：待签名串为 `${timestamp}\n${nonce}\n${rawBody}\n`
     const signatureMessage = `${timestamp}\n${nonce}\n${rawBody}\n`
     if (!this._platformCert) {
-      // 测试模式下使用固定 HMAC 验签对比守卫
+      // 测试模式下使用固定 HMAC 验签检查
       // R2 修复：以上测试放行分支已删除——未配置平台证书一律拒绝（fail-closed），与 NODE_ENV 无关。
       // 测试不再需要旁路：经构造函数注入临时密钥后做真实 RSA 验签（见 wechat.test.ts）。
       throw new RequestBoundaryError(503, 'WECHAT_CERT_MISSING', 'WeChat platform certificate is not configured')

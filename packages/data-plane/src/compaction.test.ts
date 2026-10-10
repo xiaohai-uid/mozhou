@@ -128,7 +128,7 @@ function setupBookWithFacts(): {
 }
 
 describe('卷边界状态压缩事务系统 (executeVolumeCompaction)', () => {
-  it('门禁 1：未完结卷（status != completed）拒绝执行压缩', async () => {
+  it('门 1：未完结卷（status != completed）拒绝执行压缩', async () => {
     const { plane, volumeId } = setupBookWithFacts()
 
     await expect(
@@ -142,7 +142,7 @@ describe('卷边界状态压缩事务系统 (executeVolumeCompaction)', () => {
     plane.close()
   })
 
-  it('门禁 2：不存在的 volumeNodeId 抛出 VolumeNotFoundError', async () => {
+  it('门 2：不存在的 volumeNodeId 抛出 VolumeNotFoundError', async () => {
     const { plane } = setupBookWithFacts()
 
     await expect(

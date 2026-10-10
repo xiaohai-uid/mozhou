@@ -293,7 +293,7 @@ export function AccountView(): JSX.Element {
                 <b>本地作品安全声明</b>
               </div>
               <p className="mono muted" style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.6 }}>
-                墨舟严格保护创作者数据安全：登录仅同步账号权益与云端配额，绝不扫描、读取或向公网上传您的 Windows 本地小说目录。
+                墨舟严格保护创作者数据安全：登录仅同步账号权益与云端配额，绝不扫描、读取或向公网上传您的 Windows 本地作品目录。
               </p>
               <div style={{ marginTop: 16 }}>
                 <button

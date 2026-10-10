@@ -491,7 +491,7 @@ describe('queryActiveFacts 读路径', () => {
     }
   })
 
-  it('查询入参守卫：reader 不是可查询视角；章号必须为正整数', () => {
+  it('入参检查：reader 不是可查询视角；章号必须为正整数', () => {
     const plane = newBook()
     try {
       expect(() => plane.queryActiveFacts({ chapter: 1, pov: 'reader' as never })).toThrow(TrackingRowError)

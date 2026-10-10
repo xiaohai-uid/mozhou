@@ -6,7 +6,7 @@
  * - 未配置模型 → 501 NAMING_NOT_CONFIGURED（真实性门：不伪造名称）；
  * - mode/category/count 校验 400；
  * - prompt 构造与容错解析为纯函数单元测试。
- * AI 真实网络调用不在此覆盖：SSRF 守卫禁止私网目标，控制流由 mock provider
+ * AI 真实网络调用不在此覆盖：SSRF 门拒绝私网目标，控制流由 mock provider
  * 与纯函数证明（模型提取使用夹具证明控制流，不证明真实生成质量）。
  */
 import { createServer } from 'node:http'

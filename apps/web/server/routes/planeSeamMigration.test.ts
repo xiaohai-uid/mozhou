@@ -152,7 +152,7 @@ describe('seam 迁移后：读端点行为不变', () => {
     expect(book['title']).toBe('seam 书')
   })
 
-  it('/api/library.open 有效书根 200；未登记的书根被前置守卫拒绝（400），未进 seam', async () => {
+  it('/api/library.open 有效书根 200；未登记的书根被前置门拒绝（400），未进 seam', async () => {
     const { bookDir } = newBook('libopen')
     const base = await listen()
     const ok = await post(base, '/api/library.open', { root: bookDir })

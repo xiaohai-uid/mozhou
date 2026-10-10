@@ -59,7 +59,7 @@ describe('hosted 模式：拿不到 principal 就显式拒答', () => {
     }
   })
 
-  it('测试注入的 deps 不受 hosted 守卫影响（注入是显式契约，非默认解析）', async () => {
+  it('测试注入的 deps 不受 hosted 门影响（注入是显式契约，非默认解析）', async () => {
     process.env.MOZHOU_HOSTED = 'true'
     const evaluate = () =>
       Promise.resolve({ verdict: 'ok' as const, findings: [], outputTokens: 0 })

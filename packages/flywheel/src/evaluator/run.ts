@@ -8,7 +8,7 @@
  *   - **只建议不自动改路由**（C6）：建议物是纯数据，生效 = 作者人工编辑 tier 配置
  *     后既有 loadTierConfig 机械校验 + mtime 热加载；本模块只读消费 loadTierConfig
  *     解析 incumbent 路由（缺文件/坏结构按其契约 fail-fast 抛错，宁败不猜）。
- *   - **C2 桥接守卫**：P1 meta 缺位（无任何 GenerationStarted 携带 parentTaskRef）
+ *   - **C2 桥接门**：P1 meta 缺位（无任何 GenerationStarted 携带 parentTaskRef）
  *     ⇒ taskRef 同窗 join 前提为假 ⇒ 拒绝产建议、只产 watch 条目（机械强制，
  *     测试断言 promote/demote 计数为零）。
  *   - 零时钟：nowUtc 必填注入（benchmark run.ts 先例同界）；ULID 显式铸法可注入。
@@ -55,7 +55,7 @@ export interface TaskModelEvaluationOutcome {
   readonly suggestions: readonly RoutingSuggestion[];
   readonly appendedCount: number;
   readonly bridgePresent: boolean;
-  /** watch_only = C2 守卫路径或证据面为空；evaluated = 完整五规则判定已走。 */
+  /** watch_only = C2 桥接门路径或证据面为空；evaluated = 完整五规则判定已走。 */
   readonly mode: 'evaluated' | 'watch_only';
 }
 
@@ -125,7 +125,7 @@ export async function runTaskModelEvaluation(request: RunTaskModelEvaluationRequ
 
   const projection = projectInputs({ ledger, usage });
 
-  // ---- C2 桥接守卫：join 前提缺位 ⇒ 只产 watch 条目 ------------------------
+  // ---- C2 桥接门：join 前提缺位 ⇒ 只产 watch 条目 ------------------------
   if (!projection.bridgePresent) {
     const watches = projection.unattributedRoutes.map((route) =>
       suggestionOf({

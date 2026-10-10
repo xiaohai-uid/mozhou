@@ -2,7 +2,7 @@
  * scripts/verify-mock-journey.mjs
  *
  * 主框架走通验收（零真实模型）：建书 → 会话开启 → 步进 → mock 流式生成 →
- * 采纳候选 → 审查 → 步进 → 定稿提交 → 收据回读 → 导出。全链 HTTP，起的是
+ * 采纳候选 → 审查 → 步进 → 定稿提交 → 上下文凭证回读 → 导出。全链 HTTP，起的是
  * 真实 productionServer 进程，走的真实 RuntimeEngine / 管线 / 数据面；
  * 唯一被 mock 掉的是 LLM 上游（MOZHOU_DRAFT_PROVIDER=mock，既有显式演示/测试
  * 开关，start 帧自报 provider:'mock'）。
@@ -202,7 +202,7 @@ try {
   }
   log(`session opened: taskRef=${opened.data.taskRef} step=${opened.data.currentStep}`);
 
-  // 3. 步进 prepare→compile（不依赖 provider，守卫不得误伤）
+  // 3. 步进 prepare→compile（不依赖 provider，该门不得误伤）
   const toCompile = await postJson('/api/session.advance', { root: bookRoot, chapterIndex: 1 });
   if (toCompile.status !== 200 || toCompile.data.currentStep !== 'compile') {
     throw new Error(`advance to compile failed: HTTP ${toCompile.status} ${JSON.stringify(toCompile.data)}`);
@@ -278,7 +278,7 @@ try {
   }
   log(`review passed: reportId=${review.data.reportId} mechanical=${JSON.stringify(review.data.mechanicalGate?.verdict ?? review.data.mechanicalGate ?? 'n/a')}`);
 
-  // 9. 步进 review→user_edit（verdict 'pass' 已由审查落账，守卫应放行）
+  // 9. 步进 review→user_edit（verdict 'pass' 已由审查落账，该门应放行）
   const toUserEdit = await postJson('/api/session.advance', { root: bookRoot, chapterIndex: 1 });
   if (toUserEdit.status !== 200 || toUserEdit.data.currentStep !== 'user_edit') {
     throw new Error(`advance to user_edit failed: HTTP ${toUserEdit.status} ${JSON.stringify(toUserEdit.data)}`);
@@ -322,7 +322,7 @@ try {
   }
   log(`chapter committed: ${commit.data.commitId} phase=${commit.data.phase}`);
 
-  // 11. 上下文收据可回读（draft.stream 经 draftContext 落下的编译凭证）
+  // 11. 上下文凭证可回读（draft.stream 经 draftContext 落下的编译凭证）
   const receipts = await postJson('/api/receipts', { root: bookRoot });
   if (receipts.status !== 200 || receipts.data.ok !== true || !Array.isArray(receipts.data.receipts)) {
     throw new Error(`receipts readback failed: HTTP ${receipts.status} ${JSON.stringify(receipts.data)}`);
@@ -353,7 +353,7 @@ try {
     sourceCommit: sourceCommit(),
     command: 'node scripts/verify-mock-journey.mjs',
     exitCode: 0,
-    scope: '主框架走通（mock 生成）：建书 → 会话开启 → 步进 → mock 流式生成 → 采纳 → 审查 → 步进 → 提交（步 6-10 收口）→ 收据回读 → 导出',
+    scope: '主框架走通（mock 生成）：建书 → 会话开启 → 步进 → mock 流式生成 → 采纳 → 审查 → 步进 → 提交（步 6-10 收口）→ 上下文凭证回读 → 导出',
     provider: { frame: startFrame.provider, note: 'MOZHOU_DRAFT_PROVIDER=mock（显式演示/测试开关）' },
     result: {
       promptChars: prompt.length,
@@ -385,7 +385,7 @@ try {
     sourceCommit: sourceCommit(),
     command: 'node scripts/verify-mock-journey.mjs',
     exitCode,
-    scope: '主框架走通（mock 生成）：建书 → 会话开启 → 步进 → mock 流式生成 → 采纳 → 审查 → 步进 → 提交（步 6-10 收口）→ 收据回读 → 导出',
+    scope: '主框架走通（mock 生成）：建书 → 会话开启 → 步进 → mock 流式生成 → 采纳 → 审查 → 步进 → 提交（步 6-10 收口）→ 上下文凭证回读 → 导出',
     error: message,
     limitations,
   });

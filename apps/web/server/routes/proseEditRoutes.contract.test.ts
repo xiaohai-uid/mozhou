@@ -4,7 +4,7 @@
  *
  * 覆盖：请求形状校验（400 族）、mock 流 NDJSON 帧协议（start→delta→done）、
  * mock 语义（回吐选区原文——不伪造改写）、绝不写盘（调用前后书根目录零变化）、
- * 空流守卫（provider 静默空输出 → error 帧，不给「完成的空候选」）。
+ * 空流门（provider 静默空输出 → error 帧，不给「完成的空候选」）。
  * 走 createMoZhouApiRouter 完整链路（策略白名单 + book 鉴权 + 解码缝），与
  * pipelineRoutes.advanceGuard.test.ts 同构。
  */
@@ -212,7 +212,7 @@ describe('/api/prose.edit.stream · mock 流契约', () => {
   })
 })
 
-describe('/api/prose.edit.stream · 空流守卫', () => {
+describe('/api/prose.edit.stream · 空流门', () => {
   it('mock-empty（上游静默空输出形态）→ error 帧，不给「完成的空候选」', async () => {
     process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock-empty'
     const { base, root } = await createBook(makeDataRoot())

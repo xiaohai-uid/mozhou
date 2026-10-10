@@ -5,7 +5,7 @@
  * - POST /api/chapter.prose.save：预期版本契约——expectedRevision:null=仅新建；
  *   数字=必须等于盘上 revision。冲突 409 不改磁盘；外部改盘 409（写前哈希）；
  *   committed 章 409 拒绝普通保存（R2：绝不静默降级）。
- * - POST /api/chapter.reopen：作者显式重开（复用数据平面 reopenChapter 语义：
+ * - POST /api/chapter.reopen：作者显式重开（复用数据面 reopenChapter 语义：
  *   写前哈希 + ChapterReopened 事件 + 基线刷新），重开后可编辑保存。
  * Commit 语义不受影响：本路由绝不翻转相位。
  */
@@ -269,7 +269,7 @@ describe('R2：普通保存不降级定稿；显式重开走既有语义', () =>
     expect(String(reread.data.body)).toContain('重开后的新草稿')
   })
 
-  it('验收E：外部修改与重开同时发生——重开同样拒绝（写前哈希守卫）', async () => {
+  it('验收E：外部修改与重开同时发生——重开同样拒绝（写前哈希门）', async () => {
     const { base, root } = await makeBook()
     const plane = LocalDataPlane.openOrRebuild(root)
     plane.createChapterDraft({ chapterIndex: 1, title: 'One' })
@@ -294,7 +294,7 @@ describe('R2：普通保存不降级定稿；显式重开走既有语义', () =>
 })
 
 describe('POST /api/chapter.quality（既有行为保持）', () => {
-  it('无章新书：200 no_review（诚实守卫，非 500）', async () => {
+  it('无章新书：200 no_review（诚实检查，非 500）', async () => {
     const { base, root } = await makeBook()
     const { status, data } = await post(base, '/api/chapter.quality', { root, chapterIndex: 1 })
     expect(status).toBe(200)

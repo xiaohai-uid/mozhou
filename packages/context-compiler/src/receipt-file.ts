@@ -35,7 +35,7 @@ const EVENTS_FILENAME = 'events.jsonl'
 export const RECEIPTS_DIRNAME = `${RUNTIME_DIR}/${RECEIPTS_SUBDIR}`
 export const RUNTIME_EVENTS_RELPATH = `${RUNTIME_DIR}/${EVENTS_FILENAME}`
 
-/** receipt 文件名合法性守卫（防路径穿越；id 由品牌类型约束，运行时仍复核前缀）。 */
+/** receipt 路径检查（防路径穿越；id 由品牌类型约束，运行时仍复核前缀）。 */
 const RECEIPT_ID_PATTERN = /^rcpt_[0-9A-Za-z]+$/
 
 /* ----------------------------------------------------------------------------

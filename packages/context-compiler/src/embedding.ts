@@ -67,7 +67,7 @@ export interface CreateLocalEmbeddingProviderOptions {
 }
 
 /**
- * 安装环境守卫（票面 AC）：onnxruntime-node 的 postinstall 会强拉 GPU 二进制，
+ * 安装环境门（票面 AC）：onnxruntime-node 的 postinstall 会强拉 GPU 二进制，
  * 无 CUDA 工具链时解压失败并整体回滚安装（T9 R1）。运行期置默认值兜底；
  * 安装期硬门见 scripts/check-install-env.mjs 与 docs/install.md。
  */
@@ -158,7 +158,7 @@ export async function createLocalEmbeddingProvider(
   const manifest = readManifest(modelDir)
   verifyAssets(modelDir, manifest)
 
-  // 守卫先于动态 import——静态 import 会先于副作用代码求值 fastembed 模块图。
+  // 环境门先于动态 import——静态 import 会先于副作用代码求值 fastembed 模块图。
   ensureCudaSkipEnv()
   const fastembed = await import('fastembed')
   // InitCustomOptions 未从包入口导出；字面量内联传参，由 model: CUSTOM 收窄联合分支。

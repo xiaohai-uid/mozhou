@@ -682,7 +682,7 @@ if (ch1DiskAfterUndo.includes(newReplacementText)) {
   throw new Error(`Step 5 FAILED: Undo failed to revert replacement text! Disk: ${ch1DiskAfterUndo}`);
 }
 
-// 检查数据平面版本
+// 检查数据面版本
 const planeCheck5 = LocalDataPlane.open(tempBookRoot);
 const proseSnap5 = planeCheck5.getProseChapter(1);
 planeCheck5.close();

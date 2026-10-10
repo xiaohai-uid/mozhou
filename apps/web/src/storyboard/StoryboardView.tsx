@@ -104,7 +104,7 @@ export function StoryboardView({
     return () => { aliveRef.current = false }
   }, [])
 
-  /* R1/R2 修复根因=闭包陈旧：保存链路一律经 ref 读最新值；响应归属按 ref 守卫。 */
+  /* R1/R2 修复根因=闭包陈旧：保存链路一律经 ref 读最新值；响应归属按 ref 检查。 */
   const docRef = useRef<StoryboardDocument | null>(null)
   const docIsSavedRef = useRef(false)
   const savingRef = useRef(false)
@@ -219,7 +219,7 @@ export function StoryboardView({
     return () => vv.removeEventListener('resize', keepVisible)
   }, [viewMode])
 
-  /* U06：脏状态注册到外壳（切页/切书/关抽屉守卫）+ 刷新/关闭前的 beforeunload。
+  /* U06：脏状态注册到外壳（切页/切书/关抽屉门）+ 刷新/关闭前的 beforeunload。
      只有存在工作文档且未保存时才拦；干净文档不拦。
      U05：外壳徽标读同一三态真源——空文档=idle（就绪），不谎报「已保存」。 */
   useEffect(() => {

@@ -268,7 +268,7 @@ export function StyleDistillView({
                       onClick={() => void handleApplyStyle()}
                       style={{ fontSize: 11, padding: '4px 12px' }}
                     >
-                      {applying ? '正在应用…' : root ? '应用为本书此场景文风' : '先打开作品即可应用'}
+                      {applying ? '正在应用…' : root ? '应用为当前作品此场景文风' : '先打开作品即可应用'}
                     </button>
                   </div>
                 </div>
@@ -302,7 +302,7 @@ export function StyleDistillView({
             <div className="card-shell">
               <div className="card">
                 <p className="muted" style={{ margin: 0, fontSize: 11 }}>
-                  未检测到当前书的文风画像或尚未建书。在工作台建书后，系统将自动初始化四场景 StyleProfile 种子并在写作流中演化。
+                  未检测到当前作品的文风画像或尚未建书。在工作台建书后，系统将自动初始化四场景 StyleProfile 种子并在写作流中演化。
                 </p>
               </div>
             </div>

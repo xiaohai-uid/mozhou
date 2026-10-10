@@ -810,7 +810,7 @@ export interface CommitChapterRequest {
   /**
    * 作者实际读取的章版本（深化 05 Contract Delta，与 saveProseDraft.expectedRevision
    * 同构照搬）。携带时必须等于盘上 revision——不匹配即抛 ProseRevisionConflictError，
-   * 写盘一步不进（正文/正典/账本零写入）。缺省（undefined）= 不启用该守卫：
+   * 写盘一步不进（正文/正典/账本零写入）。缺省（undefined）= 不启用该门：
    * 模块内部既有调用方不受影响；HTTP 契约面由路由强制在场（缺失 400）。
    */
   readonly expectedRevision?: number
@@ -947,7 +947,7 @@ function writeManifestFor(ctx: PlaneContext): void {
 export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest): ChapterCommitResult {
   const proseRel = proseChapterPath(request.chapterIndex)
 
-  // W3 幂等前置检查必须**先于**相位/revision 守卫：同一操作的成功结果不因章节此后
+  // W3 幂等前置检查必须**先于**相位/revision 门：同一操作的成功结果不因章节此后
   // 被提交或再编辑而否认（否则重试会撞 ChapterPhaseError/ProseRevisionConflictError）。
   if (request.operation !== undefined) {
     const replayed = findReplayableOperation(ctx.root, request.operation)
@@ -961,8 +961,8 @@ export function commitChapter(ctx: PlaneContext, request: CommitChapterRequest):
     throw new ChapterPhaseError(request.chapterIndex, 'chapter is committed — reopen it before re-committing')
   }
   // 深化 05 Contract Delta：作者所读 revision 与盘不符 ⇒ 拒绝（与 saveProseDraft 同码
-  // ProseRevisionConflictError、同顺序——相位守卫在前，revision 比对在后）。编排层在
-  // 提取缝之前已做同判，本守卫兜住提取 await 期间的并发保存窗口（TOCTOU）：任何写盘
+  // ProseRevisionConflictError、同顺序——相位门在前，revision 比对在后）。编排层在
+  // 提取缝之前已做同判，本门兜住提取 await 期间的并发保存窗口（TOCTOU）：任何写盘
   // 发生在 journal 落盘之后，此处先行比对即正文/正典/账本零写入。
   if (request.expectedRevision !== undefined && before.revision !== request.expectedRevision) {
     throw new ProseRevisionConflictError(request.chapterIndex, request.expectedRevision, before.revision)
@@ -1206,14 +1206,14 @@ export interface SaveProseDraftResult {
  * 作者草稿落盘（Accept → Active Draft）：
  * - committed 章：显式拒绝（ChapterPhaseError）——重开必须走 reopenChapter，绝不静默降级（R2）。
  * - 更新路径：revision 比对（双端/过期页面 → ProseRevisionConflictError）+
- *   写前哈希（外部改盘 → PreWriteHashMismatchError）双重守卫，冲突零磁盘变更（R1）。
+ *   写前哈希（外部改盘 → PreWriteHashMismatchError）双重门，冲突零磁盘变更（R1）。
  * - 新建路径：章必须不存在（ChapterExistsError），不把并发新建伪装成覆盖。
  * 成功即刷新哈希基线（与 createChapterDraft/reopenChapter 同纪律）。
  */
 export function saveProseDraft(ctx: PlaneContext, request: SaveProseDraftRequest): SaveProseDraftResult {
   const proseRel = proseChapterPath(request.chapterIndex)
 
-  // W3 幂等前置检查：先于新建/相位/revision 守卫——同一操作的成功结果不因章节此后
+  // W3 幂等前置检查：先于新建/相位/revision 门——同一操作的成功结果不因章节此后
   // 被再编辑或被提交而否认。
   if (request.operation !== undefined) {
     const replayed = findReplayableOperation(ctx.root, request.operation)

@@ -1,13 +1,13 @@
 # @mozhou/context-compiler
 
-确定性的上下文预算、召回与收据管线。
+确定性的上下文预算、召回与上下文凭证管线。
 
 ## Owns
 
 - 两段式上下文装配：故事圣经 + 编译器（`src/assemble.ts`、`src/compile.ts`）。
 - 多通道召回：`embeddingRecall`（本地向量）、`khopGraphRecall`（K 跳图）、`detectKeywordTriggers`（关键词快通道），
   由 `mergeChannelsWithRRF` 做 RRF 融合。
-- 预算装配与收据（`src/receipt-*.ts`、`src/tokenizer.ts`）。
+- 预算装配与上下文凭证（`src/receipt-*.ts`、`src/tokenizer.ts`）。
 - **内置本地 embedding 与分词器资产**：`BUNDLED_MODEL_ID`、`createLocalEmbeddingProvider`、`createLocalTokenizer`。
 
 > 术语见 [`GLOSSARY.md`](../../GLOSSARY.md) Part 1 §1.2。

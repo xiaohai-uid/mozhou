@@ -140,7 +140,7 @@ describe('POST /api/chapter.commit · expectedRevision 提交幂等契约（深�
     const eventsAfterFirst = eventsDisk(root)
 
     // 成功响应丢失：客户端只知「可能成功」，携同一 expectedRevision 重试——
-    // 相位守卫在 revision 比对之前拒绝，重复提交不伪装成第二次成功。
+    // 相位门在 revision 比对之前拒绝，重复提交不伪装成第二次成功。
     const retry = await post(base, '/api/chapter.commit', { root, chapterIndex: 1, summary: '定稿', expectedRevision: revision })
     expect(retry.status, JSON.stringify(retry.data)).toBe(409)
     expect(retry.data.code).toBe('CHAPTER_ALREADY_COMMITTED')

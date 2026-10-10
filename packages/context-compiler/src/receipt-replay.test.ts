@@ -192,10 +192,10 @@ describe('AC2 replayInputs 重放同一 desirability 终序', () => {
 })
 
 /* ----------------------------------------------------------------------------
- * 输入漂移与版本守卫
+ * 输入漂移与版本门
  * -------------------------------------------------------------------------- */
 
-describe('漂移定位与版本守卫', () => {
+describe('漂移定位与版本门', () => {
   const base = () => assembleBudgetedContext(richInput()).receipt
 
   it('候选内容变异 → ReplayInputDriftError 指名该 id', () => {

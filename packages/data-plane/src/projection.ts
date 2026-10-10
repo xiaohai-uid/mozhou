@@ -1,6 +1,6 @@
 /**
  * SQLite 投影 v1（T3 裁决：better-sqlite3 直连薄仓储，禁 ORM、禁增量迁移；
- * `PRAGMA user_version` 守卫由 database.ts 承担）。
+ * `PRAGMA user_version` 门由 database.ts 承担）。
  *
  * T1 表面只承载建书骨架的可查询状态：
  *   - books / outline_nodes：book.json 与大纲节点 md 的结构化行

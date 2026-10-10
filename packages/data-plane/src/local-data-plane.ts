@@ -1,6 +1,6 @@
 /**
  * LocalDataPlane——双平面数据面的测试接缝（Testing Decisions 三接缝之一）：
- * 打开书（投影版本守卫）/ 基线核对 / 全量吸收重建 / 章节相位机（T3）。
+ * 打开书（投影版本门）/ 基线核对 / 全量吸收重建 / 章节相位机（T3）。
  * EXTERNAL_MODIFIED 五态协议的完整接线归 T5 对账票。
  */
 import { existsSync, statSync } from 'node:fs'

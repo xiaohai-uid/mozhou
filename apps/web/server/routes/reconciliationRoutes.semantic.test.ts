@@ -358,7 +358,7 @@ describe('落定出口 → 语义分析批次（T28/T29 生产接线）', () => 
     armRealProvider(upstream)
     const base = await startApi()
 
-    // 与真实旅程同形的守卫：账本里没有任何 TaskStarted（作者从不调 /api/session.open）。
+    // 与真实旅程同形的前置门：账本里没有任何 TaskStarted（作者从不调 /api/session.open）。
     // 若有人把锚点解析改回 projectSession().lastReceiptId（只认会话窗口内指针），
     // 本用例会立刻转红——这正是本票修掉的「接线空转」缺陷。
     expect(

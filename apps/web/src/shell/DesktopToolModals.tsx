@@ -165,7 +165,7 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
               <div style={{ background: 'var(--surface-sunken)', padding: 10, borderRadius: 8, fontSize: 11 }}>
                 <div>● 离线版本守护：已开启</div>
                 <div className="muted" style={{ marginTop: 4 }}>
-                  外部变动冲突守卫：启用（写前哈希严格校验）
+                  外部变动冲突门：启用（写前哈希严格校验）
                 </div>
                 <div className="muted" style={{ marginTop: 2 }}>
                   全量 ZIP 备份：可随时前往「云同步与备份」生成独立全本归档包

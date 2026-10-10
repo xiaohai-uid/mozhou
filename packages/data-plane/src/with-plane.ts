@@ -12,7 +12,7 @@
  *
  * 接口刻意做成「把句柄借出去」而不是「返回一个句柄」：借出的句柄没有名字，
  * 调用点就没法忘记还。裸 `LocalDataPlane.open/openOrRebuild` 由
- * `eslint.config.js` 的 `no-restricted-syntax` 变成 error——守卫从 245 行正则
+ * `eslint.config.js` 的 `no-restricted-syntax` 变成 error——检查从 245 行正则
  * 源码扫描退化成一条常规门规则。
  *
  * ## 为什么两个入口而不是一个

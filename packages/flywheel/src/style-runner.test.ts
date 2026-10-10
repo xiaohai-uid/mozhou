@@ -146,7 +146,7 @@ describe('runStyleLearnerForWindow · 触发点编排', () => {
     expect(outcome.noEdits).toBe(true);
   });
 
-  it('delete 调用方传 removedText 被守卫拒绝（t52:B2 发布侧克隆纪律）', () => {
+  it('delete 调用方传 removedText 被镜像门拒绝（t52:B2 发布侧克隆纪律）', () => {
     const { root, bus } = hermeticBook();
     expect(() =>
       recordUserEdit({
@@ -159,7 +159,7 @@ describe('runStyleLearnerForWindow · 触发点编排', () => {
         blocks: [{ op: 'delete', paragraphStart: 1, paragraphEnd: 1, removedText: '越权携带' }],
       }),
     ).toThrow();
-    // 守卫后的 taboo 侧账不为任何窗口建立（没有合法 delete 观测）
+    // 镜像门后的 taboo 侧账不为任何窗口建立（没有合法 delete 观测）
     expect(() => loadTabooCandidateState(root)).not.toThrow();
   });
 });

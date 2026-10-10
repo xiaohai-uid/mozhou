@@ -42,12 +42,12 @@ export class DependencyManifestError extends Error {
 }
 
 /* ----------------------------------------------------------------------------
- * I1 工件级保护守卫
+ * I1 工件级保护门
  * -------------------------------------------------------------------------- */
 
 /**
- * 自动化写入前置守卫（I1）：provenance.protectedUserContent === true 即抛错。
- * 作者/应用壳的人工写路径不走此守卫——保护位约束的只是自动流程。
+ * 自动化写入前置门（I1）：provenance.protectedUserContent === true 即抛错。
+ * 作者/应用壳的人工写路径不走此门——保护位约束的只是自动流程。
  */
 export function assertAutomationReadOnly(
   provenance: AuthorProvenance,

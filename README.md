@@ -1,13 +1,13 @@
 # 🌊 墨舟 (MoZhou / Novel OS)
 
-> **定位**：长篇小说 AI 辅助创作操作系统 —— 工业级状态机 · 5 项机械门禁 · 本地数据自有 · 确定性长程因果契约
+> **定位**：长篇小说 AI 辅助创作操作系统 —— 工业级状态机 · 5 项机械门 · 本地数据自有 · 确定性长程因果契约
 
 ---
 
 ## 📌 版本声明与当前状态
 
 当前发布版本定位为 **技术预览版 (Technical Preview / v0.3.0)**（版本号以 `package.json` 为唯一事实来源）：
-- **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、5 项机械门禁与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据平面（`@mozhou/data-plane`），以及当前 Web/桌面工作台与导出链路；
+- **真实实现的核心**：本地十步生产管道（`@mozhou/pipeline`）、Story Brain 认知穿透（`@mozhou/kernel`）、5 项机械门与 4-gram 去复读（`@mozhou/quality-engine`）、确定性三通道加权 RRF 上下文装配（`@mozhou/context-compiler`）、本地 SQLite WAL 数据面（`@mozhou/data-plane`），以及当前 Web/桌面工作台与导出链路；
 - **AI 模型通道**：支持 **USER_BYOK（用户自带 Key）** 的 OpenAI-compatible 真实流式调用；未配置可用 Provider 时相关生成能力会显式显示不可用，只有明确开启 Demo 数据的环境才使用演示数据；
 - **商业化状态**：当前为**社区免费技术预览版**。云同步/云备份、付费许可证激活与正式支付通道尚未作为本 Release 的可用能力发布。
 - **部署**：只支持单机回环部署，容器与 systemd 部署必须显式设置 `MOZHOU_DATA_ROOT` 与 `MOZHOU_SECRET_KEY`。完整清单与已知限制见 [`docs/deployment.md`](docs/deployment.md)。
@@ -24,7 +24,7 @@
 
 - **数据安全**：`manifest.json` 基线改为原子且持久落盘（临时文件 + fsync + rename），并在基线损坏时可由 canon 重建——此前崩溃截断会让整本书经应用永久无法打开；流派资产包改为非破坏注入，目标文件已存在即跳过、不再静默覆盖作者内容。
 - **诚实性**：注销账号在云端删除不可用或失败时显式报错，不再回报"已删除"；小说拆解不再把与输入无关的通用模板当作本文本推断结果展示；`/api/draft.question` 补回契约要求的 `hint` 字段。
-- **宣称校正**："11 项机械门禁"改为实际的 5 项；官网撤下并不存在的 `Setup.exe` 下载项与针对未开放付费通道的退款承诺。
+- **宣称校正**："11 项机械门"改为实际的 5 项；官网撤下并不存在的 `Setup.exe` 下载项与针对未开放付费通道的退款承诺。
 - **真实生成取证**：新增 `pnpm verify:real-model`，并已用真实上游完成一次端到端取证（生成 → 采纳 → 落盘 → 提交），证据见 `evidence/real-model-journey/`。此前该链路在 CI 中始终是假 provider 或 mock，从未真实验证。
 
 ---
@@ -74,7 +74,7 @@ $env:ONNXRUNTIME_NODE_INSTALL_CUDA="skip"; pnpm install
 # 2. 全量构建
 pnpm build
 
-# 3. 运行全量测试（发布门禁以当前 CI/本地实际输出为准）
+# 3. 运行全量测试（发布门以当前 CI/本地实际输出为准）
 #    pnpm test = pnpm run test:packages && pnpm run test:web，两层都跑，任一失败即非零。
 #    默认零真实模型调用：真实模型用例在未显式启用时是 skipped，不发任何上游请求。
 pnpm test
@@ -129,7 +129,7 @@ mozhou/
 │   ├── kernel/            # 领域九柱、CausalContract 因果契约、SceneExitState
 │   ├── data-plane/        # 本地 SQLite WAL 数据库、Markdown 目录卡、五态对账
 │   ├── context-compiler/  # fastembed 向量模型、3通道加权 RRF、Reserved 预算装配
-│   ├── quality-engine/    # 5 项机械门禁、4-gram 审查、De-AI 工业级引擎 v2.0
+│   ├── quality-engine/    # 5 项机械门、4-gram 审查、De-AI 工业级引擎 v2.0
 │   ├── pipeline/          # 10 步章节生产会话状态机、回炉降级、版本追踪
 │   ├── runtime/           # 多模型运行时底座、能力注册表、Recipe 执行器
 │   ├── flywheel/          # 创作者风格画像（StyleProfile vN）、负向学习飞轮
@@ -143,11 +143,11 @@ mozhou/
 
 ---
 
-## 🛡️ 质量保证与图谱门禁
+## 🛡️ 质量保证与图谱门
 
 - **自动化测试**：发布前要求全仓库 `pnpm test` 全部通过。根 `pnpm test` 是 `pnpm run test:packages && pnpm run test:web` 的串联（包层 vitest + Web 层 vitest），任一层失败即非零；CI 为保留分层诊断，按 `test:packages` 与 `--filter @mozhou/web test` 两步分别执行，避免 Web 层重复运行。README 不固定写死会过时的测试数量，以当前 CI 实际输出为准；
 - **真实模型测试是显式入口**：`pnpm test` **默认零真实模型调用**。需要验证真实上游链路时，另跑 `pnpm run test:real-model`，并自行显式提供 `MOZHOU_API_KEY` / `MOZHOU_API_BASE` / `MOZHOU_MODEL`（该入口会设置 `MOZHOU_RUN_REAL_MODEL_TESTS=1`）。三项缺任一项即**非零失败**而非跳过；上游不可达或鉴权失败同样非零。测试不会自动发现本机凭据，也不会自行放开 `MOZHOU_ALLOW_PRIVATE_LLM` 私网端点授权。**该入口会产生真实上游费用。** 端到端取证脚本另见 `pnpm verify:real-model`；
-- **GitNexus 代码图谱门禁**：`pnpm graph:check` 经仓库自带的 `.gitnexus/run.cjs` 包装器执行 `check --cycles --json -r .`，**按 cwd 相对定位本仓库**——不再用 `--repo mozhou` 按同名选择：本机索引里存在三个同名 mozhou 仓库，那样无法确定检查的是哪一个。输出为结构化字段 `{"status":"clean","cycleCount":0,"cycles":[]}`；包装器缺失或检查失败即非零退出；
+- **GitNexus 代码图谱门**：`pnpm graph:check` 经仓库自带的 `.gitnexus/run.cjs` 包装器执行 `check --cycles --json -r .`，**按 cwd 相对定位本仓库**——不再用 `--repo mozhou` 按同名选择：本机索引里存在三个同名 mozhou 仓库，那样无法确定检查的是哪一个。输出为结构化字段 `{"status":"clean","cycleCount":0,"cycles":[]}`；包装器缺失或检查失败即非零退出；
 - **严格类型检查**：全仓库 `tsc --noEmit` **0 错误**。
 
 ---
