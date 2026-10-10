@@ -155,6 +155,14 @@ for (const wf of workflowFiles) {
 if (workflowFiles.length === 0) {
   problems.push("未找到 .github/workflows/*.yml，无法以 workflow 为事实来源核对门清单。");
 } else {
+  // 登记判定**只在门清单的表格行内**匹配，不能用全文 md.includes。
+  //
+  // 为什么（2026-10-10 实测）：docs/gates.md 的「门清单已知缺口（可见，不阻塞）」一节
+  // 会在正文里逐字点名未登记的路径（如 scripts/check-import-cycles.mjs、
+  // scripts/release/real-model-gate.mjs）。全文 includes 判定下，**缺口叙述本身**
+  // 满足了登记条件 → knownGaps 恒空 → 该节声称的「门把它们打印为 GAP 而不是悄悄
+  // 放过」变成假话，且没有任何检查能发现。散文提及不是登记，表格行才是。
+  const gateRows = md.split("\n").filter((l) => /^\s*\|/.test(l));
   for (const [name, wf] of ciGates) {
     const excluded = NOT_A_GATE.get(name);
     if (excluded) {
@@ -162,7 +170,9 @@ if (workflowFiles.length === 0) {
       continue;
     }
     const registered =
-      name.startsWith("scripts/") ? md.includes(name) : md.includes("pnpm run " + name);
+      name.startsWith("scripts/")
+        ? gateRows.some((l) => l.includes(name))
+        : gateRows.some((l) => l.includes("pnpm run " + name));
     if (registered) {
       ok.push("CI(" + wf + ") 执行的 " + name + " 在 docs/gates.md 有登记");
     } else {

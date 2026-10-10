@@ -45,6 +45,9 @@
 | **门清单在 CI 列一致性** | `node scripts/check-gates-ci-column.mjs` | 0 一致 · 1 脱节 · 2 用法错误 | 无此状态 | ✅ `ci.yml` |
 | **文档裸数字** | `node scripts/check-doc-numbers.mjs` | 0（默认只报不拦）· `--strict` 有发现即 1 | 无此状态 | ✅ `ci.yml`（只报不拦） |
 | **生成物新鲜度（按索引）** | `node scripts/check-generated-freshness.mjs` | 0 一致 · 1 陈旧 · 2 环境错误 | 无此状态 | ❌ 未接入（在 pre-commit 钩子里，见下） |
+| 静态导入环检测 | `node scripts/check-import-cycles.mjs` | 0 无环 · 1 有环 `scripts/check-import-cycles.mjs:151` | 无此状态 | ✅ `graph-gate.yml` |
+| 真实模型门（发布） | `node scripts/release/real-model-gate.mjs` | 0 VERIFIED · 1 FAILED · 2 BLOCKED `scripts/release/real-model-gate.mjs:21` | 无此状态 | ✅ `release.yml` |
+| 发布资产构建 | `node scripts/build-release.mjs` | 无显式 exit（成功即 0，非 0 即失败） | 无 | ✅ `release.yml:149` |
 
 > 末两行 2026-10-10 补：`check-gates-ci-column.mjs` 校验本表「在 CI」列与 `.github/workflows/`
 > 的实际内容一致（双向：点名 workflow 的必须在其中找到该命令；标 ❌ 的不许出现在任何 workflow）。
@@ -138,11 +141,20 @@
 > `scripts/verify-gates-contract.mjs` 里的指引文案，否则引用会指向不存在的小节。
 >
 > 本节由 `check:gates`（`scripts/verify-gates-contract.mjs` 检查 6/7）在每次运行时同步打印，
-> 目的是让「清单声称覆盖了全部门」这句话不再靠自觉。下列条目中，**第 1 条已于 2026-10-10 关闭**，
-> 第 2、3 条是**真实存在的缺口**；门把它们打印为 `GAP` 而不是悄悄放过，门默认不因此变红，
-> 因为它们是存量问题，一次全量阻断只会让门常红而无人处理。**谁该修、修前要什么授权，写在每条下面。**
+> 目的是让「清单声称覆盖了全部门」这句话不再靠自觉。
+>
+> **2026-10-10 全部关闭。** 三条都改为在本表登记（见上表新增三行）。这三条之所以此前
+> 一直报不出来、直到今天才被门看见：登记判定用的是全文 `md.includes`，而本节正文为了
+> 说明缺口会逐字点名那些脚本路径——**缺口叙述本身喂饱了登记判定**，于是 `knownGaps`
+> 恒空、本节声称的「门把它们打印为 GAP 而不是悄悄放过」是假的。现已改为**只在表格行内
+> 匹配**（散文提及不是登记），本节的空列表才有意义：它现在真的在看着。
+>
+> 门对缺口默认不因此变红，因为缺口是存量问题，一次全量阻断只会让门常红而无人处理；
+> 需要硬拦时用 `--strict-gaps`。**谁该修、修前要什么授权，写在每条下面。**
 
 1. **[已关闭 2026-10-10] `scripts/build-release.mjs` 产出的交付物没有来源戳。**
+   （登记亦已补入本表，见上表「发布资产构建」行；本条关闭的是**来源戳**问题，
+   与「未登记」是两件事。）
    该脚本是 `package.json` 的 `build:release` / `package`，也是 `.github/workflows/release.yml:149`
    「Build truthful release assets」的实际执行者；它产出三个 tar 归档
    （`build-release.mjs:163-181`）。
@@ -155,23 +167,23 @@
    **未变的部分**：`build-release.mjs` 的 `web-dist` 归档直接打包 `apps/web/dist`，
    不含此戳文件；本条的关闭只覆盖带 bundle 目录的两个归档，不改变 web-dist 归档的内容。
 
-2. **`scripts/check-import-cycles.mjs` 在本清单之外。**
+2. **[已关闭 2026-10-10] `scripts/check-import-cycles.mjs` 在本清单之外。**
    它由 `.github/workflows/graph-gate.yml:43-44` 在 CI 中执行（退出码 0 无环 / 1 有环 / 2 用法错，
-   定义见 `scripts/check-import-cycles.mjs:151`、`:158`、`:102`），但**既不在本清单，也不在
-   `package.json` 的任何 script**，因此本地无法用 `pnpm run` 复现这条 CI 门。
-   **本轮刻意未把它并入本清单表**：并表会改动既有章节的表格结构，且需要先确认
-   `graph-gate.yml` 是否有独立退出码语义约定（0/1/2 与本文件「退出码未统一」的已知缺口相关）。
-   谁该修：门清单的维护者，与退出码统一那一次独立变更一并处理。
+   定义见 `scripts/check-import-cycles.mjs:151`、`:158`、`:102`），此前既不在本清单，也不在
+   `package.json` 的任何 script，因此本地无法用 `pnpm run` 复现这条 CI 门。
+   **已并入本表**（见上表「静态导入环检测」行），命令按脚本实跑写法登记为
+   `node scripts/check-import-cycles.mjs`。未覆盖的部分：`package.json` 仍无对应 script，
+   本地复现要走 `node scripts/ci-gate.mjs import-cycles` 或直接调脚本。
 
-3. **`scripts/release/real-model-gate.mjs` 的 0/1/2 契约在本清单之外。**
+3. **[登记已关闭 2026-10-10 · 完整契约小节仍缺] `scripts/release/real-model-gate.mjs` 的 0/1/2 契约在本清单之外。**
    它由 `.github/workflows/release.yml:76` 执行，是发布路径上唯一的真实模型门；
    退出码契约写在脚本头部 `real-model-gate.mjs:21`（`0 VERIFIED · 1 FAILED · 2 BLOCKED`），
    实现见 `:118`（`const exitCode = 2`）、`:121`（`status: 'BLOCKED'`）、`:208`。
    本文件「`verify:real-model` 的完整契约」一节只覆盖 `scripts/verify-real-model-journey.mjs`，
    **没有覆盖这个发布路径包装层**，而两者的 BLOCKED 语义恰好相反（前者默认 0，后者必须非 0）。
-   **本轮刻意未补写该契约小节**：该门只在 `release.yml` 消费、不在 `ci.yml`，
-   写它的退出码表需要先确认凭据缺失时的托管行为，属独立变更。
-   谁该修：门清单维护者，与发布路径的真实模型门一起登记。
+   **本轮已把它并入本表**（见上表「真实模型门（发布）」行，退出码取自脚本头部注释）。
+   **仍未做**：补写该门的完整契约小节（凭据缺失时的托管行为、各状态如何被 release.yml
+   消费），属独立变更，需要先确认托管行为再写，不能从脚本头部一行注释推演。
 
 ### 开关 `--strict-gaps`
 

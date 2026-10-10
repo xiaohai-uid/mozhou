@@ -93,6 +93,30 @@ const BANNED = [
   // （2026-10-07 实测：`SSRF 门禁止私网目标`）。中文无词边界，机械扫描无法消除
   // 全部此类误报，故对已知碰撞加窄豁免；新增误报时按同一方式收窄，不放宽整条规则。
   { word: "门禁", re: /门禁(?!止)/g, fix: "门 + 限定词" },
+  // 「守卫」是本轮（CHG-20261007-20 §3）清扫的主攻词，裁决为「门 + 限定词」或「检查」，
+  // 但清扫做完后没有检查守护，术语必然回潮。豁免同「门禁」的处理方式：中文无词边界，
+  // 而 packages/ 里有大量 TypeScript 语言义的「类型守卫 / 形状守卫 / 断言守卫」，
+  // 那些是语言概念不是领域阻断条件，不能改（见 docs/plans/2026-10-07-terminology-
+  // ambiguity-checklist.md §0 第 3 条）。故对语言义加负向先行断言逐个豁免，
+  // 新增误报时按同一方式收窄，不放宽整条规则。
+  // 「守卫」是本轮（CHG-20261007-20 §3）清扫的主攻词，裁决为「门 + 限定词」或「检查」，
+  // 但清扫做完后没有检查守护，术语必然回潮。豁免同「门禁」的处理方式：中文无词边界，
+  // 而 packages/ 里有大量 TypeScript 语言义的「类型守卫 / 形状守卫 / 断言守卫」，
+  // 那些是语言概念不是领域阻断条件，不能改（见 docs/plans/2026-10-07-terminology-
+  // ambiguity-checklist.md §0 第 3 条）。故对语言义加负向先行断言逐个豁免，
+  // 新增误报时按同一方式收窄，不放宽整条规则。
+  // 豁免同「门禁」的处理方式：中文无词边界，而代码里有大量 TypeScript 语言义的
+  // 「类型守卫 / 形状守卫 / 收窄断言 / 校验流水线的一步」——它们是语言概念与模块
+  // 内部的步骤序，不是领域阻断条件，不能改（见 docs/plans/2026-10-07-terminology-
+  // ambiguity-checklist.md §0 第 3 条）。对语言义加负向先行断言逐个豁免，
+  // 新增误报时按同一方式收窄，不放宽整条规则。
+  {
+    word: "守卫",
+    // 「的守卫」= TypeScript 收窄断言的中文说法（如 `!Number.isInteger(...)` 的守卫），
+    // 与「在守卫之前」= 模块校验流水线里的一步，都是语言概念 / 模块内部步骤序。
+    re: /(?<!类型|形状|共享形状|非空|空值|断言|收窄)(?<!在)(?<!的)守卫/g,
+    fix: "门 + 限定词 / 检查",
+  },
   { word: "闸门", re: /闸门/g, fix: "门（确定性阻断）/ 检查点（人工介入点）" },
   { word: "工单", re: /工单/g, fix: "议题 Issue" },
   { word: "数据平面", re: /数据平面/g, fix: "数据面 Data Plane" },
@@ -105,8 +129,11 @@ const BANNED = [
 const ACTIVE_PREFIX = ["apps/web/", "packages/", "scripts/", ".github/", "specs/", "src-tauri/", "docs/agents/", "docker/"];
 const ACTIVE_FILE = new Set(["README.md", "AGENTS.md", "CLAUDE.md", "eslint.config.js", "docs/gates.md"]);
 const SCAN_EXT = /[.](md|ts|tsx|mjs|js|jsx|yml|yaml|json|html|css|rs)$/;
-// 生成物与小说语料：前者随生成器刷新，后者的「工单」是作品内容，不是术语。
-const EXEMPT_PREFIX = ["apps/web/src/code-graph/", "scripts/corpus/"];
+// 生成物与作品语料：前者随生成器刷新，后者的「工单」「守卫」是作品内容，不是术语
+// （golden-scenarios.json 的「境界战力天花板守卫」是小说设定，见 2026-10-10 实跑）。
+// apps/web/prototypes/ 是 2026-10-05 冻结的历史设计档案（GLOSSARY §0 规则 6：
+// 冻结的历史档案不改写），只因落在 apps/web/ 前缀下被扫到——按层排除，不改写档案。
+const EXEMPT_PREFIX = ["apps/web/src/code-graph/", "scripts/corpus/", "packages/benchmark/", "apps/web/prototypes/"];
 const EXEMPT_FILE = new Set(["GLOSSARY.md", "docs/term-map.md", "scripts/verify-glossary.mjs"]);
 // 显式豁免：引用已废止名称做更正说明，不是使用它。
 const ALLOWED = new Set(["AGENTS.md|遗留切片"]);

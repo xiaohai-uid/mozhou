@@ -93,7 +93,7 @@ export default tseslint.config(
   {
     // 深化 08：LocalDataPlane 句柄生命周期门。
     //
-    // 为什么是 eslint 而不是那条 245 行的正则源码扫描守卫（apps/web/server/planeHandles.test.ts，
+    // 为什么是 eslint 而不是那条 245 行的正则源码扫描门（apps/web/server/planeHandles.test.ts，
     // 已随本票删除）：忘记 close 的 SQLite 句柄**不报错、不崩、测试照样全绿**，
     // 所以判据必须落在源码结构上，而不是运行时断言。`no-restricted-syntax` 直接禁掉
     // 裸 `LocalDataPlane.open/openOrRebuild` 这个 AST 形态——比正则更准（不误伤字符串与
@@ -154,7 +154,7 @@ export default tseslint.config(
     },
   },
   {
-    // 用户数据写盘的机械守卫：**整份重写**必须走共享原子写原语 atomicWriteFileSync
+    // 用户数据写盘的机械阻断门：**整份重写**必须走共享原子写原语 atomicWriteFileSync
     // （唯一临时名 + wx 独占创建 + fsync + rename），裸 writeFileSync 会留下半份文件。
     //
     // 为什么做成规则而不是写进 CODING_STANDARDS.md：这是纯机械规则（一个固定的 API 形态），

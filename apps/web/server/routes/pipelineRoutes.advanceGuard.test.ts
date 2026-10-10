@@ -105,7 +105,7 @@ interface Journey {
 async function openSessionAt(dataRoot: string): Promise<Journey> {
   defaultBookAccessManager.setDataRoot(dataRoot)
   const base = await listen()
-  const created = await postJson(base, '/api/book', { title: 'advance 守卫测试书' })
+  const created = await postJson(base, '/api/book', { title: 'advance 阻断门测试书' })
   expect(created.status).toBe(200)
   const root = created.data['root'] as string
   const opened = await postJson(base, '/api/session.open', { root, chapterIndex: 1 })

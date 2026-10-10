@@ -163,9 +163,9 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
                 墨舟在底层 LocalDataPlane 中记录每个章节的草稿修订（revision）及定稿 SHA-256 哈希。
               </p>
               <div style={{ background: 'var(--surface-sunken)', padding: 10, borderRadius: 8, fontSize: 11 }}>
-                <div>● 离线版本守护：已开启</div>
+                <div>● 离线版本校验门：已开启</div>
                 <div className="muted" style={{ marginTop: 4 }}>
-                  外部变动冲突门：启用（写前哈希严格校验）
+                  外部变动冲突校验门：启用（写前哈希严格校验）
                 </div>
                 <div className="muted" style={{ marginTop: 2 }}>
                   全量 ZIP 备份：可随时前往「云同步与备份」生成独立全本归档包
