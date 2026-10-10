@@ -6,7 +6,7 @@
  * 2. 模型路由建议读取与评估运行：/api/flywheel.suggestions, /api/flywheel.evaluator.status, /api/flywheel.evaluator.run；
  * 3. 严格不变量（C6）：只建议，不自动改变模型路由（绝不自动写 settings.yaml）。
  */
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RouteHandler } from '../router.js'
 import { decodeBookRequest } from '../bookRequest.js'
@@ -21,6 +21,7 @@ import {
   runTaskModelEvaluation,
 } from '@mozhou/flywheel'
 import { readPipelineLedger } from '@mozhou/pipeline'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 import { tierConfigPath as defaultTierConfigPath } from '../llm/tierRouting.js'
 
 /** 最小合法 Tier 配置模板（用于冷启动或未配置 settings.yaml 时的自愈回退）。 */
@@ -51,7 +52,7 @@ function ensureEffectiveTierConfigPath(bookRoot: string, customPath?: string): s
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })
     }
-    writeFileSync(fallbackPath, DEFAULT_FALLBACK_TIER_YAML, 'utf-8')
+    atomicWriteFileSync(fallbackPath, DEFAULT_FALLBACK_TIER_YAML)
   }
   return fallbackPath
 }

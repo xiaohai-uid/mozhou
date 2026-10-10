@@ -11,7 +11,7 @@
  * 预算：单次传播 ≤100ms（T26 StaleBudgetError 承载）；扫描 N=100 章/批（T25 预算）。
  * 纯机械、零 LLM；StaleMarker 停靠仍归 propagateStaleMarkers（T6，本模块只产出 impact 投影）。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type { DependencyManifest, DependencyManifestEntry } from '@mozhou/kernel'
@@ -62,7 +62,8 @@ function jsonlAppend(root: string, row: Record<string, unknown>): void {
   mkdirSync(join(root, '.mozhou'), { recursive: true })
   const eventsPath = join(root, RUNTIME_EVENTS_PATH)
   const line = JSON.stringify(row) + '\n'
-  writeFileSync(eventsPath, line, { flag: 'a' })
+  // 追加语义用 appendFileSync（此前是 writeFileSync + { flag: 'a' }，写法绕且易被误读为整份重写）
+  appendFileSync(eventsPath, line)
 }
 
 function fingerprintOf(sortedChapters: readonly number[]): string {

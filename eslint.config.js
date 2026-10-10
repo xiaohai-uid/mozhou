@@ -153,4 +153,40 @@ export default tseslint.config(
       ],
     },
   },
+    // 用户数据写盘的机械守卫：**整份重写**必须走共享原子写原语 atomicWriteFileSync
+    // （唯一临时名 + wx 独占创建 + fsync + rename），裸 writeFileSync 会留下半份文件。
+    //
+    // 为什么做成规则而不是写进 CODING_STANDARDS.md：这是纯机械规则（一个固定的 API 形态），
+    // 而且已被证明会重复发生——2026-10-10 的会话里靠人工 grep 才找出 11 处这类裸写
+    // （draft-step / compile-step / user-edit-step / proposal-step / proposal-port /
+    // flywheel storage / memoStore / receipt-file / report-store / styleAnalysis /
+    // book-backup restore / backupRoutes），同类问题在四轮对抗复核里反复出现。
+    // 按「机械规则一律做成确定性检查、只把判断题留给评审」的纪律，它该是 lint 规则。
+    //
+    // 追加用 appendFileSync；独占创建用 writeFileSync(path, data, { flag: 'wx' })——两者都不触发本规则。
+    files: ['packages/*/src/**/*.ts', 'apps/web/server/**/*.ts'],
+    ignores: ['**/*.test.ts', 'packages/data-plane/src/atomic-write.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='writeFileSync']",
+          message:
+            '整份重写请改用 atomicWriteFileSync（@mozhou/data-plane 的共享原语）；追加请用 appendFileSync；独占创建请用 { flag: "wx" }。若确有正当例外，加进 eslint.config.js 的允许清单并写明理由。',
+        },
+      ],
+    },
+  },
+  {
+    // 允许清单（writeFileSync 的正当用法，不是遗漏）：
+    // - bookAccess.ts 对**已打开的锁文件 fd** 写入（配 ftruncateSync），不是路径写，
+    //   损坏由读侧「判 null 后接管」兜住；
+    // - providerSettings.ts 用 { flag: 'wx', mode: 0o600 } 独占创建安装密钥——原子写原语
+    //   不接受 mode/flags，这里必须用裸 writeFileSync。
+    files: ['apps/web/server/bookAccess.ts', 'apps/web/server/llm/providerSettings.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
+  },
+)
 )

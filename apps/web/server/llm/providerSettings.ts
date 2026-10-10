@@ -209,7 +209,9 @@ function parseUserConfig(plaintext: string): UserProviderConfig | null {
 function backupUnreadableCredentials(path: string, bytes: Buffer): string | null {
   const backupPath = `${path}.bak`
   try {
-    writeFileSync(backupPath, bytes)
+    // 备份也走原子写：要么完整存在、要么不存在——半份 .bak 比没有备份更危险
+    // （用户会以为凭据已保住，实际拿到的是截断文件）。
+    atomicWriteFileSync(backupPath, bytes)
     return backupPath
   } catch {
     return null

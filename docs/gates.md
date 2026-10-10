@@ -42,6 +42,17 @@
 
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 
+| **门清单在 CI 列一致性** | `node scripts/check-gates-ci-column.mjs` | 0 一致 · 1 脱节 · 2 用法错误 | 无此状态 | ✅ `ci.yml` |
+| **文档裸数字** | `node scripts/check-doc-numbers.mjs` | 0（默认只报不拦）· `--strict` 有发现即 1 | 无此状态 | ✅ `ci.yml`（只报不拦） |
+
+> 末两行 2026-10-10 补：`check-gates-ci-column.mjs` 校验本表「在 CI」列与 `.github/workflows/`
+> 的实际内容一致（双向：点名 workflow 的必须在其中找到该命令；标 ❌ 的不许出现在任何 workflow）。
+> 之所以需要它——此前 `check:gates` 只拿**硬编码的三个门名**去比对 ci.yml，于是「克隆检测」
+> 那一行写着「❌ 未接入」而它早已是 `graph-gate.yml` 的作业，门一声不响。
+> `check-doc-numbers.mjs` 扫活文档里的裸规模数字（旁边既无日期也无命令指针），只报不拦——
+> 两轮「声称 vs 现实」审计清的 15 处陈旧声称几乎全是这类数字，先让漂移可见再决定阈值。
+> 两者都接进了 `ci.yml` 的 Doc gates 步骤、`scripts/ci-gate.mjs doc-gates` 与仓库的 pre-commit 钩子。
+
 ## `verify:real-model` 的完整契约
 
 这是全仓唯一有 BLOCKED 语义的门禁，所以单列。

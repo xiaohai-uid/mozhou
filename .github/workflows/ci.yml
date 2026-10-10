@@ -50,12 +50,18 @@ jobs:
         run: pnpm --filter @mozhou/web build
       - name: Test apps/web (vitest)
         run: pnpm --filter @mozhou/web test
-      # 文档门禁：术语单一权威 + 架构地图新鲜度。
-      # 二者都是「只许变好」的检查，失败即阻断合并。
-      - name: Doc gates (glossary / architecture / gates / term-map / readmes)
+      # 文档门：术语单一权威 + 架构地图新鲜度 + 门清单的「在 CI」列一致性。
+      # 都是「只许变好」的检查，失败即阻断合并。
+      # 末两项 2026-10-10 补：`check-gates-ci-column.mjs` 校验 gates.md 的「在 CI」列与
+      # workflows 实际一致（此前只校验三个硬编码门名，于是 duplication 那行写着「未接入」
+      # 而它早已是 graph-gate.yml 的作业）；`check-doc-numbers.mjs` 只报不拦（exit 0），
+      # 把文档里的裸规模数字暴露出来——两轮审计清的 15 处陈旧声称几乎全是这类数字。
+      - name: Doc gates (glossary / architecture / gates / term-map / readmes / ci-column / doc-numbers)
         run: |
           pnpm run check:glossary
           pnpm run check:architecture
           pnpm run check:gates
           pnpm run check:term-map
           pnpm run check:readmes
+          node scripts/check-gates-ci-column.mjs
+          node scripts/check-doc-numbers.mjs
