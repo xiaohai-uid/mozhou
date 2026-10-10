@@ -4,9 +4,19 @@
  */
 import { describe, expect, it } from 'vitest'
 import { generateKeyPairSync, sign } from 'node:crypto'
-import { LicenseTicketManager, type SignedLicenseTicket } from './license.js'
+import { LicenseTicketManager, capabilitiesForPlan, type SignedLicenseTicket } from './license.js'
 import { billingCatalog, PRO_ENTITLEMENT_KEYS } from './catalog.js'
 import { RequestBoundaryError } from '../security.js'
+
+/**
+ * 白盒取服务端真实私钥，用于构造「签名有效但数据不一致」的票据，模拟签发层缺陷/旧版
+ * 签发器，从而测到能力一致性校验与字段类型守卫。修复「验签只认服务端公钥」后，这些
+ * 防御已无法通过公开 API 触发（issueTicket 派生的能力恒与 planId 自洽），故必须白盒。
+ */
+function serverPrivateKey(manager: LicenseTicketManager): string {
+  return (manager as unknown as { _privateKey: string })._privateKey
+}
+
 
 describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
   it('正常签署与 72h 内离线核验通过', () => {
@@ -146,12 +156,10 @@ describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
 
   it('能力与套餐不一致的票据在核验时被拒（CAPABILITY_PLAN_MISMATCH）', () => {
     const manager = new LicenseTicketManager()
-    // 用自生成密钥对伪造一张「free 套餐却带 pro 能力」的签名票据：签名本身有效，
-    // 但能力与 planId 不一致，必须被新增的一致性校验拦下。
-    const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    })
+    // 用服务端真实私钥签署一张「free 套餐却带 pro 能力」的票据，模拟签发层缺陷/旧版
+    // 签发器：签名本身有效，但能力与 planId 不一致，必须被一致性校验拦下。
+    // 修复「验签只认服务端公钥」后，这里必须白盒取真私钥——否则会先被 INVALID_SIGNATURE
+    // 拦下，测不到这道防御。
     const data = {
       userId: 'usr_free_author',
       deviceId: 'device_001',
@@ -160,22 +168,18 @@ describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
       expiry: Date.now() + 3600 * 1000,
       capabilities: ['pro-features'],
     }
-    const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), privateKey).toString('base64')
+    const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), serverPrivateKey(manager)).toString('base64')
 
     expect(() => {
-      manager.verifyTicket({ data, signature, publicKey }, 'device_001')
+      manager.verifyTicket({ data, signature, publicKey: manager.getPublicKey() }, 'device_001')
     }).toThrow(/CAPABILITY_PLAN_MISMATCH/)
   })
 
   it('畸形 capabilities（非数组 / 字符串 / 缺字段 / 含非字符串元素）一律 403，而非 TypeError', () => {
     const manager = new LicenseTicketManager()
-    // 用自生成密钥对签名，使签名校验通过、真正走到能力字段比较那一步；
-    // 否则会先在签名环节被 INVALID_SIGNATURE 拦下，测不到本次新增的类型守卫。
+    // 用服务端真实私钥签名，使签名校验通过、真正走到能力字段比较那一步；
+    // 否则会先在签名环节被 INVALID_SIGNATURE 拦下，测不到类型守卫。
     const signWith = (capabilities: unknown): SignedLicenseTicket => {
-      const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      })
       const data = {
         userId: 'usr_malformed',
         deviceId: 'device_001',
@@ -184,8 +188,8 @@ describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
         expiry: Date.now() + 3600 * 1000,
         capabilities,
       }
-      const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), privateKey).toString('base64')
-      return { data, signature, publicKey } as unknown as SignedLicenseTicket
+      const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), serverPrivateKey(manager)).toString('base64')
+      return { data, signature, publicKey: manager.getPublicKey() } as unknown as SignedLicenseTicket
     }
 
     for (const caps of [123, 'pro-features', undefined, ['pro-features', 42]]) {
@@ -199,5 +203,44 @@ describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
       expect((caught as RequestBoundaryError).status).toBe(403)
       expect((caught as Error).message).toMatch(/CAPABILITY_PLAN_MISMATCH/)
     }
+  })
+
+  it('自签票据（自带公钥）一律拒绝：服务端验签只认自己的公钥', () => {
+    const manager = new LicenseTicketManager()
+    // 攻击者用自生成密钥对签发一张 max_monthly 票据：capabilities 与 planId 自洽，
+    // 能通过第 5 步能力一致性校验。若验签采信票据携带的 publicKey，这张伪造票据就会被
+    // 接受——签名票据的全部意义随之失效（任何人都能自签任意套餐）。
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+    const data = {
+      userId: 'usr_attacker',
+      deviceId: 'device_001',
+      planId: 'max_monthly',
+      serverTime: Date.now(),
+      expiry: Date.now() + 3600 * 1000,
+      capabilities: [...capabilitiesForPlan('max_monthly')],
+    }
+    const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), privateKey).toString('base64')
+
+    expect(() => {
+      manager.verifyTicket({ data, signature, publicKey }, 'device_001')
+    }).toThrow(/INVALID_SIGNATURE/)
+  })
+
+  it('服务端自签发的票据仍通过核验（含 free 套餐 capabilities: [] 的空数组）', () => {
+    const manager = new LicenseTicketManager()
+    for (const planId of ['free', 'pro_monthly', 'max_monthly'] as const) {
+      const ticket = manager.issueTicket({ userId: 'usr_self', deviceId: 'device_001', planId })
+      const result = manager.verifyTicket(ticket, 'device_001')
+      expect(result.valid).toBe(true)
+      expect(result.planId).toBe(planId)
+    }
+
+    // 空能力数组是合法票据，不能被「字段类型守卫」或能力比较误伤
+    const freeTicket = manager.issueTicket({ userId: 'usr_free_self', deviceId: 'device_001', planId: 'free' })
+    expect(freeTicket.data.capabilities).toEqual([])
+    expect(manager.verifyTicket(freeTicket, 'device_001').valid).toBe(true)
   })
 })

@@ -143,8 +143,14 @@ pub fn prepare_data_root() -> Result<(PathBuf, String), String> {
     // （".mozhou_data"，下划线）。此前这里是 ".mozhou-data"（连字符）：桌面端与 CLI
     // 启动器会落到两个数据根、各自铸造一把 installation.key，同一份
     // provider-settings.enc 跨入口读不出凭据。
-    // 已知限制：本入口不读 MOZHOU_DATA_ROOT（自定义数据根请用 scripts/launcher.mjs
-    // 或安装器的 MoZhou.exe，二者都会把该变量传给服务进程）。
+    // 已知限制：本入口不读 MOZHOU_DATA_ROOT——安全扫描禁止「从环境变量取路径再做文件
+    // 操作」，两种写法均被其预写钩子拒绝（见 docs/changes/CHG-20261010-04-round3-ssrf-unification.md
+    // 与 CHG-20261010-03-round2-findings-and-residuals.md）。因此数据根取自 cwd：一旦工作
+    // 目录变化（不同启动方式、快捷方式起始目录、调试 cwd），本入口就会造出第二个数据根与
+    // 第二把 installation.key，同一份 provider-settings.enc 跨入口读不出凭据。自定义数据根请用
+    // scripts/launcher.mjs 或安装器的 MoZhou.exe，二者都会把 MOZHOU_DATA_ROOT 传给服务进程。
+    // 注：本 Tauri 入口不在当前 Windows 发行产物内（发行包只含 apps/web 的 dist/dist-server
+    // 与 desktop-server.mjs），故该限制不影响已发布产品，仅为开发/调试期风险。
     let data_root = base_dir.join(".mozhou_data");
 
     fs::create_dir_all(&data_root)

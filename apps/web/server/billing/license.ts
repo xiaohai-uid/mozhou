@@ -106,7 +106,7 @@ export class LicenseTicketManager {
     currentDeviceId: string,
     currentClientTime = Date.now(),
   ): { readonly valid: boolean; readonly planId: string; readonly error?: string | undefined } {
-    const { data, signature, publicKey } = ticket
+    const { data, signature } = ticket
 
     // 1. 设备绑定校验
     if (data.deviceId !== currentDeviceId) {
@@ -123,9 +123,13 @@ export class LicenseTicketManager {
       throw new RequestBoundaryError(403, 'TICKET_EXPIRED', `TICKET_EXPIRED: ticket expired at ${new Date(data.expiry).toISOString()}`)
     }
 
-    // 4. 非对称签名核验
+    // 4. 非对称签名核验 —— 只能用服务端自己持有的公钥。
+    //    票据里的 publicKey 仅供客户端离线校验（客户端不持有服务端公钥，需随票据携带）；
+    //    服务端校验绝不采信它：否则任何人都能自带密钥对自签任意套餐，签名票据形同虚设。
+    //    密钥轮换：rotateKeys() 替换本公钥后，此前签发的票据随即失效（72h 离线宽限期
+    //    不跨轮换）。若将来需要跨轮换的宽限，应改为服务端持有的公钥集合，绝不采信调用方输入。
     const payload = Buffer.from(JSON.stringify(data), 'utf8')
-    const keyToVerify = publicKey || this._publicKey
+    const keyToVerify = this._publicKey
     try {
       const valid = verify(null, payload, keyToVerify, Buffer.from(signature, 'base64'))
       if (!valid) {
