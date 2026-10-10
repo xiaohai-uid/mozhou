@@ -156,7 +156,12 @@ export const accountRoutes: RouteHandler = async (req, res, { path, body, json }
     if (defaultSessionManager.provider instanceof InMemoryAuthProvider) {
       defaultSessionManager.provider.updatePasswordForUser(record.userId, newPassword)
     } else {
-      await defaultSessionManager.provider.confirmPasswordReset(code, newPassword)
+      // 外部 provider 的确认结果必须被尊重：返回 false 即确认失败，
+      // 绝不撤销会话、绝不回报成功——否则用户会以为密码已改，实际仍是旧密码。
+      const confirmed = await defaultSessionManager.provider.confirmPasswordReset(code, newPassword)
+      if (!confirmed) {
+        throw new RequestBoundaryError(400, 'RESET_CONFIRM_FAILED', 'password reset could not be confirmed by the auth provider')
+      }
     }
 
     // 密码重置成功后，使用户现有全部 session 均失效

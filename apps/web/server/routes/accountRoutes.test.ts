@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net'
 import { createHash, randomBytes } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../api.js'
-import { defaultSessionManager, InMemoryAuthProvider, SESSION_COOKIE_NAME } from '../auth/session.js'
+import { defaultSessionManager, InMemoryAuthProvider, SESSION_COOKIE_NAME, type IAuthProvider } from '../auth/session.js'
 import { defaultDeviceFlowManager } from '../auth/deviceFlow.js'
 
 /**
@@ -29,6 +29,45 @@ const FIXTURE_PASSWORDS = {
   second: 'AnotherPassword789!',
   expired: 'Password999!',
 } as const
+
+/**
+ * 测试替身：非 InMemory 的 IAuthProvider，用于驱动路由的「外部 provider」分支。
+ * 仅记录 confirmPasswordReset 调用次数并返回预设结果，不触碰任何网络或真实凭据。
+ */
+class StubAuthProvider implements IAuthProvider {
+  readonly name = 'stub-provider'
+  confirmResult = false
+  confirmCalls = 0
+
+  isConfigured(): boolean {
+    return true
+  }
+  verifyToken(): Promise<null> {
+    return Promise.resolve(null)
+  }
+  signUp(): Promise<never> {
+    return Promise.reject(new Error('stub signUp not used'))
+  }
+  signIn(): Promise<never> {
+    return Promise.reject(new Error('stub signIn not used'))
+  }
+  signOut(): Promise<void> {
+    return Promise.resolve()
+  }
+  refresh(): Promise<null> {
+    return Promise.resolve(null)
+  }
+  requestPasswordReset(): Promise<{ resetCode?: string }> {
+    return Promise.resolve({})
+  }
+  confirmPasswordReset(): Promise<boolean> {
+    this.confirmCalls += 1
+    return Promise.resolve(this.confirmResult)
+  }
+  deleteAccount(): Promise<void> {
+    return Promise.resolve()
+  }
+}
 
 let servers: ReturnType<typeof createServer>[] = []
 
@@ -456,5 +495,59 @@ describe('Account & Device Authentication HTTP API (T08)', () => {
     })
     const recheckDataA = (await recheckA.json()) as { devices: unknown[] }
     expect(recheckDataA.devices).toHaveLength(2)
+  })
+
+  it('外部 provider 确认失败 → 不返回 200、不撤销既有会话', async () => {
+    const base = await listen()
+    const stub = new StubAuthProvider()
+    stub.confirmResult = false
+    defaultSessionManager.setProvider(stub)
+
+    const userId = 'usr_provider_confirm_fail'
+    // 播种一个本地已记录的重置码与该用户的既有会话，以触达「外部 provider」分支
+    const code = defaultSessionManager.createResetCode('provider-fail@mozhou.ai', userId)
+    const { cookie } = defaultSessionManager.createSession({ userId, email: 'provider-fail@mozhou.ai' })
+
+    const res = await fetch(`${base}/api/account/reset-password-confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, newPassword: FIXTURE_PASSWORDS.first }),
+    })
+
+    // provider 确实被调用一次，且其结果被尊重
+    expect(stub.confirmCalls).toBe(1)
+    expect(res.status).not.toBe(200)
+    const body = (await res.json()) as Record<string, unknown>
+    expect(body.ok).toBe(false)
+    expect(body.code).toBe('RESET_CONFIRM_FAILED')
+
+    // 会话未被撤销：旧 cookie 仍可访问
+    const check = await fetch(`${base}/api/account`, { headers: { Cookie: cookie } })
+    expect(check.status).toBe(200)
+  })
+
+  it('InMemory 分支既有语义不变：确认成功返回 200 并撤销该用户既有会话', async () => {
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+
+    const { user } = await provider.signUp('inmemory-reset@mozhou.ai', FIXTURE_PASSWORDS.original)
+    const code = defaultSessionManager.createResetCode('inmemory-reset@mozhou.ai', user.id)
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    const res = await fetch(`${base}/api/account/reset-password-confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, newPassword: FIXTURE_PASSWORDS.first }),
+    })
+    expect(res.status).toBe(200)
+
+    // 成功后既有会话被撤销（既有行为）
+    const check = await fetch(`${base}/api/account`, { headers: { Cookie: cookie } })
+    expect(check.status).toBe(401)
+
+    // 新密码可登录、旧密码失效
+    await expect(provider.signIn('inmemory-reset@mozhou.ai', FIXTURE_PASSWORDS.first)).resolves.toBeTruthy()
+    await expect(provider.signIn('inmemory-reset@mozhou.ai', FIXTURE_PASSWORDS.original)).rejects.toThrow()
   })
 })
