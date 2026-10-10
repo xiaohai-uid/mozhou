@@ -116,4 +116,21 @@ describe('QuotaManager 额度事务、断路器与并发测试 (T15)', () => {
     // 释放后额度回退可用
     expect(quota.getBalance(userId).availableUnits).toBe(3)
   })
+
+  it('按真实成本结算后断路器可达：下一次 reserve 以 HTTP 429 / CIRCUIT_BREAKER_TRIPPED 拒绝', async () => {
+    const quota = new QuotaManager()
+    quota.setDailyBudgetFen(100)
+
+    // 显式上报真实成本（第 4 个位置参数 costFen），日成本随之累加
+    await quota.reserve('usr_cost_a', 'op_real_cost_1', 1)
+    await quota.settle('usr_cost_a', 'op_real_cost_1', 1000, 100)
+    expect(quota.getDailyCost()).toBe(100)
+    expect(quota.isCircuitBreakerTripped()).toBe(true)
+
+    // 断路器触发后，下一次预留必须抛出 429（而非仅文案），供路由透传状态码
+    await expect(quota.reserve('usr_cost_b', 'op_real_cost_2', 1)).rejects.toMatchObject({
+      status: 429,
+      code: 'CIRCUIT_BREAKER_TRIPPED',
+    })
+  })
 })

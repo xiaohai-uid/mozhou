@@ -8,6 +8,7 @@
  * - POST /api/billing/quota/settle：结算实际 Token 消耗。
  */
 import type { RouteHandler } from '../router.js'
+import { RequestBoundaryError } from '../security.js'
 import { defaultLicenseTicketManager } from '../billing/license.js'
 import { defaultQuotaManager } from '../billing/quota.js'
 import { defaultEntitlementManager } from '../billing/entitlements.js'
@@ -30,8 +31,10 @@ export const managedModelRoutes: RouteHandler = (req, res, { path, body, json, p
       return true
     }
 
+    // 权益判定结果必须用于票据：只有确实享有该能力的用户才沿用其付费套餐，
+    // 否则一律降为 free。票据能力由 planId 推导，free 不再获得任何 pro 能力。
     const entitlement = defaultEntitlementManager.checkUserEntitled(userId, 'storyboard')
-    const planId = entitlement.planId ?? 'free'
+    const planId = entitlement.entitled ? (entitlement.planId ?? 'free') : 'free'
 
     const ticket = defaultLicenseTicketManager.issueTicket({
       userId,
@@ -64,7 +67,14 @@ export const managedModelRoutes: RouteHandler = (req, res, { path, body, json, p
         const reservation = await defaultQuotaManager.reserve(userId, operationId, units)
         json(200, { ok: true, reservation })
       } catch (err) {
-        json(402, { ok: false, code: 'QUOTA_EXHAUSTED', error: (err as Error).message })
+        // 保留额度层给出的状态码：日成本断路器为 429、额度耗尽为 402，
+        // 若统一压成 402，断路器对客户端就不可见。
+        const boundary = err instanceof RequestBoundaryError ? err : null
+        json(boundary?.status ?? 402, {
+          ok: false,
+          code: boundary?.code ?? 'QUOTA_EXHAUSTED',
+          error: (err as Error).message,
+        })
       }
     })()
     return true
@@ -79,12 +89,34 @@ export const managedModelRoutes: RouteHandler = (req, res, { path, body, json, p
       return true
     }
 
+    // costFen 必须由调用方提供：settle 时点无法确定适用的套餐/模型，
+    // 冻结目录 catalog.ts 的 pricePerMTokenFen 亦为 null（T18 未实测），
+    // 因此这里绝不能凭 tokens 自算价格。缺省视为 0；给出非法值时显式 400，不静默当 0。
+    const rawCostFen = body['costFen']
+    let costFen = 0
+    if (rawCostFen !== undefined) {
+      if (typeof rawCostFen !== 'number' || !Number.isFinite(rawCostFen) || rawCostFen < 0) {
+        json(400, {
+          ok: false,
+          code: 'INVALID_COST_FEN',
+          error: 'costFen must be a finite non-negative number',
+        })
+        return true
+      }
+      costFen = rawCostFen
+    }
+
     void (async () => {
       try {
-        const result = await defaultQuotaManager.settle(userId, operationId, tokens)
+        const result = await defaultQuotaManager.settle(userId, operationId, tokens, costFen)
         json(200, { ok: true, reservation: result })
       } catch (err) {
-        json(400, { ok: false, code: 'SETTLE_FAILED', error: (err as Error).message })
+        const boundary = err instanceof RequestBoundaryError ? err : null
+        json(boundary?.status ?? 400, {
+          ok: false,
+          code: boundary?.code ?? 'SETTLE_FAILED',
+          error: (err as Error).message,
+        })
       }
     })()
     return true

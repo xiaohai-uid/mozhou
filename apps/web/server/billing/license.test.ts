@@ -3,7 +3,9 @@
  * 离线票据与 Ed25519 签名核验测试 (T15 · LicenseTicketManager)。
  */
 import { describe, expect, it } from 'vitest'
+import { generateKeyPairSync, sign } from 'node:crypto'
 import { LicenseTicketManager } from './license.js'
+import { billingCatalog, PRO_ENTITLEMENT_KEYS } from './catalog.js'
 
 describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
   it('正常签署与 72h 内离线核验通过', () => {
@@ -86,5 +88,81 @@ describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
     expect(() => {
       manager.verifyTicket(ticket, 'device_001', pastTime)
     }).toThrow(/CLOCK_ROLLBACK_DETECTED/)
+  })
+
+  it('免费套餐票据不含任何 pro 能力（不再默认授予 pro-features）', () => {
+    const manager = new LicenseTicketManager()
+    const ticket = manager.issueTicket({
+      userId: 'usr_free_author',
+      deviceId: 'device_001',
+      planId: 'free',
+    })
+
+    expect(ticket.data.planId).toBe('free')
+    expect(ticket.data.capabilities).toEqual([])
+    expect(ticket.data.capabilities).not.toContain('pro-features')
+    // 自洽票据仍可通过核验
+    expect(manager.verifyTicket(ticket, 'device_001').valid).toBe(true)
+  })
+
+  it('Pro 套餐票据能力等于冻结目录的 PRO_ENTITLEMENT_KEYS', () => {
+    const manager = new LicenseTicketManager()
+    const ticket = manager.issueTicket({
+      userId: 'usr_pro_author',
+      deviceId: 'device_001',
+      planId: 'pro_monthly',
+    })
+
+    expect([...ticket.data.capabilities].sort()).toEqual([...PRO_ENTITLEMENT_KEYS].sort())
+    expect(manager.verifyTicket(ticket, 'device_001').valid).toBe(true)
+  })
+
+  it('Max 套餐票据能力含 Pro 全集与 managed-model-quota', () => {
+    const manager = new LicenseTicketManager()
+    const ticket = manager.issueTicket({
+      userId: 'usr_max_author',
+      deviceId: 'device_001',
+      planId: 'max_monthly',
+    })
+
+    expect([...ticket.data.capabilities].sort()).toEqual(
+      [...billingCatalog.max.entitlementKeys].sort(),
+    )
+    expect(ticket.data.capabilities).toContain('managed-model-quota')
+    expect(manager.verifyTicket(ticket, 'device_001').valid).toBe(true)
+  })
+
+  it('未知/本地开发套餐不获得任何能力', () => {
+    const manager = new LicenseTicketManager()
+    const ticket = manager.issueTicket({
+      userId: 'usr_local',
+      deviceId: 'device_001',
+      planId: 'local_dev',
+    })
+
+    expect(ticket.data.capabilities).toEqual([])
+  })
+
+  it('能力与套餐不一致的票据在核验时被拒（CAPABILITY_PLAN_MISMATCH）', () => {
+    const manager = new LicenseTicketManager()
+    // 用自生成密钥对伪造一张「free 套餐却带 pro 能力」的签名票据：签名本身有效，
+    // 但能力与 planId 不一致，必须被新增的一致性校验拦下。
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+    const data = {
+      userId: 'usr_free_author',
+      deviceId: 'device_001',
+      planId: 'free',
+      serverTime: Date.now(),
+      expiry: Date.now() + 3600 * 1000,
+      capabilities: ['pro-features'],
+    }
+    const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), privateKey).toString('base64')
+
+    expect(() => {
+      manager.verifyTicket({ data, signature, publicKey }, 'device_001')
+    }).toThrow(/CAPABILITY_PLAN_MISMATCH/)
   })
 })

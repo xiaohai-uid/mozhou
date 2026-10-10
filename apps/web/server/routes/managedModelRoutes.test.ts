@@ -4,11 +4,16 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createMoZhouApiRouter } from '../api.js'
 import { defaultBookAccessManager } from '../bookAccess.js'
 import { defaultSessionManager, InMemoryAuthProvider } from '../auth/session.js'
 import { defaultQuotaManager } from '../billing/quota.js'
+import { defaultBillingStore } from '../billing/store.js'
+import { PRO_ENTITLEMENT_KEYS } from '../billing/catalog.js'
 
 let servers: ReturnType<typeof createServer>[] = []
 
@@ -118,5 +123,148 @@ describe('托管模型额度与离线票据路由 (T15)', () => {
     expect(dataSettle.ok).toBe(true)
     expect(dataSettle.reservation.status).toBe('settled')
     expect(dataSettle.reservation.actualTokens).toBe(2500)
+  })
+
+  it('免费用户票据能力为空，不再默认授予 pro', async () => {
+    defaultBookAccessManager.setHostedMode(true)
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('free_ticket@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    const resTicket = await fetch(`${base}/api/billing/license/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ deviceId: 'dev_free_001' }),
+    })
+    expect(resTicket.status).toBe(200)
+    const data = (await resTicket.json()) as {
+      ticket: { data: { planId: string; capabilities: string[] } }
+    }
+    expect(data.ticket.data.planId).toBe('free')
+    expect(data.ticket.data.capabilities).toEqual([])
+    expect(data.ticket.data.capabilities).not.toContain('pro-features')
+  })
+
+  it('Pro 用户票据能力等于 PRO_ENTITLEMENT_KEYS，与 planId 一致', async () => {
+    defaultBookAccessManager.setHostedMode(true)
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-managed-route-'))
+    defaultBillingStore.setDatabasePath(join(dir, 'billing.sqlite'))
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('pro_ticket@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    // 为该用户发放 Pro 履约
+    const order = defaultBillingStore.createOrder({
+      userId: user.id,
+      planId: 'pro_monthly',
+      channel: 'wechat',
+      idempotencyKey: 'pro_ticket_k1',
+    })
+    defaultBillingStore.processPaymentNotification({
+      event: {
+        eventId: 'evt_pro_ticket',
+        channel: 'wechat',
+        orderId: order.orderId,
+        eventType: 'SUCCESS',
+        rawPayload: '{}',
+        receivedAt: new Date().toISOString(),
+      },
+      providerTransactionId: 'tx_pro_ticket',
+      paidAmountFen: 1900,
+      status: 'SUCCESS',
+    })
+
+    try {
+      const resTicket = await fetch(`${base}/api/billing/license/ticket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ deviceId: 'dev_pro_001' }),
+      })
+      expect(resTicket.status).toBe(200)
+      const data = (await resTicket.json()) as {
+        ticket: { data: { planId: string; capabilities: string[] } }
+      }
+      expect(data.ticket.data.planId).toBe('pro_monthly')
+      expect([...data.ticket.data.capabilities].sort()).toEqual([...PRO_ENTITLEMENT_KEYS].sort())
+    } finally {
+      defaultBillingStore.close()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('结算路由接受 costFen 并按真实成本累加日成本', async () => {
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('cost_user@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    await fetch(`${base}/api/billing/quota/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_cost_real', units: 1 }),
+    })
+
+    const resSettle = await fetch(`${base}/api/billing/quota/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_cost_real', tokens: 1200, costFen: 250 }),
+    })
+    expect(resSettle.status).toBe(200)
+    expect(defaultQuotaManager.getDailyCost()).toBe(250)
+  })
+
+  it('非法 costFen 显式拒绝 400，不静默当 0', async () => {
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('bad_cost@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    for (const bad of [-1, 'abc']) {
+      const res = await fetch(`${base}/api/billing/quota/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ operationId: 'op_bad_cost', tokens: 10, costFen: bad }),
+      })
+      expect(res.status).toBe(400)
+      const data = (await res.json()) as { code: string }
+      expect(data.code).toBe('INVALID_COST_FEN')
+    }
+  })
+
+  it('成本累加触发日成本断路器：下一次 reserve 返回 HTTP 429 CIRCUIT_BREAKER_TRIPPED', async () => {
+    const base = await listen()
+    defaultQuotaManager.setDailyBudgetFen(100)
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('breaker_user@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    await fetch(`${base}/api/billing/quota/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_breaker_1', units: 1 }),
+    })
+    const resSettle = await fetch(`${base}/api/billing/quota/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_breaker_1', tokens: 1000, costFen: 100 }),
+    })
+    expect(resSettle.status).toBe(200)
+    expect(defaultQuotaManager.isCircuitBreakerTripped()).toBe(true)
+
+    const resReserve = await fetch(`${base}/api/billing/quota/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_breaker_2', units: 1 }),
+    })
+    expect(resReserve.status).toBe(429)
+    const data = (await resReserve.json()) as { code: string }
+    expect(data.code).toBe('CIRCUIT_BREAKER_TRIPPED')
   })
 })
