@@ -4,9 +4,14 @@
  * 安全约束：默认只允许 HTTPS 公网端点；同时对字面 IP 与 DNS 解析结果做
  * 私有/环回/链路本地/保留地址校验，并禁止自动跟随重定向，避免 SSRF 绕过。
  * 本机私有 LLM 仅可由部署者显式设置 MOZHOU_ALLOW_PRIVATE_LLM=1 开启。
+ *
+ * host 分类（「是否私有/保留/不可达」）来自 `../ssrfGuard.js`，与爬虫侧共用同一
+ * 实现，避免两侧网段清单各自维护而漂移；本文件只保留自身策略：协议白名单、
+ * 超时、重定向逐跳复检。该分类只看字面 host，DNS rebinding 须由请求层防护。
  */
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
+import { isPrivateOrReservedAddress, normalizeAddress } from '../ssrfGuard.js'
 import { defaultProviderSettingsManager } from './providerSettings.js'
 import type { OpenAiStreamChunk, ResolvedEndpoint } from './types.js'
 export type { OpenAiStreamChunk, ResolvedEndpoint } from './types.js'
@@ -17,61 +22,6 @@ interface LookupAddress {
 }
 
 type LookupAll = (hostname: string) => Promise<readonly LookupAddress[]>
-
-function normalizeAddress(address: string): string {
-  return address.toLowerCase().replace(/^\[|\]$/g, '')
-}
-
-function isPrivateOrReservedIpv4(address: string): boolean {
-  const parts = address.split('.').map((part) => Number.parseInt(part, 10))
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true
-  const [a = 0, b = 0] = parts
-
-  if (a === 0 || a === 10 || a === 127) return true
-  if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
-  if (a === 169 && b === 254) return true
-  if (a === 172 && b >= 16 && b <= 31) return true
-  if (a === 192 && (b === 0 || b === 168)) return true
-  if (a === 198 && (b === 18 || b === 19 || b === 51)) return true
-  if (a === 203 && b === 0) return true
-  if (a >= 224) return true
-  return false
-}
-
-function isPrivateOrReservedIpv6(address: string): boolean {
-  const normalized = normalizeAddress(address)
-  if (normalized === '::' || normalized === '::1') return true
-
-  const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-  if (mapped?.[1] !== undefined) return isPrivateOrReservedIpv4(mapped[1])
-
-  // URL 解析器会把点分映射形式（::ffff:127.0.0.1）规范化为十六进制（::ffff:7f00:1），
-  // 因此嵌入 IPv4 的十六进制形式也必须还原成 v4 再判定（含 ::ffff:0:/96 转换段与 NAT64 段）。
-  const hexMapped = normalized.match(/^(?:::ffff:(?:0:)?|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
-  if (hexMapped?.[1] !== undefined && hexMapped[2] !== undefined) {
-    const high = Number.parseInt(hexMapped[1], 16)
-    const low = Number.parseInt(hexMapped[2], 16)
-    const embeddedV4 = `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`
-    return isPrivateOrReservedIpv4(embeddedV4)
-  }
-
-  const firstGroup = Number.parseInt(normalized.split(':')[0] || '0', 16)
-  if (Number.isNaN(firstGroup)) return true
-  if ((firstGroup & 0xfe00) === 0xfc00) return true // fc00::/7 unique-local
-  if ((firstGroup & 0xffc0) === 0xfe80) return true // fe80::/10 link-local
-  if ((firstGroup & 0xff00) === 0xff00) return true // multicast
-  if (normalized.startsWith('2001:db8:') || normalized === '2001:db8::') return true // documentation
-  if (normalized.startsWith('100:')) return true // 100::/64 discard-only (conservative)
-  return false
-}
-
-function isPrivateOrReservedAddress(address: string): boolean {
-  const normalized = normalizeAddress(address)
-  const family = isIP(normalized)
-  if (family === 4) return isPrivateOrReservedIpv4(normalized)
-  if (family === 6) return isPrivateOrReservedIpv6(normalized)
-  return true
-}
 
 /**
  * SSRF 门拒绝的**结构化标记**（P2 缺陷「本机模型接入指引误导」）。
