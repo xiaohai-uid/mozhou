@@ -584,6 +584,16 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：审计**仍有残余未核实项**（flywheel/pipeline/quality-engine 具名导出数 159/194/67 未逐一点算、Tauri「<15MB/<40MB」体积未实测、apps/web README 行数约数偏小）——不可读作「所有文档声称都已核实」；`MOBILE_UI_BRIEF.md` 的「原生 WebGL 着色器」属技术栈愿景未改；文档测试数无自动校验；沿用生产改密需接口变更、配额未接生成路径、receipt/report TOCTOU、`listUserBooks` 死代码、被拒预留仍停留 reserved、`verifyTicket` 生产无调用方、未连真实 Supabase、Tauri 未编译运行、一处未复现偶发、#99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
 - **遗留/风险**：`packages/data-plane/README.md`（1 行 守卫→门）与 `docs/gates.md`（大面积术语统一）被并行会话改过，均从 HEAD 版本出发只替换本轮涉及的行，`git diff --cached` 中他人术语改动行数 0；生成物无需刷新（本批只改 .md）。
 
+### CHG-20261010-13 — 2026-10-10 — 第十一轮复核点算收口（文档数字与指代清账）＋ 对抗轮次收敛，ZCode 执行
+
+- **需求来源**：第十一轮独立对抗复核（verdict `release`，连续第八次）。本轮两个结果：**上一批 9 处文档修正全部成立、证伪失败**；但点算上一轮列出的残余项时**成功证伪两处**，另发现三处「改完仍不一致」。证据见 [docs/changes/CHG-20261010-13-round11-counting-closure.md](docs/changes/CHG-20261010-13-round11-counting-closure.md)。
+- **实际变更**：140fbd5 一次性清账 7 处（7 个文件）：①`packages/pipeline/README.md` 具名导出 194→**204**（实测）；②`packages/quality-engine/README.md` 67→**78**（同口径下 flywheel 的 159 精确命中，证明口径无误）；③根 `README.md` 的 Tauri「<15MB 体积，<40MB 内存」——**本仓自己认定不可达的原始指标**（`CHG-20261006-14:25-26` 写明二者物理互斥：自带 node.exe 单文件 80MB、空闲 RAM 65~85MB），改为如实描述并指向该记录；④`apps/web/README.md` 行数改为带口径实测值（含测试 src 39,040/server 40,860；去测试 27,550/18,197）；⑤`packages/runtime/README.md` 修正「13 条 export* 挂在 src/recipe 名下」的指代错误（实际 13 是 index.ts 总数、recipe 只 3 条）；⑥`docs/adr/CODE-DUPLICATION-INVENTORY.md` 小节标题与正文自相矛盾（标题仍称「导致验签降级——已核实」）改为「曾导致…已关闭」；⑦`apps/web/MOBILE_UI_BRIEF.md` 把「原生 WebGL 着色器」从「前端技术栈」现在时拆出，单列为「目标（尚未实现）」。
+- **复核员对未覆盖面的新发现（全为低且实际不可达）**：`kernel/src/protection.ts` 排序比较器非反对称（id 带类型前缀故不可达）；`kernel/src/ulid.ts` 溢出分支不更新 `lastTime`（需单毫秒 2^80 次递增，不可达）；`WebSearchView.tsx` 的 setTimeout 未清理与搜索竞态（React 18 下无害）。**明说未发现高/中缺陷**；`kernel`、`benchmark`、`corpus`、`embedding-calib` 均未见问题。
+- **收敛判断**：复核员在报告末尾主动建议——「边际收益已很低……建议把剩余文档数字一次性清账后**转入收敛**，把资源移到真实运行时路径（真模型、act CI、安装器签名）而非再开对抗轮」。它点名的四类数字**已在本提交清账**；该判断与会话独立证据一致（连续八轮 release、最后两轮全部发现均为文档陈旧声称、本轮新覆盖的三个面只捞到不可达理论项）。**故本会话的对抗轮次到此收敛，不再新开轮次**；剩余项均属需要用户或环境才能推进（见验证状态）。
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1066 例 + 台架 3 例 + web 1299 例 / 15 跳过）；build/lint exit 0；静态环 `PASS 595 模块 / 1703 边 / 0 依赖环`；`graph:check` cycleCount 0；readmes/gates/glossary 全 0；干净 HEAD（140fbd5）副本上五个文档门全 0；数字全部由主会话自己复测（具名导出 159/204/78；行数两种口径）。
+- **验证状态**：已执行（上列实跑）。**未修/未验证（全部需要用户或环境）**：#99 真模型路径（本机无任何 API key，不拿 mock 冒充）；未推送（act 本地 CI 门未跑，需 Docker 与推送决定）；安装器未签名（需代码签名证书）；真实 Supabase 未连（生产改密修复需让 `confirmPasswordReset` 返回 userId，且无法本地验证）；Tauri 桌面入口未编译运行（不在发行产物内）；4 个 moderate 依赖漏洞未修（0 high / 0 critical）；根 README 的内存数字未实测（判 <40MB 为假的依据是本仓 CHG-20261006-14 自证）；产品决定类（真实生成路径未接配额、`listUserBooks` 死代码、被拒预留仍停留 reserved、文档数字无自动校验）；一处未复现偶发（`quota.test.ts:110`，主会话 9 次未复现）。
+- **遗留/风险**：根 `README.md` 被并行会话改过 4 行术语，本次从 HEAD 版本出发只替换 Tauri 那一行（`git diff --cached` 中他人术语改动行数 0）；其余 6 文件动手前干净；生成物无需刷新（本批只改 .md）。
+
 
 
 
