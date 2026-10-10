@@ -594,6 +594,16 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证（全部需要用户或环境）**：#99 真模型路径（本机无任何 API key，不拿 mock 冒充）；未推送（act 本地 CI 门未跑，需 Docker 与推送决定）；安装器未签名（需代码签名证书）；真实 Supabase 未连（生产改密修复需让 `confirmPasswordReset` 返回 userId，且无法本地验证）；Tauri 桌面入口未编译运行（不在发行产物内）；4 个 moderate 依赖漏洞未修（0 high / 0 critical）；根 README 的内存数字未实测（判 <40MB 为假的依据是本仓 CHG-20261006-14 自证）；产品决定类（真实生成路径未接配额、`listUserBooks` 死代码、被拒预留仍停留 reserved、文档数字无自动校验）；一处未复现偶发（`quota.test.ts:110`，主会话 9 次未复现）。
 - **遗留/风险**：根 `README.md` 被并行会话改过 4 行术语，本次从 HEAD 版本出发只替换 Tauri 那一行（`git diff --cached` 中他人术语改动行数 0）；其余 6 文件动手前干净；生成物无需刷新（本批只改 .md）。
 
+### CHG-20261010-14 — 2026-10-10 — retro 落地：提交时钩子、推送前门覆盖面与三个新检查，ZCode 执行
+
+- **需求来源**：用户 `/retro`。核心发现——**本仓的门都在，但没有任何东西在正确的时机跑它们**（CI 只在 master/main 的 push 与 PR 上触发，本地无钩子）；本次会话抓到的三个真问题（重复度门假绿空转、生成物陈旧到 HEAD 过不了自己的 CI、15 处文档陈旧声称）全属这一类。证据见 [docs/changes/CHG-20261010-14-retro-guardrails.md](docs/changes/CHG-20261010-14-retro-guardrails.md)。
+- **关键根因（实测）**：本机全局 gitconfig 设了 `core.hooksPath`，**Git 完全忽略 `.git/hooks/`**——钩子装在那里时探针提交顺利落盘（未执行）。故仓库级钩子放 `.githooks/pre-commit`（随代码版本化），由 `scripts/install-hooks.mjs` 设仓库级 `core.hooksPath=.githooks` 激活，并**链式调用机器级钩子**（那套扫凭据字面量与图谱环，不丢）。
+- **落地六项**：①`.githooks/pre-commit` + `scripts/install-hooks.mjs`（提交时跑术语/门清单含「在 CI」列/包 README/导入环四项阻断 + 生成物新鲜度阻断 + 文档裸数字告警）；②`scripts/ci-gate.mjs` 补 `doc-gates`/`import-cycles`/`duplication`（此前只覆盖 build/lint/test/graph-check，而这三类都不在任何本地路径上）；③`scripts/check-gates-ci-column.mjs` 双向校验 gates.md 的「在 CI」列（此前只拿硬编码三个门名比对 ci.yml，于是 duplication 那行写着「未接入」而它早已是 CI 作业）；④`scripts/check-doc-numbers.mjs` 只报不拦地扫活文档裸规模数字；⑤`scripts/check-generated-freshness.mjs` **按索引**判生成物新鲜度（见下）；⑥eslint 禁裸 `writeFileSync`（机械规则，本次会话靠人工 grep 才找出 11 处）并修掉剩下 3 处真裸写。
+- **最重要的一处设计取舍**：上一批把生成物检查做成告警（理由：工作区含他人未提交改动时会误判），代价是**挡不住「自己的提交把生成物改陈旧」**——`e6d3c31` 加一行注释即让 data-plane 行数 +1、`docs/architecture.md` 陈旧（第 4 次同类漂移）。索引语义（`git write-tree` 的树）不含他人未提交改动，故本检查做成**阻断**。
+- **验证（四个负例探针 + 一次守卫自证）**：钩子挡提交（移走 kernel README → exit 1 且 HEAD 未前进，逐字节还原）；「在 CI」列检查抓到副本里改回「未接入」的 duplication 行；ESLint 规则报出临时改回的裸写；新鲜度检查在索引退回旧版时报不一致并给刷新命令；**钩子还拦下了主会话自己的违规**（第 ③ 项修复的注释里写了禁用词，术语门 exit 1，改写后通过）。干净 HEAD（37f77b6）副本上八项门全 exit 0（`check-import-cycles` 需 typescript 依赖，干净副本无 node_modules 跑不了，工作区实测 595 模块 0 环）。
+- **验证状态**：已执行（上列实跑）。**未做/未验证**：**未改 CI 触发条件**（功能分支 push 仍拿不到 CI 反馈；放开到 feature/** 会消耗 CI 分钟数，属资源决定，未擅自改）；钩子需每 clone 手动激活一次；`check-doc-numbers` 阈值未定、判据是启发式；ESLint 允许清单两处内的新增裸写不拦；新鲜度检查每次提交 archive 整棵树（约 1–3 秒）且依赖 sh/tar。
+- **遗留/风险**：4 个文件（`scripts/ci-gate.mjs`、`.github/workflows/ci.yml`、`eslint.config.js`、`docs/gates.md`）被并行会话术语改动覆盖，均从 HEAD 版本出发只并入本轮改动（新增侧术语命中 0）。
+
 
 
 
