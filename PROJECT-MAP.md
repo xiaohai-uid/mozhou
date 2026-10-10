@@ -542,6 +542,17 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：真实生成路径仍未接配额（断路器只在调用方上报 costFen 时可达，是否接线属产品决定且 `managed.sellable: false`）；旧票据会因新增一致性校验失效需重签（fail-closed，TTL 72h，未实机验证桌面端缓存行为）；zip stored 用例用 32 KiB 合成上限；receipt/report 的 existsSync 预检仍 TOCTOU；`listUserBooks` 仍是无调用方的死代码；沿用 #99 真模型路径、未推送（未跑 act）、安装器未签名、发布链校验未在 Actions 实跑、Mimosa advisory、4 个 moderate 依赖漏洞。
 - **遗留/风险**：`zip-util.ts` 混有对方 1 行术语改动，暂存时还原该行措辞后入索引（`git diff --cached` 中他人术语行数 0）；`docs/term-map.md` 的工作区副本是对方按其自己的 GLOSSARY 重生成的产物，本次不覆盖，从 HEAD 版本出发只修正 `managedModelRoutes.ts` 的 `ticket` 符号行号后入索引。
 
+### CHG-20261010-09 — 2026-10-10 — 第七轮复核发现收口（成本上界 / 能力字段类型守卫 / 改密确认假成功），ZCode 执行
+
+- **需求来源**：第七轮独立对抗复核（verdict `release`，连续第四次；本轮要求**证伪**上一批三项并**首次**复核前端、会话与并发锁）报出的 1 中 2 低。证据见 [docs/changes/CHG-20261010-09-round7-findings-closure.md](docs/changes/CHG-20261010-09-round7-findings-closure.md)。
+- **实际变更**：b4ce83f 新增上界 `MAX_SETTLE_COST_FEN`（取自冻结目录 `billingCatalog.managed.budget.modelBudgetFenPerMonth`，当前 1500），超限即 400 `COST_FEN_EXCEEDS_LIMIT`——这是上一批「让成本可上报」打开的口子：任一登录用户 settle `1e308` 可让全服务的 reserve 都 429；同提交给 `verifyTicket` 的能力字段加类型守卫（畸形输入得 403 而非 TypeError/500）。4d4e87d 改密确认不再丢弃 `confirmPasswordReset` 的布尔返回值（替身实测：返回 false 时曾响应 200「重置成功」且会话已被撤销＝假成功），改为显式 400 `RESET_CONFIRM_FAILED`。09ebbce 刷新术语地图（`ticket` 符号行号 39→50）。
+- **归因更正**：第六轮登记的「旧票据会核验失败」经第七轮实测**影响为零**——全仓无该票据的生产消费者（`verifyTicket` 只在 license.ts 与其测试；`apps/web/src` 从不调该端点）。
+- **只报告未实现**：生产（Supabase）改密路径仍不可用（`consumeResetCode` 只认本进程内存表），修好它需接口变更——`confirmPasswordReset` 改为返回 `{ ok, userId? }` 以支撑会话撤销；波及两处实现（均在 `session.ts`）与一个消费方（`accountRoutes.ts`）。未实现，待裁决。
+- **首次覆盖区域结论干净**：前端 XSS（`innerHTML` 仅测试）、凭据不入 storage、写锁取放与超时/abort、会话 `HttpOnly`/`SameSite`/`Secure`+`timingSafeEqual`、设备流 PKCE S256 与 3 设备上限、数据完整性无吞读。
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1066 例 + 台架 3 例 + web 156 文件 1295 例）；web 计费+路由+鉴权 441 例（新增 6 例）；build/lint/typecheck exit 0；静态环 `PASS 595 模块 / 1703 边 / 0 依赖环`；`graph:check` cycleCount 0；重复度 15.81% < 17%；干净 HEAD（09ebbce）副本上五个文档门全 0。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：生产改密不可用且需接口变更；成本上界是「月上限约束单次成本」的保守近似；真实生成路径仍未接配额；receipt/report 的 existsSync 预检仍 TOCTOU；`listUserBooks` 仍是无调用方死代码；未连真实 Supabase；未跑 Tauri 运行时；沿用 #99 真模型路径、未推送（未跑 act）、安装器未签名、发布链校验未在 Actions 实跑、Mimosa advisory、4 个 moderate 依赖漏洞。
+- **遗留/风险**：本批 6 个源文件与测试动手前均为干净（无夹带）；`docs/term-map.md` 工作区副本属对方，本次不覆盖，只修正那一处行号后入索引。
+
 
 
 
