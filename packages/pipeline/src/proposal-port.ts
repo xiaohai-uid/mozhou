@@ -26,10 +26,10 @@
  * 对账决策缓冲持久化在 .mozhou/proposals/port_rcln_*.json，新 Port 实例同 root 打开
  * 即续接（投影悬挂标记 = CanonProposalCreated 成对头 + 记录 state=open 双凭据）。
  */
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TrackingKind } from '@mozhou/data-plane';
-import { itemIdsOf } from '@mozhou/data-plane';
+import { atomicWriteFileSync, itemIdsOf } from '@mozhou/data-plane';
 import type { ChangeSummary, ReconciliationProposal, ReconciliationService } from '@mozhou/data-plane';
 import { CANDIDATE_FAMILIES } from './extract-step.js';
 import type { CandidateFamily } from './extract-step.js';
@@ -147,10 +147,9 @@ function loadDecisionLedger(root: string, proposalId: string): ReconciliationDec
 
 function persistDecisionLedger(root: string, ledger: ReconciliationDecisionLedger): void {
   mkdirSync(join(root, '.mozhou', 'proposals'), { recursive: true });
-  const target = decisionLedgerPath(root, ledger.proposalId);
-  const tmp = target + '.tmp';
-  writeFileSync(tmp, JSON.stringify(ledger, null, 2) + '\n');
-  renameSync(tmp, target);
+  // 共享原子写（唯一临时名 + fsync + rename）：固定 `.tmp` + rename 会让并发写者
+  // 互相截断同一临时文件。
+  atomicWriteFileSync(decisionLedgerPath(root, ledger.proposalId), JSON.stringify(ledger, null, 2) + '\n');
 }
 
 /* ----------------------------------------------------------------------------

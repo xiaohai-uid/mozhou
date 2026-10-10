@@ -27,7 +27,7 @@
  * 详见 recordWholeBodyAuthorEdit 注释）：原样重存不丢窗口信号，多次小增量可凑够
  * 学习器 Nmin 样本。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ProtectedContentViolationError } from '@mozhou/kernel';
 import type { DomainEvent } from '@mozhou/kernel';
@@ -36,6 +36,7 @@ import { hashProse, parseFailurePatterns, serializeFailurePatterns, updateFailur
 import type { CorrectionReason } from '@mozhou/quality-engine';
 import {
   atomicReplace,
+  atomicWriteFileSync,
   emitFrontmatter,
   parseFrontmatter,
   proseChapterPath,
@@ -717,7 +718,9 @@ export function recordAuthorCorrection(request: RecordAuthorCorrectionRequest): 
     request.note,
   );
   mkdirSync(memoryDir, { recursive: true });
-  writeFileSync(memoryPath, serializeFailurePatterns(updated), 'utf8');
+  // 派生记忆整份重写：走原子写，崩溃/并发不再截断成半份（读侧 parseFailurePatterns
+  // 只逐行容忍撕裂行，整份截断会丢尾部记忆）。
+  atomicWriteFileSync(memoryPath, serializeFailurePatterns(updated));
 
   return {
     reportId: `corr_${request.taskRef}_${request.chapterIndex}`,

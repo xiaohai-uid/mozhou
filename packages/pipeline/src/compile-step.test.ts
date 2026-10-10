@@ -7,7 +7,7 @@
  * 全程 hermetic：临时书目录 + 注入凭证 id/时钟/固定 taskRef；stale 标记走
  * 真实传播链（commitChapter 钉版 → propagateStaleMarkers 命中）。
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -44,6 +44,7 @@ import {
   readPipelineLedger,
   runCompileStep,
 } from './index.js';
+import { PendingDependencyManifestUnreadableError } from './compile-step.js';
 
 const NOW = '2026-08-24T15:00:00.000Z';
 const LIN = 'char:lin-xuan' as EntityRef;
@@ -416,5 +417,38 @@ describe('D06 依赖钉版产出（编译 → 暂存 → 提交钉版 → findRe
     // 合法形状经同一渲染路径落盘后逐字段回读一致
     persistPendingDependencyManifest(root, 3, { entries: [{ kind: 'temporalFact', id: FACT_ID, revision: 2 }] });
     expect(readPendingDependencyManifest(root, 3)).toEqual({ entries: [{ kind: 'temporalFact', id: FACT_ID, revision: 2 }] });
+  });
+
+  it('钉版暂存原子写：盘上恒为完整合法 JSON 且无临时残留；撕裂读抛可操作错误（不自愈）', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mozhou-t06-atomic-'));
+    roots.push(root);
+    createBook({ dir: root, title: '钉版原子写之书' });
+
+    persistPendingDependencyManifest(root, 4, { entries: [{ kind: 'temporalFact', id: FACT_ID, revision: 1 }] });
+
+    // 原子写（唯一临时名 + fsync + rename）后：同目录无 `.mozhou-tmp` 残留
+    const manifestDir = join(root, PENDING_DEPENDENCY_MANIFEST_DIR);
+    expect(readdirSync(manifestDir).filter((name) => name.includes('.mozhou-tmp'))).toEqual([]);
+
+    // 盘上是完整合法 JSON（逐字段回读一致）
+    const path = join(root, pendingDependencyManifestPath(4));
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      entries: [{ kind: 'temporalFact', id: FACT_ID, revision: 1 }],
+    });
+
+    // 撕裂读：语义不明确（编译时快照不可得），故不自愈——抛可操作错误，保留 SyntaxError 契约
+    writeFileSync(path, '{"entries":[{"kind":');
+    let caught: unknown;
+    try {
+      readPendingDependencyManifest(root, 4);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SyntaxError);
+    expect(caught).toBeInstanceOf(PendingDependencyManifestUnreadableError);
+    const message = (caught as Error).message;
+    expect(message).toContain(path);
+    expect(message).toContain('删除该文件');
+    expect(message).toContain('重新编译');
   });
 });

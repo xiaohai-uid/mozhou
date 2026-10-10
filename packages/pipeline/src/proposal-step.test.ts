@@ -3,7 +3,7 @@
  * （继承/恒档/最高位）各一用例 / 提案记录落盘可回读（跨重启凭据）/
  * CanonProposalCreated 落账。零时钟零外部服务。
  */
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -230,5 +230,21 @@ describe('Canon Proposal 步', () => {
     ).toThrow(/riskClass/);
     // 抛错前零盘面残留
     expect(existsSync(join(root, RUNTIME_PROPOSALS_DIR))).toBe(false);
+  });
+
+  it('提案落盘原子写：盘上为完整合法 JSON 且无临时残留（并发写者不再互截）', () => {
+    const { root } = newBook();
+    const outcome = createCanonProposal({
+      bus: new PublishBus(),
+      bookRoot: root,
+      taskRef: 'tsk_t18_proposal',
+      chapterIndex: 2,
+      delta: { temporalFact: [factRow()], narrativePromise: [promiseRow('due')] },
+    });
+
+    const dir = join(root, RUNTIME_PROPOSALS_DIR);
+    expect(readdirSync(dir).filter((name) => name.includes('.mozhou-tmp'))).toEqual([]);
+    const raw = readFileSync(join(dir, outcome.proposalId + '.json'), 'utf8');
+    expect(JSON.parse(raw)).toMatchObject({ proposalVersion: 1, proposalId: outcome.proposalId });
   });
 });

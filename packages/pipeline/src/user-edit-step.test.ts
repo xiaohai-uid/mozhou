@@ -4,7 +4,7 @@
  * 人手外部编辑不受 I1 禁令（dual-plane Q10）/ M16 五级动作位 V1 只做光标+选区两级。
  * 零时钟零外部服务，hermetic 临时书。
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -349,5 +349,25 @@ describe('结构化纠错：AuthorCorrectionRecorded + 失败记忆折叠', () =
       .filter((event) => event?.type === 'AuthorCorrectionRecorded');
     expect(events).toHaveLength(0);
     expect(() => readFileSync(join(root, '质量', 'failure-memory.jsonl'), 'utf8')).toThrowError();
+  });
+
+  it('失败记忆原子写：整份重写落盘后无临时残留且逐行可解析（读侧撕裂容忍只兜行级）', () => {
+    const root = hermeticBook();
+    const deps = makeDeps(root);
+    recordUserEdit({ ...deps, blocks: [
+      { op: 'insert', paragraphStart: 2, paragraphEnd: 2, replacementText: '原始第一行' },
+    ] });
+    recordUserEdit({
+      ...deps,
+      blocks: [{ op: 'replace', paragraphStart: 2, paragraphEnd: 2, replacementText: '改写后的一行' }],
+      correctionReasons: ['outline_expansion'],
+      correctionNote: '备注',
+    });
+
+    const memoryDir = join(root, '质量');
+    expect(readdirSync(memoryDir).filter((name) => name.includes('.mozhou-tmp'))).toEqual([]);
+    const jsonl = readFileSync(join(memoryDir, 'failure-memory.jsonl'), 'utf8');
+    expect(jsonl.length).toBeGreaterThan(0);
+    expect(parseFailurePatterns(jsonl)).toHaveLength(1);
   });
 });

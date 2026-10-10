@@ -15,8 +15,9 @@
  * 落成 DependencyManifest 暂存（.mozhou/dependency-manifests/，运行时区非 canon），
  * 提交方按章回读钉进 ChapterCommitted 行——依赖图因此有生产侧数据源。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { atomicWriteFileSync } from '@mozhou/data-plane';
 import { parseDependencyManifest } from '@mozhou/kernel';
 import type {
   BookId,
@@ -164,6 +165,7 @@ export function buildDependencyManifest(
 /**
  * 钉版暂存：编译成功即写盘——提交时点已无编译时快照，Receipt 本身不载 revision，
  * 暂存是钉版跨「生成→提交」两请求的唯一载体。写失败原样抛出（宁败不脏）。
+ * 走共享原子写（唯一临时名 + fsync + rename）：并发写者不再互截，掉电不留半份文件。
  */
 export function persistPendingDependencyManifest(
   bookRoot: string,
@@ -171,17 +173,48 @@ export function persistPendingDependencyManifest(
   manifest: DependencyManifest,
 ): void {
   mkdirSync(join(bookRoot, PENDING_DEPENDENCY_MANIFEST_DIR), { recursive: true });
-  writeFileSync(join(bookRoot, pendingDependencyManifestPath(chapterIndex)), `${JSON.stringify(manifest, null, 2)}\n`);
+  atomicWriteFileSync(
+    join(bookRoot, pendingDependencyManifestPath(chapterIndex)),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+}
+
+/**
+ * 钉版暂存不可读（崩溃窗口留下的半份文件）：这是运行时区派生物，不是正典。
+ *
+ * 为什么不自愈：manifest 的 revision 面取自**编译时快照**，而提交时点已无该快照、
+ * Receipt 也不载 revision——无法从正典重算出「编译时真正读到的版本」。静默丢弃会让
+ * 影响分析静默失明（见 readPendingDependencyManifest 既有纪律），故只把错误换成
+ * 可操作文案。继承 SyntaxError 以保持既有「撕裂即 SyntaxError」的调用方契约。
+ */
+export class PendingDependencyManifestUnreadableError extends SyntaxError {
+  override readonly name = 'PendingDependencyManifestUnreadableError';
+
+  constructor(readonly manifestPath: string, cause: unknown) {
+    super(
+      `依赖钉版暂存不可读（疑似崩溃留下的半份文件）：${manifestPath}。` +
+        `恢复方式：删除该文件（本章将按「不钉任何上游版本」提交）或重新编译本章以重建暂存。` +
+        `底层错误：${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
 }
 
 /**
  * 钉版回读：无暂存 = 本章未经编译（手写章 / 结构层降级）⇒ null，提交方按「无钉版」提交。
  * 有暂存但形状非法 ⇒ 抛 DependencyManifestError（静默丢弃钉版 = 影响分析静默失明）。
+ * 有暂存但文件撕裂（不可解析）⇒ 抛可操作的 PendingDependencyManifestUnreadableError
+ * （语义不明确，无法从正典重算编译时 revision，故不自愈）。
  */
 export function readPendingDependencyManifest(bookRoot: string, chapterIndex: number): DependencyManifest | null {
   const path = join(bookRoot, pendingDependencyManifestPath(chapterIndex));
   if (!existsSync(path)) return null;
-  const parsed = JSON.parse(readFileSync(path, 'utf8')) as { entries?: unknown } | null;
+  let parsed: { entries?: unknown } | null;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8')) as { entries?: unknown } | null;
+  } catch (cause) {
+    // 撕裂 JSON（崩溃窗口产物）：不自愈，改为可操作错误（见类注释）。
+    throw new PendingDependencyManifestUnreadableError(path, cause);
+  }
   return parseDependencyManifest(parsed?.entries);
 }
 

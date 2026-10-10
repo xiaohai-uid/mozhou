@@ -171,6 +171,39 @@ describe('ProposalPort 统一确认面', () => {
     expect(listPendingProposalRefs({ root })).toEqual([ref]);
   });
 
+  it('对账决策缓冲原子写：部分决毕落盘为完整合法 JSON 且无临时残留', () => {
+    const { root, plane } = newBook();
+    plane.createChapterDraft({ chapterIndex: 1, title: '第一章' });
+    plane.commitChapter({
+      chapterIndex: 1,
+      summary: 'seed',
+      finalProse: '# 第一章\n\n定稿。\n',
+      appends: { temporalFact: [factRow({ validFrom: 1 })] },
+    });
+    appendFileSync(join(root, '追踪/事实.jsonl'), JSON.stringify(factRow({ subject: 'char:ahei' })) + '\n');
+    const recon = plane.reconciliation();
+    recon.pollOnce();
+    const open = recon.listOpenProposals().at(-1);
+    if (open === undefined) throw new Error('fixture: expected an open reconciliation proposal');
+    const port = new ProposalPort({ root, reconciliation: recon });
+    const ref = { port: 'reconciliation', proposalId: open.proposalId } as const;
+
+    // 只决一条 ⇒ 未决清空之前，决策缓冲落盘（收口时该文件才被删）
+    expect(port.confirm(ref, 'add:1').finalized).toBe(false);
+
+    const proposalsDir = join(root, '.mozhou', 'proposals');
+    const names = readdirSync(proposalsDir);
+    expect(names.filter((name) => name.includes('.mozhou-tmp'))).toEqual([]);
+    const ledgerFile = names.find((name) => name.startsWith('port_rcln_'));
+    expect(ledgerFile).toBeDefined();
+    const parsed = JSON.parse(readFileSync(join(proposalsDir, ledgerFile as string), 'utf8')) as {
+      ledgerVersion: number;
+      decisions: Record<string, unknown>;
+    };
+    expect(parsed.ledgerVersion).toBe(1);
+    expect(parsed.decisions['add:1']).toBeDefined();
+  });
+
   it('editAccept 协议纪律：管线空 patch 拒；对账带 patch 拒（编辑通道是文件本身）', () => {
     const { root, plane } = newBook();
     const seeded = seedPipelineProposal(root, new PublishBus());

@@ -20,12 +20,12 @@
  * 投影悬挂标记 = CanonProposalCreated#taskRef 成对头悬挂）。确认协议本体归
  * ProposalPort（proposal-port.ts），本模块只负责提案的创建与存取。
  */
-import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { newUlid } from '@mozhou/kernel';
 import type { DomainEvent, FactId, FactRiskClass } from '@mozhou/kernel';
 import type { PublishBus } from '@mozhou/runtime';
-import { RUNTIME_PROPOSALS_DIR } from '@mozhou/data-plane';
+import { RUNTIME_PROPOSALS_DIR, atomicWriteFileSync } from '@mozhou/data-plane';
 import { CANDIDATE_FAMILIES } from './extract-step.js';
 import type { CandidateDeltaBatch, CandidateFamily } from './extract-step.js';
 
@@ -165,10 +165,9 @@ function proposalPath(root: string, proposalId: string): string {
 
 function persistProposal(root: string, record: CanonProposalRecord): void {
   mkdirSync(proposalsDir(root), { recursive: true });
-  const target = proposalPath(root, record.proposalId);
-  const tmp = target + '.tmp';
-  writeFileSync(tmp, JSON.stringify(record, null, 2) + '\n');
-  renameSync(tmp, target);
+  // 共享原子写（唯一临时名 + fsync + rename）：固定 `.tmp` + rename 会让并发写者
+  // 互相截断同一临时文件。
+  atomicWriteFileSync(proposalPath(root, record.proposalId), JSON.stringify(record, null, 2) + '\n');
 }
 
 /** 读回提案记录（不存在/损坏返回 null——运行时区审计容忍，真源在账本事件指针）。 */
