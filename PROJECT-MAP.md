@@ -523,6 +523,15 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：hosted 下 restore 崩溃残留目录会被当有效作品列出（仅源码推断）；receipt/report 的 existsSync 预检仍 TOCTOU；并发互截仅单进程内由原语保证；4 个 moderate 依赖漏洞未修；生成物无自动再生成守卫（无 husky，靠 CI doc gates 兜）；「50 章 <5s」在 docs/ADR 查不到出处（仅在测试注释中被称为规格），本次未改数值也未升格为文档化规格；`scripts/build-release.mjs` 无来源戳（check:gates 已登记的已知缺口）。
 - **遗留/风险**：工作区含停摆工作线 126 个未提交文件；`receipt-file.ts` 混有对方 1 行术语改动，用「HEAD 版本 + 只套本轮改动」精确暂存（`git diff --cached` 中他人术语行数 0）；`flywheel/src/evaluator/storage.ts` 的 1 行改动经核实属对方，未入索引；生成物刷新用 `git write-tree` 造的「HEAD + 本轮改动」树对象作测量环境，避免把对方改动计入包内行数。
 
+### CHG-20261010-07 — 2026-10-10 — 第五轮复核发现收口（zip 炸弹 / 备份完整性门与归属隔离 / 发布链校验与来源戳），ZCode 执行
+
+- **需求来源**：第五轮独立对抗复核（verdict `release`，无数据丢失级或安全绕过级阻断）报出的 2 中 3 低。证据见 [docs/changes/CHG-20261010-07-round5-findings-closure.md](docs/changes/CHG-20261010-07-round5-findings-closure.md)。
+- **实际变更**：7b5a7c4 zip 解压加 `maxOutputLength`（zlib 在解压中强制，与可伪造的声明 `uncompSize` 无关）+ 按真实解压字节核总量 + 新增 `assertZipStructureIntact` 结构门；备份下载/恢复补同一道门（损坏→409 `BACKUP_CORRUPT`）；hosted 备份改落 `users/<userId>/backups`（local 不变）。b6f0c28 `release.yml` 新增「校验发布来源与版本」（祖先判定 + 版本匹配，置于构建前）；`build-release.mjs` 复用 `source-stamp.mjs` 打 `BUILD-STAMP.json`。0a47c74 文风画像改原子写（该函数无生产调用）。f4a061e 刷新架构地图（data-plane 59→60 文件）。
+- **主会话证伪（本批关键）**：子代理的炸弹测试中「谎报 `uncompSize` 为 0」那条看着到位，但**撤掉 `maxOutputLength` 后 5 例全部仍通过**——它给的 `maxTotalBytes` 只有 1024，按真实字节的总量检查替它兜住了，真正的修复点（分配本身有界）无人把守。把该例上限改为「总量 1 GiB、单文件 64 KiB」后复验：撤 `maxOutputLength` 时**该例变红、其余 4 例仍绿**，还原后全绿。
+- **验收（实跑）**：`pnpm test` exit 0（包层 119 文件 1064 例 + 台架段 3 例 + web 156 文件 1277 例）；build/typecheck/lint exit 0；静态环 `PASS 595 模块 / 1696 边 / 0 依赖环`；`graph:check` cycleCount 0；重复度 15.83% < 17%；干净 HEAD（f4a061e）副本上 architecture/term-map FRESH + glossary/gates/readmes 全 0；直测 Node 24 的 `ERR_BUFFER_TOO_LARGE` 语义；亲跑 `node scripts/build-release.mjs` 并用 `tar -tzf` 确认戳进了两个归档。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：`maxTotalBytes = 1 GiB` 为既有设计值（1 MiB 请求仍可把峰值推到约 1 GiB，单条已封顶 100 MiB）；结构门不查内容篡改（下载路径无落盘哈希可比）；hosted 存量全局备份不可见（fail-closed）；receipt/report 的 existsSync 预检仍 TOCTOU；发布链校验未在 GitHub Actions 上实跑（依赖 runner 对真实 origin 的 fetch）；未做真实并发 OOM 压测；沿用 #99 真模型路径、未推送（未跑 act）、安装器未签名、Mimosa advisory、4 个 moderate 依赖漏洞。
+- **遗留/风险**：`zip-util.ts` 混有对方 1 行术语改动，暂存时还原该行措辞后入索引（`git diff --cached` 中他人术语行数 0）；`docs/gates.md` 与 `scripts/verify-gates-contract.mjs` 里的「build-release 无来源戳」登记**只存在于对方未提交改动中**（HEAD 版无该检查），本批只提交 `release.yml` 与 `build-release.mjs` 两个干净文件，那两处文字改动留给对方。
+
 
 
 
