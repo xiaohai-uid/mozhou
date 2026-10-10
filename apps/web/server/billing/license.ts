@@ -141,8 +141,20 @@ export class LicenseTicketManager {
     //    与 planId 经冻结目录推导出的能力完全一致，从而拦下「免费套餐却带 pro 能力」
     //    这类签发缺陷。注意：这会使旧版签发器（曾默认写入 pro-features）发出的、
     //    仍在使用期内的票据核验失败；票据 TTL 上限 72 小时，重新签发即可自愈。
+    //
+    //    先做字段类型守卫：畸形输入（capabilities 非数组、缺字段、含非字符串元素）
+    //    必须在比较前被拦下。否则 [...data.capabilities] 会抛 TypeError 冒泡成 500，
+    //    而正确结果是边界错误 403。沿用同族错误码 CAPABILITY_PLAN_MISMATCH，不新造语义。
+    const rawCapabilities: unknown = data.capabilities
+    if (!Array.isArray(rawCapabilities) || !rawCapabilities.every((cap) => typeof cap === 'string')) {
+      throw new RequestBoundaryError(
+        403,
+        'CAPABILITY_PLAN_MISMATCH',
+        `CAPABILITY_PLAN_MISMATCH: ticket capabilities must be an array of strings, got ${JSON.stringify(rawCapabilities)}`,
+      )
+    }
     const expectedCapabilities = [...capabilitiesForPlan(data.planId)].sort()
-    const actualCapabilities = [...data.capabilities].sort()
+    const actualCapabilities = [...rawCapabilities].sort()
     if (
       actualCapabilities.length !== expectedCapabilities.length ||
       actualCapabilities.some((cap, i) => cap !== expectedCapabilities[i])

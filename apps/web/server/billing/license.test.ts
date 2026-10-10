@@ -4,8 +4,9 @@
  */
 import { describe, expect, it } from 'vitest'
 import { generateKeyPairSync, sign } from 'node:crypto'
-import { LicenseTicketManager } from './license.js'
+import { LicenseTicketManager, type SignedLicenseTicket } from './license.js'
 import { billingCatalog, PRO_ENTITLEMENT_KEYS } from './catalog.js'
+import { RequestBoundaryError } from '../security.js'
 
 describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
   it('正常签署与 72h 内离线核验通过', () => {
@@ -164,5 +165,39 @@ describe('LicenseTicketManager 离线票据与签名防伪 (T15)', () => {
     expect(() => {
       manager.verifyTicket({ data, signature, publicKey }, 'device_001')
     }).toThrow(/CAPABILITY_PLAN_MISMATCH/)
+  })
+
+  it('畸形 capabilities（非数组 / 字符串 / 缺字段 / 含非字符串元素）一律 403，而非 TypeError', () => {
+    const manager = new LicenseTicketManager()
+    // 用自生成密钥对签名，使签名校验通过、真正走到能力字段比较那一步；
+    // 否则会先在签名环节被 INVALID_SIGNATURE 拦下，测不到本次新增的类型守卫。
+    const signWith = (capabilities: unknown): SignedLicenseTicket => {
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      })
+      const data = {
+        userId: 'usr_malformed',
+        deviceId: 'device_001',
+        planId: 'free',
+        serverTime: Date.now(),
+        expiry: Date.now() + 3600 * 1000,
+        capabilities,
+      }
+      const signature = sign(null, Buffer.from(JSON.stringify(data), 'utf8'), privateKey).toString('base64')
+      return { data, signature, publicKey } as unknown as SignedLicenseTicket
+    }
+
+    for (const caps of [123, 'pro-features', undefined, ['pro-features', 42]]) {
+      let caught: unknown
+      try {
+        manager.verifyTicket(signWith(caps), 'device_001')
+      } catch (err) {
+        caught = err
+      }
+      expect(caught).toBeInstanceOf(RequestBoundaryError)
+      expect((caught as RequestBoundaryError).status).toBe(403)
+      expect((caught as Error).message).toMatch(/CAPABILITY_PLAN_MISMATCH/)
+    }
   })
 })

@@ -12,6 +12,17 @@ import { RequestBoundaryError } from '../security.js'
 import { defaultLicenseTicketManager } from '../billing/license.js'
 import { defaultQuotaManager } from '../billing/quota.js'
 import { defaultEntitlementManager } from '../billing/entitlements.js'
+import { billingCatalog } from '../billing/catalog.js'
+
+/**
+ * 单次结算成本上界（分）。取自冻结目录 catalog.ts 的「每月模型成本经营保护上限（分）」
+ * （billingCatalog.managed.budget.modelBudgetFenPerMonth，当前 1500），并写进代码注释固定依据：
+ * settle 的 costFen 会由 quota.ts 直接累加进全局日成本（_dailyCosts），若单次成本可任意大，
+ * 一个普通登录用户即可打掉全体用户共用的日成本断路器（后续 reserve 全部 429）。
+ * 单次调用成本超过整月经营保护上限本身即不合理，故以此冻结值为上界。
+ * 不采用 quota.ts 的 _dailyBudgetFen：它是运行期可变配置（setDailyBudgetFen），非冻结值。
+ */
+const MAX_SETTLE_COST_FEN = billingCatalog.managed.budget.modelBudgetFenPerMonth
 
 export const managedModelRoutes: RouteHandler = (req, res, { path, body, json, principal }) => {
   const userId = principal?.userId
@@ -100,6 +111,15 @@ export const managedModelRoutes: RouteHandler = (req, res, { path, body, json, p
           ok: false,
           code: 'INVALID_COST_FEN',
           error: 'costFen must be a finite non-negative number',
+        })
+        return true
+      }
+      // 上界：见 MAX_SETTLE_COST_FEN 注释。超过即显式 400，绝不进入全局成本累加。
+      if (rawCostFen > MAX_SETTLE_COST_FEN) {
+        json(400, {
+          ok: false,
+          code: 'COST_FEN_EXCEEDS_LIMIT',
+          error: `costFen must not exceed the monthly model cost protection limit (${MAX_SETTLE_COST_FEN} fen)`,
         })
         return true
       }

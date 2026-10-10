@@ -13,7 +13,7 @@ import { defaultBookAccessManager } from '../bookAccess.js'
 import { defaultSessionManager, InMemoryAuthProvider } from '../auth/session.js'
 import { defaultQuotaManager } from '../billing/quota.js'
 import { defaultBillingStore } from '../billing/store.js'
-import { PRO_ENTITLEMENT_KEYS } from '../billing/catalog.js'
+import { billingCatalog, PRO_ENTITLEMENT_KEYS } from '../billing/catalog.js'
 
 let servers: ReturnType<typeof createServer>[] = []
 
@@ -266,5 +266,88 @@ describe('托管模型额度与离线票据路由 (T15)', () => {
     expect(resReserve.status).toBe(429)
     const data = (await resReserve.json()) as { code: string }
     expect(data.code).toBe('CIRCUIT_BREAKER_TRIPPED')
+  })
+
+  it('极大 costFen（1e308）被 400 拒绝，不进入全局成本累加', async () => {
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('huge_cost@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    const res = await fetch(`${base}/api/billing/quota/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_huge_cost', tokens: 10, costFen: 1e308 }),
+    })
+    expect(res.status).toBe(400)
+    const data = (await res.json()) as { code: string }
+    expect(data.code).toBe('COST_FEN_EXCEEDS_LIMIT')
+    // 关键：未累加，全局断路器不受影响，其他用户不会被连坐。
+    expect(defaultQuotaManager.getDailyCost()).toBe(0)
+    expect(defaultQuotaManager.isCircuitBreakerTripped()).toBe(false)
+  })
+
+  it('合法量级 costFen 仍被接受：累加后可触发断路器并让下一次 reserve 返回 429', async () => {
+    const base = await listen()
+    defaultQuotaManager.setDailyBudgetFen(200)
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('legal_cost@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    const legalCostFen = 250 // <= 上界（1500）的正常量级，证明上界未把正常路径一起挡掉
+    await fetch(`${base}/api/billing/quota/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_legal_1', units: 1 }),
+    })
+    const resSettle = await fetch(`${base}/api/billing/quota/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_legal_1', tokens: 1000, costFen: legalCostFen }),
+    })
+    expect(resSettle.status).toBe(200)
+    expect(defaultQuotaManager.getDailyCost()).toBe(legalCostFen)
+    expect(defaultQuotaManager.isCircuitBreakerTripped()).toBe(true)
+
+    const resReserve = await fetch(`${base}/api/billing/quota/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_legal_2', units: 1 }),
+    })
+    expect(resReserve.status).toBe(429)
+    const data = (await resReserve.json()) as { code: string }
+    expect(data.code).toBe('CIRCUIT_BREAKER_TRIPPED')
+  })
+
+  it('costFen 边界：恰好等于上界放行，超过一点即 400', async () => {
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user } = await provider.signUp('bound_cost@client.com', 'pass123')
+    const { cookie } = defaultSessionManager.createSession({ userId: user.id, email: user.email })
+
+    const bound = billingCatalog.managed.budget.modelBudgetFenPerMonth
+    await fetch(`${base}/api/billing/quota/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_bound_ok', units: 1 }),
+    })
+    const resAtBound = await fetch(`${base}/api/billing/quota/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_bound_ok', tokens: 10, costFen: bound }),
+    })
+    expect(resAtBound.status).toBe(200)
+
+    const resOver = await fetch(`${base}/api/billing/quota/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ operationId: 'op_bound_over', tokens: 10, costFen: bound + 1 }),
+    })
+    expect(resOver.status).toBe(400)
+    const data = (await resOver.json()) as { code: string }
+    expect(data.code).toBe('COST_FEN_EXCEEDS_LIMIT')
   })
 })
