@@ -8,7 +8,7 @@
  * - 响应脱敏：对外只返回掩码 Key（如 sk-****abcd），绝不外泄明文 Key；
  * - 每次配置修改自增 configVersion 并记录修改时间。
  */
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
 import { atomicWriteFileSync } from '@mozhou/data-plane'
@@ -203,11 +203,41 @@ function parseUserConfig(plaintext: string): UserProviderConfig | null {
 /**
  * 把无法解密的凭据文件复制为 `<path>.bak` 并返回备份路径；**绝不删除**原文件。
  * 数据保护优先：文件里可能仍是用户唯一的 Key 副本（只是解不开），删了就真没了。
+ * 备份本身失败（目标不可写、磁盘满）返回 null——上层仍抛显式错误，绝不把备份失败
+ * 升级成未捕获的 500，也绝不因备份失败去动原文件。
  */
-function backupUnreadableCredentials(path: string): string {
+function backupUnreadableCredentials(path: string, bytes: Buffer): string | null {
   const backupPath = `${path}.bak`
-  writeFileSync(backupPath, readFileSync(path))
-  return backupPath
+  try {
+    writeFileSync(backupPath, bytes)
+    return backupPath
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 读文件本身失败时的**尽力**备份：用 copyFileSync，不经 JS 把内容读进来。
+ * 多数读失败（EISDIR/EACCES/EBUSY）下复制同样失败，返回 null；能成则返回路径。
+ * 无论成败都不删除原文件。
+ */
+function backupUnreadableCredentialsByCopy(path: string): string | null {
+  const backupPath = `${path}.bak`
+  try {
+    copyFileSync(path, backupPath)
+    return backupPath
+  } catch {
+    return null
+  }
+}
+
+/** 读失败的可读归因：带上 errno code（EISDIR/EACCES/EBUSY…），供错误消息与日志定位。 */
+function describeReadFailure(err: unknown): string {
+  const code = (err as NodeJS.ErrnoException).code
+  const message = err instanceof Error ? err.message : String(err)
+  return code === undefined || code === ''
+    ? `读取凭据文件失败：${message}`
+    : `读取凭据文件失败（${code}）：${message}`
 }
 
 /**
@@ -242,23 +272,35 @@ export function maskApiKey(key: string): string {
 }
 
 /**
- * 「已保存的凭据无法用当前主密钥解密」的显式错误。
+ * 「已保存的凭据无法读取或无法用当前主密钥解密」的显式错误。
  *
- * 触发场景：升级前用旧源码常量加密的 provider-settings.enc，升级后主密钥改为
- * installation.key（B7），旧文件解不开。修复前 getSettings 把解密失败折成 null，
- * 用户看到的是「从没配过」——同一个 Key 明明还在文件里。
+ * 触发场景：
+ * - 升级前用旧源码常量加密的 provider-settings.enc，升级后主密钥改为
+ *   installation.key（B7），旧文件解不开；
+ * - 凭据文件损坏、被占用、无读取权限，或该路径被目录占位（读文件本身即抛错）。
  *
- * 数据保护：抛出前原文件已复制为 `<path>.bak`，绝不删除。code 供调用方/日志识别，
+ * 修复前 getSettings 把解密失败折成 null，用户看到的是「从没配过」——同一个 Key
+ * 明明还在文件里；读文件失败更直接冒泡成 500。现在两条路径统一走这里。
+ *
+ * 数据保护：能备份就把原文件复制为 `<path>.bak`（绝不删除）；不能备份时 backupPath
+ * 为 null，message 里说明原因（底层 errno 见 detail）。code 供调用方/日志识别，
  * message 直接告诉用户下一步（重新输入 API Key）。
  */
 export class ProviderCredentialsUnreadableError extends RequestBoundaryError {
-  readonly backupPath: string
-  constructor(backupPath: string) {
+  /** 备份文件路径；备份失败时为 null（原文件在任何情况下都不删除）。 */
+  readonly backupPath: string | null
+  constructor(backupPath: string | null, detail?: string) {
+    const backupNote =
+      backupPath === null
+        ? '原文件未删除，但备份失败（见底层原因）。'
+        : `原文件未删除，已备份到 ${backupPath}。`
     super(
       409,
       'PROVIDER_CREDENTIALS_UNREADABLE',
-      '已保存的模型凭据无法用当前主密钥解密（升级后主密钥变更，或 installation.key 被替换）。' +
-        `原文件未删除，已备份到 ${backupPath}。请到「模型设置」重新输入 API Key 恢复使用。`,
+      '已保存的模型凭据无法读取或解密（升级后主密钥变更、installation.key 被替换、' +
+        '文件损坏、无读取权限或被占用）。' +
+        `${backupNote}请到「模型设置」重新输入 API Key 恢复使用。` +
+        (detail === undefined ? '' : `底层原因：${detail}`),
     )
     this.name = 'ProviderCredentialsUnreadableError'
     this.backupPath = backupPath
@@ -280,15 +322,30 @@ export class ProviderSettingsManager {
   /**
    * 读取并解密本机/本用户的凭据。文件不存在返回 null（确实没配过）。
    *
-   * 文件存在但解不开（升级后主密钥变更、installation.key 被替换、文件损坏）时
-   * **不再静默返回 null**：先尝试迁移期旧密钥重加密；不行就把原文件备份为 .bak
-   * 并抛 ProviderCredentialsUnreadableError，让调用方/界面给出「重新输入 API Key」。
+   * 显式失败（绝不静默 null、也绝不冒泡成 500）：
+   * - 文件存在但**读不出来**（损坏、权限、被占用、路径被目录占位）：先尽力备份，
+   *   再抛 ProviderCredentialsUnreadableError，message 带上底层 errno；
+   * - 文件读得到但**解不开**（升级后主密钥变更、installation.key 被替换、文件损坏）：
+   *   先尝试迁移期旧密钥重加密；不行就把原文件备份为 .bak 并抛同一错误。
+   * 两条路径都绝不删除用户文件，让调用方/界面给出「重新输入 API Key」的恢复动作。
    */
   getSettings(userId?: string): UserProviderConfig | null {
     const path = this.getSettingsPath(userId)
     if (!existsSync(path)) return null
 
-    const cipherText = readFileSync(path, 'utf8').trim()
+    let bytes: Buffer
+    try {
+      bytes = readFileSync(path)
+    } catch (err) {
+      // 读文件本身失败：与「解不开」走同一条显式错误路径。能备份就备份（copy 不经 JS 读入），
+      // 不能备份时 backupPath=null 并把底层原因写进 message。
+      throw new ProviderCredentialsUnreadableError(
+        backupUnreadableCredentialsByCopy(path),
+        describeReadFailure(err),
+      )
+    }
+
+    const cipherText = bytes.toString('utf8').trim()
     const plaintext = decrypt(cipherText)
     if (plaintext !== null) {
       const config = parseUserConfig(plaintext)
@@ -300,7 +357,7 @@ export class ProviderSettingsManager {
     if (migrated !== null) return migrated
 
     // 2) 解不开：先备份原文件（绝不删除），再抛出可操作错误。
-    throw new ProviderCredentialsUnreadableError(backupUnreadableCredentials(path))
+    throw new ProviderCredentialsUnreadableError(backupUnreadableCredentials(path, bytes))
   }
 
   saveSettings(

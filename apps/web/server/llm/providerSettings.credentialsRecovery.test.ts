@@ -11,7 +11,7 @@
  * 2) 操作员经 MOZHOU_LEGACY_SECRET_KEY 提供旧密钥：一次性重加密为当前主密钥。
  * 夹具密钥一律用构造字符串、文件用同算法现场生成——测试里没有任何可用凭据字面量。
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createCipheriv, randomBytes, scryptSync } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -101,7 +101,8 @@ describe('旧主密钥文件在新主密钥下读取 · 不静默', () => {
     // 数据保护：原文件仍在，且内容与备份逐字节一致
     expect(existsSync(settingsPath())).toBe(true)
     expect(readFileSync(settingsPath(), 'utf8')).toBe(original)
-    expect(readFileSync(err.backupPath, 'utf8')).toBe(original)
+    expect(err.backupPath).not.toBeNull()
+    expect(readFileSync(err.backupPath as string, 'utf8')).toBe(original)
   })
 
   it('getMaskedSettings 同样不静默：上抛错误而不是回 configured=false', () => {
@@ -141,5 +142,44 @@ describe('旧主密钥文件在新主密钥下读取 · 不静默', () => {
 
   it('没有文件时仍返回 null（确实没配过，不是错误）', () => {
     expect(MANAGER.getSettings()).toBeNull()
+  })
+})
+
+/**
+ * 读文件本身失败（B7 修复的残余）：修复前 getSettings 直接 readFileSync，
+ * 文件读不出来（目录占位/权限/被占用）时裸错误冒泡成 500。现改为与「解不开」
+ * 一致的显式失败：409 PROVIDER_CREDENTIALS_UNREADABLE，message 带底层 errno。
+ *
+ * 复现方式：把凭据文件路径用**目录**占位。existsSync 为真（进入读取分支），
+ * readFileSync 对目录抛 EISDIR——Windows/macOS/Linux 上均稳定复现，不依赖权限
+ * 设置（CI 常以高权限运行，chmod 000 在部分环境不生效）。
+ */
+describe('凭据文件不可读 · 显式失败而非 500/静默', () => {
+  it('目录占位凭据文件路径 ⇒ 抛 409，备份失败如实置 null，消息带底层原因', () => {
+    mkdirSync(settingsPath()) // 用目录占住 local-provider-settings.enc
+
+    let thrown: unknown
+    try {
+      MANAGER.getSettings()
+    } catch (err) {
+      thrown = err
+    }
+
+    expect(thrown).toBeInstanceOf(ProviderCredentialsUnreadableError)
+    const err = thrown as ProviderCredentialsUnreadableError
+    expect(err.status).toBe(409)
+    expect(err.code).toBe('PROVIDER_CREDENTIALS_UNREADABLE')
+    // 读都读不出来，无从备份；但绝不删除原路径（这里原「文件」仍是那个目录）
+    expect(err.backupPath).toBeNull()
+    expect(existsSync(settingsPath())).toBe(true)
+    // 消息可操作 + 带上底层 errno，便于定位（EISDIR/EPERM 等因平台而异，只查前缀）
+    expect(err.message).toContain('重新输入 API Key')
+    expect(err.message).toContain('读取凭据文件失败')
+    expect(err.message).toContain('备份失败')
+  })
+
+  it('getMaskedSettings 同路径同样上抛（GET /api/llm/settings 得 409，不是 500）', () => {
+    mkdirSync(settingsPath())
+    expect(() => MANAGER.getMaskedSettings(undefined, {})).toThrow(ProviderCredentialsUnreadableError)
   })
 })
