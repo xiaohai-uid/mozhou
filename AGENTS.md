@@ -77,7 +77,7 @@
 - 提交信息：按全局指令（文件头 `C:\zcode\AGENTS.md`）「Git 分支与提交 → 提交信息与历史保护」章执行（八类 Conventional Commits 前缀、单提交同一类别不超过 3 个问题）；破坏性 Git 操作的禁令以全局同章与本文件 §6 第 23 条为准。本节只保留项目级差异，不重复全局条文。
 - 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
 - **推送前的自动化门（项目级额外项）**：除全局的 act 本地 CI 外，本项目推送前还必须跑 `node scripts/ci-gate.mjs` 的这几个任务——`graph-check`（依赖环，期望 `clean` / `cycleCount: 0`）、`doc-gates`（术语/架构地图/门清单/README 及门清单「在 CI」列一致性）、`import-cycles`、`duplication`。这些步骤 ci.yml / release.yml / graph-gate.yml 里有、本地推送路径原本没有：图谱步骤 ci.yml 与 release.yml 都没有且 `.gitnexus/` 索引不入库，所以只在本地把得住（2026-10-07 发布审计的 1 个循环就是这样活到 HEAD 的）；文档门与导入环 2026-10-10 补齐（此前只覆盖 build/lint/test/graph-check，于是「生成物陈旧到 HEAD 过不了自己的 CI」「重复度门假绿空转」能一路活到 HEAD）。记录见 `docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md` 与 `docs/changes/CHG-20261010-14-retro-guardrails.md`。
-- **提交时的快速门（钩子）**：跑一次 `node scripts/install-hooks.mjs` 激活仓库内的 `.githooks/pre-commit`（它先链式调用机器级钩子，再跑术语/门清单/README/导入环四项秒级检查；生成物新鲜度与文档裸数字只告警）。**钩子本体在 `.githooks/` 而不是 `.git/hooks/`**——本机全局 gitconfig 设了 `core.hooksPath`，`.git/hooks/` 会被 Git 完全忽略（2026-10-10 实测：装在那里根本不执行）。
+- **提交时的快速门（钩子）**：跑一次 `node scripts/install-hooks.mjs` 激活仓库内的 `.githooks/pre-commit`（它先链式调用机器级钩子，再跑术语/门清单/README/导入环四项秒级检查，外加**生成物新鲜度按索引判定**这一项阻断检查；文档裸数字只告警）。**钩子本体在 `.githooks/` 而不是 `.git/hooks/`**——本机全局 gitconfig 设了 `core.hooksPath`，`.git/hooks/` 会被 Git 完全忽略（2026-10-10 实测：装在那里根本不执行）。
 
 ## 9. Wayfinder 追踪操作（内核线并入）
 
