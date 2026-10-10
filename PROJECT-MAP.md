@@ -496,6 +496,15 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：DNS rebinding（只看字面 host，防护应在请求层，已注释声明）；Tauri 写 installation.key 未显式限权；阈值只防恶化；迁移需操作员显式设环境变量；HTTP 级端到端未跑；R5 依赖漏洞结论（本机 registry 无 audit 端点）；安装器签名；未推送（未跑 act）；Mimosa 完整扫描；真实微信/支付宝联调；naming 502 真实模型。
 - **遗留/风险**：check:term-map 与 check:architecture 因并行会话未提交改动为 STALE（生成器只读 GLOSSARY.md / 统计包内源码行数），非本变更因果范围。
 
+### CHG-20261010-04 — 2026-10-10 — 第三轮复核发现收口（共享 SSRF 判定 / 读失败语义 / 运行态原子写），ZCode 执行
+
+- **需求来源**：第三轮独立对抗复核（verdict block）报出的 1 项新高危 + 3 项残余。证据见 [docs/changes/CHG-20261010-04-round3-ssrf-unification.md](docs/changes/CHG-20261010-04-round3-ssrf-unification.md)。
+- **实际变更**：abd99f5 抽出共享 SSRF 判定 apps/web/server/ssrfGuard.ts，crawler 与 LLM 出站门共用（原 LLM 门放行 6to4/NAT64 本地/::/96/文档段，且 POST /api/llm/settings 收任意 baseUrl）；890e295 draft-step 运行态改原子写（读路径刻意不改，语义不明确）；7a9705d getSettings 读失败走显式 409 而非 500（备份尽力而为、绝不删除）。
+- **验收（实跑）**：主会话直调新模块实测——8 个恶意形式（含 6to4/NAT64 本地/::/96/文档段/::ffff:0:7f00:1/0.1.2.3/224.0.0.1）全部判为私有/保留，3 个公网形式仍放行；crawlers+llm 136 用例、pipeline 256 用例、llm 64 用例通过；合并后全量门 test/build/lint/duplication/静态环检测(593·1685·0)/graph(0)/glossary·gates·readmes 全绿。
+- **共享化暴露并修掉一处真回归**：旧 openaiStream 的正则会拦 ::ffff:0:127.0.0.1 的规范化形态 ::ffff:0:7f00:1，纯位段判定会漏——已在 isPrivateOrReservedIpv6 前置字面还原补齐（含测试）。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：DNS rebinding（只看字面 host，防护归请求层，已注释声明）；isPrivateOrReservedAddress 对非 IP 文本 fail closed（调用方须先 isIP 门控）；重复度门只比总量（逐格式稀释，登记技术债）；readDraftState 撕裂仍抛（只消除来源）；真权限拒绝 EACCES/EBUSY 未构造（只覆盖 EISDIR）；R5 依赖漏洞结论（无 audit 端点）；安装器签名；未推送（未跑 act）；Mimosa 完整扫描；真实微信/支付宝联调；naming 502 真实模型。
+- **遗留/风险**：check:term-map 与 check:architecture 因并行会话未提交改动为 STALE，非本变更因果范围。
+
 
 
 
