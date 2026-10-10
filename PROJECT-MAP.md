@@ -514,6 +514,15 @@
 - **验证状态**：已执行（上列实跑）。**未修/未验证**：第五批 5 类（backupRoutes 备份 zip 裸写且对外 sha256 取自内存 buffer、book-backup restore 注释与事实不符、flywheel storage 整表重写、memoStore/receipt-file/report-store 固定 `.tmp`）收口待落账；并发写者互截仅单进程内由原语保证（无多进程/掉电实测）；4 个 moderate 依赖漏洞未修；沿用安装器签名、未推送（未跑 act）、Mimosa 完整扫描（advisory）、真实微信/支付宝联调、naming 502 真实模型。
 - **遗留/风险**：check:term-map 与 check:architecture 因并行会话未提交改动为 STALE，非本变更因果范围；`user-edit-step.ts(.test.ts)` 含停摆工作线未提交的术语改动，提交用「HEAD 版本 + 只套本轮 3+2 处改动」精确暂存，已核验暂存差异中他人术语行数为 0。
 
+### CHG-20261010-06 — 2026-10-10 — 主会话独立清扫收口 + 生成物陈旧修复 + 墙钟台架隔离，ZCode 执行
+
+- **需求来源**：第四轮复核判 release 之后，主会话自做的**不依赖子代理转述**的独立清扫（全仓裸 `writeFileSync` 扫描 + 干净 HEAD 副本上的门复跑）。证据见 [docs/changes/CHG-20261010-06-main-session-sweep-gen-artifacts-flaky-bench.md](docs/changes/CHG-20261010-06-main-session-sweep-gen-artifacts-flaky-bench.md)。
+- **实际变更**：5969b45 五类「裸写/固定 `.tmp`」收口（备份 zip、book-backup restore、flywheel 整表重写、memoStore、receipt-file、report-store），备份落盘改原子并**回读校验 sha256**（此前对外哈希取自内存 buffer、不描述盘上字节），共享原语加宽为 `string|Buffer`，并补上子代理遗漏的 `saveProfileSnapshot`；b40f20d 刷新 `docs/architecture.md` 与 `docs/term-map.md`；fac8a2a 把墙钟规格台架移出并行池。
+- **关键发现（主会话自查）**：①备份 zip 的 sha256 与盘上字节无关；②`book-backup` restore 注释称「原子落盘」与事实不符；③`flywheel/storage` 注释称「读侧撕裂容忍使中断安全」经证过度（整表截断会静默丢尾行）；④**`docs/architecture.md` 与 `docs/term-map.md` 在 HEAD 上就陈旧** → HEAD 自身过不了 CI 的 Doc gates——此前把该 STALE 归因给并行会话是**错的**，干净副本上实跑同样 STALE；⑤`l1-lifecycle-bench` 的 `durationMs < 5000` 是墙钟断言，同一提交全量跑红、单独跑绿、重跑又绿（脆弱测试）。
+- **验收（实跑）**：三包 489 例 + web 357 例通过；build/typecheck/lint exit 0；`test:packages` 隔离后并行段 118 文件 1059 例 + 台架段 1 文件 3 例 exit 0；**负例探针**（台架预算改 1ms）报 `expected 2225 to be less than 1` 证明断言未被静默跳过，还原后 `git diff` 为空；干净 HEAD（fac8a2a）副本上 architecture/term-map FRESH + glossary/gates/readmes 全 0；静态环 594·1694·0；重复度 15.86% < 17%；`gitnexus check` clean/0。`impact(atomicWriteFileSync)` 报 CRITICAL，系 159 直接调用方的扇出度量，非语义风险（仅加宽参数类型，对既有字符串调用方逐字节等价）。
+- **验证状态**：已执行（上列实跑）。**未修/未验证**：hosted 下 restore 崩溃残留目录会被当有效作品列出（仅源码推断）；receipt/report 的 existsSync 预检仍 TOCTOU；并发互截仅单进程内由原语保证；4 个 moderate 依赖漏洞未修；生成物无自动再生成守卫（无 husky，靠 CI doc gates 兜）；「50 章 <5s」在 docs/ADR 查不到出处（仅在测试注释中被称为规格），本次未改数值也未升格为文档化规格；`scripts/build-release.mjs` 无来源戳（check:gates 已登记的已知缺口）。
+- **遗留/风险**：工作区含停摆工作线 126 个未提交文件；`receipt-file.ts` 混有对方 1 行术语改动，用「HEAD 版本 + 只套本轮改动」精确暂存（`git diff --cached` 中他人术语行数 0）；`flywheel/src/evaluator/storage.ts` 的 1 行改动经核实属对方，未入索引；生成物刷新用 `git write-tree` 造的「HEAD + 本轮改动」树对象作测量环境，避免把对方改动计入包内行数。
+
 
 
 
