@@ -87,7 +87,7 @@
 | 任务投影 | Task Projection | `TaskProjection` | `packages/runtime/src/tasks.ts:23` | 声明 |
 | 档位路由 | Tier Routing | - | - | 未验证 |
 | 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:235` | 声明 |
-| 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:184` | 声明 |
+| 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:183` | 声明 |
 | 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
 | 能力注册表 | Capability Registry | `CapabilityRegistry` | `packages/runtime/src/registry.ts:23` | 声明 |
 | 能力配方 | Capability Recipe | `CapabilityRecipe` | `packages/runtime/src/recipe/types.ts:142` | 声明 |
@@ -115,7 +115,7 @@
 | 门 | Gate | `Gate` | `apps/web/src/capability-square/CapabilitySquareView.tsx:101` | 引用 |
 | 门禁 | - | - | - | 未验证 |
 | 闸门 | - | - | - | 未验证 |
-| 检查 | Check | `check` | `apps/web/server/routes/accountRoutes.ts:66` | 引用 |
+| 检查 | Check | `check` | `apps/web/server/routes/accountRoutes.ts:68` | 引用 |
 | 配额 | Quota | `quota` | `apps/web/server/billing/quota.test.ts:10` | 仅测试 |
 | 纵切 | Vertical Slice | - | - | 未验证 |
 | 切片 | Slice | `Slice` | `apps/web/src/workbench/editor/NovelEditorCanvas.tsx:6` | 引用 |
