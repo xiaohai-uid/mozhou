@@ -25,9 +25,9 @@ const dataRoot = dataRootOverride ? resolve(rootDir, dataRootOverride) : join(ro
  *
  * 为什么必须在这里做：本文件正是发行资产 `*-local-runtime.tar.gz` 的文档化入口
  * （启动墨舟.bat:49 / start.sh:35 都调它），而它既不设 NODE_ENV 也不设
- * MOZHOU_SECRET_KEY；providerSettings.resolveMasterKey 在该组合下会回退到源码可见的
- * DEV_FALLBACK_SECRET（providerSettings.ts:63,99），等于用公开常量加密 BYOK 凭据——
- * 读到 provider-settings.enc 的人可用公开常量解开。
+ * MOZHOU_SECRET_KEY。服务端 providerSettings.resolveMasterKey 在同一组合下会读取
+ * 数据根的 installation.key（缺失则用 CSPRNG 现场生成并落盘）——两侧同一套引导，
+ * 谁先启动谁铸造，另一侧读回同一把钥匙，密钥不在源码里。
  *
  * 首次启动铸造 installation.key（48 字节随机、0600），此后沿用同一把钥匙。随机密钥
  * 不在源码里；它与 provider-settings.enc 同处数据根，属同一信任边界（文件权限）。

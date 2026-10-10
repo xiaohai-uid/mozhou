@@ -6,7 +6,9 @@ import { fetchText, isSafePublicUrl } from './provider-utils.js'
 
 const CRAWL4AI_PORT = 11235
 const DEFAULT_ENDPOINT = `http://127.0.0.1:${CRAWL4AI_PORT}`
-const TOKEN = process.env['CRAWL4AI_TOKEN'] ?? 'local-dev-token'
+// 只从环境变量读取：源码里不留任何可用的默认凭据字面量。缺失即拒绝 crawl4ai 通道，
+// 由 smartExtractContent 平滑回落到轻量 HTTP 提取，而不是拿公开常量去认证。
+const TOKEN = process.env['CRAWL4AI_TOKEN']?.trim() ?? ''
 const TIMEOUT_MS = 20_000
 
 export interface Crawl4aiResult {
@@ -60,6 +62,16 @@ export async function crawlWithCrawl4ai(
       ok: false,
       results: [],
       error: 'SECURITY_REJECT: 目标 URL 为私有/非安全地址，已被安全策略拦截',
+    }
+  }
+
+  // 凭据门：未配置 CRAWL4AI_TOKEN 即拒绝本通道（无内置默认 token），
+  // 交由 smartExtractContent 回落到轻量 HTTP 提取。
+  if (TOKEN === '') {
+    return {
+      ok: false,
+      results: [],
+      error: 'CRAWL4AI_TOKEN 未配置：已拒绝 crawl4ai 通道（token 只从环境变量读取，无源码默认值）',
     }
   }
 

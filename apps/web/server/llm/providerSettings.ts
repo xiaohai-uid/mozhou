@@ -8,8 +8,8 @@
  * - 响应脱敏：对外只返回掩码 Key（如 sk-****abcd），绝不外泄明文 Key；
  * - 每次配置修改自增 configVersion 并记录修改时间。
  */
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
 import { atomicWriteFileSync } from '@mozhou/data-plane'
 import { defaultBookAccessManager } from '../bookAccess.js'
@@ -60,22 +60,52 @@ export function resolveEnvEndpoint(env: NodeJS.ProcessEnv = process.env): EnvEnd
 
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
 const MASTER_KEY_SALT = 'mozhou-salt-fixed'
-const DEV_FALLBACK_SECRET = 'mozhou-default-internal-master-key-2026'
 const MIN_SECRET_KEY_LENGTH = 32
+
+/**
+ * 本机凭据加密主密钥文件（installation.key）的读取/铸造。
+ *
+ * 与 scripts/launcher.mjs、scripts/release/windows/desktop-server.mjs 同一套引导：
+ * 48 字节 CSPRNG 随机、十六进制 96 字符、0600 权限。文件不存在时用 `wx` 落盘，
+ * 因此并发首启只有一个赢家，输家读回赢家写下的同一把钥匙。密钥与加密后的
+ * provider-settings.enc 同处数据根，属同一信任边界（文件权限）；它不进源码、不进库。
+ */
+function loadOrCreateInstallationKey(keyPath: string): string {
+  try {
+    mkdirSync(dirname(keyPath), { recursive: true })
+    writeFileSync(keyPath, randomBytes(48).toString('hex'), { flag: 'wx', mode: 0o600 })
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+  }
+  const key = readFileSync(keyPath, 'utf8').trim()
+  if (!/^[0-9a-f]{96}$/.test(key)) {
+    throw new Error(
+      `凭据加密主密钥文件已损坏: ${keyPath}。请从备份恢复；不要替换它，替换会使既有 BYOK 凭据无法解密。`,
+    )
+  }
+  return key
+}
 
 /**
  * 主密钥解析：加密 BYOK 凭据的密钥材料。
  *
- * 生产（NODE_ENV=production）或 hosted 模式下必须显式提供 MOZHOU_SECRET_KEY。
- * 回退到源码可见的常量会让每个部署的凭据实际可被解密——文件就在同一数据目录里，
- * 读到它的人用公开常量即可解开；固定盐还使跨实例彩虹攻击可行。
- * 本地单机（非 production 且非 hosted）保留常量回退，以维持零配置启动。
+ * 生产（NODE_ENV=production）或 hosted 模式下必须显式提供 MOZHOU_SECRET_KEY，
+ * 缺失即在服务启动阶段抛错（fail-closed）。本地单机（非 production 且非 hosted）
+ * 未显式提供时，改从数据根的 installation.key 读取；文件不存在则用 CSPRNG 现场
+ * 生成 48 字节并落盘（0600），此后沿用同一把钥匙。
  *
- * 密钥在模块加载时求值：缺失即在服务启动阶段抛出，而不是等到首次写入凭据才暴露。
+ * 为什么不再保留源码常量回退：常量一旦入库，任何读到 provider-settings.enc 的人
+ * 都能用公开常量 + 固定盐解开，加密形同装饰。改为本机随机密钥后，密钥不在源码里，
+ * 且与加密后的凭据同处数据根，属同一信任边界（文件权限）。
+ *
+ * 求值时机：由 assertMasterKeyConfigured 与首次加解密触发。刻意不在模块加载时求值——
+ * `vite build` 会以 NODE_ENV=production 加载本模块，构建机没有也不该有运行期密钥；
+ * 模块加载期抛错会把「构建」和「运行」混为一谈，直接卡死发布流水线。
  */
 export function resolveMasterKey(
   env: NodeJS.ProcessEnv = process.env,
   hostedMode = false,
+  keyFilePath?: string,
 ): Buffer {
   const secret = env['MOZHOU_SECRET_KEY']?.trim()
   if (secret !== undefined && secret !== '') {
@@ -91,12 +121,13 @@ export function resolveMasterKey(
   if (env['NODE_ENV'] === 'production' || hostedMode) {
     throw new Error(
       'MOZHOU_SECRET_KEY is required when NODE_ENV=production or MOZHOU_HOSTED=true: ' +
-        'refusing to encrypt provider credentials with a source-visible default key. ' +
+        'refusing to encrypt provider credentials without an explicit key. ' +
         'Generate one with: openssl rand -base64 48',
     )
   }
 
-  return scryptSync(DEV_FALLBACK_SECRET, MASTER_KEY_SALT, 32)
+  const path = keyFilePath ?? resolve(defaultBookAccessManager.getDataRoot(), 'installation.key')
+  return scryptSync(loadOrCreateInstallationKey(path), MASTER_KEY_SALT, 32)
 }
 
 /**
