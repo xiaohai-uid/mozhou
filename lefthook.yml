@@ -1,0 +1,23 @@
+# Git hooks：本地只跑"快"的检查，全量检查归 CI。
+#
+# 安装：
+#   pnpm add -D lefthook && npx lefthook install
+#
+# 紧急跳过（不许当常规手段）：
+#   LEFTHOOK=0 git commit / LEFTHOOK=0 git push
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: whitespace（空白错误）
+      run: git diff --cached --check
+
+    - name: eslint（仅 staged 文件）
+      glob: "*.{ts,tsx,js,mjs,cjs}"
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: typecheck（tsc -b 全量构建）
+      run: pnpm build
