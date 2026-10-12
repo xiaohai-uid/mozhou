@@ -17,6 +17,12 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "apps/web/src/code-graph/**",
-    "packages/context-compiler/assets/**"
-  ]
+    "packages/context-compiler/assets/**",
+    "docs/**",
+    "**/.zcode/**"
+  ],
+  "ignoreRationale": {
+    "docs/**": "文档与规格产物，不是构建输入。docs/ 下 10 个代码文件全部零引用（不被 package.json、任何 workflow、scripts/ 或源码 import），含归档审计探针、superpowers 历史回归脚本与 kernel-schema.draft.ts 草案。计入会让重复率虚高 0.27 个百分点。",
+    "**/.zcode/**": "本机 AI 工作流产物目录，.gitignore:19 已忽略、不入库。jscpd 3.5.10 的 gitignore:true 对该嵌套规则不生效——实测单独扫描 .zcode 重复率 63.89%，本地每次跑都被污染 57 个克隆 / 13.3 个百分点。CI 是干净检出，所以从未暴露。显式排除而非依赖 gitignore:true。"
+  }
 }

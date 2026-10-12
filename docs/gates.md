@@ -127,7 +127,8 @@
 | 包层测试 | **以 `pnpm run test:packages` 实测为准**（2026-10-10 实测：并行段 119 文件 / 1066 例 + 独占台架段 1 文件 / 3 例，全部通过；原记 103 文件 / 910 例已过期） | `pnpm run test:packages` 实跑 |
 | 覆盖率 | **未启用**。`vitest.config.ts` 已配好 coverage 段，但 `@vitest/coverage-v8` 未安装，
 | 直接 `--coverage` 会报 MISSING DEPENDENCY | `pnpm run coverage:check` |
-| 克隆检测 | **已实跑验证**（2026-10-10）：总重复 15.8% < 阈值 17%（`.jscpd.json`），exit 0；把阈值临时调到 0.01 时 exit 1 并报 `found too many duplicates`，证明该门会拦。命令走 `npx --yes jscpd@3.5.10`（需现场下载 jscpd） | `.jscpd.json` |
+| 克隆检测 | **已实跑验证**（2026-10-10 实跑；2026-10-12 修正统计口径）：本机排除本地产物后总重复 **2.42%** < 阈值 17%（`.jscpd.json`），exit 0；把阈值临时调到 0.01 时 exit 1 并报 `found too many duplicates`，证明该门会拦。命令走 `npx --yes jscpd@3.5.10`（需现场下载 jscpd）。**注意此数字只在干净检出或显式排除本地产物后成立**，见下方「重复度统计口径」 | `.jscpd.json` |
+| 重复度统计口径 | **2026-10-12 修正**。此前记录的 15.8% 之所以虚高，是因为 `jscpd@3.5.10` 的 `gitignore:true` 对**嵌套目录规则不生效**：`.gitignore:19` 明明忽略了 `.zcode/`，该目录仍被扫入（实测单独扫描重复率 63.89%），单这一项就污染 57 个克隆 / 13.3 个百分点。CI 是干净检出、`.zcode/` 不入库，所以该污染**从未在 CI 暴露**，只污染本地每次跑。已在 `.jscpd.json` 显式排除 `docs/**` 与 `**/.zcode/**`（前者 10 个代码文件零引用，本是文档产物）。修正后：克隆 149 → 78，重复率 15.71% → 2.42% | `.jscpd.json` |
 | | 覆盖率阈值 | **刻意未设** —— DSH 的「逐文件 100%」按其 §七 判断不适用于本仓；阈值须由人看过真实数字后再定 |
 
 > 启用覆盖率需要 `pnpm add -D @vitest/coverage-v8`。本仓库**刻意未擅自添加该依赖**：
