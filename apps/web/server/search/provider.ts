@@ -10,6 +10,8 @@
  */
 import { createHash } from 'node:crypto'
 import { isSafePublicUrl } from '../crawlers/provider-utils.js'
+import { pinnedRequest } from '../net/pinnedHttp.js'
+import { defaultAddressLookup, resolvePublicAddresses, type AddressLookup } from '../net/publicTarget.js'
 
 export interface SearchCitation {
   readonly id: string
@@ -62,11 +64,24 @@ export class ApiSearchProvider implements ISearchProvider {
   readonly name: string
   private readonly _apiKey: string | null
   private readonly _endpoint: string
+  private readonly _lookupAll: AddressLookup
+  private readonly _request: typeof pinnedRequest
 
-  constructor(options: { name?: string; apiKey?: string; endpoint?: string } = {}) {
+  constructor(
+    options: {
+      name?: string
+      apiKey?: string
+      endpoint?: string
+      /** 测试注入缝：DNS 与传输缺省走 Node DNS / pinnedRequest。 */
+      lookupAll?: AddressLookup
+      request?: typeof pinnedRequest
+    } = {},
+  ) {
     this.name = options.name ?? 'commercial-search'
     this._apiKey = options.apiKey ?? process.env['SEARCH_API_KEY'] ?? process.env['BOCHA_API_KEY'] ?? null
     this._endpoint = options.endpoint ?? process.env['SEARCH_API_URL'] ?? 'https://api.bocha.cn/v1/web-search'
+    this._lookupAll = options.lookupAll ?? defaultAddressLookup
+    this._request = options.request ?? pinnedRequest
   }
 
   isConfigured(): boolean {
@@ -87,15 +102,18 @@ export class ApiSearchProvider implements ISearchProvider {
       }
     }
 
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10_000)
     try {
       if (!isSafePublicUrl(this._endpoint)) {
         throw new Error(`SSRF 门：拒绝调用非安全或私有目标 ${this._endpoint}`)
       }
+      // 端点来自配置/环境变量——配置来源不是可信输入。字面 host 之外再解析校验**全部**
+      // 地址，并把连接固定到同一份结果（防 DNS rebinding；与爬虫/LLM 走同一门）。
+      const target = new URL(this._endpoint)
+      const addresses = await resolvePublicAddresses(target.hostname, this._lookupAll, controller.signal)
 
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 10_000)
-
-      const res = await fetch(this._endpoint, {
+      const res = await this._request(target, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,9 +121,8 @@ export class ApiSearchProvider implements ISearchProvider {
         },
         body: JSON.stringify({ query, count: 10 }),
         signal: controller.signal,
-        redirect: 'manual',
+        ...(addresses.length === 0 ? {} : { addresses }),
       })
-      clearTimeout(timer)
 
       if (!res.ok) {
         return {
@@ -118,7 +135,7 @@ export class ApiSearchProvider implements ISearchProvider {
         }
       }
 
-      const data = (await res.json()) as { data?: { webPages?: { value?: { name?: string; url?: string; snippet?: string; siteName?: string }[] } } }
+      const data = JSON.parse(await res.text()) as { data?: { webPages?: { value?: { name?: string; url?: string; snippet?: string; siteName?: string }[] } } }
       const rawPages = data?.data?.webPages?.value ?? []
       const now = new Date().toISOString()
 
@@ -154,6 +171,9 @@ export class ApiSearchProvider implements ISearchProvider {
         configured: true,
         error: `SEARCH_FAILED: ${(err as Error).message}`,
       }
+    } finally {
+      clearTimeout(timer)
+      controller.abort()
     }
   }
 }

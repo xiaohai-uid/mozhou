@@ -19,6 +19,24 @@ export interface LedgerCtx {
 }
 
 /**
+ * 账本物理完整性错误（**恢复入口专用**）：存在无法证明安全的半行或坏行。
+ *
+ * 与审计读的容忍口径相反：`readStoredLines` 跳过撕裂行不阻断回读，恢复入口必须
+ * fail-closed——半行意味着「上一次追加结果不明」，放行会让后续 append 把新行粘到
+ * 半行后面，把可诊断的损坏固化成永久坏行。
+ */
+export class LedgerIntegrityError extends Error {
+  override readonly name = 'LedgerIntegrityError';
+
+  constructor(
+    readonly ledgerPath: string,
+    detail: string,
+  ) {
+    super(`ledger is not physically intact: ${detail} (${ledgerPath})`);
+  }
+}
+
+/**
  * W4-2c：任务事件行 schema 版本。**只加在任务事件行上**，平铺领域行不动
  * （平铺行由 T3/T9 等先于 runtime 存在的写入方产生，动它会波及它们）。
  */
@@ -123,6 +141,37 @@ export function readLedger(ctx: LedgerCtx): StoredLine[] {
 }
 
 /**
+ * 恢复前的账本物理核对：每个非空行都必须是完整 JSON，且末行以换行结束。
+ *
+ * 与 `readStoredLines` 的容忍口径相反——审计读跳过撕裂行是为了不阻断回读，
+ * 恢复入口不能沿用：半行意味着「上一次追加结果不明」，此时放行会让后续 append
+ * 把新行粘到半行后面，把可诊断的损坏变成永久坏行（隔离复现：先写合法
+ * TaskStarted，再写 25 字节 TaskFinished 后抛 EIO，重试后盘上两段 JSON 粘成
+ * 一条坏行，重放只看到 TaskStarted，而内存已认定任务闭合）。
+ * 读取失败（EACCES 等）与半行一律上抛 ⇒ 调用方保持停止标记、保留原件。
+ */
+function assertLedgerIntact(ctx: LedgerCtx): void {
+  const path = eventsFilePath(ctx);
+  if (!existsSync(path)) return;
+  const text = readFileSync(path, 'utf8');
+  if (text.length === 0) return;
+  if (!text.endsWith('\n')) {
+    throw new LedgerIntegrityError(path, 'last line is not newline-terminated (partial append)');
+  }
+  const lines = text.split('\n');
+  // 末尾元素是最后一个 '\n' 之后的空串，不构成行
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    const line = lines[i];
+    if (line === undefined || line.trim().length === 0) continue;
+    try {
+      JSON.parse(line);
+    } catch (error) {
+      throw new LedgerIntegrityError(path, `line ${i + 1} is not valid JSON: ${(error as Error).message}`);
+    }
+  }
+}
+
+/**
  * 发布事件：词表校验 → 配对状态机校验 → 以 seq=现行数+1 追加一行 JSON。
  * 单实例内串行使用；跨进程并发由调用方（单飞裁决 #32 S11）保证。
  */
@@ -130,13 +179,36 @@ export class PublishBus {
   /** key = `${headType}#${taskRef}` → head 已开未闭。 */
   readonly #openHeads = new Map<string, DomainEventType>();
 
+  /**
+   * 追加失败后的**毒化**标记（null = 正常）。
+   *
+   * I/O 抛错可能伴随部分字节写入，结果不明——此时**不能**按「完全没写」继续发布：
+   * 后续行的 seq/配对会建立在错误前提上。置位后本实例拒绝一切 publish，
+   * 直到调用方按账本核对并用 `adoptOpenHeads` 重建（该入口会清除毒化标记）。
+   */
+  #poisoned: string | null = null;
+
+  /** 毒化原因（null = 正常）。供调用方/测试判定是否需要先做账本核对与恢复。 */
+  get poisoned(): string | null {
+    return this.#poisoned;
+  }
+
   publish(ctx: LedgerCtx, event: DomainEvent, task?: TaskRowIdentity): void {
+    if (this.#poisoned !== null) {
+      throw new Error(
+        `PublishBus 已停止发布：上一次追加失败，结果不明（${this.#poisoned}）。` +
+          'I/O 抛错可能已写入部分字节，不能按「完全没写」重试；请按账本核对后经 adoptOpenHeads 恢复。',
+      );
+    }
     if (!(DOMAIN_EVENT_TYPES as readonly string[]).includes(event.type)) {
       throw new Error(`未知事件类型 ${String(event.type)}——词表由 kernel 类型库统一持有（@mozhou/kernel domain-events.ts，T16 上收）`);
     }
     const pair = EVENT_PAIRS.find(
       ([h, t]) => h === event.type || t === event.type,
     );
+    // 配对校验只**计算**待提交的下一状态，不改内存——追加成功后才提交。
+    // 写失败时内存与账本因此都不变：重试不会误报 PAIRING_HEAD_UNCLOSED / PAIRING_TAIL_WITHOUT_HEAD。
+    let pendingPairCommit: { readonly key: string; readonly headType: DomainEventType; readonly open: boolean } | null = null;
     if (pair) {
       const key = `${pair[0]}#${event.taskRef}`;
       if (event.type === pair[0]) {
@@ -146,7 +218,7 @@ export class PublishBus {
             `${pair[0]}#${event.taskRef} 尚未闭合，禁止再次开启`,
           );
         }
-        this.#openHeads.set(key, pair[0]);
+        pendingPairCommit = { key, headType: pair[0], open: true };
       } else {
         if (!this.#openHeads.has(key)) {
           throw new PairingError(
@@ -154,7 +226,7 @@ export class PublishBus {
             `${pair[1]}#${event.taskRef} 无对应已开的 ${pair[0]}`,
           );
         }
-        this.#openHeads.delete(key);
+        pendingPairCommit = { key, headType: pair[0], open: false };
       }
     }
     // 外层 seq：账本级全局序号（既有语义，供 SSE 游标补发）；内层 sequence 由调用方按任务给。
@@ -172,7 +244,23 @@ export class PublishBus {
             sequence: task.sequence,
             event,
           };
-    appendFileSync(eventsFilePath(ctx), Buffer.from(`${JSON.stringify(row)}\n`, 'utf8'));
+    // 序列化在 try 之外：序列化失败 ⇒ 什么都没写，内存状态本就未变，无需毒化，可安全重试。
+    const line = Buffer.from(`${JSON.stringify(row)}\n`, 'utf8');
+    try {
+      appendFileSync(eventsFilePath(ctx), line);
+    } catch (error) {
+      // 追加失败（可能已写入部分字节）：内存配对状态保持不变，并毒化本实例。
+      this.#poisoned = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+    // 追加成功后才提交内存配对状态（写前失败 ⇒ 内存与账本一致，重试安全）。
+    if (pendingPairCommit !== null) {
+      if (pendingPairCommit.open) {
+        this.#openHeads.set(pendingPairCommit.key, pendingPairCommit.headType);
+      } else {
+        this.#openHeads.delete(pendingPairCommit.key);
+      }
+    }
   }
 
   /**
@@ -197,6 +285,9 @@ export class PublishBus {
    * tail 出列），幂等、只读、不改写任何行。
    */
   adoptOpenHeads(ctx: LedgerCtx): void {
+    // 恢复 = 核对 → 重建 → 解除停止。**顺序不能反**：核对或读取失败必须保持停止标记并
+    // 保留原件，否则「半行 + 解除停止 + 继续 append」会把损坏固化（见 assertLedgerIntact）。
+    assertLedgerIntact(ctx);
     const lines = readStoredLines(ctx);
     let openedAt: number | null = null;
     for (let i = 0; i < lines.length; i++) {
@@ -227,6 +318,9 @@ export class PublishBus {
         this.#openHeads.delete(key);
       }
     }
+    // 核对与重建都成功后才解除停止——这是「追加失败 ⇒ 停止发布 ⇒ 核对账本 ⇒ 恢复」
+    // 链条里唯一的解锁点。
+    this.#poisoned = null;
   }
 
   /** 测试与投影重建辅助：当前开放未闭合的 head 键集合。 */

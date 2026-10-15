@@ -61,6 +61,7 @@ import {
   resolveCandidateCancel,
   finishCandidate,
   readDraftCandidate,
+  candidateRelPath,
   type CandidateMode,
   type WriteBase,
   resolveCandidateGenerationId,
@@ -127,7 +128,14 @@ interface DraftStateWrite {
   readonly candidateId?: string;
 }
 
-function writeDraftState(root: string, state: DraftStateWrite): void {
+/** 复用候选路径的 UUID 校验；派生状态不能借 candidateId 穿出运行态目录。 */
+function candidateStateRelPath(candidateId: string): string {
+  const candidatePath = candidateRelPath(candidateId);
+  return DRAFT_STATE_DIR + '/candidates/' + candidatePath.slice(candidatePath.lastIndexOf('/') + 1);
+}
+
+/** 调用方持同一书锁：候选私有状态始终更新，章指针仅由当前所有者更新。 */
+function writeDraftState(root: string, state: DraftStateWrite, claimChapter = false): void {
   const payload: DraftStateFile = {
     stateVersion: 1,
     chapterIndex: state.chapterIndex,
@@ -138,7 +146,15 @@ function writeDraftState(root: string, state: DraftStateWrite): void {
     ...(state.reason === undefined ? {} : { reason: state.reason }),
     ...(state.candidateId === undefined ? {} : { candidateId: state.candidateId }),
   };
+  const current = readDraftState(root, state.chapterIndex);
   mkdirSync(join(root, DRAFT_STATE_DIR), { recursive: true });
+  if (state.candidateId !== undefined) {
+    const privatePath = candidateStateRelPath(state.candidateId);
+    mkdirSync(join(root, DRAFT_STATE_DIR, 'candidates'), { recursive: true });
+    atomicWriteFileSync(join(root, privatePath), JSON.stringify(payload, null, 2) + '\n');
+    // 旧任务可以结算自己的半稿；新任务已认领章指针时，旧任务不得把它抢回来。
+    if (!claimChapter && current?.candidateId !== state.candidateId) return;
+  }
   // 原子落盘（与同包 draft-candidate.writeCandidate 一致）：裸 writeFileSync 被中断会留下
   // 截断的 JSON，readDraftState 对撕裂内容宁抛不猜——一次崩溃即把该章的运行态读废。
   // tmp → fsync → rename 后，rename 是唯一可见点，盘上永远是完整 JSON。
@@ -152,6 +168,20 @@ export function readDraftState(root: string, chapterIndex: number): DraftStateFi
     return null;
   }
   return JSON.parse(readFileSync(path, 'utf8')) as DraftStateFile;
+}
+
+/** 精确回读本候选；旧版仅有章文件时，身份相符才可作为兼容来源。 */
+function readCandidateState(root: string, chapterIndex: number, candidateId: string): DraftStateFile | null {
+  const path = join(root, candidateStateRelPath(candidateId));
+  if (existsSync(path)) {
+    const state = JSON.parse(readFileSync(path, 'utf8')) as DraftStateFile;
+    if (state.candidateId !== candidateId || state.chapterIndex !== chapterIndex || state.stateVersion !== 1) {
+      throw new CandidateError('IDENTITY_MISMATCH', 'IDENTITY_MISMATCH: candidate draft state identity does not match the request');
+    }
+    return state;
+  }
+  const legacyState = readDraftState(root, chapterIndex);
+  return legacyState?.candidateId === candidateId ? legacyState : null;
 }
 
 /* ---------------------------------------------------------------------------
@@ -187,6 +217,19 @@ export interface DraftBindingOptions {
    * （未提供则只按序号丢弃，保持既有调用方行为不变）。
    */
   readonly generationEpoch?: number;
+  /**
+   * 书稿写锁注入（可选）：圈住候选的**读-改-写**短临界区。
+   *
+   * 候选落盘（draft-candidate.writeCandidate）的原子性由调用方在同一书稿锁内提供
+   * （draft-candidate.ts:400）。生成路径此前未接锁，于是「取消读到 streaming」与
+   * 「采纳/另一次取消读到同一现场」的交叉读改写会互相覆盖（丢更新）。
+   * 生产由路由注入 withBookWriteLock；未注入（既有测试、离线调用）时直接执行，
+   * 行为与注入前逐字相同。
+   *
+   * 纪律：只圈候选读改写，**不圈模型等待**——模型等待在锁外，否则同书其他写入
+   * （保存别章、备份）会被整段生成阻塞。
+   */
+  readonly withWriteLock?: (<T>(fn: () => T | Promise<T>) => Promise<T>) | undefined;
 }
 
 function assertDraftPhase(bookRoot: string, chapterIndex: number): void {
@@ -197,6 +240,15 @@ function assertDraftPhase(bookRoot: string, chapterIndex: number): void {
       'draft stream requires phase=draft, got ' + scan.phase + ' — reopen the chapter first',
     );
   }
+}
+
+/** 候选读改写短临界区：注入书稿锁时在锁内执行；未注入时直接执行（默认行为不变）。 */
+async function inCandidateSection<T>(
+  withWriteLock: DraftBindingOptions['withWriteLock'],
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  if (withWriteLock === undefined) return await fn();
+  return await withWriteLock(fn);
 }
 
 /**
@@ -214,13 +266,18 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
   // 不能被随后备用 attempt 的空输出抹掉。若按 attempt 各自计数，后写者胜会产出
   // produced=false，末帧把「生成过」判成「什么都没生成」，作者半稿反被 error 帧困死。
   let producedChars = 0
+  // 同一绑定的 fallback attempt 只能更新已认领的状态，不能重新抢占新任务的章指针。
+  let mayClaimChapter = true;
   return async () => {
     assertDraftPhase(opts.bookRoot, opts.chapterIndex);
     const producedAtStart = producedChars;
-    // 候选由调用方先建（HTTP/管线）；恢复场景（streaming/partial 跨进程）直接续用
-    let candidate = readDraftCandidate(opts.bookRoot, opts.candidate.id);
-    if (candidate === null) {
-      candidate = createDraftCandidate(opts.bookRoot, {
+    const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
+    const relPath = proseChapterPath(opts.chapterIndex);
+    // 候选由调用方先建（HTTP/管线）；恢复场景（streaming/partial 跨进程）直接续用。
+    // 读-建是读改写，放进书稿锁短临界区（见 withWriteLock 注释）。
+    let candidate = await inCandidateSection(opts.withWriteLock, () => {
+      const existing = readDraftCandidate(opts.bookRoot, opts.candidate.id);
+      const currentCandidate = existing ?? createDraftCandidate(opts.bookRoot, {
         id: opts.candidate.id,
         generationId: resolveCandidateGenerationId(opts.candidate),
         bookId: opts.candidate.bookId,
@@ -230,16 +287,22 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         ...(opts.candidate.selection === undefined ? {} : { selection: opts.candidate.selection }),
         ...(opts.candidate.seedText === undefined ? {} : { seedText: opts.candidate.seedText }),
       });
-    }
-    const relPath = proseChapterPath(opts.chapterIndex);
-    writeDraftState(opts.bookRoot, {
-      chapterIndex: opts.chapterIndex,
-      proseRelPath: relPath,
-      status: 'streaming',
-      chars: candidate.text.length,
-      candidateId: candidate.id,
+      // 认领与候选读建共用同一临界区。初始等锁期间已取消的任务不能覆盖新任务。
+      if (!aborted()) {
+        writeDraftState(opts.bookRoot, {
+          chapterIndex: opts.chapterIndex,
+          proseRelPath: relPath,
+          status: 'streaming',
+          chars: currentCandidate.text.length,
+          appendedChars: producedChars,
+          candidateId: currentCandidate.id,
+        }, mayClaimChapter);
+      }
+      mayClaimChapter = false;
+      return currentCandidate;
     });
-    const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
+    const publishState = async (state: DraftStateWrite): Promise<void> =>
+      await inCandidateSection(opts.withWriteLock, () => writeDraftState(opts.bookRoot, state));
     // 闭包收窄边界：此后 candidate 会在循环内被 appendCandidateDelta 重赋值，闭包里
     // 只依赖不变的候选 id（同 invocation 内 id 恒定）。
     const candidateIdRef = candidate.id;
@@ -248,27 +311,38 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
     // code 字段，曾被 catch 里的 provider 错误归一误判成 PROVIDER_TERMINAL_UNKNOWN
     // （审查探针 cancel-midstream）。竞态落败方幂等让位：已终态即读回现场，
     // 绝不二次结算、绝不改判他人已定的结局。
-    const settleAbort = (outcome: { readonly upstreamCompleted: boolean }) => {
-      try {
-        requestCandidateCancel(opts.bookRoot, candidateIdRef);
-        return resolveCandidateCancel(opts.bookRoot, candidateIdRef, outcome);
-      } catch (error) {
-        if (!(error instanceof CandidateError && error.code === 'CANDIDATE_NOT_CANCELLABLE')) throw error;
-        // 竞态落败方读盘取已定结局；此刻候选必须存在（本 invocation 刚建/读过），
-        // 读不到 = 盘面异常，宁败不脏
-        const settledElsewhere = readDraftCandidate(opts.bookRoot, candidateIdRef);
-        if (settledElsewhere === null) {
-          throw new CandidateError('CANDIDATE_NOT_FOUND', `CANDIDATE_NOT_FOUND: candidate ${candidateIdRef} vanished during cancel race`);
+    // 结算本身是两段候选读改写（进入中间态 → 判定终态），整段放进同一临界区，
+    // 避免外部 cancel/accept 在中间态插入。
+    const settleAbort = async (outcome: { readonly upstreamCompleted: boolean }) =>
+      await inCandidateSection(opts.withWriteLock, () => {
+        try {
+          requestCandidateCancel(opts.bookRoot, candidateIdRef);
+          return resolveCandidateCancel(opts.bookRoot, candidateIdRef, outcome);
+        } catch (error) {
+          if (!(error instanceof CandidateError && error.code === 'CANDIDATE_NOT_CANCELLABLE')) throw error;
+          // 竞态落败方读盘取已定结局；此刻候选必须存在（本 invocation 刚建/读过），
+          // 读不到 = 盘面异常，宁败不脏
+          const settledElsewhere = readDraftCandidate(opts.bookRoot, candidateIdRef);
+          if (settledElsewhere === null) {
+            throw new CandidateError('CANDIDATE_NOT_FOUND', `CANDIDATE_NOT_FOUND: candidate ${candidateIdRef} vanished during cancel race`);
+          }
+          return settledElsewhere;
         }
-        return settledElsewhere;
-      }
-    };
+      });
     // W4-2b：单任务内序号——从候选当前序号续起（跨进程续用不倒退），供丢弃迟到 chunk。
     let streamSequence = candidate.lastSequence;
     try {
       if (aborted()) {
         // 上游从未开始：判定点即此刻，未完成 ⇒ cancelled（F-09：幂等结算）
-        const settled = settleAbort({ upstreamCompleted: false });
+        const settled = await settleAbort({ upstreamCompleted: false });
+        await publishState({
+          chapterIndex: opts.chapterIndex,
+          proseRelPath: relPath,
+          status: 'partial',
+          chars: settled.text.length,
+          appendedChars: producedChars,
+          candidateId: settled.id,
+        });
         return settled.text;
       }
       for await (const delta of opts.stream()) {
@@ -276,8 +350,8 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
           // 取消后的延迟 chunk 不写盘、不继续付费重试；上游被我们中止 ⇒ 未完成 ⇒ cancelled。
           // F-09：此处直接结算并返回——旧实现 break 后会再撞下方「上游已结束」判定点，
           // 二次 requestCandidateCancel 抛错并被误判成 PROVIDER_TERMINAL_UNKNOWN。
-          const settled = settleAbort({ upstreamCompleted: false });
-          writeDraftState(opts.bookRoot, {
+          const settled = await settleAbort({ upstreamCompleted: false });
+          await publishState({
             chapterIndex: opts.chapterIndex,
             proseRelPath: relPath,
             status: 'partial',
@@ -289,11 +363,30 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         }
         if (delta.length === 0) continue;
         streamSequence += 1;
-        // 迟到 chunk 门：**写盘之前**双校验（旧代次 / 已见序号一律丢弃，不落盘不报错）
-        candidate = appendCandidateDelta(opts.bookRoot, candidate.id, delta, {
-          ...(opts.generationEpoch === undefined ? {} : { generationEpoch: opts.generationEpoch }),
-          sequence: streamSequence,
+        // 迟到 chunk 门：**写盘之前**双校验（旧代次 / 已见序号一律丢弃，不落盘不报错）。
+        // 锁内还要**再查一次取消**：等锁期间作者可能已按停止——待写 delta 不得落盘，
+        // 更不得落盘后按「自然结束」认定成功（S2：等锁前的检查覆盖不到这个窗口）。
+        const appended = await inCandidateSection(opts.withWriteLock, () => {
+          if (aborted()) return null;
+          return appendCandidateDelta(opts.bookRoot, candidate.id, delta, {
+            ...(opts.generationEpoch === undefined ? {} : { generationEpoch: opts.generationEpoch }),
+            sequence: streamSequence,
+          });
         });
+        if (appended === null) {
+          // 等锁期间被取消：丢弃待写 delta，按「上游未完成」结算（不是成功）。
+          const settled = await settleAbort({ upstreamCompleted: false });
+          await publishState({
+            chapterIndex: opts.chapterIndex,
+            proseRelPath: relPath,
+            status: 'partial',
+            chars: settled.text.length,
+            appendedChars: producedChars,
+            candidateId: settled.id,
+          });
+          return settled.text;
+        }
+        candidate = appended;
         // 纯空白帧（换行、缩进）不计入：它们不构成可采纳的正文
         producedChars += delta.trim().length;
       }
@@ -302,8 +395,8 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         // 不因「客户端在此期间按了停止」就把一次完整生成改判为取消。
         // F-09：若外部 cancelCandidate 已抢先终态化（cancelled），settleAbort 幂等让位——
         // 保留已结算的 cancelled（单次结算），状态文件按实际终态写 partial。
-        const settled = settleAbort({ upstreamCompleted: true });
-        writeDraftState(opts.bookRoot, {
+        const settled = await settleAbort({ upstreamCompleted: true });
+        await publishState({
           chapterIndex: opts.chapterIndex,
           proseRelPath: relPath,
           status: settled.taskState === 'succeeded' ? 'complete' : 'partial',
@@ -323,8 +416,10 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         );
       }
       // 流完整结束（含完成帧）：ready
-      const finalCandidate = finishCandidate(opts.bookRoot, candidate.id, 'ready');
-      writeDraftState(opts.bookRoot, {
+      const finalCandidate = await inCandidateSection(opts.withWriteLock, () =>
+        finishCandidate(opts.bookRoot, candidate.id, 'ready'),
+      );
+      await publishState({
         chapterIndex: opts.chapterIndex,
         proseRelPath: relPath,
         status: 'complete',
@@ -336,7 +431,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
     } catch (error) {
       // 取消竞态：他人已终态化候选（CANDIDATE_TERMINAL）——半稿保留，不再写盘
       if (error instanceof CandidateError && error.code === CANDIDATE_TERMINAL) {
-        writeDraftState(opts.bookRoot, {
+        await publishState({
           chapterIndex: opts.chapterIndex,
           proseRelPath: relPath,
           status: 'partial',
@@ -350,12 +445,12 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
       const classified = classifyStreamFailure(error, opts.provider);
       try {
         if (candidate.status === 'streaming') {
-          finishCandidate(opts.bookRoot, candidate.id, 'partial');
+          await inCandidateSection(opts.withWriteLock, () => finishCandidate(opts.bookRoot, candidate.id, 'partial'));
         }
       } catch {
         // 终态冲突时保留现场即可
       }
-      writeDraftState(opts.bookRoot, {
+      await publishState({
         chapterIndex: opts.chapterIndex,
         proseRelPath: relPath,
         status: 'partial',
@@ -428,6 +523,8 @@ export interface DraftStepRequest {
   readonly engine: RuntimeEngine;
   readonly bookRoot: string;
   readonly chapterIndex: number;
+  /** 本次生成的候选身份；并发入口必须提供，省略时保留旧版章状态读取方式。 */
+  readonly candidateId?: string;
   /** Compile 步产物；packet.text 是装配完成的生成输入。 */
   readonly packet: ContextPacket;
   /** recipe 实例：taskType 驱动引擎解析（tier→provider），预算字段随 payload 下发。 */
@@ -478,6 +575,7 @@ export interface DraftStepOutcome {
  * compile-step 先例，步函数不持会话）；本函数负责一次生成任务与盘面落痕。
  */
 export async function runDraftStep(request: DraftStepRequest): Promise<DraftStepOutcome> {
+  if (request.candidateId !== undefined) candidateRelPath(request.candidateId);
   const mode: DraftMode = request.mode ?? 'generate';
   // T21（t52:B1）桥接：会话窗口 taskRef→parentTaskRef（payload 层）、chapterIndex→顶层槽；
   // recipeDoc 可得时铸 M14 形状 eventPayload。业务 payload 不再携带平铺 recipeId/
@@ -498,10 +596,12 @@ export async function runDraftStep(request: DraftStepRequest): Promise<DraftStep
   );
 
   const proseRelPath = proseChapterPath(request.chapterIndex);
-  const state = readDraftState(request.bookRoot, request.chapterIndex);
+  const state = request.candidateId === undefined
+    ? readDraftState(request.bookRoot, request.chapterIndex)
+    : readCandidateState(request.bookRoot, request.chapterIndex, request.candidateId);
   // C2（T04）：生成结果从候选读取，不再从正文取——正文只能经 accept 落盘（I01）
-  const candidate =
-    state?.candidateId === undefined ? null : readDraftCandidate(request.bookRoot, state.candidateId);
+  const candidateId = request.candidateId ?? state?.candidateId;
+  const candidate = candidateId === undefined ? null : readDraftCandidate(request.bookRoot, candidateId);
   const candidateText = candidate === null ? '' : candidate.text;
   const text =
     result.outcome === 'succeeded' && typeof result.value === 'string'

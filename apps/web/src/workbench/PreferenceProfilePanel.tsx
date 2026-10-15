@@ -7,33 +7,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
-
-export interface PreferenceProfileData {
-  readonly cursor: number
-  readonly obsCount: number
-  readonly degradedWindows: number
-  readonly dims: Record<string, {
-    readonly mean: number
-    readonly variance: number
-    readonly nEffective: number
-    readonly streak: number
-  }>
-}
-
-export interface PreferenceResponse {
-  readonly ok: boolean
-  readonly materialized: boolean
-  readonly profile: PreferenceProfileData
-  readonly observationCount: number
-  readonly error?: string
-}
-
-export interface PreferenceRebuildResponse {
-  readonly ok: boolean
-  readonly observationCount: number
-  readonly profile: PreferenceProfileData
-  readonly error?: string
-}
+import type { PreferenceResponse, PreferenceRebuildResponse } from '../../shared/api'
+export type { PreferenceProfileData, PreferenceResponse, PreferenceRebuildResponse } from '../../shared/api'
 
 const DIM_LABELS: Record<string, { name: string; desc: string }> = {
   sent_len_mean: { name: '句子均长', desc: '平均每句码点字符数（句号/感叹号/问号切分）' },
@@ -177,7 +152,7 @@ export function PreferenceProfilePanel({ book }: { book: BookInfo | null }): JSX
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-faint, #666)', marginTop: 2 }} title={meta.desc}>
-                  方差 {dimState.variance.toFixed(3)} · 样本权 {dimState.nEffective.toFixed(1)}
+                  短窗方差 {dimState.variance.toFixed(3)} · 样本权 {dimState.nEffective.toFixed(1)}
                   {dimState.streak !== 0 && ` · 连续漂移 ${dimState.streak}`}
                 </div>
               </div>

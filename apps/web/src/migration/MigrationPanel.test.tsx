@@ -5,6 +5,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MigrationPanel } from './MigrationPanel'
+import type { ApplyResult } from './applyImport'
 import { SYNTHETIC_CURRENT_BOOK, installSyntheticExport } from './__fixtures__/syntheticBrowserExport'
 import { exportLocalStorage } from './exportLocalStorage'
 import { computePackageDigest } from './packageFormat'
@@ -189,6 +190,35 @@ describe('MigrationPanel（导入入口）', () => {
     expect(screen.getByTestId('apply-recheck').textContent).toContain('1 项')
     // 新稿未被覆盖；包内版本保留在隔离槽
     expect(window.localStorage.getItem(`mozhou.draft.cache.${chKey}`)).toBe('作者预览后新写的正文')
+  })
+
+  it('E02：落地结果无条件上报宿主；宿主按 written 决定是否重挂会话', async () => {
+    installSyntheticExport(window.localStorage)
+    const pkg = exportLocalStorage(window.localStorage, {
+      origin: 'http://localhost:43000',
+      userAgent: 'ua',
+      exportedAt: '2026-10-12T00:00:00.000Z',
+    })
+    stubProbeFetch()
+    const onImported = vi.fn<(result: ApplyResult) => void>()
+
+    render(<MigrationPanel onClose={() => {}} targetBook={SYNTHETIC_CURRENT_BOOK} onImported={onImported} />)
+    fireEvent.click(screen.getByRole('button', { name: '导入（新壳）' }))
+    fireEvent.change(screen.getByLabelText('迁移包 JSON'), { target: { value: JSON.stringify(pkg) } })
+    fireEvent.click(screen.getByRole('button', { name: '校验并生成导入计划' }))
+    await waitFor(() => expect(screen.getByTestId('import-plan')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '应用导入' }))
+    await screen.findByTestId('apply-result')
+    expect(onImported).toHaveBeenCalledTimes(1)
+    // 首次：写回 3 章 → 宿主据此重挂会话
+    expect(onImported.mock.calls[0]?.[0].written).toHaveLength(3)
+
+    // 二次应用：全部 duplicate → written 0 → 宿主不重挂（不会无谓打断作者）
+    fireEvent.click(screen.getByRole('button', { name: '应用导入' }))
+    await waitFor(() => expect(screen.getByTestId('apply-result').textContent).toContain('写入 0'))
+    expect(onImported).toHaveBeenCalledTimes(2)
+    expect(onImported.mock.calls[1]?.[0].written).toHaveLength(0)
   })
 })
 

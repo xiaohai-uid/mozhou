@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { apiMiddleware } from '../../server/api.js'
+import { acquireBookWriteLease } from '../../server/bookAccess.js'
 import { LocalDataPlane, createBook, proseChapterPath } from '@mozhou/data-plane'
 import { createDraftCandidate, appendCandidateDelta, finishCandidate } from '@mozhou/pipeline'
 
@@ -315,6 +316,47 @@ describe('C2 / R01: 采纳前状态校验与终态保护 (HTTP 级)', () => {
     })
     expect(acceptRes2.status).toBe(409)
     expect(proseHash(root)).toBe(beforeHash)
+  })
+
+  it('draft.accept 走书稿写锁：外部持有租约期间排队，释放后只生效一次', async () => {
+    const base = await listen()
+    const root = makeRoot()
+    const beforeHash = proseHash(root)
+    const id1 = randomUUID()
+    createDraftCandidate(root, {
+      id: id1,
+      operationId: randomUUID(),
+      bookId: 'book-local',
+      chapterIndex: 1,
+      base: { revision: 1, sha256: beforeHash },
+      mode: 'replace',
+    })
+    appendCandidateDelta(root, id1, '采纳进来的正文。\n')
+    finishCandidate(root, id1, 'ready')
+
+    // 外部持有同一本书的写租约：accept 必须在锁上排队，而不是绕过锁直接写盘
+    const lease = await acquireBookWriteLease(root, {})
+    let settled = false
+    const pending = post(base, '/api/draft.accept', {
+      root,
+      candidateId: id1,
+      base: { revision: 1, sha256: beforeHash },
+      idempotencyKey: 'k-lock-queue-1234',
+    }).then((r) => {
+      settled = true
+      return r
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(settled).toBe(false) // 被书稿锁挡住：正文此刻不得被改写
+    expect(proseHash(root)).toBe(beforeHash)
+
+    await lease.release()
+    const res = await pending
+    expect(res.status).toBe(200)
+    expect(res.data.ok).toBe(true)
+    expect(res.data.alreadyApplied).toBe(false)
+    expect(proseHash(root)).not.toBe(beforeHash)
   })
 
   it('streaming 与 failed 候选首次 accept 返回 409，正文零变更', async () => {

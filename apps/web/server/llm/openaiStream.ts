@@ -12,6 +12,8 @@
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { isPrivateOrReservedAddress, normalizeAddress } from '../ssrfGuard.js'
+import { pinnedRequest, type PinnedAddress } from '../net/pinnedHttp.js'
+import { withAbort } from '../net/abortWait.js'
 import { defaultProviderSettingsManager } from './providerSettings.js'
 import type { OpenAiStreamChunk, ResolvedEndpoint } from './types.js'
 export type { OpenAiStreamChunk, ResolvedEndpoint } from './types.js'
@@ -93,6 +95,46 @@ export function assertSafeEndpointUrl(baseUrl: string, allowPrivateNetwork = fal
 }
 
 /**
+ * 解析并**校验全部**解析地址，返回可绑定到连接的地址列表（校验与连接同源）。
+ *
+ * 与 `assertSafeRemoteTarget` 是同一份判定，区别只在返回值：本函数把已验证的
+ * 解析结果交给调用方去建连（`net/pinnedHttp.pinnedRequest` 的 lookup 注入），
+ * 从而消除「校验一次、连接时再解析一次」的 TOCTOU（DNS rebinding）。
+ * 字面 IP 与部署者授权的本机端点返回空数组（无需注入 lookup）。
+ */
+export async function resolveVerifiedAddresses(
+  target: URL,
+  lookupAll: LookupAll = async (hostname) => lookup(hostname, { all: true, verbatim: true }),
+  allowPrivateNetwork = false,
+  signal?: AbortSignal,
+): Promise<readonly PinnedAddress[]> {
+  assertProtocol(target, allowPrivateNetwork)
+  if (allowPrivateNetwork) return []
+
+  const hostname = normalizeAddress(target.hostname)
+  if (isIP(hostname) !== 0) {
+    if (isPrivateOrReservedAddress(hostname)) {
+      rejectSsrf(`SSRF 门：拒绝调用私有/环回/保留地址 ${hostname}`, target)
+    }
+    return []
+  }
+
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    rejectSsrf(`SSRF 门：拒绝调用本地主机名 ${hostname}`, target)
+  }
+
+  const addresses = await withAbort(() => lookupAll(hostname), signal)
+  if (addresses.length === 0) {
+    rejectSsrf(`SSRF 门：DNS 未解析出可验证地址 ${hostname}`, target)
+  }
+  const blocked = addresses.find((entry) => isPrivateOrReservedAddress(entry.address))
+  if (blocked !== undefined) {
+    rejectSsrf(`SSRF 门：${hostname} 解析到私有/环回/保留地址 ${blocked.address}`, target)
+  }
+  return addresses
+}
+
+/**
  * 校验一个真实出站目标。默认 lookup 注入仅用于测试；生产使用 Node DNS。
  * 任何解析结果落入私有/保留地址即整体拒绝（fail closed）。
  */
@@ -101,29 +143,7 @@ export async function assertSafeRemoteTarget(
   lookupAll: LookupAll = async (hostname) => lookup(hostname, { all: true, verbatim: true }),
   allowPrivateNetwork = false,
 ): Promise<void> {
-  assertProtocol(target, allowPrivateNetwork)
-  if (allowPrivateNetwork) return
-
-  const hostname = normalizeAddress(target.hostname)
-  if (isIP(hostname) !== 0) {
-    if (isPrivateOrReservedAddress(hostname)) {
-      rejectSsrf(`SSRF 门：拒绝调用私有/环回/保留地址 ${hostname}`, target)
-    }
-    return
-  }
-
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    rejectSsrf(`SSRF 门：拒绝调用本地主机名 ${hostname}`, target)
-  }
-
-  const addresses = await lookupAll(hostname)
-  if (addresses.length === 0) {
-    rejectSsrf(`SSRF 门：DNS 未解析出可验证地址 ${hostname}`, target)
-  }
-  const blocked = addresses.find((entry) => isPrivateOrReservedAddress(entry.address))
-  if (blocked !== undefined) {
-    rejectSsrf(`SSRF 门：${hostname} 解析到私有/环回/保留地址 ${blocked.address}`, target)
-  }
+  await resolveVerifiedAddresses(target, lookupAll, allowPrivateNetwork)
 }
 
 export function resolveChatEndpoint(env: NodeJS.ProcessEnv = process.env, userId?: string): ResolvedEndpoint | null {
@@ -145,32 +165,72 @@ function scalarText(value: unknown): string {
 }
 
 /**
+ * 流式生成的注入缝（**仅测试用**，与 `assertSafeRemoteTarget` 的 lookupAll 注入同款）。
+ * 生产不传：DNS 走 Node DNS，传输走 net/pinnedHttp.pinnedRequest。
+ */
+export interface StreamOpenAiDeps {
+  readonly lookupAll?: LookupAll | undefined
+  readonly request?: typeof pinnedRequest | undefined
+}
+
+/**
  * 发起真实 OpenAI-compatible Chat Completions 流式请求，逐 delta 产出。
  * 仅在已配置真实 Key 且显式非 mock 时调用；网络错误按流式错误语义上抛。
  * externalSignal（C2·T04）：HTTP 请求断开/显式 cancel 从中止到底层 fetch——
  * 取消后的延迟 chunk 不再产出、不继续付费重试。
+ *
+ * 取消纪律（切片 3）：
+ * - 外部 signal 在**第一次等待之前**绑定，且每个 await 之后复查；
+ * - 启动前已取消 / 解析期间取消 ⇒ 一次请求都不发；
+ * - 消费方停止迭代或流中取消 ⇒ finally 终止上游连接、释放 reader。
+ *
+ * 地址纪律：解析校验一次，把**同一份**已验证地址交给传输层绑定连接
+ * （Host/SNI/证书仍按原域名），杜绝校验与连接之间的 DNS rebinding。
  */
 export async function* streamOpenAiChat(
   endpoint: ResolvedEndpoint,
   prompt: string,
   systemPrompt: string,
   externalSignal?: AbortSignal,
+  deps?: StreamOpenAiDeps,
 ): AsyncGenerator<OpenAiStreamChunk> {
   const base = endpoint.baseUrl || 'https://api.deepseek.com'
   const url = base.replace(/\/$/, '') + '/chat/completions'
   const target = new URL(url)
-  await assertSafeRemoteTarget(target, undefined, endpoint.allowPrivateNetwork === true)
+  const request = deps?.request ?? pinnedRequest
 
   const controller = new AbortController()
-  // T07: 180s 总时限与取消信号绑定
-  const totalTimeout = setTimeout(() => controller.abort(new Error('REQUEST_TIMEOUT: total timeout 180s exceeded')), 180_000)
+  // 取消绑定必须**先于第一次等待**：此前监听挂在 DNS 校验之后，于是「DNS 等待期间取消」
+  // 会漏过——await 返回后监听才挂上，请求照常发起（隔离复现：fetchCalls=1、
+  // fetchSignalAborted=false）。这里先绑定，并在每个 await 之后复查取消状态。
   const onExternalAbort = (): void => {
     controller.abort()
   }
-  externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
+  if (externalSignal !== undefined) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true })
+  }
+
+  // T07: 180s 总时限与取消信号绑定
+  const totalTimeout = setTimeout(() => controller.abort(new Error('REQUEST_TIMEOUT: total timeout 180s exceeded')), 180_000)
 
   try {
-    const response = await fetch(url, {
+    // 启动前已取消 ⇒ 一次请求都不发
+    if (controller.signal.aborted) return
+
+    // 解析并校验全部地址，随后用**同一份结果**建连（校验与连接同源，杜绝 DNS rebinding）
+    let addresses: readonly PinnedAddress[]
+    try {
+      addresses = await resolveVerifiedAddresses(target, deps?.lookupAll, endpoint.allowPrivateNetwork === true, controller.signal)
+    } catch (error) {
+      // 外部取消保持启动前/解析阶段的空流语义；时限错误仍作为失败上抛。
+      if (externalSignal?.aborted === true) return
+      throw error
+    }
+    // DNS 等待期间取消 ⇒ 不得在取消后启动请求
+    if (controller.signal.aborted) return
+
+    const response = await request(target, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -187,42 +247,42 @@ export async function* streamOpenAiChat(
         ...(endpoint.allowPrivateNetwork ? { thinking: { type: 'disabled' }, enable_thinking: false } : {}),
       }),
       signal: controller.signal,
-      redirect: 'manual',
+      ...(addresses.length === 0 ? {} : { addresses }),
     })
 
     if (response.status >= 300 && response.status < 400) {
       throw new Error(`上游拒绝：为防止 SSRF，墨舟不会自动跟随 HTTP 重定向（${response.status}）`)
     }
-    if (!response.ok || !response.body) {
+    if (!response.ok || response.stream === null) {
       const errText = await response.text().catch(() => '')
       throw new Error(`上游 ${response.status}: ${errText.slice(0, 200)}`)
     }
 
-    const reader = response.body.getReader()
     const decoder = new TextDecoder('utf-8')
     let buffer = ''
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
+    for await (const chunk of response.stream) {
+      if (controller.signal.aborted) return
+      buffer += decoder.decode(chunk, { stream: true })
 
       let lineEnd: number
       while ((lineEnd = buffer.indexOf('\n')) !== -1) {
+        // 同一块里可能已缓冲多个事件：取出前再查一次取消，停止后不得继续产出
+        // （T3：连接已关闭但已缓冲的数据仍会走到 yield）。
+        if (controller.signal.aborted) return
         const line = buffer.slice(0, lineEnd).trim()
         buffer = buffer.slice(lineEnd + 1)
         if (!line.startsWith('data:')) continue
         const payload = line.slice(5).trim()
         if (payload === '[DONE]') {
-          controller.abort()
           return
         }
-        let chunk: {
+        let parsed: {
           choices?: { delta?: { content?: string }; finish_reason?: string }[]
           error?: { message?: unknown; code?: unknown; type?: unknown }
         }
         try {
-          chunk = JSON.parse(payload) as typeof chunk
+          parsed = JSON.parse(payload) as typeof parsed
         } catch {
           // 上游 SSE 可能包含心跳/非 JSON 行；忽略单行，不放宽目标地址门。
           continue
@@ -230,13 +290,13 @@ export async function* streamOpenAiChat(
         // 上游可能把错误塞进 HTTP 200 的 SSE 流（限流/内容拦截等）。若不显式抛出，
         // 表现就是「零 delta 的静默空输出」——调用方无法区分「模型没说话」与
         // 「上游拒绝」。此处必须抛，让失败可诊断。
-        if (chunk.error !== undefined && chunk.error !== null) {
-          const message = scalarText(chunk.error.message).slice(0, 200) || 'unknown upstream error'
-          const rawCode = scalarText(chunk.error.code)
+        if (parsed.error !== undefined && parsed.error !== null) {
+          const message = scalarText(parsed.error.message).slice(0, 200) || 'unknown upstream error'
+          const rawCode = scalarText(parsed.error.code)
           const code = rawCode.length === 0 ? '' : ` (${rawCode})`
           throw new Error(`上游流内错误${code}: ${message}`)
         }
-        const choice = chunk.choices?.[0]
+        const choice = parsed.choices?.[0]
         if (choice) {
           const delta = choice.delta?.content ?? ''
           if (delta) yield { delta, finishReason: choice.finish_reason }
@@ -246,6 +306,9 @@ export async function* streamOpenAiChat(
   } finally {
     clearTimeout(totalTimeout)
     externalSignal?.removeEventListener('abort', onExternalAbort)
+    // 消费方提前停止迭代（generator.return）或流中取消：终止上游连接，释放 reader，
+    // 不继续计费。正常完成时 abort 是幂等空操作（响应体已读完/已关闭）。
+    controller.abort()
   }
 }
 
@@ -266,13 +329,13 @@ export async function testConnection(endpoint: ResolvedEndpoint): Promise<TestCo
     const base = endpoint.baseUrl || 'https://api.deepseek.com'
     const url = base.replace(/\/$/, '') + '/chat/completions'
     const target = new URL(url)
-    await assertSafeRemoteTarget(target, undefined, endpoint.allowPrivateNetwork === true)
-
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(new Error('CONNECTION_TIMEOUT: 20s exceeded')), 20_000)
 
     try {
-      const response = await fetch(url, {
+      // 同一时限包含 DNS、连接和错误体消费；取消结束等待，不声称取消了 OS DNS。
+      const addresses = await resolveVerifiedAddresses(target, undefined, endpoint.allowPrivateNetwork === true, controller.signal)
+      const response = await pinnedRequest(target, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -285,7 +348,7 @@ export async function testConnection(endpoint: ResolvedEndpoint): Promise<TestCo
           stream: false,
         }),
         signal: controller.signal,
-        redirect: 'manual',
+        ...(addresses.length === 0 ? {} : { addresses }),
       })
 
       const latencyMs = Date.now() - start
@@ -305,6 +368,7 @@ export async function testConnection(endpoint: ResolvedEndpoint): Promise<TestCo
       }
     } finally {
       clearTimeout(timeout)
+      controller.abort() // 释放连接（非流式响应体不再消费）
     }
   } catch (err) {
     const latencyMs = Date.now() - start

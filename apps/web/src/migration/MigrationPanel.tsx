@@ -41,6 +41,11 @@ export interface MigrationPanelProps {
   readonly onClose: () => void
   readonly targetBook?: BookInfo | null
   readonly probe?: ServerStateProbe
+  /**
+   * 落地完成后的回调（E02）：宿主据此把导入结果反映到真实会话上。
+   * 面板只负责写槽位与报告；「让编辑器/对话流看见新内容」属于应用装配，不能在这里硬编码。
+   */
+  readonly onImported?: (result: ApplyResult) => void
 }
 
 const panelStyle: CSSProperties = {
@@ -108,7 +113,7 @@ function targetIdentityOf(targetBook: BookInfo | null | undefined): string {
   return `${targetBook.root}::${targetBook.bookId}`
 }
 
-export function MigrationPanel({ onClose, targetBook, probe }: MigrationPanelProps): JSX.Element {
+export function MigrationPanel({ onClose, targetBook, probe, onImported }: MigrationPanelProps): JSX.Element {
   const [tab, setTab] = useState<'export' | 'import'>('export')
   const [exported, setExported] = useState<MigrationPackageV1 | null>(null)
   const [copied, setCopied] = useState(false)
@@ -268,14 +273,16 @@ export function MigrationPanel({ onClose, targetBook, probe }: MigrationPanelPro
           snapshots.set(`${targetKey}#${item.chapterIndex}`, state)
         }
       }
-      setApplyResult(
-        applyImport(plan, {
-          recheck: {
-            local: localSnapshot,
-            server: (identity, chapterIndex) => snapshots.get(`${identityKeyOf(identity)}#${chapterIndex}`) ?? null,
-          },
-        }),
-      )
+      const result = applyImport(plan, {
+        recheck: {
+          local: localSnapshot,
+          server: (identity, chapterIndex) => snapshots.get(`${identityKeyOf(identity)}#${chapterIndex}`) ?? null,
+        },
+      })
+      setApplyResult(result)
+      // 无条件把结果交给宿主（E02）：面板只负责写槽位与报告，是否重挂会话是宿主的判断——
+      // 宿主按 `result.written` 过滤（只落隔离槽不改变任何书章会话，不需要重挂）。
+      onImported?.(result)
     } finally {
       setBusy(false)
     }

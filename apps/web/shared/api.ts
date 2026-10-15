@@ -607,3 +607,50 @@ export interface CapabilitySquareResponse {
   readonly providerAvailable: boolean
   readonly groups: readonly CapabilitySquareGroup[]
 }
+
+/** 作者偏好展示 DTO：累积字段保留兼容，展示字段由服务端公有推理函数投影。 */
+export interface PreferenceDimensionData {
+  readonly S: number
+  readonly W: number
+  readonly M: number
+  readonly emVar: number
+  readonly kappaEff: number
+  readonly driftStreak: number
+  /** 后验均值，不是短窗均值 M。 */
+  readonly mean: number
+  /** 兼容展示字段名：值为 emVar，语义是短窗方差，不是后验方差。 */
+  readonly variance: number
+  /** 兼容展示字段名：值为累计观测权 W，不含冷启动伪计数。 */
+  readonly nEffective: number
+  readonly streak: number
+}
+
+export interface PreferenceProfileData {
+  readonly version: 1
+  readonly cursor: number
+  readonly obsCount: number
+  readonly degradedWindows: number
+  readonly dims: Readonly<Record<string, PreferenceDimensionData>>
+  readonly driftLog: readonly {
+    readonly dim: string
+    readonly sourcePosition: number
+    readonly shortMean: number
+    readonly mean: number
+    readonly sigma: number
+  }[]
+}
+
+export interface PreferenceResponse {
+  readonly ok: boolean
+  readonly materialized: boolean
+  readonly profile: PreferenceProfileData
+  readonly observationCount: number
+  readonly error?: string
+}
+
+export interface PreferenceRebuildResponse {
+  readonly ok: boolean
+  readonly observationCount: number
+  readonly profile: PreferenceProfileData
+  readonly error?: string
+}

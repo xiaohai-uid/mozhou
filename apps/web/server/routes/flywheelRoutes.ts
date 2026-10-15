@@ -13,13 +13,16 @@ import { decodeBookRequest } from '../bookRequest.js'
 import {
   EVAL_MIN_CHAPTER_WINDOWS,
   EVAL_MIN_DECISIONS,
+  PREFERENCE_DIMS,
   hasMaterializedProfile,
   loadProfileOrColdStart,
+  posteriorMean,
   readPersistedObservations,
   readSuggestions,
   rebuildPreference,
   runTaskModelEvaluation,
 } from '@mozhou/flywheel'
+import type { PreferenceProfileState } from '@mozhou/flywheel'
 import { readPipelineLedger } from '@mozhou/pipeline'
 import { atomicWriteFileSync } from '@mozhou/data-plane'
 import { tierConfigPath as defaultTierConfigPath } from '../llm/tierRouting.js'
@@ -57,6 +60,62 @@ function ensureEffectiveTierConfigPath(bookRoot: string, customPath?: string): s
   return fallbackPath
 }
 
+/**
+ * 偏好画像响应 DTO（服务端就地声明）。
+ *
+ * 与 `apps/web/shared/api.ts` 的 PreferenceDimensionData / PreferenceProfileData 同口径，
+ * 改动必须同步。此处不静态 import shared/：`tsconfig.server.json` 有独立 rootDir
+ * （见 boundaryHardening.test.ts 的说明），静态引用会把 shared 拉进服务端编译程序并触发 TS6059。
+ */
+interface PreferenceDimensionData {
+  readonly S: number
+  readonly W: number
+  readonly M: number
+  readonly emVar: number
+  readonly kappaEff: number
+  readonly driftStreak: number
+  /** 后验均值，不是短窗均值 M。 */
+  readonly mean: number
+  /** 兼容展示字段名：值为 emVar，语义是短窗方差，不是后验方差。 */
+  readonly variance: number
+  /** 兼容展示字段名：值为累计观测权 W，不含冷启动伪计数。 */
+  readonly nEffective: number
+  readonly streak: number
+}
+
+interface PreferenceProfileData {
+  readonly version: 1
+  readonly cursor: number
+  readonly obsCount: number
+  readonly degradedWindows: number
+  readonly dims: Readonly<Record<string, PreferenceDimensionData>>
+  readonly driftLog: readonly {
+    readonly dim: string
+    readonly sourcePosition: number
+    readonly shortMean: number
+    readonly mean: number
+    readonly sigma: number
+  }[]
+}
+
+/** 累积态不是 UI 读数：只在 BFF 投影，持久模型与原响应字段都保持原样。 */
+function preferenceProfileView(profile: PreferenceProfileState): PreferenceProfileData {
+  const dims = Object.fromEntries<PreferenceDimensionData>(PREFERENCE_DIMS.map((dim): readonly [string, PreferenceDimensionData] => {
+    const state = profile.dims[dim]
+    const view = {
+      mean: posteriorMean(dim, state),
+      variance: state.emVar,
+      nEffective: state.W,
+      streak: state.driftStreak,
+    }
+    if (!Object.values(view).every(Number.isFinite)) {
+      throw new Error(`偏好画像维度 ${dim} 包含非有限读数，无法展示`)
+    }
+    return [dim, { ...state, ...view }]
+  }))
+  return { ...profile, dims }
+}
+
 export const flywheelRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot, principal }) => {
   if (req.method !== 'POST') return false
 
@@ -79,7 +138,7 @@ export const flywheelRoutes: RouteHandler = async (req, res, { path, body, json,
       json(200, {
         ok: true,
         materialized,
-        profile,
+        profile: preferenceProfileView(profile),
         observationCount: observations.length,
       })
     } catch (cause) {
@@ -102,7 +161,7 @@ export const flywheelRoutes: RouteHandler = async (req, res, { path, body, json,
       json(200, {
         ok: true,
         observationCount: outcome.observationCount,
-        profile: outcome.profile,
+        profile: preferenceProfileView(outcome.profile),
       })
     } catch (cause) {
       json(500, { ok: false, error: (cause as Error).message })
