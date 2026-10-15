@@ -21,7 +21,8 @@
  *   node scripts/verify-mock-journey.mjs
  *   （可选 MOZHOU_VERIFY_PORT，缺省 5198；MOZHOU_VERIFY_KEEP_BOOK=1 保留现场）
  */
-import { execSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { readSourceStamp } from './release/lib/source-stamp.mjs'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -42,9 +43,13 @@ function log(msg) {
   logLines.push(line);
 }
 
+/**
+ * 来源戳：脏工作区里短 HEAD 会谎报（旅程跑的是未提交源码，戳却指向干净提交）。
+ * 复用 scripts/release/lib/source-stamp.mjs：脏则加 `-dirty` 后缀。
+ */
 function sourceCommit() {
   try {
-    return execSync('git rev-parse --short HEAD', { cwd: repoRoot }).toString().trim();
+    return readSourceStamp(repoRoot).sourceCommit;
   } catch {
     return 'unknown';
   }

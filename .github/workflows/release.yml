@@ -111,17 +111,20 @@ jobs:
       - name: Static lint gate
         run: pnpm lint
 
-      - name: Run workspace tests
-        run: pnpm test
+      # 只跑包层。web 测试移到「Build web and production server」之后：
+      # 部分 web 用例依赖 dist-server 产物，先测后建会顺序错位；且原 `pnpm test`
+      # 已含 web 测试，再单独跑一次属重复执行。此处与 ci.yml 的顺序保持一致。
+      - name: Run workspace package tests
+        run: pnpm run test:packages
 
       - name: Typecheck web and production server
         run: pnpm --filter @mozhou/web typecheck
 
-      - name: Run web tests
-        run: pnpm --filter @mozhou/web test
-
       - name: Build web and production server
         run: pnpm --filter @mozhou/web build
+
+      - name: Run web tests
+        run: pnpm --filter @mozhou/web test
 
       # 发布路径真实模型自动化门：有凭据则跑真实模型端到端旅程，缺凭据则 BLOCKED 并阻断发布。
       # 刻意不放进默认 PR 门（ci.yml）——真实模型调用会产生费用，只在发布路径触发。

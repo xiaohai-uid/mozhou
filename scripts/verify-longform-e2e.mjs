@@ -31,7 +31,8 @@
  *    - 产出机械可核对的 journey-ledger.md（31行表格）与结构化证据文件。
  */
 
-import { execSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   appendFileSync,
   existsSync,
@@ -45,6 +46,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { holdBookWriteLock } from './lib/book-writer-lock.mjs'
+import { readSourceStamp } from './release/lib/source-stamp.mjs'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = resolve(__dirname, '..')
@@ -98,11 +100,52 @@ function flushLog() {
   writeFileSync(join(evidenceDir, 'run.log'), `${logLines.join('\n')}\n`, 'utf8')
 }
 
-function sourceCommit() {
+/**
+ * 来源戳：脏工作区里短 HEAD 会谎报（正文来自未提交改动，戳却指向干净提交）。
+ * 复用 scripts/release/lib/source-stamp.mjs：脏则加 `-dirty` 后缀并记脏文件数。
+ */
+function readStamp() {
   try {
-    return execSync('git rev-parse --short HEAD', { cwd: repoRoot }).toString().trim()
+    return readSourceStamp(repoRoot)
   } catch {
-    return 'unknown'
+    return { sourceCommit: 'unknown', sourceCommitSha: 'unknown', dirty: null, dirtyFiles: null }
+  }
+}
+
+function sourceCommit() {
+  return readStamp().sourceCommit
+}
+
+/** 证据里的来源字段：完整 SHA + 脏标记 + 脏文件数。单独短 SHA 不能证明运行时源码身份。 */
+function sourceStampFields() {
+  const stamp = readStamp()
+  return {
+    sourceCommit: stamp.sourceCommit,
+    sourceCommitSha: stamp.sourceCommitSha,
+    dirty: stamp.dirty,
+    dirtyFiles: stamp.dirtyFiles,
+  }
+}
+
+/**
+ * 全量章节摘要：逐章取 (章号, 相位, 版本, 正文 SHA-256) 拼成语料哈希。
+ * 重启一致性必须比全量正文——只比首末章字数不能证明中间章节未漂移。
+ */
+function chapterCorpusDigest(root) {
+  const entries = []
+  for (let c = 1; c <= TOTAL_CHAPTERS; c += 1) {
+    try {
+      const chapter = readProseChapter(root, proseChapterPath(c))
+      const bodyHash = createHash('sha256').update(chapter.body, 'utf8').digest('hex')
+      entries.push(`${c}:${chapter.phase}:r${chapter.revision}:${bodyHash}`)
+    } catch {
+      entries.push(`${c}:MISSING`)
+    }
+  }
+  return {
+    chaptersPresent: entries.filter((entry) => !entry.endsWith(':MISSING')).length,
+    corpusHash: createHash('sha256').update(entries.join('\n'), 'utf8').digest('hex'),
+    entries,
   }
 }
 
@@ -529,7 +572,7 @@ async function main() {
     const blockedPayload = {
       status: 'BLOCKED',
       reason: 'REAL_MODEL_UNREACHABLE',
-      sourceCommit: sourceCommit(),
+      ...sourceStampFields(),
       detail: `无法连接到测试模型 ${LLM_BASE_URL} (${LLM_MODEL})，长篇真实验收中止。`,
     }
     writeFileSync(join(evidenceDir, 'summary.json'), JSON.stringify(blockedPayload, null, 2), 'utf8')
@@ -909,9 +952,7 @@ async function main() {
     log('开始执行应用重启一致性断言...')
     const preRestartStats = {
       bookId: readBookRecord(bookRoot).id,
-      chaptersCount: TOTAL_CHAPTERS,
-      ch1ProseLength: readProseChapter(bookRoot, proseChapterPath(1)).body.length,
-      chLastProseLength: readProseChapter(bookRoot, proseChapterPath(TOTAL_CHAPTERS)).body.length,
+      ...chapterCorpusDigest(bookRoot),
     }
 
     // 杀死服务端子进程
@@ -939,24 +980,31 @@ async function main() {
 
     const postRestartStats = {
       bookId: readBookRecord(bookRoot).id,
-      chaptersCount: TOTAL_CHAPTERS,
-      ch1ProseLength: readProseChapter(bookRoot, proseChapterPath(1)).body.length,
-      chLastProseLength: readProseChapter(bookRoot, proseChapterPath(TOTAL_CHAPTERS)).body.length,
+      ...chapterCorpusDigest(bookRoot),
     }
+
+    // 逐章比对：任何一章正文/相位/版本漂移都算不一致，不能只比首末章字数。
+    const mismatchedChapters = preRestartStats.entries
+      .map((entry, index) => (entry === postRestartStats.entries[index] ? null : index + 1))
+      .filter((index) => index !== null)
 
     const restartOk =
       preRestartStats.bookId === postRestartStats.bookId &&
-      preRestartStats.ch1ProseLength === postRestartStats.ch1ProseLength &&
-      preRestartStats.chLastProseLength === postRestartStats.chLastProseLength
+      preRestartStats.chaptersPresent === TOTAL_CHAPTERS &&
+      postRestartStats.chaptersPresent === TOTAL_CHAPTERS &&
+      mismatchedChapters.length === 0
 
     const restartEvidence = {
-      preRestartStats,
-      postRestartStats,
+      bookId: { pre: preRestartStats.bookId, post: postRestartStats.bookId },
+      chaptersPresent: { pre: preRestartStats.chaptersPresent, post: postRestartStats.chaptersPresent, expected: TOTAL_CHAPTERS },
+      corpusHash: { pre: preRestartStats.corpusHash, post: postRestartStats.corpusHash },
+      mismatchedChapters,
+      comparedFields: '逐章 (章号, 相位, 版本, 正文 SHA-256)',
       restartConsistent: restartOk,
       timestamp: new Date().toISOString(),
     }
     writeFileSync(join(evidenceDir, 'restart-consistency.json'), JSON.stringify(restartEvidence, null, 2), 'utf8')
-    log(`重启一致性校验结果: ${restartOk ? 'PASS (完全一致)' : 'FAIL (存在漂移)'}`)
+    log(`重启一致性校验结果: ${restartOk ? `PASS (逐章一致 ${TOTAL_CHAPTERS}/${TOTAL_CHAPTERS})` : `FAIL (${mismatchedChapters.length} 章漂移)`}`)
 
     // 6. 题材预设接口核验 (Genre Presets Apply Verification)
     log('开始执行题材预设 (/api/genre-kit.apply) 验收...')
@@ -986,12 +1034,21 @@ async function main() {
     const flywheelRes = await postJson('/api/flywheel.preference', { root: bookRoot })
     log(`飞轮偏好状态: status=${flywheelRes.status}, ok=${flywheelRes.data.ok}`)
 
+    // 7.5 判定汇总：所有声明为必需的结果都必须进入最终通过条件，缺一即为 FAIL。
+    const compactionVerified = Boolean(compactionEvidence)
+    const genrePresetVerified = genrePresetEvidence.idempotentPass
+    const verdictFailures = []
+    if (!restartOk) verdictFailures.push(`应用重启一致性未通过：${mismatchedChapters.length} 章正文/相位/版本漂移`)
+    if (!compactionVerified) verdictFailures.push('卷压缩证据缺失（compactionEvidence 为空）')
+    if (!genrePresetVerified) verdictFailures.push('题材预设幂等性未通过')
+    const verdictStatus = verdictFailures.length === 0 ? 'PASS' : 'FAIL'
+
     // 8. 输出 journey-ledger.md
     log('生成机械可核对的长篇台账 (journey-ledger.md)...')
     const ledgerMdLines = [
       '# 墨舟 30+ 章跨卷长篇连续生产真实端到端验收台账',
       '',
-      `> 运行标识: \`${RUN_ID}\` | HEAD: \`${sourceCommit()}\` | 测试模型: \`${LLM_MODEL}\` | 状态: \`PASS\``,
+      `> 运行标识: \`${RUN_ID}\` | HEAD: \`${sourceCommit()}\` | 测试模型: \`${LLM_MODEL}\` | 状态: \`${verdictStatus}\``,
       `> 模型探针首包延迟 (TTFT): \`${ttftMs}ms\` | 总耗时: \`${probeTotalMs}ms\` | 计费: \`零付费 API 额度消耗\``,
       '',
       '| 章序 | 卷级 | 标题 | 推进动作 | 运行观测 (字数/Tokens) | 验收断言 | 核心戏剧要素与生命周期 |',
@@ -1003,11 +1060,17 @@ async function main() {
       '',
       '## 核心生命周期与里程碑核验',
       '',
-      `- **【跨卷状态压缩 Compaction】**: 第 15 章收官时成功触发 \`markVolumeCompleted\` 与 \`executeVolumeCompaction\`，第一卷大纲已原子写入卷摘要，历史终态微事实已回写折叠标记；`,
+      compactionVerified
+        ? `- **【跨卷状态压缩 Compaction】**: 第 15 章收官时触发 \`markVolumeCompleted\` 与 \`executeVolumeCompaction\`，已产出压缩证据（见 \`compaction-evidence.json\`）；`
+        : `- **【跨卷状态压缩 Compaction】**: 未取得压缩证据，本项不计入通过；`,
       `- **【长程召回剪枝】**: 第 16 章起跨入第二卷，长程召回成功过滤卷一已折叠微事实；`,
       `- **【戏剧生命周期】**: 第 3 章秘密产生、第 5 章承诺建立、第 8 章秘密对抗、第 9 章事实失效、第 12 章角色死亡、第 14 章回溯修改、第 18 章承诺兑现、第 22 章秘密反转、第 30 章决战荡平、第 31 章终章定鼎全链路打通；`,
-      `- **【应用重启一致性】**: 服务重启前后 31 章全量正文、哈希基线与卷压缩状态 100% 保持一致（见 \`restart-consistency.json\`）；`,
-      `- **【题材预设市场闭环】**: \`/api/genre-kit.apply\` 成功注入凡人修仙预设，并具备严格幂等性（二度应用 0 写入，全量跳过）。`,
+      restartOk
+        ? `- **【应用重启一致性】**: 服务重启前后逐章比对全量正文 SHA-256、相位与版本（${TOTAL_CHAPTERS}/${TOTAL_CHAPTERS} 章），结果一致（见 \`restart-consistency.json\`）；`
+        : `- **【应用重启一致性】**: 未通过——重启后有 ${mismatchedChapters.length} 章正文/相位/版本漂移（见 \`restart-consistency.json\`）；`,
+      genrePresetVerified
+        ? `- **【题材预设市场闭环】**: \`/api/genre-kit.apply\` 注入凡人修仙预设，且二度应用 0 写入、全量跳过（严格幂等）。`
+        : `- **【题材预设市场闭环】**: 未通过——二度应用未表现为严格幂等，本项不计入通过。`,
     ]
     writeFileSync(join(targetEvidenceDir, 'journey-ledger.md'), `${ledgerMdLines.join('\n')}\n`, 'utf8')
 
@@ -1018,26 +1081,36 @@ async function main() {
 
     const summaryData = {
       kind: 'longform-e2e',
-      status: 'PASS',
+      status: verdictStatus,
       runId: RUN_ID,
-      sourceCommit: sourceCommit(),
+      ...sourceStampFields(),
       totalChapters: TOTAL_CHAPTERS,
       ttftMs,
       model: LLM_MODEL,
       modelEndpoint: LLM_BASE_URL,
       bookRoot,
       serverCwd,
-      compactionVerified: Boolean(compactionEvidence),
+      compactionVerified,
       restartConsistent: restartOk,
-      genrePresetVerified: genrePresetEvidence.idempotentPass,
+      mismatchedChapters,
+      genrePresetVerified,
+      verdictFailures,
       preservedEvidenceDir: targetEvidenceDir,
       cleanedUpResources: ['临时服务端监听端口已释放', '中间构建缓存已安全持久化于隔离目录'],
     }
     writeFileSync(join(targetEvidenceDir, 'summary.json'), JSON.stringify(summaryData, null, 2), 'utf8')
     log(`验收产物与台账已保存至: ${targetEvidenceDir}`)
     log(`========================================================================`)
-    log('长篇真实验收流水线全部完成：PASS！')
+    if (verdictStatus === 'PASS') {
+      log('长篇真实验收流水线全部完成：PASS！')
+    } else {
+      log(`长篇真实验收流水线判定：FAIL！未通过项：${verdictFailures.join('；')}`)
+    }
     log(`========================================================================`)
+    if (verdictStatus !== 'PASS') {
+      process.exitCode = 1
+      return
+    }
   } finally {
     try {
       serverProcess.kill('SIGTERM')
