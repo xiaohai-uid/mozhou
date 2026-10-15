@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "271efb00-f770-4214-ae2c-993c6f2085ad",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261012-130332\\candidate.json",
+  "output": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261012-130332\\mozhou.html",
+  "specification": {
+    "sha256": "fc78618ec48a3fe0222e5ea1a022722ff8ba961ee6395881a81a5d0c0c56dbcb",
+    "bytes": 19919
+  },
+  "artifact": {
+    "sha256": "6c9e76604f03601422d4864d906a907347bfde56473659cfd891bb4f9495a6ea",
+    "bytes": 799430
+  }
+}

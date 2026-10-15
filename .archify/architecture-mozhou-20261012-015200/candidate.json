@@ -1,0 +1,888 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "墨舟 MoZhou 架构审查：本机十步生产管线、事件账本与回环边界",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-mozhou-20261012-015200/mozhou.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/xiaohai-uid/mozhou.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "8907eac01c267e96a60025f2bf0e35a98580ef9c"
+    },
+    "views": [
+      {
+        "id": "journey",
+        "label": "主干：一章的十步生产",
+        "focus": [
+          "author",
+          "workbench_ui",
+          "api_gateway",
+          "pipeline",
+          "runtime",
+          "model_endpoint"
+        ],
+        "note": "作者经工作台与网关驱动十步事务管线，draft 步流式调用上游模型；每步转换落一条账本任务事件"
+      },
+      {
+        "id": "steps",
+        "label": "步内协作面",
+        "focus": [
+          "pipeline",
+          "context_compiler",
+          "quality_engine",
+          "flywheel",
+          "data_plane"
+        ],
+        "note": "compile 召回装配、review 机械核检、flywheel_record 记账学习、prepare/commit 读写正典，各有注入缝"
+      },
+      {
+        "id": "truth",
+        "label": "事件账本与本地数据",
+        "focus": [
+          "pipeline",
+          "data_plane",
+          "kernel",
+          "ledger",
+          "canon_store",
+          "runtime_area"
+        ],
+        "note": "events.jsonl 是单一 append 真源；正典为持久真源，运行时区非正典、可弃可重建"
+      },
+      {
+        "id": "guards",
+        "label": "回环与隔离四道门",
+        "focus": [
+          "api_gateway",
+          "session_auth",
+          "book_access",
+          "credential_vault",
+          "ssrf_gate",
+          "model_endpoint"
+        ],
+        "note": "会话校验、作品沙箱写锁、凭据保险库、出站 SSRF 门；Host 非回环一律 403，公网入口被结构性关闭"
+      },
+      {
+        "id": "outside",
+        "label": "越界路径与对账",
+        "focus": [
+          "model_endpoint",
+          "external_editor",
+          "canon_store",
+          "runtime_area",
+          "workbench_ui"
+        ],
+        "note": "两条越界路径：出站模型调用经 SSRF 门；Obsidian 直接改写正典由 watcher 检出后转对账提案"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "author",
+      "type": "external",
+      "label": "创作者",
+      "sublabel": "浏览器 / 桌面窗口",
+      "pos": [
+        30,
+        269
+      ],
+      "size": [
+        110,
+        76
+      ]
+    },
+    {
+      "id": "workbench_ui",
+      "type": "frontend",
+      "label": "创作工作台",
+      "sublabel": "React 视图壳 · ApiClient",
+      "pos": [
+        230,
+        269
+      ],
+      "size": [
+        160,
+        76
+      ],
+      "sources": [
+        {
+          "path": "apps/web/src/App.tsx",
+          "line": 1,
+          "end_line": 20,
+          "label": "视图壳入口"
+        },
+        {
+          "path": "apps/web/src/api/client.ts",
+          "line": 35,
+          "end_line": 40,
+          "label": "MoZhouApiClient 门面"
+        }
+      ]
+    },
+    {
+      "id": "api_gateway",
+      "type": "backend",
+      "label": "API 分发网关",
+      "sublabel": "ApiRouter · 21 组领域路由",
+      "pos": [
+        495,
+        269
+      ],
+      "size": [
+        175,
+        76
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/api.ts",
+          "line": 607,
+          "end_line": 632,
+          "label": "领域路由装配"
+        },
+        {
+          "path": "apps/web/server/router.ts",
+          "line": 57,
+          "end_line": 76,
+          "label": "未登记策略默认拒绝"
+        },
+        {
+          "path": "apps/web/server/router.ts",
+          "line": 82,
+          "end_line": 96,
+          "label": "回环请求边界"
+        }
+      ]
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "十步事务管线",
+      "sublabel": "ChapterProductionSession",
+      "pos": [
+        790,
+        269
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/pipeline/src/steps.ts",
+          "line": 11,
+          "end_line": 22,
+          "label": "十步词表"
+        },
+        {
+          "path": "packages/pipeline/src/session.ts",
+          "line": 320,
+          "end_line": 355,
+          "label": "步进门与前进出口"
+        },
+        {
+          "path": "packages/pipeline/src/session.ts",
+          "line": 368,
+          "end_line": 440,
+          "label": "两条显式回炉边"
+        }
+      ]
+    },
+    {
+      "id": "runtime",
+      "type": "backend",
+      "label": "生成执行引擎",
+      "sublabel": "RuntimeEngine · 降级链",
+      "pos": [
+        1060,
+        269
+      ],
+      "size": [
+        170,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/runtime/src/engine.ts",
+          "line": 161,
+          "end_line": 291,
+          "label": "execute 四态与候选链"
+        },
+        {
+          "path": "packages/pipeline/src/draft-step.ts",
+          "line": 480,
+          "end_line": 490,
+          "label": "draft 步调用位"
+        }
+      ]
+    },
+    {
+      "id": "model_endpoint",
+      "type": "external",
+      "label": "上游模型端点",
+      "sublabel": "OpenAI 兼容 · BYOK / 本机",
+      "pos": [
+        1320,
+        269
+      ],
+      "size": [
+        175,
+        76
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/llm/openaiStream.ts",
+          "line": 153,
+          "end_line": 160,
+          "label": "流式调用出口"
+        }
+      ]
+    },
+    {
+      "id": "session_auth",
+      "type": "security",
+      "label": "会话与身份校验",
+      "sublabel": "Supabase / 本地单机主体",
+      "pos": [
+        505,
+        100
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/auth/session.ts",
+          "line": 46,
+          "end_line": 84,
+          "label": "凭据服务端校验"
+        },
+        {
+          "path": "apps/web/server/router.ts",
+          "line": 98,
+          "end_line": 122,
+          "label": "主体解析与本地回退"
+        }
+      ]
+    },
+    {
+      "id": "book_access",
+      "type": "security",
+      "label": "作品沙箱与写锁",
+      "sublabel": "租户隔离 · 每书单飞",
+      "pos": [
+        815,
+        100
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/bookAccess.ts",
+          "line": 38,
+          "end_line": 43,
+          "label": "授权作品视图"
+        },
+        {
+          "path": "apps/web/server/bookAccess.ts",
+          "line": 1,
+          "end_line": 10,
+          "label": "沙箱与队列职责"
+        },
+        {
+          "path": "apps/web/server/router.ts",
+          "line": 124,
+          "end_line": 145,
+          "label": "作品级所有权校验"
+        }
+      ]
+    },
+    {
+      "id": "credential_vault",
+      "type": "security",
+      "label": "凭据保险库",
+      "sublabel": "AES-256-GCM",
+      "pos": [
+        1060,
+        100
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/llm/providerSettings.ts",
+          "line": 61,
+          "end_line": 61,
+          "label": "加密算法"
+        },
+        {
+          "path": "apps/web/server/llm/providerSettings.ts",
+          "line": 110,
+          "end_line": 142,
+          "label": "主密钥求值与启动断言"
+        }
+      ]
+    },
+    {
+      "id": "ssrf_gate",
+      "type": "security",
+      "label": "出站安全门",
+      "sublabel": "私有/保留网段拒绝",
+      "pos": [
+        1285,
+        100
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/ssrfGuard.ts",
+          "line": 39,
+          "end_line": 59,
+          "label": "IPv4 私有段判定"
+        },
+        {
+          "path": "apps/web/server/llm/generationTarget.ts",
+          "line": 218,
+          "end_line": 271,
+          "label": "端点解析与拒答原因"
+        }
+      ]
+    },
+    {
+      "id": "context_compiler",
+      "type": "backend",
+      "label": "上下文编译器",
+      "sublabel": "compile 步 · 召回与预算装配",
+      "pos": [
+        495,
+        450
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/context-compiler/src/compile.ts",
+          "line": 228,
+          "end_line": 240,
+          "label": "compile 端到端收口"
+        },
+        {
+          "path": "packages/context-compiler/src/assemble.ts",
+          "line": 399,
+          "end_line": 410,
+          "label": "两阶段预算装配"
+        },
+        {
+          "path": "packages/context-compiler/src/receipt-file.ts",
+          "line": 168,
+          "end_line": 180,
+          "label": "Receipt 一证一文件"
+        }
+      ]
+    },
+    {
+      "id": "quality_engine",
+      "type": "backend",
+      "label": "质量引擎",
+      "sublabel": "review 步 · 机械门核检",
+      "pos": [
+        790,
+        450
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/quality-engine/src/mechanical-gates.ts",
+          "line": 148,
+          "end_line": 170,
+          "label": "机械门核检"
+        },
+        {
+          "path": "packages/quality-engine/src/policy.ts",
+          "line": 35,
+          "end_line": 51,
+          "label": "平台与项目策略合并"
+        },
+        {
+          "path": "packages/pipeline/src/review-step.ts",
+          "line": 161,
+          "end_line": 175,
+          "label": "review 步执行位"
+        }
+      ]
+    },
+    {
+      "id": "flywheel",
+      "type": "backend",
+      "label": "风格飞轮",
+      "sublabel": "flywheel 步 · 风格学习",
+      "pos": [
+        1060,
+        450
+      ],
+      "size": [
+        170,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/flywheel/src/style-learner.ts",
+          "line": 211,
+          "end_line": 230,
+          "label": "风格档案更新"
+        },
+        {
+          "path": "packages/pipeline/src/record-step.ts",
+          "line": 117,
+          "end_line": 130,
+          "label": "收尾记账步"
+        }
+      ]
+    },
+    {
+      "id": "kernel",
+      "type": "backend",
+      "label": "领域内核",
+      "sublabel": "九柱模型 · 事件词表",
+      "pos": [
+        495,
+        631
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/kernel/src/domain-events.ts",
+          "line": 33,
+          "end_line": 67,
+          "label": "事件词表与配对表"
+        },
+        {
+          "path": "packages/kernel/src/kernel-schema.ts",
+          "line": 1,
+          "end_line": 30,
+          "label": "领域模型 schema"
+        }
+      ]
+    },
+    {
+      "id": "data_plane",
+      "type": "backend",
+      "label": "数据平面",
+      "sublabel": "prepare / commit 步 · 原子写",
+      "pos": [
+        790,
+        631
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/chapter.ts",
+          "line": 234,
+          "end_line": 250,
+          "label": "原子替换落盘"
+        },
+        {
+          "path": "packages/data-plane/src/chapter.ts",
+          "line": 947,
+          "end_line": 960,
+          "label": "提交章节点"
+        },
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 8,
+          "end_line": 22,
+          "label": "运行时区路径常量"
+        }
+      ]
+    },
+    {
+      "id": "runtime_area",
+      "type": "database",
+      "label": "运行时区",
+      "sublabel": "receipts / proposals",
+      "pos": [
+        1060,
+        631
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 13,
+          "end_line": 22,
+          "label": "对账/任务/操作/提案仓"
+        },
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 76,
+          "end_line": 76,
+          "label": "提交意图日志"
+        }
+      ]
+    },
+    {
+      "id": "ledger",
+      "type": "database",
+      "label": "事件账本",
+      "sublabel": ".mozhou/events.jsonl · 每步追加",
+      "pos": [
+        190,
+        631
+      ],
+      "size": [
+        220,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 11,
+          "end_line": 11,
+          "label": "账本文件路径"
+        },
+        {
+          "path": "packages/runtime/src/eventBus.ts",
+          "line": 129,
+          "end_line": 176,
+          "label": "单口 append 与配对纪律"
+        },
+        {
+          "path": "packages/pipeline/src/projection.ts",
+          "line": 1,
+          "end_line": 20,
+          "label": "由账本折叠投影"
+        }
+      ]
+    },
+    {
+      "id": "canon_store",
+      "type": "database",
+      "label": "正典目录",
+      "sublabel": "正文 / 设定 / 追踪",
+      "pos": [
+        790,
+        812
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 30,
+          "end_line": 36,
+          "label": "追踪五族 jsonl"
+        },
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 68,
+          "end_line": 95,
+          "label": "正文与章节点路径"
+        },
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 132,
+          "end_line": 134,
+          "label": "canon 与运行时区边界"
+        }
+      ]
+    },
+    {
+      "id": "external_editor",
+      "type": "external",
+      "label": "Obsidian 外部编辑",
+      "sublabel": "直接改写正典文件",
+      "pos": [
+        1090,
+        812
+      ],
+      "size": [
+        180,
+        76
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/routes/reconciliationRoutes.ts",
+          "line": 243,
+          "end_line": 270,
+          "label": "启动必检与运行期 watcher"
+        },
+        {
+          "path": "apps/web/server/routes/reconciliationRoutes.ts",
+          "line": 1,
+          "end_line": 18,
+          "label": "对账规格锚点"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "本机回环部署 · 单进程 (127.0.0.1)",
+      "wraps": [
+        "workbench_ui",
+        "api_gateway",
+        "pipeline",
+        "runtime",
+        "session_auth",
+        "book_access",
+        "credential_vault",
+        "ssrf_gate",
+        "context_compiler",
+        "quality_engine",
+        "flywheel",
+        "kernel",
+        "data_plane",
+        "runtime_area",
+        "ledger",
+        "canon_store"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "凭据与出站隔离",
+      "wraps": [
+        "credential_vault",
+        "ssrf_gate"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "c-author-ui",
+      "from": "author",
+      "to": "workbench_ui",
+      "label": "创作操作",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-ui-gateway",
+      "from": "workbench_ui",
+      "to": "api_gateway",
+      "label": "POST /api/*",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-gateway-pipeline",
+      "from": "api_gateway",
+      "to": "pipeline",
+      "label": "驱动十步会话",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-pipeline-runtime",
+      "from": "pipeline",
+      "to": "runtime",
+      "label": "draft 步",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-runtime-model",
+      "from": "runtime",
+      "to": "model_endpoint",
+      "label": "流式生成",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-gateway-auth",
+      "from": "api_gateway",
+      "to": "session_auth",
+      "label": "校验会话主体",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "c-gateway-book",
+      "from": "api_gateway",
+      "to": "book_access",
+      "label": "解析作品沙箱与写锁",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "c-runtime-vault",
+      "from": "runtime",
+      "to": "credential_vault",
+      "label": "取该用户 BYOK 凭据",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "c-runtime-ssrf",
+      "from": "runtime",
+      "to": "ssrf_gate",
+      "label": "出站前校验目标主机",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "c-ssrf-model",
+      "from": "ssrf_gate",
+      "to": "model_endpoint",
+      "label": "放行后调用",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "c-pipeline-compile",
+      "from": "pipeline",
+      "to": "context_compiler",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "c-pipeline-quality",
+      "from": "pipeline",
+      "to": "quality_engine",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "c-pipeline-flywheel",
+      "from": "pipeline",
+      "to": "flywheel",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "c-pipeline-plane",
+      "from": "pipeline",
+      "to": "data_plane",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "c-pipeline-ledger",
+      "from": "pipeline",
+      "to": "ledger",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "c-plane-canon",
+      "from": "data_plane",
+      "to": "canon_store",
+      "label": "原子落盘",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "c-plane-runtime-area",
+      "from": "data_plane",
+      "to": "runtime_area",
+      "label": "非正典产物",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "c-plane-kernel",
+      "from": "data_plane",
+      "to": "kernel",
+      "label": "九柱模型",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "c-obsidian-canon",
+      "from": "external_editor",
+      "to": "canon_store",
+      "label": "改写正典文件",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "主干：一章的十步生产（已实现）",
+      "items": [
+        "十步词表固定为 prepare → compile → draft → review → user_edit → final_extract → continuity_gate → canon_proposal → commit → flywheel_record；每步转换是一条账本任务事件，当前步可随时从投影重建",
+        "一个 ChapterProductionSession 对应一章，且 V1 全局单飞：同时最多一个活动会话，别章窗口未闭合即拒绝开新卷",
+        "步进只许沿线性后继序；回炉只有两条显式逆向边（连续性门硬冲突→user_edit、文学审查 blocking_fail→draft），文学回炉每会话自动上限 2 次",
+        "前进出口结构性 fail-closed：文学审查非 pass 不放行 user_edit，门未跑或硬冲突不放行 canon_proposal，账本无 CanonCommitted 不放行 flywheel_record"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "上下文装配与质量门禁（已实现）",
+      "items": [
+        "compile 步把目录卡激活、三通道召回（关键词 + k-hop 图 + embedding）、两阶段 Reserved 预算装配串成一次调用，产物是一份不可变 Receipt",
+        "Receipt 一证一文件落在 .mozhou/receipts/，携带 recomputationHash 与 replayInputs；输入漂移时重放显式报错，不静默给近似结果",
+        "质量引擎提供 5 项机械门与 4-gram 复读检测，平台规则与项目规则按合并策略得出 ruleSetDigest 并随审查报告绑定版本",
+        "生成端点解析只有一条缝：hosted 无主体显式拒答 → 注册表路由 → BYOK；账本记录的 providerId 必然就是实际服务的那一个"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "数据平面：账本为真源，正典为持久真源（已实现）",
+      "items": [
+        "events.jsonl 是单一 append 真源，由 PublishBus 单口写入；配对纪律在写入处强制（head 未闭合禁再开、tail 无 head 即报错）",
+        "同一账本承载两种行格式：任务事件行（带 schemaVersion/taskId/sequence 身份块）与平铺领域行；回读只取任务事件行，撕裂行跳过不阻断",
+        "落盘唯一出口是原子替换：同目录唯一临时文件 → 写全循环 → fsync → close → rename，rename 是唯一可见点",
+        "canon 与运行时区由 isCanonRelPath 划界：正文/设定/追踪是正典，.mozhou/ 下的 receipts、proposals、operations 非正典、不参与对账"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "回环边界与安全隔离（已实现，本次审查重点）",
+      "items": [
+        "每条 /api/ 请求先过 assertTrustedRequest：Host 必须解析为回环地址，否则 403 UNTRUSTED_HOST——这使公网/反向代理入口在请求边界上被结构性关闭",
+        "路由策略五类（public / account / book / local-native / payment-webhook）；未登记路径默认 403，hosted 模式下 local-native 端点同样 403",
+        "作品隔离三件套：数据根排他启动锁防多实例争夺、每书 FIFO 并发队列防脏写、书根 realpath 必须落在当前用户目录内且禁止符号链接穿出",
+        "凭据以 AES-256-GCM 加密落盘；生产或 hosted 环境缺 MOZHOU_SECRET_KEY 时启动即失败（exit 1），不回退到源码可见常量",
+        "出站 SSRF 门按字面 host 判定私有/环回/链路本地/保留网段并拒绝，IPv6 按数值位段解析；但该门只判字面地址，域名解析到私网（DNS rebinding）不在本层能力内"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "本次审查观察（需使用者判断）",
+      "items": [
+        "部署面不一致：docker-compose.yml、Dockerfile、deploy/Caddyfile 与 systemd 单元都在树内，但 deploy/README.md 自己声明公网/hosted 路径当前不可用——容器只映射宿主 127.0.0.1，反代后每个 /api/* 都会被判 UNTRUSTED_HOST",
+        "分层归属待人工判定：docs/architecture.md §6 明确把 packages/runtime 与 apps/web/server/llm 之间的分层、apps/web/server 内多个落盘 store 的职责边界列为生成器不覆盖、需人读代码的判据",
+        "零入向消费者候选：@mozhou/web 与 @mozhou/benchmark 出向依赖多而入向为 0；前者是应用顶层属正常，后者是否为「尚未接线」需按 DSH 判据确认",
+        "仓库卫生：.archify/ 交付物（约 5MB）与根目录 navigation-acceptance-report.json 未入库也未进 .gitignore；入库包体积 62.84 MiB，含 23M ONNX 模型与多份 1.3M 级 evidence 截图"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "发行与未开放能力（诚实清单）",
+      "items": [
+        "版本定位是技术预览版 v0.3.0：真实实现的是本地十步管线、Story Brain、机械门、RRF 上下文装配与本地数据面",
+        "AI 通道只支持 BYOK 的 OpenAI 兼容真实流式调用；未配置 provider 时相关能力显式显示不可用，不静默降级为演示数据",
+        "支付、云同步/云备份、付费许可证激活未作为本 Release 能力发布；README 与 user-guide 已如实标注，且源码存在相应的不可用返回",
+        "桌面壳与安装器是并行发行面：Tauri 入口不在当前 Windows 发行产物内，发行包只含 apps/web 的 dist/dist-server 与 desktop-server.mjs"
+      ]
+    }
+  ]
+}

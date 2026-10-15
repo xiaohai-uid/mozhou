@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261007-101500\\candidate.json",
+    "sha256": "a05e3baecb1aff21890da7b18bee959eefa6b28b839c366830790efa2a0e7668",
+    "bytes": 17737
+  },
+  "artifact": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261007-101500\\mozhou.html",
+    "sha256": "ffc70da0271d5d815de92890ba4169b260e0e2294c95460763ed5900120d800a",
+    "bytes": 795108
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261007-101500\\review-2\\mozhou.finalize.json",
+    "summaryReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261007-101500\\review-2\\mozhou.finalize-summary.json",
+    "browserCheckReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261007-101500\\review-2\\mozhou.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-05T05:50:40.473Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2031,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "routesOverSuggestedBends": 2
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [],
+      "detours": [
+        {
+          "relationship": {
+            "id": "runtime-to-data",
+            "from": "runtime_engine",
+            "to": "local_data_root",
+            "label": "生成事件追加",
+            "collectionIndex": 12,
+            "artifactIndex": 13
+          },
+          "bends": 5,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "id": "release-to-host",
+            "from": "desktop_release",
+            "to": "production_host",
+            "label": "启动本地服务",
+            "collectionIndex": 15,
+            "artifactIndex": 16
+          },
+          "bends": 4,
+          "stretch": 1.264
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "runtime_engine → local_data_root needs 5 bends: move node runtime_engine or local_data_root so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "desktop_release → production_host needs 4 bends: move node desktop_release or production_host so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}
