@@ -671,3 +671,32 @@
 
 
 
+
+### CHG-20261012-01 — 2026-10-12 — 用户条件授权，Codex执行
+
+- 独立复核、作者运行态所有权与出站生命周期定点修复、真实包入口验收；条件满足前不提交/合并/上传。
+- 记录：[发行验收收口](docs/changes/CHG-20261012-01-release-acceptance-closure.md)。
+
+
+### CHG-20261012-02 — 2026-10-12 — 验收判定诚实性与发布 CI 顺序，ZCode 执行
+
+- 长篇验收脚本的假 PASS（全量章节摘要 + 派生判定 + 诚实台账）、发布 workflow 的构建/测试顺序与重复执行、六处验收脚本改用 dirty-aware 来源戳；未改应用代码、未新增依赖、未放宽任何门。
+- 记录：[验收判定与 CI 顺序](docs/changes/CHG-20261012-02-verification-honesty-and-ci-order.md)。
+
+
+### CHG-20261012-03 — 2026-10-12 — 正史派生断言的显示名解析，ZCode 执行
+
+- 修复空转守卫：`exportPromptfooTestCaseFromCanon` 原先用 slug 拼正则，匹配不到中文正文；改为要求显示名，缺名则记入 `unresolvedDeadCharacters` 而不产出空转规则；测试按 §20(c) 更新。
+- 记录：[正史派生断言的显示名解析](docs/changes/CHG-20261012-03-canon-derived-assertion-name-resolution.md)。
+
+
+### CHG-20261012-04 — 2026-10-12 — 工作台矮视口下 AI 控制台覆盖编辑器，ZCode 执行
+
+- 真实浏览器实测发现：1280×720 / 1366×768 下控制台行吃掉整列、编辑器被压到 0 且被覆盖；改 `ink-realm.css` 两条高度规则（控制台 `clamp(180px, calc(100vh - 620px), 480px)`、写入面 `min(470px, 42vh)`），大视口无回归。
+- 记录：[控制台覆盖编辑器](docs/changes/CHG-20261012-04-workbench-editor-console-overlap.md)。
+
+
+### CHG-20261012-06 — 2026-10-12 — 门禁加固：证据脚本卫生与构建产物新鲜度，ZCode 执行
+
+- `/retro` 复盘前四条落地：新增 `check-evidence-hygiene.mjs`（禁短 HEAD 与写死 PASS）与 `check-build-freshness.mjs`（产物落后于源码），接入 `ci-gate` 与 pre-commit 钩子，launcher 加陈旧告警，eslint 补新目录归属判定说明。
+- 记录：[门禁加固](docs/changes/CHG-20261012-06-gate-hardening-evidence-and-build-freshness.md)。

@@ -48,6 +48,15 @@ nul
 # agent 编队运行状态与一次性外部审查输出（2026-10-05 落账时划出）
 .agent-teams/
 review-result.json
+# 导航验收脚本的一次性运行输出（scripts/release/navigation-acceptance.mjs 写 cwd）
+navigation-acceptance-report.json
+
+# archify 架构图交付物：精选证据（candidate.json / mozhou.*.json / mozhou.html）按既有
+# 约定入库；每轮重新生成的渲染图（体积大）与评审前候选快照不入库。
+# 判据与上面 .dsh-audit / evidence 同款：体积大且每轮重新生成。
+.archify/**/visual-check/
+.archify/**/mozhou.visual-check.*.png
+.archify/**/*-backup.json
 
 # 本地凭据与私钥：商业发行仓库禁止误提交
 .env

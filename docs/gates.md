@@ -45,6 +45,8 @@
 | **门清单在 CI 列一致性** | `node scripts/check-gates-ci-column.mjs` | 0 一致 · 1 脱节 · 2 用法错误 | 无此状态 | ✅ `ci.yml` |
 | **文档裸数字** | `node scripts/check-doc-numbers.mjs` | 0（默认只报不拦）· `--strict` 有发现即 1 | 无此状态 | ✅ `ci.yml`（只报不拦） |
 | **生成物新鲜度（按索引）** | `node scripts/check-generated-freshness.mjs` | 0 一致 · 1 陈旧 · 2 环境错误 | 无此状态 | ❌ 未接入（在 pre-commit 钩子里，见下） |
+| **证据脚本卫生** | `node scripts/check-evidence-hygiene.mjs` | 0 干净 · 1 命中（短 HEAD 或写死 `PASS`） · 2 环境错误 | 无此状态 | ❌ 未接入（经 `ci-gate.mjs evidence-hygiene`） |
+| **构建产物新鲜度** | `node scripts/check-build-freshness.mjs` | 0 新鲜或未构建 · 1 陈旧 · 2 环境错误 | 无此状态 | ❌ 未接入（经 `ci-gate.mjs build-freshness`，launcher 另有告警） |
 | 静态导入环检测 | `node scripts/check-import-cycles.mjs` | 0 无环 · 1 有环 `scripts/check-import-cycles.mjs:151` | 无此状态 | ✅ `graph-gate.yml` |
 | 真实模型门（发布） | `node scripts/release/real-model-gate.mjs` | 0 VERIFIED · 1 FAILED · 2 BLOCKED `scripts/release/real-model-gate.mjs:21` | 无此状态 | ✅ `release.yml` |
 | 发布资产构建 | `node scripts/build-release.mjs` | 无显式 exit（成功即 0，非 0 即失败） | 无 | ✅ `release.yml:149` |
@@ -60,6 +62,13 @@
 > 改陈旧」（同类漂移在 2026-10-10 会话里出现 4 次），索引语义没有这个问题，故做成阻断。
 > 前两者都接进了 `ci.yml` 的 Doc gates 步骤、`scripts/ci-gate.mjs doc-gates` 与仓库的 pre-commit
 > 钩子；生成物新鲜度只在钩子里（CI 的检出是干净的，用 `gen-*.mjs --check` 即可）。
+> 末两行 2026-10-12 复盘补：`check-evidence-hygiene.mjs` 拦两类「知道但没人拦」的证据缺陷——
+> 用短 HEAD 标识源码（仓内已有 `source-stamp.mjs` 的 `-dirty` 规则，发布审计两次栽在这上面），
+> 以及把成功结论写成字面量 `PASS`（`verify-longform-e2e.mjs` 曾如此，历史证据里就是 `PASS`
+> 配 `compactionVerified:false`）。`check-build-freshness.mjs` 拦「产物落后于源码」——它是本次
+> 会话里那次假失败的成因（工作台崩在 `toFixed`，真因是 `dist-server` 比源码旧），而按索引判定
+> 的生成物门看不到 `dist/`（它是忽略项，索引里没有）。两者都只在本地路径上有意义：CI 是干净
+> 检出 + 现场构建。
 
 ## `verify:real-model` 的完整契约
 

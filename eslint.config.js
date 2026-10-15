@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   // 交回包是归档证据与仓库外脚本副本，不属于产品 TypeScript 工程。
   { ignores: ['handoff-results/**'] },
-  { ignores: ['**/dist/**', '**/dist-server/**', '**/target/**', 'src-tauri/target/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**'] },
+  { ignores: ['**/dist/**', '**/dist-server/**', '**/target/**', 'src-tauri/target/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', 'desktop/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
@@ -17,6 +17,14 @@ export default tseslint.config(
         // observability.ts 与 productionServer.ts 一样是无引用的孤儿模块，进不了任何
         // TS program，需在此登记；dataRoot.ts 被 bookAccess.ts 引用、可被项目服务
         // 传递发现，登记进 allowDefaultProject 反而报「重复包含」。
+        // 新目录的 lint 归属，三分支判定（2026-10-12 复盘补，实际踩过一次）：
+        //   1. 在 pnpm workspace 内（packages/*、apps/*）→ 由项目服务发现，无需登记；
+        //   2. scripts 式的独立运维脚本 → 逐行登记进 allowDefaultProject（不支持递归 glob），
+        //      并按目录关掉 no-unsafe-*（这些文件没有类型信息）；
+        //   3. 既不在 workspace、也无 tsconfig 覆盖的新顶层区域（例如 desktop/）→ 加进上面的
+        //      ignores。**不要走第 2 条**：登记会把纯 JS 文件按类型规则 lint（实测 186 个
+        //      no-unsafe-*），还会把 default project 的匹配数推过 ts-eslint 的 140 上限，
+        //      连累 scripts/ 下两个无关文件报「Too many files matched the default project」。
         projectService: {
           allowDefaultProject: [
             'scripts/*.d.mts',
@@ -56,6 +64,9 @@ export default tseslint.config(
             // 2026-10-09：爬虫目录的 SSRF 过滤测试（B1 修复新增）同样不被任何 project
             // 发现，按同一先例补登记。
             'apps/web/server/crawlers/*.test.ts',
+            // 2026-10-12：出站传输层目录（地址绑定 + 解压）同样不被任何 project 发现，
+            // 按同一先例补登记。
+            'apps/web/server/net/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，

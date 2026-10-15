@@ -7,7 +7,10 @@
 // graph-gate.yml 还跑文档门、静态导入环与重复度——它们都不在任何本地路径上，于是「门在但
 // 没人跑」的那一类问题（生成物陈旧到 HEAD 过不了自己的 CI、重复度门假绿空转）能一路活到
 // HEAD。doc-gates / import-cycles / duplication 三个任务补上这个缺口。
-// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication
+// 2026-10-12 复盘再补两条：evidence-hygiene（禁短 HEAD 与写死的 PASS 结论）与
+// build-freshness（陈旧 dist/dist-server 会制造假失败——本次会话的崩溃就是它造的）。
+// 这两条同样属于「知道但没人拦」，且都不在 CI 视野内（CI 是干净检出 + 现场构建）。
+// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness
 import { execSync } from 'node:child_process'
 
 const task = process.argv[2]
@@ -23,6 +26,10 @@ const commands = {
   'import-cycles': 'node scripts/check-import-cycles.mjs',
   // graph-gate.yml 的重复度 job；经 npx 现场取 jscpd，需要网络
   duplication: 'pnpm duplication',
+  // 证据脚本卫生：禁 `rev-parse --short HEAD` 与写死的成功结论 'PASS'
+  'evidence-hygiene': 'node scripts/check-evidence-hygiene.mjs',
+  // 生产产物是否落后于源码（dist/ 是忽略项，索引型新鲜度检查看不到它）
+  'build-freshness': 'node scripts/check-build-freshness.mjs',
 }
 const cmd = commands[task]
 if (cmd === undefined) {
