@@ -1,9 +1,10 @@
 import tseslint from 'typescript-eslint'
+import sonarjs from 'eslint-plugin-sonarjs'
 
 export default tseslint.config(
   // 交回包是归档证据与仓库外脚本副本，不属于产品 TypeScript 工程。
   { ignores: ['handoff-results/**'] },
-  { ignores: ['**/dist/**', '**/dist-server/**', '**/target/**', 'src-tauri/target/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', 'desktop/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**'] },
+  { ignores: ['**/dist/**', '**/dist-server/**', '**/target/**', 'src-tauri/target/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', 'desktop/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**', 'perf/**', 'apps/web/server/platform/__fixtures__/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
@@ -67,14 +68,19 @@ export default tseslint.config(
             // 2026-10-12：出站传输层目录（地址绑定 + 解压）同样不被任何 project 发现，
             // 按同一先例补登记。
             'apps/web/server/net/*.test.ts',
+            // 2026-10-18：agent 与 recycle 目录由 21b05ad 引入，同属不被 projectService
+            // 自动发现的 server 子目录，按同一先例补登记；匹配总数达 153，阈值上调至 165。
+            'apps/web/server/agent/*.ts',
+            'apps/web/server/recycle/*.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，
           // 上调至 120 恢复 pnpm lint 门。
           // 2026-10-09 由 120 上调至 140：服务端新增测试文件后匹配数达 121，触顶报
           // 「Too many files (>120) matched the default project」；按同一先例上调。
+          // 2026-10-18 由 140 上调至 165：agent/recycle 补登记后匹配数达 153，按同一先例上调。
           // 长期正解是让 server/ 有可被 projectService 发现的 tsconfig，而不是持续抬高阈值。
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 140,
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 165,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -198,6 +204,77 @@ export default tseslint.config(
     files: ['apps/web/server/bookAccess.ts', 'apps/web/server/llm/providerSettings.ts'],
     rules: {
       'no-restricted-syntax': 'off',
+    },
+  },
+  {
+    // SonarJS 复杂度/坏味道档（2026-10-18 新增）。
+    //
+    // 只覆盖产品源码（packages/*/src、apps/web/src、apps/web/server、apps/web/shared），
+    // 测试文件与 scripts 运维脚本不进：测试的价值在于直白，不在复杂度；一次性脚本
+    // 不该受产品门约束。
+    //
+    // **接入纪律（2026-10-18 实测后定，不是拍脑袋）**：
+    // 若把 recommended 规则集原样挂上，实测 error 会暴涨到 398——sonarjs 的规则默认
+    // 是 error 级，一天之内让 CI 门红 385 处，等于拿新工具当阻断门用，而存量改造一天做不完。
+    // **所以这里全部规则显式定档，不依赖 recommended 的默认级：**
+    //   - 确定性的坏味道（no-nested-conditional 等）→ warn：看得见、不阻断，
+    //     按「每周清一批」的节奏处理；
+    //   - 纯风格/可争议项（prefer-read-only-props、no-alphabetical-sort、
+    //     function-return-type、use-type-alias、deprecation 等）→ off：这些规则
+    //     的收益取决于团队共识，先不占注意力，需要时按个案打开；
+    //   - cognitive-complexity 阈值 30：比 SonarJS 默认 15 宽一倍，先只冒真正
+    //     离谱的函数。收敛动作单独提交、与功能改动分开，避免混淆回归归因。
+    //
+    // **可证伪的门承诺**：本段只增加 warning，不增加 error。若 `pnpm lint`
+    // 的 errorTotal > 0，说明本段的定档被破坏了或有未登记的新目录文件。
+    files: [
+      'packages/*/src/**/*.ts',
+      'apps/web/src/**/*.ts',
+      'apps/web/src/**/*.tsx',
+      'apps/web/server/**/*.ts',
+      'apps/web/shared/**/*.ts',
+    ],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    plugins: { sonarjs },
+    rules: {
+      // 确定性坏味道：warn（可观测，不阻断）
+      'sonarjs/no-nested-conditional': 'warn',
+      'sonarjs/no-duplicated-branches': 'warn',
+      'sonarjs/no-identical-conditions': 'warn',
+      'sonarjs/no-identical-functions': 'warn',
+      'sonarjs/no-identical-expressions': 'warn',
+      'sonarjs/no-all-duplicated-branches': 'warn',
+      'sonarjs/no-element-overwrite': 'warn',
+      'sonarjs/no-extra-arguments': 'warn',
+      'sonarjs/no-empty-collection': 'warn',
+      'sonarjs/no-unused-collection': 'warn',
+      'sonarjs/no-use-of-empty-return-value': 'warn',
+      'sonarjs/no-gratuitous-expressions': 'warn',
+      'sonarjs/no-inverted-boolean-check': 'warn',
+      'sonarjs/no-collection-size-mischeck': 'warn',
+      'sonarjs/void-use': 'warn',
+      'sonarjs/no-dead-store': 'warn',
+      'sonarjs/no-try-promise': 'warn',
+      'sonarjs/no-unenclosed-multiline-block': 'warn',
+      'sonarjs/no-regex-spaces': 'warn',
+      'sonarjs/super-linear-regex': 'warn',
+      'sonarjs/regex-complexity': 'warn',
+      'sonarjs/duplicates-in-character-class': 'warn',
+      'sonarjs/single-character-alternation': 'warn',
+      'sonarjs/concise-regex': 'warn',
+      'sonarjs/prefer-regexp-exec': 'warn',
+      'sonarjs/cognitive-complexity': ['warn', 30],
+      'sonarjs/no-os-command-from-path': 'warn',
+      'sonarjs/generator-without-yield': 'warn',
+      'sonarjs/no-nested-template-literals': 'off',
+      // 纯风格/可争议项：off（需要时按个案打开，逐项升级为 warn）
+      'sonarjs/prefer-read-only-props': 'off',
+      'sonarjs/no-alphabetical-sort': 'off',
+      'sonarjs/function-return-type': 'off',
+      'sonarjs/use-type-alias': 'off',
+      'sonarjs/deprecation': 'off',
+      'sonarjs/different-types-comparison': 'warn',
+      'sonarjs/no-misleading-array-reverse': 'warn',
     },
   },
 )
