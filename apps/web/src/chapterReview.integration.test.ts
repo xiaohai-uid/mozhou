@@ -123,6 +123,7 @@ describe('POST /api/chapter.review 生产接线与生命周期', () => {
         root,
         chapterIndex: 1,
         policy: DETERMINISTIC_POLICY,
+        mechanicalOptions: { minWords: 0 },
       });
 
       expect(status).toBe(200);

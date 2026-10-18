@@ -258,7 +258,7 @@ function writeWaterfallBody(root: string): void {
 describe('ADR-0025 质量审查 API 契约', () => {
   it('review pass 返回 current=true', async () => {
     await makeBookAtReview('通过之书')
-    const { status, data } = await post(bases[bases.length - 1]!, '/api/chapter.review', { root: roots[roots.length - 1]!, chapterIndex: 1, policy: DETERMINISTIC_POLICY })
+    const { status, data } = await post(bases[bases.length - 1]!, '/api/chapter.review', { root: roots[roots.length - 1]!, chapterIndex: 1, policy: DETERMINISTIC_POLICY, mechanicalOptions: { minWords: 0 } })
     expect(status).toBe(200)
     expect(data.verdict).toBe('pass')
     expect(data.current).toBe(true)

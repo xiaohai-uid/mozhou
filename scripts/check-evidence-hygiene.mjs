@@ -23,7 +23,7 @@
  *
  * 退出码：0 干净；1 命中；2 环境错误。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -87,4 +87,45 @@ if (violations.length > 0) {
   process.exit(1)
 }
 
-console.log(`PASS 证据卫生检查：${files.length} 个脚本，无短 HEAD、无写死 PASS 结论。`)
+/**
+ * 证据文件本身也要查：summary.json 的 status 必须由全部必需结果派生。
+ * 历史反例 evidence/longform-journey/2026-10-06T13-41-19-856Z 与 13-46 曾写
+ * status=PASS 但 compactionVerified=false——只看 status 的消费方会误判为通过。
+ * 无证据目录（干净检出 / CI 首次运行前）时跳过，不制造假红。
+ */
+const evidenceRoot = join(root, 'evidence', 'longform-journey')
+let evidenceChecked = 0
+const warnings = []
+if (existsSync(evidenceRoot)) {
+  for (const entry of readdirSync(evidenceRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const summary = join(evidenceRoot, entry.name, 'summary.json')
+    if (!existsSync(summary)) continue
+    evidenceChecked += 1
+    const relSummary = relative(root, summary).replace(/\\/g, '/')
+    try {
+      const record = JSON.parse(readFileSync(summary, 'utf8'))
+      if (record.status === 'PASS') {
+        for (const field of ['compactionVerified', 'genrePresetVerified', 'restartConsistent']) {
+          if (record[field] !== true) {
+            violations.push(`${relSummary} status=PASS 但 ${field} 不是 true —— 成功结论必须由全部必需结果派生`)
+          }
+        }
+        if (typeof record.sourceCommit !== 'string' || /^[0-9a-f]{7,12}$/i.test(record.sourceCommit)) {
+          warnings.push(`${relSummary} 使用短 HEAD（${String(record.sourceCommit)}）—— 新证据应使用 readSourceStamp 的完整摘要`)
+        }
+      }
+    } catch (error) {
+      violations.push(`${relSummary} 无法解析：${error.message}`)
+    }
+  }
+}
+
+if (violations.length > 0) {
+  console.error('FAIL 证据卫生检查未通过：')
+  for (const v of violations) console.error(`  - ${v}`)
+  process.exit(1)
+}
+for (const w of warnings) console.warn(`WARN ${w}`)
+
+console.log(`PASS 证据卫生检查：${files.length} 个脚本，无短 HEAD、无写死 PASS 结论；${evidenceChecked} 份长程证据无矛盾结论。`)

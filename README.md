@@ -19,8 +19,8 @@
 - **凭据安全**：BYOK 加密主密钥此前在 `MOZHOU_SECRET_KEY` 缺失时回退到源码可见常量 + 固定盐，而所有部署模板都没设置该变量——等于凭据可被任何读到文件的人解开。现在 `NODE_ENV=production` 或 `MOZHOU_HOSTED=true` 下缺失即拒绝启动（exit 1），本地单机保留零配置回退。
 - **掉电耐久**：章节、canon、基线等写入此前只有 `writeFileSync + rename` 而无 fsync，rename 可能先于数据刷盘，掉电后目标文件变零长度。现统一收敛到 `atomicWriteFileSync`（tmp → fsync → rename）。
 - **可运维性**：新增真实 `/api/health`（此前只在路由策略表登记、无处理器，实际返回 404）、单行 JSON 请求日志与 `X-Request-Id`、SIGTERM/SIGINT 优雅停机（排空在途请求，10 秒超时）。
-- **文档校正**：`docs/deployment.md` 此前描述的是一套不存在的 Next.js + Postgres + one-api 栈（本仓库无 `app/`、无 `drizzle/`），已重写为当前栈；`docs/production-deployment.md` 标记作废。
-  > 追记（2026-10-10）：该作废文档已随历史报告归档至 [`docs/archive/2026-08/`](docs/archive/2026-08/)，本条为历史陈述故不改写；现行部署栈见 [`docs/deployment.md`](docs/deployment.md)。
+- **文档校正**：`docs/deployment.md` 此前描述的是一套不存在的 Next.js + Postgres + one-api 栈（本仓库无 `app/`、无 `drizzle/`），已重写为当前栈；`docs/archive/2026-08/production-deployment.md` 标记作废。
+  > 追记（2026-10-10）：该作废文档已随历史报告归档至 [`docs/archive/2026-08/`](docs/archive/2026-08/)，本条为历史陈述，路径按归档位置标注；现行部署栈见 [`docs/deployment.md`](docs/deployment.md)。
 
 ### v0.2.1 修复摘要（历史）
 
@@ -43,7 +43,7 @@
 - **`mozhou-v<版本>-docker.tar.gz`**：本地 Docker 发行包（解压后先设 `MOZHOU_SECRET_KEY` 再 `docker compose up`）；
 - Release 同时提供 **SPDX SBOM** 与 **SHA256SUMS.txt** 用于供应链校验。
 
-源码运行时服务默认地址为 **`http://127.0.0.1:5173`**。Tauri 原生安装与代码签名仍是独立发布面；普通 Windows 用户请使用下方的本地安装器。
+源码运行时服务默认地址为 **`http://127.0.0.1:5173`**。桌面壳正在按 ADR-0037 迁往 Electron（`desktop/`）；Tauri 为 legacy 死路径。普通 Windows 用户请使用下方的本地安装器。
 
 ### 方式二：Windows 本地安装器（普通用户）
 
@@ -138,7 +138,8 @@ mozhou/
 │   └── benchmark/         # L1 确定性连续性断言、Promptfoo 测试编译器
 ├── apps/
 │   └── web/               # 现代化 Web/桌面 UI (Vite + React + TipTap AST + Tailwind)
-├── src-tauri/             # Tauri 2.0 原生跨平台桌面外壳（exe 实测 8.4MB；空闲内存 65~85MB —— 原始「<15MB / <40MB」指标经分析互斥且不可达，见 CHG-20261006-14）
+├── desktop/               # Electron 桌面壳（ADR-0037，Windows 先行；迁移中）
+├── src-tauri/             # Tauri 旧壳（legacy 死路径，不在发行产物内）
 ├── scripts/               # 启动自检、多平台发布打包与工程脚本
 └── release-artifacts/     # 全平台发布构建产物
 ```

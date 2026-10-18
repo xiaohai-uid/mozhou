@@ -74,9 +74,10 @@ export type DraftMode = 'generate' | 'continue';
 
 /**
  * 正文流缝：工厂语义——每次 attempt 取一个全新流实例（fallback 重试无法复活
- * 已消费的生成器）；delta 为增量文本片段。测试注入假流夹具，禁真网。
+ * 已消费的生成器）；delta 为增量文本片段。signal 由引擎超时与外部取消合并后传入，
+ * 传输层应据此中止在途请求。测试注入假流夹具，禁真网。
  */
-export type DraftStreamSource = () => AsyncIterable<string>;
+export type DraftStreamSource = (signal?: AbortSignal) => AsyncIterable<string>;
 
 /** 流缝传输层错误载体：raw 三家错误样本喂 normalizeProviderError 归一化表。 */
 export class ProviderTransportError extends Error {
@@ -259,8 +260,29 @@ async function inCandidateSection<T>(
  * - 完整收尾：候选 finish ready，状态文件标 complete。
  * 组合根把它注册到 engine.registerProviderBinding(解析到的 providerId, …)。
  */
+/** 合并外部取消信号与引擎超时信号；任一中止即视为中止。 */
+function combineAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
+  if (a === undefined) return b
+  if (b === undefined) return a
+  if (a.aborted) return a
+  if (b.aborted) return b
+  const controller = new AbortController()
+  const abort = (): void => controller.abort()
+  a.addEventListener('abort', abort, { once: true })
+  b.addEventListener('abort', abort, { once: true })
+  controller.signal.addEventListener(
+    'abort',
+    () => {
+      a.removeEventListener('abort', abort)
+      b.removeEventListener('abort', abort)
+    },
+    { once: true },
+  )
+  return controller.signal
+}
+
 export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBinding {
-  // 绑定只消费盘面真源与流缝，不读 payload/snapshot——零参闭包即满足 ProviderBinding 形状
+  // 绑定只消费盘面真源与流缝，不读 payload/snapshot；第三参 signal 是引擎超时中止通道。
   //
   // 跨 attempt 累加器：引擎会定向重生，首选 attempt 已落盘的半稿是真内容、可采纳，
   // 不能被随后备用 attempt 的空输出抹掉。若按 attempt 各自计数，后写者胜会产出
@@ -268,10 +290,11 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
   let producedChars = 0
   // 同一绑定的 fallback attempt 只能更新已认领的状态，不能重新抢占新任务的章指针。
   let mayClaimChapter = true;
-  return async () => {
+  return async (_payload, _snapshot, bindingOptions) => {
+    const signal = combineAbortSignals(opts.signal, bindingOptions?.signal);
     assertDraftPhase(opts.bookRoot, opts.chapterIndex);
     const producedAtStart = producedChars;
-    const aborted = (): boolean => opts.signal !== undefined && opts.signal.aborted;
+    const aborted = (): boolean => signal !== undefined && signal.aborted;
     const relPath = proseChapterPath(opts.chapterIndex);
     // 候选由调用方先建（HTTP/管线）；恢复场景（streaming/partial 跨进程）直接续用。
     // 读-建是读改写，放进书稿锁短临界区（见 withWriteLock 注释）。
@@ -345,7 +368,7 @@ export function makeDraftProviderBinding(opts: DraftBindingOptions): ProviderBin
         });
         return settled.text;
       }
-      for await (const delta of opts.stream()) {
+      for await (const delta of opts.stream(signal)) {
         if (aborted()) {
           // 取消后的延迟 chunk 不写盘、不继续付费重试；上游被我们中止 ⇒ 未完成 ⇒ cancelled。
           // F-09：此处直接结算并返回——旧实现 break 后会再撞下方「上游已结束」判定点，

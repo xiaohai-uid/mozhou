@@ -9,11 +9,26 @@ export default defineConfig({
     // vitest.bench.config.ts 独占运行，入口是 package.json 的 test:packages。
     exclude: [...configDefaults.exclude, 'packages/context-compiler/src/l1-lifecycle-bench.test.ts'],
     coverage: {
-      // 只输出实测数字，不设阻断阈值。
-      // DSH 的「逐文件 100%」不适用于本仓；阈值须由人看过真实数字后再定。
+      // 先冻结分母再采基线：include 只取生产源码，未触达文件按 0% 计入。
+      // 排除测试、类型声明与测试夹具；不按“数字难看”追加排除。
       provider: 'v8',
       reporter: ['text-summary', 'json-summary'],
-      reportsDirectory: 'coverage',
+      reportsDirectory: 'coverage/packages',
+      include: ['packages/*/src/**/*.ts'],
+      exclude: [
+        'packages/*/src/**/*.test.ts',
+        'packages/*/src/**/*.d.ts',
+        'packages/*/src/**/fixtures/**',
+      ],
+      // 阈值取 2026-10-17 实测值下方 1.4~2.0 个点；只做防退化，不做逐文件要求。
+      thresholds: {
+        lines: 81,
+        statements: 79,
+        functions: 85,
+        branches: 68,
+        perFile: false,
+        autoUpdate: false,
+      },
     },
   },
 })

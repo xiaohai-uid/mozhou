@@ -14,6 +14,7 @@ import { extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createMoZhouApiRouter } from './api.js'
 import { defaultBookAccessManager } from './bookAccess.js'
+import { defaultSessionManager } from './auth/session.js'
 import { assertMasterKeyConfigured } from './llm/providerSettings.js'
 import { log, nextRequestId } from './observability.js'
 import {
@@ -54,6 +55,8 @@ defaultBookAccessManager.lock.acquire(defaultBookAccessManager.getDataRoot())
 installReconciliationAutoAttach(apiRouter)
 
 const dataRoot = defaultBookAccessManager.getDataRoot()
+// D4：会话与重置码落到数据根；必须在开始监听前回读。损坏的状态文件显式失败。
+defaultSessionManager.configurePersistence(dataRoot)
 const bootAttach = attachReconciliationForDataRoot(dataRoot)
 if (bootAttach.attached.length > 0) {
   log('info', 'reconciliation.boot_attached', { books: bootAttach.attached.length })

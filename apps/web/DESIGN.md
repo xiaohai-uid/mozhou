@@ -1,6 +1,6 @@
 # Novel OS Design System
 
-> Project scope: `/mnt/c/zcode/novel-ai/apps/web`
+> Project scope: `apps/web`
 >
 > Design language: Night Manuscript Studio / 夜墨创作台
 >
@@ -24,9 +24,9 @@ This section is the current visual baseline approved for the desktop product. It
 
 When a design decision is made, use this order of authority:
 
-1. Product vocabulary and domain rules in `/mnt/c/zcode/novel-ai/GLOSSARY.md` and `/mnt/c/zcode/novel-ai/AGENTS.md`.
-2. Accepted product baseline in `/mnt/c/zcode/novel-ai/docs/adr/0027-ui-baseline-ink-orbit.md`.
-3. Live Ink Orbit tokens and component rules in `/mnt/c/zcode/novel-ai/apps/web/src/styles/globals.css` and `/mnt/c/zcode/novel-ai/apps/web/src/styles/ink-orbit.css`.
+1. Product vocabulary and domain rules in `GLOSSARY.md` and `AGENTS.md`.
+2. Accepted product baseline in `docs/adr/0027-ui-baseline-ink-orbit.md`.
+3. Live Ink Orbit tokens and component rules in `apps/web/src/styles/globals.css` and `apps/web/src/styles/ink-orbit.css`.
 4. Real interaction and data semantics in the current React components.
 5. The reference roles described in this document.
 
@@ -61,7 +61,7 @@ The emotional balance is:
 
 ### 3.1 Color and surfaces
 
-The following values are the existing Ink Orbit tokens from `/mnt/c/zcode/novel-ai/apps/web/src/styles/globals.css`. They are the current source of truth.
+The following values are the existing Ink Orbit tokens from `apps/web/src/styles/globals.css`. They are the current source of truth.
 
 | Role | Existing token | Current value | Use |
 | --- | --- | --- | --- |
@@ -303,7 +303,7 @@ The current motion foundation is `--ease: cubic-bezier(0.16, 1, 0.3, 1)`, with e
 
 ## 10. Icons
 
-There is no icon-library dependency in `/mnt/c/zcode/novel-ai/apps/web/package.json`. Do not install one during design-system work.
+There is no icon-library dependency in `apps/web/package.json`. Do not install one during design-system work.
 
 The current shell uses compact mono codes for navigation and existing semantic symbols/labels. Preserve that honest baseline. A future icon strategy may select one maintained library only after a separate dependency and accessibility decision. Do not mix multiple icon families, use emoji as product UI, or imitate a reference brand's glyphs.
 
@@ -333,7 +333,7 @@ There is no current mobile media query and mobile is outside the ADR-0027 accept
 
 ### Do
 
-- Read this file, `/mnt/c/zcode/novel-ai/AGENTS.md`, `/mnt/c/zcode/novel-ai/GLOSSARY.md`, ADR-0027, and the relevant live component/style files before changing UI.
+- Read this file, `AGENTS.md`, `GLOSSARY.md`, ADR-0027, and the relevant live component/style files before changing UI.
 - Reuse the existing `globals.css` and `ink-orbit.css` tokens, class language, layout regions, and state semantics.
 - Preserve the domain terms Author Intent, Active Draft, Candidate, Approval, Chapter Commit, Context Receipt / 装配看板, Quality Gate, Story Brain, Change Impact, Stale Marker, Protected Author Content, and Write Verification.
 - Make unavailable, placeholder, stale, failed, refused, and blocked states explicit and honest.
@@ -354,7 +354,7 @@ There is no current mobile media query and mobile is outside the ADR-0027 accept
 - Do not call the Context Receipt / 装配看板 “Context Viewer”.
 - Do not auto-apply rework, auto-commit a candidate, or silently overwrite Protected Author Content.
 - Do not use `any` to make UI state fit an unclear contract.
-- Do not install dependencies, edit package manifests, modify the legacy `/mnt/c/zcode/novel-ai/app`, or expand scope without a separate authorization.
+- Do not install dependencies, edit package manifests, modify the legacy `app` directory (absent from this repository), or expand scope without a separate authorization.
 
 ## 14. Brand Reference Boundary
 
@@ -375,7 +375,7 @@ Any future agent implementing UI in this project must:
 
 1. Read this `DESIGN.md` completely before proposing or writing UI changes.
 2. Read the relevant source components and styles, not just this document, and treat live source plus typed contracts as the implementation truth.
-3. Work only within `/mnt/c/zcode/novel-ai/apps/web` unless a separate request explicitly expands the scope. The legacy `/mnt/c/zcode/novel-ai/app` is out of scope.
+3. Work only within `apps/web` unless a separate request explicitly expands the scope. The legacy `app` directory does not exist in this repository.
 4. Reuse existing Ink Orbit tokens, classes, layout regions, and component semantics. Do not introduce parallel tokens or a new UI library as a shortcut.
 5. Preserve the current domain vocabulary, author-sovereignty rules, explicit placeholders, and Candidate → Approval → Commit semantics.
 6. Build one vertical slice with one observable behavior and its default, hover/active, selected, focus, disabled, loading, error, and relevant AI/pipeline states. Do not create speculative screens.

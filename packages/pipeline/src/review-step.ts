@@ -368,9 +368,24 @@ export interface ExecuteChapterReviewRequest {
 /** 深度章节审查统一执行产物（集结语义审查、5项机械门、金句收割与反例库沉淀） */
 export interface ExecuteChapterReviewOutcome extends ReviewStepOutcome {
   readonly mechanicalGate: MechanicalGateReport;
+  /** 文学 verdict 与机械门的合并判据（D1）；会话前进与 API 顶层 verdict 都用它。 */
+  readonly effectiveVerdict: 'pass' | 'blocking_fail' | 'refused';
   readonly harvestedQuotesCount: number;
   readonly absorbedCounterexamplesCount: number;
   readonly secondaryLifecycleWarnings?: readonly string[] | undefined;
+}
+
+/**
+ * 文学 verdict 与机械门的合并判据（D1）：refused 保持最高优先级；
+ * 任一 blocking_fail 或机械门失败均为 blocking_fail；两者都通过才 pass。
+ */
+export function deriveEffectiveQualityVerdict(
+  verdict: QualityReviewReport['verdict'],
+  mechanicalGate: MechanicalGateReport,
+): 'pass' | 'blocking_fail' | 'refused' {
+  if (verdict === 'refused') return 'refused';
+  if (verdict === 'blocking_fail' || !mechanicalGate.passed) return 'blocking_fail';
+  return 'pass';
 }
 
 /**
@@ -521,6 +536,7 @@ export async function executeChapterReview(
   const completedResponse = responseValidation.value as ReviewCapabilityCompletedResponse;
   const report = completedResponse.report;
   const mechanicalGate = completedResponse.mechanicalGate;
+  const effectiveVerdict = deriveEffectiveQualityVerdict(report.verdict, mechanicalGate);
 
   // 6. 迟到拦截校验：确保在落盘前未触发取消
   checkAborted();
@@ -601,6 +617,8 @@ export async function executeChapterReview(
       request.session.recordQualityReview({
         reportId: report.reportId,
         verdict: report.verdict,
+        mechanicalPassed: mechanicalGate.passed,
+        ...(mechanicalGate.fails.length > 0 ? { mechanicalFails: mechanicalGate.fails } : {}),
         reportPath: reportRelPath,
         draftRevision: input.revision,
         draftContentHash: report.anchor.draftContentHash,
@@ -614,6 +632,7 @@ export async function executeChapterReview(
     report,
     reportRelPath,
     mechanicalGate,
+    effectiveVerdict,
     harvestedQuotesCount,
     absorbedCounterexamplesCount,
     ...(secondaryWarnings.length > 0 ? { secondaryLifecycleWarnings: secondaryWarnings } : {}),

@@ -23,6 +23,20 @@
 
 > 每次授权的持久编辑登记一条；ID 格式 `CHG-YYYYMMDD-NN`。并发写入用不同 ID，合并前重读本索引。条目只链接证据（diff、测试输出、ADR），不复制内容；不含凭据与无关个人信息。已完成记录保留，更正用追加与 `supersedes` 链接。
 
+### CHG-20261018-01 — 2026-10-18 — 用户批准，ZCode 执行
+
+- **需求来源**：用户要求按大厂标准（OpenAI/腾讯）对照十层职责评审结论收敛阻断级工程缺陷（D1~D5）。
+- **实际变更**：机械门结果写入账本并阻断 `review→user_edit`；引擎超时经 AbortSignal 中止在途 Provider 并丢弃迟到 chunk；新建 31 章长程夜跑工作流并作废两份假 PASS 证据；服务端会话与重置码落盘数据根实现跨重启存活；任务中心接通真实任务记录与活跃徽标。附带治理活文档路径、桌面栈口径、jscpd 与 Vitest 环境陷阱。
+- **验收**：`pnpm build` / Web 构建与类型检查 / `graph-check` / 导入环 / 证据卫生 / 构建新鲜度 / 文档门 / 克隆检测全绿；Mock 主链 `VERIFIED`；包层 1095 与 Web 层 1448 用例通过（0 失败）。
+- **详细记录**：`docs/changes/CHG-20261018-01-core-defects-d1-d5.md`
+
+### CHG-20261017-01 — 2026-10-17 — 用户批准，ZCode 执行
+
+- **需求来源**：工具链补齐计划；覆盖率门禁此前标注未启用。
+- **实际变更**：根与 Web 安装 `@vitest/coverage-v8@4.1.11`；两套 coverage include/阈值；`test:coverage:packages` / `test:coverage:web`；CI 与 release 用覆盖率命令替换测试步骤；本地 `ci-gate test` 同步；`report-coverage-status` 改为配置完整性检查；`gates.md` 回填实测与阈值。
+- **验收**：两层正常通过；负例 exit 1；frozen-lockfile 通过；文档门全过；Windows 本机结果，未推送。
+- **详细记录**：`docs/changes/CHG-20261017-01-coverage-gate.md`
+
 ### CHG-20261005-01 — 2026-10-05 — 用户授权，ZCode 执行
 
 - **需求来源**：用户要求审查项目 `AGENTS.md` 与全局共享规则的差异（2026-10-05 会话）；审查结论为 1 处硬缺口 + 1 处可选精简，用户随后授权只变更项目侧。
@@ -83,7 +97,7 @@
 - **实际变更**（按子项分列；材料为各执行子任务返回记录，落盘产物已在盘核实：spec.md、W3 报告、ADR-0035、verify 脚本、evidence/w2-writer-lock/ 三份报告）：
 
   - **① 规格补全与 W3 报告**
-    - 位置：新增 `.scratch/openwrite-parity-memo-naming/spec.md`（memo/naming 追认规格：授权链 OpenWrite 调研 §3.1 #11/#13 → 本地议题文件 `.scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md` → api-contract §27 DELTA-006；用户旅程与范围边界明确排除云功能/支付/托管；`/api/memo`、`/api/naming` 契约带 file:line；12 条可测验收；已实现/已验证/未验证三分清单；mock 接缝仅非生产生效 `namingRoutes.ts:122-127` 对齐 `pipelineRoutes.ts:97-99` 同族）；新增 `docs/w3-operations-implementation-report-2026-10-05.md`（saveProseDraft 轻量 v2 journal 当时决策 D-1~D-5、写正文→写结果记录→删 journal 线性化顺序 `chapter.ts:1214-1326` 前滚/回滚两向恢复语义与 buildOperationRecord 同源读取、operation-idempotency + recovery-reentry 共 52 用例实跑证据）；`docs/adr/0035-operation-idempotency-and-reconcilable-write-results.md` 仅在挂账段末尾追加关闭注记指向 W3 报告（原决策文字未动，追加式更正，符合 ADR 纪律）。
+    - 位置：新增 `.scratch/openwrite-parity-memo-naming/spec.md`（memo/naming 追认规格：授权链 OpenWrite 调研 §3.1 #11/#13 → 本地议题文件 `.scratch/mozhou-mvp/issues/22-openwrite-parity-memo-naming.md` → api-contract §27 DELTA-006；用户旅程与范围边界明确排除云功能/支付/托管；`/api/memo`、`/api/naming` 契约带 file:line；12 条可测验收；已实现/已验证/未验证三分清单；mock 接缝仅非生产生效 `namingRoutes.ts:122-127` 对齐 `pipelineRoutes.ts:97-99` 同族）；新增 `docs/w3-operations-implementation-report-2026-10-05.md`（saveProseDraft 轻量 v2 journal 当时决策 D-1~D-5、写正文→写结果记录→删 journal 线性化顺序 `chapter.ts:1214-1326` 前滚/回滚两向恢复语义与 buildOperationRecord 同源读取、operation-idempotency + recovery-reentry 共 52 用例实跑证据）；`docs/adr/0035-operation-idempotency-and-reconcilable-write-results.md` 仅在挂账段末尾追加关闭注记指向 W3 报告（原决策文字未动，追加式更正，符合 ADR 纪律）。该报告现位于 `docs/archive/2026-10/w3-operations-implementation-report-2026-10-05.md`。
     - 为什么：/code-review 指出 memo/naming 属规格外能力、W3 决策散在代码未记录；权威=用户「文档大于代码」指令 + `.scratch/mozhou-mvp/contracts/api-contract.md` §27 DELTA-006 + 规划 §6.5。
     - 验证：memo/naming 相关 5 个测试文件实跑通过（memoRoutes 6 + namingRoutes 5 + mockProviderGate 3 + MemoView 4 + DesktopToolModals.naming 2）。
     - 遗留：保存路径 journal 崩溃注入恢复无专门用例（saveProseDraft 无 onStage 故障注入钩子，recovery-reentry REC-01~04 均构造自提交路径，「保存形状 journal 触发 recoverPendingCommit」未被任何测试直接执行）——W3 报告 §4.3 已挂出补测建议，本轮为文档任务未动代码；naming 502 路径（NAMING_UPSTREAM_FAILED/NAMING_PARSE_FAILED）真实模型行为未实测（费用/环境未授权）；memo/naming hosted 多用户端到端与 UI 人工走查未做；`views.test.ts`（视图注册表 23 项契约测试）未重跑——均已在规格 §4.3 如实标注；本轮新增文档的地图登记由本条补齐。
@@ -120,7 +134,7 @@
   - 子项②「test:web 未跑」与终局门禁的口径差：`pnpm test` = test:packages && test:web，终局门禁已覆盖，读时以本注为准。
   - 子项③验证段「TS2352 未修」已被主会话修正：`taskStream.routes.test.ts:170` 补 `as unknown as` 中转，`tsconfig.server.json` 全仓类型错误 1→0（c2f7373 引入的基线错误就此清零）。
   - 主会话终局门禁重跑（全部实跑）：`ci-gate build` exit=0；`ci-gate test` exit=0（135 文件/962 用例/0 失败）；`gitnexus analyze` 刷新至 11413 节点/30494 边；`check` **clean/0 环**；`detect_changes` 48 符号/155 文件，符号清单逐一对得上本轮工作、无越界符号（云功能/禁改文件零出现）。
-  - 新增文档登记：`.scratch/openwrite-parity-memo-naming/spec.md`（按 `.scratch` 忽略政策留在本地，不入库）；`docs/w3-operations-implementation-report-2026-10-05.md`（随 docs 提交入库）。
+  - 新增文档登记：`.scratch/openwrite-parity-memo-naming/spec.md`（按 `.scratch` 忽略政策留在本地，不入库）；`docs/w3-operations-implementation-report-2026-10-05.md`（随 docs 提交入库；现位于 `docs/archive/2026-10/`）。
 
 ### CHG-20261005-06 — 2026-10-05 — 用户授权（「可以」批准先跑完整安全审计），ZCode 执行
 
@@ -399,7 +413,7 @@
 ### CHG-20261008-21 — 2026-10-08 — 用户授权（「按你推荐的来吧」，retro 候选 3→1→4→2），ZCode 执行
 
 - **需求来源**：/retro 会话产出的候选清单，用户授权按推荐顺序执行。证据见 [docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md](docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md)。
-- **观察基线**：HEAD e321323；windows/build.mjs:94 无条件取 HEAD 作戳；CI 无图谱步骤、.gitnexus 不入库；追踪器开放议题 0 条（仓库 PUBLIC）；提交钩子扫描恒 scanner_enobufs。同类缺陷早在 audit-2026-10-03/01-baseline-and-graph-gate.md:350 已登记为散文，未机械化。
+- **观察基线**：HEAD e321323；windows/build.mjs:94 无条件取 HEAD 作戳；CI 无图谱步骤、.gitnexus 不入库；追踪器开放议题 0 条（仓库 PUBLIC）；提交钩子扫描恒 scanner_enobufs。同类缺陷早在 docs/archive/2026-10/audit-2026-10-03/01-baseline-and-graph-gate.md:350 已登记为散文，未机械化。
 - **实际变更**：①产物戳诚实化——新增 scripts/release/lib/source-stamp.mjs（脏工作区戳 <sha>-dirty + sourceCommitSha/dirty/dirtyFiles），windows/build.mjs 改用并加 --print-stamp；②AGENTS.md §8 增项目级推送前门禁：必须跑 node scripts/ci-gate.mjs graph-check（任务已存在，未改该文件）；③Mimosa 决策：保持 open（advisory），后果是不得宣称项目安全；④挂账项待提 issue 清单（仓库 PUBLIC，未提交）。
 - **验收**：戳函数两分支实跑（clean→abc1234；dirty→abc1234-dirty）；真实仓库 --print-stamp → e3213238…-dirty / 125 项；node scripts/ci-gate.mjs graph-check → clean/cycleCount=0（exit 0）；MCP check clean/0。
 - **验证状态**：已执行（实跑见上）。未做：完整安装器重跑（会覆盖已登记的干净产物 9aa2c286…，故不跑）；scripts/ 不在图谱索引内（impact 报 Target not found），改用消费方 grep 替代并如实披露。
@@ -408,7 +422,7 @@
 ### CHG-20261008-22 — 2026-10-08 — 用户授权（「按你推荐的来」，议题 #96），ZCode 执行
 
 - **需求来源**：GitHub 议题 #96（用户授权实施）。证据见 [docs/changes/CHG-20261008-22-coding-standards-extraction.md](docs/changes/CHG-20261008-22-coding-standards-extraction.md)。
-- **观察基线**：HEAD 0b71ee6；仓库根无 CODING_STANDARDS.md；三条作者数据约束住在 AGENTS.md §7 表格、被每个实现代理每轮加载；.agents/skills/code-review/SKILL.md:36 规定该文件存在时必须纳入扫描清单。
+- **观察基线**：HEAD 0b71ee6；仓库根无 CODING_STANDARDS.md；三条作者数据约束住在 AGENTS.md §7 表格、被每个实现代理每轮加载；全局 code-review 技能（SKILL.md:36）规定该文件存在时必须纳入扫描清单。
 - **实际变更**：①新建 CODING_STANDARDS.md（只收判断类；机械类以 docs/gates.md 为唯一清单、不复制）；②AGENTS.md §7 原表格改为指针（保留触发条件与范围边界，净减 5 行）；③附带修正 AGENTS.md §8 上一轮那行的禁用词「门禁」→「推送前的自动化门」。
 - **验收**：check:glossary exit 0（改前 exit 1 报 AGENTS.md:97 禁用词）；check:gates/term-map/readmes 均 exit 0；check:architecture exit 1 归因并行会话（生成器 countLOC 统计包内源码行数，其约 60 个源码文件未提交；本变更未触碰任何 .ts/.js）。
 - **验证状态**：已执行（上述命令实跑）；docs-only 按规程未跑测试套件。双轴评审（Standards 4 项判断类 + Spec 无实质缺失）已按发现修正三处、记缺口一处。
@@ -671,32 +685,3 @@
 
 
 
-
-### CHG-20261012-01 — 2026-10-12 — 用户条件授权，Codex执行
-
-- 独立复核、作者运行态所有权与出站生命周期定点修复、真实包入口验收；条件满足前不提交/合并/上传。
-- 记录：[发行验收收口](docs/changes/CHG-20261012-01-release-acceptance-closure.md)。
-
-
-### CHG-20261012-02 — 2026-10-12 — 验收判定诚实性与发布 CI 顺序，ZCode 执行
-
-- 长篇验收脚本的假 PASS（全量章节摘要 + 派生判定 + 诚实台账）、发布 workflow 的构建/测试顺序与重复执行、六处验收脚本改用 dirty-aware 来源戳；未改应用代码、未新增依赖、未放宽任何门。
-- 记录：[验收判定与 CI 顺序](docs/changes/CHG-20261012-02-verification-honesty-and-ci-order.md)。
-
-
-### CHG-20261012-03 — 2026-10-12 — 正史派生断言的显示名解析，ZCode 执行
-
-- 修复空转守卫：`exportPromptfooTestCaseFromCanon` 原先用 slug 拼正则，匹配不到中文正文；改为要求显示名，缺名则记入 `unresolvedDeadCharacters` 而不产出空转规则；测试按 §20(c) 更新。
-- 记录：[正史派生断言的显示名解析](docs/changes/CHG-20261012-03-canon-derived-assertion-name-resolution.md)。
-
-
-### CHG-20261012-04 — 2026-10-12 — 工作台矮视口下 AI 控制台覆盖编辑器，ZCode 执行
-
-- 真实浏览器实测发现：1280×720 / 1366×768 下控制台行吃掉整列、编辑器被压到 0 且被覆盖；改 `ink-realm.css` 两条高度规则（控制台 `clamp(180px, calc(100vh - 620px), 480px)`、写入面 `min(470px, 42vh)`），大视口无回归。
-- 记录：[控制台覆盖编辑器](docs/changes/CHG-20261012-04-workbench-editor-console-overlap.md)。
-
-
-### CHG-20261012-06 — 2026-10-12 — 门禁加固：证据脚本卫生与构建产物新鲜度，ZCode 执行
-
-- `/retro` 复盘前四条落地：新增 `check-evidence-hygiene.mjs`（禁短 HEAD 与写死 PASS）与 `check-build-freshness.mjs`（产物落后于源码），接入 `ci-gate` 与 pre-commit 钩子，launcher 加陈旧告警，eslint 补新目录归属判定说明。
-- 记录：[门禁加固](docs/changes/CHG-20261012-06-gate-hardening-evidence-and-build-freshness.md)。

@@ -21,7 +21,7 @@ import {
   QUALITY_REWORK_LIMIT_EXCEEDED,
 } from '../routeCodes.js'
 import { decodeBookRequest, noOpenProductionSessionError } from '../bookRequest.js'
-import { BOOK_WRITE_BUSY, isBookWriteBusyError, withBookWriteLock } from '../bookAccess.js'
+import { withBookWriteLock } from '../bookAccess.js'
 import { emptyDraftStream, mockDraftStream } from './draftStreamEmulation.js'
 import {
   AcceptConflictError,
@@ -79,12 +79,6 @@ import type { GenerationUnavailableReason } from '../llm/generationTarget.js'
 import { buildDraftContext } from '../draftContext.js'
 import { assertSafeBookRoot } from '../security.js'
 import { canonProposalView } from '../proposals.js'
-
-/**
- * 书稿写锁排队上限（与 proseRoutes.ts 同值）：采纳/取消是**本地短临界区**，
- * 正常只等另一个写者收尾；超过该时限仍被占 ⇒ 409 BOOK_WRITE_BUSY，不无限挂请求。
- */
-const BOOK_WRITE_QUEUE_TIMEOUT_MS = 30_000
 
 const DIALOGUE_CAPABILITIES = [
   { id: 'continuation', label: '续写' },
@@ -345,8 +339,6 @@ async function makeStreamEngine(
         mode: 'generate',
         stream: () => (emptyMock ? emptyDraftStream() : mockDraftStream(mockOutputSeed, onDelta)),
         candidate,
-        // 候选读改写短临界区接同一书稿锁：模型等待在锁外，只有落候选的瞬间持锁。
-        withWriteLock: (fn) => withBookWriteLock(root, fn, { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS }),
         ...(signal === undefined ? {} : { signal }),
       }),
     )
@@ -401,13 +393,13 @@ async function makeStreamEngine(
         // 沿用既有 'deepseek' 直码档。
         provider: 'deepseek',
         mode: 'generate',
-        stream: () =>
+        stream: (streamSignal) =>
           (async function* () {
             const systemPrompt =
               '你是资深中文网文作者。输入已由墨舟 Context Compiler 按当前作品正典与章节状态装配。' +
               '严格遵守其中的事实、人物知识边界、承诺与作者指令；只输出本章正文，不复述上下文。' +
               '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用。'
-            for await (const chunk of streamOpenAiChat(effectiveEndpoint, modelPrompt, systemPrompt, signal)) {
+            for await (const chunk of streamOpenAiChat(effectiveEndpoint, modelPrompt, systemPrompt, streamSignal ?? signal)) {
               if (chunk.delta.length > 0) {
                 onDelta(chunk.delta)
                 yield chunk.delta
@@ -415,7 +407,6 @@ async function makeStreamEngine(
             }
           })(),
         candidate,
-        withWriteLock: (fn) => withBookWriteLock(root, fn, { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS }),
         ...(signal === undefined ? {} : { signal }),
       }),
     )
@@ -728,7 +719,6 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
         engine,
         bookRoot: safeRoot,
         chapterIndex,
-        candidateId,
         packet: context.packet,
         recipe,
       })
@@ -802,20 +792,9 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
       return true
     }
     try {
-      // W2-3：候选取消是书根内的读-改-写，与采纳/保存共用同一书稿锁。
-      // 否则「取消读到 streaming」与「采纳读到同一现场」的交叉写会互相覆盖。
-      const safeRoot = assertSafeBookRoot(root)
-      const candidate = await withBookWriteLock(
-        safeRoot,
-        () => cancelCandidate(safeRoot, candidateId),
-        { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS },
-      )
+      const candidate = cancelCandidate(assertSafeBookRoot(root), candidateId)
       json(200, { ok: true, candidateId, status: candidate.status })
     } catch (error) {
-      if (isBookWriteBusyError(error)) {
-        json(409, { ok: false, code: BOOK_WRITE_BUSY, error: (error as Error).message })
-        return true
-      }
       json(409, { ok: false, error: (error as Error).message })
     }
     return true
@@ -845,34 +824,22 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     const expectedRevision = typeof body['expectedRevision'] === 'number' ? body['expectedRevision'] : undefined
     const taskId = typeof body['taskId'] === 'string' ? body['taskId'] : undefined
     try {
-      // W2-3：采纳是书根内的读-改-写（候选读取 + 版本核对 + 正文更新 + 结果记录），
-      // 整段在统一书稿锁内执行——同书第二写入者排队（超时 409），不同书并发。
-      // 本段无模型等待，可整段持锁（模型等待在生成路由，锁外）。
-      const result = await withBookWriteLock(
-        root,
-        () =>
-          acceptDraft({
-            bookRoot: root,
-            candidateId,
-            base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
-            idempotencyKey,
-            bookId,
-            chapterIndex: requestedChapterIndex,
-            allowPartial,
-            confirmPartial,
-            expectedRevision,
-            operationId,
-            principalId: principal?.userId,
-            taskId,
-          }),
-        { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS },
-      )
+      const result = acceptDraft({
+        bookRoot: root,
+        candidateId,
+        base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
+        idempotencyKey,
+        bookId,
+        chapterIndex: requestedChapterIndex,
+        allowPartial,
+        confirmPartial,
+        expectedRevision,
+        operationId,
+        principalId: principal?.userId,
+        taskId,
+      })
       json(200, { ok: true, ...result })
     } catch (error) {
-      if (isBookWriteBusyError(error)) {
-        json(409, { ok: false, code: BOOK_WRITE_BUSY, error: (error as Error).message })
-        return true
-      }
       if (error instanceof AcceptConflictError) {
         json(409, { ok: false, code: error.code, error: error.message })
         return true
@@ -1117,7 +1084,7 @@ function createReviewSemanticEvaluator(
 
       json(200, {
         ok: true,
-        verdict: outcome.report.verdict,
+        verdict: outcome.effectiveVerdict,
         reportId: outcome.report.reportId,
         reportPath: outcome.reportRelPath,
         draftRevision: outcome.input.revision,
@@ -1128,6 +1095,7 @@ function createReviewSemanticEvaluator(
         advisories: failed.filter((e) => e.severity === 'advisory'),
         semanticReviewer: semanticReviewerStatus,
         mechanicalGate: outcome.mechanicalGate,
+        mechanicalFailures: outcome.mechanicalGate.fails,
       })
       return true
     } catch (error) {

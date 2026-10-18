@@ -46,6 +46,14 @@ export interface SessionProjection {
    * 显式回炉；refused 停给作者（无静默放行）。崩溃恢复沿账本折叠重建。
    */
   readonly lastQualityVerdict: 'pass' | 'blocking_fail' | 'refused' | null;
+  /**
+   * 本窗口内最近一次 QualityReviewCompleted 的机械门结果（D1）：
+   * true/false，或 null（旧账本/尚未审查）。review→user_edit 前进出口
+   * 同时要求文学 verdict='pass' 与本字段不为 false。
+   */
+  readonly lastMechanicalPassed: boolean | null;
+  /** 最近一次机械门的失败项（用于拒绝路径的可诊断信息；旧账本为空）。 */
+  readonly lastMechanicalFails: readonly string[];
   /** 本窗口内已发生的质量回炉次数（TaskStepTransitioned reason=quality_rework 计数）。 */
   readonly qualityReworkCount: number;
   /** 成对约束悬挂 head 键（head#taskRef；投影合并侧呈现，规格 §3）。 */
@@ -75,6 +83,8 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
   let lastReceiptId: ContextReceiptId | null = null;
   let lastGateVerdict: 'pass' | 'hard_conflict' | null = null;
   let lastQualityVerdict: 'pass' | 'blocking_fail' | 'refused' | null = null;
+  let lastMechanicalPassed: boolean | null = null;
+  let lastMechanicalFails: string[] = [];
   let qualityReworkCount = 0;
   const openHeads: string[] = [];
 
@@ -96,6 +106,8 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
           lastReceiptId = null;
           lastGateVerdict = null;
           lastQualityVerdict = null;
+          lastMechanicalPassed = null;
+          lastMechanicalFails = [];
           qualityReworkCount = 0;
           openHeads.length = 0;
           const step = event.payload?.['step'];
@@ -125,6 +137,12 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
               verdict === 'pass' || verdict === 'blocking_fail' || verdict === 'refused'
                 ? verdict
                 : lastQualityVerdict;
+            const mechanicalPassed = event.payload?.['mechanicalPassed'];
+            lastMechanicalPassed = typeof mechanicalPassed === 'boolean' ? mechanicalPassed : null;
+            const mechanicalFails = event.payload?.['mechanicalFails'];
+            lastMechanicalFails = Array.isArray(mechanicalFails)
+              ? mechanicalFails.filter((failure): failure is string => typeof failure === 'string')
+              : [];
           } else if (type === 'TaskFinished') {
             finished = true;
           } else if (type === 'CanonCommitted') {
@@ -188,6 +206,8 @@ export function projectSession(rows: readonly PipelineLedgerRow[], chapterIndex:
     lastReceiptId,
     lastGateVerdict,
     lastQualityVerdict,
+    lastMechanicalPassed,
+    lastMechanicalFails,
     qualityReworkCount,
     openHeads: [...openHeads],
   };

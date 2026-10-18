@@ -34,7 +34,8 @@ pnpm --filter @mozhou/web dev    # 仅前端 Vite dev server
 pnpm build            # tsc -b（工作区全量类型构建）
 pnpm lint             # eslint .
 pnpm test             # test:packages（vitest）+ test:web
-pnpm desktop:dev      # Tauri 桌面壳开发模式（需 Rust 工具链）
+pnpm desktop:dev      # legacy Tauri 旧壳（死路径；Electron 见 desktop/README.md）
+cd desktop && pnpm start  # Electron 桌面壳（先按 desktop/README.md 安装）
 ```
 
 ### 提交前的自动化门（本地必须跑）
@@ -43,16 +44,18 @@ pnpm desktop:dev      # Tauri 桌面壳开发模式（需 Rust 工具链）
 # 一次性：激活仓库内钩子
 node scripts/install-hooks.mjs
 
-# 每次提交前：AGENTS.md §8 要求本项目额外跑这四项（CI 里有、本地推送路径原本没有）
+# 每次提交前：AGENTS.md §8 要求本项目额外跑这些任务（完整清单见该节）
 node scripts/ci-gate.mjs graph-check     # 依赖环，期望 clean / cycleCount: 0
 node scripts/ci-gate.mjs doc-gates       # 术语 / 门清单 / README / 生成物新鲜度
 node scripts/ci-gate.mjs import-cycles   # 静态导入环
 node scripts/ci-gate.mjs duplication     # 克隆检测
+node scripts/ci-gate.mjs evidence-hygiene # 证据脚本卫生
+node scripts/ci-gate.mjs build-freshness  # 生产产物是否落后于源码
 ```
 
 > 钩子本体在 `.githooks/pre-commit`，**不是** `.git/hooks/`——本机全局 gitconfig 设了
 > `core.hooksPath`，`.git/hooks/` 会被 Git 完全忽略（2026-10-10 实测：装在那里根本不执行）。
-> 钩子跑 4 项秒级检查 + 生成物新鲜度（阻断）+ 文档裸数字（只告警）。
+> 钩子跑 6 项秒级检查 + 生成物新鲜度（阻断）+ 文档裸数字（只告警）。
 
 ### 文档与生成物
 
@@ -62,6 +65,7 @@ node scripts/verify-gates-contract.mjs # 门清单防腐化门
 node scripts/gen-architecture.mjs      # 重新生成 docs/architecture.md（勿手改）
 node scripts/gen-term-map.mjs          # 重新生成 docs/term-map.md
 node scripts/check-generated-freshness.mjs   # 生成物是否与索引一致
+node scripts/check-doc-paths.mjs       # 文档路径与命令是否存在
 ```
 
 > **Windows 注意**：`check-generated-freshness.mjs` 内部用 `sh` 执行命令。裸 PowerShell

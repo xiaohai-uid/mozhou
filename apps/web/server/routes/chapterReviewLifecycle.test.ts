@@ -305,6 +305,7 @@ describe('章节审查生产链路全生命周期与高可靠故障测试', () =
         root,
         chapterIndex: 1,
         policy: TEST_POLICY,
+        mechanicalOptions: { minWords: 0 },
       })
 
       // 1. 响应断言
@@ -836,6 +837,7 @@ describe('章节审查生产链路全生命周期与高可靠故障测试', () =
         root,
         chapterIndex: 1,
         policy: TEST_POLICY,
+        mechanicalOptions: { minWords: 0 },
       })
       expect(secondRes.status).toBe(200)
       expect(secondRes.data.ok).toBe(true)

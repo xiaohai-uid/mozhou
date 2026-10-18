@@ -382,6 +382,7 @@ export interface WorksOverviewResponse {
     readonly draftChapters: number
     readonly totalWords: number
     readonly entityCount: number
+    readonly taskCount?: number
   }
   readonly chapters: readonly WorksChapterSummary[]
   readonly outlineNodes: readonly {
@@ -404,8 +405,10 @@ export interface TasksResponse {
   readonly ok: true
   readonly totalEvents: number
   readonly totalTraversals: number
+  readonly taskCount?: number
   readonly events: readonly TaskEventSummary[]
   readonly traversals: readonly ImpactRecord[]
+  readonly taskRecords?: readonly unknown[]
 }
 
 export interface StyleDistillResponse {

@@ -7,8 +7,10 @@ import {
   withBook,
   withStrictBook,
   atomicWriteFileSync,
+  countTaskRecords,
   createBook,
   listImpactRecords,
+  listTaskRecords,
   proseChapterPath,
   readProseChapter,
   renderProseChapter,
@@ -165,6 +167,7 @@ export const worksRoutes: RouteHandler = async (req, res, { path, body, json, bo
         draftChapters: overview.draftCount,
         totalWords: overview.totalWordCount,
         entityCount: canon.entityCards.length,
+        taskCount: countTaskRecords(root),
       },
       chapters: overview.chapters,
       outlineNodes: canon.outlineNodes.map((n) => ({
@@ -227,8 +230,10 @@ export const worksRoutes: RouteHandler = async (req, res, { path, body, json, bo
       ok: true,
       totalEvents: ledger.length,
       totalTraversals: traversals.length,
+      taskCount: countTaskRecords(root),
       events,
       traversals: [...traversals].reverse(),
+      taskRecords: listTaskRecords(root),
     })
     return true
   }

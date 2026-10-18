@@ -231,7 +231,7 @@ async function makeBookWithWalkedWindow(title: string): Promise<{ base: string; 
       nowIso: '2026-09-28T00:00:00.000Z',
     },
   )
-  const review = await post(base, '/api/chapter.review', { root, chapterIndex: 1, policy: DETERMINISTIC_POLICY })
+  const review = await post(base, '/api/chapter.review', { root, chapterIndex: 1, policy: DETERMINISTIC_POLICY, mechanicalOptions: { minWords: 0 } })
   expect(review.status).toBe(200)
   expect(review.data.verdict).toBe('pass')
 

@@ -22,7 +22,7 @@
  *   （可选 MOZHOU_VERIFY_PORT，缺省 5198；MOZHOU_VERIFY_KEEP_BOOK=1 保留现场）
  */
 import { spawn } from 'node:child_process';
-import { readSourceStamp } from './release/lib/source-stamp.mjs'
+import { readSourceStamp } from './release/lib/source-stamp.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -270,10 +270,13 @@ try {
   log('prose on disk verified to contain streamed text');
 
   // 8. 文学审查（确定性策略，零模型调用；编译凭证由 draft.stream 的 draftContext 落下）
+  // 骨架旅程用 30 字 mock 草稿；显式关闭字数窗口，机械门的阻断行为由
+  // review-step / productionRoutes 的负例单独覆盖。默认窗口仍对真实草稿生效。
   const review = await postJson('/api/chapter.review', {
     root: bookRoot,
     chapterIndex: 1,
     policy: DETERMINISTIC_POLICY,
+    mechanicalOptions: { minWords: 0 },
   });
   if (review.status !== 200 || review.data.ok !== true) {
     throw new Error(`chapter.review failed: HTTP ${review.status} ${JSON.stringify(review.data)}`);
@@ -281,7 +284,7 @@ try {
   if (review.data.verdict !== 'pass') {
     throw new Error(`review verdict is "${review.data.verdict}", expected "pass": ${JSON.stringify(review.data.blockingFailures ?? review.data)}`);
   }
-  log(`review passed: reportId=${review.data.reportId} mechanical=${JSON.stringify(review.data.mechanicalGate?.verdict ?? review.data.mechanicalGate ?? 'n/a')}`);
+  log(`review passed: reportId=${review.data.reportId} mechanicalPassed=${review.data.mechanicalGate?.passed}`);
 
   // 9. 步进 review→user_edit（verdict 'pass' 已由审查落账，该门应放行）
   const toUserEdit = await postJson('/api/session.advance', { root: bookRoot, chapterIndex: 1 });

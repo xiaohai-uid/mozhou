@@ -17,11 +17,11 @@ const task = process.argv[2]
 const commands = {
   build: 'pnpm build',
   lint: 'pnpm lint',
-  test: 'pnpm test',
+  test: 'pnpm run test:coverage:packages && pnpm run test:coverage:web',
   'graph-check': 'pnpm graph:check',
   // 与 ci.yml 的「Doc gates」步骤同集；gen-* 两个 --check 判生成物是否与已提交状态一致
   'doc-gates':
-    'node scripts/verify-glossary.mjs && node scripts/verify-gates-contract.mjs && node scripts/verify-package-readmes.mjs && node scripts/gen-architecture.mjs --check && node scripts/gen-term-map.mjs --check && node scripts/check-gates-ci-column.mjs && node scripts/check-doc-numbers.mjs',
+    'node scripts/verify-glossary.mjs && node scripts/verify-gates-contract.mjs && node scripts/verify-package-readmes.mjs && node scripts/gen-architecture.mjs --check && node scripts/gen-term-map.mjs --check && node scripts/check-gates-ci-column.mjs && node scripts/check-doc-numbers.mjs && node scripts/check-doc-paths.mjs',
   // graph-gate.yml 的静态环 job（不依赖 GitNexus 索引，与 graph-check 是两回事）
   'import-cycles': 'node scripts/check-import-cycles.mjs',
   // graph-gate.yml 的重复度 job；经 npx 现场取 jscpd，需要网络

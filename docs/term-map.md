@@ -90,7 +90,7 @@
 | 会话重放 | Session Replay | - | - | 未验证 |
 | 任务投影 | Task Projection | `TaskProjection` | `packages/runtime/src/tasks.ts:23` | 声明 |
 | 档位路由 | Tier Routing | - | - | 未验证 |
-| 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:235` | 声明 |
+| 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:252` | 声明 |
 | 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:183` | 声明 |
 | 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
 | 技能 | Skill | `skill` | `apps/web/server/agent/skills.ts:179` | 局部同名 |

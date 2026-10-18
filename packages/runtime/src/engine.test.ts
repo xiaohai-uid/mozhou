@@ -157,6 +157,34 @@ describe('T12 timeout+fallback 降级链（F-05 语义修订）', () => {
     expect(fallbackStarted).toBe(0);
   });
 
+  it('超时会向 binding 传递中止信号；迟到完成不被采纳', async () => {
+    const { engine } = makeEngine();
+    engine.registerCapability(CAP_FB);
+    let observedSignal: AbortSignal | undefined;
+    let resolveLate: ((value: string) => void) | undefined;
+    let fallbackStarted = 0;
+    engine.registerProviderBinding('deepseek', (_payload, _snapshot, options) => {
+      observedSignal = options?.signal;
+      return new Promise<string>((resolve) => {
+        resolveLate = resolve;
+      });
+    });
+    engine.registerProviderBinding('glm', () => {
+      fallbackStarted += 1;
+      return Promise.resolve('fallback result');
+    });
+
+    const result = await engine.execute('CHAPTER_DRAFTING', {});
+    expect(result.outcome).toBe('failed_terminal');
+    expect(observedSignal?.aborted).toBe(true);
+    expect(fallbackStarted).toBe(0);
+
+    // 迟到完成不改变已结算结果（单次结算）。
+    resolveLate?.('late primary result');
+    await Promise.resolve();
+    expect(result.outcome).toBe('failed_terminal');
+  });
+
   it('可恢复失败仍烧 fallback：候选全灭 ⇒ failed_recoverable + triedProviders 列表', async () => {
     const { engine } = makeEngine();
     engine.registerCapability(CAP_FB);

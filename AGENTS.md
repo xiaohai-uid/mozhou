@@ -4,6 +4,70 @@
 >
 > Repo-level agent instructions; the global contract above always wins, and this file never replaces it.
 
+## 快速上手（Agent 实操层）
+
+> 本节只放「跑什么、改哪里会被拦、哪里会骗人」；流程与范围纪律以下文 §1–§9 为准。
+
+### 仓库结构
+
+- `apps/web` = 产品本体（应用，不是库）：UI `src/`、本地 BFF `server/`、前后端共享 DTO `shared/`。
+- `packages/*` = 8 个库包（7 个核心 + `benchmark`），依赖必须无环：`kernel`（叶子）→ `data-plane` → `context-compiler` → `runtime` → `pipeline` → `quality-engine` → `flywheel`；`benchmark` 是基准套件，当前零入向消费者。
+- `desktop/` = Electron 桌面壳（ADR-0037，Windows 先行，迁移中）；`src-tauri/` = 未接线的 Tauri 旧壳（死路径，不在任何发行产物）；`scripts/release/windows/` + Inno = 当前仍活的手工安装器路径。
+- `scripts/` = 门与发布脚本；`docs/` = 架构、门清单、ADR；`.scratch/` = 规格与决策（**不是**执行状态，执行状态在 GitHub Issues）。
+
+### 命令
+
+```bash
+corepack enable pnpm
+export ONNXRUNTIME_NODE_INSTALL_CUDA=skip   # preinstall 检查要求跳过 CUDA
+pnpm install
+
+pnpm build                                  # tsc -b 全工作区类型构建
+pnpm lint
+pnpm test                                   # 包层 vitest + apps/web vitest
+pnpm --filter @mozhou/web typecheck         # UI + server 两套 tsconfig
+pnpm start                                  # 本地启动（根目录没有 dev 脚本）
+pnpm --filter @mozhou/web dev               # 仅前端 Vite
+
+# 聚焦单测（不要为此跑全量）
+pnpm exec vitest run packages/kernel/src/<name>.test.ts
+pnpm --filter @mozhou/web exec vitest run src/<name>.test.tsx
+```
+
+提交前跑 `node scripts/ci-gate.mjs <task>`，任务全集见 §8。
+
+### 架构与机械约束（lint / 构建会直接拦）
+
+- `apps/web/src` **禁止** import `apps/web/server/**`；走 `shared/` DTO 或 HTTP。
+- `apps/web/server` **禁止静态 import** `apps/web/shared/**`：`tsconfig.server.json` 独立 `rootDir` 会报 TS6059。就地声明同口径 DTO，并注释「与 `shared/xxx` 同口径，改动必须同步」。
+- 新增 HTTP 路由必须在 `server/routePolicies.ts` 声明策略，否则默认拒绝。
+- 出网唯一路径：`server/llm/openaiStream.ts`（含 SSRF 与密钥范围校验）。
+- 禁止裸 `LocalDataPlane.open/openOrRebuild`；用 `withBook`/`withStrictBook`，长活句柄用 `retainBook`/`releaseBook` 成对转移。
+- 整份重写文件必须用 `atomicWriteFileSync`（`@mozhou/data-plane`）；追加用 `appendFileSync`；独占创建用 `writeFileSync(..., { flag: 'wx' })`。
+- `docs/architecture.md`、`docs/term-map.md` 是生成物，**禁止手改**，跑对应 `gen:*`。
+- 改门前先改 `docs/gates.md` 表格，再改脚本（`check:gates` 会对账）。
+- TS 全仓 `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` + `verbatimModuleSyntax`；ESM/NodeNext；包对外只走 `exports` 字段。
+
+### 常见坑
+
+- Windows 上 pnpm 是 `.cmd` shim，Node 无 shell 启动会 ENOENT/EINVAL；需要程序化跑 pnpm 时用 `node scripts/ci-gate.mjs` 这类包装器。
+- 钩子本体在 `.githooks/`，用 `node scripts/install-hooks.mjs` 激活；本机 `core.hooksPath` 会让 `.git/hooks/` 完全失效。
+- `check-generated-freshness.mjs` 依赖 `sh` 在 PATH（Git Bash 的 `C:\Program Files\Git\bin`）；裸 PowerShell 会 exit 2，不是脚本缺陷。
+- `dist/`、`dist-server/` 是忽略项；陈旧产物会制造假失败，先重建再判断。
+- 改源码后 GitNexus 索引会陈旧（`node .gitnexus/run.cjs analyze`）；索引不覆盖 `scripts/`。
+- `pnpm desktop:build` 构建的是 Tauri 旧壳，不是当前 Electron 壳；Electron 入口是 `desktop/`。
+- Node 版本：`.nvmrc` 钉 22.23.2，24.x 实测可用；换版本必须重验 `better-sqlite3` 原生绑定。
+
+### 敏感改动前先读
+
+| 改动面 | 先读 |
+|---|---|
+| 作者数据 / 正文写入 / 恢复 | `CODING_STANDARDS.md` + 本文件 §7 |
+| UI / 视觉 | `apps/web/DESIGN.md`；视觉 token 真值在 `apps/web/src/styles/globals.css` |
+| 桌面发行 / 安装器 | `docs/adr/0037-electron-desktop-shell-migration.md`、`desktop/README.md` |
+| 门清单语义 | `docs/gates.md`（**BLOCKED ≠ PASSED**） |
+| 架构 / 依赖 | `docs/architecture.md`、`docs/adr/INDEX.md` |
+
 ## 0. 流程权威与优先级
 
 本仓只有一套流程权威：**mattpocock/skills**。UVSD 并入 §1–§8（管"能不能做"），Wayfinder 并入 §9（管"记在哪"）；二者冲突时 **§1–§8 的范围纪律优先**，宁可停下报告依赖，不得自行扩大范围。spec-kit/speckit、superpowers、DSH `.dwf.ts` 分别降级为产物目录（`.specify/`、`specs/`）、历史层（`docs/superpowers/`）、任务级脚本（`.zcode/workflow-drafts/`），保留文件但不再产生新约束。六条线的完整裁决与理由见 [ADR-0031](docs/adr/0031-single-workflow-authority.md)；术语以 [`GLOSSARY.md`](./GLOSSARY.md) 为准，本文件只定义流程；决策入口 `docs/adr/INDEX.md`。
@@ -64,7 +128,7 @@
 - 契约全集：`.scratch/mozhou-mvp/contracts/api-contract.md`（已实现端点以后端发射端 + 契约测试为准，UI 消费是协议子集）
 - 执行跟踪：GitHub Issues（见 §9）；本地规格文档：`.scratch/<feature-slug>/`（**不是**执行状态的家）
 - spike 结论：`docs/spikes/`（见 0.5 探针）
-- 里程碑：`v1.0.0-release`（全站 12 接口真实化，90/90 测试）
+- 里程碑（历史）：`v1.0.0-release`（当时 12 接口真实化、90/90 测试；当前接口数以后端发射端与契约测试为准）
 - 挂账项（Deferred Item，用户已定排除）：书源 HTML 规则解析器、会员支付真实化、projects 审查记录+导出备份；风格库持久化已收官（2026-08-11，议题 #14/#15）
 
 > **已更正**：本节的执行跟踪家、挂账项命名与决策记录家已分别更正为 GitHub Issues、挂账项 Deferred Item、`docs/adr/`（原为本地 issues 目录、「遗留切片」、OB `10_Projects/墨舟.md`）；依据 `GLOSSARY.md` Part 2 与 ADR-0032/0034。
@@ -78,8 +142,8 @@
   - AI 代理工作分支可用 `feature/<agent>-<module>` 前缀，但合入语义必须遵守六分支模型（功能只进 `develop`，不直接进 `main`）。
 - 提交信息：按全局指令（文件头 `C:\zcode\AGENTS.md`）「Git 分支与提交 → 提交信息与历史保护」章执行（八类 Conventional Commits 前缀、单提交同一类别不超过 3 个问题）；破坏性 Git 操作的禁令以全局同章与本文件 §6 第 23 条为准。本节只保留项目级差异，不重复全局条文。
 - 存量历史分支删除前一律打 `archive/branch/<name>` tag 归档，可随时找回。
-- **推送前的自动化门（项目级额外项）**：除全局的 act 本地 CI 外，本项目推送前还必须跑 `node scripts/ci-gate.mjs` 的这几个任务——`graph-check`（依赖环，期望 `clean` / `cycleCount: 0`）、`doc-gates`（术语/架构地图/门清单/README 及门清单「在 CI」列一致性）、`import-cycles`、`duplication`。这些步骤 ci.yml / release.yml / graph-gate.yml 里有、本地推送路径原本没有：图谱步骤 ci.yml 与 release.yml 都没有且 `.gitnexus/` 索引不入库，所以只在本地把得住（2026-10-07 发布审计的 1 个循环就是这样活到 HEAD 的）；文档门与导入环 2026-10-10 补齐（此前只覆盖 build/lint/test/graph-check，于是「生成物陈旧到 HEAD 过不了自己的 CI」「重复度门假绿空转」能一路活到 HEAD）。记录见 `docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md` 与 `docs/changes/CHG-20261010-14-retro-guardrails.md`。
-- **提交时的快速门（钩子）**：跑一次 `node scripts/install-hooks.mjs` 激活仓库内的 `.githooks/pre-commit`（它先链式调用机器级钩子，再跑术语/门清单/README/导入环四项秒级检查，外加**生成物新鲜度按索引判定**这一项阻断检查；文档裸数字只告警）。**钩子本体在 `.githooks/` 而不是 `.git/hooks/`**——本机全局 gitconfig 设了 `core.hooksPath`，`.git/hooks/` 会被 Git 完全忽略（2026-10-10 实测：装在那里根本不执行）。
+- **推送前的自动化门（项目级额外项）**：除全局的 act 本地 CI 外，本项目推送前还必须跑 `node scripts/ci-gate.mjs` 的**全部任务**（不带参数运行会打印清单）：`build`、`lint`、`test`、`graph-check`（依赖环，期望 `clean` / `cycleCount: 0`）、`doc-gates`（术语/架构地图/门清单/README 及门清单「在 CI」列一致性）、`import-cycles`、`duplication`、`evidence-hygiene`（禁短 HEAD 与写死 PASS 结论）、`build-freshness`（陈旧产物）。这些步骤分散在 ci.yml / release.yml / graph-gate.yml 中；其中 `graph-check` 三条 workflow 都没有、`.gitnexus/` 索引也不入库，所以只在本地把得住（2026-10-07 发布审计的 1 个循环就是这样活到 HEAD 的）；文档门与导入环 2026-10-10 补齐（此前只覆盖 build/lint/test/graph-check，于是「生成物陈旧到 HEAD 过不了自己的 CI」「重复度门假绿空转」能一路活到 HEAD）。记录见 `docs/changes/CHG-20261008-21-release-stamp-and-local-graph-gate.md` 与 `docs/changes/CHG-20261010-14-retro-guardrails.md`。
+- **提交时的快速门（钩子）**：跑一次 `node scripts/install-hooks.mjs` 激活仓库内的 `.githooks/pre-commit`（它先链式调用机器级钩子，再跑术语/门清单/CI 列/README/导入环/证据卫生六项秒级检查，外加**生成物新鲜度按索引判定**这一项阻断检查；文档裸数字只告警）。**钩子本体在 `.githooks/` 而不是 `.git/hooks/`**——本机全局 gitconfig 设了 `core.hooksPath`，`.git/hooks/` 会被 Git 完全忽略（2026-10-10 实测：装在那里根本不执行）。
 
 ## 9. Wayfinder 追踪操作（内核线并入）
 
@@ -102,7 +166,7 @@ Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mozhou** (13698 symbols, 28915 relationships, 620 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mozhou** (13971 symbols, 29358 relationships, 610 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

@@ -14,8 +14,9 @@ export interface ShellTelemetry {
   readonly receipts: readonly ReceiptListItem[]
   readonly quality: QualityStatusLite | null
   readonly matrixRows: MatrixRowsLite['rows'] | null
+  readonly taskCount: number
 }
-const EMPTY: ShellTelemetry = { works: null, receipts: [], quality: null, matrixRows: null }
+const EMPTY: ShellTelemetry = { works: null, receipts: [], quality: null, matrixRows: null, taskCount: 0 }
 
 export function useShellTelemetry(root: string | null, chapterIndex: number): ShellTelemetry {
   const [telemetry, setTelemetry] = useState<ShellTelemetry>(EMPTY)
@@ -45,6 +46,7 @@ export function useShellTelemetry(root: string | null, chapterIndex: number): Sh
           ? quality.value
           : null,
       matrixRows: matrix.status === 'fulfilled' && Array.isArray(matrix.value?.matrix?.rows) ? matrix.value.matrix.rows : null,
+      taskCount: works.status === 'fulfilled' && typeof works.value?.stats?.taskCount === 'number' ? works.value.stats.taskCount : 0,
     })
   }, [root, chapterIndex])
 

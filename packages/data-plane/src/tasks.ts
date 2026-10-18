@@ -209,6 +209,27 @@ export function countTaskRecords(root: string): number {
   return readdirSync(dir).filter((name) => name.endsWith('.json')).length
 }
 
+/** 可观测：读取当前书内所有任务记录（按更新时间倒序）。 */
+export function listTaskRecords(root: string): readonly TaskRecord[] {
+  const dir = join(root, RUNTIME_TASKS_DIR)
+  if (!existsSync(dir)) {
+    return []
+  }
+  const records: TaskRecord[] = []
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.json')) continue
+    try {
+      const parsed = JSON.parse(readFileSync(join(dir, name), 'utf8')) as Record<string, unknown>
+      if (parsed['recordVersion'] === TASK_RECORD_VERSION) {
+        records.push(parsed as unknown as TaskRecord)
+      }
+    } catch {
+      // 容错：跳过损坏文件
+    }
+  }
+  return records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
 /** 任务是否处于结果不明状态（末次 attempt 为 outcome_unknown）。 */
 export function isTaskOutcomeUnknown(record: TaskRecord): boolean {
   if (record.attempts.length === 0) return false

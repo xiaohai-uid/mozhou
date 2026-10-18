@@ -11,6 +11,9 @@
 import type { IncomingMessage } from 'node:http'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { parseCookies, RateLimiter, RequestBoundaryError } from '../security.js'
+import { SessionStore, sessionRef } from './sessionStore.js'
+import type { ResetCodeRecord, SessionRecord } from './sessionTypes.js'
+export type { ResetCodeRecord, SessionRecord } from './sessionTypes.js'
 
 export interface VerifiedPrincipal {
   readonly userId: string
@@ -433,24 +436,7 @@ export class InMemoryAuthProvider implements IAuthProvider {
  * SessionManager 会话与重置管理
  * ========================================================================== */
 
-export interface SessionRecord {
-  readonly sessionId: string
-  readonly userId: string
-  readonly email: string | null
-  /** 供 `assertCsrf` 校验的令牌；当前未接线、不下发客户端（见 assertCsrf 注释）。 */
-  readonly csrfToken: string
-  readonly createdAt: number
-  expiresAt: number
-  revoked: boolean
-}
-
-export interface ResetCodeRecord {
-  readonly code: string
-  readonly email: string
-  readonly userId: string
-  readonly expiresAt: number
-  consumed: boolean
-}
+// SessionRecord / ResetCodeRecord 见 ./sessionTypes.ts（避免与 sessionStore 的类型导入成环）。
 
 export const SESSION_COOKIE_NAME = 'mozhou_session'
 export const DEFAULT_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 小时
@@ -460,6 +446,7 @@ export class SessionManager {
   private readonly _sessions = new Map<string, SessionRecord>()
   private readonly _resetCodes = new Map<string, ResetCodeRecord>()
   private _provider: IAuthProvider
+  private _store: SessionStore | null = null
   readonly loginLimiter = new RateLimiter(5, 60 * 1000) // 5 次/分钟
   readonly resetLimiter = new RateLimiter(3, 60 * 1000) // 3 次/分钟
 
@@ -473,6 +460,46 @@ export class SessionManager {
 
   setProvider(provider: IAuthProvider): void {
     this._provider = provider
+  }
+
+  /**
+   * D4：配置持久化并回读（单进程假设；应在开始监听前调用一次）。
+   * 损坏的状态文件显式抛错，不静默把所有会话当成不存在。
+   */
+  configurePersistence(dataRoot: string): void {
+    const store = new SessionStore(dataRoot)
+    const state = store.load()
+    this._sessions.clear()
+    this._resetCodes.clear()
+    if (state !== null) {
+      for (const session of state.sessions) {
+        if (!session.revoked) this._sessions.set(session.sessionId, session)
+      }
+      for (const code of state.resetCodes) {
+        // 保留已消费但未过期的记录：重启后仍返回「已使用」而不是「不存在」。
+        this._resetCodes.set(code.code, code)
+      }
+    }
+    this._store = store
+    this.pruneExpired()
+    this.persist()
+  }
+
+  private persist(): void {
+    this._store?.save(this._sessions.values(), this._resetCodes.values())
+  }
+
+  private audit(event: string, fields: Record<string, unknown>): void {
+    this._store?.audit(event, fields)
+  }
+
+  private pruneExpired(now = Date.now()): void {
+    for (const [id, rec] of this._sessions) {
+      if (rec.revoked || rec.expiresAt <= now) this._sessions.delete(id)
+    }
+    for (const [code, rec] of this._resetCodes) {
+      if (rec.expiresAt <= now) this._resetCodes.delete(code)
+    }
   }
 
   createSession(principal: VerifiedPrincipal, maxAgeMs = DEFAULT_SESSION_MAX_AGE_MS): { session: SessionRecord; cookie: string } {
@@ -489,6 +516,8 @@ export class SessionManager {
       revoked: false,
     }
     this._sessions.set(sessionId, session)
+    this.persist()
+    this.audit('session.created', { userId: principal.userId, sessionRef: sessionRef(sessionId) })
 
     const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
     const maxAgeSec = Math.floor(maxAgeMs / 1000)
@@ -502,6 +531,7 @@ export class SessionManager {
     if (!rec) return null
     if (rec.revoked || Date.now() > rec.expiresAt) {
       this._sessions.delete(sessionId)
+      this.persist()
       return null
     }
     return rec
@@ -512,15 +542,23 @@ export class SessionManager {
     if (rec) {
       rec.revoked = true
       this._sessions.delete(sessionId)
+      this.persist()
+      this.audit('session.revoked', { userId: rec.userId, sessionRef: sessionRef(sessionId) })
     }
   }
 
   revokeAllForUser(userId: string): void {
+    let revoked = 0
     for (const [id, rec] of this._sessions.entries()) {
       if (rec.userId === userId) {
         rec.revoked = true
         this._sessions.delete(id)
+        revoked += 1
       }
+    }
+    if (revoked > 0) {
+      this.persist()
+      this.audit('session.revoked_all', { userId, count: revoked })
     }
   }
 
@@ -538,6 +576,8 @@ export class SessionManager {
       consumed: false,
     }
     this._resetCodes.set(code, record)
+    this.persist()
+    this.audit('reset.created', { userId, resetRef: sessionRef(code) })
     return code
   }
 
@@ -551,10 +591,13 @@ export class SessionManager {
     }
     if (Date.now() > record.expiresAt) {
       this._resetCodes.delete(code)
+      this.persist()
       throw new RequestBoundaryError(400, 'RESET_CODE_EXPIRED', 'reset code has expired')
     }
     // 首次消费成功，状态置为已消费
     record.consumed = true
+    this.persist()
+    this.audit('reset.consumed', { userId: record.userId, resetRef: sessionRef(code) })
     return record
   }
 
@@ -618,6 +661,7 @@ export class SessionManager {
     this._resetCodes.clear()
     this.loginLimiter.clear()
     this.resetLimiter.clear()
+    this.persist()
   }
 }
 

@@ -120,7 +120,13 @@ export class MoZhouApiClient {
     blockingFailures: unknown[]
     advisories: unknown[]
     semanticReviewer: string
-    mechanicalGate?: unknown
+    mechanicalGate?: {
+      readonly passed: boolean
+      readonly checks?: readonly unknown[]
+      readonly fails: readonly string[]
+      readonly oks?: readonly string[]
+    }
+    mechanicalFailures?: readonly string[]
   }> {
     return post('/api/chapter.review', {
       ...this.bookParams(),

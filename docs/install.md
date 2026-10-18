@@ -6,7 +6,7 @@
 
 | 依赖 | 版本 | 说明 |
 |---|---|---|
-| Node.js | **22.23.2** | 仓库 `.nvmrc` 钉版；better-sqlite3 的 ABI 绑定该版本，其他版本测试会挂 |
+| Node.js | **22.23.2** | 仓库 `.nvmrc` 钉版；24.x 已实测可用（2026-10-10）。换版本须重验 better-sqlite3 原生绑定 |
 | pnpm | 9.15.0 | 见根 `package.json` 的 `packageManager` 字段 |
 
 ```bash
@@ -41,5 +41,5 @@ pnpm build && pnpm lint && pnpm test   # 三绿 = 就绪
 ## 故障排查
 
 - **安装立刻失败并提示缺 `ONNXRUNTIME_NODE_INSTALL_CUDA=skip`** → 按提示 export 后重试。
-- **测试报 better-sqlite3 `NODE_MODULE_VERSION` 不符 / Module did not self-register** → Node 版本不是 22.23.2，回前置步骤重装。
+- **测试报 better-sqlite3 `NODE_MODULE_VERSION` 不符 / Module did not self-register** → 按 `.nvmrc` 重装；换版本须重验原生绑定。
 - **报模型资产 hash 不符或缺失** → 资产文件被改动或未随仓检出；恢复该目录后重试（以 `manifest.json` 为准）。

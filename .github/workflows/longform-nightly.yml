@@ -1,0 +1,74 @@
+# 31 章长篇真实端到端验收：夜间与手动触发。
+# 刻意不放进 PR 门（ci.yml）——31 章真实模型调用会产生费用与较长耗时。
+name: longform-nightly
+
+on:
+  schedule:
+    # UTC 18:00 = Asia/Shanghai 02:00
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+
+concurrency:
+  group: longform-nightly
+  cancel-in-progress: false
+
+jobs:
+  longform:
+    name: 31-chapter longform e2e (real model)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@9.15.0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build workspace (tsc -b)
+        run: pnpm build
+      - name: Build web and production server
+        run: pnpm --filter @mozhou/web build
+
+      # 缺凭据即显式失败：不用 skipped / BLOCKED 冒充通过。
+      - name: Preflight real-model credentials
+        env:
+          MOZHOU_API_KEY: ${{ secrets.MOZHOU_API_KEY }}
+          MOZHOU_API_BASE: ${{ secrets.MOZHOU_API_BASE }}
+          MOZHOU_MODEL: ${{ secrets.MOZHOU_MODEL }}
+        run: |
+          if [ -z "${MOZHOU_API_KEY:-}" ] || [ -z "${MOZHOU_API_BASE:-}" ] || [ -z "${MOZHOU_MODEL:-}" ]; then
+            echo "::error::MOZHOU_API_KEY, MOZHOU_API_BASE and MOZHOU_MODEL are required for the longform gate"
+            exit 1
+          fi
+
+      - name: Run 31-chapter longform e2e
+        run: node scripts/verify-longform-e2e.mjs
+        env:
+          MOZHOU_API_KEY: ${{ secrets.MOZHOU_API_KEY }}
+          MOZHOU_API_BASE: ${{ secrets.MOZHOU_API_BASE }}
+          MOZHOU_MODEL: ${{ secrets.MOZHOU_MODEL }}
+
+      # 即使长程失败也检查已落盘证据：status=PASS 与必需结果矛盾必须失败。
+      - name: Evidence hygiene
+        if: always()
+        run: node scripts/check-evidence-hygiene.mjs
+
+      - name: Upload longform evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mozhou-longform-evidence
+          path: evidence/longform-journey/**
+          if-no-files-found: warn
+          retention-days: 30

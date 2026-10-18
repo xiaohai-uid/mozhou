@@ -22,9 +22,6 @@
     "test:web": "pnpm --filter @mozhou/web test",
     "verify:real-model": "node scripts/verify-real-model-journey.mjs",
     "verify:journey": "node scripts/verify-mock-journey.mjs",
-    "verify:desktop-key-guard": "node scripts/verify-desktop-key-guard.mjs",
-    "verify:desktop-stop-result": "node scripts/verify-desktop-stop-result.mjs",
-    "verify:desktop-instance-identity": "node scripts/verify-desktop-instance-identity.mjs",
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
     "graph:snapshot": "node scripts/export-code-graph.mjs",
@@ -40,11 +37,16 @@
     "check:term-map": "node scripts/gen-term-map.mjs --self-test && node scripts/gen-term-map.mjs --check",
     "check:readmes": "node scripts/verify-package-readmes.mjs",
     "duplication": "npx --yes jscpd@3.5.10 --config .jscpd.json .",
-    "coverage:check": "node scripts/report-coverage-status.mjs"
+    "perf:smoke": "node perf/k6/run-smoke.mjs",
+    "coverage:check": "node scripts/report-coverage-status.mjs",
+    "test:coverage:packages": "vitest run --coverage && vitest run --config vitest.bench.config.ts",
+    "test:coverage:web": "pnpm --filter @mozhou/web test:coverage"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^9.17.0",
+    "eslint-plugin-sonarjs": "^4.2.2",
     "typescript": "~5.5.4",
     "typescript-eslint": "^8.18.0",
     "vitest": "^4.0.4"
