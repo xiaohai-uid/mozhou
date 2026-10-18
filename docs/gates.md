@@ -40,6 +40,8 @@
 | 草稿上下文测量 | `node scripts/measure-draft-context.mjs` | 2 `:229`、`:238`、`:242` · 1 `:246` | 无 | ❌ |
 | 覆盖率 | `pnpm run test:coverage:packages`（包层）· `pnpm run test:coverage:web`（Web 层） | 0 达阈值 · 1 低于阈值或运行失败 | 无 | ✅ `ci.yml` |
 | 克隆检测 | `pnpm run duplication` | 见 jscpd（`.github/workflows/graph-gate.yml:54-73` 的 duplication job；0 未超阈值 / 非 0 超阈值） | 无 | ✅ `graph-gate.yml` |
+| **性能冒烟门** | `pnpm run perf:smoke` | 0 通过 · 1 阈值红或端点失败 `perf/k6/smoke.js` · 2 环境阻塞 `perf/k6/run-smoke.mjs:29` | 2（构建缺失/服务未起） | ✅ `perf-smoke-nightly.yml` · `release.yml` |
+| **白名单对账门** | `node scripts/check-lint-whitelist.mjs` | 0 一致 · 1 漏登记或超限 `scripts/check-lint-whitelist.mjs` | 无此状态 | ❌ 未接入（已在 pre-commit 与 `pnpm lint` 前置） |
 
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 

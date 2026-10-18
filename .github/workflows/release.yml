@@ -126,6 +126,16 @@ jobs:
       - name: Build web and production server
         run: pnpm --filter @mozhou/web build
 
+      # 发布路径性能冒烟门：发版前压测 30 秒，确保服务在常驻并发下延迟与可用性达标。
+      # 依赖上一步产出的 apps/web/dist-server；压测未过（退出码非 0）直接阻断发包。
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1.2.2
+        with:
+          k6-version: v2.3.0
+
+      - name: K6 performance smoke release gate
+        run: pnpm perf:smoke
+
       # 发布路径真实模型自动化门：有凭据则跑真实模型端到端旅程，缺凭据则 BLOCKED 并阻断发布。
       # 刻意不放进默认 PR 门（ci.yml）——真实模型调用会产生费用，只在发布路径触发。
       # 依赖上一步产出的 apps/web/dist-server 与 pnpm build 产出的 packages/data-plane/dist。

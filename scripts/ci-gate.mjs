@@ -10,7 +10,8 @@
 // 2026-10-12 复盘再补两条：evidence-hygiene（禁短 HEAD 与写死的 PASS 结论）与
 // build-freshness（陈旧 dist/dist-server 会制造假失败——本次会话的崩溃就是它造的）。
 // 这两条同样属于「知道但没人拦」，且都不在 CI 视野内（CI 是干净检出 + 现场构建）。
-// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness
+// 2026-10-18 补齐性能与白名单门：perf-smoke（K6 冒烟）与 lint-whitelist（对账检查）。
+// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness|perf-smoke|lint-whitelist
 import { execSync } from 'node:child_process'
 
 const task = process.argv[2]
@@ -30,6 +31,10 @@ const commands = {
   'evidence-hygiene': 'node scripts/check-evidence-hygiene.mjs',
   // 生产产物是否落后于源码（dist/ 是忽略项，索引型新鲜度检查看不到它）
   'build-freshness': 'node scripts/check-build-freshness.mjs',
+  // 2026-10-18 补：K6 性能冒烟门（10 VU / 30s，打只读三端点）
+  'perf-smoke': 'pnpm perf:smoke',
+  // 2026-10-18 补：eslint 白名单对账门（秒级扫描测试目录与上限）
+  'lint-whitelist': 'node scripts/check-lint-whitelist.mjs',
 }
 const cmd = commands[task]
 if (cmd === undefined) {

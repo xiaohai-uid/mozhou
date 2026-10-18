@@ -41,6 +41,8 @@ pnpm --filter @mozhou/web exec vitest run src/<name>.test.tsx
 - `apps/web/src` **禁止** import `apps/web/server/**`；走 `shared/` DTO 或 HTTP。
 - `apps/web/server` **禁止静态 import** `apps/web/shared/**`：`tsconfig.server.json` 独立 `rootDir` 会报 TS6059。就地声明同口径 DTO，并注释「与 `shared/xxx` 同口径，改动必须同步」。
 - 新增 HTTP 路由必须在 `server/routePolicies.ts` 声明策略，否则默认拒绝。
+- 涉及 HTTP 路由与服务端链路改动，交付前必须跑 `pnpm perf:smoke` 验证并发可用性。
+- 新增目录若含 server 源码或测试，必须在 `eslint.config.js` 白名单登记（pre-commit 自动拦截）。
 - 出网唯一路径：`server/llm/openaiStream.ts`（含 SSRF 与密钥范围校验）。
 - 禁止裸 `LocalDataPlane.open/openOrRebuild`；用 `withBook`/`withStrictBook`，长活句柄用 `retainBook`/`releaseBook` 成对转移。
 - 整份重写文件必须用 `atomicWriteFileSync`（`@mozhou/data-plane`）；追加用 `appendFileSync`；独占创建用 `writeFileSync(..., { flag: 'wx' })`。

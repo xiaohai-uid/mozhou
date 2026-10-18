@@ -33,6 +33,8 @@ node scripts/verify-package-readmes.mjs || exit 1
 node scripts/check-import-cycles.mjs || exit 1
 # 2026-10-12 复盘补：禁短 HEAD 与写死的 'PASS' 结论（两者都真实制造过错误结论）。
 node scripts/check-evidence-hygiene.mjs || exit 1
+# 2026-10-18 复盘补：白名单对账门（秒级拦截未登记新目录，防 fatal parsing error 隐匿）。
+node scripts/check-lint-whitelist.mjs || exit 1
 
 # ── 3) 生成物新鲜度：按**索引**判定，因此可以阻断 ────────────────────────
 # 直接在工作区跑 --check 会把他人未提交的改动算成陈旧，只能降级为告警；而告警挡不住
