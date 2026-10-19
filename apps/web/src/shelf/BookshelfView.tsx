@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LibraryResponse, LibraryOpenResponse } from '../../shared/api'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
+import { DocImportModal } from '../works/DocImportModal'
 
 export function BookshelfView({
   parentDir,
@@ -33,6 +34,7 @@ export function BookshelfView({
   const [busy, setBusy] = useState(false)
   const [importTitle, setImportTitle] = useState('')
   const [importing, setImporting] = useState(false)
+  const [importDocModalOpen, setImportDocModalOpen] = useState(false)
 
   const load = useCallback(async (): Promise<void> => {
     if (parentDir === null) return
@@ -108,9 +110,17 @@ export function BookshelfView({
       </div>
 
       <div className="conversation">
-        <div className="actions" style={{ marginTop: 0 }}>
+        <div className="actions" style={{ marginTop: 0, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn" onClick={() => { void load() }} disabled={busy}>
             {busy ? '扫描中…' : '刷新书库'}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setImportDocModalOpen(true)}
+            data-testid="bookshelf-import-doc-btn"
+          >
+            导入既有文档 (.docx / .txt / .md)
           </button>
           <span className="mono muted" style={{ alignSelf: 'center' }}>
             书库根：{parentDir}
@@ -193,6 +203,16 @@ export function BookshelfView({
           ))}
         </section>
       </div>
+      <DocImportModal
+        isOpen={importDocModalOpen}
+        parentDir={parentDir}
+        onClose={() => setImportDocModalOpen(false)}
+        onSuccess={(created) => {
+          setImportDocModalOpen(false)
+          void load()
+          onSwitchBook(created)
+        }}
+      />
     </section>
   )
 }

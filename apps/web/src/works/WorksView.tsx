@@ -12,11 +12,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorksOverviewResponse } from '../../shared/api'
 import { post } from '../lib/post'
+import { DocImportModal } from './DocImportModal'
+import type { BookInfo } from '../shell/workbenchStorage'
+import { parentDirOf } from '../shell/paths'
 
 export function WorksView({
   root,
   onGoToWorkbench,
   onOpenStoryboard,
+  onSwitchBook,
 }: {
   /** 当前书根（无书时为 null 显式引导）。 */
   root: string | null
@@ -24,10 +28,14 @@ export function WorksView({
   onGoToWorkbench: () => void
   /** 带章节进入漫剧分镜（T04）。 */
   onOpenStoryboard?: ((chapterIndex: number) => void) | undefined
+  /** 导入或切换书籍回调。 */
+  onSwitchBook?: ((book: BookInfo) => void) | undefined
 }): JSX.Element {
   const [data, setData] = useState<WorksOverviewResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const parentDir = root === null ? undefined : parentDirOf(root)
 
   const load = useCallback(async (): Promise<void> => {
     if (root === null) return
@@ -62,14 +70,31 @@ export function WorksView({
               <p className="muted" style={{ margin: 0, fontSize: 11, lineHeight: 1.8 }}>
                 我的作品 = 当前作品概览与章节全景：先在工作台或 Wizard 中建书，再回到本面板查看完整目录与统计。
               </p>
-              <div className="actions" style={{ marginTop: 12 }}>
+              <div className="actions" style={{ marginTop: 12, display: 'flex', gap: 10 }}>
                 <button className="btn-primary" onClick={onGoToWorkbench}>
                   前往工作台建书
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setImportModalOpen(true)}
+                  data-testid="works-import-doc-btn"
+                >
+                  导入既有文档 (DOCX / TXT / MD)
                 </button>
               </div>
             </div>
           </div>
         </div>
+        <DocImportModal
+          isOpen={importModalOpen}
+          parentDir={parentDir}
+          onClose={() => setImportModalOpen(false)}
+          onSuccess={(created) => {
+            setImportModalOpen(false)
+            onSwitchBook?.(created)
+          }}
+        />
       </section>
     )
   }
@@ -81,7 +106,16 @@ export function WorksView({
         <span className="meta">
           {data !== null ? `${data.book.title} · ${data.stats.totalChapters} 章 · ${data.stats.totalWords} 字` : '加载中…'}
         </span>
-        <div className="save">
+        <div className="save" style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setImportModalOpen(true)}
+            data-testid="works-import-doc-btn"
+            style={{ fontSize: 10, padding: '4px 8px' }}
+          >
+            导入新文档
+          </button>
           <button className="btn" onClick={onGoToWorkbench} style={{ fontSize: 10, padding: '4px 8px' }}>
             前往工作台写作 →
           </button>
@@ -227,6 +261,15 @@ export function WorksView({
           </>
         )}
       </div>
+      <DocImportModal
+        isOpen={importModalOpen}
+        parentDir={parentDir}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={(created) => {
+          setImportModalOpen(false)
+          onSwitchBook?.(created)
+        }}
+      />
     </section>
   )
 }

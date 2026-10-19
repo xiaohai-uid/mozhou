@@ -603,6 +603,45 @@ export interface CapabilitySquareResponse {
   readonly groups: readonly CapabilitySquareGroup[]
 }
 
+/** 既有文档导入 DTO（与 shared/api.ts 同口径，改动必须同步）。 */
+export type DocImportFormat = 'txt' | 'md' | 'docx'
+export type DocSplitMode = 'auto' | 'title' | 'blank-line' | 'word-count'
+
+export interface DocSplitOptionsDto {
+  readonly splitMode?: DocSplitMode
+  readonly wordCountThreshold?: number
+  readonly customTitlePattern?: string
+}
+
+export interface DocImportPreviewChapterDto {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly wordCount: number
+  readonly preview: string
+}
+
+export interface DocImportPreviewDtoResponse {
+  readonly ok: true
+  readonly preview: true
+  readonly chapterCount: number
+  readonly chapters: readonly DocImportPreviewChapterDto[]
+}
+
+export interface DocImportExecuteChapterDto {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly wordCount: number
+}
+
+export interface DocImportExecuteDtoResponse {
+  readonly ok: true
+  readonly root: string
+  readonly bookId: string
+  readonly title: string
+  readonly chapterCount: number
+  readonly chapters: readonly DocImportExecuteChapterDto[]
+}
+
 /* ============================================================================
  * 路由分发器与中间件装配 (Router Dispatcher)
  * ========================================================================== */

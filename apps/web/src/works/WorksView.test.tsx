@@ -86,7 +86,7 @@ describe('WorksView（我的作品）', () => {
     expect(view).toMatchSnapshot()
   })
 
-  it('未建书时呈现显式引导与前往工作台按钮', async () => {
+  it('未建书时呈现显式引导与前往工作台按钮，点击导入按钮可唤起 DocImportModal', async () => {
     const onGoToWorkbench = vi.fn()
     render(<WorksView root={null} onGoToWorkbench={onGoToWorkbench} />)
     expect(screen.getByTestId('works-empty')).toBeInTheDocument()
@@ -95,6 +95,29 @@ describe('WorksView（我的作品）', () => {
     const btn = screen.getByRole('button', { name: '前往工作台建书' })
     await userEvent.click(btn)
     expect(onGoToWorkbench).toHaveBeenCalled()
+
+    const importBtn = screen.getByTestId('works-import-doc-btn')
+    expect(importBtn).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await userEvent.click(importBtn)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('导入已有书稿建书')).toBeInTheDocument()
+  })
+
+  it('已建书时标题栏呈现导入新文档按钮，点击可唤起导入弹窗', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_WORKS)))
+    render(<WorksView root="C:/tmp/fake-god" onGoToWorkbench={() => {}} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('works-overview')).toBeInTheDocument()
+    })
+
+    const importBtn = screen.getByRole('button', { name: '导入新文档' })
+    expect(importBtn).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await userEvent.click(importBtn)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('读取失败显式报错（role=alert），不静默', async () => {

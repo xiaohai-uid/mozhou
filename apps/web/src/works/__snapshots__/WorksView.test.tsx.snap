@@ -18,7 +18,16 @@ exports[`WorksView（我的作品） > 作品概览与章节目录渲染（书�
     </span>
     <div
       class="save"
+      style="display: flex; gap: 8px;"
     >
+      <button
+        class="btn"
+        data-testid="works-import-doc-btn"
+        style="font-size: 10px; padding: 4px 8px;"
+        type="button"
+      >
+        导入新文档
+      </button>
       <button
         class="btn"
         style="font-size: 10px; padding: 4px 8px;"

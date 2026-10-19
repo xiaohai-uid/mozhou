@@ -104,6 +104,19 @@ describe('BookshelfView（书架）', () => {
     expect(screen.getByLabelText('书源书名')).toHaveValue('')
   })
 
+  it('书架顶部操作栏点击导入既有文档按钮唤起 DocImportModal', async () => {
+    stubShelfFetch()
+    render(<BookshelfView parentDir={PARENT} currentRoot={'C:/tmp/lib/甲书'} onSwitchBook={() => {}} />)
+
+    const importDocBtn = screen.getByTestId('bookshelf-import-doc-btn')
+    expect(importDocBtn).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await userEvent.click(importDocBtn)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('导入已有书稿建书')).toBeInTheDocument()
+  })
+
   it('无书库目录：显式引导（不假装可用）', () => {
     render(<BookshelfView parentDir={null} currentRoot={null} onSwitchBook={() => {}} />)
     expect(screen.getByTestId('bookshelf-empty').textContent).toContain('书架暂不可用')

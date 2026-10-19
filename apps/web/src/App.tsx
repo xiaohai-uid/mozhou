@@ -384,6 +384,7 @@ export function App(): JSX.Element {
                 root={book?.root ?? null}
                 onGoToWorkbench={() => setView('workbench')}
                 onOpenStoryboard={(ch) => { setStoryboardChapter(ch); handleSelectView('storyboard') }}
+                onSwitchBook={handleBookSwitch}
               />
             ) : view === 'storyboard' ? (
               <StoryboardView

@@ -11,6 +11,10 @@ import type {
   ChangeMatrixResponse,
   CloudSyncResponse,
   CrawlerExtractResponse,
+  DocImportExecuteDtoResponse,
+  DocImportFormat,
+  DocImportPreviewDtoResponse,
+  DocSplitOptionsDto,
   DraftQuestionResponse,
   LibraryOpenResponse,
   LibraryResponse,
@@ -224,6 +228,27 @@ export class MoZhouApiClient {
 
   activateMembership(licenseKey: string): Promise<MembershipResponse> {
     return post('/api/membership.activate', { licenseKey })
+  }
+
+  previewImportDocument(payload: {
+    title?: string
+    content?: string
+    fileBase64?: string
+    format?: DocImportFormat
+    splitOptions?: DocSplitOptionsDto
+  }): Promise<DocImportPreviewDtoResponse> {
+    return post('/api/library.import.doc', { ...payload, previewOnly: true })
+  }
+
+  executeImportDocument(payload: {
+    parentDir?: string
+    title: string
+    content?: string
+    fileBase64?: string
+    format?: DocImportFormat
+    splitOptions?: DocSplitOptionsDto
+  }): Promise<DocImportExecuteDtoResponse> {
+    return post('/api/library.import.doc', payload)
   }
 }
 
