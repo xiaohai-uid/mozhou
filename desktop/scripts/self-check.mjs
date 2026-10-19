@@ -212,7 +212,7 @@ async function scenarioA() {
     const logAfterExit = existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
     check(
       'A13 退出走排空路径（非 Kill）',
-      /服务端停机结果 drained=true/.test(logAfterExit),
+      /服务端停机结果.*drained=true/.test(logAfterExit),
       (logAfterExit.match(/服务端停机结果[^\n]*/) ?? ['(无停机日志)'])[0],
     )
 

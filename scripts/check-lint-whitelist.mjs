@@ -145,6 +145,32 @@ if (totalMatched > maxLimit) {
   failed = true
 }
 
+// 检查 4：防双重发现陷阱。apps/web/server 下的生产代码（非 *.test.ts）若已被 api.ts 引用，
+// 则严禁在 allowDefaultProject 中用 *.ts 登记，否则 typescript-eslint projectService 会报
+// "was included by allowDefaultProject but also was found in the project service"。
+const apiTsPath = join(repoRoot, 'apps', 'web', 'server', 'api.ts')
+if (existsSync(apiTsPath)) {
+  const apiSrc = readFileSync(apiTsPath, 'utf8')
+  const doubleIncludeRisks = []
+  for (const pat of whitelistPatterns) {
+    if (pat.startsWith('apps/web/server/') && pat.endsWith('/*.ts') && !pat.endsWith('/*.test.ts')) {
+      if (pat.includes('test-support') || pat.endsWith('productionServer.ts') || pat.endsWith('observability.ts')) continue
+      const dir = pat.replace(/\/\*\.ts$/, '')
+      const dirBase = dir.split('/').pop()
+      if (dirBase && (apiSrc.includes(`/${dirBase}/`) || apiSrc.includes(`/${dirBase}.`))) {
+        doubleIncludeRisks.push({ pattern: pat, dirBase, dir })
+      }
+    }
+  }
+  if (doubleIncludeRisks.length > 0) {
+    console.error(`[check-lint-whitelist] FAIL: 发现 ${doubleIncludeRisks.length} 条白名单规则存在双重发现风险（源码已被 api.ts 引用，请收窄为 *.test.ts）：`)
+    for (const item of doubleIncludeRisks) {
+      console.error(`  - ${item.pattern} -> 应改为 ${item.dir}/*.test.ts`)
+    }
+    failed = true
+  }
+}
+
 if (failed) {
   console.error('\n[check-lint-whitelist] 对账未通过。请更新 eslint.config.js。')
   process.exit(1)

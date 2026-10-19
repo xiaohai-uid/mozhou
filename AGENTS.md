@@ -64,7 +64,7 @@ pnpm --filter @mozhou/web exec vitest run src/<name>.test.tsx
 
 | 改动面 | 先读 |
 |---|---|
-| 作者数据 / 正文写入 / 恢复 | `CODING_STANDARDS.md` + 本文件 §7 |
+| 作者数据 / 正文写入 / 恢复 / 测试 | `CODING_STANDARDS.md` + 本文件 §7；正文物理路径唯一真源为 `packages/data-plane/src/layout.ts` 的 `proseChapterPath(n)`（带卷目录 `正文/第一卷/第0001章.md`），严禁手拼平铺路径 |
 | UI / 视觉 | `apps/web/DESIGN.md`；视觉 token 真值在 `apps/web/src/styles/globals.css` |
 | 桌面发行 / 安装器 | `docs/adr/0037-electron-desktop-shell-migration.md`、`desktop/README.md` |
 | 门清单语义 | `docs/gates.md`（**BLOCKED ≠ PASSED**） |
@@ -120,7 +120,7 @@ pnpm --filter @mozhou/web exec vitest run src/<name>.test.tsx
 
 ### 7. 项目基建
 
-**作者数据相关改动**（正文写入、任务切换、恢复）优先核对三条项目约束：作者决定正文写入／旧任务不能污染新现场／恢复必须验证作者数据。它们的判断类条款与硬护栏在 [`CODING_STANDARDS.md`](./CODING_STANDARDS.md)——评审代理在 `/code-review` 的 Standards 轴读全文，机械类约束一律做成确定性检查、不加进该文件。三条对应现有领域契约，不授权新增功能，也不改变已冻结的领域契约；完整验收例、源位置与本轮观察见 [Codex 项目验收规格与证据](.scratch/codex-readiness-20261006/spec-and-evidence.md)。
+**作者数据与验收相关改动**（正文写入、任务切换、恢复、验收定性、UI异步落盘断言）优先核对五条项目约束：作者决定正文写入／旧任务不能污染新现场／恢复必须验证作者数据／验收定性与证据范围如实声明／UI异步落盘与持久化断言必须等待终态。它们的判断类条款与硬护栏在 [`CODING_STANDARDS.md`](./CODING_STANDARDS.md)——评审代理在 `/code-review` 的 Standards 轴读全文，机械类约束一律做成确定性检查、不加进该文件。五条对应现有领域契约与验收纪律，不授权新增功能，也不改变已冻结的领域契约；完整验收例、源位置与本轮观察见 [Codex 项目验收规格与证据](.scratch/codex-readiness-20261006/spec-and-evidence.md)。
 
 - 术语：**[`GLOSSARY.md`](./GLOSSARY.md)**（原 `CONTEXT.md`，2026-10-01 迁正）
 - 架构地图：`docs/architecture.md`；决策地图：`docs/adr/INDEX.md`；决策记录：`docs/adr/`
@@ -168,7 +168,7 @@ Single-context：`GLOSSARY.md` 在仓库根（单份术语权威，无 `GLOSSARY
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **mozhou** (13971 symbols, 29358 relationships, 610 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **mozhou** (14268 symbols, 30171 relationships, 617 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

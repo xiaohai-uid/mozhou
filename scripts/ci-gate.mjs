@@ -11,7 +11,8 @@
 // build-freshness（陈旧 dist/dist-server 会制造假失败——本次会话的崩溃就是它造的）。
 // 这两条同样属于「知道但没人拦」，且都不在 CI 视野内（CI 是干净检出 + 现场构建）。
 // 2026-10-18 补齐性能与白名单门：perf-smoke（K6 冒烟）与 lint-whitelist（对账检查）。
-// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness|perf-smoke|lint-whitelist
+// 2026-10-18 补：desktop-journey（Playwright Electron 桌面端端到端旅程与 Trace 回归）。
+// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness|perf-smoke|lint-whitelist|desktop-journey
 import { execSync } from 'node:child_process'
 
 const task = process.argv[2]
@@ -35,6 +36,8 @@ const commands = {
   'perf-smoke': 'pnpm perf:smoke',
   // 2026-10-18 补：eslint 白名单对账门（秒级扫描测试目录与上限）
   'lint-whitelist': 'node scripts/check-lint-whitelist.mjs',
+  // 2026-10-18 补：Playwright Electron 桌面端端到端旅程回归与失败 Trace 回放门
+  'desktop-journey': 'pnpm verify:desktop-journey',
 }
 const cmd = commands[task]
 if (cmd === undefined) {

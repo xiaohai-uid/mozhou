@@ -18,14 +18,14 @@ export class SkillLookupTool extends NovelTool {
     required: ['id'],
   }
 
-  async execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
+  execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
     const id = str(args, 'id')
     const skill = host.skills.read(id)
-    if (skill === null) return { ok: false, content: '技能不存在或格式非法：' + id }
+    if (skill === null) return Promise.resolve({ ok: false, content: '技能不存在或格式非法：' + id })
     const res =
       'scripts ' + skill.resources.scripts + ' · references ' + skill.resources.references + ' · assets ' + skill.resources.assets
     const header = '# ' + skill.name + '（' + skill.id + ' v' + skill.version + '）\n资源：' + res + '\n\n'
-    return { ok: true, content: clip(header + skill.body) }
+    return Promise.resolve({ ok: true, content: clip(header + skill.body) })
   }
 }
 
@@ -44,10 +44,10 @@ export class SkillCreateTool extends NovelTool {
     required: ['id', 'name', 'description', 'body'],
   }
 
-  async execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
+  execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
     const id = str(args, 'id')
-    if (host.skills.read(id) !== null) return { ok: false, content: '技能已存在，请用 skill_update：' + id }
-    return writeSkill(args, host, 'skill_create')
+    if (host.skills.read(id) !== null) return Promise.resolve({ ok: false, content: '技能已存在，请用 skill_update：' + id })
+    return Promise.resolve(writeSkill(args, host, 'skill_create'))
   }
 }
 
@@ -66,10 +66,10 @@ export class SkillUpdateTool extends NovelTool {
     required: ['id', 'name', 'description', 'body'],
   }
 
-  async execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
+  execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
     const id = str(args, 'id')
-    if (host.skills.read(id) === null) return { ok: false, content: '技能不存在，请用 skill_create：' + id }
-    return writeSkill(args, host, 'skill_update')
+    if (host.skills.read(id) === null) return Promise.resolve({ ok: false, content: '技能不存在，请用 skill_create：' + id })
+    return Promise.resolve(writeSkill(args, host, 'skill_update'))
   }
 }
 

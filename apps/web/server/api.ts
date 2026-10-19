@@ -26,6 +26,9 @@ import { memoRoutes } from './routes/memoRoutes.js'
 import { taskStreamRoutes } from './routes/taskStreamRoutes.js'
 import { namingRoutes } from './routes/namingRoutes.js'
 import { flywheelRoutes } from './routes/flywheelRoutes.js'
+import { agentRoutes } from './routes/agentRoutes.js'
+import { skillRoutes } from './routes/skillRoutes.js'
+import { recycleRoutes } from './routes/recycleRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -42,6 +45,10 @@ export { analyzeNovelBreakdown, type NovelBreakdownAnalysis } from './analysis/n
 export { analyzeTextStyle, saveBookStyleProfile, loadBookStyleProfile, type StyleAnalysisResult, type BookStyleProfile } from './analysis/styleAnalysis.js'
 export { defaultSkillsCatalogManager, SkillsCatalogManager, type PromptSkillRecipe } from './skills/catalog.js'
 export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory } from './routePolicies.js'
+export { skillRoutes, type SkillsListResponse, type SkillsReadResponse, type SkillsSaveResponse, type SkillsDeleteResponse, type SkillsErrorResponse } from './routes/skillRoutes.js'
+export { recycleRoutes, type RecycleListResponse, type RecycleRestoreResponse, type RecyclePurgeResponse, type RecycleErrorResponse } from './routes/recycleRoutes.js'
+export { SkillStore, SkillError, type SkillRecord, type SkillSummary, type SkillWriteInput } from './agent/skills.js'
+export { RecycleStore, RecycleError, type TrashEntry, type RestoreResult } from './recycle/recycleStore.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
 import type { ContextReceipt } from '@mozhou/kernel'
@@ -629,6 +636,9 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(taskStreamRoutes)
     .use(namingRoutes)
     .use(flywheelRoutes)
+    .use(agentRoutes)
+    .use(skillRoutes)
+    .use(recycleRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

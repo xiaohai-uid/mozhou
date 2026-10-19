@@ -22,6 +22,8 @@
     "test:web": "pnpm --filter @mozhou/web test",
     "verify:real-model": "node scripts/verify-real-model-journey.mjs",
     "verify:journey": "node scripts/verify-mock-journey.mjs",
+    "verify:desktop-journey": "node desktop/scripts/verify-desktop-author-journey.mjs",
+    "benchmark:promptfoo": "node packages/benchmark/promptfoo/run-eval.mjs",
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
     "graph:snapshot": "node scripts/export-code-graph.mjs",

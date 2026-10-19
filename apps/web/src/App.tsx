@@ -50,6 +50,7 @@ import { StoryboardView } from './storyboard/StoryboardView'
 import { confirmStoryboardLeave } from './storyboard/dirtyGuard'
 import { MobileShell } from './mobile/MobileShell'
 import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
+import { MigrationPanel } from './migration/MigrationPanel'
 
 const CodeGraphView = lazy(async () => {
   const module = await import('./code-graph/CodeGraphView')
@@ -69,6 +70,13 @@ const INSPECTOR_VIEW_TO_TAB: Partial<Record<ViewId, InspectorTabId>> = {
 
 const DEFAULT_STAGE = PIPELINE_STAGES.findIndex((stage) => stage.id === 'review')
 const WIZARD_DONE_KEY = 'mozhou.wizard.done'
+/** 迁移入口：非导航触发（不新增 NAV_GROUPS 项，views.test.ts 断言 6 组 23 项）。 */
+const MIGRATION_HASH = '#migration'
+
+function migrationRequested(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.location.hash === MIGRATION_HASH
+}
 
 function wizardCompleted(): boolean {
   try {
@@ -177,6 +185,21 @@ export function App(): JSX.Element {
   const [sceneSheetOpen, setSceneSheetOpen] = useState(false)
   /** 作品页「带章节进入分镜」的待打开章号（T04）。 */
   const [storyboardChapter, setStoryboardChapter] = useState<number | null>(null)
+  /** 浏览器数据迁移面板（`#migration` 触发，非导航入口）。 */
+  const [migrationOpen, setMigrationOpen] = useState(migrationRequested)
+  /**
+   * 数据代次（E02）：迁移导入真正写回既有槽位后前进，用来重挂工作台会话，
+   * 让编辑器与对话流按 localStorage 里的新内容重新装配。
+   * 只在 `written > 0` 时前进——只落隔离槽不改变任何书章会话，不需要重挂。
+   */
+  const [dataGeneration, setDataGeneration] = useState(0)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onHashChange = () => setMigrationOpen(migrationRequested())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   useEffect(() => {
     saveScenePreference(scenePreference)
@@ -328,7 +351,7 @@ export function App(): JSX.Element {
             {/* U03：写作对话并入真实写作入口——dialogue 与 workbench 同元素同 key（状态不丢），仅滚动到对话面板 */}
             {(view === 'workbench' || view === 'dialogue') ? (
               <WorkbenchView
-                key={book?.root ?? 'no-book'}
+                key={`${book?.root ?? 'no-book'}#${dataGeneration}`}
                 book={book}
                 chapterIndex={chapterIndex}
                 onChapterIndexChange={setChapterIndex}
@@ -422,6 +445,19 @@ export function App(): JSX.Element {
           precreated={book}
           onComplete={handleWizardComplete}
           onReplay={handleWizardDismiss}
+        />
+      )}
+      {migrationOpen && (
+        <MigrationPanel
+          targetBook={book}
+          onImported={(result) => {
+            // 只有真正写回书章槽位才重挂：让编辑器/对话流按新内容重新装配（E02）。
+            if (result.written.length > 0) setDataGeneration((n) => n + 1)
+          }}
+          onClose={() => {
+            if (typeof window !== 'undefined') window.location.hash = ''
+            setMigrationOpen(false)
+          }}
         />
       )}
     </ErrorBoundary>

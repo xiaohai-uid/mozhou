@@ -22,6 +22,8 @@ import {
 } from '../routeCodes.js'
 import { decodeBookRequest, noOpenProductionSessionError } from '../bookRequest.js'
 import { withBookWriteLock } from '../bookAccess.js'
+
+const BOOK_WRITE_QUEUE_TIMEOUT_MS = 30_000
 import { emptyDraftStream, mockDraftStream } from './draftStreamEmulation.js'
 import {
   AcceptConflictError,
@@ -824,20 +826,28 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     const expectedRevision = typeof body['expectedRevision'] === 'number' ? body['expectedRevision'] : undefined
     const taskId = typeof body['taskId'] === 'string' ? body['taskId'] : undefined
     try {
-      const result = acceptDraft({
-        bookRoot: root,
-        candidateId,
-        base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
-        idempotencyKey,
-        bookId,
-        chapterIndex: requestedChapterIndex,
-        allowPartial,
-        confirmPartial,
-        expectedRevision,
-        operationId,
-        principalId: principal?.userId,
-        taskId,
-      })
+      // W2-3：采纳是书根内的读-改-写（候选读取 + 版本核对 + 正文更新 + 结果记录），
+      // 整段在统一书稿锁内执行——同书第二写入者排队（超时 409），不同书并发。
+      // 本段无模型等待，可整段持锁（模型等待在生成路由，锁外）。
+      const result = await withBookWriteLock(
+        root,
+        () =>
+          acceptDraft({
+            bookRoot: root,
+            candidateId,
+            base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
+            idempotencyKey,
+            bookId,
+            chapterIndex: requestedChapterIndex,
+            allowPartial,
+            confirmPartial,
+            expectedRevision,
+            operationId,
+            principalId: principal?.userId,
+            taskId,
+          }),
+        { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS },
+      )
       json(200, { ok: true, ...result })
     } catch (error) {
       if (error instanceof AcceptConflictError) {

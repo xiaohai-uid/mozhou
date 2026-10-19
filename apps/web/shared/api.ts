@@ -657,3 +657,85 @@ export interface PreferenceRebuildResponse {
   readonly profile: PreferenceProfileData
   readonly error?: string
 }
+
+/** 智能体工具定义与分发 DTO（与 apps/web/server/routes/agentRoutes.ts 同口径，改动必须同步）。 */
+export interface ToolDefinitionDto {
+  readonly name: string
+  readonly description: string
+  readonly parameters: {
+    readonly type: 'object'
+    readonly properties: Readonly<Record<string, unknown>>
+    readonly required?: readonly string[]
+  }
+}
+
+export interface ToolsListDtoResponse {
+  readonly ok: true
+  readonly tools: readonly ToolDefinitionDto[]
+}
+
+export interface ToolResultDto {
+  readonly ok: boolean
+  readonly content: string
+  readonly meta?: Readonly<Record<string, unknown>>
+}
+
+/** 技能系统 DTO（与 apps/web/server/routes/skillRoutes.ts 同口径，改动必须同步）。 */
+export interface SkillSummaryDto {
+  readonly id: string
+  readonly name: string
+  readonly description: string
+  readonly version: string
+  readonly license: string
+  readonly resources: Readonly<Record<'scripts' | 'references' | 'assets', number>>
+}
+
+export interface SkillRecordDto extends SkillSummaryDto {
+  readonly body: string
+  readonly dir: string
+}
+
+export interface SkillsListDtoResponse {
+  readonly ok: true
+  readonly skills: readonly SkillSummaryDto[]
+}
+
+export interface SkillsReadDtoResponse {
+  readonly ok: true
+  readonly skill: SkillRecordDto
+}
+
+export interface SkillsSaveDtoResponse {
+  readonly ok: true
+  readonly skill: SkillRecordDto
+}
+
+export interface SkillsDeleteDtoResponse {
+  readonly ok: true
+  readonly deleted: boolean
+}
+
+/** 回收站 DTO（与 apps/web/server/routes/recycleRoutes.ts 同口径，改动必须同步）。 */
+export interface TrashEntryDto {
+  readonly id: string
+  readonly originalPath: string
+  readonly name: string
+  readonly deletedAt: string
+  readonly isDirectory: boolean
+}
+
+export interface RecycleListDtoResponse {
+  readonly ok: true
+  readonly entries: readonly TrashEntryDto[]
+}
+
+export interface RecycleRestoreDtoResponse {
+  readonly ok: true
+  readonly restoredTo: string
+}
+
+export interface RecyclePurgeDtoResponse {
+  readonly ok: true
+  readonly purged: boolean
+}
+

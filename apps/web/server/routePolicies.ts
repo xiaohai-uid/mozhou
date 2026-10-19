@@ -59,6 +59,15 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   // AI 起名走 BYOK 模型调用，必须挂主体避免 hosted 匿名滥用。
   '/api/memo': 'account',
   '/api/naming': 'account',
+  '/api/tools.list': 'account',
+  '/api/tools.execute': 'account',
+  '/api/skills.list': 'account',
+  '/api/skills.read': 'account',
+  '/api/skills.save': 'account',
+  '/api/skills.delete': 'account',
+  '/api/recycle.list': 'account',
+  '/api/recycle.restore': 'account',
+  '/api/recycle.purge': 'account',
   '/api/book': 'account', // 创建新作品（在 hosted 下归属当前用户）
   '/api/llm/settings': 'account',
   '/api/llm/test': 'account',
@@ -81,6 +90,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/library': 'local-native',
   '/api/library.open': 'local-native',
   '/api/library.import': 'local-native',
+  '/api/library.import.doc': 'local-native',
 
   // ---- 4. Book 作品级隔离路由 (要求 AuthorizedBook) ----
   '/api/book.state': 'book',

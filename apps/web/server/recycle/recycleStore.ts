@@ -11,9 +11,10 @@
  *
  * 恢复策略：原路径已被占用时**拒绝恢复**，绝不覆盖新内容。用户可自行改回或先清理。
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join, resolve } from 'node:path'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 
 const META_FILE = 'meta.json'
 const PAYLOAD = 'payload'
@@ -105,8 +106,17 @@ export class RecycleStore {
       deletedAt: now.toISOString(),
       isDirectory,
     }
-    writeFileSync(join(entryDir, META_FILE), JSON.stringify(entry, null, 2), 'utf8')
-    renameSync(target, join(entryDir, PAYLOAD))
+    atomicWriteFileSync(join(entryDir, META_FILE), JSON.stringify(entry, null, 2) + '\n')
+    try {
+      renameSync(target, join(entryDir, PAYLOAD))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EXDEV') {
+        cpSync(target, join(entryDir, PAYLOAD), { recursive: true })
+        rmSync(target, { recursive: true, force: true })
+      } else {
+        throw error
+      }
+    }
     return entry
   }
 
@@ -136,7 +146,16 @@ export class RecycleStore {
     }
     try {
       mkdirSync(resolve(meta.originalPath, '..'), { recursive: true })
-      renameSync(payload, meta.originalPath)
+      try {
+        renameSync(payload, meta.originalPath)
+      } catch (renameErr) {
+        if ((renameErr as NodeJS.ErrnoException).code === 'EXDEV') {
+          cpSync(payload, meta.originalPath, { recursive: true })
+          rmSync(payload, { recursive: true, force: true })
+        } else {
+          throw renameErr
+        }
+      }
     } catch (error) {
       return { ok: false, error: '恢复失败：' + (error as Error).message }
     }

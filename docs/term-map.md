@@ -93,7 +93,7 @@
 | 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:252` | 声明 |
 | 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:183` | 声明 |
 | 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
-| 技能 | Skill | `skill` | `apps/web/server/agent/skills.ts:179` | 局部同名 |
+| 技能 | Skill | `skill` | `apps/web/server/agent/skills.ts:186` | 局部同名 |
 | 能力注册表 | Capability Registry | `CapabilityRegistry` | `packages/runtime/src/registry.ts:23` | 声明 |
 | 能力配方 | Capability Recipe | `CapabilityRecipe` | `packages/runtime/src/recipe/types.ts:142` | 声明 |
 | 任务流 | Task Stream | - | - | 未验证 |

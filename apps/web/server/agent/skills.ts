@@ -15,8 +15,9 @@
  * 安全边界（重要）：本模块**只把 scripts/ 当文本资源存**，从不执行其中任何内容。
  * 没有 `terminal` 工具，技能也无法自己跑起来——写入技能不构成提权路径。
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
+import { atomicWriteFileSync } from '@mozhou/data-plane'
 
 /** 技能标识：英文小写连字符（与跨平台路径约定一致）。 */
 const SKILL_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -104,7 +105,13 @@ export function parseSkillMarkdown(text: string): { readonly meta: SkillFrontMat
   if (description === '') {
     throw new SkillError(400, 'SKILL_DESCRIPTION_REQUIRED', 'frontmatter 缺少 description（触发关键词靠它命中）')
   }
-  const { name: _n, description: _d, version, license, ...extra } = fields
+  const version = fields['version']
+  const license = fields['license']
+  const extra = { ...fields }
+  delete extra['name']
+  delete extra['description']
+  delete extra['version']
+  delete extra['license']
   return {
     meta: {
       name,
@@ -178,8 +185,14 @@ export class SkillStore {
       if (!entry.isDirectory()) continue
       const skill = this.read(entry.name)
       if (skill !== null) {
-        const { body: _body, dir: _dir, ...summary } = skill
-        out.push(summary)
+        out.push({
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          version: skill.version,
+          license: skill.license,
+          resources: skill.resources,
+        })
       }
     }
     return out.sort((a, b) => a.id.localeCompare(b.id))
@@ -216,7 +229,7 @@ export class SkillStore {
     }
     const dir = join(this.root, input.id)
     mkdirSync(dir, { recursive: true })
-    writeFileSync(
+    atomicWriteFileSync(
       join(dir, SKILL_FILE),
       renderSkillMarkdown(
         {
@@ -228,7 +241,6 @@ export class SkillStore {
         },
         input.body,
       ),
-      'utf8',
     )
     for (const [relPath, content] of Object.entries(input.resources ?? {})) {
       const target = resolve(dir, relPath)
@@ -237,7 +249,7 @@ export class SkillStore {
         throw new SkillError(400, 'SKILL_RESOURCE_OUTSIDE', `资源路径必须位于 scripts/ references/ assets/ 之下：${relPath}`)
       }
       mkdirSync(resolve(target, '..'), { recursive: true })
-      writeFileSync(target, content, 'utf8')
+      atomicWriteFileSync(target, content)
     }
     const record = this.read(input.id)
     if (record === null) throw new SkillError(500, 'SKILL_WRITE_UNCONFIRMED', '技能写入后回读失败')

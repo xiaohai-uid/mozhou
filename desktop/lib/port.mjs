@@ -44,6 +44,32 @@ export function isPortFree(port) {
   })
 }
 
+/**
+ * 诊断端口不可用的具体原因（区分真实进程占用 vs Windows 系统段保留）。
+ * 避免开发者在遇到不可用端口时误以为有未清理的孤儿服务。
+ */
+export function diagnosePortUnavailability(port) {
+  return new Promise((resolvePromise) => {
+    const probe = createServer()
+    probe.once('error', (err) => {
+      const code = err.code ?? 'UNKNOWN'
+      const isReserved =
+        process.platform === 'win32' && (code === 'EACCES' || code === 'EADDRINUSE')
+      resolvePromise({
+        free: false,
+        code,
+        reason: isReserved
+          ? `端口 ${port} 不可用（可能处于 Windows 系统保留端口段，如 Hyper-V/HNS 动态范围）`
+          : `端口 ${port} 被其他活动进程占用 (${code})`,
+      })
+    })
+    probe.once('listening', () => {
+      probe.close(() => resolvePromise({ free: true, code: 'OK', reason: `端口 ${port} 可用` }))
+    })
+    probe.listen(port, '127.0.0.1')
+  })
+}
+
 /** 读取 `/api/health`；任何失败（连不上、超时、非 JSON）都返回 null，不抛。 */
 export async function probeHealth(port, timeoutMs = 800) {
   const controller = new AbortController()

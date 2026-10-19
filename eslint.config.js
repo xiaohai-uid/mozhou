@@ -4,7 +4,7 @@ import sonarjs from 'eslint-plugin-sonarjs'
 export default tseslint.config(
   // 交回包是归档证据与仓库外脚本副本，不属于产品 TypeScript 工程。
   { ignores: ['handoff-results/**'] },
-  { ignores: ['**/dist/**', '**/dist-server/**', '**/target/**', 'src-tauri/target/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', 'desktop/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**', 'perf/**', 'apps/web/server/platform/__fixtures__/**'] },
+  { ignores: ['**/dist/**', '**/dist-server/**', '**/target/**', 'src-tauri/target/**', '**/node_modules/**', '**/.next/**', '**/*.config.js', '**/*.config.ts', 'prototype/**', 'docs/**', 'app/**', 'scripts/embedding-calib/**', 'scripts/verify-r05-journey.mjs', 'scripts/release/**', 'desktop/**', '.scratch/**', 'figma-upload/**', '.gitnexus/**', 'archive-legacy/**', 'evidence/**', 'release-artifacts/**', '.dsh-audit/**', 'artifacts/**', '.tmp-vite-build/**', '**/.worktrees/**', '**/.zcode/**', 'audit-2026-10-03/**', 'perf/**', 'packages/benchmark/promptfoo/**', 'apps/web/server/platform/__fixtures__/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
@@ -68,10 +68,10 @@ export default tseslint.config(
             // 2026-10-12：出站传输层目录（地址绑定 + 解压）同样不被任何 project 发现，
             // 按同一先例补登记。
             'apps/web/server/net/*.test.ts',
-            // 2026-10-18：agent 与 recycle 目录由 21b05ad 引入，同属不被 projectService
-            // 自动发现的 server 子目录，按同一先例补登记；匹配总数达 153，阈值上调至 165。
-            'apps/web/server/agent/*.ts',
-            'apps/web/server/recycle/*.ts',
+            // 2026-10-18：agent 与 recycle 目录由 21b05ad 引入；源码均已接入 api.ts，
+            // 仅测试文件需要 defaultProject 支持。
+            'apps/web/server/agent/*.test.ts',
+            'apps/web/server/recycle/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，

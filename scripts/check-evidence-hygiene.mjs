@@ -32,6 +32,7 @@ const STAMP_IMPL = 'scripts/release/lib/source-stamp.mjs'
 
 const SHORT_HEAD = /rev-parse\s+--short\s+HEAD/
 const LITERAL_PASS = /status\s*:\s*['"]PASS['"]/i
+const LITERAL_SUBCHECK_PASSED = /\brecordCheck\s*\(\s*['"][^'"]+['"]\s*,\s*['"][^'"]+['"]\s*,\s*['"](?:passed|PASS)['"]/i
 
 /** 递归收集 scripts/ 下的 .mjs（跳过 node_modules）。 */
 function collect(dir, out) {
@@ -78,6 +79,9 @@ for (const full of files) {
     if (LITERAL_PASS.test(line)) {
       violations.push(`${rel}:${index + 1} 把成功结论写成字面量 'PASS' —— 结论必须由断言派生，失败以非零退出`)
     }
+    if (LITERAL_SUBCHECK_PASSED.test(line)) {
+      violations.push(`${rel}:${index + 1} 在 recordCheck 中把检查项结果硬编码为字面量 'passed' —— 子项检查结论必须由真值条件派生（如 isOk ? 'passed' : 'failed'）`)
+    }
   })
 }
 
@@ -88,9 +92,9 @@ if (violations.length > 0) {
 }
 
 /**
- * 证据文件本身也要查：summary.json 的 status 必须由全部必需结果派生。
- * 历史反例 evidence/longform-journey/2026-10-06T13-41-19-856Z 与 13-46 曾写
- * status=PASS 但 compactionVerified=false——只看 status 的消费方会误判为通过。
+ * 证据文件本身也要查：summary.json 与 result.json 的 status 必须由全部必需结果派生。
+ * 历史反例 evidence/longform-journey 曾写 status=PASS 但 compactionVerified=false；
+ * 2026-10-18 作者旅程曾有 status=VERIFIED 但存在 failed 子项的假通过。
  * 无证据目录（干净检出 / CI 首次运行前）时跳过，不制造假红。
  */
 const evidenceRoot = join(root, 'evidence', 'longform-journey')
@@ -121,6 +125,33 @@ if (existsSync(evidenceRoot)) {
   }
 }
 
+const authorJourneyRoot = join(root, 'evidence', 'windows-author-journey')
+if (existsSync(authorJourneyRoot)) {
+  for (const entry of readdirSync(authorJourneyRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const resultJson = join(authorJourneyRoot, entry.name, 'result.json')
+    if (!existsSync(resultJson)) continue
+    evidenceChecked += 1
+    const relResult = relative(root, resultJson).replace(/\\/g, '/')
+    try {
+      const record = JSON.parse(readFileSync(resultJson, 'utf8'))
+      if (record.status === 'VERIFIED') {
+        if (record.summary && typeof record.summary.failed === 'number' && record.summary.failed > 0) {
+          violations.push(`${relResult} status=VERIFIED 但 summary.failed=${record.summary.failed} —— 成功结论与失败子项自相矛盾`)
+        }
+        if (Array.isArray(record.checks)) {
+          const failedChecks = record.checks.filter((c) => c.verdict === 'failed')
+          if (failedChecks.length > 0) {
+            violations.push(`${relResult} status=VERIFIED 但存在 ${failedChecks.length} 个 failed 检查项 —— 成功结论与检查明细矛盾`)
+          }
+        }
+      }
+    } catch (error) {
+      violations.push(`${relResult} 无法解析：${error.message}`)
+    }
+  }
+}
+
 if (violations.length > 0) {
   console.error('FAIL 证据卫生检查未通过：')
   for (const v of violations) console.error(`  - ${v}`)
@@ -128,4 +159,4 @@ if (violations.length > 0) {
 }
 for (const w of warnings) console.warn(`WARN ${w}`)
 
-console.log(`PASS 证据卫生检查：${files.length} 个脚本，无短 HEAD、无写死 PASS 结论；${evidenceChecked} 份长程证据无矛盾结论。`)
+console.log(`PASS 证据卫生检查：${files.length} 个脚本，无短 HEAD、无写死 PASS/passed 结论；${evidenceChecked} 份证据无自相矛盾。`)

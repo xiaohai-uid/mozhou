@@ -11,6 +11,7 @@
   "scripts": {
     "start": "electron .",
     "self-check": "node scripts/self-check.mjs",
+    "test:journey": "node scripts/verify-desktop-author-journey.mjs",
     "postinstall": "install-electron"
   },
   "devDependencies": {
