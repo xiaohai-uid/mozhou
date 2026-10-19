@@ -25,8 +25,8 @@
 - 词条总数: **97**
 - 声明: **27**
 - 局部同名: **7**
-- 引用: **13**
-- 仅测试: **2**
+- 引用: **14**
+- 仅测试: **1**
 - 未验证: **48**
 
 ## 已确认的命名漂移
@@ -121,7 +121,7 @@
 | 门禁 | - | - | - | 未验证 |
 | 闸门 | - | - | - | 未验证 |
 | 检查 | Check | `check` | `apps/web/server/routes/accountRoutes.ts:68` | 引用 |
-| 配额 | Quota | `quota` | `apps/web/server/billing/quota.test.ts:10` | 仅测试 |
+| 配额 | Quota | `quota` | `apps/web/src/shell/storage/browserStorage.ts:77` | 引用 |
 | 纵切 | Vertical Slice | - | - | 未验证 |
 | 切片 | Slice | `Slice` | `apps/web/src/workbench/editor/NovelEditorCanvas.tsx:6` | 引用 |
 | 挂账项 | Deferred Item | - | - | 未验证 |

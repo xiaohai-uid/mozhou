@@ -7,22 +7,16 @@ import { CapabilityChannels } from './shell/CapabilityChannels'
 import { ChangeMatrixPanel } from './change-matrix/ChangeMatrixPanel'
 import { SceneLayer } from './shell/scene/SceneLayer'
 import { SceneSettingsSheet } from './shell/scene/SceneSettingsSheet'
-import {
-  loadScenePreference,
-  resolveSceneProfile,
-  saveScenePreference,
-} from './shell/scene/scenePreference'
-import type { ScenePreference } from './shell/scene/scenePreference'
+import { resolveSceneProfile } from './shell/scene/scenePreference'
 import { InspectorEmpty, InspectorTower } from './shell/InspectorTower'
-import type { InspectorTabId, InspectorSummary } from './shell/InspectorTower'
-import { PipelineStrip, PIPELINE_STAGES } from './shell/PipelineStrip'
+import type { InspectorSummary } from './shell/InspectorTower'
+import { PipelineStrip } from './shell/PipelineStrip'
 import { useShellTelemetry } from './shell/useShellTelemetry'
 import { deriveStageStates, deriveSummary } from './shell/shellTelemetry'
 import { parentDirOf } from './shell/paths'
 import { PlaceholderView } from './shell/PlaceholderView'
 import { TopBar } from './shell/TopBar'
 import { loadWorkbenchState, saveWorkbenchState } from './shell/workbenchStorage'
-import type { BookInfo } from './shell/workbenchStorage'
 import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
 import { ReceiptPanel } from './context-receipt/ReceiptPanel'
@@ -44,47 +38,19 @@ import { CanonGraphView } from './canon-graph/CanonGraphView'
 import { GenreKitMarketplaceView } from './genre-kits/GenreKitMarketplaceView'
 import { StoryBrainPanel } from './story-brain/StoryBrainPanel'
 import { WizardOverlay } from './wizard/WizardOverlay'
-import type { WizardOutcome } from './wizard/WizardOverlay'
 import { WorkbenchView } from './workbench/WorkbenchView'
 import { StoryboardView } from './storyboard/StoryboardView'
-import { confirmStoryboardLeave } from './storyboard/dirtyGuard'
 import { MobileShell } from './mobile/MobileShell'
-import { DesktopToolModals, type DesktopModalType } from './shell/DesktopToolModals'
+import { DesktopToolModals } from './shell/DesktopToolModals'
 import { MigrationPanel } from './migration/MigrationPanel'
+import { useBookSession } from './shell/useBookSession'
+import { useAppNavigation } from './shell/useAppNavigation'
+import { useAppOverlays } from './shell/useAppOverlays'
 
 const CodeGraphView = lazy(async () => {
   const module = await import('./code-graph/CodeGraphView')
   return { default: module.CodeGraphView }
 })
-
-function stageToFocus(stageIndex: number): number {
-  return stageIndex / (PIPELINE_STAGES.length - 1)
-}
-
-const INSPECTOR_VIEW_TO_TAB: Partial<Record<ViewId, InspectorTabId>> = {
-  'quality-gate': 'quality',
-  'story-brain': 'story-brain',
-  'context-receipt': 'context-receipt',
-  'change-matrix': 'change-matrix',
-}
-
-const DEFAULT_STAGE = PIPELINE_STAGES.findIndex((stage) => stage.id === 'review')
-const WIZARD_DONE_KEY = 'mozhou.wizard.done'
-/** 迁移入口：非导航触发（不新增 NAV_GROUPS 项，views.test.ts 断言 6 组 23 项）。 */
-const MIGRATION_HASH = '#migration'
-
-function migrationRequested(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.location.hash === MIGRATION_HASH
-}
-
-function wizardCompleted(): boolean {
-  try {
-    return window.localStorage.getItem(WIZARD_DONE_KEY) === 'done'
-  } catch {
-    return false
-  }
-}
 
 export interface ErrorBoundaryProps {
   children: ReactNode
@@ -169,43 +135,66 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
 export function App(): JSX.Element {
   const [initial] = useState(loadWorkbenchState)
-  const [book, setBook] = useState<BookInfo | null>(initial.book)
-  const [view, setView] = useState<ViewId>(initial.view)
-  const [chapterIndex, setChapterIndex] = useState(1)
-  // T2：「为什么这么写」落点。正文侧点一次即带 receiptId 跳到装配看板并预选该条，
-  // 免去「切视图 + 在列表里翻找本章」两步。作者不必知道回执 id 长什么样。
-  const [receiptFocus, setReceiptFocus] = useState<string | null>(null)
-  const [stage, setStage] = useState(DEFAULT_STAGE)
-  const [inspectorTab, setInspectorTab] = useState<InspectorTabId>('quality')
-  const [wizardOpen, setWizardOpen] = useState(
-    () => initial.book === null && !wizardCompleted(),
-  )
-  const [desktopModal, setDesktopModal] = useState<DesktopModalType>(null)
-  const [scenePreference, setScenePreference] = useState<ScenePreference>(loadScenePreference)
-  const [sceneSheetOpen, setSceneSheetOpen] = useState(false)
-  /** 作品页「带章节进入分镜」的待打开章号（T04）。 */
-  const [storyboardChapter, setStoryboardChapter] = useState<number | null>(null)
-  /** 浏览器数据迁移面板（`#migration` 触发，非导航入口）。 */
-  const [migrationOpen, setMigrationOpen] = useState(migrationRequested)
-  /**
-   * 数据代次（E02）：迁移导入真正写回既有槽位后前进，用来重挂工作台会话，
-   * 让编辑器与对话流按 localStorage 里的新内容重新装配。
-   * 只在 `written > 0` 时前进——只落隔离槽不改变任何书章会话，不需要重挂。
-   */
-  const [dataGeneration, setDataGeneration] = useState(0)
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const onHashChange = () => setMigrationOpen(migrationRequested())
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
-  }, [])
+  // 1. 应用导航切片（view, stage, inspectorTab, receiptFocus, storyboardChapter）
+  const navigation = useAppNavigation({ initialView: initial.view })
+  const {
+    view,
+    setView,
+    stage,
+    setStage,
+    stageFocus,
+    inspectorTab,
+    setInspectorTab,
+    receiptFocus,
+    storyboardChapter,
+    handleSelectView,
+    explainContext,
+    openStoryboard,
+  } = navigation
 
-  useEffect(() => {
-    saveScenePreference(scenePreference)
-  }, [scenePreference])
+  // 2. 作品会话切片（book, chapterIndex, dataGeneration, selectBook）
+  const session = useBookSession({
+    initialBook: initial.book,
+    onNavigateWorkbench: () => setView('workbench'),
+  })
+  const {
+    book,
+    chapterIndex,
+    setChapterIndex,
+    dataGeneration,
+    bumpDataGeneration,
+    selectBook,
+    handleBookCreated,
+    handleBookSwitch,
+  } = session
 
-  /** 管线六态 + 检视摘要轨的真实数据证据（works/receipts/quality/matrix）。 */
+  // 3. 覆盖层与互斥栈切片（wizard, desktopModal, sceneSheet, migration）
+  const overlays = useAppOverlays({
+    initialBook: initial.book,
+    onBookSelected: selectBook,
+    onNavigateWorkbench: () => setView('workbench'),
+    onDataGenerationBump: bumpDataGeneration,
+  })
+  const {
+    wizardOpen,
+    desktopModal,
+    sceneSheetOpen,
+    migrationOpen,
+    scenePreference,
+    setScenePreference,
+    openWizard,
+    openDesktopModal,
+    closeDesktopModal,
+    openSceneSheet,
+    closeSceneSheet,
+    closeMigration,
+    handleWizardComplete,
+    handleWizardDismiss,
+    handleMigrationImported,
+  } = overlays
+
+  // 遥测管线与摘要
   const telemetry = useShellTelemetry(book?.root ?? null, chapterIndex)
   const stageStates = deriveStageStates({
     bookExists: book !== null,
@@ -247,41 +236,7 @@ export function App(): JSX.Element {
     document.getElementById('dialogue-panel')?.scrollIntoView({ block: 'start' })
   }, [view, book])
 
-  const handleSelectView = (next: ViewId): void => {
-    // U06：分镜有未保存修改时，切页先经确认（取消=留在原地，焦点/滚动自然保留）
-    if (next !== 'storyboard' && !confirmStoryboardLeave('切换到其他页面')) return
-    if (next !== 'storyboard') setStoryboardChapter(null) // 离开分镜不带旧章号
-    setView(next)
-    const tab = INSPECTOR_VIEW_TO_TAB[next]
-    if (tab !== undefined) setInspectorTab(tab)
-  }
-
-  const selectBook = (nextBook: BookInfo): void => {
-    // U06：切书同样经过离开确认（干净文档直接通过）
-    if (!confirmStoryboardLeave('切换作品')) return
-    setBook(nextBook)
-    setChapterIndex(1)
-    setView('workbench')
-  }
-
-  const handleBookCreated = (created: BookInfo): void => selectBook(created)
-  const handleBookSwitch = (switched: BookInfo): void => selectBook(switched)
   const parentDir = book === null ? null : parentDirOf(book.root)
-
-  const handleWizardComplete = (outcome: WizardOutcome): void => {
-    try {
-      window.localStorage.setItem(WIZARD_DONE_KEY, 'done')
-    } catch {
-      // localStorage 不可用：完成标记是增强，不阻塞工作台。
-    }
-    selectBook({ root: outcome.root, bookId: outcome.bookId, title: outcome.title })
-    setWizardOpen(false)
-  }
-
-  const handleWizardDismiss = (): void => {
-    setWizardOpen(false)
-    setView('workbench')
-  }
 
   const panels = {
     quality:
@@ -327,7 +282,7 @@ export function App(): JSX.Element {
         <>
           <SceneLayer
             profile={resolveSceneProfile(scenePreference, book?.bookId ?? null)}
-            focus={stageToFocus(stage)}
+            focus={stageFocus}
           />
           <div
             className={
@@ -339,9 +294,9 @@ export function App(): JSX.Element {
             <TopBar
               book={book}
               onHome={() => handleSelectView('workbench')}
-              onReplayWizard={() => setWizardOpen(true)}
-              onOpenModal={setDesktopModal}
-              onOpenScene={() => setSceneSheetOpen(true)}
+              onReplayWizard={openWizard}
+              onOpenModal={openDesktopModal}
+              onOpenScene={openSceneSheet}
             />
             <CapabilityChannels activeView={view} onSelect={handleSelectView} taskCount={telemetry.taskCount} />
             {/* U01：分镜页不挂小说生产管线与质量塔（独立创作任务面） */}
@@ -357,13 +312,7 @@ export function App(): JSX.Element {
                 onChapterIndexChange={setChapterIndex}
                 onBookCreated={handleBookCreated}
                 chapters={telemetry.works?.chapters}
-                onExplainContext={(receiptId) => {
-                  setReceiptFocus(receiptId)
-                  // F-08：走 handleSelectView 让 INSPECTOR_VIEW_TO_TAB 映射生效——此前
-                  // 直接 setView('context-receipt')，检视塔不切到装配看板，中央内容
-                  // 又没有该视图分支，用户只看到 PlaceholderView。
-                  handleSelectView('context-receipt')
-                }}
+                onExplainContext={explainContext}
               />
             ) : view === 'book-shelf' ? (
               <BookshelfView
@@ -383,7 +332,7 @@ export function App(): JSX.Element {
               <WorksView
                 root={book?.root ?? null}
                 onGoToWorkbench={() => setView('workbench')}
-                onOpenStoryboard={(ch) => { setStoryboardChapter(ch); handleSelectView('storyboard') }}
+                onOpenStoryboard={openStoryboard}
                 onSwitchBook={handleBookSwitch}
               />
             ) : view === 'storyboard' ? (
@@ -391,8 +340,8 @@ export function App(): JSX.Element {
                 key={book?.root ?? 'no-book'}
                 book={book}
                 initialChapterIndex={storyboardChapter ?? undefined}
-                onGoToShelf={() => { setStoryboardChapter(null); handleSelectView('book-shelf') }}
-                onCreateBook={() => setWizardOpen(true)}
+                onGoToShelf={() => handleSelectView('book-shelf')}
+                onCreateBook={openWizard}
               />
             ) : view === 'tasks' ? (
               <TasksView root={book?.root ?? null} onGoToWorkbench={() => setView('workbench')} />
@@ -430,13 +379,13 @@ export function App(): JSX.Element {
               <InspectorTower activeTab={inspectorTab} onTabChange={setInspectorTab} panels={panels} summary={inspectorSummary} />
             )}
           </div>
-          <DesktopToolModals activeModal={desktopModal} book={book} onClose={() => setDesktopModal(null)} />
+          <DesktopToolModals activeModal={desktopModal} book={book} onClose={closeDesktopModal} />
           {sceneSheetOpen && (
             <SceneSettingsSheet
               preference={scenePreference}
               book={book}
               onChange={setScenePreference}
-              onClose={() => setSceneSheetOpen(false)}
+              onClose={closeSceneSheet}
             />
           )}
         </>
@@ -451,14 +400,8 @@ export function App(): JSX.Element {
       {migrationOpen && (
         <MigrationPanel
           targetBook={book}
-          onImported={(result) => {
-            // 只有真正写回书章槽位才重挂：让编辑器/对话流按新内容重新装配（E02）。
-            if (result.written.length > 0) setDataGeneration((n) => n + 1)
-          }}
-          onClose={() => {
-            if (typeof window !== 'undefined') window.location.hash = ''
-            setMigrationOpen(false)
-          }}
+          onImported={(result) => handleMigrationImported(result.written.length)}
+          onClose={closeMigration}
         />
       )}
     </ErrorBoundary>
