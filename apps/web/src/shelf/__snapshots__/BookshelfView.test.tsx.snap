@@ -38,6 +38,13 @@ exports[`BookshelfView（书架） > 书库列表渲染（书名/章数/书 id�
       >
         导入既有文档 (.docx / .txt / .md)
       </button>
+      <button
+        class="btn"
+        data-testid="bookshelf-recycle-bin-btn"
+        type="button"
+      >
+        回收站
+      </button>
       <span
         class="mono muted"
         style="align-self: center;"

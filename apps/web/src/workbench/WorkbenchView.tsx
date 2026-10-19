@@ -1,7 +1,6 @@
 /**
- * 中栏工作台（实现票 T40 · ADR-0027）。
- * 对话区骨架 + 建书/账本 + 创作辅助工具。所有状态文案必须来自真实数据；
- * 未接入的数据指标不得以示例数值伪装成当前用户状态。
+ * 中栏工作台（实现票 T40 · ADR-0027）。对话区骨架 + 建书/账本 + 创作辅助工具。
+ * 所有状态文案必须来自真实数据；未接入的数据指标不得以示例数值伪装成当前用户状态。
  */
 import { useCallback, useEffect, useState } from 'react'
 import { post } from '../lib/post'
@@ -14,6 +13,7 @@ import type { WorksChapterSummary } from '../../shared/api'
 import { WhyThisWritingButton } from '../context-receipt/WhyThisWritingButton'
 import { PreferenceProfilePanel } from './PreferenceProfilePanel'
 import { ModelRoutingSuggestionsPanel } from './ModelRoutingSuggestionsPanel'
+import { AgentToolboxPanel } from './AgentToolboxPanel'
 interface BookCreated {
   ok: true
   root: string
@@ -160,6 +160,10 @@ export function WorkbenchView({
           <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('compliance')}>
             <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></svg>
             敏感词审查
+          </button>
+          <button className="btn" style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setActiveModal('toolbox')} data-testid="open-agent-toolbox-btn" title="智能体工具箱">
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>
+            工具箱
           </button>
         </div>
       </div>
@@ -325,6 +329,18 @@ export function WorkbenchView({
                 <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <PreferenceProfilePanel book={book} />
                   <ModelRoutingSuggestionsPanel book={book} />
+                </div>
+              </details>
+            )}
+
+            {book !== null && (
+              <details className="card-shell studio-agent-toolbox" style={{ marginTop: 24, cursor: 'pointer' }} data-testid="studio-agent-toolbox-details">
+                <summary style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-faint)', outline: 'none', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>智能体工具箱与沙箱调试 (Agent Tool Registry & Sandbox)</span>
+                  <span style={{ fontSize: 10 }}>展开 ▾</span>
+                </summary>
+                <div style={{ padding: '10px 14px' }}>
+                  <AgentToolboxPanel book={book} />
                 </div>
               </details>
             )}

@@ -38,6 +38,8 @@ const commands = {
   'lint-whitelist': 'node scripts/check-lint-whitelist.mjs',
   // 2026-10-18 补：Playwright Electron 桌面端端到端旅程回归与失败 Trace 回放门
   'desktop-journey': 'pnpm verify:desktop-journey',
+  // 2026-10-19 补：Playwright Electron 桌面端安装包结构与运行时健康校验门
+  'desktop-package': 'pnpm verify:desktop-package',
 }
 const cmd = commands[task]
 if (cmd === undefined) {

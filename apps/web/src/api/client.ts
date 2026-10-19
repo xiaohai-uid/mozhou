@@ -23,6 +23,9 @@ import type {
   RankScanResponse,
   ReceiptDetailResponse,
   ReceiptListResponse,
+  RecycleListDtoResponse,
+  RecyclePurgeDtoResponse,
+  RecycleRestoreDtoResponse,
   StoryBrainFactsResponse,
   StyleDistillResponse,
   TasksResponse,
@@ -249,6 +252,28 @@ export class MoZhouApiClient {
     splitOptions?: DocSplitOptionsDto
   }): Promise<DocImportExecuteDtoResponse> {
     return post('/api/library.import.doc', payload)
+  }
+
+  /* ---- 工作区回收站 ---- */
+  listRecycle(trashRoot?: string): Promise<RecycleListDtoResponse> {
+    const payload: Record<string, unknown> = {}
+    if (this._config.root) payload['root'] = this._config.root
+    if (trashRoot) payload['trashRoot'] = trashRoot
+    return post('/api/recycle.list', payload)
+  }
+
+  restoreRecycle(id: string, trashRoot?: string): Promise<RecycleRestoreDtoResponse> {
+    const payload: Record<string, unknown> = { id }
+    if (this._config.root) payload['root'] = this._config.root
+    if (trashRoot) payload['trashRoot'] = trashRoot
+    return post('/api/recycle.restore', payload)
+  }
+
+  purgeRecycle(id: string, trashRoot?: string): Promise<RecyclePurgeDtoResponse> {
+    const payload: Record<string, unknown> = { id }
+    if (this._config.root) payload['root'] = this._config.root
+    if (trashRoot) payload['trashRoot'] = trashRoot
+    return post('/api/recycle.purge', payload)
   }
 }
 

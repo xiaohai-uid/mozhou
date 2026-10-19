@@ -83,6 +83,16 @@ MOZHOU_SELFCHECK_ELECTRON_ARGS="--no-sandbox" pnpm run self-check
 只有当前用户的令牌无法初始化 Chromium 沙箱时（本开发机即如此，Electron 直接退出码 3）才需要它。
 这与 `webPreferences.sandbox` 是两件事：后者（渲染器沙箱）始终为 `true`，A8 断言的就是它。
 
+## 打包与自动化校验
+
+```bash
+cd desktop
+pnpm run package:dir       # 构建独立免安装绿色运行目录（位于 release-artifacts/）
+pnpm run package:windows   # 构建并编译 Windows 完整安装包（若具备 Inno Setup 6）
+pnpm run verify:package    # 运行桌面安装包自动化结构与原生模块健康校验 (10 项断言)
+pnpm run test:journey      # 运行 Electron 桌面端端到端作者旅程回归 (16 项断言)
+```
+
 ## 安全姿态
 
 - 渲染进程：`nodeIntegration:false`、`contextIsolation:true`、`sandbox:true`、`webviewTag:false`，

@@ -9,7 +9,7 @@
 
 | 包 | 路径 | 源码文件 | 源码行数 | 测试文件 | 测试行数 | 内部依赖 |
 |---|---|---:|---:|---:|---:|---|
-| `@mozhou/web` | `apps/web` | 197 | 49288 | 78 | 13803 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/flywheel`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
+| `@mozhou/web` | `apps/web` | 201 | 51234 | 80 | 14424 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/flywheel`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/pipeline` | `packages/pipeline` | 59 | 18982 | 34 | 10116 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/data-plane` | `packages/data-plane` | 66 | 16555 | 28 | 7314 | `@mozhou/kernel` |
 | `@mozhou/context-compiler` | `packages/context-compiler` | 20 | 8082 | 10 | 3567 | `@mozhou/data-plane`, `@mozhou/kernel` |

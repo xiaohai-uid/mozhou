@@ -15,6 +15,7 @@ import type { LibraryResponse, LibraryOpenResponse } from '../../shared/api'
 import { post } from '../lib/post'
 import type { BookInfo } from '../shell/workbenchStorage'
 import { DocImportModal } from '../works/DocImportModal'
+import { RecycleBinModal } from '../recycle/RecycleBinModal'
 
 export function BookshelfView({
   parentDir,
@@ -35,6 +36,7 @@ export function BookshelfView({
   const [importTitle, setImportTitle] = useState('')
   const [importing, setImporting] = useState(false)
   const [importDocModalOpen, setImportDocModalOpen] = useState(false)
+  const [recycleModalOpen, setRecycleModalOpen] = useState(false)
 
   const load = useCallback(async (): Promise<void> => {
     if (parentDir === null) return
@@ -121,6 +123,14 @@ export function BookshelfView({
             data-testid="bookshelf-import-doc-btn"
           >
             导入既有文档 (.docx / .txt / .md)
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setRecycleModalOpen(true)}
+            data-testid="bookshelf-recycle-bin-btn"
+          >
+            回收站
           </button>
           <span className="mono muted" style={{ alignSelf: 'center' }}>
             书库根：{parentDir}
@@ -211,6 +221,14 @@ export function BookshelfView({
           setImportDocModalOpen(false)
           void load()
           onSwitchBook(created)
+        }}
+      />
+      <RecycleBinModal
+        isOpen={recycleModalOpen}
+        root={currentRoot}
+        onClose={() => setRecycleModalOpen(false)}
+        onRestored={() => {
+          void load()
         }}
       />
     </section>

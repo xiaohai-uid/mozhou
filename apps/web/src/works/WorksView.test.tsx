@@ -100,17 +100,30 @@ describe('WorksView（我的作品）', () => {
     expect(importBtn).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).toBeNull()
 
-    await userEvent.click(importBtn)
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('导入已有书稿建书')).toBeInTheDocument()
+    const recycleBtn = screen.getByTestId('works-recycle-bin-btn')
+    expect(recycleBtn).toBeInTheDocument()
+
+    await userEvent.click(recycleBtn)
+    expect(screen.getByTestId('recycle-bin-modal')).toBeInTheDocument()
+    expect(screen.getByText('工作区回收站')).toBeInTheDocument()
   })
 
-  it('已建书时标题栏呈现导入新文档按钮，点击可唤起导入弹窗', async () => {
+  it('已建书时标题栏呈现回收站按钮与导入新文档按钮，点击可唤起对应弹窗', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_WORKS)))
     render(<WorksView root="C:/tmp/fake-god" onGoToWorkbench={() => {}} />)
     await waitFor(() => {
       expect(screen.getByTestId('works-overview')).toBeInTheDocument()
     })
+
+    const recycleBtn = screen.getByTestId('works-recycle-bin-btn')
+    expect(recycleBtn).toBeInTheDocument()
+    await userEvent.click(recycleBtn)
+    expect(screen.getByTestId('recycle-bin-modal')).toBeInTheDocument()
+    expect(screen.getByText('工作区回收站')).toBeInTheDocument()
+
+    // 关闭回收站
+    await userEvent.click(screen.getByRole('button', { name: '关闭回收站' }))
+    expect(screen.queryByTestId('recycle-bin-modal')).toBeNull()
 
     const importBtn = screen.getByRole('button', { name: '导入新文档' })
     expect(importBtn).toBeInTheDocument()

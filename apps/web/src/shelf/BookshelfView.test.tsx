@@ -117,6 +117,19 @@ describe('BookshelfView（书架）', () => {
     expect(screen.getByText('导入已有书稿建书')).toBeInTheDocument()
   })
 
+  it('书架顶部操作栏点击回收站按钮唤起 RecycleBinModal', async () => {
+    stubShelfFetch()
+    render(<BookshelfView parentDir={PARENT} currentRoot={'C:/tmp/lib/甲书'} onSwitchBook={() => {}} />)
+
+    const recycleBtn = screen.getByTestId('bookshelf-recycle-bin-btn')
+    expect(recycleBtn).toBeInTheDocument()
+    expect(screen.queryByTestId('recycle-bin-modal')).toBeNull()
+
+    await userEvent.click(recycleBtn)
+    expect(screen.getByTestId('recycle-bin-modal')).toBeInTheDocument()
+    expect(screen.getByText('工作区回收站')).toBeInTheDocument()
+  })
+
   it('无书库目录：显式引导（不假装可用）', () => {
     render(<BookshelfView parentDir={null} currentRoot={null} onSwitchBook={() => {}} />)
     expect(screen.getByTestId('bookshelf-empty').textContent).toContain('书架暂不可用')

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { WorksOverviewResponse } from '../../shared/api'
 import { post } from '../lib/post'
 import { DocImportModal } from './DocImportModal'
+import { RecycleBinModal } from '../recycle/RecycleBinModal'
 import type { BookInfo } from '../shell/workbenchStorage'
 import { parentDirOf } from '../shell/paths'
 
@@ -35,6 +36,7 @@ export function WorksView({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [recycleModalOpen, setRecycleModalOpen] = useState(false)
   const parentDir = root === null ? undefined : parentDirOf(root)
 
   const load = useCallback(async (): Promise<void> => {
@@ -82,6 +84,14 @@ export function WorksView({
                 >
                   导入既有文档 (DOCX / TXT / MD)
                 </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setRecycleModalOpen(true)}
+                  data-testid="works-recycle-bin-btn"
+                >
+                  回收站
+                </button>
               </div>
             </div>
           </div>
@@ -93,6 +103,14 @@ export function WorksView({
           onSuccess={(created) => {
             setImportModalOpen(false)
             onSwitchBook?.(created)
+          }}
+        />
+        <RecycleBinModal
+          isOpen={recycleModalOpen}
+          root={null}
+          onClose={() => setRecycleModalOpen(false)}
+          onRestored={() => {
+            void load()
           }}
         />
       </section>
@@ -107,6 +125,15 @@ export function WorksView({
           {data !== null ? `${data.book.title} · ${data.stats.totalChapters} 章 · ${data.stats.totalWords} 字` : '加载中…'}
         </span>
         <div className="save" style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setRecycleModalOpen(true)}
+            data-testid="works-recycle-bin-btn"
+            style={{ fontSize: 10, padding: '4px 8px' }}
+          >
+            回收站
+          </button>
           <button
             type="button"
             className="btn"
@@ -268,6 +295,14 @@ export function WorksView({
         onSuccess={(created) => {
           setImportModalOpen(false)
           onSwitchBook?.(created)
+        }}
+      />
+      <RecycleBinModal
+        isOpen={recycleModalOpen}
+        root={root}
+        onClose={() => setRecycleModalOpen(false)}
+        onRestored={() => {
+          void load()
         }}
       />
     </section>

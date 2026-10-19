@@ -18,8 +18,9 @@ import { runLocalComplianceCheck } from '../shared/complianceCheck'
 import { executeExportWorkflow } from '../export-suite/exportDownload'
 import { post } from '../lib/post'
 import type { NamingSuccessResponse, NamingSuggestion } from '../../shared/api'
+import { AgentToolboxPanel } from '../workbench/AgentToolboxPanel'
 
-export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'compliance'
+export type DesktopModalType = null | 'history' | 'inspiration' | 'export' | 'compliance' | 'toolbox'
 
 export interface DesktopToolModalsProps {
   activeModal: DesktopModalType
@@ -32,6 +33,7 @@ const TITLES: Record<Exclude<DesktopModalType, null>, string> = {
   inspiration: '本地灵感起名工坊与卡文骰子',
   export: '作品导出',
   compliance: '平台敏感词与合规审查',
+  toolbox: '智能体工具箱与沙箱调用',
 }
 
 /** AI 起名类目（/api/naming 契约 id 的展示映射；本地摇号见上方 LOCAL PRESET）。 */
@@ -357,6 +359,10 @@ export function DesktopToolModals({ activeModal, book, onClose }: DesktopToolMod
               )}
             </div>
           </div>
+        )}
+
+        {activeModal === 'toolbox' && (
+          <AgentToolboxPanel book={book} />
         )}
       </div>
     </aside>

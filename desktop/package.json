@@ -12,9 +12,13 @@
     "start": "electron .",
     "self-check": "node scripts/self-check.mjs",
     "test:journey": "node scripts/verify-desktop-author-journey.mjs",
+    "package:dir": "node scripts/package-windows-electron.mjs --dir-only",
+    "package:windows": "node scripts/package-windows-electron.mjs",
+    "verify:package": "node scripts/verify-package-integrity.mjs",
     "postinstall": "install-electron"
   },
   "devDependencies": {
+    "@electron/asar": "^4.3.1",
     "electron": "44.7.0",
     "playwright-core": "1.64.0"
   }
