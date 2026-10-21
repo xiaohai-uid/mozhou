@@ -90,4 +90,65 @@ describe('D4 会话持久化', () => {
     const broken = new SessionManager(new InMemoryAuthProvider())
     expect(() => broken.configurePersistence(root)).toThrow()
   })
+
+  it('配额淘汰的会话跨重启依然失效，保留的会话不受影响', () => {
+    const root = tempRoot()
+    const first = manager(root)
+    const sessions = []
+    for (let i = 0; i < 11; i++) {
+      sessions.push(first.createSession({ userId: 'quota-user', email: 'q@example.com' }).session)
+    }
+
+    // 重启后回读：被淘汰的最老会话仍不可用
+    const second = manager(root)
+    expect(second.getSession(sessions[0]!.sessionId)).toBeNull()
+    for (let i = 1; i < 11; i++) {
+      expect(second.getSession(sessions[i]!.sessionId)).not.toBeNull()
+    }
+  })
+
+  it('配额淘汰写入审计事件且不落原始 token', () => {
+    const root = tempRoot()
+    const first = manager(root)
+    const sessions = []
+    for (let i = 0; i < 11; i++) {
+      sessions.push(first.createSession({ userId: 'audit-user', email: 'a@example.com' }).session)
+    }
+
+    const audit = readFileSync(join(root, 'users', 'auth-audit.jsonl'), 'utf8')
+    expect(audit).toContain('session.evicted_user_quota')
+    expect(audit).not.toContain(sessions[0]!.sessionId)
+  })
+
+  it('全局容量上限按最老会话淘汰', () => {
+    const root = tempRoot()
+    const capped = new SessionManager(new InMemoryAuthProvider(), {
+      maxSessionsPerUser: 100,
+      maxActiveSessions: 2,
+    })
+    capped.configurePersistence(root)
+
+    const a = capped.createSession({ userId: 'cap-a', email: null }).session
+    const b = capped.createSession({ userId: 'cap-b', email: null }).session
+    const c = capped.createSession({ userId: 'cap-c', email: null }).session
+
+    expect(capped.getSession(a.sessionId)).toBeNull()
+    expect(capped.getSession(b.sessionId)).not.toBeNull()
+    expect(capped.getSession(c.sessionId)).not.toBeNull()
+  })
+
+  it('全局重置码上限优先淘汰已消费的旧记录，未消费记录保持可用', () => {
+    const root = tempRoot()
+    const capped = new SessionManager(new InMemoryAuthProvider(), { maxResetCodes: 2 })
+    capped.configurePersistence(root)
+
+    const code1 = capped.createResetCode('r1@example.com', 'u1')
+    capped.consumeResetCode(code1)
+    const code2 = capped.createResetCode('r2@example.com', 'u2')
+    capped.createResetCode('r3@example.com', 'u3')
+
+    // 已消费的 code1 被优先淘汰；code2/code3 仍有效
+    expect(() => capped.consumeResetCode(code1)).toThrow(/invalid or not found/)
+    expect(capped.consumeResetCode(code2).userId).toBe('u2')
+  })
 })

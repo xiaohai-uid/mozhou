@@ -441,17 +441,33 @@ export class InMemoryAuthProvider implements IAuthProvider {
 export const SESSION_COOKIE_NAME = 'mozhou_session'
 export const DEFAULT_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 小时
 export const RESET_CODE_TTL_MS = 10 * 60 * 1000 // 10 分钟单次重置码
+export const DEFAULT_MAX_SESSIONS_PER_USER = 10 // 单用户最大并发有效会话数
+export const DEFAULT_MAX_ACTIVE_SESSIONS = 1000 // 全局最大活跃会话数
+export const DEFAULT_MAX_RESET_CODES = 500 // 全局最大密码重置码数
 
 export class SessionManager {
   private readonly _sessions = new Map<string, SessionRecord>()
   private readonly _resetCodes = new Map<string, ResetCodeRecord>()
   private _provider: IAuthProvider
   private _store: SessionStore | null = null
+  readonly maxSessionsPerUser: number
+  readonly maxActiveSessions: number
+  readonly maxResetCodes: number
   readonly loginLimiter = new RateLimiter(5, 60 * 1000) // 5 次/分钟
   readonly resetLimiter = new RateLimiter(3, 60 * 1000) // 3 次/分钟
 
-  constructor(provider?: IAuthProvider) {
+  constructor(
+    provider?: IAuthProvider,
+    options?: {
+      readonly maxSessionsPerUser?: number
+      readonly maxActiveSessions?: number
+      readonly maxResetCodes?: number
+    },
+  ) {
     this._provider = provider ?? (process.env.NODE_ENV === 'test' ? new InMemoryAuthProvider() : new SupabaseAuthProvider())
+    this.maxSessionsPerUser = options?.maxSessionsPerUser ?? DEFAULT_MAX_SESSIONS_PER_USER
+    this.maxActiveSessions = options?.maxActiveSessions ?? DEFAULT_MAX_ACTIVE_SESSIONS
+    this.maxResetCodes = options?.maxResetCodes ?? DEFAULT_MAX_RESET_CODES
   }
 
   get provider(): IAuthProvider {
@@ -503,9 +519,43 @@ export class SessionManager {
   }
 
   createSession(principal: VerifiedPrincipal, maxAgeMs = DEFAULT_SESSION_MAX_AGE_MS): { session: SessionRecord; cookie: string } {
+    const now = Date.now()
+    // 1. 被动清理已自然过期会话
+    this.pruneExpired(now)
+
+    // 2. 检查并执行单用户并发会话配额保护（淘汰该用户最老的有效会话）
+    const userSessions: SessionRecord[] = []
+    for (const s of this._sessions.values()) {
+      if (s.userId === principal.userId && !s.revoked) {
+        userSessions.push(s)
+      }
+    }
+    if (userSessions.length >= this.maxSessionsPerUser) {
+      userSessions.sort((a, b) => a.createdAt - b.createdAt)
+      const toEvictCount = userSessions.length - this.maxSessionsPerUser + 1
+      for (let i = 0; i < toEvictCount; i++) {
+        const oldest = userSessions[i]
+        if (oldest) {
+          oldest.revoked = true
+          this._sessions.delete(oldest.sessionId)
+          this.audit('session.evicted_user_quota', { userId: principal.userId, sessionRef: sessionRef(oldest.sessionId) })
+        }
+      }
+    }
+
+    // 3. 检查全局活跃会话容量硬护栏
+    if (this._sessions.size >= this.maxActiveSessions) {
+      const allSessions = Array.from(this._sessions.values()).sort((a, b) => a.createdAt - b.createdAt)
+      const oldestGlobal = allSessions[0]
+      if (oldestGlobal) {
+        oldestGlobal.revoked = true
+        this._sessions.delete(oldestGlobal.sessionId)
+        this.audit('session.evicted_capacity', { userId: oldestGlobal.userId, sessionRef: sessionRef(oldestGlobal.sessionId) })
+      }
+    }
+
     const sessionId = 'ses_' + randomBytes(32).toString('hex')
     const csrfToken = 'csr_' + randomBytes(24).toString('hex')
-    const now = Date.now()
     const session: SessionRecord = {
       sessionId,
       userId: principal.userId,
@@ -567,12 +617,27 @@ export class SessionManager {
   }
 
   createResetCode(email: string, userId: string, ttlMs = RESET_CODE_TTL_MS): string {
+    const now = Date.now()
+    this.pruneExpired(now)
+
+    // 全局重置码容量硬上限：优先淘汰已消费的旧记录；无已消费记录时淘汰最早到期者。
+    if (this._resetCodes.size >= this.maxResetCodes) {
+      const consumedCodes = Array.from(this._resetCodes.values()).filter((c) => c.consumed)
+      const candidates = consumedCodes.length > 0 ? consumedCodes : Array.from(this._resetCodes.values())
+      candidates.sort((a, b) => a.expiresAt - b.expiresAt)
+      const victim = candidates[0]
+      if (victim) {
+        this._resetCodes.delete(victim.code)
+        this.audit('reset.evicted_capacity', { userId: victim.userId, resetRef: sessionRef(victim.code) })
+      }
+    }
+
     const code = 'rst_' + randomBytes(20).toString('hex')
     const record: ResetCodeRecord = {
       code,
       email: email.trim().toLowerCase(),
       userId,
-      expiresAt: Date.now() + ttlMs,
+      expiresAt: now + ttlMs,
       consumed: false,
     }
     this._resetCodes.set(code, record)
