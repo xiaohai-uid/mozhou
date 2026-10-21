@@ -443,7 +443,22 @@ export const DEFAULT_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 小时
 export const RESET_CODE_TTL_MS = 10 * 60 * 1000 // 10 分钟单次重置码
 export const DEFAULT_MAX_SESSIONS_PER_USER = 10 // 单用户最大并发有效会话数
 export const DEFAULT_MAX_ACTIVE_SESSIONS = 1000 // 全局最大活跃会话数
-export const DEFAULT_MAX_RESET_CODES = 500 // 全局最大密码重置码数
+export const DEFAULT_MAX_RESET_CODES = 500 // 全局未消费重置码上限（已消费记录只随过期清理）
+
+export interface SessionManagerOptions {
+  readonly maxSessionsPerUser?: number
+  readonly maxActiveSessions?: number
+  readonly maxResetCodes?: number
+}
+
+/** 容量阈值必须是正整数：0 或负数会让配额判断反向失效，因此显式拒绝而不是静默接受。 */
+function requirePositiveLimit(name: string, value: number | undefined, fallback: number): number {
+  if (value === undefined) return fallback
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer (received ${String(value)})`)
+  }
+  return value
+}
 
 export class SessionManager {
   private readonly _sessions = new Map<string, SessionRecord>()
@@ -456,18 +471,15 @@ export class SessionManager {
   readonly loginLimiter = new RateLimiter(5, 60 * 1000) // 5 次/分钟
   readonly resetLimiter = new RateLimiter(3, 60 * 1000) // 3 次/分钟
 
-  constructor(
-    provider?: IAuthProvider,
-    options?: {
-      readonly maxSessionsPerUser?: number
-      readonly maxActiveSessions?: number
-      readonly maxResetCodes?: number
-    },
-  ) {
+  constructor(provider?: IAuthProvider, options?: SessionManagerOptions) {
     this._provider = provider ?? (process.env.NODE_ENV === 'test' ? new InMemoryAuthProvider() : new SupabaseAuthProvider())
-    this.maxSessionsPerUser = options?.maxSessionsPerUser ?? DEFAULT_MAX_SESSIONS_PER_USER
-    this.maxActiveSessions = options?.maxActiveSessions ?? DEFAULT_MAX_ACTIVE_SESSIONS
-    this.maxResetCodes = options?.maxResetCodes ?? DEFAULT_MAX_RESET_CODES
+    this.maxSessionsPerUser = requirePositiveLimit(
+      'maxSessionsPerUser',
+      options?.maxSessionsPerUser,
+      DEFAULT_MAX_SESSIONS_PER_USER,
+    )
+    this.maxActiveSessions = requirePositiveLimit('maxActiveSessions', options?.maxActiveSessions, DEFAULT_MAX_ACTIVE_SESSIONS)
+    this.maxResetCodes = requirePositiveLimit('maxResetCodes', options?.maxResetCodes, DEFAULT_MAX_RESET_CODES)
   }
 
   get provider(): IAuthProvider {
@@ -498,6 +510,10 @@ export class SessionManager {
     }
     this._store = store
     this.pruneExpired()
+    // 升级前的状态文件没有容量上限：回读时立即收敛，避免「上限只在写入时生效」。
+    this.trimAllUserSessions(0)
+    this.trimGlobalSessions(this.maxActiveSessions)
+    this.trimResetCodes(this.maxResetCodes)
     this.persist()
   }
 
@@ -518,41 +534,72 @@ export class SessionManager {
     }
   }
 
+  private evictSession(victim: SessionRecord, event: string): void {
+    victim.revoked = true
+    this._sessions.delete(victim.sessionId)
+    this.audit(event, { userId: victim.userId, sessionRef: sessionRef(victim.sessionId) })
+  }
+
+  /** 单用户配额：淘汰该用户最老的有效会话，直到能容纳新会话（reserve 为预留位置数）。 */
+  private trimUserSessions(userId: string, reserve: number): void {
+    const userSessions: SessionRecord[] = []
+    for (const session of this._sessions.values()) {
+      if (session.userId === userId && !session.revoked) userSessions.push(session)
+    }
+    const keep = Math.max(0, this.maxSessionsPerUser - reserve)
+    if (userSessions.length <= keep) return
+    userSessions.sort((a, b) => a.createdAt - b.createdAt)
+    for (const victim of userSessions.slice(0, userSessions.length - keep)) {
+      this.evictSession(victim, 'session.evicted_user_quota')
+    }
+  }
+
+  private trimAllUserSessions(reserve: number): void {
+    const userIds = new Set<string>()
+    for (const session of this._sessions.values()) userIds.add(session.userId)
+    for (const userId of userIds) this.trimUserSessions(userId, reserve)
+  }
+
+  /** 全局容量：淘汰最老会话，直到剩余数量不超过 target。 */
+  private trimGlobalSessions(target: number): void {
+    if (this._sessions.size <= target) return
+    const all = Array.from(this._sessions.values()).sort((a, b) => a.createdAt - b.createdAt)
+    for (const victim of all.slice(0, this._sessions.size - target)) {
+      this.evictSession(victim, 'session.evicted_capacity')
+    }
+  }
+
+  /**
+   * 重置码容量：只淘汰未消费记录。已消费记录必须保留到自然过期——「已使用」与
+   * 「不存在」是两种不同的回答，删掉前者会让跨重启的重放检测失去准确语义。
+   */
+  private trimResetCodes(target: number): void {
+    if (this._resetCodes.size <= target) return
+    const candidates = Array.from(this._resetCodes.values()).filter((rec) => !rec.consumed)
+    if (candidates.length === 0) return
+    candidates.sort((a, b) => a.expiresAt - b.expiresAt)
+    for (const victim of candidates.slice(0, this._resetCodes.size - target)) {
+      this._resetCodes.delete(victim.code)
+      this.audit('reset.evicted_capacity', { userId: victim.userId, resetRef: sessionRef(victim.code) })
+    }
+  }
+
+  /** 同一邮箱只保留最新的未消费重置码，避免重复请求把旧链接一直留在内存里。 */
+  private dropSupersededResetCodes(email: string): void {
+    for (const [code, rec] of this._resetCodes) {
+      if (!rec.consumed && rec.email === email) {
+        this._resetCodes.delete(code)
+        this.audit('reset.superseded', { userId: rec.userId, resetRef: sessionRef(code) })
+      }
+    }
+  }
+
   createSession(principal: VerifiedPrincipal, maxAgeMs = DEFAULT_SESSION_MAX_AGE_MS): { session: SessionRecord; cookie: string } {
     const now = Date.now()
-    // 1. 被动清理已自然过期会话
+    // 被动清理已自然过期会话，再为即将插入的会话腾出配额与全局位置。
     this.pruneExpired(now)
-
-    // 2. 检查并执行单用户并发会话配额保护（淘汰该用户最老的有效会话）
-    const userSessions: SessionRecord[] = []
-    for (const s of this._sessions.values()) {
-      if (s.userId === principal.userId && !s.revoked) {
-        userSessions.push(s)
-      }
-    }
-    if (userSessions.length >= this.maxSessionsPerUser) {
-      userSessions.sort((a, b) => a.createdAt - b.createdAt)
-      const toEvictCount = userSessions.length - this.maxSessionsPerUser + 1
-      for (let i = 0; i < toEvictCount; i++) {
-        const oldest = userSessions[i]
-        if (oldest) {
-          oldest.revoked = true
-          this._sessions.delete(oldest.sessionId)
-          this.audit('session.evicted_user_quota', { userId: principal.userId, sessionRef: sessionRef(oldest.sessionId) })
-        }
-      }
-    }
-
-    // 3. 检查全局活跃会话容量硬护栏
-    if (this._sessions.size >= this.maxActiveSessions) {
-      const allSessions = Array.from(this._sessions.values()).sort((a, b) => a.createdAt - b.createdAt)
-      const oldestGlobal = allSessions[0]
-      if (oldestGlobal) {
-        oldestGlobal.revoked = true
-        this._sessions.delete(oldestGlobal.sessionId)
-        this.audit('session.evicted_capacity', { userId: oldestGlobal.userId, sessionRef: sessionRef(oldestGlobal.sessionId) })
-      }
-    }
+    this.trimUserSessions(principal.userId, 1)
+    this.trimGlobalSessions(this.maxActiveSessions - 1)
 
     const sessionId = 'ses_' + randomBytes(32).toString('hex')
     const csrfToken = 'csr_' + randomBytes(24).toString('hex')
@@ -619,23 +666,14 @@ export class SessionManager {
   createResetCode(email: string, userId: string, ttlMs = RESET_CODE_TTL_MS): string {
     const now = Date.now()
     this.pruneExpired(now)
-
-    // 全局重置码容量硬上限：优先淘汰已消费的旧记录；无已消费记录时淘汰最早到期者。
-    if (this._resetCodes.size >= this.maxResetCodes) {
-      const consumedCodes = Array.from(this._resetCodes.values()).filter((c) => c.consumed)
-      const candidates = consumedCodes.length > 0 ? consumedCodes : Array.from(this._resetCodes.values())
-      candidates.sort((a, b) => a.expiresAt - b.expiresAt)
-      const victim = candidates[0]
-      if (victim) {
-        this._resetCodes.delete(victim.code)
-        this.audit('reset.evicted_capacity', { userId: victim.userId, resetRef: sessionRef(victim.code) })
-      }
-    }
+    const normalizedEmail = email.trim().toLowerCase()
+    this.dropSupersededResetCodes(normalizedEmail)
+    this.trimResetCodes(this.maxResetCodes - 1)
 
     const code = 'rst_' + randomBytes(20).toString('hex')
     const record: ResetCodeRecord = {
       code,
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       userId,
       expiresAt: now + ttlMs,
       consumed: false,

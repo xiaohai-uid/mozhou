@@ -185,16 +185,17 @@ describe('Session & Auth Verification (T08)', () => {
     }
   })
 
-  it('passively prunes expired sessions when creating a new session', () => {
-    const sm = new SessionManager()
-    // 创建一个已过期的会话（maxAgeMs = -1000）
-    const { session: expiredSession } = sm.createSession({ userId: 'usr_exp', email: 'exp@mozhou.ai' }, -1000)
+  it('passively prunes expired sessions instead of counting them against the quota', () => {
+    const sm = new SessionManager(undefined, { maxSessionsPerUser: 2 })
+    const principal = { userId: 'usr_prune', email: 'prune@mozhou.ai' }
 
-    // 创建新会话，应被动修剪掉过期记录
-    sm.createSession({ userId: 'usr_new', email: 'new@mozhou.ai' })
+    const live = sm.createSession(principal).session
+    // 该会话在创建时就已过期：它不该占用配额，也不该把更早的有效会话挤掉。
+    sm.createSession(principal, -1000)
+    const newest = sm.createSession(principal).session
 
-    // 已过期的会话应被清理
-    expect(sm.getSession(expiredSession.sessionId)).toBeNull()
+    expect(sm.getSession(live.sessionId)).not.toBeNull()
+    expect(sm.getSession(newest.sessionId)).not.toBeNull()
   })
 
   it('evicts earliest-expiring reset code at capacity when none are consumed', () => {
@@ -207,5 +208,20 @@ describe('Session & Auth Verification (T08)', () => {
     expect(() => sm.consumeResetCode(code1)).toThrow(/invalid or not found/)
     expect(sm.consumeResetCode(code2).userId).toBe('usr_b')
     expect(sm.consumeResetCode(code3).userId).toBe('usr_c')
+  })
+
+  it('keeps only the newest unconsumed reset code per email', () => {
+    const sm = new SessionManager()
+    const older = sm.createResetCode('dup@mozhou.ai', 'usr_dup', 60_000)
+    const newer = sm.createResetCode('dup@mozhou.ai', 'usr_dup', 60_000)
+
+    expect(() => sm.consumeResetCode(older)).toThrow(/invalid or not found/)
+    expect(sm.consumeResetCode(newer).userId).toBe('usr_dup')
+  })
+
+  it('rejects non-positive capacity limits instead of silently breaking the guard', () => {
+    expect(() => new SessionManager(undefined, { maxSessionsPerUser: 0 })).toThrow(/positive integer/)
+    expect(() => new SessionManager(undefined, { maxActiveSessions: -1 })).toThrow(/positive integer/)
+    expect(() => new SessionManager(undefined, { maxResetCodes: 1.5 })).toThrow(/positive integer/)
   })
 })

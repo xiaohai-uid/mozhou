@@ -137,18 +137,67 @@ describe('D4 会话持久化', () => {
     expect(capped.getSession(c.sessionId)).not.toBeNull()
   })
 
-  it('全局重置码上限优先淘汰已消费的旧记录，未消费记录保持可用', () => {
+  it('全局重置码上限只淘汰未消费记录，已消费记录跨重启仍答「已使用」', () => {
     const root = tempRoot()
     const capped = new SessionManager(new InMemoryAuthProvider(), { maxResetCodes: 2 })
     capped.configurePersistence(root)
 
-    const code1 = capped.createResetCode('r1@example.com', 'u1')
-    capped.consumeResetCode(code1)
-    const code2 = capped.createResetCode('r2@example.com', 'u2')
-    capped.createResetCode('r3@example.com', 'u3')
+    const consumed = capped.createResetCode('used@example.com', 'u1')
+    capped.consumeResetCode(consumed)
+    const older = capped.createResetCode('older@example.com', 'u2')
+    const newer = capped.createResetCode('newer@example.com', 'u3')
 
-    // 已消费的 code1 被优先淘汰；code2/code3 仍有效
-    expect(() => capped.consumeResetCode(code1)).toThrow(/invalid or not found/)
-    expect(capped.consumeResetCode(code2).userId).toBe('u2')
+    // 未消费的最旧记录被淘汰，已消费记录保留语义
+    expect(() => capped.consumeResetCode(older)).toThrow(/invalid or not found/)
+    expect(() => capped.consumeResetCode(consumed)).toThrow(/already been consumed/)
+    expect(capped.consumeResetCode(newer).userId).toBe('u3')
+
+    // 重启后「已使用」仍成立，不降级为「不存在」
+    const second = manager(root)
+    expect(() => second.consumeResetCode(consumed)).toThrow(/already been consumed/)
+  })
+
+  it('创建会话时被动清理过期会话（持久化文件中不再出现）', () => {
+    const root = tempRoot()
+    const first = manager(root)
+    const { session: expired } = first.createSession({ userId: 'u-expired', email: null }, -1000)
+
+    first.createSession({ userId: 'u-live', email: null })
+
+    const persisted = readFileSync(join(root, 'users', 'auth-state.json'), 'utf8')
+    expect(persisted).not.toContain(expired.sessionId)
+  })
+
+  it('回读超过新上限的状态文件时收敛容量', () => {
+    const root = tempRoot()
+    mkdirSync(join(root, 'users'), { recursive: true })
+    const sessions = Array.from({ length: 5 }, (_, i) => ({
+      sessionId: `ses_legacy_${i}`,
+      userId: 'u-legacy',
+      email: null,
+      csrfToken: `csr_legacy_${i}`,
+      createdAt: 1_000 + i,
+      expiresAt: Date.now() + 3_600_000,
+      revoked: false,
+    }))
+    writeFileSync(join(root, 'users', 'auth-state.json'), JSON.stringify({ schemaVersion: 1, sessions, resetCodes: [] }))
+
+    const capped = new SessionManager(new InMemoryAuthProvider(), { maxSessionsPerUser: 2 })
+    capped.configurePersistence(root)
+
+    expect(capped.getSession('ses_legacy_0')).toBeNull()
+    expect(capped.getSession('ses_legacy_2')).toBeNull()
+    expect(capped.getSession('ses_legacy_3')).not.toBeNull()
+    expect(capped.getSession('ses_legacy_4')).not.toBeNull()
+  })
+
+  it('重置码审计不落原始 code', () => {
+    const root = tempRoot()
+    const first = manager(root)
+    const code = first.createResetCode('audit-reset@example.com', 'u-audit')
+
+    const audit = readFileSync(join(root, 'users', 'auth-audit.jsonl'), 'utf8')
+    expect(audit).toContain('reset.created')
+    expect(audit).not.toContain(code)
   })
 })
