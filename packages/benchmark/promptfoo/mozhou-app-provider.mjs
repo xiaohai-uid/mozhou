@@ -100,11 +100,19 @@ export default class MozhouAppProvider {
       '2. 严禁使用章末总结体（如“他终于明白”、“这一夜注定无人入眠”）与说书人预告体；\n' +
       '3. 严守 POV 视角与秘密隔离，绝不泄露视角外未公开的机密事实。\n'
 
+    // promptfoo 可能把 vars 值序列化成字符串（数组场景会被写成 "char:wang-lin"），
+    // 所以这里先归一成数组再 join；否则真实模型模式下该场景直接报 TypeError。
+    const deadList = Array.isArray(vars.deadCharacters)
+      ? vars.deadCharacters
+      : (typeof vars.deadCharacters === 'string' && vars.deadCharacters.length > 0
+        ? [vars.deadCharacters]
+        : [])
+
     const userPrompt = `【角色视角: ${vars.pov || '主角'} | 当前章节: 第${vars.chapterIndex || 1}章】\n` +
       (vars.sceneGoal ? `【场景目标】: ${vars.sceneGoal}\n` : '') +
       (vars.realm ? `【角色境界】: ${vars.realm}\n` : '') +
       (vars.injury ? `【角色伤势】: ${vars.injury}\n` : '') +
-      (vars.deadCharacters ? `【已死亡角色】: ${vars.deadCharacters.join(', ')}\n` : '') +
+      (deadList.length > 0 ? `【已死亡角色】: ${deadList.join(', ')}\n` : '') +
       `【写作指令】: ${prompt}\n【正文】:`
 
     const payload = {
