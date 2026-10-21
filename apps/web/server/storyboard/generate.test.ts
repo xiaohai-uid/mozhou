@@ -78,6 +78,22 @@ function fakeStream(chunks: string[], opts: { recordAbort?: (s: string) => void 
 }
 
 /**
+ * 按调用次序返回不同输出的假传输：第 n 次调用取 outputs[n-1]，用尽后一直返回最后一份。
+ * 用于验证「结构失败返工一次」与「不无限重试」，同时记录每次的用户提示。
+ */
+function scriptedStream(outputs: string[], prompts: string[]) {
+  let calls = 0
+  const stream = async function* (_endpoint: ResolvedEndpoint, prompt: string): AsyncGenerator<OpenAiStreamChunk> {
+    await Promise.resolve()
+    prompts.push(prompt)
+    const out = outputs[Math.min(calls, outputs.length - 1)] ?? ''
+    calls += 1
+    yield { delta: out }
+  }
+  return { stream, count: () => calls }
+}
+
+/**
  * 深化 06：deps 的端点缝换成统一解析缝 `resolveTarget`（带 reason 的显式结果）。
  * 注入的是**成功解析结果**（providerId 与端点由同一次解析产出，测试即按此形状构造），
  * 传输仍由 fakeStream 桩接管。
@@ -275,6 +291,65 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
       streamChat: fakeStream([]) as unknown as typeof import('../llm/openaiStream.js').streamOpenAiChat,
       env: {},
     })).rejects.toBeInstanceOf(SourceTooLargeError)
+  })
+
+  it('结构校验失败 ⇒ 带问题清单返工一次后成功（共两次上游调用）', async () => {
+    const root = makeBook()
+    const hash = sourceHashOf(root)
+    const prompts: string[] = []
+    const base = JSON.parse(modelPayload()) as { shots: Array<Record<string, unknown>> }
+    // 弱结构遵循模型的实际形态：dialogue 写成字符串
+    const invalid = modelPayload({ shots: [{ ...base.shots[0], dialogue: '你听，潮水退下去的声音。' }] })
+
+    const calls = scriptedStream([invalid, modelPayload()], prompts)
+    const { document } = await generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+      resolveTarget: resolveTargetOk,
+      streamChat: calls.stream,
+      env: {},
+    })
+
+    expect(prompts).toHaveLength(2)
+    expect(prompts[1]).toContain('【返工要求】')
+    expect(prompts[1]).toContain('dialogue')
+    expect(document.shots).toHaveLength(1)
+    expect(calls.count()).toBe(2)
+  })
+
+  it('结构校验连续失败 ⇒ 只尝试两次就上抛，不无限重试', async () => {
+    const root = makeBook()
+    const hash = sourceHashOf(root)
+    const prompts: string[] = []
+    const base = JSON.parse(modelPayload()) as { shots: Array<Record<string, unknown>> }
+    const invalid = modelPayload({ shots: [{ ...base.shots[0], dialogue: '仍然不是数组' }] })
+
+    const calls = scriptedStream([invalid], prompts)
+    await expect(
+      generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+        resolveTarget: resolveTargetOk,
+        streamChat: calls.stream,
+        env: {},
+      }),
+    ).rejects.toMatchObject({ name: 'ModelOutputError', code: 'MODEL_OUTPUT_INVALID' })
+
+    expect(calls.count()).toBe(2)
+  })
+
+  it('超长输出不返工（避免把一次失败放大成两次计费）', async () => {
+    const root = makeBook()
+    const hash = sourceHashOf(root)
+    const prompts: string[] = []
+    const big = 'x'.repeat(STORYBOARD_LIMITS.maxResponseBytes + 1024)
+    const calls = scriptedStream([big], prompts)
+
+    await expect(
+      generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+        resolveTarget: resolveTargetOk,
+        streamChat: calls.stream,
+        env: {},
+      }),
+    ).rejects.toMatchObject({ code: 'MODEL_OUTPUT_OVERSIZE' })
+
+    expect(calls.count()).toBe(1)
   })
 
   // 整改 T02：这条真机冒烟原先只要 shell 里有 MOZHOU_API_KEY / DEEPSEEK_API_KEY /

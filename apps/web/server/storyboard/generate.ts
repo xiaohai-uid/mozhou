@@ -7,7 +7,8 @@
  * - 原文只作数据：系统提示明确正文中任何指令一律忽略；模型输出不决定文件路径、
  *   书身份、id、revision、总时长——这些全部由服务端重铸；
  * - 无 provider 时明确不可用（PROVIDER_UNAVAILABLE），不生成假分镜；
- * - maxAttempts=1（不自动重试）；超时由共享传输的 60s AbortController 承担；
+ * - 最多两次尝试：只在结构校验失败时返工一次（带问题清单），其余失败立即上抛；
+ *   超时由共享传输的 60s AbortController 承担；
  * - 候选只在内存中，绝不写盘（保存走 /api/storyboard.save）；
  * - 累积输出超 maxResponseBytes 立即中止（禁止静默截断）。
  */
@@ -105,9 +106,127 @@ function extractJsonText(raw: string): string {
   return text.slice(start, end + 1)
 }
 
+/** 结构不合规时允许的一次返工：首次失败后带问题清单重试一次，之后如实失败。 */
+const STORYBOARD_MAX_ATTEMPTS = 2
+
 /**
- * 生成分镜候选（单次有界同步请求；不写盘；单书串行）。
+ * 只对「模型没按形状输出」重试。超长（OVERSIZE）、引文不锚定（UNANCHORED）、
+ * 超时都不重试：它们要么是已中止的部分输出，要么是素材本身无法逐字匹配，
+ * 重试只会把一次失败放大成两次计费。
+ *
+ * 依据：2026-10-21 用 dots-3-note-preview:free 跑真实模型冒烟时，7 个镜头里 6 个把
+ * dialogue 写成字符串、order 还断号——属于可返工的输出形态，不是产品契约问题。
+ */
+function isRetryableOutputError(cause: unknown): boolean {
+  return cause instanceof ModelOutputError && cause.code === 'MODEL_OUTPUT_INVALID'
+}
+
+function buildRepairHint(cause: unknown): string {
+  const detail = cause instanceof Error ? cause.message.slice(0, 400) : '未知原因'
+  return [
+    `上一次输出未通过结构校验：${detail}`,
+    '只输出一个 JSON 对象，并严格按第 4 条的镜头形状重出：',
+    'dialogue 必须是数组（没有对白就写 []），order 必须从 1 连续递增且不重复。',
+  ].join('\n')
+}
+
+interface GenerateOnceInput {
+  readonly endpoint: Parameters<typeof streamOpenAiChat>[0]
+  readonly streamChat: typeof streamOpenAiChat
+  readonly snapshot: ReturnType<typeof readSourceSnapshot>
+  readonly chapterIndex: number
+  readonly options: AdaptationOptions
+  /** 非空表示这是返工尝试：把上一次的校验问题拼在用户提示末尾。 */
+  readonly repairHint: string
+}
+
+/** 单次有界请求：流式累积 → 解析 → 结构校验 → 引文锚定 → 服务端重铸总时长。 */
+async function generateOnce(input: GenerateOnceInput): Promise<StoryboardCandidate> {
+  const { endpoint, streamChat, snapshot, chapterIndex, options, repairHint } = input
+  const basePrompt = buildUserPrompt(snapshot.body, chapterIndex, options)
+  const userPrompt = repairHint.length === 0 ? basePrompt : `${basePrompt}\n【返工要求】\n${repairHint}`
+
+  // 有界累积：单次尝试超 maxResponseBytes 立即中止（不截断、不采用）。
+  let raw = ''
+  let rawBytes = 0
+  try {
+    for await (const chunk of streamChat(endpoint, userPrompt, SYSTEM_PROMPT_TEMPLATE)) {
+      raw += chunk.delta
+      rawBytes = Buffer.byteLength(raw, 'utf8')
+      if (rawBytes > STORYBOARD_LIMITS.maxResponseBytes) {
+        throw new ModelOutputError('MODEL_OUTPUT_OVERSIZE', `模型输出超过 ${STORYBOARD_LIMITS.maxResponseBytes} 字节上限，已中止（未截断、未采用）`)
+      }
+    }
+  } catch (cause) {
+    if (cause instanceof ModelOutputError) throw cause
+    if (cause instanceof Error && cause.name === 'AbortError') {
+      throw new ModelOutputError('MODEL_OUTPUT_INVALID', '模型响应超时（60s）被中止——本次未生成候选')
+    }
+    throw cause
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(extractJsonText(raw))
+  } catch (cause) {
+    if (cause instanceof ModelOutputError) throw cause
+    throw new ModelOutputError('MODEL_OUTPUT_INVALID', `模型输出不是合法 JSON：${(cause as Error).message.slice(0, 120)}`)
+  }
+
+  // 模型只产内容；id/revision/源/总时长/时间戳全部服务端重铸。
+  const content = parsed as Record<string, unknown>
+  const now = new Date().toISOString()
+  const assembled = {
+    schemaVersion: STORYBOARD_SCHEMA_VERSION,
+    id: mintStoryboardId(),
+    revision: 0,
+    title: content['title'],
+    characters: content['characters'],
+    shots: content['shots'],
+    warnings: Array.isArray(content['warnings']) ? content['warnings'] : [],
+    source: snapshot.source,
+    options,
+    generation: { provider: 'openai-compatible', model: endpoint.model },
+    totalEstimatedDurationSeconds: 0,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  let document: StoryboardDocument
+  try {
+    document = validateStoryboardDocument(assembled)
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === 'StoryboardValidationError') {
+      const issues = (cause as { issues?: readonly string[] }).issues ?? []
+      throw new ModelOutputError('MODEL_OUTPUT_INVALID', `模型输出未通过结构校验：${issues.slice(0, 8).join('；')}`)
+    }
+    throw cause
+  }
+
+  // sourceQuote 锚定强校验：origin=source 的镜头引文必须逐字出现在本次源正文中。
+  const unanchored = document.shots
+    .filter((shot) => shot.origin === 'source' && !snapshot.body.includes(shot.sourceQuote))
+    .map((shot) => shot.id)
+  if (unanchored.length > 0) {
+    throw new ModelOutputError(
+      'MODEL_OUTPUT_UNANCHORED',
+      `以下镜头的 sourceQuote 未在原文中逐字找到（禁止改写引文）：${unanchored.slice(0, 10).join(', ')}`,
+    )
+  }
+
+  // totalEstimatedDurationSeconds 服务端求和（不采信模型自报）。
+  const finalDocument: StoryboardDocument = {
+    ...document,
+    totalEstimatedDurationSeconds: sumEstimatedDuration(document.shots),
+  }
+  return { document: validateStoryboardDocument(finalDocument) }
+}
+
+/**
+ * 生成分镜候选（最多两次有界同步请求；不写盘；单书串行）。
  * 返回的 document 已通过运行时校验，字段为服务端权威值。
+ *
+ * 两次尝试都在同一把书锁内完成：返工期间别的请求不能插进来读同一份快照。
  */
 export async function generateStoryboardCandidate(
   root: string,
@@ -137,79 +256,14 @@ export async function generateStoryboardCandidate(
       throw new SourceTooLargeError(snapshot.characterCount)
     }
 
-    // 有界累积：超 maxResponseBytes 立即中止（maxAttempts=1，无自动重试）。
-    let raw = ''
-    let rawBytes = 0
-    try {
-      for await (const chunk of streamChat(endpoint, buildUserPrompt(snapshot.body, chapterIndex, options), SYSTEM_PROMPT_TEMPLATE)) {
-        raw += chunk.delta
-        rawBytes = Buffer.byteLength(raw, 'utf8')
-        if (rawBytes > STORYBOARD_LIMITS.maxResponseBytes) {
-          throw new ModelOutputError('MODEL_OUTPUT_OVERSIZE', `模型输出超过 ${STORYBOARD_LIMITS.maxResponseBytes} 字节上限，已中止（未截断、未采用）`)
-        }
+    let repairHint = ''
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await generateOnce({ endpoint, streamChat, snapshot, chapterIndex, options, repairHint })
+      } catch (cause) {
+        if (attempt >= STORYBOARD_MAX_ATTEMPTS || !isRetryableOutputError(cause)) throw cause
+        repairHint = buildRepairHint(cause)
       }
-    } catch (cause) {
-      if (cause instanceof ModelOutputError) throw cause
-      if (cause instanceof Error && cause.name === 'AbortError') {
-        throw new ModelOutputError('MODEL_OUTPUT_INVALID', '模型响应超时（60s）被中止——本次未生成候选')
-      }
-      throw cause
     }
-
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(extractJsonText(raw))
-    } catch (cause) {
-      if (cause instanceof ModelOutputError) throw cause
-      throw new ModelOutputError('MODEL_OUTPUT_INVALID', `模型输出不是合法 JSON：${(cause as Error).message.slice(0, 120)}`)
-    }
-
-    // 模型只产内容；id/revision/源/总时长/时间戳全部服务端重铸。
-    const content = parsed as Record<string, unknown>
-    const now = new Date().toISOString()
-    const assembled = {
-      schemaVersion: STORYBOARD_SCHEMA_VERSION,
-      id: mintStoryboardId(),
-      revision: 0,
-      title: content['title'],
-      characters: content['characters'],
-      shots: content['shots'],
-      warnings: Array.isArray(content['warnings']) ? content['warnings'] : [],
-      source: snapshot.source,
-      options,
-      generation: { provider: 'openai-compatible', model: endpoint.model },
-      totalEstimatedDurationSeconds: 0,
-      createdAt: now,
-      updatedAt: now,
-    }
-
-    let document: StoryboardDocument
-    try {
-      document = validateStoryboardDocument(assembled)
-    } catch (cause) {
-      if (cause instanceof Error && cause.name === 'StoryboardValidationError') {
-        const issues = (cause as { issues?: readonly string[] }).issues ?? []
-        throw new ModelOutputError('MODEL_OUTPUT_INVALID', `模型输出未通过结构校验：${issues.slice(0, 8).join('；')}`)
-      }
-      throw cause
-    }
-
-    // sourceQuote 锚定强校验：origin=source 的镜头引文必须逐字出现在本次源正文中。
-    const unanchored = document.shots
-      .filter((shot) => shot.origin === 'source' && !snapshot.body.includes(shot.sourceQuote))
-      .map((shot) => shot.id)
-    if (unanchored.length > 0) {
-      throw new ModelOutputError(
-        'MODEL_OUTPUT_UNANCHORED',
-        `以下镜头的 sourceQuote 未在原文中逐字找到（禁止改写引文）：${unanchored.slice(0, 10).join(', ')}`,
-      )
-    }
-
-    // totalEstimatedDurationSeconds 服务端求和（不采信模型自报）。
-    const finalDocument: StoryboardDocument = {
-      ...document,
-      totalEstimatedDurationSeconds: sumEstimatedDuration(document.shots),
-    }
-    return { document: validateStoryboardDocument(finalDocument) }
   })
 }
