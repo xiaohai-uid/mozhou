@@ -148,10 +148,14 @@ export class WechatPayVerifier {
       const keyBuffer = Buffer.from(this._apiV3Key, 'utf8')
       const nonceBuffer = Buffer.from(resource.nonce, 'utf8')
       const dataBuffer = Buffer.from(resource.ciphertext, 'base64')
+      // 认证标签固定取末 16 字节；不足 16 字节的载荷直接判失败，不做截断放行。
+      if (dataBuffer.length < 16) {
+        throw new RequestBoundaryError(400, 'DECRYPT_FAILED', 'WeChat payload is shorter than the 16-byte GCM auth tag')
+      }
       const authTag = dataBuffer.subarray(dataBuffer.length - 16)
       const encryptedData = dataBuffer.subarray(0, dataBuffer.length - 16)
 
-      const decipher = createDecipheriv('aes-256-gcm', keyBuffer, nonceBuffer)
+      const decipher = createDecipheriv('aes-256-gcm', keyBuffer, nonceBuffer, { authTagLength: 16 })
       decipher.setAuthTag(authTag)
       if (resource.associated_data) {
         decipher.setAAD(Buffer.from(resource.associated_data, 'utf8'))

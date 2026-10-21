@@ -174,7 +174,8 @@ function decryptWith(key: Buffer, cipherText: string): string | null {
   try {
     const iv = Buffer.from(ivHex, 'hex')
     const tag = Buffer.from(tagHex, 'hex')
-    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, key, iv)
+    // 显式声明 16 字节认证标签：长度由本端钉死，不随密文里的 tagHex 变短而放行。
+    const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, key, iv, { authTagLength: 16 })
     decipher.setAuthTag(tag)
     let decrypted = decipher.update(dataHex, 'hex', 'utf8')
     decrypted += decipher.final('utf8')
