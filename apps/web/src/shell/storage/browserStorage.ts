@@ -49,7 +49,9 @@ export interface StorageAdapter {
   setItem(key: string, value: string): void
   removeItem(key: string): void
   clear(): void
-  readonly isMemoryFallback: boolean
+  readonly isMemoryFallback?: boolean
+  readonly lastWritePersisted?: boolean
+  readonly hasQuotaExceeded?: boolean
 }
 
 /**
@@ -132,6 +134,10 @@ export class MemoryStorageAdapter implements StorageAdapter {
 /** 包装实际的 localStorage 或其替身，处理 Quota / 安全异常并自动切换为内存回退 */
 export class BrowserStorageAdapter implements StorageAdapter {
   private memoryFallback: MemoryStorageAdapter | null = null
+  private _hasQuotaExceeded = false
+  private _lastWritePersisted = true
+  private _nativeAvailable: boolean | null = null
+  private readonly quotaListeners = new Set<(key: string, error: unknown) => void>()
 
   constructor(private readonly getNativeStorage: () => Storage | null = () => defaultGetLocalStorage()) {}
 
@@ -145,16 +151,40 @@ export class BrowserStorageAdapter implements StorageAdapter {
 
   public get isMemoryFallback(): boolean {
     if (this.memoryFallback !== null) return true
+    if (this._nativeAvailable !== null) return !this._nativeAvailable
     const native = this.getNativeSafe()
-    if (!native) return true
+    if (!native) {
+      this._nativeAvailable = false
+      return true
+    }
     try {
       const testKey = '__mozhou_test__'
       native.setItem(testKey, '1')
       native.removeItem(testKey)
+      this._nativeAvailable = true
       return false
     } catch {
+      this._nativeAvailable = false
       return true
     }
+  }
+
+  public get hasQuotaExceeded(): boolean {
+    return this._hasQuotaExceeded
+  }
+
+  public get lastWritePersisted(): boolean {
+    return this._lastWritePersisted
+  }
+
+  public onQuotaExceeded(listener: (key: string, error: unknown) => void): () => void {
+    this.quotaListeners.add(listener)
+    return () => this.quotaListeners.delete(listener)
+  }
+
+  public getMemoryEntries(): ReadonlyArray<[string, string]> {
+    if (!this.memoryFallback) return []
+    return this.memoryFallback.keys().map((k) => [k, this.memoryFallback!.getItem(k)!])
   }
 
   public getItem(key: string): string | null {
@@ -179,17 +209,39 @@ export class BrowserStorageAdapter implements StorageAdapter {
     if (!native) {
       this.ensureMemoryFallback()
       this.memoryFallback!.setItem(key, value)
+      this._lastWritePersisted = false
       return
     }
     try {
       native.setItem(key, value)
+      this._lastWritePersisted = true
       if (this.memoryFallback && this.memoryFallback.has(key)) {
         this.memoryFallback.removeItem(key)
       }
-    } catch {
-      // QuotaExceededError 或 SecurityError 沙箱受限时透明降级写入内存 Map
-      this.ensureMemoryFallback()
-      this.memoryFallback!.setItem(key, value)
+    } catch (err) {
+      if (isQuotaExceededError(err)) {
+        // 配额超出：立即标记配额异常与非持久态，并转存内存保证运行现场不崩
+        this._hasQuotaExceeded = true
+        this._lastWritePersisted = false
+        this.ensureMemoryFallback()
+        this.memoryFallback!.setItem(key, value)
+        for (const listener of this.quotaListeners) {
+          try {
+            listener(key, err)
+          } catch {
+            // ignore
+          }
+        }
+        return
+      }
+      if (isSecurityError(err)) {
+        this._lastWritePersisted = false
+        this.ensureMemoryFallback()
+        this.memoryFallback!.setItem(key, value)
+        return
+      }
+      this._lastWritePersisted = false
+      throw err
     }
   }
 
@@ -223,6 +275,9 @@ export class BrowserStorageAdapter implements StorageAdapter {
 
   public reset(): void {
     this.memoryFallback = null
+    this._hasQuotaExceeded = false
+    this._lastWritePersisted = true
+    this._nativeAvailable = null
   }
 
   private ensureMemoryFallback(): void {
@@ -301,7 +356,8 @@ export function getStorageRawString(
 }
 
 /**
- * 强类型安全写入（自动序列化为 JSON，捕获 QuotaExceeded）
+ * 强类型安全写入（自动序列化为 JSON，返回物理持久化是否成功）
+ * 若遭遇配额超限转入内存暂存，返回 false 告知调用方未完成持久化。
  */
 export function setStorageItem<T>(
   key: StorageKey,
@@ -311,6 +367,9 @@ export function setStorageItem<T>(
   try {
     const raw = JSON.stringify(value)
     adapter.setItem(key, raw)
+    if (adapter.lastWritePersisted === false) {
+      return false
+    }
     return true
   } catch {
     return false
@@ -318,7 +377,8 @@ export function setStorageItem<T>(
 }
 
 /**
- * 写入原始字符串
+ * 写入原始字符串（返回物理持久化是否成功）
+ * 若遭遇配额超限转入内存暂存，返回 false 告知调用方未完成持久化。
  */
 export function setStorageRawString(
   key: StorageKey,
@@ -327,10 +387,42 @@ export function setStorageRawString(
 ): boolean {
   try {
     adapter.setItem(key, value)
+    if (adapter.lastWritePersisted === false) {
+      return false
+    }
     return true
   } catch {
     return false
   }
+}
+
+/**
+ * 查询当前存储持久化状态
+ */
+export function getStoragePersistStatus(adapter: StorageAdapter = defaultStorage): {
+  readonly isMemoryFallback: boolean
+  readonly hasQuotaExceeded: boolean
+  readonly lastWritePersisted: boolean
+} {
+  return {
+    isMemoryFallback: adapter.isMemoryFallback ?? false,
+    hasQuotaExceeded: adapter.hasQuotaExceeded ?? false,
+    lastWritePersisted: adapter.lastWritePersisted ?? true,
+  }
+}
+
+/**
+ * 导出内存回退暂存区的所有未落盘草稿条目（提供可恢复出口）
+ */
+export function exportMemoryDrafts(adapter: StorageAdapter = defaultStorage): Record<string, string> {
+  if (adapter instanceof BrowserStorageAdapter) {
+    const res: Record<string, string> = {}
+    for (const [k, v] of adapter.getMemoryEntries()) {
+      res[k] = v
+    }
+    return res
+  }
+  return {}
 }
 
 /**

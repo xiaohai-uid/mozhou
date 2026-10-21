@@ -17,6 +17,7 @@ if (process.platform !== 'win32' || process.arch !== 'x64') {
 }
 
 const dirOnly = process.argv.includes('--dir-only')
+const strict = process.argv.includes('--strict') || process.env.MOZHOU_STRICT_PACKAGE === 'true'
 const stamp = readSourceStamp(root)
 
 if (process.argv.includes('--print-stamp')) {
@@ -25,6 +26,10 @@ if (process.argv.includes('--print-stamp')) {
 }
 
 if (stamp.dirty) {
+  if (strict) {
+    console.error(`ERROR: 工作区有 ${stamp.dirtyFiles} 个未提交改动——严格打包模式下禁止构建带有 -dirty 标记的候选产物`)
+    process.exit(1)
+  }
   console.warn(`WARNING: 工作区有 ${stamp.dirtyFiles} 个未提交改动——产物戳记作 ${stamp.sourceCommit}，不能作为干净提交 ${stamp.sourceCommitSha} 的证明`)
 }
 
@@ -79,7 +84,7 @@ try {
 } finally {
   // 清理临时 shell staging
   try {
-    cpSync(shellStaging, shellStaging) // no-op check
+    rmSync(shellStaging, { recursive: true, force: true })
   } catch {}
 }
 
@@ -173,6 +178,7 @@ if (!existsSync(nodeLicense)) throw new Error(`Missing Node distribution license
 cpSync(nodeLicense, join(runtimeDir, 'LICENSE.txt'))
 
 writeFileSync(join(bundle, 'package.json'), JSON.stringify({ name: 'mozhou-desktop-windows', version, type: 'module' }, null, 2))
+writeFileSync(join(bundle, 'BUILD_STAMP.json'), JSON.stringify(stamp, null, 2) + '\n', 'utf8')
 writeFileSync(join(bundle, 'DEPENDENCIES.json'), JSON.stringify({ node: process.version, electron: '44.7.0', packages: inventory }, null, 2))
 writeFileSync(
   join(bundle, '使用说明.txt'),

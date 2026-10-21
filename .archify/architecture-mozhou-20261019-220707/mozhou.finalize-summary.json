@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\candidate.json",
+    "sha256": "93cd9c49130c762872dd26dc7bdefffef0cf614f154130d82b3de16e7f9cb2da",
+    "bytes": 22753
+  },
+  "artifact": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.html",
+    "sha256": "11dbf72558b44915ddf25ca7408b51ca5d231a432643c4068721002e24f90f28",
+    "bytes": 886083
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/evidence-path-conflict",
+      "severity": "error",
+      "message": "browser-check will not replace the existing unowned evidence path \"C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.browser-check.json\".",
+      "subject": {
+        "artifact": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.html",
+        "evidencePath": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.browser-check.json"
+      },
+      "evidence": {
+        "reason": {
+          "code": "ownership-artifact-mismatch"
+        }
+      },
+      "supportedFixes": [
+        "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.finalize.json",
+    "summaryReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.finalize-summary.json",
+    "browserCheckReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-19T14:36:14.161Z",
+    "source": "network",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1208,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

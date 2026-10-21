@@ -121,7 +121,7 @@
 | 门禁 | - | - | - | 未验证 |
 | 闸门 | - | - | - | 未验证 |
 | 检查 | Check | `check` | `apps/web/server/routes/accountRoutes.ts:68` | 引用 |
-| 配额 | Quota | `quota` | `apps/web/src/shell/storage/browserStorage.ts:77` | 引用 |
+| 配额 | Quota | `quota` | `apps/web/src/shell/storage/browserStorage.ts:79` | 引用 |
 | 纵切 | Vertical Slice | - | - | 未验证 |
 | 切片 | Slice | `Slice` | `apps/web/src/workbench/editor/NovelEditorCanvas.tsx:6` | 引用 |
 | 挂账项 | Deferred Item | - | - | 未验证 |

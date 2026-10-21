@@ -36,28 +36,46 @@ function recordCheck(name, passed, detail = '') {
 
 console.log('[verify-package-integrity] 开始执行桌面安装包自动化校验...')
 
+const currentStamp = readSourceStamp(repoRoot)
+
 // 1. 寻找最近的 Electron 构建产物目录或打包结果记录
 let targetBundle = process.env.MOZHOU_BUNDLE_PATH
 const resultFile = join(artifactsDir, 'windows-electron-build-result.json')
 const dirResultFile = join(artifactsDir, 'windows-desktop-dir-result.json')
 
 if (!targetBundle) {
-  if (existsSync(resultFile)) {
-    try {
-      const data = JSON.parse(readFileSync(resultFile, 'utf8'))
-      if (data.bundle && existsSync(data.bundle)) targetBundle = data.bundle
-    } catch {}
-  } else if (existsSync(dirResultFile)) {
+  if (existsSync(dirResultFile)) {
     try {
       const data = JSON.parse(readFileSync(dirResultFile, 'utf8'))
-      if (data.bundle && existsSync(data.bundle)) targetBundle = data.bundle
+      if (data.bundle && existsSync(data.bundle)) {
+        if (data.sourceCommitSha === currentStamp.sourceCommitSha) {
+          targetBundle = data.bundle
+        } else {
+          console.warn(`[verify-package-integrity] 既有目录构建记录对应旧提交 (${data.sourceCommitSha} != 当前 ${currentStamp.sourceCommitSha})，触发重新构建...`)
+        }
+      }
+    } catch {}
+  } else if (existsSync(resultFile)) {
+    try {
+      const data = JSON.parse(readFileSync(resultFile, 'utf8'))
+      if (data.bundle && existsSync(data.bundle)) {
+        if (data.sourceCommitSha === currentStamp.sourceCommitSha) {
+          targetBundle = data.bundle
+        } else {
+          console.warn(`[verify-package-integrity] 既有安装包构建记录对应旧提交 (${data.sourceCommitSha} != 当前 ${currentStamp.sourceCommitSha})，触发重新构建...`)
+        }
+      }
     } catch {}
   }
 }
 
 if (!targetBundle || !existsSync(targetBundle)) {
-  console.warn('[verify-package-integrity] 未指定或未找到既有 bundle 产物，执行快速目录打包生成验证目标...')
-  execFileSync('node', [join(here, 'package-windows-electron.mjs'), '--dir-only'], {
+  console.warn('[verify-package-integrity] 未指定或未找到匹配当前提交的 bundle 产物，执行快速目录打包生成验证目标...')
+  const packageArgs = [join(here, 'package-windows-electron.mjs'), '--dir-only']
+  if (process.argv.includes('--strict') || process.env.MOZHOU_STRICT_PACKAGE === 'true') {
+    packageArgs.push('--strict')
+  }
+  execFileSync('node', packageArgs, {
     cwd: desktopDir,
     stdio: 'inherit',
   })
@@ -136,7 +154,32 @@ try {
 }
 recordCheck('V10 桌面主程序 MoZhou.exe --headless --stop 正常响应并安全退出', shellStopOk, shellStopOutput.trim())
 
-// 6. 证据收据落盘
+// 6. 检查构建产物与当前源码提交的一致性
+let bundleCommitSha = 'unknown'
+const buildStampFile = join(targetBundle, 'BUILD_STAMP.json')
+if (existsSync(buildStampFile)) {
+  try {
+    bundleCommitSha = JSON.parse(readFileSync(buildStampFile, 'utf8')).sourceCommitSha
+  } catch {}
+} else if (existsSync(dirResultFile)) {
+  try {
+    const d = JSON.parse(readFileSync(dirResultFile, 'utf8'))
+    if (d.bundle === targetBundle) {
+      bundleCommitSha = d.sourceCommitSha
+    }
+  } catch {}
+}
+
+const strict = process.argv.includes('--strict') || process.env.MOZHOU_STRICT_PACKAGE === 'true'
+const commitMatches = Boolean(bundleCommitSha && bundleCommitSha === currentStamp.sourceCommitSha)
+const cleanMatch = strict ? (commitMatches && !currentStamp.dirty) : commitMatches
+recordCheck(
+  'V11 桌面打包产物源码提交哈希与当前仓库 HEAD 严格一致',
+  cleanMatch,
+  `bundleCommit=${bundleCommitSha}, repoHead=${currentStamp.sourceCommitSha}${currentStamp.dirty ? ' (dirty)' : ''}`
+)
+
+// 7. 证据收据落盘
 let sourceStamp = { sourceCommit: 'unknown', dirty: false }
 try {
   sourceStamp = readSourceStamp(repoRoot)

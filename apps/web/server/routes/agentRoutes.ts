@@ -7,6 +7,8 @@
  */
 import { join } from 'node:path'
 import type { RouteHandler } from '../router.js'
+import { defaultBookAccessManager } from '../bookAccess.js'
+import { RequestBoundaryError } from '../security.js'
 import { createDefaultToolRegistry } from '../agent/registry.js'
 import { SkillStore } from '../agent/skills.js'
 import { RecycleStore } from '../recycle/recycleStore.js'
@@ -19,7 +21,7 @@ export interface ToolsListResponse {
 
 export type ToolsExecuteResponse = ToolResult
 
-export const agentRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot: contextBookRoot }) => {
+export const agentRoutes: RouteHandler = async (req, res, { path, body, json, bookRoot: contextBookRoot, principal, authorizedBook: contextAuthorizedBook }) => {
   if (req.method !== 'POST') return false
 
   if (path === '/api/tools.list') {
@@ -53,10 +55,37 @@ export const agentRoutes: RouteHandler = async (req, res, { path, body, json, bo
         ? (rawArgs as Record<string, unknown>)
         : {}
 
-    const bookRoot =
-      typeof body['root'] === 'string' && body['root'].trim() !== ''
-        ? body['root'].trim()
-        : contextBookRoot ?? null
+    let bookRoot: string | null = contextAuthorizedBook?.root ?? contextBookRoot ?? null
+    const hasBookSpecifier =
+      (typeof body['root'] === 'string' && body['root'].trim() !== '') ||
+      (typeof body['bookId'] === 'string' && body['bookId'].trim() !== '')
+
+    if (body['root'] !== undefined && (typeof body['root'] !== 'string' || body['root'].trim() === '')) {
+      json(400, { ok: false, code: 'INVALID_PATH', error: 'book root must be a non-empty string' })
+      return true
+    }
+
+    if (hasBookSpecifier) {
+      try {
+        const authorizedBook = defaultBookAccessManager.resolveAuthorizedBook(principal ?? null, body)
+        bookRoot = authorizedBook.root
+      } catch (err) {
+        if (err instanceof RequestBoundaryError) {
+          json(err.status, {
+            ok: false,
+            code: err.code,
+            error: err.message,
+          })
+          return true
+        }
+        json(400, {
+          ok: false,
+          code: 'INVALID_BOOK_ROOT',
+          error: (err as Error).message,
+        })
+        return true
+      }
+    }
 
     const registry = createDefaultToolRegistry()
     const enabledOverrides = body['enabledTools']

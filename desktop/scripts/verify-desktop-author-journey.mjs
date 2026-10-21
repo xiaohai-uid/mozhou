@@ -55,6 +55,19 @@ const defaultExtraArgs = process.platform === 'win32' && !rawExtraArgs.includes(
   : []
 const extraArgs = [...defaultExtraArgs, ...rawExtraArgs]
 
+let targetExecutable = electronPath
+let isPackagedBinary = false
+
+const customExe = process.env.MOZHOU_BUNDLE_EXE
+const customBundle = process.env.MOZHOU_BUNDLE_PATH
+if (customExe && existsSync(customExe)) {
+  targetExecutable = resolve(customExe)
+  isPackagedBinary = true
+} else if (customBundle && existsSync(join(customBundle, 'MoZhou.exe'))) {
+  targetExecutable = resolve(join(customBundle, 'MoZhou.exe'))
+  isPackagedBinary = true
+}
+
 const headless = process.env.MOZHOU_SELFCHECK_HEADLESS !== '0'
 const OPERATION_TIMEOUT = Number(process.env.MOZHOU_JOURNEY_TIMEOUT ?? 45_000)
 
@@ -73,10 +86,12 @@ function childEnv(dataRoot, profileRoot) {
     MOZHOU_DATA_ROOT: dataRoot,
     MOZHOU_DESKTOP_PROFILE_ROOT: profileRoot,
     MOZHOU_DESKTOP_CHANNEL: 'test',
-    MOZHOU_APP_DIR: join(repoRoot, 'apps', 'web'),
-    MOZHOU_DESKTOP_SERVER_ENTRY: join(repoRoot, 'scripts', 'release', 'windows', 'desktop-server.mjs'),
-    MOZHOU_NODE_EXE: process.execPath,
-    MOZHOU_DRAFT_PROVIDER: 'mock',
+    MOZHOU_DRAFT_PROVIDER: process.env.MOZHOU_DRAFT_PROVIDER ?? 'mock',
+  }
+  if (!isPackagedBinary) {
+    env.MOZHOU_APP_DIR = join(repoRoot, 'apps', 'web')
+    env.MOZHOU_DESKTOP_SERVER_ENTRY = join(repoRoot, 'scripts', 'release', 'windows', 'desktop-server.mjs')
+    env.MOZHOU_NODE_EXE = process.execPath
   }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.ELECTRON_FORCE_RENDERER_ACCESSIBILITY
@@ -85,7 +100,7 @@ function childEnv(dataRoot, profileRoot) {
 }
 
 function shellArgs(dataRoot, { headless: useHeadless }) {
-  const args = [desktopDir, '--data-dir', dataRoot]
+  const args = isPackagedBinary ? ['--data-dir', dataRoot] : [desktopDir, '--data-dir', dataRoot]
   if (useHeadless) args.push('--headless')
   args.push(...extraArgs)
   return args
@@ -163,7 +178,7 @@ async function runJourney1_CreateEditSaveRestart() {
   try {
     // 1.1 首次启动并开启 Trace
     app = await electron.launch({
-      executablePath: electronPath,
+      executablePath: targetExecutable,
       args: shellArgs(dataRoot, { headless }),
       env: childEnv(dataRoot, profileRoot),
       timeout: OPERATION_TIMEOUT,
@@ -284,7 +299,7 @@ async function runJourney1_CreateEditSaveRestart() {
     // 1.7 冷重启并验证持久化回读
     log('正在使用相同数据根启动冷重启，验证持久化现场回读…')
     app = await electron.launch({
-      executablePath: electronPath,
+      executablePath: targetExecutable,
       args: shellArgs(dataRoot, { headless }),
       env: childEnv(dataRoot, profileRoot),
       timeout: OPERATION_TIMEOUT,
@@ -349,7 +364,7 @@ async function runJourney2_SwitchBookIsolation() {
 
   try {
     app = await electron.launch({
-      executablePath: electronPath,
+      executablePath: targetExecutable,
       args: shellArgs(dataRoot, { headless }),
       env: childEnv(dataRoot, profileRoot),
       timeout: OPERATION_TIMEOUT,
@@ -456,7 +471,7 @@ async function runJourney3_DeliberateFailureTrace() {
 
   try {
     app = await electron.launch({
-      executablePath: electronPath,
+      executablePath: targetExecutable,
       args: shellArgs(dataRoot, { headless }),
       env: childEnv(dataRoot, profileRoot),
       timeout: OPERATION_TIMEOUT,

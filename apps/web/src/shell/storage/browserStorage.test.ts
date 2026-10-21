@@ -20,7 +20,9 @@ import {
   draftBaselineKey,
   draftCacheKey,
   editorProjectionKey,
+  exportMemoryDrafts,
   getStorageItem,
+  getStoragePersistStatus,
   getStorageRawString,
   isQuotaExceededError,
   isSecurityError,
@@ -176,7 +178,8 @@ describe('QuotaExceeded 与受限沙箱回退机制', () => {
     vi.restoreAllMocks()
   })
 
-  it('写入遭遇 QuotaExceededError 时捕获异常并透明转入内存 Map 回退', () => {
+  it('写入遭遇 QuotaExceededError 时捕获异常并转入内存暂存，标记持久化失败并提供可恢复出口', () => {
+    let quotaAlertCount = 0
     const failingStorage: Storage = {
       length: 0,
       clear: () => { mockStore = {} },
@@ -192,25 +195,43 @@ describe('QuotaExceeded 与受限沙箱回退机制', () => {
     }
 
     const adapter = createStorageAdapter(() => failingStorage)
+    adapter.onQuotaExceeded(() => {
+      quotaAlertCount++
+    })
     expect(adapter.isMemoryFallback).toBe(false)
+    expect(adapter.hasQuotaExceeded).toBe(false)
+    expect(adapter.lastWritePersisted).toBe(true)
 
-    // 正常写入可进原生
-    adapter.setItem('normal.key', 'ok')
+    // 1. 正常写入可进原生存储，setStorageItem / setStorageRawString 返回 true
+    const normalOk = setStorageRawString('normal.key', 'ok', adapter)
+    expect(normalOk).toBe(true)
     expect(mockStore['normal.key']).toBe('ok')
+    expect(adapter.lastWritePersisted).toBe(true)
 
-    // 触发 QuotaExceededError
-    expect(() => {
-      adapter.setItem('quota.bomb', 'large data')
-    }).not.toThrow()
+    // 2. 触发 QuotaExceededError：setStorageRawString 返回 false（明确告知调用方未完成持久化落盘）
+    const bombOk = setStorageRawString('quota.bomb', 'large draft data', adapter)
+    expect(bombOk).toBe(false) // 杜绝虚假保存成功
+    expect(adapter.hasQuotaExceeded).toBe(true)
+    expect(adapter.lastWritePersisted).toBe(false)
+    expect(quotaAlertCount).toBe(1)
 
-    // 降级为内存回退：数据依然可被读出，未丢失
-    expect(adapter.getItem('quota.bomb')).toBe('large data')
-    // 原生存储未保存 bomb
+    // 3. 原生存储未保存 bomb，但当前会话内存保留暂存防丢
     expect(mockStore['quota.bomb']).toBeUndefined()
+    expect(adapter.getItem('quota.bomb')).toBe('large draft data')
 
-    // 降级后后续写入继续由内存 Map 接管
-    adapter.setItem('after.bomb', 'memory saved')
-    expect(adapter.getItem('after.bomb')).toBe('memory saved')
+    // 4. 提供可恢复出口：可导出内存暂存的草稿条目
+    const memoryDrafts = exportMemoryDrafts(adapter)
+    expect(memoryDrafts['quota.bomb']).toBe('large draft data')
+
+    // 5. 状态探测接口真实反映降级现状
+    const status = getStoragePersistStatus(adapter)
+    expect(status.hasQuotaExceeded).toBe(true)
+    expect(status.lastWritePersisted).toBe(false)
+
+    // 6. 新实例重新打开（模拟重启应用）：原生存储只包含 normal.key，证明未虚假写入物理磁盘
+    const reloadedAdapter = createStorageAdapter(() => failingStorage)
+    expect(reloadedAdapter.getItem('normal.key')).toBe('ok')
+    expect(reloadedAdapter.getItem('quota.bomb')).toBeNull()
   })
 
   it('当 localStorage 不可用或访问被安全沙箱拦截（SecurityError）时自动降级到内存 Map', () => {

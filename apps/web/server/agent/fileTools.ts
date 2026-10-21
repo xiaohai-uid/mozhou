@@ -5,9 +5,28 @@
  * 删除走宿主回收站软删除，不直接抹掉内容——这样「智能体能删文件」不等于「内容会丢」。
  */
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { atomicWriteFileSync } from '@mozhou/data-plane'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { PROSE_DIR, atomicWriteFileSync } from '@mozhou/data-plane'
 import { authorize } from './authorize.js'
+
+/**
+ * 判定目标路径是否属于受保护的正文章节或正文目录。
+ * 正文章节承载版本冲突锁、前置 YAML 与排他写锁，禁止由通用文件工具裸写或删除。
+ */
+export function isProseProtectedPath(targetPath: string, bookRoot: string | null): boolean {
+  const norm = resolve(targetPath).split(sep).join('/')
+  if (bookRoot) {
+    const rel = relative(resolve(bookRoot), resolve(targetPath)).split(sep).join('/')
+    if (!rel.startsWith('..') && !isAbsolute(rel)) {
+      if (rel === PROSE_DIR || rel.startsWith(`${PROSE_DIR}/`)) return true
+    }
+  }
+  // 无论是否显式绑定书根，正文章节文件（正文/或 /正文/ 下的 .md 文件）一律受到保护
+  if (norm.endsWith('.md') && (norm.includes(`/${PROSE_DIR}/`) || norm.startsWith(`${PROSE_DIR}/`))) {
+    return true
+  }
+  return false
+}
 import {
   MAX_LIST_ENTRIES,
   MAX_READ_BYTES,
@@ -78,6 +97,12 @@ export class FileWriteTool extends NovelTool {
   execute(args: Readonly<Record<string, unknown>>, host: ToolHost): Promise<ToolResult> {
     const auth = authorize(str(args, 'path'), host)
     if (!auth.ok) return Promise.resolve({ ok: false, content: auth.error })
+    if (isProseProtectedPath(auth.path, host.bookRoot)) {
+      return Promise.resolve({
+        ok: false,
+        content: '正文章节文件受到版本一致性与排他写锁保护，禁止通过 file_write 直接覆盖。请使用正文受控保存接口。',
+      })
+    }
     const content = str(args, 'content')
     if (Buffer.byteLength(content, 'utf8') > MAX_WRITE_BYTES) {
       return Promise.resolve({ ok: false, content: '内容过大（上限 ' + MAX_WRITE_BYTES + ' 字节）' })
@@ -122,10 +147,23 @@ export class FileManageTool extends NovelTool {
     if (!auth.ok) return Promise.resolve({ ok: false, content: auth.error })
 
     if (action === 'mkdir') {
+      if (isProseProtectedPath(auth.path, host.bookRoot)) {
+        return Promise.resolve({
+          ok: false,
+          content: '正文章节与正文目录受保护，禁止通过 file_manage 操作。',
+        })
+      }
       mkdirSync(auth.path, { recursive: true })
       return Promise.resolve({ ok: true, content: '已创建目录 ' + auth.path })
     }
     if (!existsSync(auth.path)) return Promise.resolve({ ok: false, content: '路径不存在：' + auth.path })
+
+    if (isProseProtectedPath(auth.path, host.bookRoot)) {
+      return Promise.resolve({
+        ok: false,
+        content: '正文章节与正文目录受保护，禁止通过 file_manage 进行修改、移动或删除。',
+      })
+    }
 
     if (action === 'move_to_trash') {
       if (host.trash === undefined) return Promise.resolve({ ok: false, content: '回收站不可用：宿主未注入 trash' })
@@ -137,6 +175,12 @@ export class FileManageTool extends NovelTool {
     if (to === '') return Promise.resolve({ ok: false, content: action + ' 需要 to' })
     const authTo = authorize(to, host)
     if (!authTo.ok) return Promise.resolve({ ok: false, content: authTo.error })
+    if (isProseProtectedPath(authTo.path, host.bookRoot)) {
+      return Promise.resolve({
+        ok: false,
+        content: '正文章节与正文目录受保护，禁止通过 file_manage 将文件覆盖至正文路径。',
+      })
+    }
     try {
       mkdirSync(dirname(authTo.path), { recursive: true })
       if (action === 'rename') {

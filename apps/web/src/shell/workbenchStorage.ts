@@ -56,8 +56,8 @@ export function loadWorkbenchState(): WorkbenchState {
   )
 }
 
-export function saveWorkbenchState(state: WorkbenchState): void {
-  setStorageItem(STORAGE_KEYS.WORKBENCH_STATE, state)
+export function saveWorkbenchState(state: WorkbenchState): boolean {
+  return setStorageItem(STORAGE_KEYS.WORKBENCH_STATE, state)
 }
 
 /**
@@ -75,13 +75,14 @@ export function loadDraftCache(chapterKey: DraftCacheKey): string {
   return getStorageRawString(draftCacheKey(chapterKey), '')
 }
 
-export function saveDraftCache(text: string, chapterKey: DraftCacheKey): void {
-  if (chapterKey === null) return
+export function saveDraftCache(text: string, chapterKey: DraftCacheKey): boolean {
+  if (chapterKey === null) return false
   const key = draftCacheKey(chapterKey)
   if (text) {
-    setStorageRawString(key, text)
+    return setStorageRawString(key, text)
   } else {
     removeStorageItem(key)
+    return true
   }
 }
 

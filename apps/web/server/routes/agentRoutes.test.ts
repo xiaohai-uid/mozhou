@@ -10,11 +10,12 @@
  */
 import { createServer } from 'node:http'
 import type { AddressInfo, Server } from 'node:net'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createMoZhouApiRouter, defaultBookAccessManager } from '../api.js'
+import { defaultSessionManager } from '../auth/session.js'
 
 let servers: Server[] = []
 const tempDirs: string[] = []
@@ -59,6 +60,12 @@ function listen(): Promise<string> {
 function makeTemp(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   tempDirs.push(dir)
+  return dir
+}
+
+function makeBookRoot(prefix: string): string {
+  const dir = makeTemp(prefix)
+  writeFileSync(join(dir, 'book.json'), JSON.stringify({ title: '测试作品' }), 'utf8')
   return dir
 }
 
@@ -136,7 +143,7 @@ describe('智能体工具路由 (Agent Tools Routes)', () => {
   })
 
   it('POST /api/tools.execute 执行 file_write 与 file_read 在书根内正常读写', async () => {
-    const bookRoot = makeTemp('mozhou-agent-book-')
+    const bookRoot = makeBookRoot('mozhou-agent-book-')
     const base = await listen()
 
     // 1. 写文件
@@ -171,7 +178,7 @@ describe('智能体工具路由 (Agent Tools Routes)', () => {
   })
 
   it('POST /api/tools.execute 路径越界保护：外部路径需确认，系统目录硬拒绝', async () => {
-    const bookRoot = makeTemp('mozhou-agent-book-')
+    const bookRoot = makeBookRoot('mozhou-agent-book-')
     const outsideRoot = makeTemp('mozhou-agent-outside-')
     const outsideFile = join(outsideRoot, 'secret.md')
     writeFileSync(outsideFile, '外部机密内容', 'utf8')
@@ -224,7 +231,7 @@ describe('智能体工具路由 (Agent Tools Routes)', () => {
   })
 
   it('POST /api/tools.execute 支持 file_manage 创建目录与移动至回收站', async () => {
-    const bookRoot = makeTemp('mozhou-agent-book-')
+    const bookRoot = makeBookRoot('mozhou-agent-book-')
     const targetFile = join(bookRoot, 'draft.md')
     writeFileSync(targetFile, '待删除草稿', 'utf8')
 
@@ -261,5 +268,96 @@ describe('智能体工具路由 (Agent Tools Routes)', () => {
     const mkdirData = (await mkdirRes.json()) as { ok: boolean }
     expect(mkdirData.ok).toBe(true)
     expect(existsSync(newDir)).toBe(true)
+  })
+
+  it('POST /api/tools.execute 拦截伪造书根：传入未包含 book.json 的外部目录直接被 400 阻断', async () => {
+    const fakeRoot = makeTemp('mozhou-fake-root-')
+    const base = await listen()
+
+    const res = await fetch(`${base}/api/tools.execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        root: fakeRoot,
+        name: 'file_read',
+        args: { path: join(fakeRoot, 'test.md') },
+      }),
+    })
+    expect(res.status).toBe(400)
+    const data = (await res.json()) as { ok: boolean; code: string; error: string }
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('NOT_A_MOZHOU_BOOK')
+  })
+
+  it('POST /api/tools.execute 托管模式下阻断客户端自报文件系统根路径', async () => {
+    defaultBookAccessManager.setHostedMode(true)
+    const { cookie } = defaultSessionManager.createSession({ userId: 'u_hosted_test', email: 'test@mozhou.ai' })
+    const bookRoot = makeBookRoot('mozhou-hosted-root-')
+    const base = await listen()
+
+    const res = await fetch(`${base}/api/tools.execute`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      },
+      body: JSON.stringify({
+        root: bookRoot,
+        name: 'file_read',
+        args: { path: join(bookRoot, 'test.md') },
+      }),
+    })
+    expect(res.status).toBe(400)
+    const data = (await res.json()) as { ok: boolean; code: string }
+    expect(data.ok).toBe(false)
+    expect(data.code).toBe('INVALID_HOSTED_INPUT')
+  })
+
+  it('POST /api/tools.execute 正文章节防篡改保护：禁止通过 file_write 覆写正文', async () => {
+    const bookRoot = makeBookRoot('mozhou-agent-book-')
+    const proseDir = join(bookRoot, '正文', '第一卷')
+    mkdirSync(proseDir, { recursive: true })
+    const chapter1 = join(proseDir, '第0001章.md')
+    writeFileSync(chapter1, '# 第一章 正文内容', 'utf8')
+
+    const base = await listen()
+    const res = await fetch(`${base}/api/tools.execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        root: bookRoot,
+        name: 'file_write',
+        args: { path: chapter1, content: '恶意篡改正文' },
+      }),
+    })
+    expect(res.status).toBe(200)
+    const data = (await res.json()) as { ok: boolean; content: string }
+    expect(data.ok).toBe(false)
+    expect(data.content).toContain('正文章节文件受到版本一致性与排他写锁保护')
+    expect(readFileSync(chapter1, 'utf8')).toBe('# 第一章 正文内容')
+  })
+
+  it('POST /api/tools.execute 正文章节防篡改保护：禁止通过 file_manage 移动或删除正文', async () => {
+    const bookRoot = makeBookRoot('mozhou-agent-book-')
+    const proseDir = join(bookRoot, '正文', '第一卷')
+    mkdirSync(proseDir, { recursive: true })
+    const chapter1 = join(proseDir, '第0001章.md')
+    writeFileSync(chapter1, '# 第一章 正文内容', 'utf8')
+
+    const base = await listen()
+    const res = await fetch(`${base}/api/tools.execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        root: bookRoot,
+        name: 'file_manage',
+        args: { action: 'move_to_trash', path: chapter1 },
+      }),
+    })
+    expect(res.status).toBe(200)
+    const data = (await res.json()) as { ok: boolean; content: string }
+    expect(data.ok).toBe(false)
+    expect(data.content).toContain('正文章节与正文目录受保护')
+    expect(existsSync(chapter1)).toBe(true)
   })
 })

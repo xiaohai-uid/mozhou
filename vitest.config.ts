@@ -2,6 +2,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    maxWorkers: process.platform === 'win32' ? 4 : undefined,
     include: ['packages/*/src/**/*.test.ts'],
     // 墙钟规格台架（50 章全弧 <5s）不参与并行跑：它与其余 118 个文件并行时，
     // CPU/IO 争用会把被测的 durationMs 推过预算，产生与产品无关的红（2026-10-10
