@@ -1,0 +1,17 @@
+# Gitleaks 配置（仓库根）：只压掉一类已核实的误报。
+#
+# 背景：gitleaks v8.30 的 generic-api-key 规则按熵值匹配，把
+# packages/pipeline/src/draft-accept-audit.test.ts 里的测试夹具
+# `idempotencyKey: 'idemp_partial_reject_1'` 判成密钥（2026-10-21 全历史扫描 847
+# 提交，2 处命中均为该文件）。两者都是纯测试常量，不是凭据。
+#
+# 约束：
+# - condition = "AND"：必须同时满足路径与形态才放行，避免把该文件里任何真实凭据一起放过。
+# - 只放行 idemp_ 前缀的幂等键，不放行通用长字符串。
+title = "MoZhou gitleaks config"
+
+[allowlist]
+description = "测试夹具中的幂等键（idemp_*）被 generic-api-key 按熵值误判"
+condition = "AND"
+paths = ['''packages/pipeline/src/draft-accept-audit\.test\.ts''']
+regexes = ['''idemp_[A-Za-z0-9_]{1,64}''']
