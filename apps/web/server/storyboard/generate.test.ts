@@ -310,7 +310,8 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
 
     expect(prompts).toHaveLength(2)
     expect(prompts[1]).toContain('【返工要求】')
-    expect(prompts[1]).toContain('dialogue')
+    // 必须证明第一次的具体问题被带进了返工提示，而不是只命中静态模板里的 "dialogue"
+    expect(prompts[1]).toContain('shots[0].dialogue must be array')
     expect(document.shots).toHaveLength(1)
     expect(calls.count()).toBe(2)
   })
@@ -323,15 +324,39 @@ describe('generateStoryboardCandidate（注入式传输）', () => {
     const invalid = modelPayload({ shots: [{ ...base.shots[0], dialogue: '仍然不是数组' }] })
 
     const calls = scriptedStream([invalid], prompts)
+    const err = await generateStoryboardCandidate(root, 1, hash, OPTIONS, {
+      resolveTarget: resolveTargetOk,
+      streamChat: calls.stream,
+      env: {},
+    }).catch((cause: unknown) => cause)
+
+    expect(err).toMatchObject({ name: 'ModelOutputError', code: 'MODEL_OUTPUT_INVALID' })
+    // 两次都失败时要如实说明已经返工过，不能让调用方以为只有一次尝试
+    expect((err as Error).message).toContain('已自动返工一次仍失败')
+    expect(calls.count()).toBe(2)
+  })
+
+  it('超时不返工（否则 60 秒会拖成 120 秒并多计费一次）', async () => {
+    const root = makeBook()
+    const hash = sourceHashOf(root)
+    let calls = 0
+    const streamChat = async function* (): AsyncGenerator<OpenAiStreamChunk> {
+      await Promise.resolve()
+      calls += 1
+      const err = new Error('This operation was aborted')
+      err.name = 'AbortError'
+      throw err
+    }
+
     await expect(
       generateStoryboardCandidate(root, 1, hash, OPTIONS, {
         resolveTarget: resolveTargetOk,
-        streamChat: calls.stream,
+        streamChat,
         env: {},
       }),
-    ).rejects.toMatchObject({ name: 'ModelOutputError', code: 'MODEL_OUTPUT_INVALID' })
+    ).rejects.toMatchObject({ name: 'ModelOutputError', code: 'MODEL_OUTPUT_INVALID', retryable: false })
 
-    expect(calls.count()).toBe(2)
+    expect(calls).toBe(1)
   })
 
   it('超长输出不返工（避免把一次失败放大成两次计费）', async () => {

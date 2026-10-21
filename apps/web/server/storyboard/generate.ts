@@ -46,8 +46,19 @@ export class SourceTooLargeError extends Error {
 
 export class ModelOutputError extends Error {
   override readonly name = 'ModelOutputError'
-  constructor(readonly code: 'MODEL_OUTPUT_INVALID' | 'MODEL_OUTPUT_UNANCHORED' | 'MODEL_OUTPUT_OVERSIZE', detail: string) {
+  /**
+   * 是否允许带问题清单返工一次。由成因决定，不只看 code：
+   * 结构/JSON 形态问题可返工；超时虽然也复用 INVALID 这个对外码，但重试只会
+   * 把 60 秒拖成 120 秒并多计费一次，所以显式标 false。
+   */
+  readonly retryable: boolean
+  constructor(
+    readonly code: 'MODEL_OUTPUT_INVALID' | 'MODEL_OUTPUT_UNANCHORED' | 'MODEL_OUTPUT_OVERSIZE',
+    detail: string,
+    retryable: boolean = code === 'MODEL_OUTPUT_INVALID',
+  ) {
     super(detail)
+    this.retryable = retryable
   }
 }
 
@@ -118,7 +129,7 @@ const STORYBOARD_MAX_ATTEMPTS = 2
  * dialogue 写成字符串、order 还断号——属于可返工的输出形态，不是产品契约问题。
  */
 function isRetryableOutputError(cause: unknown): boolean {
-  return cause instanceof ModelOutputError && cause.code === 'MODEL_OUTPUT_INVALID'
+  return cause instanceof ModelOutputError && cause.retryable
 }
 
 function buildRepairHint(cause: unknown): string {
@@ -160,7 +171,7 @@ async function generateOnce(input: GenerateOnceInput): Promise<StoryboardCandida
   } catch (cause) {
     if (cause instanceof ModelOutputError) throw cause
     if (cause instanceof Error && cause.name === 'AbortError') {
-      throw new ModelOutputError('MODEL_OUTPUT_INVALID', '模型响应超时（60s）被中止——本次未生成候选')
+      throw new ModelOutputError('MODEL_OUTPUT_INVALID', '模型响应超时（60s）被中止——本次未生成候选', false)
     }
     throw cause
   }
@@ -257,13 +268,20 @@ export async function generateStoryboardCandidate(
     }
 
     let repairHint = ''
-    for (let attempt = 1; ; attempt += 1) {
+    let lastError: unknown = null
+    for (let attempt = 1; attempt <= STORYBOARD_MAX_ATTEMPTS; attempt += 1) {
       try {
         return await generateOnce({ endpoint, streamChat, snapshot, chapterIndex, options, repairHint })
       } catch (cause) {
-        if (attempt >= STORYBOARD_MAX_ATTEMPTS || !isRetryableOutputError(cause)) throw cause
+        lastError = cause
+        if (!isRetryableOutputError(cause) || attempt >= STORYBOARD_MAX_ATTEMPTS) break
         repairHint = buildRepairHint(cause)
       }
     }
+    // 走到这里说明两次都没成：明确告知已经返工过，别让调用方以为只有一次尝试。
+    if (lastError instanceof ModelOutputError && lastError.retryable) {
+      throw new ModelOutputError('MODEL_OUTPUT_INVALID', `已自动返工一次仍失败：${lastError.message}`)
+    }
+    throw lastError
   })
 }
