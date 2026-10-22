@@ -1,0 +1,39 @@
+{
+  "$schema": "https://repomix.com/schemas/config.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "topFilesLength": 20,
+    "showLineNumbers": true
+  },
+  "include": [
+    "packages/*/src/**",
+    "apps/web/src/**",
+    "apps/web/server/**",
+    "desktop/lib/**",
+    "scripts/*.mjs"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      "dist/**",
+      "dist-server/**",
+      "coverage/**",
+      "out/**",
+      "release/**",
+      ".gitnexus/**",
+      ".archify/**",
+      "docs/archive/**",
+      "apps/web/src/code-graph/codeGraphData.json",
+      "docs/retrospectives/**/casebook.jsonl",
+      "packages/context-compiler/assets/**",
+      "**/*.LICENSE*.txt",
+      "prototypes/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

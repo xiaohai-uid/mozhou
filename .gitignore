@@ -70,3 +70,8 @@ review-result.json
 *.crt
 *.p12
 *.pfx
+
+# Repomix 生成的技能参考包：整仓源码快照（约 2.1MB），每次源码改动即过期。
+# 配置 repomix.config.json 入库以便随时重建；快照本身留在本地。
+.claude/skills/repomix-reference-mozhou/
+repomix-output.xml
