@@ -67,6 +67,7 @@ import {
   proseChapterPath,
   readBookRecord,
   readProseChapter,
+  readStyleProfiles,
   withStrictBook,
 } from '@mozhou/data-plane'
 import { createHash } from 'node:crypto'
@@ -988,6 +989,38 @@ function createReviewSemanticEvaluator(
   }
 }
 
+/**
+ * 生效文风档案的禁用词并集（去重、保序）。
+ *
+ * 四场景型画像全量注入生成上下文（flywheel `renderStyleSections` 把每行的
+ * `tabooWords` 渲染进 `style_profile:<scenarioType>` 结构层），因此「生效集」
+ * 就是四行并集，不存在按场景型选择的第二套判据。
+ *
+ * 读盘失败（文风.md 缺失/结构违例）原样抛出：宁败不脏——静默跳过会让禁用词
+ * 约束悄悄失效，正是本消费方要消灭的缺陷。
+ */
+function collectTabooWords(root: string): string[] {
+  const seen = new Set<string>()
+  const words: string[] = []
+  for (const row of Object.values(readStyleProfiles(root))) {
+    for (const word of row.tabooWords) {
+      const trimmed = word.trim()
+      if (trimmed.length === 0 || seen.has(trimmed)) continue
+      seen.add(trimmed)
+      words.push(trimmed)
+    }
+  }
+  return words
+}
+
+/**
+ * 禁用词是字面量而不是正则源：转义正则元字符后再交给既有红线通道，
+ * 避免 `A+B` 之类词条把 `AAAB` 也判成命中（机械门只收 regex source）。
+ */
+function escapeRegexLiteral(word: string): string {
+  return word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
   /* ---- 文学质量审查与回炉 ---- */
   if (path === '/api/chapter.review') {
     const decoded = decodeBookRequest(body, resolvedRoot, { principal })
@@ -1071,6 +1104,24 @@ function createReviewSemanticEvaluator(
     const actionBeatParagraphs = rawActionBeats ? new Set(rawActionBeats.filter((n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0)) : undefined
 
     try {
+      // 生效文风档案的禁用词接入**既有**机械门红线通道（mechanical-gates 的
+      // mech_03_redlines）：命中即 mechanicalGate.passed=false →
+      // deriveEffectiveQualityVerdict=blocking_fail → 既有拒收（session.advance 409）。
+      // 恢复路径是作者改文后重审，不是 /api/chapter.rework：机械门单挂时落账的文学
+      // verdict 仍是 pass（review-step.ts 传 report.verdict），而 requestQualityRework
+      // 只在 lastQualityVerdict=blocking_fail 时才合法；仅当文学 verdict 同为
+      // blocking_fail 时回炉才可用。不新建并行门，也不在前端拦截。
+      const tabooWords = collectTabooWords(root)
+      const mechanicalOptionsWithTaboo =
+        tabooWords.length === 0
+          ? mechanicalOptions
+          : {
+              ...(mechanicalOptions ?? {}),
+              customRedlines: [
+                ...(Array.isArray(mechanicalOptions?.customRedlines) ? mechanicalOptions.customRedlines : []),
+                ...tabooWords.map(escapeRegexLiteral),
+              ],
+            }
       const outcome = await executeChapterReview({
         bookRoot: root,
         chapterIndex,
@@ -1082,7 +1133,7 @@ function createReviewSemanticEvaluator(
         autoAbsorbCounterexamples: true,
         ...(semanticEvaluator !== undefined ? { semanticEvaluator } : {}),
         ...(actionBeatParagraphs !== undefined ? { actionBeatParagraphs } : {}),
-        ...(mechanicalOptions !== undefined ? { mechanicalOptions } : {}),
+        ...(mechanicalOptionsWithTaboo !== undefined ? { mechanicalOptions: mechanicalOptionsWithTaboo } : {}),
         // 截止时间只由宿主这一处拥有：本路由已建 AbortController + setTimeout，
         // 只传 signal；不再同时传 timeoutMs，避免同一截止时间出现两个定时器
         // （并防止内层把超时误归类成取消）。

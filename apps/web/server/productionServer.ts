@@ -85,10 +85,15 @@ function setSecurityHeaders(res: ServerResponse): void {
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Referrer-Policy', 'no-referrer')
   res.setHeader('X-Frame-Options', 'DENY')
+  // form-action 不回退到 default-src：缺省等于放行任意表单提交目标（ZAP 10055）。
+  // style-src 保留 'unsafe-inline'：前端有大量内联样式，收紧需要 nonce/hash 改造，
+  // 属独立工程，不在本次加固范围。
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
   )
+  // 本地工作台不需要任何设备能力；显式拒绝，避免第三方内容借同源页面申请（ZAP 10063）。
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
 }
 
 function insideDist(candidate: string): boolean {
@@ -100,18 +105,23 @@ function requestPath(url: string | undefined): string {
   return (url ?? '/').split('?')[0] ?? '/'
 }
 
+/** 404 也要带 Content-Type：缺省时浏览器按嗅探处理（ZAP 10019）。 */
+function sendNotFound(res: ServerResponse): void {
+  res.statusCode = 404
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  res.end('Not Found')
+}
+
 function serveFile(res: ServerResponse, absolutePath: string, headOnly: boolean): void {
   let stat
   try {
     stat = statSync(absolutePath)
   } catch {
-    res.statusCode = 404
-    res.end('Not Found')
+    sendNotFound(res)
     return
   }
   if (!stat.isFile()) {
-    res.statusCode = 404
-    res.end('Not Found')
+    sendNotFound(res)
     return
   }
 
