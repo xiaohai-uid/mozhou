@@ -208,6 +208,34 @@ jobs:
           tar -xzf release-artifacts/*-docker.tar.gz -C "$tmp"
           docker build --tag mozhou-release-smoke "$tmp/docker-bundle"
 
+      # 只 build 不运行证明不了发行镜像能启动：基线换错、npm/pnpm 裁剪过度、
+      # 数据根权限或 CMD 路径失配，都会让用户拿到一个 build 成功但起不来的包。
+      - name: Smoke-test Docker release image serves /api/health
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name mozhou-release-smoke-run \
+            --env MOZHOU_SECRET_KEY="$(openssl rand -base64 48)" \
+            --env MOZHOU_DATA_ROOT=/data \
+            --publish 127.0.0.1:5189:5173 \
+            mozhou-release-smoke
+          trap 'docker rm --force mozhou-release-smoke-run >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for _ in $(seq 1 30); do
+            code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5189/api/health || true)"
+            if [ "$code" = "200" ]; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker logs mozhou-release-smoke-run || true
+            exit 1
+          fi
+          docker rm --force mozhou-release-smoke-run
+          trap - EXIT
+
       - name: Generate SHA-256 manifest
         shell: bash
         run: |
