@@ -73,6 +73,12 @@ export function decidePathAccess(rawPath: unknown, options: PathPolicyOptions): 
   }
 
   const trimmed = rawPath.trim()
+  // Windows 盘符路径在非 Windows 平台不是绝对路径：若不拦，它会被当成相对路径解析到
+  // 书根内并被放行，「系统目录拒绝」这条安全性质就随平台漂移。
+  // 2026-10-22 在 Linux CI 实测：C:\Windows\... 被判 allowed，Windows 上判 denied。
+  if (process.platform !== 'win32' && /^[a-zA-Z]:[\\/]/.test(trimmed)) {
+    return { access: 'denied', resolvedPath: null, reason: 'Windows 绝对路径在非 Windows 平台无法解析' }
+  }
   if (!isAbsolute(trimmed) && options.bookRoot === null) {
     return { access: 'denied', resolvedPath: null, reason: '相对路径在无书根时无法解析' }
   }

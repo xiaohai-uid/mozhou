@@ -46,6 +46,18 @@ describe('路径权限模型', () => {
     expect(decidePathAccess(join(bookRoot, 'a\u0000b.md'), { bookRoot }).access).toBe('denied')
   })
 
+  it('Windows 盘符路径在非 Windows 平台直接拒绝（安全性质不随平台漂移）', () => {
+    const decision = decidePathAccess('C:\\Users\\someone\\book\\ch1.md', { bookRoot })
+    if (process.platform === 'win32') {
+      // Windows 上这是绝对路径：不在书根内，交给作者确认。
+      expect(decision.access).toBe('needs-confirmation')
+    } else {
+      // POSIX 上它不是绝对路径；旧实现会把它解析成书根内的怪文件名并放行（allowed），
+      // 使「系统目录拒绝」只在 Windows 成立。这里锁死为 denied。
+      expect(decision.access).toBe('denied')
+    }
+  })
+
   it('无书根时相对路径无法解析 → denied；空路径 → denied', () => {
     expect(decidePathAccess('ch1.md', { bookRoot: null }).access).toBe('denied')
     expect(decidePathAccess('   ', { bookRoot }).access).toBe('denied')
