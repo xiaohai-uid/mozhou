@@ -12,7 +12,9 @@
 // 这两条同样属于「知道但没人拦」，且都不在 CI 视野内（CI 是干净检出 + 现场构建）。
 // 2026-10-18 补齐性能与白名单门：perf-smoke（K6 冒烟）与 lint-whitelist（对账检查）。
 // 2026-10-18 补：desktop-journey（Playwright Electron 桌面端端到端旅程与 Trace 回归）。
-// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness|perf-smoke|lint-whitelist|desktop-journey
+// 2026-10-21 补：e2e（跨浏览器 Chromium/Firefox/WebKit 冒烟）。此前 test:e2e 只存在于
+// package.json，没有任何自动化路径调用它——交付即闲置，正是本文件开头列的那类缺陷。
+// 用法：node scripts/ci-gate.mjs build|lint|test|graph-check|doc-gates|import-cycles|duplication|evidence-hygiene|build-freshness|perf-smoke|lint-whitelist|desktop-journey|e2e
 import { execSync } from 'node:child_process'
 
 const task = process.argv[2]
@@ -40,6 +42,8 @@ const commands = {
   'desktop-journey': 'pnpm verify:desktop-journey',
   // 2026-10-19 补：Playwright Electron 桌面端安装包结构与运行时健康校验门
   'desktop-package': 'pnpm verify:desktop-package',
+  // 2026-10-21 补：跨浏览器 E2E 冒烟门（生产产物 + 隔离数据根；0 通过 / 1 失败 / 2 阻塞）
+  e2e: 'pnpm test:e2e',
 }
 const cmd = commands[task]
 if (cmd === undefined) {

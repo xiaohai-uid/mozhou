@@ -42,6 +42,7 @@
 | 克隆检测 | `pnpm run duplication` | 见 jscpd（`.github/workflows/graph-gate.yml:54-73` 的 duplication job；0 未超阈值 / 非 0 超阈值） | 无 | ✅ `graph-gate.yml` |
 | **性能冒烟门** | `pnpm run perf:smoke` | 0 通过 · 1 阈值红或端点失败 `perf/k6/smoke.js` · 2 环境阻塞 `perf/k6/run-smoke.mjs:29` | 2（构建缺失/服务未起） | ✅ `perf-smoke-nightly.yml` · `release.yml` |
 | **白名单对账门** | `node scripts/check-lint-whitelist.mjs` | 0 一致 · 1 漏登记或超限 `scripts/check-lint-whitelist.mjs` | 无此状态 | ❌ 未接入（已在 pre-commit 与 `pnpm lint` 前置） |
+| **跨浏览器 E2E 冒烟** | `pnpm run test:e2e` | 0 通过 · 1 测试失败 · 2 环境阻塞（产物缺失/陈旧或端口非法，`e2e/run-e2e.mjs`） | 2（前置检查未通过） | ❌ 未接入（经 `ci-gate.mjs e2e`，本地推送前门） |
 
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 
@@ -79,6 +80,14 @@
 > 同日补 31 章长程门：`longform-nightly.yml` 每日/手动运行，缺三个模型 secret 即显式失败；
 > `check-evidence-hygiene.mjs` 同步扫描 `summary.json`，`status=PASS` 与任一必需结果矛盾即失败。
 > 两条历史假 PASS 已作废，见 `docs/audit/longform-evidence-invalidation-20261017.md`。
+> 2026-10-21 补跨浏览器 E2E 冒烟门（Chromium / Firefox / WebKit 各跑一遍生产服务）：
+> 入口是 `e2e/run-e2e.mjs`，不是直接 `playwright test`。原因是 Playwright 会把
+> webServer 提前退出统一折成测试失败（只把退出码拼进错误文案，进程退出码仍是 1），
+> 直接以它作入口时「没测成」与「测了但红」无法区分。包装器在 Playwright 之外校验
+> 端口合法、产物存在且不早于源码，任一不成立即 exit 2。产物新鲜度必须单独拦：
+> `check-build-freshness.mjs` 对「未构建」返回 0，只靠它会放过「忘记构建」。
+> 本门未进 GitHub Actions（需额外 `playwright install --with-deps`），目前经
+> `ci-gate.mjs e2e` 挂在本地推送前门；CI 的「在 CI」列因此标 ❌。
 
 ## `verify:real-model` 的完整契约
 

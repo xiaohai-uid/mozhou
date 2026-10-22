@@ -43,11 +43,14 @@
     "check:lint-whitelist": "node scripts/check-lint-whitelist.mjs",
     "duplication": "npx --yes jscpd@3.5.10 --config .jscpd.json .",
     "perf:smoke": "node perf/k6/run-smoke.mjs",
+    "e2e:install": "playwright install chromium firefox webkit",
+    "test:e2e": "node e2e/run-e2e.mjs",
     "coverage:check": "node scripts/report-coverage-status.mjs",
     "test:coverage:packages": "vitest run --coverage && vitest run --config vitest.bench.config.ts",
     "test:coverage:web": "pnpm --filter @mozhou/web test:coverage"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "^9.17.0",
