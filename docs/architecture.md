@@ -15,7 +15,7 @@
 | `@mozhou/context-compiler` | `packages/context-compiler` | 20 | 8082 | 10 | 3567 | `@mozhou/data-plane`, `@mozhou/kernel` |
 | `@mozhou/flywheel` | `packages/flywheel` | 36 | 7169 | 14 | 2947 | `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/runtime` | `packages/runtime` | 30 | 4755 | 12 | 2053 | `@mozhou/data-plane`, `@mozhou/kernel` |
-| `@mozhou/kernel` | `packages/kernel` | 16 | 3248 | 7 | 942 | — |
+| `@mozhou/kernel` | `packages/kernel` | 16 | 3433 | 7 | 1106 | — |
 | `@mozhou/quality-engine` | `packages/quality-engine` | 27 | 3071 | 12 | 1142 | — |
 | `@mozhou/benchmark` | `packages/benchmark` | 11 | 1605 | 7 | 908 | `@mozhou/context-compiler`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 
@@ -77,7 +77,7 @@
 
 ## 5. 叶子包（零内部依赖）
 
-- `@mozhou/kernel` — `packages/kernel`（3248 行）
+- `@mozhou/kernel` — `packages/kernel`（3433 行）
 - `@mozhou/quality-engine` — `packages/quality-engine`（3071 行）
 
 ## 6. 本生成器**不**覆盖的判据

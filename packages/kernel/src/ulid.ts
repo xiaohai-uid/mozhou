@@ -26,11 +26,26 @@ const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ' as const
 const TIME_CHARS = 10 // 48 bit 毫秒时间戳
 const RANDOM_CHARS = 16 // 80 bit 随机数
 
+/** ULID 规范：时间戳是 48 bit 无符号整数，最大 2^48-1（281474976710655）。 */
+const MAX_TIME_MS = 2 ** 48 - 1
+
 const RANDOM_BITS = BigInt(RANDOM_CHARS * 5) // 80
 const RANDOM_MAX = (1n << RANDOM_BITS) - 1n
 
 let lastTime = -1
 let lastRandom = 0n
+
+/**
+ * 越界时间戳会让时间段静默截断（例如负数编码成 ZZZZZZZZZZ），
+ * 从而破坏「字典序 = 时间序」的契约；按规范在铸造前拒绝。
+ */
+function assertTimestamp(value: number): void {
+  if (!Number.isInteger(value) || value < 0 || value > MAX_TIME_MS) {
+    throw new RangeError(
+      `newUlid: now() 必须返回 [0, ${MAX_TIME_MS}] 内的整数毫秒时间戳，收到 ${String(value)}`,
+    )
+  }
+}
 
 function encode(value: bigint, chars: number): string {
   let out = ''
@@ -56,12 +71,18 @@ function random80(): bigint {
  * 同毫秒内以上一枚的随机段 +1 续排（单调），溢出则顺延一毫秒。
  */
 export function newUlid(now: () => number = Date.now): Ulid {
-  let time = now()
+  const candidate = now()
+  assertTimestamp(candidate)
+  let time = candidate
   if (time <= lastTime) {
     time = lastTime
     lastRandom += 1n
     if (lastRandom > RANDOM_MAX) {
       time += 1
+      // 进位后必须同步 lastTime：否则下一枚仍以旧 lastTime 为基准，
+      // 会落回上一毫秒（实测 b=…01…0000、c=…00…0001，b<c 为 false），
+      // 破坏「字典序 = 时间序」的契约。
+      lastTime = time
       lastRandom = 0n
     }
   } else {
