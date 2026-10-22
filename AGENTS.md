@@ -52,9 +52,11 @@ pnpm --filter @mozhou/web exec vitest run src/<name>.test.tsx
 
 ### 常见坑
 
-- Windows 上 pnpm 是 `.cmd` shim，Node 无 shell 启动会 ENOENT/EINVAL；需要程序化跑 pnpm 时用 `node scripts/ci-gate.mjs` 这类包装器。
+- Windows 上 pnpm 是 `.cmd` shim，Node 无 shell 启动会 ENOENT/EINVAL；程序化跑 pnpm 一律走 `node scripts/pnpm.mjs <参数…>`（`shell: true` + 逐参数引号，退出码原样透传）。门任务也可用 `node scripts/ci-gate.mjs <task>`。
 - 钩子本体在 `.githooks/`，用 `node scripts/install-hooks.mjs` 激活；本机 `core.hooksPath` 会让 `.git/hooks/` 完全失效。
 - `check-generated-freshness.mjs` 依赖 `sh` 在 PATH（Git Bash 的 `C:\Program Files\Git\bin`）；裸 PowerShell 会 exit 2，不是脚本缺陷。
+- 拆提交时生成物要逐笔重建：`check-generated-freshness.mjs` 按**索引树**判定，而 `gen-architecture.mjs` 读工作区。做法是 `git add <本提交文件> && git stash push --keep-index --include-untracked -m tmp` → `node scripts/gen-architecture.mjs` → `git add docs/architecture.md` → 提交 → `git stash pop`。`stash pop` 会刷新源码 mtime，之后若 `build-freshness` 报陈旧，先 `pnpm --filter @mozhou/web build` 再判定。
+- Mimosa 钩子会把「提交消息正文里出现源码路径」判成「通过 Bash 写源码」并整条拦截（连 `git add` 都不执行）。把消息写进临时文件再 `git commit -F <文件>`；不要用 `--no-verify` 绕过。
 - `dist/`、`dist-server/` 是忽略项；陈旧产物会制造假失败，先重建再判断。
 - 改源码后 GitNexus 索引会陈旧（`node .gitnexus/run.cjs analyze`）；索引不覆盖 `scripts/`。
 - `pnpm desktop:build` 构建的是 Tauri 旧壳，不是当前 Electron 壳；Electron 入口是 `desktop/`。
@@ -68,6 +70,7 @@ pnpm --filter @mozhou/web exec vitest run src/<name>.test.tsx
 | UI / 视觉 | `apps/web/DESIGN.md`；视觉 token 真值在 `apps/web/src/styles/globals.css` |
 | 桌面发行 / 安装器 | `docs/adr/0037-electron-desktop-shell-migration.md`、`desktop/README.md` |
 | 门清单语义 | `docs/gates.md`（**BLOCKED ≠ PASSED**） |
+| 长篇验收 / 证据格式 | `evidence/longform-journey/README.md`（`status` 由三个布尔派生的规则）、`docs/gates.md` |
 | 架构 / 依赖 | `docs/architecture.md`、`docs/adr/INDEX.md` |
 
 ## 0. 流程权威与优先级
