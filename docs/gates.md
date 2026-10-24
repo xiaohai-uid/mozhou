@@ -42,7 +42,8 @@
 | 克隆检测 | `pnpm run duplication` | 见 jscpd（`.github/workflows/graph-gate.yml:54-73` 的 duplication job；0 未超阈值 / 非 0 超阈值） | 无 | ✅ `graph-gate.yml` |
 | **性能冒烟门** | `pnpm run perf:smoke` | 0 通过 · 1 阈值红或端点失败 `perf/k6/smoke.js` · 2 环境阻塞 `perf/k6/run-smoke.mjs:29` | 2（构建缺失/服务未起） | ✅ `perf-smoke-nightly.yml` · `release.yml` |
 | **白名单对账门** | `node scripts/check-lint-whitelist.mjs` | 0 一致 · 1 漏登记或超限 `scripts/check-lint-whitelist.mjs` | 无此状态 | ❌ 未接入（已在 pre-commit 与 `pnpm lint` 前置） |
-| **跨浏览器 E2E 冒烟** | `pnpm run test:e2e` | 0 通过 · 1 测试失败 · 2 环境阻塞（产物缺失/陈旧或端口非法，`e2e/run-e2e.mjs`） | 2（前置检查未通过） | ❌ 未接入（经 `ci-gate.mjs e2e`，本地推送前门） |
+| **生成器确定性** | `pnpm run check:gen-determinism` | 0 一致 · 1 违规（`scripts/gen-*.mjs` 用 `readdirSync` 且无 `sort(`，生成物会随文件系统目录项顺序漂移，`scripts/check-gen-determinism.mjs`） | 无此状态 | ❌ 未接入（经 `ci-gate.mjs gen-determinism`，本地推送前门） |
+| **跨浏览器 E2E 冒烟** | `pnpm run test:e2e` | 0 通过 · 1 测试失败 · 2 环境阻塞（产物缺失/陈旧或端口非法，`e2e/run-e2e.mjs`） | 2（前置检查未通过） | ✅ `e2e-nightly.yml` |
 
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 

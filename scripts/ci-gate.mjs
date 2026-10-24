@@ -44,6 +44,8 @@ const commands = {
   'desktop-package': 'pnpm verify:desktop-package',
   // 2026-10-21 补：跨浏览器 E2E 冒烟门（生产产物 + 隔离数据根；0 通过 / 1 失败 / 2 阻塞）
   e2e: 'pnpm test:e2e',
+  // 2026-10-24 补：生成器确定性门（gen-*.mjs 用 readdirSync 必须排序，防生成物跨平台漂移）
+  'gen-determinism': 'pnpm run check:gen-determinism',
 }
 const cmd = commands[task]
 if (cmd === undefined) {
