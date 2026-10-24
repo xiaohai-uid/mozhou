@@ -92,12 +92,12 @@
 | 档位路由 | Tier Routing | - | - | 未验证 |
 | 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:252` | 声明 |
 | 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:183` | 声明 |
-| 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
-| 技能 | Skill | `skill` | `apps/web/server/agent/skills.ts:186` | 局部同名 |
+| 能力 | Capability | `capability` | `apps/web/server/billing/entitlements.ts:34` | 引用 |
+| 技能 | Skill | `skill` | `apps/web/server/agent/skillTools.ts:23` | 局部同名 |
 | 能力注册表 | Capability Registry | `CapabilityRegistry` | `packages/runtime/src/registry.ts:23` | 声明 |
 | 能力配方 | Capability Recipe | `CapabilityRecipe` | `packages/runtime/src/recipe/types.ts:142` | 声明 |
 | 任务流 | Task Stream | - | - | 未验证 |
-| 候选生成标识 | Generation Id | `generationId` | `packages/pipeline/src/draft-candidate.ts:111` | 引用 |
+| 候选生成标识 | Generation Id | `generationId` | `apps/web/server/routes/pipelineRoutes.ts:308` | 引用 |
 | 评估引擎 | Evaluation Engine | - | - | 未验证 |
 | 长篇基准 | Long Novel Benchmark | - | - | 未验证 |
 | 文学审查报告 | QualityReviewReport | `QualityReviewReport` | `packages/quality-engine/src/types.ts:68` | 声明 |
@@ -115,7 +115,7 @@
 | 议题 | Issue | `issue` | `packages/pipeline/src/gate-step.ts:216` | 局部同名 |
 | 工单 | Ticket | `ticket` | `apps/web/server/routes/managedModelRoutes.ts:50` | 局部同名 |
 | 本地规格文档 | Local Spec Doc | - | - | 未验证 |
-| 地图 | Map | `Map` | `packages/benchmark/src/metrics.ts:215` | 引用 |
+| 地图 | Map | `Map` | `apps/web/server/agent/registry.ts:21` | 引用 |
 | 状态标签 | Triage Label | - | - | 未验证 |
 | 门 | Gate | `Gate` | `apps/web/src/capability-square/CapabilitySquareView.tsx:101` | 引用 |
 | 门禁 | - | - | - | 未验证 |
@@ -130,10 +130,10 @@
 | 决策记录 | ADR | `ADR` | `apps/web/src/story-brain/StoryBrainPanel.tsx:143` | 引用 |
 | 纪事 | Chronicle | - | - | 未验证 |
 | 架构地图 | Architecture Map | - | - | 未验证 |
-| 契约 | Contract | `contract` | `packages/pipeline/src/gate-step.ts:215` | 局部同名 |
+| 契约 | Contract | `contract` | `apps/web/server/routes/pipelineRoutes.ts:453` | 局部同名 |
 | 接缝 | Seam | - | - | 未验证 |
 | 消费者 | Definition | `definition` | `packages/quality-engine/src/deterministic.ts:101` | 引用 |
 | 工作台 | Workbench | `workbench` | `apps/web/src/capability-square/capabilityDetails.ts:21` | 引用 |
 | 智能体 Harness | Agent Harness | - | - | 未验证 |
-| 版本 | Version | `version` | `packages/pipeline/src/draft-candidate.ts:322` | 局部同名 |
+| 版本 | Version | `version` | `apps/web/server/routes/skillRoutes.ts:108` | 局部同名 |
 | 会话 | Session | `Session` | `apps/web/src/workbench/DialogueStream.telemetry.test.tsx:12` | 仅测试 |
