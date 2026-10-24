@@ -24,6 +24,7 @@ import { managedModelRoutes } from './routes/managedModelRoutes.js'
 import { exportRoutes } from './routes/exportRoutes.js'
 import { memoRoutes } from './routes/memoRoutes.js'
 import { taskStreamRoutes } from './routes/taskStreamRoutes.js'
+import { factsRoutes } from './routes/factsRoutes.js'
 import { namingRoutes } from './routes/namingRoutes.js'
 import { flywheelRoutes } from './routes/flywheelRoutes.js'
 import { agentRoutes } from './routes/agentRoutes.js'
@@ -673,6 +674,7 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(exportRoutes)
     .use(memoRoutes)
     .use(taskStreamRoutes)
+    .use(factsRoutes)
     .use(namingRoutes)
     .use(flywheelRoutes)
     .use(agentRoutes)

@@ -11,7 +11,7 @@
 |---|---|---:|---:|---:|---:|---|
 | `@mozhou/web` | `apps/web` | 207 | 52570 | 82 | 14999 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/flywheel`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/pipeline` | `packages/pipeline` | 59 | 18982 | 34 | 10116 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/quality-engine`, `@mozhou/runtime` |
-| `@mozhou/data-plane` | `packages/data-plane` | 67 | 16631 | 29 | 7376 | `@mozhou/kernel` |
+| `@mozhou/data-plane` | `packages/data-plane` | 69 | 17022 | 30 | 7552 | `@mozhou/kernel` |
 | `@mozhou/context-compiler` | `packages/context-compiler` | 20 | 8082 | 10 | 3567 | `@mozhou/data-plane`, `@mozhou/kernel` |
 | `@mozhou/flywheel` | `packages/flywheel` | 36 | 7169 | 14 | 2947 | `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 | `@mozhou/runtime` | `packages/runtime` | 30 | 4755 | 12 | 2053 | `@mozhou/data-plane`, `@mozhou/kernel` |

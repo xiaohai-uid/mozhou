@@ -72,6 +72,8 @@ export default tseslint.config(
             // 仅测试文件需要 defaultProject 支持。
             'apps/web/server/agent/*.test.ts',
             'apps/web/server/recycle/*.test.ts',
+            // 2026-10-24：章后事实账本 facts 目录（#117）按同一先例补登记。
+            'apps/web/server/facts/*.test.ts',
           ],
           defaultProject: 'apps/web/tsconfig.server.json',
           // 2026-10-02 由 80 上调至 120：服务端新增测试文件使 defaultProject 匹配数达到 86，

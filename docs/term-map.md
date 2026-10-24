@@ -22,12 +22,12 @@
 
 ## 统计
 
-- 词条总数: **97**
+- 词条总数: **98**
 - 声明: **27**
 - 局部同名: **7**
 - 引用: **14**
 - 仅测试: **1**
-- 未验证: **48**
+- 未验证: **49**
 
 ## 已确认的命名漂移
 
@@ -49,6 +49,7 @@
 | 实体引用 | Entity Ref | `EntityRef` | `packages/kernel/src/kernel-schema.ts:62` | 声明 |
 | 时序事实 | Temporal Fact | `TemporalFact` | `packages/kernel/src/kernel-schema.ts:239` | 声明 |
 | 候选事实 | Candidate Fact | - | - | 未验证 |
+| 候选事实账本 | Candidate Fact Ledger | - | - | 未验证 |
 | 候选 | Candidate | `Candidate` | `apps/web/src/workbench/editor/ProseEditorPanel.tsx:558` | 引用 |
 | 正典事实 | Canon Fact | - | - | 未验证 |
 | 知情状态 | Knowledge State | `KnowledgeState` | `packages/kernel/src/kernel-schema.ts:279` | 声明 |
