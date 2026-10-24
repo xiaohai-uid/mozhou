@@ -1,5 +1,5 @@
 /**
- * 候选事实账本（Candidate Fact Ledger · 第一切片 #117）。
+ * 候选事实账本（Candidate Fact Ledger · #117 章节事件查 + #118 人物心理状态查）。
  *
  * 规格：.scratch/chapter-fact-ledger/spec.md（裁决：两查先行、提交后回顾）。
  * 存储先例：tasks.ts —— `<bookRoot>/.mozhou/fact-ledger/<sha256(candidateId)>.json`
@@ -33,6 +33,15 @@ export type FactStatus = 'pending' | 'confirmed' | 'rejected' | 'voided'
 export interface FactCandidatePayload {
   readonly summary: string
   readonly detail?: string
+  /**
+   * 人物心理状态查（psychological_state，#118）专属结构化字段：人物标识与前后状态。
+   * event 候选不携带；psychological_state 候选在提取缝（mock 与解析）强制三字段齐备，
+   * 决断的编辑确认载荷同口径校验（路由层 parseDecidePayload）。
+   * 账本本身把载荷当不透明内容：决断状态机与作废传播对两类候选完全一致。
+   */
+  readonly character?: string
+  readonly before?: string
+  readonly after?: string
 }
 
 export interface NewFactCandidate {

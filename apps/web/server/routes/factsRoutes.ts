@@ -1,5 +1,5 @@
 /**
- * 候选事实账本 HTTP 面（#117 · 提取 / 待决 / 决断 / 历史）。
+ * 候选事实账本 HTTP 面（#117 章节事件查 + #118 人物心理状态查 · 提取 / 待决 / 决断 / 历史）。
  *
  * - book 类别：root/bookId 经路由层 resolveAuthorizedBook 解析（hosted 主体隔离继承既有缝）；
  * - 提取：mock 判据与行内编辑流同源；真实分支经 resolveGenerationTarget 单缝，
@@ -34,6 +34,7 @@ import {
   FACT_EXTRACTION_SYSTEM_PROMPT,
   mockFactExtraction,
   parseFactExtractionOutput,
+  psychStateSummary,
 } from '../facts/extraction.js'
 
 type RouteContext = {
@@ -135,12 +136,24 @@ function handleCandidates(ctx: RouteContext): boolean {
   return true
 }
 
-/** 从决断载荷解析编辑后内容；非法即 400。 */
+/** 从决断载荷解析编辑后内容；非法即 400。载荷出现 character 即按心理状态候选口径校验。 */
 function parseDecidePayload(raw: unknown): FactCandidatePayload | undefined | 'INVALID' {
   if (raw === null || typeof raw !== 'object') {
     return undefined
   }
   const item = raw as Record<string, unknown>
+  // 人物心理状态候选（#118）的编辑确认走结构化字段：character / before / after 必填，
+  // 摘要由三字段派生（与提取缝 psychStateSummary 同口径）。
+  const character = typeof item['character'] === 'string' ? item['character'].trim() : ''
+  if (character.length > 0) {
+    const before = typeof item['before'] === 'string' ? item['before'].trim() : ''
+    const after = typeof item['after'] === 'string' ? item['after'].trim() : ''
+    if (before.length === 0 || after.length === 0) {
+      return 'INVALID'
+    }
+    return { summary: psychStateSummary(character, before, after), character, before, after }
+  }
+  // 事件候选（#117 口径不变）：summary 必填。
   const summary = typeof item['summary'] === 'string' ? item['summary'].trim() : ''
   if (summary.length === 0) {
     return 'INVALID'

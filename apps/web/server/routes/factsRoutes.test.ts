@@ -106,7 +106,7 @@ describe('候选事实账本 HTTP 面 (#117)', () => {
     const candidateId = String(candidates[0]?.['candidateId'])
 
     const pending = await post(base, '/api/facts.candidates', { root: bookRoot, chapterIndex: 1 })
-    expect((pending.data['candidates'] as unknown[]).length).toBe(1)
+    expect((pending.data['candidates'] as unknown[]).length).toBe(2)
 
     const decided = await post(base, '/api/facts.decide', {
       root: bookRoot,
@@ -122,12 +122,58 @@ describe('候选事实账本 HTTP 面 (#117)', () => {
 
     const history = await post(base, '/api/facts.history', { root: bookRoot, chapterIndex: 1 })
     const records = history.data['records'] as Array<Record<string, unknown>>
-    expect(records.length).toBe(1)
+    expect(records.length).toBe(2)
     expect(records[0]?.['status']).toBe('confirmed')
     const original = records[0]?.['payload'] as Record<string, unknown>
     const decidedPayload = records[0]?.['decidedPayload'] as Record<string, unknown>
     expect(decidedPayload['summary']).toBe('作者修订后的事件')
     expect(original['summary']).not.toBe('作者修订后的事件')
+  })
+
+  it('mock 一次提取同时产出事件与人物心理状态两类候选，同列表可决断（#118 第二查）', async () => {
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    const base = await listen()
+
+    const extracted = await post(base, '/api/facts.extract', { root: bookRoot, chapterIndex: 1 })
+    expect(extracted.status).toBe(200)
+    const candidates = extracted.data['candidates'] as Array<Record<string, unknown>>
+    expect(candidates.map((c) => c['kind'])).toEqual(expect.arrayContaining(['event', 'psychological_state']))
+
+    // 候选载荷含人物标识与前后状态
+    const psych = candidates.find((c) => c['kind'] === 'psychological_state') as Record<string, unknown>
+    const psychPayload = psych['payload'] as Record<string, unknown>
+    expect(String(psychPayload['character']).length).toBeGreaterThan(0)
+    expect(String(psychPayload['before']).length).toBeGreaterThan(0)
+    expect(String(psychPayload['after']).length).toBeGreaterThan(0)
+    expect(String(psych['evidence']).length).toBeGreaterThan(0)
+
+    // 同一待决列表出现两类候选
+    const pending = await post(base, '/api/facts.candidates', { root: bookRoot, chapterIndex: 1 })
+    const pendingList = pending.data['candidates'] as Array<Record<string, unknown>>
+    expect(pendingList.map((c) => c['kind'])).toEqual(expect.arrayContaining(['event', 'psychological_state']))
+
+    // 心理状态候选同决断面：编辑确认走结构化字段 → 幂等重放（含相反方向决断）
+    const psychId = String(psych['candidateId'])
+    const decided = await post(base, '/api/facts.decide', {
+      root: bookRoot,
+      factCandidateId: psychId,
+      decision: 'confirmed',
+      payload: { character: '萧炎', before: '平静', after: '起了戒备' },
+    })
+    expect(decided.status).toBe(200)
+    expect(decided.data['replayed']).toBe(false)
+    const decidedRecord = decided.data['record'] as Record<string, unknown>
+    const decidedPayload = decidedRecord['decidedPayload'] as Record<string, unknown>
+    expect(decidedPayload['after']).toBe('起了戒备')
+
+    const replay = await post(base, '/api/facts.decide', { root: bookRoot, factCandidateId: psychId, decision: 'rejected' })
+    expect(replay.data['replayed']).toBe(true)
+    expect((replay.data['record'] as Record<string, unknown>)['status']).toBe('confirmed')
+
+    // 历史同口径可查
+    const history = await post(base, '/api/facts.history', { root: bookRoot, chapterIndex: 1 })
+    const records = history.data['records'] as Array<Record<string, unknown>>
+    expect(records.some((r) => r['kind'] === 'psychological_state' && r['status'] === 'confirmed')).toBe(true)
   })
 
   it('同章重复提取：旧 pending 作废（计数回传），对旧候选决断 409', async () => {
@@ -139,10 +185,10 @@ describe('候选事实账本 HTTP 面 (#117)', () => {
     const oldId = String(firstCandidates[0]?.['candidateId'])
 
     const second = await post(base, '/api/facts.extract', { root: bookRoot, chapterIndex: 1 })
-    expect(second.data['voided']).toBe(1)
+    expect(second.data['voided']).toBe(2) // 事件 + 心理状态两类候选一并作废
 
     const pending = await post(base, '/api/facts.candidates', { root: bookRoot, chapterIndex: 1 })
-    expect((pending.data['candidates'] as unknown[]).length).toBe(1)
+    expect((pending.data['candidates'] as unknown[]).length).toBe(2)
 
     const stale = await post(base, '/api/facts.decide', { root: bookRoot, factCandidateId: oldId, decision: 'confirmed' })
     expect(stale.status).toBe(409)
@@ -239,7 +285,7 @@ describe('候选事实账本 hosted 主体隔离 (#117 验收)', () => {
     const candidateId = String(aCandidates[0]?.['candidateId'])
 
     const pending = await post(base, '/api/facts.candidates', { bookId: bookA.bookId, chapterIndex: 1 }, cookieA)
-    expect((pending.data['candidates'] as unknown[]).length).toBe(1)
+    expect((pending.data['candidates'] as unknown[]).length).toBe(2)
 
     const decided = await post(
       base,
@@ -252,7 +298,7 @@ describe('候选事实账本 hosted 主体隔离 (#117 验收)', () => {
 
     const history = await post(base, '/api/facts.history', { bookId: bookA.bookId, chapterIndex: 1 }, cookieA)
     expect(history.status).toBe(200)
-    expect((history.data['records'] as unknown[]).length).toBe(1)
+    expect((history.data['records'] as unknown[]).length).toBe(2)
 
     // B 对自己的书只看到自己的账本，与 A 互不串
     const bPending = await post(base, '/api/facts.candidates', { bookId: bookB.bookId, chapterIndex: 1 }, cookieB)

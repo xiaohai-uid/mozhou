@@ -240,6 +240,39 @@ describe('候选事实账本 · 决断状态机', () => {
     expect(chapterOnePending[0]?.extractionRunId).toBe('run_0002')
   })
 
+  it('心理状态候选（#118 第二查）：与事件候选同账本同口径——插入、同列表、编辑确认、历史可查', () => {
+    const psych: NewFactCandidate = {
+      kind: 'psychological_state',
+      payload: { summary: '萧炎：平静 → 戒备', character: '萧炎', before: '平静', after: '戒备' },
+      evidence: '两人不欢而散，各自记恨。',
+      chapterIndex: 1,
+      proseHash: chapterProseHash,
+      extractionRunId: 'run_psych',
+    }
+    const { inserted } = insertFactCandidates(bookRoot, 1, [eventCandidate(), psych], '2026-10-24T00:00:00.000Z')
+    expect(inserted.map((r) => r.kind)).toEqual(['event', 'psychological_state'])
+
+    // 同一待决列表出现两类候选
+    const pending = listPendingFactCandidates(bookRoot, 1)
+    expect(pending.map((r) => r.kind)).toEqual(['event', 'psychological_state'])
+
+    // 编辑确认：结构化前后状态写入 decidedPayload，原始候选不被覆写
+    const psychRecord = inserted[1]!
+    const decided = decideFactCandidate(
+      bookRoot,
+      psychRecord.candidateId,
+      { decision: 'confirmed', payload: { summary: '萧炎：平静 → 戒备加深', character: '萧炎', before: '平静', after: '戒备加深' } },
+      '2026-10-24T01:00:00.000Z',
+    )
+    expect(decided.record.status).toBe('confirmed')
+    expect(decided.record.decidedPayload?.character).toBe('萧炎')
+    expect(decided.record.decidedPayload?.after).toBe('戒备加深')
+    expect(decided.record.payload['after']).toBe('戒备') // 原始候选 payload 不被覆写
+
+    const history = listFactLedgerHistory(bookRoot, { chapterIndex: 1 })
+    expect(history.some((r) => r.kind === 'psychological_state' && r.status === 'confirmed')).toBe(true)
+  })
+
   it('历史 limit：正整数取最近 N 条；0 / 负数返回空数组（0 不表示全部），缺省返回全部', () => {
     const first = insertFactCandidates(bookRoot, 1, [eventCandidate()], '2026-10-24T00:00:00.000Z')
     decideFactCandidate(bookRoot, first.inserted[0]!.candidateId, { decision: 'confirmed' }, '2026-10-24T00:10:00.000Z')
