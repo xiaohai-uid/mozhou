@@ -1,15 +1,18 @@
 /**
- * 章后事实账本（Fact Ledger · 章后事实账本第一切片 #117）。
+ * 候选事实账本（Candidate Fact Ledger · 第一切片 #117）。
  *
  * 规格：.scratch/chapter-fact-ledger/spec.md（裁决：两查先行、提交后回顾）。
  * 存储先例：tasks.ts —— `<bookRoot>/.mozhou/fact-ledger/<sha256(candidateId)>.json`
- * 一记录一文件，运行时区、非 canon：不参与对账、不进 manifest 基线。
+ * 一候选一记录、记录只增不删（决断在原记录上落定，不新增第二条记录），
+ * 运行时区、非 canon：不参与对账、不进 manifest 基线。
  *
  * 决断状态机（单向）：
- *   pending → confirmed | rejected；voided 由「同章重新提取」传播，任何终态不可逆。
- * - 原始候选 payload 绝不覆写：编辑确认写 decidedPayload，原 payload 原样保留；
- * - 同候选重复决断幂等返回首次结果（replayed: true）；
- * - 同章重新提取先作废该章全部 pending（现场隔离：旧任务不污染新现场），
+ *   pending → confirmed | rejected；voided 由现场传播（同章重新提取、
+ *   决断时正文版本与候选绑定版本不符），任何终态不可逆。
+ * - 原始候选 payload 绝不覆写：编辑确认在同一记录写 decidedPayload，原 payload 原样保留；
+ * - 已决断候选再次决断（含相反方向）按幂等重放返回首次结果（replayed: true）；
+ * - 一次提取定义一个新现场：同章全部旧 pending 先作废再插入——
+ *   无论正文版本是否变化、无论本批是否提出候选（空提取同样是新现场），
  *   confirmed / rejected 历史不受影响。
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
@@ -17,7 +20,9 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { newUlid } from '@mozhou/kernel'
 import { atomicWriteFileSync } from './atomic-write.js'
-import { RUNTIME_FACT_LEDGER_DIR } from './layout.js'
+import { RUNTIME_FACT_LEDGER_DIR, proseChapterPath } from './layout.js'
+import { readProseChapter } from './chapter.js'
+import { sha256Hex } from './sha256.js'
 
 export const FACT_LEDGER_RECORD_VERSION = 1
 
@@ -69,6 +74,13 @@ export class FactCandidateNotPendingError extends Error {
   }
 }
 
+/** 批次现场与候选章号不一致：整批拒绝落账，不产生半现场。 */
+export class FactBatchChapterMismatchError extends Error {
+  constructor(sceneChapterIndex: number, candidateChapterIndex: number) {
+    super(`FACT_BATCH_CHAPTER_MISMATCH: extraction scene is chapter ${sceneChapterIndex}, but a candidate declares chapter ${candidateChapterIndex}`)
+  }
+}
+
 function ledgerDir(root: string): string {
   const dir = join(root, RUNTIME_FACT_LEDGER_DIR)
   mkdirSync(dir, { recursive: true })
@@ -87,6 +99,15 @@ function readRecord(root: string, candidateId: string): FactLedgerRecord | null 
 
 function writeRecord(root: string, record: FactLedgerRecord): void {
   atomicWriteFileSync(recordPath(root, record.candidateId), JSON.stringify(record, null, 2) + '\n')
+}
+
+/** 当前章正文版本身份；正文缺失或不可解析时返回 null（该章现场已不存在）。 */
+function currentChapterProseHash(root: string, chapterIndex: number): string | null {
+  try {
+    return sha256Hex(readProseChapter(root, proseChapterPath(chapterIndex)).body)
+  } catch {
+    return null
+  }
 }
 
 function listAllRecords(root: string): FactLedgerRecord[] {
@@ -115,14 +136,27 @@ export interface InsertFactCandidatesResult {
 }
 
 /**
- * 插入一次提取的候选。同章（chapterIndex）全部旧 pending 先作废再插入——
- * 无论正文版本是否变化：一次提取定义一个新现场。
+ * 插入一次提取的候选。chapterIndex 是本次提取的现场章号，必须显式给出——
+ * 同章（chapterIndex）全部旧 pending 先作废再插入，无论正文版本是否变化、
+ * 无论本批是否提出候选（空提取同样是新现场）：一次提取定义一个新现场。
+ * 批次内任何候选章号与现场章号不一致即整批拒绝（FactBatchChapterMismatchError），
+ * 不产生半现场。
  */
-export function insertFactCandidates(root: string, candidates: readonly NewFactCandidate[], now?: string): InsertFactCandidatesResult {
+export function insertFactCandidates(
+  root: string,
+  chapterIndex: number,
+  candidates: readonly NewFactCandidate[],
+  now?: string,
+): InsertFactCandidatesResult {
+  for (const candidate of candidates) {
+    if (candidate.chapterIndex !== chapterIndex) {
+      throw new FactBatchChapterMismatchError(chapterIndex, candidate.chapterIndex)
+    }
+  }
   const createdAt = chronological(now)
   const voided: string[] = []
   for (const record of listAllRecords(root)) {
-    if (record.chapterIndex === candidates[0]?.chapterIndex && record.status === 'pending') {
+    if (record.chapterIndex === chapterIndex && record.status === 'pending') {
       writeRecord(root, { ...record, status: 'voided' })
       voided.push(record.candidateId)
     }
@@ -165,6 +199,15 @@ export interface DecideFactCandidateResult {
 
 /**
  * 单向决断。已决断 → 幂等重放首次结果；voided → 显式拒绝；不存在 → NotFound。
+ *
+ * 幂等重放契约（含相反方向决断）：单向状态机不做反向翻转。已决断候选收到任意
+ * 方向的再次决断时，返回账本真实状态（首次决断的 status / decidedAt / decidedPayload）
+ * 并带 replayed: true——客户端必须按 record.status 判读结果，而不是凭本次请求方向；
+ * replayed: true 表示「该候选早已决断，本次未产生新决断」，不区分同向重放与方向冲突。
+ *
+ * 正文版本身份校验：pending 候选绑定的 proseHash 与当前章正文不一致（作者改稿后
+ * 未重提取），或正文已不可读，即旧现场残留——按 voided 传播并拒绝决断
+ * （确认的事实必须来自当前正文现场，旧任务不能污染新现场）。
  */
 export function decideFactCandidate(
   root: string,
@@ -182,6 +225,10 @@ export function decideFactCandidate(
   if (record.status !== 'pending') {
     return { record, replayed: true }
   }
+  if (currentChapterProseHash(root, record.chapterIndex) !== record.proseHash) {
+    writeRecord(root, { ...record, status: 'voided' })
+    throw new FactCandidateVoidedError(candidateId)
+  }
 
   const decided: FactLedgerRecord = {
     ...record,
@@ -193,7 +240,11 @@ export function decideFactCandidate(
   return { record: decided, replayed: false }
 }
 
-/** 账本历史（含 voided / 已决断）；chapterIndex 过滤可选，limit 截取最近 N 条。 */
+/**
+ * 账本历史（含 voided / 已决断）；chapterIndex 过滤可选。
+ * limit 取最近 N 条：必须是正整数，0 / 负数 / 非整数返回空数组（0 不表示「全部」），
+ * 缺省返回全部。
+ */
 export function listFactLedgerHistory(
   root: string,
   filter?: { readonly chapterIndex?: number; readonly limit?: number },
@@ -201,7 +252,10 @@ export function listFactLedgerHistory(
   const filtered = listAllRecords(root).filter(
     (record) => filter?.chapterIndex === undefined || record.chapterIndex === filter.chapterIndex,
   )
-  return filter?.limit !== undefined ? filtered.slice(-filter.limit) : filtered
+  const limit = filter?.limit
+  if (limit === undefined) return filtered
+  if (!Number.isInteger(limit) || limit <= 0) return []
+  return filtered.slice(-limit)
 }
 
 /** 提取批次身份：服务端一次调用一个 runId，候选可按批追溯。 */

@@ -21,7 +21,7 @@ export const RUNTIME_OPERATIONS_DIR = `${RUNTIME_DIR}/operations`
  *  运行时区，非 canon、不参与对账；未确认提案跨重启待决的盘面凭据（S8 Proposal 后行）。 */
 export const RUNTIME_PROPOSALS_DIR = `${RUNTIME_DIR}/proposals`
 
-/** 章后事实账本（fact ledger · #117）：一候选一文件，文件名 = sha256(candidateId)。运行时区，非 canon。 */
+/** 候选事实账本（Candidate Fact Ledger · #117）：一候选一文件，文件名 = sha256(candidateId)。运行时区，非 canon。 */
 export const RUNTIME_FACT_LEDGER_DIR = `${RUNTIME_DIR}/fact-ledger`
 
 export const BOOK_RECORD_PATH = 'book.json'

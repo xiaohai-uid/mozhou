@@ -1,10 +1,11 @@
 /**
- * 章后事实账本 HTTP 面（#117 · 提取 / 待决 / 决断 / 历史）。
+ * 候选事实账本 HTTP 面（#117 · 提取 / 待决 / 决断 / 历史）。
  *
  * - book 类别：root/bookId 经路由层 resolveAuthorizedBook 解析（hosted 主体隔离继承既有缝）；
  * - 提取：mock 判据与行内编辑流同源；真实分支经 resolveGenerationTarget 单缝，
  *   未配置 provider 时显式 PROVIDER_UNAVAILABLE，绝不假成功；
- * - 决断幂等与现场隔离（同章重提取作废旧 pending）由数据面 fact-ledger 保证。
+ * - 决断幂等（含相反方向决断按幂等重放返回首次结果）与现场隔离（同章重提取
+ *   作废旧 pending；决断时正文版本不符同样作废）由数据面 fact-ledger 保证。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { RouteHandler } from '../router.js'
@@ -105,7 +106,7 @@ async function handleExtract(req: IncomingMessage, res: ServerResponse, ctx: Rou
       proseHash,
       extractionRunId: runId,
     }))
-    const result = insertFactCandidates(root, payload)
+    const result = insertFactCandidates(root, chapterIndex, payload)
     json(200, {
       ok: true,
       runId,

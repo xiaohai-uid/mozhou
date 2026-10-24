@@ -1,7 +1,8 @@
 // @vitest-environment node
 /**
- * 章后事实账本 HTTP 面测试（#117 · 真实 HTTP 级，mock 提取确定性）。
- * 断言外部行为：extract → candidates → decide → history 全链路与两个必备负例。
+ * 候选事实账本 HTTP 面测试（#117 · 真实 HTTP 级，mock 提取确定性）。
+ * 断言外部行为：extract → candidates → decide → history 全链路与两个必备负例；
+ * hosted 主体隔离（跨主体 bookId / 候选 id 越权拒绝）单列验收组。
  */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -9,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBook, proseChapterPath, renderProseChapter } from '@mozhou/data-plane'
+import { createBook, insertFactCandidates, proseChapterPath, renderProseChapter } from '@mozhou/data-plane'
 import { newUlid } from '@mozhou/kernel'
 import { createMoZhouApiRouter } from '../api.js'
 import { defaultBillingStore } from '../billing/store.js'
@@ -50,6 +51,7 @@ afterEach(() => {
   for (const s of servers) s.close()
   servers = []
   defaultBillingStore.close()
+  defaultBookAccessManager.setHostedMode(false)
   delete process.env['MOZHOU_DRAFT_PROVIDER']
   for (const d of tempDirs) {
     try {
@@ -81,15 +83,15 @@ function listen(): Promise<string> {
   })
 }
 
-function post(base: string, path: string, payload: Record<string, unknown>): Promise<{ status: number; data: Record<string, unknown> }> {
+function post(base: string, path: string, payload: Record<string, unknown>, cookie?: string): Promise<{ status: number; data: Record<string, unknown> }> {
   return fetch(`${base}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(cookie !== undefined ? { Cookie: cookie } : {}) },
     body: JSON.stringify(payload),
   }).then(async (res) => ({ status: res.status, data: (await res.json()) as Record<string, unknown> }))
 }
 
-describe('章后事实账本 HTTP 面 (#117)', () => {
+describe('候选事实账本 HTTP 面 (#117)', () => {
   it('mock 提取 → 待决列表 → 幂等决断 → 历史全链路', async () => {
     process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
     const base = await listen()
@@ -104,7 +106,6 @@ describe('章后事实账本 HTTP 面 (#117)', () => {
     const candidateId = String(candidates[0]?.['candidateId'])
 
     const pending = await post(base, '/api/facts.candidates', { root: bookRoot, chapterIndex: 1 })
-    console.log('DEBUG pending:', JSON.stringify(pending).slice(0, 300))
     expect((pending.data['candidates'] as unknown[]).length).toBe(1)
 
     const decided = await post(base, '/api/facts.decide', {
@@ -166,5 +167,101 @@ describe('章后事实账本 HTTP 面 (#117)', () => {
     const result = await post(base, '/api/facts.extract', { root: bookRoot, chapterIndex: 99 })
     expect(result.status).toBe(404)
     expect(result.data['ok']).toBe(false)
+  })
+})
+
+describe('候选事实账本 hosted 主体隔离 (#117 验收)', () => {
+  it('hosted：无认证 401；跨主体 bookId 与跨主体候选 id 越权拒绝；本主体全链路可用', async () => {
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-facts-hosted-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    defaultBookAccessManager.setHostedMode(true)
+
+    const base = await listen()
+    const provider = new InMemoryAuthProvider()
+    defaultSessionManager.setProvider(provider)
+    const { user: userA } = await provider.signUp('a@test.com', 'passA123')
+    const { user: userB } = await provider.signUp('b@test.com', 'passB123')
+    const { cookie: cookieA } = defaultSessionManager.createSession({ userId: userA.id, email: userA.email })
+    const { cookie: cookieB } = defaultSessionManager.createSession({ userId: userB.id, email: userB.email })
+
+    const bookA = defaultBookAccessManager.createHostedBook(userA.id, 'A的书')
+    const bookB = defaultBookAccessManager.createHostedBook(userB.id, 'B的书')
+    writeFileSync(
+      join(bookA.root, proseChapterPath(1)),
+      renderProseChapter({ mozhouId: `prose_${newUlid()}`, revision: 1, chapterIndex: 1, phase: 'draft', body: PROSE_BODY }),
+      'utf8',
+    )
+
+    // 无认证：hosted 模式在路由层认证缝直接 401
+    const anonymous = await post(base, '/api/facts.extract', { bookId: bookA.bookId, chapterIndex: 1 })
+    expect(anonymous.status).toBe(401)
+    expect(anonymous.data['code']).toBe('UNAUTHORIZED')
+
+    // 跨主体 bookId：A 的凭据访问 B 的书 → 四路由全部 404 BOOK_NOT_FOUND
+    for (const path of ['/api/facts.extract', '/api/facts.candidates', '/api/facts.decide', '/api/facts.history']) {
+      const res = await post(
+        base,
+        path,
+        { bookId: bookB.bookId, chapterIndex: 1, factCandidateId: 'fc_foreign', decision: 'confirmed' },
+        cookieA,
+      )
+      expect(res.status, `${path} must reject cross-subject access`).toBe(404)
+      expect(res.data['code']).toBe('BOOK_NOT_FOUND')
+    }
+
+    // 跨主体对象级：A 用自己的 bookId 却携带 B 账本内的候选 id → 404 FACT_CANDIDATE_NOT_FOUND
+    const { inserted: bCandidates } = insertFactCandidates(bookB.root, 1, [
+      {
+        kind: 'event',
+        payload: { summary: 'B 的私密事件' },
+        evidence: 'B 的正文摘句',
+        chapterIndex: 1,
+        proseHash: 'e'.repeat(64),
+        extractionRunId: 'fx_b_secret',
+      },
+    ])
+    const crossObject = await post(
+      base,
+      '/api/facts.decide',
+      { bookId: bookA.bookId, factCandidateId: bCandidates[0]!.candidateId, decision: 'confirmed' },
+      cookieA,
+    )
+    expect(crossObject.status).toBe(404)
+    expect(crossObject.data['code']).toBe('FACT_CANDIDATE_NOT_FOUND')
+
+    // 本主体：A 对自己的书全链路可用（隔离不是全拒）
+    const extracted = await post(base, '/api/facts.extract', { bookId: bookA.bookId, chapterIndex: 1 }, cookieA)
+    expect(extracted.status).toBe(200)
+    expect(extracted.data['ok']).toBe(true)
+    const aCandidates = extracted.data['candidates'] as Array<Record<string, unknown>>
+    const candidateId = String(aCandidates[0]?.['candidateId'])
+
+    const pending = await post(base, '/api/facts.candidates', { bookId: bookA.bookId, chapterIndex: 1 }, cookieA)
+    expect((pending.data['candidates'] as unknown[]).length).toBe(1)
+
+    const decided = await post(
+      base,
+      '/api/facts.decide',
+      { bookId: bookA.bookId, factCandidateId: candidateId, decision: 'confirmed' },
+      cookieA,
+    )
+    expect(decided.status).toBe(200)
+    expect(decided.data['replayed']).toBe(false)
+
+    const history = await post(base, '/api/facts.history', { bookId: bookA.bookId, chapterIndex: 1 }, cookieA)
+    expect(history.status).toBe(200)
+    expect((history.data['records'] as unknown[]).length).toBe(1)
+
+    // B 对自己的书只看到自己的账本，与 A 互不串
+    const bPending = await post(base, '/api/facts.candidates', { bookId: bookB.bookId, chapterIndex: 1 }, cookieB)
+    expect(bPending.status).toBe(200)
+    const bPendingList = bPending.data['candidates'] as Array<Record<string, unknown>>
+    expect(bPendingList.length).toBe(1)
+    expect(bPendingList[0]?.['extractionRunId']).toBe('fx_b_secret')
+    const bHistory = await post(base, '/api/facts.history', { bookId: bookB.bookId }, cookieB)
+    expect(bHistory.status).toBe(200)
+    expect((bHistory.data['records'] as unknown[]).length).toBe(1)
   })
 })
