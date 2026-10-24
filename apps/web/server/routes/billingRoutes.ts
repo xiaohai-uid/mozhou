@@ -6,8 +6,10 @@
  * - POST /api/billing/order（或通过 body 传 orderId）：主体只能查自己的订单（A 查 B 返回 404）；
  * - POST /api/payments/wechat/notify：微信支付异步通知回调（豁免普通登录，以 APIv3 验签为边界）；
  * - POST /api/payments/alipay/notify：支付宝异步通知回调（豁免普通登录，以 RSA2 验签为边界）；
- * - POST /api/billing/orders/refund：退款审计接口。
+ * - POST /api/billing/orders/refund：运营退款接口（ops 类别：免普通登录，
+ *   以 MOZHOU_OPS_TOKEN 共享凭据为边界；未配置时 fail-closed 503）。
  */
+import { createHash, timingSafeEqual } from 'node:crypto'
 import type { RouteHandler } from '../router.js'
 import { defaultBillingStore } from '../billing/store.js'
 import { defaultNotificationDispatcher } from '../billing/notifications.js'
@@ -153,8 +155,25 @@ export const billingRoutes: RouteHandler = (req, res, { path, body, rawText, raw
     return true
   }
 
-  /* ---- 5. 订单退款处理 ---- */
+  /* ---- 5. 订单退款处理（仅运营：MOZHOU_OPS_TOKEN 校验） ---- */
   if (path === '/api/billing/orders/refund' && req.method === 'POST') {
+    // 退款是运营动作，不是登录用户能力：登录态（甚至本地模式的默认主体）不足以授权。
+    // 凭据未配置时 fail-closed 拒绝，与支付验签器未配置的 503 同一口径。
+    const opsToken = process.env['MOZHOU_OPS_TOKEN']?.trim() ?? ''
+    if (opsToken === '') {
+      json(503, { ok: false, code: 'REFUND_OPS_NOT_CONFIGURED', error: 'refund requires MOZHOU_OPS_TOKEN to be configured' })
+      return true
+    }
+    const authHeader = req.headers['authorization'] ?? ''
+    const providedToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : ''
+    // 先散列再恒定时间比对：不泄露令牌长度，也不受时序侧信道影响
+    const providedHash = createHash('sha256').update(providedToken).digest()
+    const expectedHash = createHash('sha256').update(opsToken).digest()
+    if (!timingSafeEqual(providedHash, expectedHash)) {
+      json(401, { ok: false, code: 'REFUND_UNAUTHORIZED', error: 'valid operator token required' })
+      return true
+    }
+
     const orderId = typeof body['orderId'] === 'string' ? body['orderId'].trim() : ''
     const amountFen = typeof body['amountFen'] === 'number' ? body['amountFen'] : 0
 

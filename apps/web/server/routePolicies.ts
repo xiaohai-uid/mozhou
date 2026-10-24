@@ -2,7 +2,7 @@
  * apps/web · 全路由安全与多租户所有权策略注册表 (Route Policies · T09)。
  * 
  * 依照 reference/03-public-billing.md T09 规格：
- * - 明确分类每个 API 为 public / account / book / local-native / payment-webhook；
+ * - 明确分类每个 API 为 public / account / book / local-native / payment-webhook / ops；
  * - 未知路径默认拒绝 (FAIL-CLOSED)；
  * - 自动化检查当前所有注册路由都在表中；
  * - hosted 模式下禁止访问 local-native 端点。
@@ -14,6 +14,7 @@ export type RouteCategory =
   | 'book'            // 需要已登录 Session 且必须持有 AuthorizedBook（正文/分镜/生成/审查/流水等作品级操作）
   | 'local-native'    // 仅在本地单机 (local) 模式下开放，hosted 模式下 403 拒绝（如本地目录直接浏览）
   | 'payment-webhook' // 支付渠道异步通知，免普通 Session 登录但需支付签名强校验
+  | 'ops'             // 运营操作（如退款），免普通 Session 登录，以 MOZHOU_OPS_TOKEN 共享凭据为边界
 
 export interface RoutePolicy {
   readonly path: string
@@ -76,7 +77,6 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/backups/restore': 'account',
   '/api/billing/orders': 'account',
   '/api/billing/order': 'account',
-  '/api/billing/orders/refund': 'account',
   '/api/billing/license/ticket': 'account',
   '/api/billing/quota/status': 'account',
   '/api/billing/quota/reserve': 'account',
@@ -85,6 +85,9 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   // ---- 3. Payment Webhook 支付异步通知 (免普通登录，验签为边界) ----
   '/api/payments/wechat/notify': 'payment-webhook',
   '/api/payments/alipay/notify': 'payment-webhook',
+
+  // ---- 3b. Ops 运营操作 (免普通登录，MOZHOU_OPS_TOKEN 为边界；处理端 fail-closed) ----
+  '/api/billing/orders/refund': 'ops',
 
   // ---- 3. Local-Native 本地专用路由 (hosted 下 403 拒绝) ----
   '/api/library': 'local-native',
