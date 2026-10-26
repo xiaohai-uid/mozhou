@@ -1,7 +1,7 @@
 /**
  * 右侧检视塔（实现票 T40 · Ink Realm 摘要轨，ADR-0028）：
  * 顶部只读 summary rail——每个数字必须有真实来源（shellTelemetry 推导），
- * 没有则显示 '—'；四 tab：质量门 / Story Brain / 装配看板 / 变更矩阵。
+ * 没有则显示 '—'；五 tab：质量门 / 章后回顾 / Story Brain / 装配看板 / 变更矩阵。
  */
 import type { ReactNode } from 'react'
 import type { InspectorSummary } from './shellTelemetry'
@@ -10,6 +10,7 @@ export type { InspectorSummary }
 
 export const INSPECTOR_TABS = [
   { id: 'quality', label: '质量门' },
+  { id: 'chapter-review', label: '章后回顾' },
   { id: 'story-brain', label: 'Story Brain' },
   { id: 'context-receipt', label: '装配看板' },
   { id: 'change-matrix', label: '变更矩阵' },

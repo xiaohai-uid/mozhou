@@ -1,9 +1,11 @@
 /**
- * 候选事实账本 HTTP 面（#117 章节事件查 + #118 人物心理状态查 · 提取 / 待决 / 决断 / 历史）。
+ * 候选事实账本 HTTP 面（#117 章节事件查 + #118 人物心理状态查 · 提取 / 待决 / 决断 / 历史；
+ * #119 增补状态面 /api/facts.status 与共享提取缝）。
  *
  * - book 类别：root/bookId 经路由层 resolveAuthorizedBook 解析（hosted 主体隔离继承既有缝）；
  * - 提取：mock 判据与行内编辑流同源；真实分支经 resolveGenerationTarget 单缝，
- *   未配置 provider 时显式 PROVIDER_UNAVAILABLE，绝不假成功；
+ *   未配置 provider 时显式 PROVIDER_UNAVAILABLE，绝不假成功；提取核心与提交链
+ *   自动触发（facts/autoExtract.ts，#119 ①）共用同一实现；
  * - 决断幂等（含相反方向决断按幂等重放返回首次结果）与现场隔离（同章重提取
  *   作废旧 pending；决断时正文版本不符同样作废）由数据面 fact-ledger 保证。
  */
@@ -12,30 +14,21 @@ import type { RouteHandler } from '../router.js'
 import { decodeBookRequest } from '../bookRequest.js'
 import { INVALID_BOOK_REQUEST, PROVIDER_UNAVAILABLE } from '../routeCodes.js'
 import {
-  insertFactCandidates,
   decideFactCandidate,
   listPendingFactCandidates,
   listFactLedgerHistory,
-  newExtractionRunId,
-  readProseChapter,
-  proseChapterPath,
-  sha256Hex,
   FactCandidateNotFoundError,
   FactCandidateVoidedError,
   type FactCandidatePayload,
-  type NewFactCandidate,
 } from '@mozhou/data-plane'
-import { resolveGenerationTarget } from '../llm/generationTarget.js'
-import { DRAFT_TASK_TYPE } from '../llm/tierRouting.js'
-import { streamOpenAiChat } from '../llm/openaiStream.js'
-import { isMockDraftProviderMode } from './pipelineRoutes.js'
 import {
-  buildFactExtractionUserPrompt,
-  FACT_EXTRACTION_SYSTEM_PROMPT,
-  mockFactExtraction,
-  parseFactExtractionOutput,
-  psychStateSummary,
-} from '../facts/extraction.js'
+  readFactExtractionStatus,
+  runFactExtractionWithProgress,
+  FactExtractionChapterMissingError,
+  FactExtractionProviderUnavailableError,
+} from '../facts/autoExtract.js'
+import { draftProviderAvailability } from './pipelineRoutes.js'
+import { psychStateSummary } from '../facts/extraction.js'
 
 type RouteContext = {
   readonly path: string
@@ -59,66 +52,77 @@ async function handleExtract(req: IncomingMessage, res: ServerResponse, ctx: Rou
     return true
   }
 
-  let proseBody: string
+  // 共享提取缝（facts/autoExtract.ts，#119 ①）：mock 判据、resolveGenerationTarget
+  // 单缝、结构化解析、账本落定、进度行（Started/Finished/Failed，trigger=manual_retry）
+  // 全部与提交链自动触发共用同一实现——两边任何口径漂移立即全线可见。
+  // HTTP 侧只保留契约映射（404 / PROVIDER_UNAVAILABLE / 502）与客户端断连中止。
+  const abortController = new AbortController()
+  res.on('close', () => abortController.abort())
   try {
-    proseBody = readProseChapter(root, proseChapterPath(chapterIndex)).body
-  } catch {
-    json(404, { ok: false, code: 'CHAPTER_NOT_FOUND', error: `chapter ${chapterIndex} prose not found or malformed` })
-    return true
-  }
-  const proseHash = sha256Hex(proseBody)
-  const runId = newExtractionRunId()
-
-  try {
-    let extracted
-    if (isMockDraftProviderMode(process.env)) {
-      extracted = mockFactExtraction(chapterIndex, proseBody)
-    } else {
-      const target = await resolveGenerationTarget({
-        taskType: DRAFT_TASK_TYPE,
-        principal: principal === null || principal === undefined ? undefined : { userId: principal.userId },
-        env: process.env,
-      })
-      if (!target.available) {
-        if (target.reason === 'no_provider_configured') {
-          // 与 prose.edit.stream 前置闸同语义：真没配任何 provider 才笼统收口
-          json(200, { ok: false, code: PROVIDER_UNAVAILABLE, error: 'provider unavailable: no draft provider configured' })
-          return true
-        }
-        throw new Error(`PROVIDER_UNAVAILABLE: ${target.detail}`)
-      }
-      const abortController = new AbortController()
-      res.on('close', () => abortController.abort())
-      let raw = ''
-      for await (const chunk of streamOpenAiChat(target.endpoint, buildFactExtractionUserPrompt(chapterIndex, proseBody), FACT_EXTRACTION_SYSTEM_PROMPT, abortController.signal)) {
-        raw += chunk.delta
-      }
-      if (raw.trim().length === 0) {
-        throw new Error('FACT_EXTRACTION_PARSE_FAILED: provider returned an empty stream')
-      }
-      extracted = parseFactExtractionOutput(raw)
-    }
-
-    const payload: readonly NewFactCandidate[] = extracted.map((candidate) => ({
-      kind: candidate.kind,
-      payload: candidate.payload,
-      evidence: candidate.evidence,
+    const outcome = await runFactExtractionWithProgress({
+      root,
       chapterIndex,
-      proseHash,
-      extractionRunId: runId,
-    }))
-    const result = insertFactCandidates(root, chapterIndex, payload)
+      trigger: 'manual_retry',
+      ...(principal === null || principal === undefined || principal.userId === undefined
+        ? {}
+        : { principalUserId: principal.userId }),
+      signal: abortController.signal,
+    })
     json(200, {
       ok: true,
-      runId,
-      proseHash,
-      inserted: result.inserted.length,
-      voided: result.voided.length,
-      candidates: result.inserted,
+      runId: outcome.runId,
+      proseHash: outcome.proseHash,
+      inserted: outcome.inserted.length,
+      voided: outcome.voided.length,
+      candidates: outcome.inserted,
     })
   } catch (error) {
+    if (error instanceof FactExtractionChapterMissingError) {
+      json(404, { ok: false, code: 'CHAPTER_NOT_FOUND', error: error.message })
+      return true
+    }
+    if (error instanceof FactExtractionProviderUnavailableError) {
+      // 与 prose.edit.stream 前置闸同语义：真没配任何 provider 才笼统收口
+      json(200, { ok: false, code: PROVIDER_UNAVAILABLE, error: 'provider unavailable: no draft provider configured' })
+      return true
+    }
     json(502, { ok: false, code: 'FACT_EXTRACTION_FAILED', error: (error as Error).message })
   }
+  return true
+}
+
+/**
+ * 章后提取状态（#119 章后回顾面板数据面）：最近一条提取进度行（账本平铺行）+
+ * 待决候选数 + provider 活探针。未配置模型时 extraction 可能为 null 而
+ * provider.available=false——面板据此显示「未配置模型」与重试入口，绝不假成功。
+ */
+async function handleStatus(ctx: RouteContext): Promise<boolean> {
+  const { body, json, bookRoot, principal } = ctx
+  const decoded = decodeBookRequest(body, bookRoot ?? null, { principal })
+  if (!decoded.ok) {
+    json(decoded.error.status, { ok: false, code: decoded.error.code, error: decoded.error.error })
+    return true
+  }
+  const { root, chapterIndex } = decoded.value
+  if (!Number.isInteger(chapterIndex) || chapterIndex < 1) {
+    json(400, { ok: false, code: INVALID_BOOK_REQUEST, error: 'chapterIndex must be a positive integer' })
+    return true
+  }
+  const status = readFactExtractionStatus(root, chapterIndex)
+  const availability = await draftProviderAvailability(
+    process.env,
+    principal === null || principal === undefined ? undefined : principal.userId,
+  )
+  json(200, {
+    ok: true,
+    chapterIndex,
+    extraction: status.latest,
+    pendingCount: status.pendingCount,
+    provider: {
+      available: availability.available,
+      ...(availability.available ? {} : { reason: availability.reason, detail: availability.detail }),
+    },
+  })
   return true
 }
 
@@ -232,6 +236,7 @@ export const factsRoutes: RouteHandler = async (req, res, { path, body, json, bo
   const ctx: RouteContext = { path, body, json, bookRoot, principal }
 
   if (path === '/api/facts.extract') return handleExtract(req, res, ctx)
+  if (path === '/api/facts.status') return handleStatus(ctx)
   if (path === '/api/facts.candidates') return handleCandidates(ctx)
   if (path === '/api/facts.decide') return handleDecide(ctx)
   if (path === '/api/facts.history') return handleHistory(ctx)

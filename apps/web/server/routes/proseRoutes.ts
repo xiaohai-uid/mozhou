@@ -202,6 +202,7 @@ import type {
 } from '@mozhou/pipeline'
 import { PublishBus } from '@mozhou/runtime'
 import { runPreferenceLearning, runStyleLearnerForWindow } from '@mozhou/flywheel'
+import { scheduleAutoFactExtraction } from '../facts/autoExtract.js'
 import { extractChapterDelta } from '../analysis/deltaExtractor.js'
 import { resolveGenerationTarget } from '../llm/generationTarget.js'
 import {
@@ -919,6 +920,16 @@ export const proseRoutes: RouteHandler = async (req, res, { path, body, json, bo
               // 偏好学习是自愈派生面，失败不阻断后续
             }
             runStyleLearnerForWindow({ bus: new PublishBus(), bookRoot: root, taskRef, chapterIndex })
+            // 章后事实账本自动提取（#119 ①）：提交完成即 fire-and-forget 派发，
+            // 绝不阻塞本响应与 session.advance；未配置 provider 时任务自跳过
+            // （零账本行），进度经 FactExtraction* 平铺行进任务中心与 /api/facts.status。
+            void scheduleAutoFactExtraction({
+              root,
+              chapterIndex,
+              ...(principal === null || principal === undefined || principal.userId === undefined
+                ? {}
+                : { principalUserId: principal.userId }),
+            })
           },
         })
       } finally {

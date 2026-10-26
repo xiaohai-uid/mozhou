@@ -311,3 +311,57 @@ describe('候选事实账本 hosted 主体隔离 (#117 验收)', () => {
     expect((bHistory.data['records'] as unknown[]).length).toBe(1)
   })
 })
+
+describe('章后提取状态面 (#119)', () => {
+  it('mock 提取后 status：Finished 进度行 + 待决计数 + provider 可用', async () => {
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    const base = await listen()
+
+    const extracted = await post(base, '/api/facts.extract', { root: bookRoot, chapterIndex: 1 })
+    expect(extracted.status, JSON.stringify(extracted.data)).toBe(200)
+    const runId = String(extracted.data['runId'])
+
+    const status = await post(base, '/api/facts.status', { root: bookRoot, chapterIndex: 1 })
+    expect(status.status, JSON.stringify(status.data)).toBe(200)
+    expect(status.data['ok']).toBe(true)
+    const extraction = status.data['extraction'] as Record<string, unknown>
+    expect(extraction['type']).toBe('FactExtractionFinished')
+    expect(extraction['runId']).toBe(runId)
+    expect(extraction['inserted']).toBe(2)
+    expect(status.data['pendingCount']).toBe(2)
+    expect((status.data['provider'] as Record<string, unknown>)['available']).toBe(true)
+  })
+
+  it('未配置任何 provider：status 显示活探针失败；手动提取失败原因持久保留', async () => {
+    const base = await listen()
+
+    const extracted = await post(base, '/api/facts.extract', { root: bookRoot, chapterIndex: 1 })
+    expect(extracted.data['ok']).toBe(false)
+    expect(extracted.data['code']).toBe('PROVIDER_UNAVAILABLE')
+
+    // 手动提取的失败落 Failed 行（trigger=manual_retry，规格 User Story 13 保留失败原因）
+    const status = await post(base, '/api/facts.status', { root: bookRoot, chapterIndex: 1 })
+    expect(status.status, JSON.stringify(status.data)).toBe(200)
+    const extraction = status.data['extraction'] as Record<string, unknown>
+    expect(extraction['type']).toBe('FactExtractionFailed')
+    expect(String(extraction['reason'])).toContain('PROVIDER_UNAVAILABLE')
+    expect(extraction['trigger']).toBe('manual_retry')
+    expect(status.data['pendingCount']).toBe(0)
+    const provider = status.data['provider'] as Record<string, unknown>
+    expect(provider['available']).toBe(false)
+    expect(provider['reason']).toBe('no_provider_configured')
+  })
+
+  it('chapterIndex 非法：400；chapter 不存在：status 仍 200（零进度零候选）', async () => {
+    process.env['MOZHOU_DRAFT_PROVIDER'] = 'mock'
+    const base = await listen()
+
+    const bad = await post(base, '/api/facts.status', { root: bookRoot, chapterIndex: 0 })
+    expect(bad.status).toBe(400)
+
+    const missing = await post(base, '/api/facts.status', { root: bookRoot, chapterIndex: 9 })
+    expect(missing.status, JSON.stringify(missing.data)).toBe(200)
+    expect(missing.data['extraction']).toBeNull()
+    expect(missing.data['pendingCount']).toBe(0)
+  })
+})

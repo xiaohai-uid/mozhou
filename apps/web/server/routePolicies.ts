@@ -79,6 +79,7 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/billing/order': 'account',
   // 候选事实账本（#117）：book 级，hosted 主体隔离继承路由层 AuthorizedBook 缝
   '/api/facts.extract': 'book',
+  '/api/facts.status': 'book',
   '/api/facts.candidates': 'book',
   '/api/facts.decide': 'book',
   '/api/facts.history': 'book',

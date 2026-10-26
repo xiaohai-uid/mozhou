@@ -84,7 +84,7 @@
 | 重放输入 | Replay Inputs | `ReplayInputs` | `packages/kernel/src/kernel-schema.ts:464` | 声明 |
 | 图触发源 | Graph Trigger Source | - | - | 未验证 |
 | K 跳召回 | K-Hop Recall | - | - | 未验证 |
-| 连续性门 | Continuity Gate | `continuityGate` | `apps/web/server/routes/proseRoutes.ts:975` | 引用 |
+| 连续性门 | Continuity Gate | `continuityGate` | `apps/web/server/routes/proseRoutes.ts:986` | 引用 |
 | 上下文档位 | AI Context Tier | `AiContextTier` | `packages/kernel/src/kernel-schema.ts:573` | 声明 |
 | 小说运行时 | Novel Runtime | - | - | 未验证 |
 | 事件总线 | Event Bus | - | - | 未验证 |

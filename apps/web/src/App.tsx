@@ -19,6 +19,7 @@ import { TopBar } from './shell/TopBar'
 import { loadWorkbenchState, saveWorkbenchState } from './shell/workbenchStorage'
 import type { ViewId } from './shell/views'
 import { QualityPanel } from './quality/QualityPanel'
+import { ChapterReviewPanel } from './facts/ChapterReviewPanel'
 import { ReceiptPanel } from './context-receipt/ReceiptPanel'
 import { BookshelfView } from './shelf/BookshelfView'
 import { BookSourceView } from './book-source/BookSourceView'
@@ -244,6 +245,12 @@ export function App(): JSX.Element {
         <InspectorEmpty note="建书后可用——先在工作台建书，再回到本面板运行文学质量审查。" />
       ) : (
         <QualityPanel root={book.root} chapterIndex={chapterIndex} />
+      ),
+    'chapter-review':
+      book === null ? (
+        <InspectorEmpty note="建书后可用——章节定稿后自动触发的候选事实提取与逐项确认在此进行。" />
+      ) : (
+        <ChapterReviewPanel root={book.root} chapterIndex={chapterIndex} />
       ),
     'story-brain':
       book === null ? (

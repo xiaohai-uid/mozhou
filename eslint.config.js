@@ -15,9 +15,6 @@ export default tseslint.config(
         // 服务端 *.test.ts 不在 app 工程（include: src）内；projectService 只按目录
         // 发现 tsconfig.json，tsconfig.server.json 不被自动发现——按目录扁平登记
         // （allowDefaultProject 不支持递归 glob，新 server 测试目录需在此补一行）。
-        // observability.ts 与 productionServer.ts 一样是无引用的孤儿模块，进不了任何
-        // TS program，需在此登记；dataRoot.ts 被 bookAccess.ts 引用、可被项目服务
-        // 传递发现，登记进 allowDefaultProject 反而报「重复包含」。
         // 新目录的 lint 归属，三分支判定（2026-10-12 复盘补，实际踩过一次）：
         //   1. 在 pnpm workspace 内（packages/*、apps/*）→ 由项目服务发现，无需登记；
         //   2. scripts 式的独立运维脚本 → 逐行登记进 allowDefaultProject（不支持递归 glob），
@@ -42,7 +39,9 @@ export default tseslint.config(
             // 同类：按单文件登记；同目录其余 .ts 被项目服务发现，不能用 glob（见上）。
             'apps/web/shared/operations.schema.ts',
             'apps/web/server/productionServer.ts',
-            'apps/web/server/observability.ts',
+            // observability.ts 原为无引用孤儿模块（与 productionServer.ts 同类）在此登记；
+            // 2026-10-24（#119）起被 server/facts/autoExtract.ts 引用、经项目服务传递发现，
+            // 登记反而报「重复包含」，按 dataRoot.ts 同款规则撤出白名单。
             'apps/web/server/*.test.ts',
             'apps/web/server/routes/*.test.ts',
             'apps/web/server/storyboard/*.test.ts',
