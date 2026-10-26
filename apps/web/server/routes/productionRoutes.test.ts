@@ -253,11 +253,22 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
       body: JSON.stringify({ root: dir, chapterIndex: 1 }),
     })
 
-    // 发起审查
+    // 发起审查（确定性空规则策略隔离机械门；骨架用例显式关闭字数窗口）
+    const deterministicPolicy = {
+      schemaVersion: 1,
+      projectId: 't06-review-test',
+      rules: [],
+      maxAutomaticReworks: 2,
+    }
     const resReview = await fetch(`${base}/api/chapter.review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+      body: JSON.stringify({
+        root: dir,
+        chapterIndex: 1,
+        policy: deterministicPolicy,
+        mechanicalOptions: { minWords: 0 },
+      }),
     })
     expect(resReview.status).toBe(200)
     const dataReview = (await resReview.json()) as {
@@ -267,10 +278,12 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
       reportPath: string
       draftRevision: number
       draftContentHash: string
-      mechanicalGate: unknown
+      mechanicalGate: { passed: boolean; fails: string[] }
+      mechanicalFailures: string[]
     }
     expect(dataReview.ok).toBe(true)
-    expect(typeof dataReview.verdict).toBe('string')
+    expect(dataReview.verdict).toBe('pass')
+    expect(dataReview.mechanicalGate.passed).toBe(true)
     expect(typeof dataReview.reportId).toBe('string')
     expect(typeof dataReview.draftRevision).toBe('number')
     expect(typeof dataReview.draftContentHash).toBe('string')
@@ -280,6 +293,34 @@ describe('十步生产状态机与会话恢复 (T06)', () => {
     const reportPath = join(dir, dataReview.reportPath.replace(/\\/g, '/'))
     const report = JSON.parse(readFileSync(reportPath, 'utf8')) as { anchor: { receiptId: string } }
     expect(report.anchor.receiptId).not.toBe('rcpt_web_1')
+
+    // D1 负例：短章触发机械门，顶层 verdict 必须合并为 blocking_fail，且前进被拒。
+    const resBlocked = await fetch(`${base}/api/chapter.review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        root: dir,
+        chapterIndex: 1,
+        policy: deterministicPolicy,
+        mechanicalOptions: { minWords: 2000, maxWords: 6000 },
+      }),
+    })
+    expect(resBlocked.status).toBe(200)
+    const dataBlocked = (await resBlocked.json()) as {
+      verdict: string
+      mechanicalFailures: string[]
+      mechanicalGate: { passed: boolean }
+    }
+    expect(dataBlocked.verdict).toBe('blocking_fail')
+    expect(dataBlocked.mechanicalGate.passed).toBe(false)
+    expect(dataBlocked.mechanicalFailures.length).toBeGreaterThan(0)
+
+    const resAdvance = await fetch(`${base}/api/session.advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: dir, chapterIndex: 1 }),
+    })
+    expect(resAdvance.status).toBe(409)
   })
 
   it('D10：该章无编译凭证时 chapter.review → 409 NO_COMPILED_RECEIPT 且不产报告', async () => {

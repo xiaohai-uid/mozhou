@@ -382,6 +382,7 @@ export interface WorksOverviewResponse {
     readonly draftChapters: number
     readonly totalWords: number
     readonly entityCount: number
+    readonly taskCount?: number
   }
   readonly chapters: readonly WorksChapterSummary[]
   readonly outlineNodes: readonly {
@@ -404,8 +405,10 @@ export interface TasksResponse {
   readonly ok: true
   readonly totalEvents: number
   readonly totalTraversals: number
+  readonly taskCount?: number
   readonly events: readonly TaskEventSummary[]
   readonly traversals: readonly ImpactRecord[]
+  readonly taskRecords?: readonly unknown[]
 }
 
 export interface StyleDistillResponse {
@@ -607,3 +610,171 @@ export interface CapabilitySquareResponse {
   readonly providerAvailable: boolean
   readonly groups: readonly CapabilitySquareGroup[]
 }
+
+/** 作者偏好展示 DTO：累积字段保留兼容，展示字段由服务端公有推理函数投影。 */
+export interface PreferenceDimensionData {
+  readonly S: number
+  readonly W: number
+  readonly M: number
+  readonly emVar: number
+  readonly kappaEff: number
+  readonly driftStreak: number
+  /** 后验均值，不是短窗均值 M。 */
+  readonly mean: number
+  /** 兼容展示字段名：值为 emVar，语义是短窗方差，不是后验方差。 */
+  readonly variance: number
+  /** 兼容展示字段名：值为累计观测权 W，不含冷启动伪计数。 */
+  readonly nEffective: number
+  readonly streak: number
+}
+
+export interface PreferenceProfileData {
+  readonly version: 1
+  readonly cursor: number
+  readonly obsCount: number
+  readonly degradedWindows: number
+  readonly dims: Readonly<Record<string, PreferenceDimensionData>>
+  readonly driftLog: readonly {
+    readonly dim: string
+    readonly sourcePosition: number
+    readonly shortMean: number
+    readonly mean: number
+    readonly sigma: number
+  }[]
+}
+
+export interface PreferenceResponse {
+  readonly ok: boolean
+  readonly materialized: boolean
+  readonly profile: PreferenceProfileData
+  readonly observationCount: number
+  readonly error?: string
+}
+
+export interface PreferenceRebuildResponse {
+  readonly ok: boolean
+  readonly observationCount: number
+  readonly profile: PreferenceProfileData
+  readonly error?: string
+}
+
+/** 智能体工具定义与分发 DTO（与 apps/web/server/routes/agentRoutes.ts 同口径，改动必须同步）。 */
+export interface ToolDefinitionDto {
+  readonly name: string
+  readonly description: string
+  readonly parameters: {
+    readonly type: 'object'
+    readonly properties: Readonly<Record<string, unknown>>
+    readonly required?: readonly string[]
+  }
+}
+
+export interface ToolsListDtoResponse {
+  readonly ok: true
+  readonly tools: readonly ToolDefinitionDto[]
+}
+
+export interface ToolResultDto {
+  readonly ok: boolean
+  readonly content: string
+  readonly meta?: Readonly<Record<string, unknown>>
+}
+
+/** 技能系统 DTO（与 apps/web/server/routes/skillRoutes.ts 同口径，改动必须同步）。 */
+export interface SkillSummaryDto {
+  readonly id: string
+  readonly name: string
+  readonly description: string
+  readonly version: string
+  readonly license: string
+  readonly resources: Readonly<Record<'scripts' | 'references' | 'assets', number>>
+}
+
+export interface SkillRecordDto extends SkillSummaryDto {
+  readonly body: string
+  readonly dir: string
+}
+
+export interface SkillsListDtoResponse {
+  readonly ok: true
+  readonly skills: readonly SkillSummaryDto[]
+}
+
+export interface SkillsReadDtoResponse {
+  readonly ok: true
+  readonly skill: SkillRecordDto
+}
+
+export interface SkillsSaveDtoResponse {
+  readonly ok: true
+  readonly skill: SkillRecordDto
+}
+
+export interface SkillsDeleteDtoResponse {
+  readonly ok: true
+  readonly deleted: boolean
+}
+
+/** 回收站 DTO（与 apps/web/server/routes/recycleRoutes.ts 同口径，改动必须同步）。 */
+export interface TrashEntryDto {
+  readonly id: string
+  readonly originalPath: string
+  readonly name: string
+  readonly deletedAt: string
+  readonly isDirectory: boolean
+}
+
+export interface RecycleListDtoResponse {
+  readonly ok: true
+  readonly entries: readonly TrashEntryDto[]
+}
+
+export interface RecycleRestoreDtoResponse {
+  readonly ok: true
+  readonly restoredTo: string
+}
+
+export interface RecyclePurgeDtoResponse {
+  readonly ok: true
+  readonly purged: boolean
+}
+
+/** 既有文档导入 DTO（与 apps/web/server/routes/worksRoutes.ts 同口径，改动必须同步）。 */
+export type DocImportFormat = 'txt' | 'md' | 'docx'
+export type DocSplitMode = 'auto' | 'title' | 'blank-line' | 'word-count'
+
+export interface DocSplitOptionsDto {
+  readonly splitMode?: DocSplitMode
+  readonly wordCountThreshold?: number
+  readonly customTitlePattern?: string
+}
+
+export interface DocImportPreviewChapterDto {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly wordCount: number
+  readonly preview: string
+}
+
+export interface DocImportPreviewDtoResponse {
+  readonly ok: true
+  readonly preview: true
+  readonly chapterCount: number
+  readonly chapters: readonly DocImportPreviewChapterDto[]
+}
+
+export interface DocImportExecuteChapterDto {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly wordCount: number
+}
+
+export interface DocImportExecuteDtoResponse {
+  readonly ok: true
+  readonly root: string
+  readonly bookId: string
+  readonly title: string
+  readonly chapterCount: number
+  readonly chapters: readonly DocImportExecuteChapterDto[]
+}
+

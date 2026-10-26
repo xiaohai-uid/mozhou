@@ -2,7 +2,7 @@
  * apps/web · 全路由安全与多租户所有权策略注册表 (Route Policies · T09)。
  * 
  * 依照 reference/03-public-billing.md T09 规格：
- * - 明确分类每个 API 为 public / account / book / local-native / payment-webhook；
+ * - 明确分类每个 API 为 public / account / book / local-native / payment-webhook / ops；
  * - 未知路径默认拒绝 (FAIL-CLOSED)；
  * - 自动化检查当前所有注册路由都在表中；
  * - hosted 模式下禁止访问 local-native 端点。
@@ -14,6 +14,7 @@ export type RouteCategory =
   | 'book'            // 需要已登录 Session 且必须持有 AuthorizedBook（正文/分镜/生成/审查/流水等作品级操作）
   | 'local-native'    // 仅在本地单机 (local) 模式下开放，hosted 模式下 403 拒绝（如本地目录直接浏览）
   | 'payment-webhook' // 支付渠道异步通知，免普通 Session 登录但需支付签名强校验
+  | 'ops'             // 运营操作（如退款），免普通 Session 登录，以 MOZHOU_OPS_TOKEN 共享凭据为边界
 
 export interface RoutePolicy {
   readonly path: string
@@ -59,6 +60,15 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   // AI 起名走 BYOK 模型调用，必须挂主体避免 hosted 匿名滥用。
   '/api/memo': 'account',
   '/api/naming': 'account',
+  '/api/tools.list': 'account',
+  '/api/tools.execute': 'account',
+  '/api/skills.list': 'account',
+  '/api/skills.read': 'account',
+  '/api/skills.save': 'account',
+  '/api/skills.delete': 'account',
+  '/api/recycle.list': 'account',
+  '/api/recycle.restore': 'account',
+  '/api/recycle.purge': 'account',
   '/api/book': 'account', // 创建新作品（在 hosted 下归属当前用户）
   '/api/llm/settings': 'account',
   '/api/llm/test': 'account',
@@ -67,7 +77,12 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/backups/restore': 'account',
   '/api/billing/orders': 'account',
   '/api/billing/order': 'account',
-  '/api/billing/orders/refund': 'account',
+  // 候选事实账本（#117）：book 级，hosted 主体隔离继承路由层 AuthorizedBook 缝
+  '/api/facts.extract': 'book',
+  '/api/facts.status': 'book',
+  '/api/facts.candidates': 'book',
+  '/api/facts.decide': 'book',
+  '/api/facts.history': 'book',
   '/api/billing/license/ticket': 'account',
   '/api/billing/quota/status': 'account',
   '/api/billing/quota/reserve': 'account',
@@ -77,10 +92,14 @@ export const ROUTE_POLICIES: Readonly<Record<string, RouteCategory>> = Object.fr
   '/api/payments/wechat/notify': 'payment-webhook',
   '/api/payments/alipay/notify': 'payment-webhook',
 
+  // ---- 3b. Ops 运营操作 (免普通登录，MOZHOU_OPS_TOKEN 为边界；处理端 fail-closed) ----
+  '/api/billing/orders/refund': 'ops',
+
   // ---- 3. Local-Native 本地专用路由 (hosted 下 403 拒绝) ----
   '/api/library': 'local-native',
   '/api/library.open': 'local-native',
   '/api/library.import': 'local-native',
+  '/api/library.import.doc': 'local-native',
 
   // ---- 4. Book 作品级隔离路由 (要求 AuthorizedBook) ----
   '/api/book.state': 'book',

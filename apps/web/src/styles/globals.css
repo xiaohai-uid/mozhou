@@ -22,7 +22,9 @@
   --hairline: rgba(241, 237, 230, 0.085);
   --hairline-strong: rgba(241, 237, 230, 0.15);
   --text-muted: #a4a9b2;
-  --text-faint: #6e7682;
+  /* 弱化文本同样要满足 WCAG AA：surface-2(#151c26) 上 4.98:1、surface-3(#1a222e) 上 4.65:1；
+     旧值 #6e7682 最低只有 3.49:1，Lighthouse 报了 15 处对比度不达标。 */
+  --text-faint: #828b99;
   --danger: #e77f8c;
   --success: #78c8a4;
   --warning: #d9a65f;

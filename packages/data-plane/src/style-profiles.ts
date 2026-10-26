@@ -203,6 +203,7 @@ function parseRows(blockLines: readonly string[]): StyleProfilesMap {
     const fields = new Map<string, string>();
     const buckets: SentenceLengthBucket[] = [];
     const tabooWords: string[] = [];
+    let tabooWordsInlineEmpty = false;
 
     // 字段区：四空格缩进 key: value 或子表头
     while (index < blockLines.length && lineAt(blockLines, index).startsWith('    ')) {
@@ -226,16 +227,24 @@ function parseRows(blockLines: readonly string[]): StyleProfilesMap {
         }
         continue;
       }
-      if (field === 'tabooWords' && rest === '') {
-        index += 1;
-        while (index < blockLines.length && lineAt(blockLines, index).startsWith('      - ')) {
-          try {
-            tabooWords.push(parseWord(lineAt(blockLines, index).slice(8)));
-          } catch (error) {
-            fail(`taboo 词条违例: ${(error as Error).message}`);
-          }
+      if (field === 'tabooWords') {
+        if (rest === '') {
           index += 1;
+          while (index < blockLines.length && lineAt(blockLines, index).startsWith('      - ')) {
+            try {
+              tabooWords.push(parseWord(lineAt(blockLines, index).slice(8)));
+            } catch (error) {
+              fail(`taboo 词条违例: ${(error as Error).message}`);
+            }
+            index += 1;
+          }
+          continue;
         }
+        // 内联形态只允许空表；非空禁用词必须走子表。内联空表不计入 fields：
+        // 它是「本行没有禁用词」的显式标记，不是第六个标量字段。
+        if (rest !== '[]') fail(`${scenarioType}.tabooWords 内联形态只允许 []`);
+        tabooWordsInlineEmpty = true;
+        index += 1;
         continue;
       }
       if (fields.has(field)) fail(`重复字段: ${field}`);
@@ -244,8 +253,16 @@ function parseRows(blockLines: readonly string[]): StyleProfilesMap {
       index += 1;
     }
 
-    if (fields.size !== 6) {
-      fail(`${scenarioType} 行字段不全（须 id/revision/dialogueRatio/sentenceLengthDistribution/tabooWords/sensoryDensity/actionPacing 七项，得 ${fields.size + 1} 组）`);
+    // 子表字段（sentenceLengthDistribution/tabooWords）不入 fields：此处只校验
+    // 五个必需标量齐备且无未知字段。旧逻辑按「6 组」计数，只有内联
+    // `tabooWords: []` 能凑够——非空禁用词写入后永远读不回来。
+    const requiredScalars = ['id', 'revision', 'dialogueRatio', 'sensoryDensity', 'actionPacing'];
+    const missingScalars = requiredScalars.filter((field) => !fields.has(field));
+    if (missingScalars.length > 0 || fields.size !== requiredScalars.length) {
+      fail(
+        `${scenarioType} 行字段不全或含未知字段（须 id/revision/dialogueRatio/sentenceLengthDistribution/tabooWords/sensoryDensity/actionPacing 七项，标量 ${fields.size} 组` +
+          `${missingScalars.length > 0 ? `，缺 ${missingScalars.join('/')}` : ''}）`,
+      );
     }
     const id = fields.get('id');
     if (id === undefined || !ULID_PATTERN.test(id)) fail(`${scenarioType}.id 形状违例: ${String(id)}`);
@@ -265,13 +282,10 @@ function parseRows(blockLines: readonly string[]): StyleProfilesMap {
       fail(`${scenarioType} 句长桶 share 合计须 ≈1（差 |Σ−1|=${Math.abs(shareSum - 1)} 超 1e-6 容差）`);
     }
 
-    const tabooInline = fields.get('tabooWords');
-    if (tabooInline !== undefined) {
-      if (tabooInline !== '[]') fail(`${scenarioType}.tabooWords 内联形态只允许 []`);
-    } else if (tabooWords.length === 0) {
+    if (!tabooWordsInlineEmpty && tabooWords.length === 0) {
       fail(`${scenarioType}.tabooWords 子表不得为空块（空表请写 tabooWords: []）`);
     }
-    const words = tabooInline !== undefined ? [] : tabooWords;
+    const words = tabooWordsInlineEmpty ? [] : tabooWords;
     if (new Set(words).size !== words.length) fail(`${scenarioType}.tabooWords 存在重复词条`);
 
     rows[scenarioType as ScenarioType] = {

@@ -11,6 +11,10 @@ import type {
   ChangeMatrixResponse,
   CloudSyncResponse,
   CrawlerExtractResponse,
+  DocImportExecuteDtoResponse,
+  DocImportFormat,
+  DocImportPreviewDtoResponse,
+  DocSplitOptionsDto,
   DraftQuestionResponse,
   LibraryOpenResponse,
   LibraryResponse,
@@ -19,6 +23,9 @@ import type {
   RankScanResponse,
   ReceiptDetailResponse,
   ReceiptListResponse,
+  RecycleListDtoResponse,
+  RecyclePurgeDtoResponse,
+  RecycleRestoreDtoResponse,
   StoryBrainFactsResponse,
   StyleDistillResponse,
   TasksResponse,
@@ -120,7 +127,13 @@ export class MoZhouApiClient {
     blockingFailures: unknown[]
     advisories: unknown[]
     semanticReviewer: string
-    mechanicalGate?: unknown
+    mechanicalGate?: {
+      readonly passed: boolean
+      readonly checks?: readonly unknown[]
+      readonly fails: readonly string[]
+      readonly oks?: readonly string[]
+    }
+    mechanicalFailures?: readonly string[]
   }> {
     return post('/api/chapter.review', {
       ...this.bookParams(),
@@ -218,6 +231,49 @@ export class MoZhouApiClient {
 
   activateMembership(licenseKey: string): Promise<MembershipResponse> {
     return post('/api/membership.activate', { licenseKey })
+  }
+
+  previewImportDocument(payload: {
+    title?: string
+    content?: string
+    fileBase64?: string
+    format?: DocImportFormat
+    splitOptions?: DocSplitOptionsDto
+  }): Promise<DocImportPreviewDtoResponse> {
+    return post('/api/library.import.doc', { ...payload, previewOnly: true })
+  }
+
+  executeImportDocument(payload: {
+    parentDir?: string
+    title: string
+    content?: string
+    fileBase64?: string
+    format?: DocImportFormat
+    splitOptions?: DocSplitOptionsDto
+  }): Promise<DocImportExecuteDtoResponse> {
+    return post('/api/library.import.doc', payload)
+  }
+
+  /* ---- 工作区回收站 ---- */
+  listRecycle(trashRoot?: string): Promise<RecycleListDtoResponse> {
+    const payload: Record<string, unknown> = {}
+    if (this._config.root) payload['root'] = this._config.root
+    if (trashRoot) payload['trashRoot'] = trashRoot
+    return post('/api/recycle.list', payload)
+  }
+
+  restoreRecycle(id: string, trashRoot?: string): Promise<RecycleRestoreDtoResponse> {
+    const payload: Record<string, unknown> = { id }
+    if (this._config.root) payload['root'] = this._config.root
+    if (trashRoot) payload['trashRoot'] = trashRoot
+    return post('/api/recycle.restore', payload)
+  }
+
+  purgeRecycle(id: string, trashRoot?: string): Promise<RecyclePurgeDtoResponse> {
+    const payload: Record<string, unknown> = { id }
+    if (this._config.root) payload['root'] = this._config.root
+    if (trashRoot) payload['trashRoot'] = trashRoot
+    return post('/api/recycle.purge', payload)
   }
 }
 

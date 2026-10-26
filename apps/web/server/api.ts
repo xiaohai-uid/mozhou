@@ -24,8 +24,12 @@ import { managedModelRoutes } from './routes/managedModelRoutes.js'
 import { exportRoutes } from './routes/exportRoutes.js'
 import { memoRoutes } from './routes/memoRoutes.js'
 import { taskStreamRoutes } from './routes/taskStreamRoutes.js'
+import { factsRoutes } from './routes/factsRoutes.js'
 import { namingRoutes } from './routes/namingRoutes.js'
 import { flywheelRoutes } from './routes/flywheelRoutes.js'
+import { agentRoutes } from './routes/agentRoutes.js'
+import { skillRoutes } from './routes/skillRoutes.js'
+import { recycleRoutes } from './routes/recycleRoutes.js'
 export { defaultBookAccessManager, BookAccessManager, type AuthorizedBook } from './bookAccess.js'
 export { defaultAccountStore, AccountStore, type UserProfile } from './account/store.js'
 export { defaultProviderSettingsManager, ProviderSettingsManager, type UserProviderConfig, type MaskedProviderConfig } from './llm/providerSettings.js'
@@ -42,6 +46,10 @@ export { analyzeNovelBreakdown, type NovelBreakdownAnalysis } from './analysis/n
 export { analyzeTextStyle, saveBookStyleProfile, loadBookStyleProfile, type StyleAnalysisResult, type BookStyleProfile } from './analysis/styleAnalysis.js'
 export { defaultSkillsCatalogManager, SkillsCatalogManager, type PromptSkillRecipe } from './skills/catalog.js'
 export { ROUTE_POLICIES, getRoutePolicy, isRegisteredRoute, type RouteCategory } from './routePolicies.js'
+export { skillRoutes, type SkillsListResponse, type SkillsReadResponse, type SkillsSaveResponse, type SkillsDeleteResponse, type SkillsErrorResponse } from './routes/skillRoutes.js'
+export { recycleRoutes, type RecycleListResponse, type RecycleRestoreResponse, type RecyclePurgeResponse, type RecycleErrorResponse } from './routes/recycleRoutes.js'
+export { SkillStore, SkillError, type SkillRecord, type SkillSummary, type SkillWriteInput } from './agent/skills.js'
+export { RecycleStore, RecycleError, type TrashEntry, type RestoreResult } from './recycle/recycleStore.js'
 
 import type { ChapterPhase, ChangeMatrix, ImpactRecord } from '@mozhou/data-plane'
 import type { ContextReceipt } from '@mozhou/kernel'
@@ -596,6 +604,45 @@ export interface CapabilitySquareResponse {
   readonly groups: readonly CapabilitySquareGroup[]
 }
 
+/** 既有文档导入 DTO（与 shared/api.ts 同口径，改动必须同步）。 */
+export type DocImportFormat = 'txt' | 'md' | 'docx'
+export type DocSplitMode = 'auto' | 'title' | 'blank-line' | 'word-count'
+
+export interface DocSplitOptionsDto {
+  readonly splitMode?: DocSplitMode
+  readonly wordCountThreshold?: number
+  readonly customTitlePattern?: string
+}
+
+export interface DocImportPreviewChapterDto {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly wordCount: number
+  readonly preview: string
+}
+
+export interface DocImportPreviewDtoResponse {
+  readonly ok: true
+  readonly preview: true
+  readonly chapterCount: number
+  readonly chapters: readonly DocImportPreviewChapterDto[]
+}
+
+export interface DocImportExecuteChapterDto {
+  readonly chapterIndex: number
+  readonly title: string
+  readonly wordCount: number
+}
+
+export interface DocImportExecuteDtoResponse {
+  readonly ok: true
+  readonly root: string
+  readonly bookId: string
+  readonly title: string
+  readonly chapterCount: number
+  readonly chapters: readonly DocImportExecuteChapterDto[]
+}
+
 /* ============================================================================
  * 路由分发器与中间件装配 (Router Dispatcher)
  * ========================================================================== */
@@ -627,8 +674,12 @@ export function createMoZhouApiRouter(): ApiRouter {
     .use(exportRoutes)
     .use(memoRoutes)
     .use(taskStreamRoutes)
+    .use(factsRoutes)
     .use(namingRoutes)
     .use(flywheelRoutes)
+    .use(agentRoutes)
+    .use(skillRoutes)
+    .use(recycleRoutes)
 }
 
 const apiRouter = createMoZhouApiRouter()

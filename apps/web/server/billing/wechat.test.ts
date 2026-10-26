@@ -179,6 +179,32 @@ describe('WechatPayVerifier · R2 fail-closed', () => {
     )
   })
 
+  it('密文短于 16 字节标签 → 400 DECRYPT_FAILED（不做截断放行）', () => {
+    const { publicKeyPem, privateKey } = makeKeyPair()
+    const apiV3Key = randomBytes(16).toString('hex')
+    const nonce = randomBytes(6).toString('hex')
+    const verifier = new WechatPayVerifier({ mchId: 'm', appId: 'a', apiV3Key, platformCert: publicKeyPem })
+
+    // 12 字符 base64 = 9 字节，连一个完整 GCM 标签都放不下。
+    const shortCiphertext = Buffer.alloc(9, 7).toString('base64')
+    const rawBody = JSON.stringify({ resource: { algorithm: 'AEAD_AES_256_GCM', ciphertext: shortCiphertext, nonce } })
+    const ts = nowSec()
+
+    expectBoundaryError(
+      () =>
+        verifier.verifyAndParseNotification(
+          {
+            'wechatpay-timestamp': ts,
+            'wechatpay-nonce': nonce,
+            'wechatpay-signature': signWechat(privateKey, ts, nonce, rawBody),
+          },
+          rawBody,
+        ),
+      400,
+      'DECRYPT_FAILED',
+    )
+  })
+
   it('有平台证书但缺 APIv3 密钥 → 503 APIV3_KEY_MISSING', () => {
     const { publicKeyPem, privateKey } = makeKeyPair()
     const verifier = new WechatPayVerifier({ mchId: 'm', appId: 'a', platformCert: publicKeyPem })

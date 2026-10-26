@@ -16,12 +16,16 @@
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
     "package": "node scripts/build-release.mjs",
-    "lint": "eslint .",
+    "lint": "node scripts/check-lint-whitelist.mjs && eslint .",
     "test": "pnpm run test:packages && pnpm run test:web",
     "test:packages": "vitest run && vitest run --config vitest.bench.config.ts",
     "test:web": "pnpm --filter @mozhou/web test",
     "verify:real-model": "node scripts/verify-real-model-journey.mjs",
     "verify:journey": "node scripts/verify-mock-journey.mjs",
+    "verify:desktop-journey": "node desktop/scripts/verify-desktop-author-journey.mjs",
+    "verify:desktop-package": "node desktop/scripts/verify-package-integrity.mjs",
+    "package:desktop": "pnpm build && pnpm --filter @mozhou/web build && node desktop/scripts/package-windows-electron.mjs",
+    "benchmark:promptfoo": "node packages/benchmark/promptfoo/run-eval.mjs",
     "graph:status": "node .gitnexus/run.cjs status",
     "graph:analyze": "node .gitnexus/run.cjs analyze",
     "graph:snapshot": "node scripts/export-code-graph.mjs",
@@ -32,16 +36,26 @@
     "check:architecture": "node scripts/gen-architecture.mjs --check",
     "gen:adr-refs": "node scripts/gen-adr-refs.mjs",
     "check:glossary": "node scripts/verify-glossary.mjs",
+    "check:gen-determinism": "node scripts/check-gen-determinism.mjs",
     "check:gates": "node scripts/verify-gates-contract.mjs",
     "gen:term-map": "node scripts/gen-term-map.mjs",
     "check:term-map": "node scripts/gen-term-map.mjs --self-test && node scripts/gen-term-map.mjs --check",
     "check:readmes": "node scripts/verify-package-readmes.mjs",
+    "check:lint-whitelist": "node scripts/check-lint-whitelist.mjs",
     "duplication": "npx --yes jscpd@3.5.10 --config .jscpd.json .",
-    "coverage:check": "node scripts/report-coverage-status.mjs"
+    "perf:smoke": "node perf/k6/run-smoke.mjs",
+    "e2e:install": "playwright install chromium firefox webkit",
+    "test:e2e": "node e2e/run-e2e.mjs",
+    "coverage:check": "node scripts/report-coverage-status.mjs",
+    "test:coverage:packages": "vitest run --coverage && vitest run --config vitest.bench.config.ts",
+    "test:coverage:web": "pnpm --filter @mozhou/web test:coverage"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^9.17.0",
+    "eslint-plugin-sonarjs": "^4.2.2",
     "typescript": "~5.5.4",
     "typescript-eslint": "^8.18.0",
     "vitest": "^4.0.4"
@@ -50,10 +64,11 @@
     "overrides": {
       "tar": "7.5.22",
       "js-yaml": "4.3.2",
-      "fast-uri": "3.1.7",
-      "brace-expansion@^1.0.0": "1.1.20",
-      "brace-expansion@^5.0.0": "5.0.11",
-      "source-map-js": "1.2.2"
+      "fast-uri": "3.1.8",
+      "brace-expansion@^1.0.0": "1.1.21",
+      "brace-expansion@^5.0.0": "5.0.12",
+      "source-map-js": "1.2.2",
+      "vite": "6.4.4"
     },
     "patchedDependencies": {
       "fastembed@2.1.0": "patches/fastembed@2.1.0.patch"

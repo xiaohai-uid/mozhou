@@ -31,20 +31,28 @@
 
 | **架构地图新鲜度** | `pnpm run check:architecture` | 0 一致（无显式 exit，自然落透） · 1 陈旧 `scripts/gen-architecture.mjs:140` | 无此状态 | ✅ `ci.yml` |
 | **真实模型旅程** | `pnpm run verify:real-model` | 0 VERIFIED · 1 FAILED · **0 BLOCKED** · **2 BLOCKED `--strict`** | `status: 'BLOCKED'` `scripts/verify-real-model-journey.mjs:76` | ❌ 未接入 |
+| **31 章长程验收** | `node scripts/verify-longform-e2e.mjs` | 0 PASS · 1 FAIL/缺密钥 `:84` · 2 BLOCKED（模型不可达 `:580`） | 无此状态（`status` 字段） | ✅ `longform-nightly.yml` |
 | 无引用审计 | `pnpm run audit:unreferenced` | 2 `scripts/audit-unreferenced.mjs:112` | 无 | ❌ |
 | 代码图谱检查 | `pnpm run graph:check` | 由 runner 决定 `.gitnexus/run.cjs:321` | 无 | ❌ |
 | 真实模型测试 | `pnpm run test:real-model` | 1 `scripts/run-real-model-tests.mjs:53`、`:78` · 透传 `result.status` `:80` | 无 | ❌ |
 | 真实小说旅程 | `node scripts/verify-real-novel-journey.mjs` | 2 `scripts/verify-real-novel-journey.mjs:31` | 无 | ❌ |
 | R05 端到端旅程 | `node scripts/verify-r05-journey.mjs` | 0 `scripts/verify-r05-journey.mjs:1249` | 无 | ❌ |
 | 草稿上下文测量 | `node scripts/measure-draft-context.mjs` | 2 `:229`、`:238`、`:242` · 1 `:246` | 无 | ❌ |
-| 覆盖率 | `pnpm run coverage:check`（仅报告状态） | 0 配置就绪 · 1 配置缺失 | 无 | ❌ 未接入 |
+| 覆盖率 | `pnpm run test:coverage:packages`（包层）· `pnpm run test:coverage:web`（Web 层） | 0 达阈值 · 1 低于阈值或运行失败 | 无 | ✅ `ci.yml` |
 | 克隆检测 | `pnpm run duplication` | 见 jscpd（`.github/workflows/graph-gate.yml:54-73` 的 duplication job；0 未超阈值 / 非 0 超阈值） | 无 | ✅ `graph-gate.yml` |
+| **性能冒烟门** | `pnpm run perf:smoke` | 0 通过 · 1 阈值红或端点失败 `perf/k6/smoke.js` · 2 环境阻塞 `perf/k6/run-smoke.mjs:29` | 2（构建缺失/服务未起） | ✅ `perf-smoke-nightly.yml` · `release.yml` |
+| **白名单对账门** | `node scripts/check-lint-whitelist.mjs` | 0 一致 · 1 漏登记或超限 `scripts/check-lint-whitelist.mjs` | 无此状态 | ❌ 未接入（已在 pre-commit 与 `pnpm lint` 前置） |
+| **生成器确定性** | `pnpm run check:gen-determinism` | 0 一致 · 1 违规（`scripts/gen-*.mjs` 用 `readdirSync` 且无 `sort(`，生成物会随文件系统目录项顺序漂移，`scripts/check-gen-determinism.mjs`） | 无此状态 | ❌ 未接入（经 `ci-gate.mjs gen-determinism`，本地推送前门） |
+| **跨浏览器 E2E 冒烟** | `pnpm run test:e2e` | 0 通过 · 1 测试失败 · 2 环境阻塞（产物缺失/陈旧或端口非法，`e2e/run-e2e.mjs`） | 2（前置检查未通过） | ✅ `e2e-nightly.yml` |
 
 | 既有 CI 链 | `pnpm build` / `lint` / `test:packages` / `--filter @mozhou/web typecheck` / `test` / `build` / `pnpm audit` | pnpm 标准 | 无 | ✅ `ci.yml:32-49` |
 
 | **门清单在 CI 列一致性** | `node scripts/check-gates-ci-column.mjs` | 0 一致 · 1 脱节 · 2 用法错误 | 无此状态 | ✅ `ci.yml` |
 | **文档裸数字** | `node scripts/check-doc-numbers.mjs` | 0（默认只报不拦）· `--strict` 有发现即 1 | 无此状态 | ✅ `ci.yml`（只报不拦） |
+| **文档路径与命令** | `node scripts/check-doc-paths.mjs` | 0 一致 · 1 路径或命令不存在 | 无此状态 | ❌ 未接入（经 `ci-gate.mjs doc-gates`） |
 | **生成物新鲜度（按索引）** | `node scripts/check-generated-freshness.mjs` | 0 一致 · 1 陈旧 · 2 环境错误 | 无此状态 | ❌ 未接入（在 pre-commit 钩子里，见下） |
+| **证据脚本卫生** | `node scripts/check-evidence-hygiene.mjs` | 0 干净 · 1 命中（短 HEAD、写死 `PASS` 或证据矛盾） · 2 环境错误 | 无此状态 | ✅ `longform-nightly.yml`（也经 `ci-gate.mjs evidence-hygiene`） |
+| **构建产物新鲜度** | `node scripts/check-build-freshness.mjs` | 0 新鲜或未构建 · 1 陈旧 · 2 环境错误 | 无此状态 | ❌ 未接入（经 `ci-gate.mjs build-freshness`，launcher 另有告警） |
 | 静态导入环检测 | `node scripts/check-import-cycles.mjs` | 0 无环 · 1 有环 `scripts/check-import-cycles.mjs:151` | 无此状态 | ✅ `graph-gate.yml` |
 | 真实模型门（发布） | `node scripts/release/real-model-gate.mjs` | 0 VERIFIED · 1 FAILED · 2 BLOCKED `scripts/release/real-model-gate.mjs:21` | 无此状态 | ✅ `release.yml` |
 | 发布资产构建 | `node scripts/build-release.mjs` | 无显式 exit（成功即 0，非 0 即失败） | 无 | ✅ `release.yml:149` |
@@ -60,6 +68,27 @@
 > 改陈旧」（同类漂移在 2026-10-10 会话里出现 4 次），索引语义没有这个问题，故做成阻断。
 > 前两者都接进了 `ci.yml` 的 Doc gates 步骤、`scripts/ci-gate.mjs doc-gates` 与仓库的 pre-commit
 > 钩子；生成物新鲜度只在钩子里（CI 的检出是干净的，用 `gen-*.mjs --check` 即可）。
+> 末两行 2026-10-12 复盘补：`check-evidence-hygiene.mjs` 拦两类「知道但没人拦」的证据缺陷——
+> 用短 HEAD 标识源码（仓内已有 `source-stamp.mjs` 的 `-dirty` 规则，发布审计两次栽在这上面），
+> 以及把成功结论写成字面量 `PASS`（`verify-longform-e2e.mjs` 曾如此，历史证据里就是 `PASS`
+> 配 `compactionVerified:false`）。`check-build-freshness.mjs` 拦「产物落后于源码」——它是本次
+> 会话里那次假失败的成因（工作台崩在 `toFixed`，真因是 `dist-server` 比源码旧），而按索引判定
+> 的生成物门看不到 `dist/`（它是忽略项，索引里没有）。`check-build-freshness.mjs` 只在本地路径上
+> 有意义（CI 是干净检出 + 现场构建）；`check-evidence-hygiene.mjs` 也进 `longform-nightly.yml`，
+> 只检查本次长程产出的证据，push/PR CI 仍不生成证据。
+> 2026-10-17 再补 `check-doc-paths.mjs`：核对活文档里的仓库路径、未登记绝对路径与
+> `node scripts/*.mjs` / `pnpm run` 命令。只进 `ci-gate.mjs doc-gates`，未接 CI 与 pre-commit。
+> 同日补 31 章长程门：`longform-nightly.yml` 每日/手动运行，缺三个模型 secret 即显式失败；
+> `check-evidence-hygiene.mjs` 同步扫描 `summary.json`，`status=PASS` 与任一必需结果矛盾即失败。
+> 两条历史假 PASS 已作废，见 `docs/audit/longform-evidence-invalidation-20261017.md`。
+> 2026-10-21 补跨浏览器 E2E 冒烟门（Chromium / Firefox / WebKit 各跑一遍生产服务）：
+> 入口是 `e2e/run-e2e.mjs`，不是直接 `playwright test`。原因是 Playwright 会把
+> webServer 提前退出统一折成测试失败（只把退出码拼进错误文案，进程退出码仍是 1），
+> 直接以它作入口时「没测成」与「测了但红」无法区分。包装器在 Playwright 之外校验
+> 端口合法、产物存在且不早于源码，任一不成立即 exit 2。产物新鲜度必须单独拦：
+> `check-build-freshness.mjs` 对「未构建」返回 0，只靠它会放过「忘记构建」。
+> 本门未进 GitHub Actions（需额外 `playwright install --with-deps`），目前经
+> `ci-gate.mjs e2e` 挂在本地推送前门；CI 的「在 CI」列因此标 ❌。
 
 ## `verify:real-model` 的完整契约
 
@@ -124,15 +153,15 @@
 
 | 项 | 实测值 | 出处 |
 |---|---|---|
-| 包层测试 | **以 `pnpm run test:packages` 实测为准**（2026-10-10 实测：并行段 119 文件 / 1066 例 + 独占台架段 1 文件 / 3 例，全部通过；原记 103 文件 / 910 例已过期） | `pnpm run test:packages` 实跑 |
-| 覆盖率 | **未启用**。`vitest.config.ts` 已配好 coverage 段，但 `@vitest/coverage-v8` 未安装，
-| 直接 `--coverage` 会报 MISSING DEPENDENCY | `pnpm run coverage:check` |
+| 包层测试 | **以 `pnpm run test:packages` 实测为准**（2026-10-17 实测：并行段 122 文件 / 1091 例 + 独占台架段 1 文件 / 3 例，全部通过；原记 119 文件 / 1066 例已过期） | `pnpm run test:packages` 实跑 |
+| 覆盖率（包层） | **已启用**。2026-10-17 实测：行 82.75%（7223/8728）、语句 80.40%（7748/9636）、函数 86.42%（1305/1510）、分支 69.91%（4646/6645）；阈值 lines 81 / statements 79 / functions 85 / branches 68，`perFile: false`、`autoUpdate: false` | `pnpm run test:coverage:packages` |
+| 覆盖率（Web 层） | **已启用**。2026-10-17 实测：行 78.80%（9159/11623）、语句 76.76%（9887/12880）、函数 74.64%（1643/2201）、分支 70.55%（6866/9732）；阈值 lines 77 / statements 75 / functions 73 / branches 69，`perFile: false`、`autoUpdate: false`。测试以 `--maxWorkers=2` 运行，规避 Windows 上 fork worker 的 EPIPE 偶发；正常与负例均实测 | `pnpm run test:coverage:web` |
 | 克隆检测 | **已实跑验证**（2026-10-10 实跑；2026-10-12 修正统计口径）：本机排除本地产物后总重复 **2.42%** < 阈值 17%（`.jscpd.json`），exit 0；把阈值临时调到 0.01 时 exit 1 并报 `found too many duplicates`，证明该门会拦。命令走 `npx --yes jscpd@3.5.10`（需现场下载 jscpd）。**注意此数字只在干净检出或显式排除本地产物后成立**，见下方「重复度统计口径」 | `.jscpd.json` |
 | 重复度统计口径 | **2026-10-12 修正**。此前记录的 15.8% 之所以虚高，是因为 `jscpd@3.5.10` 的 `gitignore:true` 对**嵌套目录规则不生效**：`.gitignore:19` 明明忽略了 `.zcode/`，该目录仍被扫入（实测单独扫描重复率 63.89%），单这一项就污染 57 个克隆 / 13.3 个百分点。CI 是干净检出、`.zcode/` 不入库，所以该污染**从未在 CI 暴露**，只污染本地每次跑。已在 `.jscpd.json` 显式排除 `docs/**` 与 `**/.zcode/**`（前者 10 个代码文件零引用，本是文档产物）。修正后：克隆 149 → 78，重复率 15.71% → 2.42% | `.jscpd.json` |
-| | 覆盖率阈值 | **刻意未设** —— DSH 的「逐文件 100%」按其 §七 判断不适用于本仓；阈值须由人看过真实数字后再定 |
+| | 覆盖率阈值来源 | 各维取实测值下方 1.4~2.0 个点；负例用 CLI 将行阈值设为 100，exit 1 且原因为 `Coverage for lines (82.75%) does not meet global threshold (100%)`，输出写独立目录 | `vitest run --coverage --coverage.thresholds.lines=100 --coverage.reportsDirectory=coverage-negative/packages` |
 
-> 启用覆盖率需要 `pnpm add -D @vitest/coverage-v8`。本仓库**刻意未擅自添加该依赖**：
-> 它会改动 `pnpm-lock.yaml` 并引入供应链变更，需显式授权。
+> 覆盖率依赖已按显式授权加入：根与 `apps/web` 均精确锁定 `@vitest/coverage-v8@4.1.11`（与 `vitest@4.1.11` 对齐），
+> `pnpm-lock.yaml` 随之更新。覆盖率是防退化门，不等于作者真实路径验收，也不替代发布通过证据。
 
 ## 门清单已知缺口（可见，不阻塞）
 

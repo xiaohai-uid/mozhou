@@ -3,7 +3,7 @@
  * 墨舟 (Novel OS) 商业发行版统一启动器。
  * 负责环境自检、按需构建、启动正式 Node HTTP 服务、自动打开浏览器与优雅退出。
  */
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join, dirname, resolve } from 'node:path'
@@ -66,6 +66,16 @@ console.log('\x1b[36m%s\x1b[0m', `
   ║                                                               ║
   ╚═══════════════════════════════════════════════════════════════╝
 `)
+
+// 产物存在但落后于源码时给出警告：陈旧产物会制造假失败（2026-10-12 实测——工作台因
+// dist-server 陈旧而崩在 toFixed，一度被当成产品缺陷）。产物缺失由下面的分支直接构建。
+if (existsSync(webDistDir) && existsSync(serverEntry)) {
+  try {
+    execFileSync(process.execPath, [join(rootDir, 'scripts/check-build-freshness.mjs')], { stdio: 'pipe' })
+  } catch {
+    console.warn('⚠ 生产产物落后于源码。若行为与源码不符，先执行：pnpm --filter @mozhou/web build\n')
+  }
+}
 
 if (!existsSync(webDistDir) || !existsSync(serverEntry)) {
   console.log('ℹ 检测到生产产物缺失，正在执行完整生产构建...')

@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\candidate.json",
+    "sha256": "93cd9c49130c762872dd26dc7bdefffef0cf614f154130d82b3de16e7f9cb2da",
+    "bytes": 22753
+  },
+  "artifact": {
+    "path": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\mozhou.html",
+    "sha256": "d495d1bd6df5ff11e522fb4b31340a3c50f54726c03b83c3bf832512e314d545",
+    "bytes": 884012
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\review-2\\mozhou.finalize.json",
+    "summaryReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\review-2\\mozhou.finalize-summary.json",
+    "browserCheckReceipt": "C:\\zcode\\novel-ai\\.archify\\architecture-mozhou-20261019-220707\\review-2\\mozhou.browser-check.json"
+  },
+  "update": {
+    "status": "update_available",
+    "installedVersion": "3.1.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": "https://github.com/tt-a1i/archify/releases/tag/v3.2.0",
+    "severity": "normal",
+    "checkedAt": "2026-10-19T14:16:45.330Z",
+    "source": "cache",
+    "noticeRequired": true,
+    "noticeText": "Archify update: 3.1.0 → 3.2.0. A previous check at 2026-10-19T14:16:45.330Z found a newer release. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0. The installed Skill has not changed; ask to snooze or ignore this reminder.",
+    "eventKey": "archify@sha256:70e210265c59f24dcbdf2a502ff671104b5454e7ee7d3554aecd86bad32384f5"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2867,
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 27,
+      "routesOverSuggestedBends": 11,
+      "routesOverSuggestedStretch": 2
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "ui-storage",
+            "from": "workbench_ui",
+            "to": "storage_adapter",
+            "label": "状态落盘",
+            "collectionIndex": 3,
+            "artifactIndex": 4
+          },
+          "right": {
+            "id": "ui-gateway",
+            "from": "workbench_ui",
+            "to": "api_gateway",
+            "label": "API 调用",
+            "collectionIndex": 4,
+            "artifactIndex": 5
+          },
+          "point": [
+            360.00000000000006,
+            156
+          ],
+          "sharedNode": "workbench_ui"
+        },
+        {
+          "left": {
+            "id": "gateway-auth",
+            "from": "api_gateway",
+            "to": "session_auth",
+            "label": "会话校验",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "right": {
+            "id": "gateway-book",
+            "from": "api_gateway",
+            "to": "book_access",
+            "label": "沙箱写锁",
+            "collectionIndex": 6,
+            "artifactIndex": 7
+          },
+          "point": [
+            360,
+            268
+          ],
+          "sharedNode": "api_gateway"
+        },
+        {
+          "left": {
+            "id": "gateway-auth",
+            "from": "api_gateway",
+            "to": "session_auth",
+            "label": "会话校验",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "right": {
+            "id": "editor-gateway",
+            "from": "external_editor",
+            "to": "api_gateway",
+            "label": "对账检出",
+            "collectionIndex": 29,
+            "artifactIndex": 30
+          },
+          "point": [
+            360,
+            317
+          ],
+          "sharedNode": "api_gateway"
+        },
+        {
+          "left": {
+            "id": "gateway-book",
+            "from": "api_gateway",
+            "to": "book_access",
+            "label": "沙箱写锁",
+            "collectionIndex": 6,
+            "artifactIndex": 7
+          },
+          "right": {
+            "id": "editor-gateway",
+            "from": "external_editor",
+            "to": "api_gateway",
+            "label": "对账检出",
+            "collectionIndex": 29,
+            "artifactIndex": 30
+          },
+          "point": [
+            446,
+            268
+          ],
+          "sharedNode": "api_gateway"
+        },
+        {
+          "left": {
+            "id": "gateway-agent",
+            "from": "api_gateway",
+            "to": "agent_layer",
+            "label": "工具调度",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "right": {
+            "id": "gateway-recycle",
+            "from": "api_gateway",
+            "to": "recycle_store",
+            "label": "回收调度",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "point": [
+            655,
+            177
+          ],
+          "sharedNode": "api_gateway"
+        },
+        {
+          "left": {
+            "id": "gateway-agent",
+            "from": "api_gateway",
+            "to": "agent_layer",
+            "label": "工具调度",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "right": {
+            "id": "importer-dataplane",
+            "from": "doc_importer",
+            "to": "data_plane",
+            "label": "分章写入",
+            "collectionIndex": 26,
+            "artifactIndex": 27
+          },
+          "point": [
+            577,
+            156
+          ]
+        },
+        {
+          "left": {
+            "id": "gateway-recycle",
+            "from": "api_gateway",
+            "to": "recycle_store",
+            "label": "回收调度",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "right": {
+            "id": "importer-dataplane",
+            "from": "doc_importer",
+            "to": "data_plane",
+            "label": "分章写入",
+            "collectionIndex": 26,
+            "artifactIndex": 27
+          },
+          "point": [
+            577,
+            177
+          ]
+        },
+        {
+          "left": {
+            "id": "gateway-import",
+            "from": "api_gateway",
+            "to": "doc_importer",
+            "label": "导入分章",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "right": {
+            "id": "importer-dataplane",
+            "from": "doc_importer",
+            "to": "data_plane",
+            "label": "分章写入",
+            "collectionIndex": 26,
+            "artifactIndex": 27
+          },
+          "point": [
+            577,
+            107
+          ],
+          "sharedNode": "doc_importer"
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "id": "gateway-book",
+            "from": "api_gateway",
+            "to": "book_access",
+            "label": "沙箱写锁",
+            "collectionIndex": 6,
+            "artifactIndex": 7
+          },
+          "bends": 3,
+          "stretch": 1.093
+        },
+        {
+          "relationship": {
+            "id": "gateway-recycle",
+            "from": "api_gateway",
+            "to": "recycle_store",
+            "label": "回收调度",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "bends": 4,
+          "stretch": 1.287,
+          "directCorridorBlockers": [
+            {
+              "id": "agent_layer",
+              "label": "智能体工具层",
+              "box": [
+                580,
+                180,
+                150,
+                64
+              ]
+            }
+          ]
+        },
+        {
+          "relationship": {
+            "id": "gateway-import",
+            "from": "api_gateway",
+            "to": "doc_importer",
+            "label": "导入分章",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "bends": 3,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "id": "pipeline-flywheel",
+            "from": "pipeline",
+            "to": "flywheel",
+            "label": "record",
+            "collectionIndex": 13,
+            "artifactIndex": 14
+          },
+          "bends": 3,
+          "stretch": 1.142,
+          "directCorridorBlockers": [
+            {
+              "id": "context_compiler",
+              "label": "上下文编译器",
+              "box": [
+                580,
+                320,
+                150,
+                64
+              ]
+            }
+          ]
+        },
+        {
+          "relationship": {
+            "id": "runtime-vault",
+            "from": "runtime",
+            "to": "credential_vault",
+            "label": "取凭据",
+            "collectionIndex": 15,
+            "artifactIndex": 16
+          },
+          "bends": 4,
+          "stretch": 1.163,
+          "directCorridorBlockers": [
+            {
+              "id": "quality_engine",
+              "label": "质量引擎",
+              "box": [
+                580,
+                460,
+                150,
+                64
+              ]
+            }
+          ]
+        },
+        {
+          "relationship": {
+            "id": "runtime-ssrf",
+            "from": "runtime",
+            "to": "ssrf_gate",
+            "label": "出站校验",
+            "collectionIndex": 16,
+            "artifactIndex": 17
+          },
+          "bends": 4,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "id": "pipeline-dataplane",
+            "from": "pipeline",
+            "to": "data_plane",
+            "label": "提交",
+            "collectionIndex": 19,
+            "artifactIndex": 20
+          },
+          "bends": 3,
+          "stretch": 1.153,
+          "directCorridorBlockers": [
+            {
+              "id": "runtime",
+              "label": "生成执行引擎",
+              "box": [
+                380,
+                460,
+                160,
+                64
+              ]
+            }
+          ]
+        },
+        {
+          "relationship": {
+            "id": "pipeline-ledger",
+            "from": "pipeline",
+            "to": "ledger",
+            "label": "发布事件",
+            "collectionIndex": 20,
+            "artifactIndex": 21
+          },
+          "bends": 4,
+          "stretch": 1.501,
+          "directCorridorBlockers": [
+            {
+              "id": "runtime",
+              "label": "生成执行引擎",
+              "box": [
+                380,
+                460,
+                160,
+                64
+              ]
+            },
+            {
+              "id": "data_plane",
+              "label": "数据平面",
+              "box": [
+                380,
+                600,
+                160,
+                64
+              ]
+            }
+          ]
+        }
+      ],
+      "truncated": true
+    },
+    "hints": [
+      "workbench_ui → storage_adapter and workbench_ui → api_gateway cross next to workbench_ui: move node storage_adapter or api_gateway so the two reach workbench_ui from different sides (for example one level with it, one directly above or below it).",
+      "api_gateway → session_auth and api_gateway → book_access cross next to api_gateway: move node session_auth or book_access so the two reach api_gateway from different sides (for example one level with it, one directly above or below it).",
+      "api_gateway → session_auth and external_editor → api_gateway cross next to api_gateway: move node session_auth or external_editor so the two reach api_gateway from different sides (for example one level with it, one directly above or below it).",
+      "api_gateway → book_access and external_editor → api_gateway cross next to api_gateway: move node book_access or external_editor so the two reach api_gateway from different sides (for example one level with it, one directly above or below it).",
+      "api_gateway → agent_layer and api_gateway → recycle_store cross next to api_gateway: move node agent_layer or recycle_store so the two reach api_gateway from different sides (for example one level with it, one directly above or below it).",
+      "api_gateway → agent_layer crosses doc_importer → data_plane: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "api_gateway → recycle_store crosses doc_importer → data_plane: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "api_gateway → doc_importer and doc_importer → data_plane cross next to doc_importer: move node api_gateway or data_plane so the two reach doc_importer from different sides (for example one level with it, one directly above or below it)."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}

@@ -23,6 +23,7 @@ import type { Resolution } from './registry.js';
 export type ProviderBinding = (
   payload: unknown,
   snapshot: ResolutionSnapshot,
+  options?: { readonly signal?: AbortSignal },
 ) => Promise<unknown>;
 
 /** 可恢复失败（M17 二级定向重生的载体）：携带 repairHint。 */
@@ -43,11 +44,11 @@ export class ProviderBindingMissingError extends Error {
 }
 
 /**
- * 超时（F-05 语义修正）：超时只意味着「等待放弃」，在途调用**没有被取消**——结果
- * 不明（可能已计费、可能已产生效果）。因此超时按 outcome_unknown 纪律处理：关闭
- * 自动重试链、不再叠加 fallback（两个 provider 并行 = 重复计费/重复效果），由上层
- * 经显式新 attempt（tasks.retry + 计费确认）重发。旧语义（TimeoutError 触发 fallback
- * 链）已被审查合成探针证伪：主调用完成的同时 fallback 也完成。
+ * 超时（F-05 语义修正）：引擎会通过 binding 的 options.signal 尝试中止在途调用；
+ * 但「已中止」不证明上游未计费、未产生效果，因此结果仍按 outcome_unknown 纪律处理：
+ * 关闭自动重试链、不再叠加 fallback（两个 provider 并行 = 重复计费/重复效果），由上层
+ * 经显式新 attempt（tasks.retry + 计费确认）重发。binding 必须尊重传入的 signal；
+ * 忽略 signal 的旧 binding 仍会迟到完成，但结果不会被采纳。
  */
 export class TimeoutError extends RecoverableError {
   override name = 'TimeoutError';
@@ -67,13 +68,19 @@ export class OutcomeUnknownError extends Error {
 }
 
 /** 竞速包装：timeoutMs 内未决即 TimeoutError；定时器用后即清（不留悬挂句柄）。
- * 注意：超时不取消在途调用（ProviderBinding 无中止通道）——见 TimeoutError 的 F-05 注。 */
-function withTimeout<T>(p: Promise<T>, timeoutMs: number, providerId: string): Promise<T> {
+ * onTimeout 用于把中止信号传给 binding——超时不只是放弃等待，还要尽力停掉在途调用。 */
+function withTimeout<T>(
+  p: Promise<T>,
+  timeoutMs: number,
+  providerId: string,
+  onTimeout?: (error: TimeoutError) => void,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new TimeoutError(`TIMEOUT: ${providerId} 超过 ${timeoutMs}ms 未返回`)),
-      timeoutMs,
-    );
+    const timer = setTimeout(() => {
+      const error = new TimeoutError(`TIMEOUT: ${providerId} 超过 ${timeoutMs}ms 未返回`);
+      onTimeout?.(error);
+      reject(error);
+    }, timeoutMs);
     p.then(
       (v) => {
         clearTimeout(timer);
@@ -202,13 +209,17 @@ export class RuntimeEngine {
         });
       }
       triedProviders.push(providerId);
+      const attemptController = new AbortController();
       try {
         const binding = this.#bindings.get(providerId);
         if (!binding) throw new ProviderBindingMissingError(providerId);
         const value = await withTimeout(
-          Promise.resolve().then(() => binding(payload, snapshot)),
+          Promise.resolve().then(() =>
+            binding(payload, snapshot, { signal: attemptController.signal }),
+          ),
           resolution.failurePolicy.timeoutMs,
           providerId,
+          (error) => attemptController.abort(error),
         );
         // 快照反映实际服务的 provider（降级成功时 ≠ 主候选）
         const servedSnapshot: ResolutionSnapshot = { ...snapshot, providerId };
@@ -225,6 +236,7 @@ export class RuntimeEngine {
         });
         return { outcome: 'succeeded', value, snapshot: servedSnapshot, taskRef };
       } catch (err) {
+        attemptController.abort(err instanceof Error ? err : new Error(String(err)));
         lastReason = err instanceof Error ? err.message : String(err);
         // outcome_unknown 结果不明：关闭自动重试链，不继续尝试 fallback provider，
         // 区分正常重生（RecoverableError）与结果不明，不误伤正常重试。

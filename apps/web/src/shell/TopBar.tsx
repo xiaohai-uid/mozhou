@@ -21,6 +21,7 @@ const ICONS = {
   export: 'M12 3v12M7 10l5 5 5-5M4 21h16',
   compliance: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
   scene: 'M3 5h18v12H3zM3 13l5-4 4 3 3-2 6 4M8.5 8.5h.01',
+  toolbox: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z',
 } as const
 
 export function TopBar({
@@ -79,6 +80,9 @@ export function TopBar({
         </button>
         <button type="button" className="quiet-btn" onClick={() => onOpenModal?.('compliance')} title="合规审查尚未接入">
           <ToolIcon path={ICONS.compliance} /> <span className="top-btn-label">敏感词</span>
+        </button>
+        <button type="button" className="quiet-btn" data-testid="topbar-toolbox-btn" onClick={() => onOpenModal?.('toolbox')} title="智能体工具箱与沙箱调用">
+          <ToolIcon path={ICONS.toolbox} /> <span className="top-btn-label">工具箱</span>
         </button>
         <button className="quiet-btn" disabled title="数据面为本地存储；云同步未接入">
           <i className="status-dot" />

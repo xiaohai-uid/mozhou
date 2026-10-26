@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import type { PlanId } from './contracts.js'
 import { BillingStore } from './store.js'
 
 const tempDirs: string[] = []
@@ -184,6 +185,44 @@ describe('BillingStore 订单与事务履约 (T14)', () => {
     expect(refunded.state).toBe('refunded')
     // 权益已撤销
     expect(store.getActiveGrantForUser('usr_david')).toBeNull()
+
+    store.close()
+  })
+
+  it('运营手动授予：直接发放权益，manual_ 前缀订单号，非法套餐与非法天数拒绝', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mozhou-billing-manual-grant-'))
+    tempDirs.push(dir)
+    const store = new BillingStore()
+    store.setDatabasePath(join(dir, 'test-billing.sqlite'))
+
+    // 1. 正常手动授予 Max 权益
+    const grant = store.grantManualEntitlement({ userId: 'usr_ops_test', planId: 'max_monthly' })
+    expect(grant.planId).toBe('max_monthly')
+    expect(grant.orderId.startsWith('manual_')).toBe(true)
+    expect(grant.periodEnd > grant.periodStart).toBe(true)
+
+    // 2. 权益可被权益判定面读到
+    const active = store.getActiveGrantForUser('usr_ops_test')
+    expect(active?.grantId).toBe(grant.grantId)
+
+    // 3. 自定义天数：90 天授权的周期更远，成为当前有效权益
+    const grant90 = store.grantManualEntitlement({ userId: 'usr_ops_test', planId: 'pro_monthly', durationDays: 90 })
+    expect(store.getActiveGrantForUser('usr_ops_test')?.periodEnd).toBe(grant90.periodEnd)
+
+    // 4. 非法套餐拒绝（与支付下单同口径，运行时可绕过类型系统传入任意串）
+    expect(() => {
+      store.grantManualEntitlement({ userId: 'usr_ops_test', planId: 'free_forever' as PlanId })
+    }).toThrow(/INVALID_PLAN/)
+
+    // 5. 非法天数拒绝
+    expect(() => {
+      store.grantManualEntitlement({ userId: 'usr_ops_test', planId: 'pro_monthly', durationDays: 0 })
+    }).toThrow(/INVALID_DURATION/)
+
+    // 6. 空 userId 拒绝
+    expect(() => {
+      store.grantManualEntitlement({ userId: '  ', planId: 'pro_monthly' })
+    }).toThrow(/INVALID_USER/)
 
     store.close()
   })

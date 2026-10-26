@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "serve": "node dist-server/productionServer.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage --maxWorkers=2",
     "test:real-model": "node ../../scripts/run-real-model-tests.mjs",
     "typecheck": "tsc -b && tsc -p tsconfig.server.json --noEmit"
   },
@@ -35,6 +36,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "4.1.11",
     "jsdom": "^25.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.5.4",

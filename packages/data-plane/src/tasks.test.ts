@@ -16,6 +16,7 @@ import {
   createTaskRecord,
   finishTaskAttempt,
   linkTaskOperation,
+  listTaskRecords,
   nextTaskSequence,
   readTaskRecord,
   taskRecordPath,
@@ -124,5 +125,14 @@ describe('W4-2a 任务记录', () => {
     // 文件原样保留（不降级覆盖）
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
     expect((parsed as { recordVersion: number }).recordVersion).toBe(99)
+  })
+
+  it('listTaskRecords 返回当前书内所有合法任务记录并按时间排序', () => {
+    expect(listTaskRecords(root)).toEqual([])
+    createTaskRecord(root, { taskId: 'task_1', bookId: 'b', taskKind: 'draft.generate' })
+    createTaskRecord(root, { taskId: 'task_2', bookId: 'b', taskKind: 'draft.continue' })
+    const records = listTaskRecords(root)
+    expect(records.length).toBe(2)
+    expect(records.map((r) => r.taskId).sort()).toEqual(['task_1', 'task_2'])
   })
 })

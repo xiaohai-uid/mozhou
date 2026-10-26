@@ -140,6 +140,23 @@ export class QualityReviewNotPassError extends Error {
 }
 
 /**
+ * 机械门未通过、前进出口关闭（D1）：文学审查 verdict 可能为 pass，但机械门
+ * 是独立的硬判据（字数窗口/占位符/AI 红线/复读/4-gram）。两者都通过才放行；
+ * 机械门失败走作者改文后的重新审查，不允许静默提交。
+ */
+export class MechanicalGateNotPassedError extends Error {
+  override readonly name = 'MechanicalGateNotPassedError';
+  constructor(chapterIndex: number, taskRef: string, fails: readonly string[]) {
+    const detail = fails.length > 0 ? fails.join('; ') : 'no failure details recorded';
+    super(
+      `chapter ${chapterIndex} session ${taskRef}: mechanical gate failed (${detail}) ` +
+        '— forward exit to user_edit requires both literary pass and mechanical pass (D1); ' +
+        'edit the draft and run the review again',
+    );
+  }
+}
+
+/**
  * 连续性门未通过即试图步进 canon_proposal（C3 会话收口）：出口只对
  * verdict='pass' 开放——hard_conflict 悬置走 HardConflictUnresolvedError 的
  * 显式回炉；verdict=null（门从未运行）同样是跳步，不能把未经校验的 delta
@@ -326,9 +343,17 @@ export class ChapterProductionSession {
     // 判据读当下投影——崩溃恢复后同样可判）。blocking_fail 只能显式回炉，
     // refused 停给作者；'pass' 放行。
     if (to === 'user_edit' && this.#currentStep === 'review') {
-      const verdict = this.project().lastQualityVerdict;
+      const projection = this.project();
+      const verdict = projection.lastQualityVerdict;
       if (verdict !== 'pass') {
         throw new QualityReviewNotPassError(this.#chapterIndex, this.#taskRef, verdict);
+      }
+      if (projection.lastMechanicalPassed === false) {
+        throw new MechanicalGateNotPassedError(
+          this.#chapterIndex,
+          this.#taskRef,
+          projection.lastMechanicalFails,
+        );
       }
     }
     // S7 停止策略与 C3 会话收口：硬冲突悬置或门未跑时前进出口关闭
@@ -390,6 +415,9 @@ export class ChapterProductionSession {
   recordQualityReview(payload: {
     readonly reportId: string;
     readonly verdict: 'pass' | 'blocking_fail' | 'refused';
+    /** 机械门结果（D1）：与文学 verdict 分开入账，前进出口同时校验两者。 */
+    readonly mechanicalPassed?: boolean;
+    readonly mechanicalFails?: readonly string[];
     readonly reportPath?: string;
     readonly draftRevision?: number;
     readonly draftContentHash?: string;

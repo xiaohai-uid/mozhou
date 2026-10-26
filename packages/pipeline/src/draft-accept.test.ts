@@ -3,7 +3,16 @@ import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID, createHash } from 'node:crypto'
-import { LocalDataPlane, createBook, proseChapterPath, OperationIdReusedError } from '@mozhou/data-plane'
+import {
+  LocalDataPlane,
+  createBook,
+  proseChapterPath,
+  OperationIdReusedError,
+  operationRecordPath,
+  readOperationRecord,
+  createTaskRecord,
+  readTaskRecord,
+} from '@mozhou/data-plane'
 import {
   createDraftCandidate,
   appendCandidateDelta,
@@ -776,6 +785,228 @@ describe('draft-accept (C2 / R01): 写前校验与终态保护', () => {
       expect(afterConflict.body).toBe(afterA.body)
       expect(readDraftCandidate(root, b.id)?.canonState).toBe('unaccepted')
       expect(existsSync(join(root, '.mozhou', 'accept-intents', b.id + '.json'))).toBe(false)
+    })
+  })
+
+  describe('F-01 加固：恢复分支身份前置与操作结果补全', () => {
+    function diskRevision(): number {
+      const plane = LocalDataPlane.open(root)
+      const revision = plane.getProseChapter(1).revision
+      plane.close()
+      return revision
+    }
+
+    it('done 回放不得绕过身份检查：同 key 换 operationId 在副作用前拒绝', () => {
+      const { id, base, bookId } = createFixtureCandidate('replace')
+      finishCandidate(root, id, 'ready')
+
+      const first = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'f01b-key',
+        operationId: 'f01b-op-A',
+        bookId,
+      })
+      expect(first.alreadyApplied).toBe(false)
+
+      const beforeRaw = readFileSync(join(root, proseChapterPath(1)), 'utf8')
+      const beforeRevision = diskRevision()
+
+      // 同候选同 key，但换成另一个 operationId：intent 里存的是 op-A，请求是 op-B。
+      // 修复前 done 分支先于身份检查返回，这里会拿到 alreadyApplied —— 恢复分支的旁路。
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 'f01b-key',
+          operationId: 'f01b-op-B',
+          bookId,
+        }),
+      ).toThrow(AcceptConflictError)
+
+      expect(readFileSync(join(root, proseChapterPath(1)), 'utf8')).toBe(beforeRaw)
+      expect(diskRevision()).toBe(beforeRevision)
+      expect(readDraftCandidate(root, id)?.status).toBe('accepted')
+    })
+
+    it('无原始身份的 intent（旧记录/未带 operationId 的请求所写）拒绝绑定新操作', () => {
+      const { id, base } = createFixtureCandidate('replace')
+      finishCandidate(root, id, 'ready')
+
+      // 不带 operationId 的采纳 ⇒ intent 是 v2 但无 operation 块
+      const first = acceptDraft({ bookRoot: root, candidateId: id, base, idempotencyKey: 'f01c-key' })
+      expect(first.alreadyApplied).toBe(false)
+
+      const intentPath = join(root, '.mozhou', 'accept-intents', `${id}.json`)
+      const intent = JSON.parse(readFileSync(intentPath, 'utf8')) as { schemaVersion: number; operation?: unknown }
+      expect(intent.schemaVersion).toBe(2)
+      expect(intent.operation).toBeUndefined()
+
+      // 带 operationId 的重试无法证明同源 ⇒ 拒绝，绝不把新操作绑到旧记录上
+      expect(() =>
+        acceptDraft({ bookRoot: root, candidateId: id, base, idempotencyKey: 'f01c-key', operationId: 'f01c-op' }),
+      ).toThrow(AcceptConflictError)
+    })
+
+    it('done 已写、操作结果未写时重试：补齐操作记录且正文版本不再增长', () => {
+      const { id, base, bookId } = createFixtureCandidate('replace')
+      finishCandidate(root, id, 'ready')
+
+      const first = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'f01d-key',
+        operationId: 'f01d-op',
+        bookId,
+      })
+      expect(first.alreadyApplied).toBe(false)
+      expect(readOperationRecord(root, 'f01d-op')?.result.appliedRevision).toBe(first.revision)
+
+      // 模拟「done 已写、操作结果未写」窗口：删掉结果文件，intent 保持 done
+      rmSync(operationRecordPath(root, 'f01d-op'))
+
+      const retry = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'f01d-key',
+        operationId: 'f01d-op',
+        bookId,
+      })
+      expect(retry.alreadyApplied).toBe(true)
+      expect(retry.revision).toBe(first.revision)
+      expect(diskRevision()).toBe(first.revision) // 正文版本只增加一次
+
+      // 操作结果必须可查（身份取自 intent 快照，不依赖本次请求）
+      const record = readOperationRecord(root, 'f01d-op')
+      expect(record).not.toBeNull()
+      expect(record?.result.appliedRevision).toBe(first.revision)
+      expect(record?.result.appliedBodyHash).toBe(first.sha256)
+    })
+
+    it('记录已写、原任务关联未写：重试不带 taskId 仍恢复原关联（S3）', () => {
+      const { id, base, bookId } = createFixtureCandidate('replace')
+      finishCandidate(root, id, 'ready')
+
+      // 原任务尚不存在 ⇒ 首次采纳在「结果记录已写、关联失败」处抛错（TASK_NOT_FOUND）
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 's3-key',
+          operationId: 's3-op',
+          taskId: 's3-task',
+          bookId,
+        }),
+      ).toThrow()
+      expect(readOperationRecord(root, 's3-op')).not.toBeNull() // 结果记录已写
+      const firstRevision = diskRevision()
+
+      // 补上原任务记录后重试（**不带 taskId**）⇒ 必须按 intent 中保存的原任务补关联
+      createTaskRecord(root, { taskId: 's3-task', bookId, taskKind: 'draft.generate' })
+      const retry = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 's3-key',
+        operationId: 's3-op',
+        bookId,
+      })
+      expect(retry.alreadyApplied).toBe(true)
+      expect(retry.revision).toBe(firstRevision)
+      expect(diskRevision()).toBe(firstRevision) // 正文不再增长
+      expect(readTaskRecord(root, 's3-task')?.operationIds).toContain('s3-op')
+    })
+
+    it('intent 已有原身份时，省略 operationId 不得免除校验（S4）', () => {
+      const { id, base, bookId } = createFixtureCandidate('replace')
+      finishCandidate(root, id, 'ready')
+
+      const first = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 's4-key',
+        operationId: 's4-op',
+        principalId: 'principal-A',
+        bookId,
+      })
+      expect(first.alreadyApplied).toBe(false)
+
+      // 另一主体省略 operationId 重试 ⇒ 拒绝（修复前返回 alreadyApplied，等于跨主体回放）
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 's4-key',
+          principalId: 'principal-B',
+          bookId,
+        }),
+      ).toThrow(AcceptConflictError)
+
+      // 同主体省略 operationId 同样拒绝：有原身份就必须出示（契约显式，不留静默旁路）
+      expect(() =>
+        acceptDraft({
+          bookRoot: root,
+          candidateId: id,
+          base,
+          idempotencyKey: 's4-key',
+          principalId: 'principal-A',
+          bookId,
+        }),
+      ).toThrow(AcceptConflictError)
+
+      // 出示同一身份仍可正常回放
+      const replay = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 's4-key',
+        operationId: 's4-op',
+        principalId: 'principal-A',
+        bookId,
+      })
+      expect(replay.alreadyApplied).toBe(true)
+      expect(replay.revision).toBe(first.revision)
+    })
+
+    it('窗口 2 恢复（intent=intent、盘面=after）同样补齐操作结果', () => {
+      const { id, base, bookId } = createFixtureCandidate('replace')
+      finishCandidate(root, id, 'ready')
+
+      const first = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'f01e-key',
+        operationId: 'f01e-op',
+        bookId,
+      })
+      expect(first.alreadyApplied).toBe(false)
+
+      const intentPath = join(root, '.mozhou', 'accept-intents', `${id}.json`)
+      const doneIntent = JSON.parse(readFileSync(intentPath, 'utf8')) as Record<string, unknown>
+      // 回退 intent 为 intent 态（模拟正文已落盘但 done 未写），并删掉操作结果
+      writeFileSync(intentPath, JSON.stringify({ ...doneIntent, state: 'intent' }), 'utf8')
+      rmSync(operationRecordPath(root, 'f01e-op'))
+
+      const retry = acceptDraft({
+        bookRoot: root,
+        candidateId: id,
+        base,
+        idempotencyKey: 'f01e-key',
+        operationId: 'f01e-op',
+        bookId,
+      })
+      expect(retry.alreadyApplied).toBe(true)
+      expect(retry.revision).toBe(first.revision)
+      expect(readOperationRecord(root, 'f01e-op')?.result.appliedRevision).toBe(first.revision)
+      expect((JSON.parse(readFileSync(intentPath, 'utf8')) as { state?: string }).state).toBe('done')
     })
   })
 })

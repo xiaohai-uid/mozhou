@@ -23,10 +23,11 @@
  * 用法：
  *   node scripts/release/real-model-gate.mjs
  */
-import { execSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readSourceStamp } from './lib/source-stamp.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -54,11 +55,21 @@ function presentVars(names) {
   return names.filter((name) => (process.env[name] ?? '').trim().length > 0)
 }
 
-function sourceCommit() {
+/**
+ * 来源戳：脏工作区里短 HEAD 会谎报（旅程跑的是未提交源码，戳却指向干净提交）。
+ * 复用 scripts/release/lib/source-stamp.mjs：脏则加 `-dirty` 后缀并记脏文件数。
+ */
+function sourceStampFields() {
   try {
-    return execSync('git rev-parse --short HEAD', { cwd: repoRoot }).toString().trim()
+    const stamp = readSourceStamp(repoRoot)
+    return {
+      sourceCommit: stamp.sourceCommit,
+      sourceCommitSha: stamp.sourceCommitSha,
+      dirty: stamp.dirty,
+      dirtyFiles: stamp.dirtyFiles,
+    }
   } catch {
-    return 'unknown'
+    return { sourceCommit: 'unknown', sourceCommitSha: 'unknown', dirty: null, dirtyFiles: null }
   }
 }
 
@@ -120,7 +131,7 @@ if (detectedKeys.length === 0) {
     kind: 'release-gate',
     status: 'BLOCKED',
     reason: 'NO_REAL_MODEL_CREDENTIAL',
-    sourceCommit: sourceCommit(),
+    ...sourceStampFields(),
     command: INVOKED_COMMAND,
     exitCode,
     scope: SCOPE,
@@ -189,7 +200,7 @@ const provider =
 writeEvidence({
   kind: 'release-gate',
   status,
-  sourceCommit: sourceCommit(),
+  ...sourceStampFields(),
   command: INVOKED_COMMAND,
   exitCode,
   scope: SCOPE,

@@ -24,12 +24,26 @@ exports[`BookshelfView（书架） > 书库列表渲染（书名/章数/书 id�
   >
     <div
       class="actions"
-      style="margin-top: 0px;"
+      style="margin-top: 0px; display: flex; gap: 10px; flex-wrap: wrap;"
     >
       <button
         class="btn"
       >
         刷新书库
+      </button>
+      <button
+        class="btn-primary"
+        data-testid="bookshelf-import-doc-btn"
+        type="button"
+      >
+        导入既有文档 (.docx / .txt / .md)
+      </button>
+      <button
+        class="btn"
+        data-testid="bookshelf-recycle-bin-btn"
+        type="button"
+      >
+        回收站
       </button>
       <span
         class="mono muted"

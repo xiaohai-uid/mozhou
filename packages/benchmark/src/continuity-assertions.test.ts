@@ -172,10 +172,26 @@ describe('L1 确定性连续性断言引擎 (evaluateContinuityPacket)', () => {
     expect(options.unrevealedSecrets?.[0]?.secretKeywords).toContain('真神降临古阵');
     expect(options.deadCharacters).toContain('char:wang-lin');
 
-    const promptfooCase = exportPromptfooTestCaseFromCanon(options, '古庙探秘');
+    // 显示名必须由调用方给出：只凭 ref 剥出的 slug 匹配不到中文正文（见下一用例）。
+    const promptfooCase = exportPromptfooTestCaseFromCanon(options, '古庙探秘', { 'char:wang-lin': ['王林'] });
     expect(promptfooCase.description).toContain('第 3 章 (古庙探秘)');
     expect(promptfooCase.assert.some((a) => a.value === '真神降临古阵')).toBe(true);
-    expect(promptfooCase.assert.some((a) => a.value.includes('wang-lin'))).toBe(true);
+    expect(promptfooCase.assert.some((a) => a.value.startsWith('王林(?:'))).toBe(true);
+    expect(promptfooCase.unresolvedDeadCharacters).toBeUndefined();
+  });
+
+  it('缺显示名时不生成空转断言，并把未解析角色如实记录', () => {
+    const options = generateContinuityAssertionsFromCanon([], 4, 'protagonist', ['char:wang-lin']);
+    const promptfooCase = exportPromptfooTestCaseFromCanon(options, '古庙探秘');
+    // 旧行为会产出 `wang-lin(?:...)`：中文正文里永不触发，是一条空转守卫。
+    expect(promptfooCase.assert.some((a) => a.value.includes('wang-lin'))).toBe(false);
+    expect(promptfooCase.unresolvedDeadCharacters).toEqual(['char:wang-lin']);
+  });
+
+  it('名字含正则元字符时按字面量匹配', () => {
+    const options = generateContinuityAssertionsFromCanon([], 4, 'protagonist', ['char:a.b']);
+    const promptfooCase = exportPromptfooTestCaseFromCanon(options, '古庙探秘', { 'char:a.b': ['A.B'] });
+    expect(promptfooCase.assert.some((a) => a.value.startsWith('A\\.B(?:'))).toBe(true);
   });
 });
 

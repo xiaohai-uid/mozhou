@@ -9,15 +9,15 @@
 
 | 包 | 路径 | 源码文件 | 源码行数 | 测试文件 | 测试行数 | 内部依赖 |
 |---|---|---:|---:|---:|---:|---|
-| `@mozhou/web` | `apps/web` | 177 | 43539 | 67 | 11490 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/flywheel`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
-| `@mozhou/pipeline` | `packages/pipeline` | 57 | 18022 | 32 | 9472 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/quality-engine`, `@mozhou/runtime` |
-| `@mozhou/data-plane` | `packages/data-plane` | 60 | 15541 | 27 | 6951 | `@mozhou/kernel` |
+| `@mozhou/web` | `apps/web` | 209 | 53261 | 83 | 15269 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/flywheel`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
+| `@mozhou/pipeline` | `packages/pipeline` | 59 | 18982 | 34 | 10116 | `@mozhou/context-compiler`, `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/quality-engine`, `@mozhou/runtime` |
+| `@mozhou/data-plane` | `packages/data-plane` | 69 | 17198 | 30 | 7665 | `@mozhou/kernel` |
 | `@mozhou/context-compiler` | `packages/context-compiler` | 20 | 8082 | 10 | 3567 | `@mozhou/data-plane`, `@mozhou/kernel` |
 | `@mozhou/flywheel` | `packages/flywheel` | 36 | 7169 | 14 | 2947 | `@mozhou/data-plane`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
-| `@mozhou/runtime` | `packages/runtime` | 29 | 4444 | 11 | 1848 | `@mozhou/data-plane`, `@mozhou/kernel` |
-| `@mozhou/kernel` | `packages/kernel` | 16 | 3248 | 7 | 942 | — |
+| `@mozhou/runtime` | `packages/runtime` | 30 | 4755 | 12 | 2053 | `@mozhou/data-plane`, `@mozhou/kernel` |
+| `@mozhou/kernel` | `packages/kernel` | 16 | 3433 | 7 | 1106 | — |
 | `@mozhou/quality-engine` | `packages/quality-engine` | 27 | 3071 | 12 | 1142 | — |
-| `@mozhou/benchmark` | `packages/benchmark` | 11 | 1565 | 7 | 892 | `@mozhou/context-compiler`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
+| `@mozhou/benchmark` | `packages/benchmark` | 11 | 1605 | 7 | 908 | `@mozhou/context-compiler`, `@mozhou/kernel`, `@mozhou/pipeline`, `@mozhou/quality-engine`, `@mozhou/runtime` |
 
 ## 2. 依赖边
 
@@ -77,7 +77,7 @@
 
 ## 5. 叶子包（零内部依赖）
 
-- `@mozhou/kernel` — `packages/kernel`（3248 行）
+- `@mozhou/kernel` — `packages/kernel`（3433 行）
 - `@mozhou/quality-engine` — `packages/quality-engine`（3071 行）
 
 ## 6. 本生成器**不**覆盖的判据

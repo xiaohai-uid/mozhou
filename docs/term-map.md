@@ -22,12 +22,12 @@
 
 ## 统计
 
-- 词条总数: **97**
+- 词条总数: **98**
 - 声明: **27**
-- 局部同名: **6**
-- 引用: **13**
-- 仅测试: **3**
-- 未验证: **48**
+- 局部同名: **7**
+- 引用: **14**
+- 仅测试: **1**
+- 未验证: **49**
 
 ## 已确认的命名漂移
 
@@ -49,6 +49,7 @@
 | 实体引用 | Entity Ref | `EntityRef` | `packages/kernel/src/kernel-schema.ts:62` | 声明 |
 | 时序事实 | Temporal Fact | `TemporalFact` | `packages/kernel/src/kernel-schema.ts:239` | 声明 |
 | 候选事实 | Candidate Fact | - | - | 未验证 |
+| 候选事实账本 | Candidate Fact Ledger | - | - | 未验证 |
 | 候选 | Candidate | `Candidate` | `apps/web/src/workbench/editor/ProseEditorPanel.tsx:558` | 引用 |
 | 正典事实 | Canon Fact | - | - | 未验证 |
 | 知情状态 | Knowledge State | `KnowledgeState` | `packages/kernel/src/kernel-schema.ts:279` | 声明 |
@@ -83,21 +84,21 @@
 | 重放输入 | Replay Inputs | `ReplayInputs` | `packages/kernel/src/kernel-schema.ts:464` | 声明 |
 | 图触发源 | Graph Trigger Source | - | - | 未验证 |
 | K 跳召回 | K-Hop Recall | - | - | 未验证 |
-| 连续性门 | Continuity Gate | `continuityGate` | `apps/web/server/routes/proseRoutes.ts:975` | 引用 |
+| 连续性门 | Continuity Gate | `continuityGate` | `apps/web/server/routes/proseRoutes.ts:986` | 引用 |
 | 上下文档位 | AI Context Tier | `AiContextTier` | `packages/kernel/src/kernel-schema.ts:573` | 声明 |
 | 小说运行时 | Novel Runtime | - | - | 未验证 |
 | 事件总线 | Event Bus | - | - | 未验证 |
 | 会话重放 | Session Replay | - | - | 未验证 |
 | 任务投影 | Task Projection | `TaskProjection` | `packages/runtime/src/tasks.ts:23` | 声明 |
 | 档位路由 | Tier Routing | - | - | 未验证 |
-| 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:235` | 声明 |
+| 章节生产会话 | Chapter Production Session | `ChapterProductionSession` | `packages/pipeline/src/session.ts:252` | 声明 |
 | 提案端口 | Proposal Port | `ProposalPort` | `packages/pipeline/src/proposal-port.ts:183` | 声明 |
-| 能力 | Capability | `capability` | `packages/kernel/src/kernel-schema.ts:621` | 引用 |
-| 技能 | Skill | `skill` | `apps/web/src/workbench/DialogueStream.hardening.test.tsx:49` | 仅测试 |
+| 能力 | Capability | `capability` | `apps/web/server/billing/entitlements.ts:34` | 引用 |
+| 技能 | Skill | `skill` | `apps/web/server/agent/skillTools.ts:23` | 局部同名 |
 | 能力注册表 | Capability Registry | `CapabilityRegistry` | `packages/runtime/src/registry.ts:23` | 声明 |
 | 能力配方 | Capability Recipe | `CapabilityRecipe` | `packages/runtime/src/recipe/types.ts:142` | 声明 |
 | 任务流 | Task Stream | - | - | 未验证 |
-| 候选生成标识 | Generation Id | `generationId` | `packages/pipeline/src/draft-candidate.ts:111` | 引用 |
+| 候选生成标识 | Generation Id | `generationId` | `apps/web/server/routes/pipelineRoutes.ts:308` | 引用 |
 | 评估引擎 | Evaluation Engine | - | - | 未验证 |
 | 长篇基准 | Long Novel Benchmark | - | - | 未验证 |
 | 文学审查报告 | QualityReviewReport | `QualityReviewReport` | `packages/quality-engine/src/types.ts:68` | 声明 |
@@ -115,13 +116,13 @@
 | 议题 | Issue | `issue` | `packages/pipeline/src/gate-step.ts:216` | 局部同名 |
 | 工单 | Ticket | `ticket` | `apps/web/server/routes/managedModelRoutes.ts:50` | 局部同名 |
 | 本地规格文档 | Local Spec Doc | - | - | 未验证 |
-| 地图 | Map | `Map` | `packages/benchmark/src/metrics.ts:215` | 引用 |
+| 地图 | Map | `Map` | `apps/web/server/agent/registry.ts:21` | 引用 |
 | 状态标签 | Triage Label | - | - | 未验证 |
 | 门 | Gate | `Gate` | `apps/web/src/capability-square/CapabilitySquareView.tsx:101` | 引用 |
 | 门禁 | - | - | - | 未验证 |
 | 闸门 | - | - | - | 未验证 |
 | 检查 | Check | `check` | `apps/web/server/routes/accountRoutes.ts:68` | 引用 |
-| 配额 | Quota | `quota` | `apps/web/server/billing/quota.test.ts:10` | 仅测试 |
+| 配额 | Quota | `quota` | `apps/web/src/shell/storage/browserStorage.ts:79` | 引用 |
 | 纵切 | Vertical Slice | - | - | 未验证 |
 | 切片 | Slice | `Slice` | `apps/web/src/workbench/editor/NovelEditorCanvas.tsx:6` | 引用 |
 | 挂账项 | Deferred Item | - | - | 未验证 |
@@ -130,10 +131,10 @@
 | 决策记录 | ADR | `ADR` | `apps/web/src/story-brain/StoryBrainPanel.tsx:143` | 引用 |
 | 纪事 | Chronicle | - | - | 未验证 |
 | 架构地图 | Architecture Map | - | - | 未验证 |
-| 契约 | Contract | `contract` | `packages/pipeline/src/gate-step.ts:215` | 局部同名 |
+| 契约 | Contract | `contract` | `apps/web/server/routes/pipelineRoutes.ts:453` | 局部同名 |
 | 接缝 | Seam | - | - | 未验证 |
 | 消费者 | Definition | `definition` | `packages/quality-engine/src/deterministic.ts:101` | 引用 |
 | 工作台 | Workbench | `workbench` | `apps/web/src/capability-square/capabilityDetails.ts:21` | 引用 |
 | 智能体 Harness | Agent Harness | - | - | 未验证 |
-| 版本 | Version | `version` | `packages/pipeline/src/draft-candidate.ts:322` | 局部同名 |
+| 版本 | Version | `version` | `apps/web/server/routes/skillRoutes.ts:108` | 局部同名 |
 | 会话 | Session | `Session` | `apps/web/src/workbench/DialogueStream.telemetry.test.tsx:12` | 仅测试 |

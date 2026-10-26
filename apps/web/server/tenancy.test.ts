@@ -134,7 +134,7 @@ function scanImplementedRoutes(): ImplementedRoutes {
 }
 describe('全路由租户隔离与所有权策略 (T09)', () => {
   it('策略注册表非空、分类合法、键为 /api/ 路径', () => {
-    const validCategories = new Set(['public', 'account', 'book', 'local-native', 'payment-webhook'])
+    const validCategories = new Set(['public', 'account', 'book', 'local-native', 'payment-webhook', 'ops'])
     const routes = Object.entries(ROUTE_POLICIES)
     expect(routes.length).toBeGreaterThanOrEqual(30)
     for (const [route, cat] of routes) {

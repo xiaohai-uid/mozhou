@@ -1,10 +1,12 @@
 /**
  * Scene System 本地偏好（ADR-0028 · 规格 §3）。
- * Scene 是界面偏好，不是 Canon：持久化到 localStorage `mozhou.scene.v1`，
+ * Scene 是界面偏好，不是 Canon：持久化到统一存储适配器 `mozhou.scene.v1`，
  * 任何改动不触碰正典/正文/Receipt/Pipeline 状态。与 workbenchStorage 同纪律：
  * 解析失败/存储不可用一律静默回退（偏好是增强，不是硬依赖）。
  * 上传图持久化预算：dataURL 超限时仅本次会话有效（不落盘），由 UI 明示。
  */
+
+import { STORAGE_KEYS, getStorageItem, setStorageItem } from '../storage/browserStorage'
 
 export type SceneId = 'silver-atrium' | 'city-night' | 'cloud-sea' | 'rain-city' | 'library' | 'custom'
 export type SceneFigureAnchor = 'left' | 'center' | 'right'
@@ -38,7 +40,7 @@ export interface ScenePreference {
   books: Record<string, SceneProfile>
 }
 
-export const SCENE_STORAGE_KEY = 'mozhou.scene.v1'
+export const SCENE_STORAGE_KEY = STORAGE_KEYS.SCENE_PREFERENCE
 
 export const SCENE_UPLOAD_BUDGET = {
   /** 背景文件预算（字节）。 */
@@ -64,39 +66,38 @@ export const DEFAULT_SCENE_PROFILE: SceneProfile = {
 
 function isSceneProfile(value: unknown): value is SceneProfile {
   if (typeof value !== 'object' || value === null) return false
-  const profile = value as SceneProfile
+  const raw = value as Record<string, unknown>
+  const figure = raw.figure
   return (
-    typeof profile.sceneId === 'string' &&
-    typeof profile.brightness === 'number' &&
-    typeof profile.blur === 'number' &&
-    typeof profile.veil === 'number' &&
-    typeof profile.figure === 'object' &&
-    profile.figure !== null &&
-    typeof profile.figure.enabled === 'boolean'
+    typeof raw.sceneId === 'string' &&
+    typeof raw.brightness === 'number' &&
+    typeof raw.blur === 'number' &&
+    typeof raw.veil === 'number' &&
+    typeof figure === 'object' &&
+    figure !== null &&
+    typeof (figure as Record<string, unknown>).enabled === 'boolean'
   )
 }
 
+function isScenePreference(value: unknown): value is ScenePreference {
+  if (typeof value !== 'object' || value === null) return false
+  const parsed = value as ScenePreference
+  return parsed.version === 1 && isSceneProfile(parsed.global)
+}
+
 export function loadScenePreference(): ScenePreference {
-  try {
-    const raw = window.localStorage.getItem(SCENE_STORAGE_KEY)
-    if (raw !== null) {
-      const parsed = JSON.parse(raw) as ScenePreference
-      if (parsed.version === 1 && isSceneProfile(parsed.global)) {
-        return { version: 1, global: parsed.global, books: parsed.books ?? {} }
-      }
-    }
-  } catch {
-    // 解析失败：静默回退默认偏好（增强，不阻塞）。
+  const parsed = getStorageItem<ScenePreference>(SCENE_STORAGE_KEY, {
+    validator: isScenePreference,
+    fallback: { version: 1, global: DEFAULT_SCENE_PROFILE, books: {} },
+  })
+  if (parsed) {
+    return { version: 1, global: parsed.global, books: parsed.books ?? {} }
   }
   return { version: 1, global: DEFAULT_SCENE_PROFILE, books: {} }
 }
 
 export function saveScenePreference(preference: ScenePreference): void {
-  try {
-    window.localStorage.setItem(SCENE_STORAGE_KEY, JSON.stringify(preference))
-  } catch {
-    // 持久化失败：静默（会话内仍生效）。
-  }
+  setStorageItem(SCENE_STORAGE_KEY, preference)
 }
 
 /** 有书且有 override 用 override；有书无 override 继承 global；无书用 global。 */

@@ -111,17 +111,30 @@ jobs:
       - name: Static lint gate
         run: pnpm lint
 
-      - name: Run workspace tests
-        run: pnpm test
+      # 只跑包层。web 测试移到「Build web and production server」之后：
+      # 部分 web 用例依赖 dist-server 产物，先测后建会顺序错位；且原 `pnpm test`
+      # 已含 web 测试，再单独跑一次属重复执行。此处与 ci.yml 的顺序保持一致。
+      - name: Run workspace package tests
+        run: pnpm run test:coverage:packages
 
       - name: Typecheck web and production server
         run: pnpm --filter @mozhou/web typecheck
 
       - name: Run web tests
-        run: pnpm --filter @mozhou/web test
+        run: pnpm run test:coverage:web
 
       - name: Build web and production server
         run: pnpm --filter @mozhou/web build
+
+      # 发布路径性能冒烟门：发版前压测 30 秒，确保服务在常驻并发下延迟与可用性达标。
+      # 依赖上一步产出的 apps/web/dist-server；压测未过（退出码非 0）直接阻断发包。
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1.2.2
+        with:
+          k6-version: v2.3.0
+
+      - name: K6 performance smoke release gate
+        run: pnpm perf:smoke
 
       # 发布路径真实模型自动化门：有凭据则跑真实模型端到端旅程，缺凭据则 BLOCKED 并阻断发布。
       # 刻意不放进默认 PR 门（ci.yml）——真实模型调用会产生费用，只在发布路径触发。
@@ -194,6 +207,34 @@ jobs:
           tmp="$(mktemp -d)"
           tar -xzf release-artifacts/*-docker.tar.gz -C "$tmp"
           docker build --tag mozhou-release-smoke "$tmp/docker-bundle"
+
+      # 只 build 不运行证明不了发行镜像能启动：基线换错、npm/pnpm 裁剪过度、
+      # 数据根权限或 CMD 路径失配，都会让用户拿到一个 build 成功但起不来的包。
+      - name: Smoke-test Docker release image serves /api/health
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name mozhou-release-smoke-run \
+            --env MOZHOU_SECRET_KEY="$(openssl rand -base64 48)" \
+            --env MOZHOU_DATA_ROOT=/data \
+            --publish 127.0.0.1:5189:5173 \
+            mozhou-release-smoke
+          trap 'docker rm --force mozhou-release-smoke-run >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for _ in $(seq 1 30); do
+            code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5189/api/health || true)"
+            if [ "$code" = "200" ]; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker logs mozhou-release-smoke-run || true
+            exit 1
+          fi
+          docker rm --force mozhou-release-smoke-run
+          trap - EXIT
 
       - name: Generate SHA-256 manifest
         shell: bash

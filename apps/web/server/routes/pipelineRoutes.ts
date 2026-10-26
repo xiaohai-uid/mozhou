@@ -22,6 +22,8 @@ import {
 } from '../routeCodes.js'
 import { decodeBookRequest, noOpenProductionSessionError } from '../bookRequest.js'
 import { withBookWriteLock } from '../bookAccess.js'
+
+const BOOK_WRITE_QUEUE_TIMEOUT_MS = 30_000
 import { emptyDraftStream, mockDraftStream } from './draftStreamEmulation.js'
 import {
   AcceptConflictError,
@@ -65,6 +67,7 @@ import {
   proseChapterPath,
   readBookRecord,
   readProseChapter,
+  readStyleProfiles,
   withStrictBook,
 } from '@mozhou/data-plane'
 import { createHash } from 'node:crypto'
@@ -393,13 +396,13 @@ async function makeStreamEngine(
         // 沿用既有 'deepseek' 直码档。
         provider: 'deepseek',
         mode: 'generate',
-        stream: () =>
+        stream: (streamSignal) =>
           (async function* () {
             const systemPrompt =
               '你是资深中文网文作者。输入已由墨舟 Context Compiler 按当前作品正典与章节状态装配。' +
               '严格遵守其中的事实、人物知识边界、承诺与作者指令；只输出本章正文，不复述上下文。' +
               '保持既有文风与节奏，禁止总结性陈词、禁止上帝视角预告、禁止否定排比与破折号滥用。'
-            for await (const chunk of streamOpenAiChat(effectiveEndpoint, modelPrompt, systemPrompt, signal)) {
+            for await (const chunk of streamOpenAiChat(effectiveEndpoint, modelPrompt, systemPrompt, streamSignal ?? signal)) {
               if (chunk.delta.length > 0) {
                 onDelta(chunk.delta)
                 yield chunk.delta
@@ -824,20 +827,28 @@ export const pipelineRoutes: RouteHandler = async (req, res, { path, body, json,
     const expectedRevision = typeof body['expectedRevision'] === 'number' ? body['expectedRevision'] : undefined
     const taskId = typeof body['taskId'] === 'string' ? body['taskId'] : undefined
     try {
-      const result = acceptDraft({
-        bookRoot: root,
-        candidateId,
-        base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
-        idempotencyKey,
-        bookId,
-        chapterIndex: requestedChapterIndex,
-        allowPartial,
-        confirmPartial,
-        expectedRevision,
-        operationId,
-        principalId: principal?.userId,
-        taskId,
-      })
+      // W2-3：采纳是书根内的读-改-写（候选读取 + 版本核对 + 正文更新 + 结果记录），
+      // 整段在统一书稿锁内执行——同书第二写入者排队（超时 409），不同书并发。
+      // 本段无模型等待，可整段持锁（模型等待在生成路由，锁外）。
+      const result = await withBookWriteLock(
+        root,
+        () =>
+          acceptDraft({
+            bookRoot: root,
+            candidateId,
+            base: { revision: Number(rawBase.revision), sha256: String(rawBase.sha256) },
+            idempotencyKey,
+            bookId,
+            chapterIndex: requestedChapterIndex,
+            allowPartial,
+            confirmPartial,
+            expectedRevision,
+            operationId,
+            principalId: principal?.userId,
+            taskId,
+          }),
+        { timeoutMs: BOOK_WRITE_QUEUE_TIMEOUT_MS },
+      )
       json(200, { ok: true, ...result })
     } catch (error) {
       if (error instanceof AcceptConflictError) {
@@ -978,6 +989,38 @@ function createReviewSemanticEvaluator(
   }
 }
 
+/**
+ * 生效文风档案的禁用词并集（去重、保序）。
+ *
+ * 四场景型画像全量注入生成上下文（flywheel `renderStyleSections` 把每行的
+ * `tabooWords` 渲染进 `style_profile:<scenarioType>` 结构层），因此「生效集」
+ * 就是四行并集，不存在按场景型选择的第二套判据。
+ *
+ * 读盘失败（文风.md 缺失/结构违例）原样抛出：宁败不脏——静默跳过会让禁用词
+ * 约束悄悄失效，正是本消费方要消灭的缺陷。
+ */
+function collectTabooWords(root: string): string[] {
+  const seen = new Set<string>()
+  const words: string[] = []
+  for (const row of Object.values(readStyleProfiles(root))) {
+    for (const word of row.tabooWords) {
+      const trimmed = word.trim()
+      if (trimmed.length === 0 || seen.has(trimmed)) continue
+      seen.add(trimmed)
+      words.push(trimmed)
+    }
+  }
+  return words
+}
+
+/**
+ * 禁用词是字面量而不是正则源：转义正则元字符后再交给既有红线通道，
+ * 避免 `A+B` 之类词条把 `AAAB` 也判成命中（机械门只收 regex source）。
+ */
+function escapeRegexLiteral(word: string): string {
+  return word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
   /* ---- 文学质量审查与回炉 ---- */
   if (path === '/api/chapter.review') {
     const decoded = decodeBookRequest(body, resolvedRoot, { principal })
@@ -1061,6 +1104,24 @@ function createReviewSemanticEvaluator(
     const actionBeatParagraphs = rawActionBeats ? new Set(rawActionBeats.filter((n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0)) : undefined
 
     try {
+      // 生效文风档案的禁用词接入**既有**机械门红线通道（mechanical-gates 的
+      // mech_03_redlines）：命中即 mechanicalGate.passed=false →
+      // deriveEffectiveQualityVerdict=blocking_fail → 既有拒收（session.advance 409）。
+      // 恢复路径是作者改文后重审，不是 /api/chapter.rework：机械门单挂时落账的文学
+      // verdict 仍是 pass（review-step.ts 传 report.verdict），而 requestQualityRework
+      // 只在 lastQualityVerdict=blocking_fail 时才合法；仅当文学 verdict 同为
+      // blocking_fail 时回炉才可用。不新建并行门，也不在前端拦截。
+      const tabooWords = collectTabooWords(root)
+      const mechanicalOptionsWithTaboo =
+        tabooWords.length === 0
+          ? mechanicalOptions
+          : {
+              ...(mechanicalOptions ?? {}),
+              customRedlines: [
+                ...(Array.isArray(mechanicalOptions?.customRedlines) ? mechanicalOptions.customRedlines : []),
+                ...tabooWords.map(escapeRegexLiteral),
+              ],
+            }
       const outcome = await executeChapterReview({
         bookRoot: root,
         chapterIndex,
@@ -1072,7 +1133,7 @@ function createReviewSemanticEvaluator(
         autoAbsorbCounterexamples: true,
         ...(semanticEvaluator !== undefined ? { semanticEvaluator } : {}),
         ...(actionBeatParagraphs !== undefined ? { actionBeatParagraphs } : {}),
-        ...(mechanicalOptions !== undefined ? { mechanicalOptions } : {}),
+        ...(mechanicalOptionsWithTaboo !== undefined ? { mechanicalOptions: mechanicalOptionsWithTaboo } : {}),
         // 截止时间只由宿主这一处拥有：本路由已建 AbortController + setTimeout，
         // 只传 signal；不再同时传 timeoutMs，避免同一截止时间出现两个定时器
         // （并防止内层把超时误归类成取消）。
@@ -1084,7 +1145,7 @@ function createReviewSemanticEvaluator(
 
       json(200, {
         ok: true,
-        verdict: outcome.report.verdict,
+        verdict: outcome.effectiveVerdict,
         reportId: outcome.report.reportId,
         reportPath: outcome.reportRelPath,
         draftRevision: outcome.input.revision,
@@ -1095,6 +1156,7 @@ function createReviewSemanticEvaluator(
         advisories: failed.filter((e) => e.severity === 'advisory'),
         semanticReviewer: semanticReviewerStatus,
         mechanicalGate: outcome.mechanicalGate,
+        mechanicalFailures: outcome.mechanicalGate.fails,
       })
       return true
     } catch (error) {

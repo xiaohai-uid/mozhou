@@ -162,4 +162,66 @@ describe('Session & Auth Verification (T08)', () => {
     } as unknown as IncomingMessage
     expect(() => sm.assertCsrf(invalidReq, session)).toThrow('CSRF')
   })
+
+  it('evicts oldest session when user exceeds maxSessionsPerUser', () => {
+    const sm = new SessionManager()
+    const principal = { userId: 'usr_capacity', email: 'cap@mozhou.ai' }
+    const sessions = []
+
+    // 默认上限 10 个，创建 11 个会话
+    for (let i = 0; i < 11; i++) {
+      const { session } = sm.createSession(principal)
+      sessions.push(session)
+    }
+
+    // 第 1 个（最老会话）应被自动淘汰并失效
+    const firstSession = sessions[0]!
+    expect(sm.getSession(firstSession.sessionId)).toBeNull()
+
+    // 随后的 10 个会话依然保持有效
+    for (let i = 1; i < 11; i++) {
+      const sess = sessions[i]!
+      expect(sm.getSession(sess.sessionId)).not.toBeNull()
+    }
+  })
+
+  it('passively prunes expired sessions instead of counting them against the quota', () => {
+    const sm = new SessionManager(undefined, { maxSessionsPerUser: 2 })
+    const principal = { userId: 'usr_prune', email: 'prune@mozhou.ai' }
+
+    const live = sm.createSession(principal).session
+    // 该会话在创建时就已过期：它不该占用配额，也不该把更早的有效会话挤掉。
+    sm.createSession(principal, -1000)
+    const newest = sm.createSession(principal).session
+
+    expect(sm.getSession(live.sessionId)).not.toBeNull()
+    expect(sm.getSession(newest.sessionId)).not.toBeNull()
+  })
+
+  it('evicts earliest-expiring reset code at capacity when none are consumed', () => {
+    const sm = new SessionManager(undefined, { maxResetCodes: 2 })
+    const code1 = sm.createResetCode('a@mozhou.ai', 'usr_a', 1000)
+    const code2 = sm.createResetCode('b@mozhou.ai', 'usr_b', 5000)
+    const code3 = sm.createResetCode('c@mozhou.ai', 'usr_c', 9000)
+
+    // 最早到期的 code1 被淘汰，其余仍可用
+    expect(() => sm.consumeResetCode(code1)).toThrow(/invalid or not found/)
+    expect(sm.consumeResetCode(code2).userId).toBe('usr_b')
+    expect(sm.consumeResetCode(code3).userId).toBe('usr_c')
+  })
+
+  it('keeps only the newest unconsumed reset code per email', () => {
+    const sm = new SessionManager()
+    const older = sm.createResetCode('dup@mozhou.ai', 'usr_dup', 60_000)
+    const newer = sm.createResetCode('dup@mozhou.ai', 'usr_dup', 60_000)
+
+    expect(() => sm.consumeResetCode(older)).toThrow(/invalid or not found/)
+    expect(sm.consumeResetCode(newer).userId).toBe('usr_dup')
+  })
+
+  it('rejects non-positive capacity limits instead of silently breaking the guard', () => {
+    expect(() => new SessionManager(undefined, { maxSessionsPerUser: 0 })).toThrow(/positive integer/)
+    expect(() => new SessionManager(undefined, { maxActiveSessions: -1 })).toThrow(/positive integer/)
+    expect(() => new SessionManager(undefined, { maxResetCodes: 1.5 })).toThrow(/positive integer/)
+  })
 })

@@ -27,6 +27,15 @@ function walk(dir) {
 }
 for (const r of SEARCH_ROOTS) walk(r);
 
+// 目录项顺序随文件系统变化（NTFS 与 ext4/overlayfs 不同），不排序会让生成物跨平台漂移：
+// 本机 --check 通过、Linux CI 却报 STALE（2026-10-22 推送前门实测）。
+// 用 POSIX 化后的路径做字节序比较，避免分隔符差异影响排序。
+files.sort((a, b) => {
+  const x = a.replace(/\\/g, "/");
+  const y = b.replace(/\\/g, "/");
+  return x < y ? -1 : x > y ? 1 : 0;
+});
+
 // ---------- 剥离注释与字符串字面量 ----------
 // 返回该行的「纯代码」视图；block 注释状态在行间传递。
 function codeOnly(lines, startIdx) {

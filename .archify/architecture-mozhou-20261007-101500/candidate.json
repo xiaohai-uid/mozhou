@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "墨舟 MoZhou 架构总览：本地十步创作管线与数据平面",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-mozhou-20261007-101500/mozhou.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/xiaohai-uid/mozhou.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "06a5069e39359c521fd9db4b2b3f088c5f451181"
+    },
+    "views": [
+      {
+        "id": "journey",
+        "label": "主干创作旅程",
+        "focus": ["author", "ui_shell", "api_gateway", "pipeline_engine", "llm_resolver", "runtime_engine", "model_service"],
+        "note": "作者经工作台、BFF 网关、十步事务管线与运行时执行底座完成流式生成"
+      },
+      {
+        "id": "domain",
+        "label": "领域与数据平面",
+        "focus": ["pipeline_engine", "context_compiler", "story_kernel", "quality_engine", "local_data_root", "reconciliation"],
+        "note": "上下文装配、九柱领域模型、机械门禁与正典/投影/账本落盘"
+      },
+      {
+        "id": "security",
+        "label": "安全与隔离边界",
+        "focus": ["api_gateway", "book_access", "byok_vault", "llm_resolver", "model_service"],
+        "note": "路由策略 FAIL-CLOSED、作品沙箱写锁、BYOK 加密与出站 SSRF 门"
+      },
+      {
+        "id": "deploy",
+        "label": "本地宿主与发行",
+        "focus": ["production_host", "desktop_release", "api_gateway", "local_data_root"],
+        "note": "Node 生产宿主、Tauri 桌面壳与 Windows 安装器共用同一套服务端"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "author",
+      "type": "external",
+      "label": "创作者",
+      "sublabel": "浏览器工作台 / 桌面窗口",
+      "pos": [30, 310],
+      "size": [105, 60]
+    },
+    {
+      "id": "ui_shell",
+      "type": "frontend",
+      "label": "创作工作台",
+      "sublabel": "React 视图壳 · ApiClient",
+      "pos": [205, 306],
+      "size": [160, 68],
+      "sources": [
+        { "path": "apps/web/src/App.tsx", "line": 165, "end_line": 165, "label": "视图状态路由" },
+        { "path": "apps/web/src/api/client.ts", "line": 35, "end_line": 35, "label": "MoZhouApiClient 门面" }
+      ]
+    },
+    {
+      "id": "api_gateway",
+      "type": "backend",
+      "label": "BFF 安全网关",
+      "sublabel": "ApiRouter · 路由策略白名单",
+      "pos": [455, 306],
+      "size": [175, 68],
+      "sources": [
+        { "path": "apps/web/server/router.ts", "line": 57, "end_line": 66, "label": "未登记路径默认拒绝" },
+        { "path": "apps/web/server/routePolicies.ts", "line": 24, "end_line": 44, "label": "五类路由策略表" },
+        { "path": "apps/web/server/api.ts", "line": 607, "end_line": 607, "label": "领域路由装配" }
+      ]
+    },
+    {
+      "id": "pipeline_engine",
+      "type": "backend",
+      "label": "十步事务管线",
+      "sublabel": "ChapterProductionSession · 全局单飞",
+      "pos": [700, 296],
+      "size": [250, 88],
+      "sources": [
+        { "path": "packages/pipeline/src/steps.ts", "line": 11, "end_line": 22, "label": "十步步进词表" },
+        { "path": "packages/pipeline/src/session.ts", "line": 235, "end_line": 235, "label": "会话状态机" },
+        { "path": "apps/web/server/routes/pipelineRoutes.ts", "line": 433, "end_line": 433, "label": "会话开卷端点" }
+      ]
+    },
+    {
+      "id": "llm_resolver",
+      "type": "backend",
+      "label": "生成目标解析缝",
+      "sublabel": "注册表 → BYOK → 带原因不可用",
+      "pos": [1034, 306],
+      "size": [180, 68],
+      "sources": [
+        { "path": "apps/web/server/llm/generationTarget.ts", "line": 218, "end_line": 218, "label": "单一解析缝" },
+        { "path": "apps/web/server/llm/tierRouting.ts", "line": 152, "end_line": 165, "label": "端点身份 = providerId" }
+      ]
+    },
+    {
+      "id": "runtime_engine",
+      "type": "backend",
+      "label": "运行时执行底座",
+      "sublabel": "能力注册表 · attempts/fallback",
+      "pos": [1324, 306],
+      "size": [175, 68],
+      "sources": [
+        { "path": "packages/runtime/src/engine.ts", "line": 132, "end_line": 158, "label": "引擎与绑定注册" },
+        { "path": "packages/pipeline/src/draft-step.ts", "line": 482, "end_line": 482, "label": "draft 步调用 engine.execute" }
+      ]
+    },
+    {
+      "id": "model_service",
+      "type": "cloud",
+      "label": "OpenAI 兼容上游",
+      "sublabel": "DeepSeek 默认 · SSE 流式",
+      "tag": "需自备 Key",
+      "pos": [1324, 520],
+      "size": [175, 64],
+      "sources": [
+        { "path": "apps/web/server/llm/openaiStream.ts", "line": 130, "end_line": 140, "label": "出站 SSRF 门" },
+        { "path": "apps/web/server/llm/openaiStream.ts", "line": 149, "end_line": 149, "label": "DNS 解析后复核" }
+      ]
+    },
+    {
+      "id": "context_compiler",
+      "type": "backend",
+      "label": "上下文装配编译器",
+      "sublabel": "两阶段预算 · 精确 Tokenizer · 收据",
+      "pos": [610, 60],
+      "size": [165, 64],
+      "sources": [
+        { "path": "packages/context-compiler/src/assemble.ts", "line": 399, "end_line": 415, "label": "预算装配主入口" },
+        { "path": "packages/context-compiler/src/assemble.ts", "line": 126, "end_line": 149, "label": "配置默认表" }
+      ]
+    },
+    {
+      "id": "story_kernel",
+      "type": "backend",
+      "label": "故事内核",
+      "sublabel": "九柱领域实体 · 因果契约",
+      "pos": [795, 60],
+      "size": [165, 64],
+      "sources": [
+        { "path": "packages/kernel/src/kernel-schema.ts", "line": 114, "end_line": 114, "label": "实体种类枚举" },
+        { "path": "packages/kernel/src/causal-contract.ts", "line": 42, "end_line": 42, "label": "因果契约实体" },
+        { "path": "packages/kernel/src/causal-contract.ts", "line": 121, "end_line": 121, "label": "契约审计" }
+      ]
+    },
+    {
+      "id": "quality_engine",
+      "type": "backend",
+      "label": "质量门禁引擎",
+      "sublabel": "5 项机械门 · 4-gram 去复读",
+      "pos": [700, 520],
+      "size": [170, 64],
+      "sources": [
+        { "path": "packages/quality-engine/src/mechanical-gates.ts", "line": 148, "end_line": 148, "label": "机械门判定入口" },
+        { "path": "packages/quality-engine/src/mechanical-gates.ts", "line": 21, "end_line": 31, "label": "AI 红线正则表" },
+        { "path": "packages/quality-engine/src/mechanical-gates.ts", "line": 111, "end_line": 111, "label": "4-gram 重复检测" }
+      ]
+    },
+    {
+      "id": "book_access",
+      "type": "security",
+      "label": "作品沙箱与写锁",
+      "sublabel": "排他启动锁 · 每书 FIFO 队列",
+      "pos": [200, 520],
+      "size": [175, 64],
+      "sources": [
+        { "path": "apps/web/server/bookAccess.ts", "line": 110, "end_line": 129, "label": "数据根排他锁" },
+        { "path": "apps/web/server/bookAccess.ts", "line": 221, "end_line": 226, "label": "每书并发队列" }
+      ]
+    },
+    {
+      "id": "byok_vault",
+      "type": "security",
+      "label": "BYOK 凭据仓储",
+      "sublabel": "scrypt + AES-256-GCM",
+      "tag": "缺钥拒启",
+      "pos": [1034, 520],
+      "size": [180, 64],
+      "sources": [
+        { "path": "apps/web/server/llm/providerSettings.ts", "line": 76, "end_line": 88, "label": "主密钥派生" },
+        { "path": "apps/web/server/llm/providerSettings.ts", "line": 111, "end_line": 111, "label": "生产缺钥拒绝启动" },
+        { "path": "apps/web/server/llm/providerSettings.ts", "line": 61, "end_line": 61, "label": "加密算法常量" }
+      ]
+    },
+    {
+      "id": "local_data_root",
+      "type": "database",
+      "label": "本地数据根",
+      "sublabel": "正典 Markdown · SQLite WAL 投影 · events.jsonl",
+      "tag": "MOZHOU_DATA_ROOT",
+      "pos": [800, 700],
+      "size": [240, 68],
+      "sources": [
+        { "path": "packages/data-plane/src/atomic-write.ts", "line": 42, "end_line": 52, "label": "原子落盘唯一出口" },
+        { "path": "packages/data-plane/src/database.ts", "line": 19, "end_line": 19, "label": "WAL 打开投影库" },
+        { "path": "packages/runtime/src/eventBus.ts", "line": 175, "end_line": 175, "label": "PublishBus 单口追加账本" }
+      ]
+    },
+    {
+      "id": "reconciliation",
+      "type": "backend",
+      "label": "外部对账宿主",
+      "sublabel": "启动必检 + 运行期 watcher",
+      "pos": [1160, 700],
+      "size": [185, 64],
+      "sources": [
+        { "path": "apps/web/server/routes/reconciliationRoutes.ts", "line": 243, "end_line": 243, "label": "数据根启动必检" },
+        { "path": "apps/web/server/routes/reconciliationRoutes.ts", "line": 270, "end_line": 270, "label": "书根解析自动挂接" }
+      ]
+    },
+    {
+      "id": "production_host",
+      "type": "cloud",
+      "label": "Node 生产宿主",
+      "sublabel": "127.0.0.1:5173 · 优雅停机",
+      "tag": "仅回环监听",
+      "pos": [455, 520],
+      "size": [185, 64],
+      "sources": [
+        { "path": "apps/web/server/productionServer.ts", "line": 26, "end_line": 26, "label": "默认回环监听" },
+        { "path": "apps/web/server/productionServer.ts", "line": 37, "end_line": 37, "label": "缺主密钥拒绝启动" },
+        { "path": "apps/web/server/productionServer.ts", "line": 40, "end_line": 40, "label": "进程级排他启动锁" }
+      ]
+    },
+    {
+      "id": "desktop_release",
+      "type": "external",
+      "label": "本地桌面发行面",
+      "sublabel": "Tauri 壳 · Windows 安装器",
+      "tag": "安装器未签名",
+      "pos": [455, 700],
+      "size": [175, 64],
+      "sources": [
+        { "path": "src-tauri/src/main.rs", "line": 40, "end_line": 46, "label": "启动服务并健康探测" },
+        { "path": "src-tauri/src/server_manager.rs", "line": 184, "end_line": 219, "label": "子进程托管与 Job Object" },
+        { "path": "scripts/release/windows/desktop-server.mjs", "line": 1, "end_line": 20, "label": "安装包内启动入口" }
+      ]
+    }
+  ],
+  "connections": [
+    { "id": "author-to-ui", "from": "author", "to": "ui_shell", "label": "创作交互", "variant": "emphasis" },
+    { "id": "ui-to-gateway", "from": "ui_shell", "to": "api_gateway", "label": "POST /api/*" },
+    { "id": "gateway-to-pipeline", "from": "api_gateway", "to": "pipeline_engine", "label": "路由分发" },
+    { "id": "pipeline-to-resolver", "from": "pipeline_engine", "to": "llm_resolver", "label": "解析生成目标" },
+    { "id": "resolver-to-runtime", "from": "llm_resolver", "to": "runtime_engine", "label": "providerId 绑定" },
+    { "id": "runtime-to-model", "from": "runtime_engine", "to": "model_service", "label": "SSE 流式", "fromSide": "bottom", "toSide": "top" },
+    { "id": "pipeline-to-compiler", "from": "pipeline_engine", "to": "context_compiler", "label": "预算装配", "fromSide": "top", "toSide": "bottom" },
+    { "id": "pipeline-to-kernel", "from": "pipeline_engine", "to": "story_kernel", "label": "事实抽取", "fromSide": "top", "toSide": "bottom" },
+    { "id": "resolver-to-byok", "from": "llm_resolver", "to": "byok_vault", "label": "解密出站凭据", "fromSide": "bottom", "toSide": "top" },
+    { "id": "gateway-to-bookaccess", "from": "api_gateway", "to": "book_access", "label": "租户校验 · 写锁", "fromSide": "bottom", "toSide": "top" },
+    { "id": "pipeline-to-quality", "from": "pipeline_engine", "to": "quality_engine", "label": "质量审查步进", "fromSide": "bottom", "toSide": "top" },
+    { "id": "pipeline-to-data", "from": "pipeline_engine", "to": "local_data_root", "label": "定稿原子落盘", "fromSide": "bottom", "toSide": "top" },
+    { "id": "runtime-to-data", "from": "runtime_engine", "to": "local_data_root", "label": "生成事件追加", "fromSide": "bottom", "toSide": "right" },
+    { "id": "recon-to-data", "from": "reconciliation", "to": "local_data_root", "label": "外部修改检出", "fromSide": "left", "toSide": "right" },
+    { "id": "host-to-gateway", "from": "production_host", "to": "api_gateway", "label": "承载 HTTP 服务", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "id": "release-to-host", "from": "desktop_release", "to": "production_host", "label": "启动本地服务", "variant": "dashed", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "主干旅程：一章的十步生产（已实现）",
+      "items": [
+        "十步词表固定为 prepare → compile → draft → review → user_edit → final_extract → continuity_gate → canon_proposal → commit → flywheel_record；每步转换是一条账本任务事件，当前步可随时从投影恢复",
+        "一个 ChapterProductionSession 对应一章，同书同时最多一个活动会话（全局单飞）；回环重走只由作者显式动作驱动，不由管线自行回炉",
+        "网关对每条 /api/ 请求先查路由策略，未登记路径直接 403 UNREGISTERED_ROUTE_POLICY；hosted 模式下 local-native 端点同样 403",
+        "生成目标解析收敛为一条缝：注册表 → BYOK → 带原因的不可用。端点身份 = providerId，账本记的 providerId 必然就是实际服务的那一个"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "上下文装配与质量门禁（已实现）",
+      "items": [
+        "两阶段 Reserved 预算：输出预留、结构层与正文保底配额都不参与竞争；竞争池按 desirability 全序（pinned > tierRank > relevanceScore > id）序贯预订，入选即「装得下的最长前缀」",
+        "精确 Tokenizer 是唯一计量权威，未注入即抛 TokenizerUnavailable——无精确计量器的模型拒绝装配，绝不降级为估算",
+        "装配是纯函数：同输入必产出逐字节相同的 packet 与 receipt；receipt 携带 recomputationHash 与 replayInputs，可离线复算",
+        "放置收敛超限时抛 ConvergenceError（fail loudly），victim 恒取 desirability 最低者，绝不静默截正文；质量侧另有 5 项机械门与 4-gram 复读检测"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "数据平面：正典为真源，投影可弃（已实现）",
+      "items": [
+        "落盘唯一出口 atomicWriteFileSync：同目录唯一临时文件 → 写全循环 → fsync → close → rename。rename 是唯一可见点，掉电最多丢本次写入，不会留下半份文件",
+        "SQLite 以 WAL 打开；runtime.sqlite 是可丢弃投影，可由正典确定性重建（rebuildProjectionFromCanon），基线损坏也能由 canon 重算",
+        "events.jsonl 是单一 append 真源，由 PublishBus 单口写入；管线侧同账读两种行格式（任务事件行与平铺领域行），撕裂行跳过、以数组位为权威时序",
+        "数据根由 MOZHOU_DATA_ROOT 统一解析，空串与纯空白视为未设置——防止部署模板留空时把书稿写回可丢的镜像层"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "安全与隔离边界（已实现）",
+      "items": [
+        "路由策略五类：public / account / book / local-native / payment-webhook；未知路径 FAIL-CLOSED，hosted 模式禁止 local-native",
+        "作品级隔离：数据根排他启动锁防止同目录多实例争夺，每书 FIFO 并发队列防脏写，书根 realpath 必须落在当前用户目录内、禁止符号链接穿出",
+        "BYOK 主密钥由 scrypt 派生，凭据以 AES-256-GCM 加密落盘；生产或 hosted 环境缺 MOZHOU_SECRET_KEY 直接 exit 1，本地单机保留零配置回退",
+        "出站 SSRF 门：协议白名单 + 字面 IP/本机名判定 + DNS 解析结果复核，拒绝私有、环回、链路本地与保留地址，并禁止自动跟随重定向"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "已实现且留有本地取证",
+      "items": [
+        "真实模型链路：evidence/real-model-journey 留有 status=VERIFIED 的端到端取证（建书 → 建章 → 真实流式生成 → 采纳候选 → 定稿提交），start 帧自报 provider=real-openai-compatible",
+        "长篇连续性：31/31 章跨卷端到端连续生产全绿，服务重启前后数据一致（evidence/longform-journey）",
+        "桌面壳：Tauri 原生 Release 二进制实测约 8.44MB；Windows 安装器静默安装退出码 0，重启后 /api/health 返回 200 且原作品仍可打开",
+        "工程门禁：根 pnpm test 串联包层与 Web 层 vitest，pnpm graph:check 经 .gitnexus/run.cjs 执行依赖环检查，当前 status=clean、cycleCount=0"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "未验证与未开放边界（诚实清单）",
+      "items": [
+        "支付渠道：微信 APIv3 与支付宝 RSA2 异步通知的验签、订单与配额结算已实现（billingRoutes.ts:105,124），但真实商户网关与实收款项未在线上实测",
+        "云同步：/api/cloud-sync 如实返回 cloudSyncAvailable: false 与 syncStatus=offline_ready，云同步/云备份未作为本 Release 能力发布",
+        "Windows 安装器未做代码签名，对外发布前仍需代码签名、下载渠道、升级路径与独立 Windows 机器复验",
+        "日常 pnpm test 默认零真实模型调用（真实用例 skipped），商业上游的生成质量与成本未全面实测；Tauri 桌面形态与安装器是两条并行发行面，尚未合并为单一交付物"
+      ]
+    }
+  ]
+}

@@ -22,6 +22,8 @@ export interface QualitySummary {
   readonly semanticReviewer?: 'unavailable' | 'attached'
   readonly blockingFailures?: readonly EvaluationView[]
   readonly advisories?: readonly EvaluationView[]
+  /** 机械门失败项（D1）：与文学 blockingFailures 分开呈现，任一失败即阻断前进。 */
+  readonly mechanicalFailures?: readonly string[]
 }
 
 interface EvaluationView {
@@ -345,6 +347,16 @@ export function QualityPanel({ root, chapterIndex }: { root: string; chapterInde
                     {evidence.excerpt !== undefined && <q> {evidence.excerpt}</q>}
                   </p>
                 ))}
+              </div>
+            ))}
+          </div>
+        )}
+        {(summary?.mechanicalFailures?.length ?? 0) > 0 && (
+          <div>
+            <h4 className="mono muted" style={{ margin: '12px 0 4px' }}>MECHANICAL GATE FAILURES（机械门，阻断）</h4>
+            {summary?.mechanicalFailures?.map((failure, index) => (
+              <div className="finding" key={index}>
+                <p style={{ margin: 0 }}>{failure}</p>
               </div>
             ))}
           </div>

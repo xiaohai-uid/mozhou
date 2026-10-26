@@ -24,6 +24,7 @@ import {
   ChapterProductionSession,
   ChapterReviewCancelledError,
   ChapterReviewTimeoutError,
+  MechanicalGateNotPassedError,
   NoCompiledReceiptAnchorError,
   acceptDraft,
   defaultReviewCapabilityExecutor,
@@ -350,6 +351,47 @@ describe('ADR-0025 runReviewStep：版本绑定审查报告', () => {
     expect(outcome.harvestedQuotesCount).toBeGreaterThanOrEqual(1);
     expect(session.currentStep).toBe('review');
     expect(session.project().lastQualityVerdict).toBe('pass')
+  });
+
+  it('D1：机械门失败时 review→user_edit 必须被拒，即使文学 verdict=pass', async () => {
+    const root = hermeticBook();
+    const bus = new PublishBus();
+    const session = ChapterProductionSession.start({
+      bus,
+      root,
+      chapterIndex: 3,
+      newTaskRef: () => 'tsk_d1_mechanical',
+    });
+    session.advance('compile');
+    session.advance('draft');
+
+    const ctx = draftEngine(root, ['短章。\n']);
+    await runDraftStep({
+      engine: ctx.engine,
+      bookRoot: root,
+      chapterIndex: 3,
+      packet: PACKET,
+      recipe: RECIPE,
+    });
+    acceptDraftOf(root, ctx);
+
+    const outcome = await executeChapterReview({
+      bookRoot: root,
+      chapterIndex: 3,
+      session,
+      receiptId: 'rcpt_d1_mechanical',
+      // 空规则集：本用例隔离机械门，确保文学 verdict 为 pass。
+      policy: { schemaVersion: 1, projectId: '核检之书', rules: [], maxAutomaticReworks: 2 },
+      reviewer: REVIEWER,
+      mechanicalOptions: { minWords: 2000, maxWords: 6000 },
+    });
+
+    expect(outcome.report.verdict).toBe('pass');
+    expect(outcome.mechanicalGate.passed).toBe(false);
+    expect(outcome.effectiveVerdict).toBe('blocking_fail');
+    expect(session.project().lastQualityVerdict).toBe('pass');
+    expect(session.project().lastMechanicalPassed).toBe(false);
+    expect(() => session.advance('user_edit')).toThrowError(MechanicalGateNotPassedError);
   });
 
   it('D10：没有编译凭证锚点时拒答，绝不编造 receiptId 落盘', async () => {

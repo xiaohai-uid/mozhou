@@ -146,7 +146,7 @@ docker compose ps          # 等待 mozhou 变为 healthy
 |---|---|
 | 公网 / 多用户部署不可用 | 生产服务器只接受 loopback 的 `Host`/`Origin`，域名或反代后每个 `/api/*` 都会被判 `UNTRUSTED_HOST` 拒绝。`deploy/README.md` 的 hosted 路径因此当前不可用。 |
 | 付费通道未开放 | 会员支付与许可证激活尚未作为可用能力发布；代码内的 billing 对账 worker 无调度器驱动。 |
-| 原生安装器未发布 | 不提供 Windows/macOS 签名安装器；Tauri 原生安装与代码签名是独立发布面。 |
+| 签名安装器未发布 | 本地未签名安装器已提供（README 方式二）；Windows/macOS 签名与下载渠道仍未发布。Tauri 为 legacy 死路径，Electron 迁移见 ADR-0037。 |
 | 无外部 APM / 指标 | 见 §5。 |
 
 ## 8. 上线前核对

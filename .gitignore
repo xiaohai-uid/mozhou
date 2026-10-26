@@ -21,6 +21,10 @@
 apps/web/.mozhou_data/
 dist/
 dist-server/
+coverage/
+coverage-negative/
+# Serena 会话缓存与项目配置（本机工具产物）
+.serena/
 target/
 src-tauri/target/
 # Tauri 生成的 ACL 能力清单与运行期自描述文件，每次构建/启动重新生成
@@ -39,9 +43,17 @@ scripts/embedding-calib/fp32-model/
 .dsh-audit/
 artifacts/
 .tmp-vite-build/
+packages/benchmark/promptfoo/eval-results.json
+navigation-acceptance-report.json
+.archify/**/visual-check/
+.archify/**/*.png
+.archify/**/*.backup.json
+.archify/**/candidate.*.json
+.npmrc
 # 模型旅程证据逐轮追加、含完整生成文本；已追踪的 R-fixes 等既有证据保留入库
 evidence/*
 !evidence/R-fixes/
+!evidence/facts-review-119/
 # Windows 设备名误建的文件
 nul
 
@@ -59,3 +71,8 @@ review-result.json
 *.crt
 *.p12
 *.pfx
+
+# Repomix 生成的技能参考包：整仓源码快照（约 2.1MB），每次源码改动即过期。
+# 配置 repomix.config.json 入库以便随时重建；快照本身留在本地。
+.claude/skills/repomix-reference-mozhou/
+repomix-output.xml

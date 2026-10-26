@@ -25,12 +25,16 @@ if [ -n "${global_dir:-}" ] && [ -f "$global_dir/pre-commit" ]; then
 fi
 
 # ── 2) 本仓快速门 ────────────────────────────────────────────────────────
-echo "[pre-commit] 快速检查：术语 / 门清单（含在 CI 列一致性）/ 包 README / 静态导入环"
+echo "[pre-commit] 快速检查：术语 / 门清单（含在 CI 列一致性）/ 包 README / 静态导入环 / 证据脚本卫生"
 node scripts/verify-glossary.mjs || exit 1
 node scripts/verify-gates-contract.mjs || exit 1
 node scripts/check-gates-ci-column.mjs || exit 1
 node scripts/verify-package-readmes.mjs || exit 1
 node scripts/check-import-cycles.mjs || exit 1
+# 2026-10-12 复盘补：禁短 HEAD 与写死的 'PASS' 结论（两者都真实制造过错误结论）。
+node scripts/check-evidence-hygiene.mjs || exit 1
+# 2026-10-18 复盘补：白名单对账门（秒级拦截未登记新目录，防 fatal parsing error 隐匿）。
+node scripts/check-lint-whitelist.mjs || exit 1
 
 # ── 3) 生成物新鲜度：按**索引**判定，因此可以阻断 ────────────────────────
 # 直接在工作区跑 --check 会把他人未提交的改动算成陈旧，只能降级为告警；而告警挡不住

@@ -32,6 +32,13 @@ export interface CreateOrderParams {
   readonly customOrderId?: string | undefined
 }
 
+export interface GrantManualEntitlementParams {
+  readonly userId: string
+  readonly planId: PlanId
+  /** 授权天数，缺省 30（与 createOrder 的月度周期同口径）。 */
+  readonly durationDays?: number
+}
+
 interface OrderRow {
   order_id: string
   user_id: string
@@ -349,6 +356,53 @@ export class BillingStore {
       const updated = db.prepare<[string], OrderRow>('SELECT * FROM orders WHERE order_id = ?').get(orderId)
       return this.mapOrderRow(updated!)
     })()
+  }
+
+  /**
+   * 运营手动授予权益（员工测试账户等非支付场景）：
+   * - 直接写入 entitlement_grants，order_id 用 manual_ 前缀与支付履约单区分，
+   *   该前缀即事后在 billing.sqlite 里的检索审计锚点；
+   * - planId 校验与支付下单同口径，只接受 catalog 冻结的两个套餐；
+   * - 不创建订单、不记 payment_events：这不是支付事件，混入会污染对账。
+   */
+  grantManualEntitlement(params: GrantManualEntitlementParams): EntitlementGrant {
+    const db = this.getDb()
+    const { userId, planId } = params
+
+    if (!userId || userId.trim() === '') {
+      throw new RequestBoundaryError(400, 'INVALID_USER', 'INVALID_USER: userId required for manual grant')
+    }
+    if (planId !== 'pro_monthly' && planId !== 'max_monthly') {
+      throw new RequestBoundaryError(400, 'INVALID_PLAN', `INVALID_PLAN: invalid planId: ${String(planId)}`)
+    }
+    let durationDays = 30
+    if (params.durationDays !== undefined) {
+      if (!Number.isInteger(params.durationDays) || params.durationDays < 1) {
+        throw new RequestBoundaryError(400, 'INVALID_DURATION', 'INVALID_DURATION: durationDays must be a positive integer')
+      }
+      durationDays = params.durationDays
+    }
+
+    const now = new Date()
+    const periodStart = now.toISOString()
+    const periodEnd = new Date(now.getTime() + durationDays * 24 * 3600 * 1000).toISOString()
+    const grantId = 'grt_' + randomBytes(16).toString('hex')
+    const manualOrderId = 'manual_' + randomBytes(12).toString('hex')
+
+    db.prepare(`
+      INSERT INTO entitlement_grants (grant_id, order_id, user_id, plan_id, period_start, period_end, granted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(grantId, manualOrderId, userId, planId, periodStart, periodEnd, periodStart)
+
+    return {
+      grantId,
+      orderId: manualOrderId,
+      userId,
+      planId,
+      periodStart,
+      periodEnd,
+      grantedAt: periodStart,
+    }
   }
 
   getActiveGrantForUser(userId: string): EntitlementGrant | null {

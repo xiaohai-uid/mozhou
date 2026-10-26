@@ -132,6 +132,13 @@ export interface PromptfooGeneratedCase {
     readonly type: 'not-contains' | 'not-regex' | 'javascript';
     readonly value: string;
   }[];
+  /** 未取得显示名、因而不生成断言的角色（EntityRef 形式）。缺省表示断言完整。 */
+  readonly unresolvedDeadCharacters?: readonly string[] | undefined;
+}
+
+/** 把字面文本转义成可安全嵌入正则的字面量（名字里可能带 `.`、`(` 等元字符）。 */
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -166,10 +173,17 @@ export function generateContinuityAssertionsFromCanon(
 
 /**
  * 将正史派生的连续性规则导出为标准 Promptfoo 测试用例（用于 CI 与离线模型回归）。
+ *
+ * `deadCharacterNames` 是 EntityRef → 该角色在正文中出现的**字面名**（通常取实体卡的
+ * `name` 与 `kind: 'exact'` 的 aliases；regex 型别名不在本函数范围内）。**必须提供**：
+ * 只凭 ref 剥出的 `wang-lin` 这类 slug 匹配不到中文正文，硬编会得到一条永不触发的
+ * 空转断言。拿不到名字的角色不生成断言，改记入 `unresolvedDeadCharacters`，让缺口
+ * 可见，而不是静默通过。
  */
 export function exportPromptfooTestCaseFromCanon(
   options: ContinuityAssertionOptions,
   chapterTitle: string,
+  deadCharacterNames?: Readonly<Record<string, readonly string[]>>,
 ): PromptfooGeneratedCase {
   const asserts: { type: 'not-contains' | 'not-regex' | 'javascript'; value: string }[] = [];
 
@@ -181,10 +195,19 @@ export function exportPromptfooTestCaseFromCanon(
     }
   }
 
+  const unresolvedDeadCharacters: string[] = [];
   if (options.deadCharacters && options.deadCharacters.length > 0) {
     for (const dead of options.deadCharacters) {
-      const name = dead.replace('char:', '');
-      asserts.push({ type: 'not-regex', value: `${name}(?:推门|冷笑|说道|拔剑|站起身|抱拳)` });
+      const names = (deadCharacterNames?.[dead] ?? [])
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0);
+      if (names.length === 0) {
+        unresolvedDeadCharacters.push(dead);
+        continue;
+      }
+      for (const name of new Set(names)) {
+        asserts.push({ type: 'not-regex', value: `${escapeRegex(name)}(?:推门|冷笑|说道|拔剑|站起身|抱拳)` });
+      }
     }
   }
 
@@ -204,6 +227,7 @@ export function exportPromptfooTestCaseFromCanon(
       prompt: `撰写第 ${options.currentChapterIndex} 章《${chapterTitle}》核心场景正文。`,
     },
     assert: asserts,
+    ...(unresolvedDeadCharacters.length > 0 ? { unresolvedDeadCharacters } : {}),
   };
 }
 

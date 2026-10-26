@@ -1,0 +1,901 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "墨舟 MoZhou 架构审查：十步会话状态机、智能体工具层与双写事件账本",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-mozhou-20261019-220707/mozhou.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/xiaohai-uid/mozhou.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "285cdc9fbe40671a1d8dc39d689e581cccacbdd8"
+    },
+    "views": [
+      {
+        "id": "journey",
+        "label": "主干：作者一章生成、存储适配与正典采纳",
+        "focus": [
+          "author",
+          "desktop_shell",
+          "workbench_ui",
+          "storage_adapter",
+          "api_gateway",
+          "pipeline",
+          "runtime",
+          "model_endpoint"
+        ],
+        "note": "作者经 Electron 桌面壳与工作台驱动十步状态机；browserStorage 统一接管草稿落盘，流式生成并采纳正典"
+      },
+      {
+        "id": "steps",
+        "label": "步内协作与智能体工具层",
+        "focus": [
+          "pipeline",
+          "context_compiler",
+          "quality_engine",
+          "flywheel",
+          "agent_layer",
+          "doc_importer",
+          "data_plane"
+        ],
+        "note": "compile 召回装配、review 机械核检、flywheel 风格学习、ToolRegistry 智能体工具与 DOCX/TXT 稿件导入分章"
+      },
+      {
+        "id": "truth",
+        "label": "双写事件账本与本地正典数据",
+        "focus": [
+          "pipeline",
+          "data_plane",
+          "kernel",
+          "ledger",
+          "canon_store",
+          "runtime_area",
+          "recycle_store"
+        ],
+        "note": "PublishBus 任务发布与 DataPlane 领域提交双写同一 events.jsonl；正典目录原子落盘，回收站管理 .mozhou/trash"
+      },
+      {
+        "id": "guards",
+        "label": "回环限制与出站安全防线",
+        "focus": [
+          "api_gateway",
+          "session_auth",
+          "book_access",
+          "credential_vault",
+          "ssrf_gate",
+          "model_endpoint"
+        ],
+        "note": "assertTrustedRequest 回环门、本地单机主体、每书 FIFO 写锁沙箱、AES-256-GCM 凭据库与出站 Host/DNS 绑定"
+      },
+      {
+        "id": "external",
+        "label": "外部编辑与正典对账",
+        "focus": [
+          "external_editor",
+          "canon_store",
+          "data_plane",
+          "api_gateway"
+        ],
+        "note": "Obsidian 直改正典 Markdown 文件，由对账路由检出并走提案裁决，不污染工作台在线生成上下文"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "author",
+      "type": "external",
+      "label": "创作者",
+      "sublabel": "桌面作者 / 浏览器",
+      "pos": [
+        30,
+        40
+      ],
+      "size": [
+        130,
+        64
+      ]
+    },
+    {
+      "id": "external_editor",
+      "type": "external",
+      "label": "Obsidian 外部编辑",
+      "sublabel": "正典 Markdown 直改",
+      "pos": [
+        30,
+        740
+      ],
+      "size": [
+        130,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/routes/reconciliationRoutes.ts",
+          "line": 45
+        }
+      ]
+    },
+    {
+      "id": "desktop_shell",
+      "type": "frontend",
+      "label": "Electron 桌面壳",
+      "sublabel": "宿主生命周期 · 探活",
+      "pos": [
+        190,
+        40
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "desktop/main.mjs",
+          "line": 36
+        },
+        {
+          "path": "desktop/lib/server-process.mjs",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "workbench_ui",
+      "type": "frontend",
+      "label": "创作工作台",
+      "sublabel": "React 视图壳 · 状态切片",
+      "pos": [
+        190,
+        180
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/src/App.tsx",
+          "line": 46
+        },
+        {
+          "path": "apps/web/src/api/client.ts",
+          "line": 35
+        }
+      ]
+    },
+    {
+      "id": "session_auth",
+      "type": "security",
+      "label": "会话与身份校验",
+      "sublabel": "本地单机主体 · 签名校验",
+      "pos": [
+        190,
+        320
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/auth/session.ts",
+          "line": 18
+        },
+        {
+          "path": "apps/web/server/router.ts",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "book_access",
+      "type": "security",
+      "label": "作品沙箱与写锁",
+      "sublabel": "每书单飞 · FIFO 写队列",
+      "pos": [
+        190,
+        460
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/bookAccess.ts",
+          "line": 276
+        }
+      ]
+    },
+    {
+      "id": "kernel",
+      "type": "backend",
+      "label": "领域内核",
+      "sublabel": "九柱模型 · 领域事件词表",
+      "pos": [
+        190,
+        600
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/kernel/src/domain-events.ts",
+          "line": 16
+        }
+      ]
+    },
+    {
+      "id": "canon_store",
+      "type": "database",
+      "label": "正典文件目录",
+      "sublabel": "正文 / 设定 / 追踪",
+      "pos": [
+        190,
+        740
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 93
+        }
+      ]
+    },
+    {
+      "id": "storage_adapter",
+      "type": "frontend",
+      "label": "统一存储适配器",
+      "sublabel": "browserStorage · 内存回退",
+      "pos": [
+        380,
+        40
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/src/shell/storage/browserStorage.ts",
+          "line": 12
+        },
+        {
+          "path": "apps/web/src/shell/storage/browserStorage.ts",
+          "line": 248
+        }
+      ]
+    },
+    {
+      "id": "api_gateway",
+      "type": "backend",
+      "label": "API 分发网关",
+      "sublabel": "ApiRouter · 回环拦截",
+      "pos": [
+        380,
+        180
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/api.ts",
+          "line": 7
+        },
+        {
+          "path": "apps/web/server/router.ts",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "十步会话状态机",
+      "sublabel": "ChapterProductionSession",
+      "pos": [
+        380,
+        320
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/pipeline/src/steps.ts",
+          "line": 11
+        },
+        {
+          "path": "packages/pipeline/src/session.ts",
+          "line": 252
+        }
+      ]
+    },
+    {
+      "id": "runtime",
+      "type": "backend",
+      "label": "生成执行引擎",
+      "sublabel": "RuntimeEngine",
+      "pos": [
+        380,
+        460
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/runtime/src/engine.ts",
+          "line": 139
+        },
+        {
+          "path": "packages/pipeline/src/draft-step.ts",
+          "line": 480
+        }
+      ]
+    },
+    {
+      "id": "data_plane",
+      "type": "backend",
+      "label": "数据平面",
+      "sublabel": "prepare/commit · 原子落盘",
+      "pos": [
+        380,
+        600
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/chapter.ts",
+          "line": 18
+        },
+        {
+          "path": "packages/data-plane/src/layout.ts",
+          "line": 93
+        }
+      ]
+    },
+    {
+      "id": "ledger",
+      "type": "database",
+      "label": "事件账本 (双写)",
+      "sublabel": ".mozhou/events.jsonl",
+      "pos": [
+        380,
+        740
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/runtime/src/eventBus.ts",
+          "line": 129
+        },
+        {
+          "path": "packages/data-plane/src/chapter.ts",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "agent_layer",
+      "type": "backend",
+      "label": "智能体工具层",
+      "sublabel": "ToolRegistry · 路径策略",
+      "pos": [
+        580,
+        180
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/agent/registry.ts",
+          "line": 20
+        },
+        {
+          "path": "apps/web/server/routes/agentRoutes.ts",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "id": "context_compiler",
+      "type": "backend",
+      "label": "上下文编译器",
+      "sublabel": "compile 步 · 召回装配",
+      "pos": [
+        580,
+        320
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/context-compiler/src/compile.ts",
+          "line": 100
+        }
+      ]
+    },
+    {
+      "id": "quality_engine",
+      "type": "backend",
+      "label": "质量引擎",
+      "sublabel": "review 步 · 机械门",
+      "pos": [
+        580,
+        460
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/quality-engine/src/mechanical-gates.ts",
+          "line": 13
+        },
+        {
+          "path": "packages/pipeline/src/review-step.ts",
+          "line": 161
+        }
+      ]
+    },
+    {
+      "id": "runtime_area",
+      "type": "database",
+      "label": "非正典运行时区",
+      "sublabel": ".mozhou/ receipts/trash",
+      "pos": [
+        580,
+        600
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/chapter.ts",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "doc_importer",
+      "type": "backend",
+      "label": "既有稿件导入",
+      "sublabel": "DOCX/TXT/MD 智能分章",
+      "pos": [
+        770,
+        40
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/data-plane/src/import/document-importer.ts",
+          "line": 32
+        },
+        {
+          "path": "packages/data-plane/src/import/chapter-splitter.ts",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "recycle_store",
+      "type": "backend",
+      "label": "工作区回收站",
+      "sublabel": "RecycleStore · 软删排空",
+      "pos": [
+        770,
+        180
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/recycle/recycleStore.ts",
+          "line": 81
+        },
+        {
+          "path": "apps/web/server/routes/recycleRoutes.ts",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "id": "flywheel",
+      "type": "backend",
+      "label": "风格飞轮",
+      "sublabel": "record 步 · 学习核",
+      "pos": [
+        770,
+        320
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "packages/flywheel/src/style-learner.ts",
+          "line": 2
+        },
+        {
+          "path": "packages/pipeline/src/record-step.ts",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "id": "credential_vault",
+      "type": "security",
+      "label": "凭据保险库",
+      "sublabel": "AES-256-GCM BYOK",
+      "pos": [
+        770,
+        460
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/llm/providerSettings.ts",
+          "line": 19
+        }
+      ]
+    },
+    {
+      "id": "ssrf_gate",
+      "type": "security",
+      "label": "出站安全门",
+      "sublabel": "字面 Host · DNS 绑定",
+      "pos": [
+        770,
+        600
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/ssrfGuard.ts",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "id": "model_endpoint",
+      "type": "external",
+      "label": "上游模型端点",
+      "sublabel": "OpenAI 兼容 · 流式响应",
+      "pos": [
+        970,
+        600
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "apps/web/server/llm/openaiStream.ts",
+          "line": 40
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "墨舟单机宿主与回环数据面 (127.0.0.1 / Localhost)",
+      "wraps": [
+        "desktop_shell",
+        "workbench_ui",
+        "storage_adapter",
+        "api_gateway",
+        "session_auth",
+        "book_access",
+        "kernel",
+        "canon_store",
+        "pipeline",
+        "runtime",
+        "data_plane",
+        "ledger",
+        "agent_layer",
+        "context_compiler",
+        "quality_engine",
+        "runtime_area",
+        "doc_importer",
+        "recycle_store",
+        "flywheel",
+        "credential_vault",
+        "ssrf_gate"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "凭据与出站隔离区",
+      "wraps": [
+        "credential_vault",
+        "ssrf_gate"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "author-desktop",
+      "from": "author",
+      "to": "desktop_shell",
+      "label": "启动"
+    },
+    {
+      "id": "desktop-ui",
+      "from": "desktop_shell",
+      "to": "workbench_ui",
+      "label": "宿主渲染"
+    },
+    {
+      "id": "author-ui",
+      "from": "author",
+      "to": "workbench_ui",
+      "label": "创作操作",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-storage",
+      "from": "workbench_ui",
+      "to": "storage_adapter",
+      "label": "状态落盘"
+    },
+    {
+      "id": "ui-gateway",
+      "from": "workbench_ui",
+      "to": "api_gateway",
+      "label": "API 调用",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gateway-auth",
+      "from": "api_gateway",
+      "to": "session_auth",
+      "label": "会话校验",
+      "variant": "security"
+    },
+    {
+      "id": "gateway-book",
+      "from": "api_gateway",
+      "to": "book_access",
+      "label": "沙箱写锁",
+      "variant": "security"
+    },
+    {
+      "id": "gateway-agent",
+      "from": "api_gateway",
+      "to": "agent_layer",
+      "label": "工具调度"
+    },
+    {
+      "id": "gateway-recycle",
+      "from": "api_gateway",
+      "to": "recycle_store",
+      "label": "回收调度"
+    },
+    {
+      "id": "gateway-import",
+      "from": "api_gateway",
+      "to": "doc_importer",
+      "label": "导入分章"
+    },
+    {
+      "id": "gateway-pipeline",
+      "from": "api_gateway",
+      "to": "pipeline",
+      "label": "驱动会话",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pipeline-compile",
+      "from": "pipeline",
+      "to": "context_compiler",
+      "label": "compile"
+    },
+    {
+      "id": "pipeline-quality",
+      "from": "pipeline",
+      "to": "quality_engine",
+      "label": "review"
+    },
+    {
+      "id": "pipeline-flywheel",
+      "from": "pipeline",
+      "to": "flywheel",
+      "label": "record"
+    },
+    {
+      "id": "pipeline-runtime",
+      "from": "pipeline",
+      "to": "runtime",
+      "label": "draft",
+      "variant": "emphasis"
+    },
+    {
+      "id": "runtime-vault",
+      "from": "runtime",
+      "to": "credential_vault",
+      "label": "取凭据",
+      "variant": "security"
+    },
+    {
+      "id": "runtime-ssrf",
+      "from": "runtime",
+      "to": "ssrf_gate",
+      "label": "出站校验",
+      "variant": "security"
+    },
+    {
+      "id": "ssrf-endpoint",
+      "from": "ssrf_gate",
+      "to": "model_endpoint",
+      "label": "放行",
+      "variant": "security"
+    },
+    {
+      "id": "runtime-endpoint",
+      "from": "runtime",
+      "to": "model_endpoint",
+      "label": "流式生成",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pipeline-dataplane",
+      "from": "pipeline",
+      "to": "data_plane",
+      "label": "提交"
+    },
+    {
+      "id": "pipeline-ledger",
+      "from": "pipeline",
+      "to": "ledger",
+      "label": "发布事件"
+    },
+    {
+      "id": "dataplane-kernel",
+      "from": "data_plane",
+      "to": "kernel"
+    },
+    {
+      "id": "dataplane-ledger",
+      "from": "data_plane",
+      "to": "ledger",
+      "label": "直接追加"
+    },
+    {
+      "id": "dataplane-canon",
+      "from": "data_plane",
+      "to": "canon_store",
+      "label": "原子落盘",
+      "variant": "emphasis"
+    },
+    {
+      "id": "dataplane-runtimearea",
+      "from": "data_plane",
+      "to": "runtime_area",
+      "label": "运行产物"
+    },
+    {
+      "id": "agent-dataplane",
+      "from": "agent_layer",
+      "to": "data_plane",
+      "label": "受控读写"
+    },
+    {
+      "id": "importer-dataplane",
+      "from": "doc_importer",
+      "to": "data_plane",
+      "label": "分章写入"
+    },
+    {
+      "id": "recycle-runtimearea",
+      "from": "recycle_store",
+      "to": "runtime_area",
+      "label": "归档清理"
+    },
+    {
+      "id": "editor-canon",
+      "from": "external_editor",
+      "to": "canon_store",
+      "label": "直接改写",
+      "variant": "dashed"
+    },
+    {
+      "id": "editor-gateway",
+      "from": "external_editor",
+      "to": "api_gateway",
+      "label": "对账检出",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "主干：十步会话与前端状态解耦（已实现）",
+      "items": [
+        "十步词表固定为 prepare → compile → draft → review → user_edit → final_extract → continuity_gate → canon_proposal → commit → flywheel_record；跨生成、审查与作者动作的会话状态机，线性后继且出口结构性 fail-closed",
+        "一个 ChapterProductionSession 对应一章，V1 全局单飞：同时最多一个活动会话，别章窗口未闭合即拒绝开新卷；前进出口严格核检",
+        "前端状态层提炼 useBookSession、useAppNavigation、useAppOverlays 三个高内聚切片 Hook，彻底塌缩 App.tsx 散乱的 15 个 useState",
+        "统一 browserStorage 存储适配器集中 STORAGE_KEYS 字典，提供强类型泛型接口、JSON 容错与无痕/受限沙箱内存 Map 回退，彻底终结散落的裸调 localStorage"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "智能体工具层与文档导入分章（已实现）",
+      "items": [
+        "智能体工具注册表 ToolRegistry 接入 /api/tools.* 与 /api/skills.*，支持三档路径安全策略（file_read / file_write / file_manage）与 AgentToolboxPanel 交互",
+        "既有稿件导入引擎基于零三方依赖 DOCX OOXML 解包与 TXT/MD 正则分章，打通作品库与书架建书闭环（/api/library.import.doc）",
+        "工作区回收站 RecycleStore 接入 /api/recycle.* 与 RecycleBinModal，支持作品与章节软删除元数据记录、逆向还原与物理排空粉碎",
+        "桌面端基于 Electron 壳迁移（ADR-0037），主进程实现子进程 Node.js 生命周期管理、健康探测与优雅排空，并固化打包与完整性校验门禁"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "数据平面：双写事件账本与原子替换（已实现）",
+      "items": [
+        "任务事件经 PublishBus 发布（packages/runtime/src/eventBus.ts:129）；领域提交由数据平面直接追加同一账本（packages/data-plane/src/chapter.ts:18），卷压缩亦直接追加——「账本单口写入」不成立",
+        "同一账本承载两种行格式：任务事件行（带 schemaVersion / taskId / sequence 身份块）与平铺领域行；回读只取任务事件行，撕裂行跳过不阻断",
+        "落盘唯一出口是原子替换：同目录唯一临时文件 → 写全循环 → fsync → close → rename，rename 是唯一可见点（packages/data-plane/src/chapter.ts:18）",
+        "canon 与运行时区由 isCanonRelPath 划界：正文/设定/追踪是正典；.mozhou/ 下的 receipts、proposals、trash、accept-intents 非正典、不参与对账"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "回环边界、沙箱写锁与出站防线（已实现）",
+      "items": [
+        "每条 /api/ 请求先过 assertTrustedRequest：Host 必须解析为回环地址，否则 403 UNTRUSTED_HOST——公网/反代入口在边界上结构性关闭（apps/web/server/router.ts:6）",
+        "路由策略五类（public / account / book / local-native / payment-webhook）；未登记路径默认 403，hosted 模式下 local-native 端点同样 403",
+        "作品隔离三件套：数据根排他启动锁防多实例争夺、每书 FIFO 并发队列防脏写、书根 realpath 必须落在当前用户目录内且禁止符号链接穿出",
+        "凭据以 AES-256-GCM 加密落盘；生产或 hosted 环境缺 MOZHOU_SECRET_KEY 时启动即失败，不回退到源码可见常量",
+        "出站 SSRF 门按字面 host 判定私有/环回/保留网段并拒绝，三切片修复已补齐 DNS 绑定已验证地址，消除了旧版 DNS rebinding 盲区"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "本次架构审查观察（需使用者判断）",
+      "items": [
+        "部署面不一致（持续存在）：docker-compose.yml、Dockerfile、deploy/Caddyfile 都在树内，但 deploy/README.md 自述公网/hosted 路径当前不可用——容器仅映射宿主 127.0.0.1，反代后每个 /api/* 请求会被判 UNTRUSTED_HOST",
+        "历史决策记录表述存留：ADR-0023 仍保留「EventLedger 写入权 = publishEvent 单口」的历史断言，而源码实现确为双写模式；按规范已接受的 ADR 保持历史原貌，不随意涂改",
+        "真实商户支付与云同步仍属挂账：真实线上支付验签及配额结算代码已就绪（billingRoutes），但线上商户实收款项未接真实网关；/api/cloud-sync 返回 offline_ready",
+        "基线与工程卫生（HEAD 提交 285cdc9）：全仓 182 测试文件 1532 用例全绿，代码图谱 14268 节点 0 环，构建无报错；本图所有断言均已通过 HEAD 字节比对与机械门禁双重核验"
+      ]
+    }
+  ]
+}

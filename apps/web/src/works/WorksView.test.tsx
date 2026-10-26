@@ -86,7 +86,7 @@ describe('WorksView（我的作品）', () => {
     expect(view).toMatchSnapshot()
   })
 
-  it('未建书时呈现显式引导与前往工作台按钮', async () => {
+  it('未建书时呈现显式引导与前往工作台按钮，点击导入按钮可唤起 DocImportModal', async () => {
     const onGoToWorkbench = vi.fn()
     render(<WorksView root={null} onGoToWorkbench={onGoToWorkbench} />)
     expect(screen.getByTestId('works-empty')).toBeInTheDocument()
@@ -95,6 +95,42 @@ describe('WorksView（我的作品）', () => {
     const btn = screen.getByRole('button', { name: '前往工作台建书' })
     await userEvent.click(btn)
     expect(onGoToWorkbench).toHaveBeenCalled()
+
+    const importBtn = screen.getByTestId('works-import-doc-btn')
+    expect(importBtn).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    const recycleBtn = screen.getByTestId('works-recycle-bin-btn')
+    expect(recycleBtn).toBeInTheDocument()
+
+    await userEvent.click(recycleBtn)
+    expect(screen.getByTestId('recycle-bin-modal')).toBeInTheDocument()
+    expect(screen.getByText('工作区回收站')).toBeInTheDocument()
+  })
+
+  it('已建书时标题栏呈现回收站按钮与导入新文档按钮，点击可唤起对应弹窗', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okJson(MOCK_WORKS)))
+    render(<WorksView root="C:/tmp/fake-god" onGoToWorkbench={() => {}} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('works-overview')).toBeInTheDocument()
+    })
+
+    const recycleBtn = screen.getByTestId('works-recycle-bin-btn')
+    expect(recycleBtn).toBeInTheDocument()
+    await userEvent.click(recycleBtn)
+    expect(screen.getByTestId('recycle-bin-modal')).toBeInTheDocument()
+    expect(screen.getByText('工作区回收站')).toBeInTheDocument()
+
+    // 关闭回收站
+    await userEvent.click(screen.getByRole('button', { name: '关闭回收站' }))
+    expect(screen.queryByTestId('recycle-bin-modal')).toBeNull()
+
+    const importBtn = screen.getByRole('button', { name: '导入新文档' })
+    expect(importBtn).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    await userEvent.click(importBtn)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('读取失败显式报错（role=alert），不静默', async () => {

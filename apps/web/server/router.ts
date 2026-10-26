@@ -97,7 +97,7 @@ export class ApiRouter {
 
     // 3. 用户主体认证解析
     let principal: VerifiedPrincipal | null = null
-    if (policy !== 'public' && policy !== 'payment-webhook') {
+    if (policy !== 'public' && policy !== 'payment-webhook' && policy !== 'ops') {
       try {
         principal = await defaultSessionManager.verifyRequestSession(req)
       } catch {
@@ -113,7 +113,7 @@ export class ApiRouter {
         principal = { userId: 'local_user', email: 'local@mozhou.internal' }
       }
     } else {
-      // public 路由尝试提取可选身份
+      // public / payment-webhook / ops 路由不要求登录，尝试提取可选身份
       try {
         principal = await defaultSessionManager.verifyRequestSession(req)
       } catch {

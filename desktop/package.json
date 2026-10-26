@@ -1,0 +1,25 @@
+{
+  "name": "@mozhou/desktop",
+  "private": true,
+  "version": "0.3.0",
+  "description": "墨舟 Electron 桌面壳（Windows x64 先行）：窗口、托盘、单实例、稳定端口与就绪握手；服务端仍为独立官方 Node 子进程。",
+  "type": "module",
+  "main": "main.mjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "self-check": "node scripts/self-check.mjs",
+    "test:journey": "node scripts/verify-desktop-author-journey.mjs",
+    "package:dir": "node scripts/package-windows-electron.mjs --dir-only",
+    "package:windows": "node scripts/package-windows-electron.mjs",
+    "verify:package": "node scripts/verify-package-integrity.mjs",
+    "postinstall": "install-electron"
+  },
+  "devDependencies": {
+    "@electron/asar": "^4.3.1",
+    "electron": "44.7.0",
+    "playwright-core": "1.64.0"
+  }
+}

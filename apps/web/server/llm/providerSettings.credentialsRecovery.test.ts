@@ -182,4 +182,14 @@ describe('凭据文件不可读 · 显式失败而非 500/静默', () => {
     mkdirSync(settingsPath())
     expect(() => MANAGER.getMaskedSettings(undefined, {})).toThrow(ProviderCredentialsUnreadableError)
   })
+
+  it('认证标签被截短 ⇒ 视为不可读，不静默返回空配置', () => {
+    // 正确主密钥 + 结构合法，只把 16 字节 tag 截成 8 字节：
+    // 若解密端不钉死 authTagLength，这会成为「短标签也算认证通过」的入口。
+    const valid = encryptFixture(CURRENT_SECRET, JSON.stringify(CONFIG))
+    const [ivHex, tagHex, dataHex] = valid.split(':')
+    writeFileSync(settingsPath(), `${ivHex}:${(tagHex ?? '').slice(0, 16)}:${dataHex}`)
+
+    expect(() => MANAGER.getSettings()).toThrow(ProviderCredentialsUnreadableError)
+  })
 })

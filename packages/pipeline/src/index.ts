@@ -53,6 +53,7 @@ export {
   GateNotPassedError,
   GlobalSingleFlightError,
   HardConflictUnresolvedError,
+  MechanicalGateNotPassedError,
   QualityReviewNotPassError,
   QualityReworkLimitExceededError,
   QualityReworkNotDrivenError,

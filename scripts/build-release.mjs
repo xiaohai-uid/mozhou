@@ -172,7 +172,40 @@ const dockerDir = join(artifactsDir, 'docker-bundle')
 const dockerRuntimeDir = join(dockerDir, bundleName)
 mkdirSync(dockerDir, { recursive: true })
 cpSync(runtimeDir, dockerRuntimeDir, { recursive: true })
-writeFileSync(join(dockerDir, 'Dockerfile'), `FROM node:22.23.2-bookworm-slim\nWORKDIR /app\nENV NODE_ENV=production\nENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip\nENV PORT=5173\nENV HOST=0.0.0.0\nENV MOZHOU_DATA_ROOT=/data\nRUN npm install -g pnpm@9.15.0 && mkdir -p /data && chown node:node /data\nCOPY --chown=node:node ${bundleName}/ /app/\nRUN pnpm install --prod --frozen-lockfile\nUSER node\nEXPOSE 5173\nCMD ["node", "apps/web/dist-server/productionServer.js"]\n`, 'utf8')
+// 发布包 Dockerfile 必须与仓库根 Dockerfile 同基线：digest 固定 node 22.23.3 /
+// Debian 13 trixie。旧版这里钉的是 node:22.23.2-bookworm-slim，并在运行层
+// `npm install -g pnpm`，于是 bookworm 的 zlib1g 危急项与 npm 自带的 HIGH
+// 仍随发行包发给用户；只改根 Dockerfile 而不改这里等于没修。
+// 同步要求：换基线 digest 时两处一起改；运行层不得再安装 npm/pnpm。
+const releaseDockerfile = `FROM node:22.23.3-trixie-slim@sha256:28d03803f09ba76560e273af33beb7eda4ed68fa0698bc9bd15e9a6e35693923 AS builder
+WORKDIR /app
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+RUN npm install -g pnpm@9.15.0
+COPY ${bundleName}/ /app/
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @mozhou/web deploy --prod /out \\
+ && rm -rf /out/src /out/server /out/shared /out/prototypes /out/release-artifacts /out/public \\
+           /out/index.html /out/vite.config.ts /out/vitest.config.ts \\
+           /out/tsconfig.json /out/tsconfig.server.json \\
+           /out/DESIGN.md /out/MOBILE_UI_BRIEF.md /out/README.md \\
+           /out/.mimosa /out/.mozhou_data
+
+FROM node:22.23.3-trixie-slim@sha256:28d03803f09ba76560e273af33beb7eda4ed68fa0698bc9bd15e9a6e35693923 AS runner
+WORKDIR /app
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \\
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+ENV NODE_ENV=production
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+ENV PORT=5173
+ENV HOST=0.0.0.0
+ENV MOZHOU_DATA_ROOT=/data
+RUN mkdir -p /data && chown node:node /data
+COPY --chown=node:node --from=builder /out /app
+USER node
+EXPOSE 5173
+CMD ["node", "dist-server/productionServer.js"]
+`
+writeFileSync(join(dockerDir, 'Dockerfile'), releaseDockerfile, 'utf8')
 writeFileSync(join(dockerDir, 'docker-compose.yml'), `services:\n  mozhou:\n    build: .\n    restart: unless-stopped\n    ports:\n      - "127.0.0.1:\${MOZHOU_PORT:-5173}:5173"\n    environment:\n      NODE_ENV: production\n      ONNXRUNTIME_NODE_INSTALL_CUDA: skip\n      PORT: 5173\n      HOST: 0.0.0.0\n      MOZHOU_DATA_ROOT: /data\n      MOZHOU_SECRET_KEY: \${MOZHOU_SECRET_KEY:?MOZHOU_SECRET_KEY is required - generate one with openssl rand -base64 48}\n      MOZHOU_API_KEY: \${MOZHOU_API_KEY:-}\n      DEEPSEEK_API_KEY: \${DEEPSEEK_API_KEY:-}\n      OPENAI_API_KEY: \${OPENAI_API_KEY:-}\n    volumes:\n      - mozhou-data:/data\n    healthcheck:\n      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]\n      interval: 30s\n      timeout: 5s\n      retries: 3\n      start_period: 20s\nvolumes:\n  mozhou-data:\n`, 'utf8')
 writeFileSync(join(dockerDir, 'README.md'), '# 墨舟 Docker 本地发行包\n\n先设置必填的凭据加密主密钥，再启动：\n\n```bash\nexport MOZHOU_SECRET_KEY="$(openssl rand -base64 48)"\ndocker compose up --build -d\n```\n\n宿主端默认只监听 127.0.0.1。书稿持久化在命名卷 `mozhou-data`（挂载于容器 `/data`）；\n`docker compose down` 不会删除它，仅 `docker compose down -v` 会。\n', 'utf8')
 

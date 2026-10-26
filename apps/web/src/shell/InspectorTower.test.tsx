@@ -1,5 +1,5 @@
 /**
- * 检视塔组件测试（实现票 T40）：四 tab 骨架 + 切换 + 显式占位纪律。
+ * 检视塔组件测试（实现票 T40；#119 增补章后回顾 tab）：五 tab 骨架 + 切换 + 显式占位纪律。
  */
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -9,6 +9,7 @@ import type { InspectorTabId } from './InspectorTower'
 
 const PANELS: Record<InspectorTabId, string> = {
   quality: '质量门面板内容',
+  'chapter-review': '章后回顾面板内容',
   'story-brain': 'Story Brain 面板内容',
   'context-receipt': '装配看板面板内容',
   'change-matrix': '变更矩阵面板内容',
@@ -27,14 +28,15 @@ function renderTower(activeTab: InspectorTabId, onTabChange: (tab: InspectorTabI
 }
 
 describe('InspectorTower', () => {
-  it('四 tab 骨架齐备，激活 tab 与对应面板可见（CSS 由 .panel.active 控制）', () => {
+  it('五 tab 骨架齐备，激活 tab 与对应面板可见（CSS 由 .panel.active 控制）', () => {
     renderTower('quality', () => {})
     expect(screen.getByRole('tab', { name: '质量门' }).className).toContain('active')
+    expect(screen.getByRole('tab', { name: '章后回顾' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Story Brain' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '装配看板' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '变更矩阵' })).toBeInTheDocument()
     const panels = document.querySelectorAll('.panel')
-    expect(panels).toHaveLength(4)
+    expect(panels).toHaveLength(5)
     expect(document.querySelector('[data-panel="quality"]')?.className).toContain('active')
     expect(document.querySelector('[data-panel="quality"]')?.textContent).toContain('质量门面板内容')
   })

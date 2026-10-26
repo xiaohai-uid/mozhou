@@ -66,6 +66,10 @@ _Avoid_: Memory item、context note、setting entry
 从 AI 生成草稿正文中提取、尚未验证的事实断言，等待用户验证或章节提交。
 _Avoid_: Canon、true fact、memory。**中文一律写"候选事实"，不得只写"候选"**
 
+**候选事实账本 (Candidate Fact Ledger)**:
+书内运行时区中存放候选事实及其决断状态的追加式存储；每条候选绑定来源章节与正文版本，作者确认/拒绝/编辑决断后状态单向演进，拒绝与作废记录永久保留，同章重新提取作废旧现场。
+_Avoid_: 事实账本（省略"候选"）、事件账本（那是管线账本事件）、knowledge base、fact table
+
 **候选 (Candidate)**:
 **必须带限定词。** 本仓有三个候选：**候选草稿**（未经采纳的生成产物）、**候选事实**（见上条）、**候选条目**（上下文装配的召回候选）。裸用"候选"即为错误。
 _Avoid_: 全部（裸用）
@@ -495,7 +499,7 @@ _Avoid_: 全部（裸用指登录态或写作对话）
 ## 已知存量违规（冻结层不追改，不阻塞使用）
 
 1. **9 个 `.scratch/mozhou-deepening-20260928/issues/*.md` 带 `status` frontmatter**（8 个 `ready-for-agent` + 1 个 `wontfix`），其余 65 个本地规格文档**没有**该字段，74 个中仅 32 个进 git。按 Part 2 §2.1，状态只应存在于 GitHub 议题，故这 9 个字段无权威。该批次已冻结（见 ADR-0034）。
-2. **11 处"闸门"**。除本表、`docs/term-map.md` 与 `scripts/verify-glossary.mjs`（三处都是登记/检测该词本身）外，其余全部在冻结的历史档案内：`docs/adr/CODE-DUPLICATION-INVENTORY.md` ×3、`audit-2026-10-03/01-baseline-and-graph-gate.md` ×3、`docs/research/t51-grill-learner-protocols.md`、`docs/novel-four-project-acceptance-matrix-2026-08-16.md`、`docs/w3-operations-implementation-report-2026-10-05.md`（引述禁令本身）、`audit-2026-10-03/logs/014-AGENTS-md-diff.txt`、`PROJECT-MAP.md`。`packages/context-compiler/src/compile.ts` 的"硬隔离闸"已于 2026-10-05 改为"硬隔离门"。
+2. **11 处"闸门"**。除本表、`docs/term-map.md` 与 `scripts/verify-glossary.mjs`（三处都是登记/检测该词本身）外，其余全部在冻结的历史档案内：`docs/adr/CODE-DUPLICATION-INVENTORY.md` ×3、`docs/archive/2026-10/audit-2026-10-03/01-baseline-and-graph-gate.md` ×3、`docs/research/t51-grill-learner-protocols.md`、`docs/archive/2026-08/novel-four-project-acceptance-matrix-2026-08-16.md`、`docs/archive/2026-10/w3-operations-implementation-report-2026-10-05.md`（引述禁令本身）、`docs/archive/2026-10/audit-2026-10-03/logs/014-AGENTS-md-diff.txt`、`PROJECT-MAP.md`。`packages/context-compiler/src/compile.ts` 的"硬隔离闸"已于 2026-10-05 改为"硬隔离门"。
 3. **三套执行跟踪 ID 方案并存**：本地 `NN-<slug>`、speckit `[ID] [P?]`、GitHub `#31`。规范只剩 GitHub `#31`（议题）。
 4. **两套"造什么"权威**：`AGENTS.md` §1（User journeys define product scope）与 `specs/*/spec.md`（User Scenarios）互不引用。规范权威是 `AGENTS.md` §1。
-5. **冻结层的「门禁」「工单」「数据平面」存量。** 2026-10-07 完成活跃层清扫：代码注释与测试标题、`README.md`、包 README、`scripts/`、`.github/workflows/`、`docs/gates.md`、`eslint.config.js`；同时把 Part 3 禁用词接进 `pnpm run check:glossary`（只扫活跃层，范围见 `scripts/verify-glossary.mjs` §7）。剩余存量全部在冻结的历史档案（`docs/adr/`、`docs/changes/`、`docs/specs/`、`docs/handoff/`、`docs/audit/`、`docs/research/`、`docs/spikes/`、`audit-2026-10-03/`、`handoff-results/`、`.scratch/`、`PROJECT-MAP.md`、根级历史审计报告）与生成物（`apps/web/src/code-graph/codeGraphData.*`、`docs/term-map.md`）中，按 §0 规则 6 不追改。
+5. **冻结层的「门禁」「工单」「数据平面」存量。** 2026-10-07 完成活跃层清扫：代码注释与测试标题、`README.md`、包 README、`scripts/`、`.github/workflows/`、`docs/gates.md`、`eslint.config.js`；同时把 Part 3 禁用词接进 `pnpm run check:glossary`（只扫活跃层，范围见 `scripts/verify-glossary.mjs` §7）。剩余存量全部在冻结的历史档案（`docs/adr/`、`docs/changes/`、`docs/specs/`、`docs/handoff/`、`docs/audit/`、`docs/research/`、`docs/spikes/`、`docs/archive/2026-10/audit-2026-10-03/`、`handoff-results/`、`.scratch/`、`PROJECT-MAP.md`、根级历史审计报告）与生成物（`apps/web/src/code-graph/codeGraphData.*`、`docs/term-map.md`）中，按 §0 规则 6 不追改。

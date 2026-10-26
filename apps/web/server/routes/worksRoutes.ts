@@ -6,14 +6,18 @@ import { join, resolve } from 'node:path'
 import {
   withBook,
   withStrictBook,
-  atomicWriteFileSync,
+  countTaskRecords,
   createBook,
   listImpactRecords,
-  proseChapterPath,
-  readProseChapter,
-  renderProseChapter,
+  listTaskRecords,
   runTraversal,
   scanLibrary,
+  importDocumentToBook,
+  parseDocumentToChapters,
+  ImportParseError,
+  BookDirectoryNotEmptyError,
+  type DocumentFormat,
+  type SplitOptions,
 } from '@mozhou/data-plane'
 import { withBookWriteLock } from '../bookAccess.js'
 import { canonicalJson, listReceiptIds, loadReceipt } from '@mozhou/context-compiler'
@@ -165,6 +169,7 @@ export const worksRoutes: RouteHandler = async (req, res, { path, body, json, bo
         draftChapters: overview.draftCount,
         totalWords: overview.totalWordCount,
         entityCount: canon.entityCards.length,
+        taskCount: countTaskRecords(root),
       },
       chapters: overview.chapters,
       outlineNodes: canon.outlineNodes.map((n) => ({
@@ -227,8 +232,10 @@ export const worksRoutes: RouteHandler = async (req, res, { path, body, json, bo
       ok: true,
       totalEvents: ledger.length,
       totalTraversals: traversals.length,
+      taskCount: countTaskRecords(root),
       events,
       traversals: [...traversals].reverse(),
+      taskRecords: listTaskRecords(root),
     })
     return true
   }
@@ -281,53 +288,125 @@ export const worksRoutes: RouteHandler = async (req, res, { path, body, json, bo
     return true
   }
 
-  if (path === '/api/library.import') {
+  if (path === '/api/library.import' || path === '/api/library.import.doc') {
     const rawParent = typeof body['parentDir'] === 'string' ? body['parentDir'] : null
     const title = typeof body['title'] === 'string' ? body['title'].trim() : ''
     const initialBody = typeof body['initialBody'] === 'string' ? body['initialBody'].trim() : undefined
+    const content = typeof body['content'] === 'string' ? body['content'] : undefined
+    const fileBase64 = typeof body['fileBase64'] === 'string' ? body['fileBase64'] : undefined
+    const format = typeof body['format'] === 'string' ? (body['format'] as DocumentFormat) : undefined
+    const splitOptions =
+      typeof body['splitOptions'] === 'object' && body['splitOptions'] !== null
+        ? (body['splitOptions'] as SplitOptions)
+        : undefined
+    const isPreview = body['previewOnly'] === true || body['action'] === 'preview'
+
+    if (isPreview) {
+      try {
+        let buf: Buffer | undefined
+        if (fileBase64) {
+          buf = Buffer.from(fileBase64, 'base64')
+        }
+        const textContent = content ?? initialBody
+        const chapters = parseDocumentToChapters({
+          content: textContent,
+          buffer: buf,
+          format,
+          bookTitle: title || undefined,
+          splitOptions,
+        })
+        json(200, {
+          ok: true,
+          preview: true,
+          chapterCount: chapters.length,
+          chapters: chapters.map((ch) => ({
+            chapterIndex: ch.chapterIndex,
+            title: ch.title,
+            wordCount: ch.wordCount,
+            preview: ch.content.slice(0, 200),
+          })),
+        })
+      } catch (error) {
+        json(400, { ok: false, error: (error as Error).message })
+      }
+      return true
+    }
+
     if (rawParent === null || title.length === 0) {
       json(400, { ok: false, error: 'parentDir and non-empty title required' })
       return true
     }
-    const { targetDir } = assertSafeParentDirectory(rawParent, sanitizeDirName(title))
-    const targetRoot = targetDir ?? join(rawParent, sanitizeDirName(title))
-    // W2-3：建书是书稿写入。书根此刻尚不存在（canonicalBookKey 需要 realpath），
-    // 故以**已存在的父目录**为锁键：同一父目录下的并发建书被串行化，
-    // 建书后紧随的建章草稿写在同一锁内。
+    const { parentDir, targetDir } = assertSafeParentDirectory(rawParent, sanitizeDirName(title))
+    const targetRoot = targetDir ?? join(parentDir, sanitizeDirName(title))
+
     try {
-      const result = await withBookWriteLock(resolve(rawParent), () => {
-        const created = createBook({ dir: targetRoot, title })
-        if (initialBody !== undefined && initialBody.length > 0) {
-          try {
-            withStrictBook(created.root, (plane) => {
-              plane.createChapterDraft({ chapterIndex: 1, title: '第一章' })
-              const scan = readProseChapter(created.root, proseChapterPath(1))
-              const updatedContent = renderProseChapter({
-                mozhouId: scan.mozhouId,
-                revision: scan.revision,
-                chapterIndex: 1,
-                phase: 'draft',
-                body: `# 第一章\n\n${initialBody}\n`,
-              })
-              const absPath = join(created.root, proseChapterPath(1))
-              atomicWriteFileSync(absPath, updatedContent)
-            })
-          } catch {
-            // 容错处理
-          }
-        }
-        return created
+      let buf: Buffer | undefined
+      if (fileBase64) {
+        buf = Buffer.from(fileBase64, 'base64')
+      }
+      const textContent = content ?? initialBody
+
+      if (textContent !== undefined || buf !== undefined || format !== undefined) {
+        const failAtChapter = typeof body['_failAtChapter'] === 'number' ? body['_failAtChapter'] : undefined
+        const testHook = failAtChapter !== undefined
+          ? (chIndex: number) => {
+              if (chIndex === failAtChapter) {
+                throw new Error(`SIMULATED_IMPORT_FAILURE_AT_CHAPTER_${failAtChapter}`)
+              }
+            }
+          : undefined
+
+        const result = await withBookWriteLock(resolve(parentDir), () => {
+          return importDocumentToBook({
+            parentDir,
+            title,
+            targetDir: targetRoot,
+            content: textContent,
+            buffer: buf,
+            format,
+            splitOptions,
+            _testHookBeforeChapterDraft: testHook,
+          })
+        }, { timeoutMs: 30_000 })
+
+        json(200, {
+          ok: true,
+          root: result.root,
+          bookId: result.bookId,
+          title: result.title,
+          chapterCount: result.chapterCount,
+          chapters: result.chapters,
+        })
+        return true
+      }
+
+      const result = await withBookWriteLock(resolve(parentDir), () => {
+        return createBook({ dir: targetRoot, title })
       }, { timeoutMs: 30_000 })
+
       json(200, {
         ok: true,
         root: result.root,
         bookId: result.book.id,
         title: result.book.title,
+        chapterCount: 0,
+        chapters: [],
       })
+      return true
     } catch (error) {
-      json(409, { ok: false, error: (error as Error).message })
+      if (error instanceof ImportParseError) {
+        json(400, { ok: false, error: (error as Error).message })
+      } else if (
+        error instanceof BookDirectoryNotEmptyError ||
+        (error as Error).message.includes('not empty') ||
+        (error as Error).message.includes('exists')
+      ) {
+        json(409, { ok: false, error: (error as Error).message })
+      } else {
+        json(409, { ok: false, error: (error as Error).message })
+      }
+      return true
     }
-    return true
   }
 
   return false

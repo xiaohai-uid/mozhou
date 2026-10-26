@@ -688,3 +688,69 @@ describe('Draft 运行态文件原子落盘', () => {
   });
 });
 
+/**
+ * D2：引擎超时不只是放弃等待，还要把中止信号传到 binding 与传输层。
+ * 迟到 chunk 必须在写盘前被 aborted() 拦住；结果按 outcome_unknown 收口。
+ */
+describe('D2 引擎超时中止在途 provider', () => {
+  it('超时触发 binding signal 中止，迟到 chunk 不落候选', async () => {
+    const { root } = hermeticBook();
+    const engine = new RuntimeEngine({ bus: new PublishBus(), ctx: { root }, newTaskRef: () => 'gen_d2_timeout' });
+    engine.registerCapability({
+      taskType: 'CHAPTER_DRAFTING',
+      providerId: 'deepseek',
+      providerVersion: '1.0.0',
+      failurePolicy: { timeoutMs: 200, fallbackProviderIds: [] },
+    });
+
+    let observedSignal: AbortSignal | undefined;
+    let sawAbort = false;
+    let releaseLate: (() => void) | undefined;
+    const stream = (signal?: AbortSignal) =>
+      (async function* () {
+        observedSignal = signal;
+        signal?.addEventListener(
+          'abort',
+          () => {
+            sawAbort = true;
+            releaseLate?.();
+          },
+          { once: true },
+        );
+        await Promise.resolve();
+        yield '第一段。';
+        await new Promise<void>((resolve) => {
+          releaseLate = resolve;
+          if (signal?.aborted) resolve();
+        });
+        yield '迟到段落。';
+      })();
+
+    const candidate = candidateContext(root, 7);
+    engine.registerProviderBinding(
+      'deepseek',
+      makeDraftProviderBinding({
+        bookRoot: root,
+        chapterIndex: 7,
+        provider: 'deepseek',
+        mode: 'generate',
+        stream,
+        candidate,
+      }),
+    );
+
+    const outcome = await runDraftStep({
+      engine,
+      bookRoot: root,
+      chapterIndex: 7,
+      packet: PACKET,
+      recipe: RECIPE,
+    });
+
+    expect(outcome.outcome).toBe('failed_terminal');
+    expect(observedSignal?.aborted).toBe(true);
+    expect(sawAbort).toBe(true);
+    expect(readCandidateText(root, candidate)).toBe('第一段。');
+  });
+});
+

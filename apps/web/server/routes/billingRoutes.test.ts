@@ -24,6 +24,7 @@ vi.hoisted(() => {
     'WECHAT_PLATFORM_CERT',
     'ALIPAY_APP_ID',
     'ALIPAY_PUBLIC_KEY',
+    'MOZHOU_OPS_TOKEN',
   ]) {
     delete process.env[key]
   }
@@ -288,7 +289,63 @@ describe('订单与支付回调路由 (T14)', () => {
     expect(updated?.state).not.toBe('paid')
   })
 
-  it('退款处理：POST /api/billing/orders/refund 变更状态为 refunded', async () => {
+  it('退款凭据校验：未配置 MOZHOU_OPS_TOKEN 503 fail-closed，令牌不符 401', async () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-refund-gate-'))
+    tempDirs.push(dataRoot)
+    defaultBookAccessManager.setDataRoot(dataRoot)
+    defaultBillingStore.setDatabasePath(join(dataRoot, 'billing.sqlite'))
+
+    const base = await listen()
+    const order = defaultBillingStore.createOrder({
+      userId: 'usr_refund_gate',
+      planId: 'pro_monthly',
+      channel: 'wechat',
+      idempotencyKey: 'refund_gate_k1',
+    })
+    defaultBillingStore.processPaymentNotification({
+      event: {
+        eventId: 'evt_wx_ref_gate',
+        channel: 'wechat',
+        orderId: order.orderId,
+        eventType: 'TRANSACTION.SUCCESS',
+        rawPayload: '{}',
+        receivedAt: new Date().toISOString(),
+      },
+      providerTransactionId: 'wx_tx_ref_gate',
+      paidAmountFen: 1900,
+      status: 'SUCCESS',
+    })
+
+    try {
+      // 1. 未配置运营凭据 → 503 fail-closed（即使本地模式带默认主体也不放行）
+      const resNoConfig = await fetch(`${base}/api/billing/orders/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.orderId, amountFen: 1900 }),
+      })
+      expect(resNoConfig.status).toBe(503)
+      const noConfigData = (await resNoConfig.json()) as { code: string }
+      expect(noConfigData.code).toBe('REFUND_OPS_NOT_CONFIGURED')
+
+      // 2. 已配置但令牌不符 → 401
+      process.env['MOZHOU_OPS_TOKEN'] = 'ops_real_token'
+      const resWrongToken = await fetch(`${base}/api/billing/orders/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ops_wrong_token' },
+        body: JSON.stringify({ orderId: order.orderId, amountFen: 1900 }),
+      })
+      expect(resWrongToken.status).toBe(401)
+      const wrongData = (await resWrongToken.json()) as { code: string }
+      expect(wrongData.code).toBe('REFUND_UNAUTHORIZED')
+
+      // 3. 订单状态未被改动
+      expect(defaultBillingStore.getOrder(order.orderId)?.state).toBe('paid')
+    } finally {
+      delete process.env['MOZHOU_OPS_TOKEN']
+    }
+  })
+
+  it('退款处理：携带运营令牌 POST /api/billing/orders/refund 变更状态为 refunded', async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), 'mozhou-refund-route-'))
     tempDirs.push(dataRoot)
     defaultBookAccessManager.setDataRoot(dataRoot)
@@ -316,17 +373,22 @@ describe('订单与支付回调路由 (T14)', () => {
       status: 'SUCCESS',
     })
 
-    const resRefund = await fetch(`${base}/api/billing/orders/refund`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: order.orderId,
-        amountFen: 1900,
-      }),
-    })
-    expect(resRefund.status).toBe(200)
-    const data = (await resRefund.json()) as { ok: boolean; order: { state: string } }
-    expect(data.ok).toBe(true)
-    expect(data.order.state).toBe('refunded')
+    process.env['MOZHOU_OPS_TOKEN'] = 'ops_test_token'
+    try {
+      const resRefund = await fetch(`${base}/api/billing/orders/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ops_test_token' },
+        body: JSON.stringify({
+          orderId: order.orderId,
+          amountFen: 1900,
+        }),
+      })
+      expect(resRefund.status).toBe(200)
+      const data = (await resRefund.json()) as { ok: boolean; order: { state: string } }
+      expect(data.ok).toBe(true)
+      expect(data.order.state).toBe('refunded')
+    } finally {
+      delete process.env['MOZHOU_OPS_TOKEN']
+    }
   })
 })

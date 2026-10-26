@@ -5,17 +5,21 @@
  * host 的私有/保留判定已抽到 `../ssrfGuard.js`（与 LLM 出站共用同一实现，避免两侧
  * 网段清单再次漂移）。本文件只保留爬虫侧策略：协议白名单、域名后缀过滤、重定向逐跳复检。
  *
- * 边界声明（不要误读为已修复）：`isSafePublicUrl` 只看 URL 里的**字面 host**，
- * 不做 DNS 解析。公网域名解析到私网地址（DNS rebinding）本函数无法识别，
- * 防护必须落在发起请求的那一层——连接前解析域名并二次校验解析结果，
- * 或按解析后的 IP 直连并禁止重定向到私网（本文件的重定向已逐跳复检字面 host，
- * 但仍不覆盖域名解析结果）。
+ * DNS rebinding（已修）：`isSafePublicUrl` 只看 URL 里的**字面 host**；公网域名解析到
+ * 私网地址本函数无法识别。因此 `fetchText` 在每跳发请求前**解析并校验全部地址**，
+ * 再用 `net/pinnedHttp` 把连接固定到同一份已验证结果（lookup 注入），
+ * 使「校验用的解析结果」与「实际连接的解析结果」同源；Host/SNI/证书仍按原域名。
  */
+import { isIP } from 'node:net'
 import {
   extractEmbeddedIpv4,
   isPrivateOrReservedIpv4,
   isPrivateOrReservedIpv6,
+  normalizeAddress,
 } from '../ssrfGuard.js'
+import { pinnedRequest, type PinnedAddress } from '../net/pinnedHttp.js'
+import { defaultAddressLookup, resolvePublicAddresses, type AddressLookup } from '../net/publicTarget.js'
+import { abortReason } from '../net/abortWait.js'
 
 const DEFAULT_TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 3
@@ -65,11 +69,38 @@ export function isSafePublicUrl(urlString: string): boolean {
   }
 }
 
+/** fetchText 的注入缝（**仅测试用**）：DNS 与传输缺省走 Node DNS / pinnedRequest。 */
+export interface FetchTextDeps {
+  readonly lookupAll?: AddressLookup | undefined
+  readonly request?: typeof pinnedRequest | undefined
+}
+
+/**
+ * 逐跳的地址校验（爬虫策略层）：字面 host 预检 + 本机/私有后缀过滤，再交给共享内核
+ * 解析并逐条校验全部地址（`net/publicTarget.resolvePublicAddresses`）。
+ * 字面 IP 端点返回空数组（字面判定已由 isSafePublicUrl 完成，无需 lookup 注入）。
+ */
+async function resolveVerifiedTarget(parsed: URL, lookupAll: AddressLookup, signal: AbortSignal): Promise<readonly PinnedAddress[]> {
+  const hostname = normalizeAddress(parsed.hostname)
+  if (isIP(hostname) !== 0) return []
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan')
+  ) {
+    throw new Error('SECURITY_REJECT: 目标域名为本机/私有后缀，已被安全策略拦截')
+  }
+  return await resolvePublicAddresses(hostname, lookupAll, signal)
+}
+
 export async function fetchText(
   url: string,
   headers: Record<string, string>,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   redirectCount = 0,
+  deps?: FetchTextDeps,
 ): Promise<{ ok: boolean; status: number; body: string; error?: string }> {
   if (!isSafePublicUrl(url)) {
     return {
@@ -80,13 +111,22 @@ export async function fetchText(
     }
   }
 
+  const lookupAll = deps?.lookupAll ?? defaultAddressLookup
+  const request = deps?.request ?? pinnedRequest
   const ctrl = new AbortController()
+  const deadline = Date.now() + timeoutMs
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const response = await fetch(url, {
+    const parsed = new URL(url)
+    // 字面 host 之外再解析校验全部地址，并把连接固定到同一份结果（防 DNS rebinding）。
+    // 每一跳（含重定向目标）都走这一步。
+    const addresses = await resolveVerifiedTarget(parsed, lookupAll, ctrl.signal)
+    const response = await request(parsed, {
+      method: 'GET',
       headers,
       signal: ctrl.signal,
-      redirect: 'manual', // 手动处理重定向，严格重新校验目标 Location 防 SSRF 绕过
+      // 重定向不自动跟随（与 fetch 的 redirect:'manual' 同语义），逐跳重新校验
+      ...(addresses.length === 0 ? {} : { addresses }),
     })
 
     // 处理 3xx 重定向
@@ -104,7 +144,7 @@ export async function fetchText(
           error: 'REDIRECT_LIMIT_EXCEEDED: 超过最大重定向次数限制',
         }
       }
-      const location = response.headers.get('Location')
+      const location = response.headers.get('location')
       if (!location) {
         return {
           ok: false,
@@ -122,11 +162,21 @@ export async function fetchText(
           error: 'SECURITY_REJECT: 重定向目标为私有/非安全地址，已被安全策略拦截',
         }
       }
-      return fetchText(nextUrl, headers, timeoutMs, redirectCount + 1)
+      // 跳转前释放当前连接；仅同 origin 保留凭据，跨 origin 不传播敏感请求头。
+      ctrl.abort()
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0) throw abortReason(ctrl.signal)
+      const sameOrigin = new URL(nextUrl).origin === parsed.origin
+      const nextHeaders = sameOrigin ? headers : Object.fromEntries(
+        Object.entries(headers).filter(([name]) => ![
+          'authorization', 'proxy-authorization', 'cookie', 'cookie2', 'x-api-key', 'api-key',
+        ].includes(name.toLowerCase())),
+      )
+      return await fetchText(nextUrl, nextHeaders, remainingMs, redirectCount + 1, deps)
     }
 
     const body = await response.text()
-    return { ok: response.ok, status: response.status ?? 0, body }
+    return { ok: response.ok, status: response.status, body }
   } catch (error) {
     return {
       ok: false,
@@ -136,6 +186,7 @@ export async function fetchText(
     }
   } finally {
     clearTimeout(timer)
+    ctrl.abort() // 释放本跳连接
   }
 }
 
