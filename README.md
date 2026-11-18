@@ -4,6 +4,8 @@
 
 ---
 
+**第一次试用墨舟**　想用现成包，可从 [v0.1.1 Release](https://github.com/xiaohai-uid/mozhou/releases/tag/v0.1.1) 下载 `mozhou-v0.1.1-local-runtime.tar.gz` 和同页的 `SHA256SUMS.txt`。想体验本文描述的 v0.3.0，请从当前源码按[用户指南](docs/user-guide.md)安装。首次启动后跟随建书向导创建一本测试作品；真实 AI 写作需要配置自己的模型 Key。
+
 ## 📌 版本声明与当前状态
 
 当前发布版本定位为 **技术预览版 (Technical Preview / v0.3.0)**（版本号以 `package.json` 为唯一事实来源）：
@@ -43,11 +45,11 @@
 - **`mozhou-v<版本>-docker.tar.gz`**：本地 Docker 发行包（解压后先设 `MOZHOU_SECRET_KEY` 再 `docker compose up`）；
 - Release 同时提供 **SPDX SBOM** 与 **SHA256SUMS.txt** 用于供应链校验。
 
-源码运行时服务默认地址为 **`http://127.0.0.1:5173`**。Tauri 原生安装与代码签名仍是独立发布面；普通 Windows 用户请使用下方的本地安装器。
+源码运行时服务默认地址为 **`http://127.0.0.1:5173`**。Tauri 原生安装与代码签名仍是独立发布面；需要制作 Windows 安装包的开发者可使用下方的本地构建方式。
 
 ### 方式二：Windows 本地安装器（普通用户）
 
-当前工作分支已提供无需预装 Node.js、pnpm 或开发工具的 Windows x64 安装器：
+开发者可以在本地构建 Windows x64 安装器。生成的安装包内置运行时，用户机器无需预装 Node.js 或 pnpm：
 
 - 构建产物：`release-artifacts/MoZhou-0.3.0-windows-x64-setup.exe`；
 - 安装范围：当前用户的 `%LOCALAPPDATA%\Programs\MoZhou`，不需要管理员权限；
